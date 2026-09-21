@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_STATE_DIGEST_H
 
 #include <cstdint>
+#include <cstring>
 
 namespace downwell {
 
@@ -23,6 +24,13 @@ public:
     void addU64(std::uint64_t value) {
         for (int shift = 0; shift < 64; shift += 8)
             addByte(static_cast<std::uint8_t>(value >> shift));
+    }
+
+    void addF32(float value) {
+        std::uint32_t bits;
+        static_assert(sizeof(bits) == sizeof(value), "32-bit float required");
+        std::memcpy(&bits, &value, sizeof(bits));
+        addU32(bits);
     }
 
     std::uint64_t value() const { return value_; }

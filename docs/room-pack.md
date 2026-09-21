@@ -72,3 +72,10 @@ overflow-safe total size, and every room/layer slice before any view is exposed.
 Tests cover malformed synthetic packs and also open the complete locally
 generated payload, confirming the audited totals and the `rmInit`/`rmMenu`
 creation-order anchors.
+
+`PackedRoomLoader` is the bounded bridge from these decoded views to
+`RoomLoader`. It resolves each instance's unique layer membership and transfers
+identity, position, scale, rotation, image state, creation-code references,
+persistence, layer ID, and depth into native instance storage. A missing or
+duplicate layer membership rejects the complete room before runtime state is
+changed.

@@ -46,6 +46,8 @@ void testRoomTransitionKeepsPersistentInstances() {
     instances.create(1, 10, 7, true);
     instances.create(2, 20, 7, false);
     instances.create(3, 30, 7, true);
+    instances.find(3)->x = 44;
+    instances.find(3)->depth = -100;
     instances.find(3)->alarms.set(4, 12);
 
     instances.enterRoom(20);
@@ -56,6 +58,8 @@ void testRoomTransitionKeepsPersistentInstances() {
             "persistent instances enter the destination room");
     require(instances.at(1).alarms.get(4) == 12,
             "persistent instance state survives transition");
+    require(instances.at(1).x == 44 && instances.at(1).depth == -100,
+            "persistent transform and layer state survive transition");
 }
 
 } // namespace

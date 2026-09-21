@@ -11,6 +11,17 @@ struct RoomInstanceDefinition {
     std::uint32_t instanceId;
     std::int32_t objectId;
     bool persistent;
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    float scaleX = 1.0F;
+    float scaleY = 1.0F;
+    float rotation = 0.0F;
+    float imageSpeed = 1.0F;
+    float imageIndex = 0.0F;
+    std::int32_t creationCodeId = -1;
+    std::int32_t preCreateCodeId = -1;
+    std::uint32_t layerId = 0;
+    std::int32_t depth = 0;
 };
 
 enum class RoomInstancePhase {
@@ -54,6 +65,17 @@ public:
                              roomId,
                              definition.persistent);
             InstanceRecord& instance = *instances.find(definition.instanceId);
+            instance.x = definition.x;
+            instance.y = definition.y;
+            instance.scaleX = definition.scaleX;
+            instance.scaleY = definition.scaleY;
+            instance.rotation = definition.rotation;
+            instance.imageSpeed = definition.imageSpeed;
+            instance.imageIndex = definition.imageIndex;
+            instance.creationCodeId = definition.creationCodeId;
+            instance.preCreateCodeId = definition.preCreateCodeId;
+            instance.layerId = definition.layerId;
+            instance.depth = definition.depth;
             instanceHandler(instance, RoomInstancePhase::preCreate);
             instanceHandler(instance, RoomInstancePhase::create);
             instanceHandler(instance, RoomInstancePhase::instanceCreation);

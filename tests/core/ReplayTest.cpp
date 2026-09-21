@@ -92,7 +92,7 @@ void testReplayProducesStableStartupState() {
 
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
-    require(runtime.stateDigest() == 0xf167b718ee5fbe56ULL,
+    require(runtime.stateDigest() == 0x79ea534078a5a5a6ULL,
             "startup state digest remains wire-stable");
 }
 

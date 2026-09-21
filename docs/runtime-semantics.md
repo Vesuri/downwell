@@ -75,8 +75,9 @@ collision, draw ordering, and the exact timing of deferred room changes remain.
 
 `InstanceStore` is a fixed-capacity, allocation-free container with stable
 creation order and unique 32-bit instance IDs. Each record carries its object
-and room IDs, persistence/active flags, and its own `AlarmBank`. Erasure and
-room changes compact the array without reordering survivors.
+and room IDs, transform/image state, creation-code references, resolved layer
+ID/depth, persistence/active flags, and its own `AlarmBank`. Erasure and room
+changes compact the array without reordering survivors.
 
 The startup model uses a two-slot specialization populated from the recovered
 `rmInit` records. Transitioning to `rmMenu` now removes instance 100066

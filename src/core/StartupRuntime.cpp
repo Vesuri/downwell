@@ -140,7 +140,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(3); // Startup-state digest schema.
+    digest.addU32(4); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -155,6 +155,17 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU32(instance.instanceId);
         digest.addI32(instance.objectId);
         digest.addI32(instance.roomId);
+        digest.addI32(instance.x);
+        digest.addI32(instance.y);
+        digest.addF32(instance.scaleX);
+        digest.addF32(instance.scaleY);
+        digest.addF32(instance.rotation);
+        digest.addF32(instance.imageSpeed);
+        digest.addF32(instance.imageIndex);
+        digest.addI32(instance.creationCodeId);
+        digest.addI32(instance.preCreateCodeId);
+        digest.addU32(instance.layerId);
+        digest.addI32(instance.depth);
         digest.addBool(instance.persistent);
         digest.addBool(instance.active);
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm)

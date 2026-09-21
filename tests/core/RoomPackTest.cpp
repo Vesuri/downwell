@@ -1,4 +1,5 @@
 #include "core/RoomPack.h"
+#include "core/PackedRoomLoader.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -146,6 +147,44 @@ void testValidation() {
             "out-of-range room slice is rejected");
 }
 
+void testPackedRoomLoader() {
+    const std::vector<std::uint8_t> bytes = makePack();
+    const downwell::RoomPack pack(bytes.data(), bytes.size());
+    downwell::InstanceStore<3> instances;
+    const auto noInstanceEvents = [](downwell::InstanceRecord&,
+                                     downwell::RoomInstancePhase) {};
+    const auto noRoomCode = [](std::int32_t) {};
+    require(downwell::PackedRoomLoader<3>::enter(
+                instances, pack, 7, true, noInstanceEvents, noRoomCode) ==
+                downwell::PackedRoomLoadResult::success,
+            "packed room loads into native instance storage");
+    require(instances.size() == 2, "all packed instances are loaded");
+    require(instances.at(0).instanceId == 100065 &&
+                instances.at(0).objectId == 37 && instances.at(0).persistent,
+            "packed creation order and persistence are retained");
+    require(instances.at(0).x == -64 && instances.at(0).y == 80 &&
+                instances.at(0).scaleX == 1.0F,
+            "packed transform is retained");
+    require(instances.at(0).layerId == 13 && instances.at(0).depth == -300000,
+            "layer membership resolves into instance state");
+
+    std::vector<std::uint8_t> damaged = bytes;
+    // Final membership is changed from instance 100066 to 100065, making one
+    // duplicate membership and leaving the second instance without a layer.
+    const std::size_t finalMembership = damaged.size() - 4;
+    damaged[finalMembership + 0] = 0xe1;
+    damaged[finalMembership + 1] = 0x86;
+    damaged[finalMembership + 2] = 0x01;
+    damaged[finalMembership + 3] = 0x00;
+    const downwell::RoomPack damagedPack(damaged.data(), damaged.size());
+    downwell::InstanceStore<3> empty;
+    require(downwell::PackedRoomLoader<3>::enter(
+                empty, damagedPack, 7, true, noInstanceEvents, noRoomCode) ==
+                downwell::PackedRoomLoadResult::invalidLayerMembership,
+            "duplicate or missing layer membership is rejected");
+    require(empty.empty(), "invalid packed room leaves instance store untouched");
+}
+
 void testGeneratedPack(const char* path) {
     std::ifstream input(path, std::ios::binary);
     require(input.good(), "generated room pack opens");
@@ -174,6 +213,7 @@ void testGeneratedPack(const char* path) {
 int main(int argc, char** argv) {
     testDecode();
     testValidation();
+    testPackedRoomLoader();
     if (argc == 2)
         testGeneratedPack(argv[1]);
     std::cout << "room pack tests passed\n";

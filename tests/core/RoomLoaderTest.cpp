@@ -63,7 +63,8 @@ void testDestinationRoomKeepsPersistentFirst() {
     instances.create(100065, 37, 7, true);
     instances.create(100066, 36, 7, false);
     const downwell::RoomInstanceDefinition definitions[] = {
-        {104218, 35, false}
+        {104218, 35, false, 72, 96, 1.0F, 1.0F, 0.0F, 1.0F, 0.0F,
+         -1, -1, 93, 0}
     };
     std::vector<TraceEntry> trace;
     const auto instanceHandler = [&trace](downwell::InstanceRecord& instance,
@@ -80,6 +81,9 @@ void testDestinationRoomKeepsPersistentFirst() {
     require(instances.at(0).instanceId == 100065 &&
                 instances.at(1).instanceId == 104218,
             "persistent instances precede newly created room instances");
+    require(instances.at(1).x == 72 && instances.at(1).y == 96 &&
+                instances.at(1).layerId == 93 && instances.at(1).depth == 0,
+            "native room fields populate instance state");
     require(trace.size() == 5, "destination room omits Game Start");
     require(trace[0].instanceId == 104218 &&
                 trace[0].phase == downwell::RoomInstancePhase::preCreate,

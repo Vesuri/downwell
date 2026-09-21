@@ -12,6 +12,17 @@ struct InstanceRecord {
     std::uint32_t instanceId = 0;
     std::int32_t objectId = -1;
     std::int32_t roomId = -1;
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    float scaleX = 1.0F;
+    float scaleY = 1.0F;
+    float rotation = 0.0F;
+    float imageSpeed = 1.0F;
+    float imageIndex = 0.0F;
+    std::int32_t creationCodeId = -1;
+    std::int32_t preCreateCodeId = -1;
+    std::uint32_t layerId = 0;
+    std::int32_t depth = 0;
     bool persistent = false;
     bool active = true;
     AlarmBank alarms;
