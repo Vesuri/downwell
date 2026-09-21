@@ -3,8 +3,8 @@
 
 CXX := clang++
 
-SDL_CFLAGS  := $(shell pkg-config --cflags sdl2)
-SDL_LDFLAGS := $(shell pkg-config --libs sdl2)
+SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
+SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image)
 
 CPPFLAGS := -Isrc $(SDL_CFLAGS)
 CXXFLAGS := -std=c++17 -g -O0 -Wall -Wextra -Wpedantic -MMD -MP
@@ -15,6 +15,7 @@ SOURCES := \
 	src/core/ObjectPack.cpp \
 	src/core/Replay.cpp \
 	src/core/RoomPack.cpp \
+	src/core/SpritePack.cpp \
 	src/core/StartupRuntime.cpp \
 	src/platform/sdl/PlatformSDL.cpp \
 	src/main.cpp
@@ -56,7 +57,7 @@ build/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-run: generate-room-pack generate-object-pack $(TARGET)
+run: generate-room-pack generate-object-pack generate-sprite-pack $(TARGET)
 	./$(TARGET)
 
 $(STARTUP_TEST_TARGET): $(STARTUP_TEST_SOURCES)

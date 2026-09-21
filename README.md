@@ -41,9 +41,9 @@ transition to `rmMenu`. `make run` regenerates the native room pack and loads
 the recovered room definitions, so the transition creates all 192 serialized
 `rmMenu` instances alongside the persistent controller, then applies the room
 code's runtime-created `ditherFade` as instance 105186. Most object event logic
-is not translated yet. The program renders an asset-free diagnostic at
-GameMaker's native 160x284 application-surface size; original art is not yet
-loaded.
+is not translated yet. The program renders at GameMaker's native 160x284
+application-surface size and now draws the recovered tiled `sprDitherFade`
+directly from its original texture atlas over the diagnostic menu view.
 
 Space or Z advances the splash sequence, and Escape quits. `make test` checks
 the automatic 731-tick desktop transition, input-driven skipping, the

@@ -20,6 +20,10 @@ void Game::render(Renderer& renderer) const {
                           {238, 238, 226, 255});
         renderer.fillRect(16, 24, logicalWidth - 32, 8,
                           {224, 44, 48, 255});
+        const InstanceRecord* fade = startup_.instance(105186);
+        if (fade != nullptr)
+            renderer.drawSpriteTiled(733,
+                static_cast<std::uint32_t>(fade->imageIndex), 0, 0);
     } else {
         const int stage = startup_.showSplash();
         const int width = stage * 16;

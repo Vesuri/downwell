@@ -1,6 +1,7 @@
 #include "core/Game.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
+#include "core/SpritePack.h"
 #include "platform/sdl/PlatformSDL.h"
 #include <cstdio>
 #include <fstream>
@@ -27,6 +28,16 @@ int main() {
     const downwell::ObjectPack objectPack(objectBytes.data(), objectBytes.size());
     if (!objectPack.valid())
         std::fprintf(stderr, "warning: native object pack unavailable; using bounded event routing\n");
+
+    std::ifstream spriteFile("generated/downwell-sprites.dwsp", std::ios::binary);
+    const std::vector<std::uint8_t> spriteBytes(
+        (std::istreambuf_iterator<char>(spriteFile)),
+        std::istreambuf_iterator<char>());
+    const downwell::SpritePack spritePack(spriteBytes.data(), spriteBytes.size());
+    if (!spritePack.valid() ||
+        !platform.loadSpriteAssets(spritePack,
+            "extracted/utmt-0.9.2.0/TexturePages"))
+        std::fprintf(stderr, "warning: recovered sprite assets unavailable\n");
 
     downwell::Game game(roomPack.valid() ? &roomPack : nullptr,
                         objectPack.valid() ? &objectPack : nullptr);
