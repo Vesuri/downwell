@@ -72,6 +72,8 @@
   suppression for the default play style.
 - [x] Give all six area-one enemies native fractional motion state and their
   recovered ground, jump, steering, wall-crawl, and initial latch behaviours.
+- [x] Split defeated-enemy rewards into recovered two- and ten-value physical
+  gems with bounce, attraction, collection, expiry, and fixed-capacity state.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

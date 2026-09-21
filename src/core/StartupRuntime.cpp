@@ -115,6 +115,11 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainEnemiesDefeated_ = 0;
     mainJumps_ = 0;
     mainBulletCount_ = 0;
+    mainCurrencyCount_ = 0;
+    mainCurrencyTotal_ = 0;
+    mainGameGemTotal_ = 0;
+    mainGemStreak_ = 0;
+    mainGemStreakTimer_ = 0;
     mainBuilderInitialized_ = false;
     mainBuilderY_ = 704;
     mainBuilderGenerationCount_ = -30;
@@ -249,6 +254,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if (roomId_ == mainRoomId) {
         updateMainBullets();
         updateMainEnemies();
+        updateMainCurrency();
         updateMainLifecycle();
     }
 }
@@ -502,6 +508,9 @@ void StartupRuntime::updateMainBullets() {
                 if (enemy->objectId != 112) {
                     enemy->health -= 10;
                     if (enemy->health <= 0) {
+                        spawnMainCurrency(static_cast<float>(enemy->x),
+                                          static_cast<float>(enemy->y),
+                                          enemy->reward);
                         enemy->active = false;
                         ++mainEnemiesDefeated_;
                     }
@@ -530,6 +539,82 @@ void StartupRuntime::updateMainBullets() {
             mainBullets_[write++] = bullet;
     }
     mainBulletCount_ = write;
+}
+
+void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount) {
+    while (amount > 0 && mainCurrencyCount_ < mainCurrencyCapacity) {
+        MainCurrencyState& gem = mainCurrencyItems_[mainCurrencyCount_++];
+        gem = MainCurrencyState{};
+        gem.x = x;
+        gem.y = y;
+        gem.large = amount >= 10;
+        gem.amount = gem.large ? 10 : 2;
+        gem.speedX = static_cast<float>(random_.random(4.0) - 2.0);
+        gem.speedY = static_cast<float>(random_.random(4.0) - 2.0);
+        random_.irandom(3); // imgSp = choose(-0.5, -0.3, 0.3, 0.5).
+        random_.irandom(70); // First gemdir candidate.
+        random_.irandom(70); // Second gemdir candidate.
+        random_.irandom(1);  // choose(candidate one, candidate two).
+        amount -= gem.amount;
+    }
+}
+
+void StartupRuntime::updateMainCurrency() {
+    if (mainGemStreakTimer_ > 0)
+        --mainGemStreakTimer_;
+    else
+        mainGemStreak_ = 0;
+
+    std::size_t write = 0;
+    for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
+        MainCurrencyState gem = mainCurrencyItems_[index];
+        ++gem.age;
+        const float dx = mainPlayerX_ - gem.x;
+        const float dy = mainPlayerY_ - gem.y;
+        if (!gem.attracted && gem.age >= 15 &&
+            std::abs(dx) < 24.0F && std::abs(dy) < 24.0F)
+            gem.attracted = true;
+        if (gem.attracted) {
+            const float distance = std::sqrt(dx * dx + dy * dy);
+            const float speed = std::min(9.0F, 4.0F +
+                static_cast<float>(gem.age - 15) * 0.125F);
+            if (distance > 0.001F) {
+                gem.speedX = dx / distance * speed;
+                gem.speedY = dy / distance * speed;
+            }
+            gem.x += gem.speedX;
+            gem.y += gem.speedY;
+        } else {
+            gem.speedY = std::min(4.0F, gem.speedY + 0.035F);
+            const float nextX = gem.x + gem.speedX;
+            if (mainSolidAt(nextX, gem.y))
+                gem.speedX *= -0.7F;
+            else
+                gem.x = nextX;
+            const float nextY = gem.y + gem.speedY;
+            if (gem.speedY > 0.0F && mainSolidAt(gem.x, nextY + 4.0F)) {
+                gem.speedY = -0.5F - static_cast<float>(random_.random(0.7));
+                gem.speedX *= 0.7F;
+            } else {
+                gem.y = nextY;
+            }
+            if (std::abs(gem.speedX) < 0.05F)
+                gem.speedX = gem.speedX < 0.0F ? -0.05F : 0.05F;
+        }
+        const bool collected = gem.age >= 10 &&
+            std::abs(mainPlayerX_ - gem.x) <= 6.0F &&
+            std::abs(mainPlayerY_ - gem.y) <= 8.0F;
+        if (collected) {
+            mainCurrencyTotal_ += static_cast<std::uint32_t>(gem.amount);
+            mainGameGemTotal_ += static_cast<std::uint32_t>(gem.amount);
+            mainGemStreak_ += static_cast<std::uint32_t>(gem.amount);
+            mainGemStreakTimer_ = 300;
+            ++soundPlayRequests_;
+        } else if (gem.age < 310) {
+            mainCurrencyItems_[write++] = gem;
+        }
+    }
+    mainCurrencyCount_ = write;
 }
 
 void StartupRuntime::updateMainEnemies() {
@@ -1292,6 +1377,11 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainEnemiesDefeated_ = 0;
                 mainJumps_ = 0;
                 mainBulletCount_ = 0;
+                mainCurrencyCount_ = 0;
+                mainCurrencyTotal_ = 0;
+                mainGameGemTotal_ = 0;
+                mainGemStreak_ = 0;
+                mainGemStreakTimer_ = 0;
                 instance->alarms.set(2, 30);
             }
             // scrPlayerInit's full state comes later. These are the two
@@ -1882,7 +1972,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(27); // Startup-state digest schema.
+    digest.addU32(28); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1968,6 +2058,22 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(mainBullets_[index].x);
         digest.addF32(mainBullets_[index].y);
     }
+    digest.addU32(static_cast<std::uint32_t>(mainCurrencyCount_));
+    for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
+        const MainCurrencyState& gem = mainCurrencyItems_[index];
+        digest.addF32(gem.x);
+        digest.addF32(gem.y);
+        digest.addF32(gem.speedX);
+        digest.addF32(gem.speedY);
+        digest.addI32(gem.amount);
+        digest.addU32(gem.age);
+        digest.addBool(gem.large);
+        digest.addBool(gem.attracted);
+    }
+    digest.addU32(mainCurrencyTotal_);
+    digest.addU32(mainGameGemTotal_);
+    digest.addU32(mainGemStreak_);
+    digest.addU32(mainGemStreakTimer_);
     digest.addBool(mainBuilderInitialized_);
     digest.addI32(mainBuilderY_);
     digest.addI32(mainBuilderGenerationCount_);

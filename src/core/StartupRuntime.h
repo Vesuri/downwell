@@ -28,9 +28,17 @@ public:
         float x = 0.0F;
         float y = 0.0F;
     };
+    struct MainCurrencyState {
+        float x = 0.0F, y = 0.0F, speedX = 0.0F, speedY = 0.0F;
+        std::int32_t amount = 0;
+        std::uint16_t age = 0;
+        bool large = false;
+        bool attracted = false;
+    };
 
     static constexpr std::size_t instanceCapacity = 2048;
     static constexpr std::size_t mainBulletCapacity = 16;
+    static constexpr std::size_t mainCurrencyCapacity = 64;
     static constexpr int entryRoomId = 7;
     static constexpr int playMenuRoomId = 8;
     static constexpr int mainRoomId = 11;
@@ -135,6 +143,13 @@ public:
     const MainBulletState& mainBulletAt(std::size_t index) const {
         return mainBullets_[index];
     }
+    std::size_t mainCurrencyCount() const { return mainCurrencyCount_; }
+    const MainCurrencyState& mainCurrencyAt(std::size_t index) const {
+        return mainCurrencyItems_[index];
+    }
+    std::uint32_t mainCurrencyTotal() const { return mainCurrencyTotal_; }
+    std::uint32_t mainGemStreak() const { return mainGemStreak_; }
+    std::uint32_t mainGemStreakTimer() const { return mainGemStreakTimer_; }
     bool mainBuilderInitialized() const { return mainBuilderInitialized_; }
     int mainBuilderY() const { return mainBuilderY_; }
     int mainBuilderGenerationCount() const { return mainBuilderGenerationCount_; }
@@ -185,6 +200,8 @@ private:
     bool moveMainPlayerAxis(float amount, bool horizontal);
     void fireMainGun(InstanceRecord& instance);
     void updateMainBullets();
+    void spawnMainCurrency(float x, float y, std::int32_t amount);
+    void updateMainCurrency();
     void updateMainLifecycle();
     void updateMainEnemies();
     InstanceRecord* mainBulletEnemyCollision(float x, float y);
@@ -230,7 +247,9 @@ private:
     std::uint32_t soundGainRequests_ = 0;
     std::uint32_t soundPlayRequests_ = 0;
     std::uint32_t ditherFadeSpawnRequests_ = 0;
-    DeferredInstanceQueue<128> deferredInstances_;
+    // A single 21x18 recovered side-room pattern can emit more than 128
+    // objects before GameMaker returns to the step loop.
+    DeferredInstanceQueue<512> deferredInstances_;
     std::uint32_t nextRuntimeInstanceId_ = 105186;
     bool deferredCommandsSucceeded_ = true;
     bool inputLeft_ = false;
@@ -300,6 +319,12 @@ private:
     std::uint32_t mainJumps_ = 0;
     std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
     std::size_t mainBulletCount_ = 0;
+    std::array<MainCurrencyState, mainCurrencyCapacity> mainCurrencyItems_{};
+    std::size_t mainCurrencyCount_ = 0;
+    std::uint32_t mainCurrencyTotal_ = 0;
+    std::uint32_t mainGameGemTotal_ = 0;
+    std::uint32_t mainGemStreak_ = 0;
+    std::uint32_t mainGemStreakTimer_ = 0;
     bool mainBuilderInitialized_ = false;
     int mainBuilderY_ = 704;
     int mainBuilderGenerationCount_ = -30;

@@ -116,6 +116,14 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<int>(bullet.x - viewX),
                             static_cast<int>(bullet.y - viewY));
     }
+    for (std::size_t index = 0; index < startup_.mainCurrencyCount(); ++index) {
+        const StartupRuntime::MainCurrencyState& gem =
+            startup_.mainCurrencyAt(index);
+        renderer.drawSprite(gem.large ? 134 : 133,
+                            static_cast<std::uint32_t>((gem.age / 2U) % 4U),
+                            static_cast<int>(gem.x - viewX),
+                            static_cast<int>(gem.y - viewY));
+    }
 
     // scrDrawHud's default 160-pixel charge gauge. The animated fill and pop
     // frames settle on these frames; retaining the one-pixel construction also

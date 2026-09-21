@@ -550,7 +550,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "releasing after the jump unlocks an airborne gunboot shot");
         runtime.step(releasedMain, false);
         for (int tick = 0;
-             tick < 1200 && runtime.mainBuilderSideRoomsGenerated() == 0;
+             tick < 3000 && runtime.mainBuilderSideRoomsGenerated() == 0;
              ++tick) {
             if (runtime.mainPlayerGrounded()) {
                 runtime.step(fireMain, true);
@@ -563,9 +563,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 6 &&
+                    runtime.mainBuilderLastRightPattern() == 2 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
-                    runtime.mainBuilderRowsGenerated() == 95,
+                    runtime.mainBuilderRowsGenerated() == 94,
                 "the first scheduled side room preserves deterministic selection and rows");
         require(runtime.mainBuilderSpecialObjectsGenerated() == 7,
                 "every special marker in right-room pattern six is interpreted");
@@ -586,6 +586,14 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
                 "side-room utility and reward objects retain recovered IDs");
+        require(runtime.mainEnemiesDefeated() > 0 &&
+                    runtime.mainCurrencyCount() +
+                        static_cast<std::size_t>(runtime.mainCurrencyTotal()) > 0,
+                "defeated enemies produce physical or already-collected gems");
+        if (runtime.mainCurrencyTotal() > 0)
+            require(runtime.mainGemStreak() > 0 &&
+                        runtime.mainGemStreakTimer() > 0,
+                    "collected physical gems feed the recovered streak timer");
     }
 }
 
