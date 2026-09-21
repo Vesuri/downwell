@@ -15,6 +15,7 @@ The extraction produced:
 - 8,420 strings;
 - a versioned JSON resource manifest;
 - authoritative `GEN8` room order (distinct from physical room resource order);
+- `GEN8` object/tile instance allocator boundaries;
 - 2,075 object-event bindings;
 - 5,186 placed room instances across 25 rooms;
 - 132 room layers.
@@ -24,6 +25,12 @@ links, texture atlas rectangles and pages, sound/audio-group relationships,
 font metrics, script-to-code bindings, constants, room dimensions/views,
 instance transforms, authoritative instance-creation order, and instance-layer
 membership. Numeric IDs are preserved throughout.
+
+The pinned build records `GEN8.LastObj = 105186` and
+`GEN8.LastTile = 10000000`. Serialized room-instance IDs occupy the contiguous
+range 100000–105185, so 105186 is the source-backed starting boundary for
+runtime-created object IDs. This value must be carried into native runtime data
+rather than recomputed from whichever subset of rooms happens to be loaded.
 
 There are 2,810 total `CODE` records. The remaining 309 records are child entries
 whose instruction streams belong to root entries; they remain represented in

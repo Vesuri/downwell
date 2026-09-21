@@ -30,7 +30,7 @@ tools/bootstrap-utmt.sh
 - exact VM assembly for every root code entry;
 - a schema-3 JSON manifest containing resource IDs, symbols, authoritative room
   and instance-creation order, object/event bindings, room instances/views/layers,
-  layer membership, sprite atlas links,
+  layer membership, object/tile instance allocator boundaries, sprite atlas links,
   sound groups, font metrics, constants, code relationships, variables, and
   functions.
 

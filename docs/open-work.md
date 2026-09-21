@@ -8,6 +8,7 @@
   rooms, texture metadata, fonts, shaders, and audio metadata.
 - [x] Define the initial versioned manifest and validate core cross-references.
 - [x] Prove a byte-for-byte parser round trip of `data.win`.
+- [x] Export and verify the authoritative runtime object/tile ID boundaries.
 - [x] Recover authoritative room order and document the initial boot/transition
   behavior slice.
 - Sample difficult code entries and compare decompilation to VM assembly.

@@ -196,6 +196,8 @@ var manifest = new
         },
         defaultWindowWidth = Data.GeneralInfo.DefaultWindowWidth,
         defaultWindowHeight = Data.GeneralInfo.DefaultWindowHeight,
+        lastObjectInstanceId = Data.GeneralInfo.LastObj,
+        lastTileInstanceId = Data.GeneralInfo.LastTile,
         roomOrder = Data.GeneralInfo.RoomOrder.Select((entry, index) => new
         {
             index,

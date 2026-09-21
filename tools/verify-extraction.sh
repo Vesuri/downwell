@@ -33,6 +33,8 @@ jq -e --arg hash "$INPUT_SHA256" '
     .source.sha256 == $hash and
     .source.immutable == true and
     .gameMaker.bytecodeVersion == 17 and
+    (.gameMaker.lastObjectInstanceId | type == "number") and
+    (.gameMaker.lastTileInstanceId | type == "number") and
     .gameMaker.isYyc == false and
     (.gameMaker.roomOrder | length) == .counts.rooms and
     .counts.objects == (.resources.objects | length) and
