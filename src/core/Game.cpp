@@ -9,6 +9,10 @@ class OffsetRenderer final : public Renderer {
 public:
     OffsetRenderer(Renderer& renderer, int x) : renderer_(renderer), x_(x) {}
     void clear(Color color) override { renderer_.clear(color); }
+    void setClipRect(int x, int y, int width, int height) override {
+        renderer_.setClipRect(x + x_, y, width, height);
+    }
+    void clearClipRect() override { renderer_.clearClipRect(); }
     void fillRect(int x, int y, int width, int height, Color color) override {
         renderer_.fillRect(x + x_, y, width, height, color);
     }
@@ -49,7 +53,12 @@ void Game::update(const Input& input) {
 }
 
 void Game::render(Renderer& renderer) const {
-    renderer.clear({10, 10, 12, 255});
+    // GameMaker renders the 160x284 room surface into the centre of the
+    // 380x284 PC application surface.  Everything outside it is the HUD
+    // layer, whose untouched pen is true black.
+    renderer.clear({0, 0, 0, 255});
+    renderer.setClipRect(playfieldX, 0, StartupRuntime::surfaceWidth,
+                         logicalHeight);
     OffsetRenderer playfield(renderer, playfieldX);
     if (startup_.inMenu()) {
         renderMenu(playfield);
@@ -57,7 +66,6 @@ void Game::render(Renderer& renderer) const {
         renderPlayMenu(playfield);
     } else if (startup_.inMainRoom()) {
         renderMain(playfield);
-        renderLandscapeHud(renderer);
     } else {
         const int stage = startup_.showSplash();
         if (stage == 2)
@@ -67,6 +75,9 @@ void Game::render(Renderer& renderer) const {
         if (stage == 5 || stage == 6)
             playfield.drawSpriteTiled(733, 11, -300, 0); // sprDitherFade
     }
+    renderer.clearClipRect();
+    if (startup_.inMainRoom())
+        renderLandscapeHud(renderer);
 }
 
 void Game::renderMain(Renderer& renderer) const {

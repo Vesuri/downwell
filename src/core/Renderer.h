@@ -18,6 +18,8 @@ class Renderer {
 public:
     virtual ~Renderer() = default;
     virtual void clear(Color color) = 0;
+    virtual void setClipRect(int x, int y, int width, int height) = 0;
+    virtual void clearClipRect() = 0;
     virtual void fillRect(int x, int y, int width, int height, Color color) = 0;
     virtual void drawSpriteTiled(std::int32_t spriteId,
                                  std::uint32_t frame,

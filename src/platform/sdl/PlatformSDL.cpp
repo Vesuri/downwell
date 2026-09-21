@@ -96,6 +96,15 @@ void PlatformSDL::clear(Color color) {
     SDL_RenderClear(renderer_);
 }
 
+void PlatformSDL::setClipRect(int x, int y, int width, int height) {
+    const SDL_Rect rect{x, y, width, height};
+    SDL_RenderSetClipRect(renderer_, &rect);
+}
+
+void PlatformSDL::clearClipRect() {
+    SDL_RenderSetClipRect(renderer_, nullptr);
+}
+
 void PlatformSDL::fillRect(int x, int y, int width, int height, Color color) {
     SDL_Rect rect{x, y, width, height};
     SDL_SetRenderDrawColor(renderer_, color.r, color.g, color.b, color.a);

@@ -25,6 +25,8 @@ public:
     bool loadFontAssets(const FontPack& pack);
 
     void clear(Color color) override;
+    void setClipRect(int x, int y, int width, int height) override;
+    void clearClipRect() override;
     void fillRect(int x, int y, int width, int height, Color color) override;
     void drawSpriteTiled(std::int32_t spriteId, std::uint32_t frame,
                          int x, int y) override;
