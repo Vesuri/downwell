@@ -53,6 +53,10 @@ lifecycle, event phases, replay validation, and the state oracle without SDL.
 Room-entry tests also pin serialized creation order, persistence, lifecycle
 phases, and atomic failure behavior.
 
+Splash stages 2, 4, 5, and 6 now draw their recovered Devolver, controls, and
+dither sprites. Stage 3 credits require the font renderer and remain blank for
+now; fade-frame interpolation is also still pending.
+
 The cross-target replay and state-comparison contract is documented in
 [docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional
 GameMaker behavior is tracked separately in

@@ -26,10 +26,12 @@ void Game::render(Renderer& renderer) const {
             renderer.drawSprite(31, 0, logicalWidth / 2, logicalHeight / 2);
     } else {
         const int stage = startup_.showSplash();
-        const int width = stage * 16;
-        renderer.fillRect((logicalWidth - width) / 2,
-                          logicalHeight / 2 - 4,
-                          width, 8, {238, 238, 226, 255});
+        if (stage == 2)
+            renderer.drawSprite(696, 0, 80, 140); // sprDevolverLogo
+        if (stage == 4 || stage == 5)
+            renderer.drawSprite(695, 0, 80, 140); // sprControls
+        if (stage == 5 || stage == 6)
+            renderer.drawSpriteTiled(733, 11, -300, 0); // sprDitherFade
     }
 }
 
