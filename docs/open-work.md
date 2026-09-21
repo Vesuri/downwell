@@ -55,6 +55,8 @@
   area-one wall/block rendering and collision to the native 16×16 mask.
 - [x] Trigger the menu title from recovered camera-center alignment so entering
   either edge of the well cannot deadlock the teleporter sequence.
+- [x] Honor `playerDraw`'s `goalStop` guard so the frozen player is hidden
+  during the menu-well camera transition.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.

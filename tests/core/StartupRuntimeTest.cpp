@@ -183,6 +183,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(edgeEntry.menuTeleportActive() &&
                     edgeEntry.menuPlayerX() < 324.0F,
                 "left-edge well entry reproduces the missed player-X title trigger");
+        require(!edgeEntry.menuPlayerVisible(),
+                "playerDraw hides the goal-stopped player during well entry");
         for (int tick = 0;
              tick < 180 && !edgeEntry.menuTitleRevealStarted();
              ++tick)
@@ -260,6 +262,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "player falls through the recovered 64-pixel well opening");
         require(runtime.menuTeleportActive(),
                 "touching the shaft trigger activates objTeleportMain");
+        require(!runtime.menuPlayerVisible(),
+                "teleporter goalStop suppresses the menu player sprite");
         for (int tick = 0; tick < 76; ++tick)
             runtime.step(wake, false);
         require(runtime.menuTitleReady(),

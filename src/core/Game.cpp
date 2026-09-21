@@ -187,13 +187,18 @@ void Game::renderMenu(Renderer& renderer) const {
         if (!objectPack_->findObject(instance.objectId, object))
             continue;
 
+        const bool isPlayer = instance.objectId == 35;
+        // playerDraw() suppresses the sprite while the well teleporter holds
+        // goalStop, before EnterSequence scrolls the camera into the shaft.
+        if (isPlayer && !startup_.menuPlayerVisible())
+            continue;
+
         float roomX = static_cast<float>(instance.x);
         float roomY = static_cast<float>(instance.y);
         if (instance.objectId == 312) { // objBgNightsky Step: parallax view follow
             roomX = std::floor(120.0F + viewX / 1.2F);
             roomY = std::floor((viewY + logicalHeight / 2.0F) / 1.1F);
         }
-        const bool isPlayer = instance.objectId == 35;
         std::int32_t spriteId = isPlayer
                                     ? startup_.menuPlayerSpriteId()
                                     : object.spriteId;

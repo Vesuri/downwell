@@ -95,6 +95,7 @@ public:
     float menuPlayerX() const { return menuPlayerX_; }
     float menuPlayerY() const { return menuPlayerY_; }
     bool menuPlayerGrounded() const { return menuPlayerGrounded_; }
+    bool menuPlayerVisible() const { return !menuPlayerGoalStop_; }
     float menuCameraViewX() const { return menuCameraX_ - surfaceWidth / 2.0F; }
     float menuCameraViewY() const { return menuCameraY_ - surfaceHeight / 2.0F; }
     bool menuTitleReady() const { return menuTitleReady_; }
