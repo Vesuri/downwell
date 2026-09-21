@@ -27,6 +27,7 @@
 - [x] Bridge packed rooms into complete native instance definitions.
 - [x] Load recovered `rmInit` and all 192 `rmMenu` instances in the SDL startup
   runtime.
+- [x] Define and generate a deterministic native object/event binding pack.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.

@@ -88,6 +88,17 @@ Its endian-explicit format is documented in
 deterministic generation, the portable C++ decoder, and startup entry into the
 fully populated recovered `rmMenu` state.
 
+The complete object/property/event graph has a separate native lowering:
+
+```sh
+make generate-object-pack
+make verify-object-pack
+```
+
+The `DWOB` format is documented in
+[docs/object-pack.md](docs/object-pack.md). Its code-entry IDs retain an exact
+link to recovered GML and VM assembly for the native event dispatcher.
+
 ## Amiga toolchain
 
 ```sh

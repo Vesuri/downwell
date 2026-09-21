@@ -37,7 +37,7 @@ ROOM_PACK_TEST_TARGET := build/room-pack-test
 ROOM_PACK_TEST_SOURCES := tests/core/RoomPackTest.cpp src/core/RoomPack.cpp
 TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET)
 
-.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack amiga clean
+.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack amiga clean
 
 all: $(TARGET)
 
@@ -103,6 +103,12 @@ verify-room-pack: $(ROOM_PACK_TEST_TARGET)
 	tools/generate-room-pack.py --check
 	./$(ROOM_PACK_TEST_TARGET) generated/downwell-rooms.dwrm
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm
+
+generate-object-pack:
+	tools/generate-object-pack.py
+
+verify-object-pack:
+	tools/generate-object-pack.py --check
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'
