@@ -20,6 +20,9 @@ void testDesktopBootState() {
     downwell::StartupRuntime runtime;
     require(runtime.roomId() == 7, "rmInit is the entry room");
     require(runtime.controllerPersistent(), "controller is persistent");
+    require(runtime.activeInstanceCount() == 2, "rmInit creates two instances");
+    require(runtime.hasInstance(100065), "controller uses recovered instance ID");
+    require(runtime.hasInstance(100066), "transition object uses recovered instance ID");
     require(runtime.initTimes() == 1, "scrInitialize increments initTimes");
     require(runtime.showSplash() == 1, "desktop enables splash sequence");
     require(!runtime.roomDestinationSet(), "destination starts unset");
@@ -31,6 +34,9 @@ void testNonDesktopSkipsSplash() {
     require(runtime.roomId() == 20, "non-desktop reaches rmMenu immediately");
     require(runtime.roomDestination() == 20, "rmMenu is selected deterministically");
     require(runtime.achievementLoginCalls() == 1, "login is requested once");
+    require(runtime.activeInstanceCount() == 1, "room transition removes room-owned instance");
+    require(runtime.hasInstance(100065), "persistent controller survives room transition");
+    require(!runtime.hasInstance(100066), "rmInit transition object is removed");
 }
 
 void testRecoveredDesktopTiming() {

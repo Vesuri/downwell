@@ -43,5 +43,19 @@ Confirmed startup order is:
 2. instance 100066, object 36, `objInitRm`.
 
 Confirmed `rmMenu` order begins with instance 104218, object 35,
-`objPlayer_n`. Persistent-instance transfer and the timing of deferred room
-changes are not yet implemented in the general scheduler.
+`objPlayer_n`. General event dispatch and the exact timing of deferred room
+changes are not yet implemented.
+
+## Instance storage
+
+`InstanceStore` is a fixed-capacity, allocation-free container with stable
+creation order and unique 32-bit instance IDs. Each record carries its object
+and room IDs, persistence/active flags, and its own `AlarmBank`. Erasure and
+room changes compact the array without reordering survivors.
+
+The startup model uses a two-slot specialization populated from the recovered
+`rmInit` records. Transitioning to `rmMenu` now removes instance 100066
+(`objInitRm`) and preserves instance 100065 (`objControlerN`), including its
+per-instance state. Loading the 192 serialized `rmMenu` instances is a separate
+room-loader milestone; the startup store deliberately does not pretend they
+already exist.

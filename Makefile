@@ -26,7 +26,9 @@ REPLAY_TEST_TARGET := build/replay-test
 REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp
 ALARM_TEST_TARGET := build/alarm-bank-test
 ALARM_TEST_SOURCES := tests/core/AlarmBankTest.cpp
-TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET)
+INSTANCE_TEST_TARGET := build/instance-store-test
+INSTANCE_TEST_SOURCES := tests/core/InstanceStoreTest.cpp
+TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET)
 
 .PHONY: all run test extract verify-extraction amiga clean
 
@@ -55,10 +57,15 @@ $(ALARM_TEST_TARGET): $(ALARM_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ALARM_TEST_SOURCES)
 
+$(INSTANCE_TEST_TARGET): $(INSTANCE_TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(INSTANCE_TEST_SOURCES)
+
 test: $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET)
 	./$(REPLAY_TEST_TARGET)
 	./$(ALARM_TEST_TARGET)
+	./$(INSTANCE_TEST_TARGET)
 
 extract:
 	tools/extract.sh
