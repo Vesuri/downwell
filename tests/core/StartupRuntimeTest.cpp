@@ -191,6 +191,22 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "horizontal movement selects the default run sprite");
         require(runtime.menuCameraViewX() > 32.0F,
                 "free cam begins following the moving player");
+
+        for (int tick = 0; tick < 105; ++tick)
+            runtime.step(wake, false);
+        title = runtime.instance(105192);
+        require(title != nullptr && title->alarms.get(2) >= 0,
+                "crossing beneath the title arms its recovered reveal delay");
+        for (int tick = 0; tick < 50; ++tick)
+            runtime.step(wake, false);
+        title = runtime.instance(105192);
+        require(title != nullptr && title->imageIndex == 9.0F &&
+                    title->imageSpeed == 0.0F,
+                "title reveal reaches and holds its final recovered frame");
+        for (int tick = 0; tick < 76; ++tick)
+            runtime.step(wake, false);
+        require(runtime.menuTitleReady(),
+                "title completion eventually enables the teleporter sequence");
     }
 }
 

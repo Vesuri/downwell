@@ -55,6 +55,9 @@ void StartupRuntime::reset(PlatformProfile profile) {
     menuPlayerImageSpeed_ = 0.1F;
     menuCameraX_ = 112.0F;
     menuCameraY_ = 512.0F;
+    menuTitleFirstBoot_ = false;
+    menuTitleReady_ = false;
+    menuTitleStartY_ = 432.0F;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -379,8 +382,49 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 2495: // gml_Object_objTitle_Create_0 (first-boot path)
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
             instance->imageSpeed = 0.0F;
+            instance->imageIndex = 0.0F;
+            menuTitleFirstBoot_ = false;
+            menuTitleReady_ = false;
+            menuTitleStartY_ = static_cast<float>(instance->y);
+        }
+        return;
+    case 2496: // gml_Object_objTitle_Alarm_2
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.32F;
+        return;
+    case 2497: // gml_Object_objTitle_Alarm_1
+        ++implementedCodeCalls_;
+        menuTitleReady_ = true;
+        return;
+    case 2498: // gml_Object_objTitle_Alarm_0 (visual effects omitted)
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->alarms.set(1, 75);
+        return;
+    case 2499: // gml_Object_objTitle_Step_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            if (!menuPlayerNapping_ &&
+                menuPlayerX_ > instance->x - 4.0F &&
+                menuPlayerX_ < instance->x + 4.0F &&
+                !menuTitleFirstBoot_) {
+                instance->alarms.set(2, 15);
+                menuTitleFirstBoot_ = true;
+            }
+            if (instance->imageSpeed > 0.0F) {
+                instance->imageIndex += instance->imageSpeed;
+                if (instance->imageIndex >= 9.0F) {
+                    instance->imageIndex = 9.0F;
+                    instance->imageSpeed = 0.0F;
+                    instance->alarms.set(0, 1);
+                }
+            }
+            instance->y = static_cast<std::int32_t>(std::round(
+                menuTitleStartY_ - 3.0F * (instance->imageIndex / 9.0F)));
+        }
         return;
     case 2790: // gml_Object_ditherFade_Create_0
         ++implementedCodeCalls_;
@@ -504,7 +548,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(8); // Startup-state digest schema.
+    digest.addU32(9); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -534,6 +578,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addF32(menuPlayerImageSpeed_);
     digest.addF32(menuCameraX_);
     digest.addF32(menuCameraY_);
+    digest.addBool(menuTitleFirstBoot_);
+    digest.addBool(menuTitleReady_);
+    digest.addF32(menuTitleStartY_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

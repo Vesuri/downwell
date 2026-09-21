@@ -79,6 +79,7 @@ public:
     float menuPlayerX() const { return menuPlayerX_; }
     float menuCameraViewX() const { return menuCameraX_ - surfaceWidth / 2.0F; }
     float menuCameraViewY() const { return menuCameraY_ - surfaceHeight / 2.0F; }
+    bool menuTitleReady() const { return menuTitleReady_; }
     std::uint64_t stateDigest() const;
 
 private:
@@ -144,6 +145,9 @@ private:
     float menuPlayerImageSpeed_ = 0.1F;
     float menuCameraX_ = 112.0F;
     float menuCameraY_ = 512.0F;
+    bool menuTitleFirstBoot_ = false;
+    bool menuTitleReady_ = false;
+    float menuTitleStartY_ = 432.0F;
 };
 
 } // namespace downwell
