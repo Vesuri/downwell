@@ -451,6 +451,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainPlayerSpeedY() == 0.0F &&
                     runtime.mainPlayerSpriteId() == 31,
                 "landing settles on lower generated geometry after the shot");
+        require(runtime.mainLandings() == 1 && runtime.mainAmmo() == 8,
+                "the airborne-to-grounded edge fully recharges the gunboots");
         bool standingOnGeneratedBlock = false;
         bool foundInitializedBlock = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {

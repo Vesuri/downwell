@@ -107,6 +107,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
     mainBlocksDestroyed_ = 0;
+    mainLandings_ = 0;
     mainBulletCount_ = 0;
     mainBuilderInitialized_ = false;
     mainBuilderY_ = 704;
@@ -675,6 +676,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!mainPlayerInitialized_)
         return;
 
+    const bool wasGrounded = mainPlayerGrounded_;
     mainPlayerSpeedY_ = std::min(7.0F, mainPlayerSpeedY_ + 0.2F);
     if (inputFireReleased_) {
         mainJumpShootLocked_ = false;
@@ -714,6 +716,14 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!moveMainPlayerAxis(mainPlayerSpeedY_, false)) {
         mainPlayerGrounded_ = mainPlayerSpeedY_ > 0.0F;
         mainPlayerSpeedY_ = 0.0F;
+    }
+    if (!wasGrounded && mainPlayerGrounded_) {
+        ++mainLandings_;
+        if (mainAmmo_ < 8) {
+            // scrWallCol calls scrRecharge on the airborne-to-grounded edge.
+            mainAmmo_ = 8;
+            ++soundPlayRequests_;
+        }
     }
 
     mainPlayerSpriteId_ = mainPlayerGrounded_ ? 31
@@ -911,6 +921,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainShootLeg_ = -1;
                 mainShotsFired_ = 0;
                 mainBlocksDestroyed_ = 0;
+                mainLandings_ = 0;
                 mainBulletCount_ = 0;
                 instance->alarms.set(2, 30);
             }
@@ -1382,7 +1393,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(19); // Startup-state digest schema.
+    digest.addU32(20); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1457,6 +1468,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainShootLeg_);
     digest.addU32(mainShotsFired_);
     digest.addU32(mainBlocksDestroyed_);
+    digest.addU32(mainLandings_);
     digest.addU32(static_cast<std::uint32_t>(mainBulletCount_));
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         digest.addF32(mainBullets_[index].x);

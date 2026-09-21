@@ -126,6 +126,7 @@ public:
     int mainAmmo() const { return mainAmmo_; }
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
     std::uint32_t mainBlocksDestroyed() const { return mainBlocksDestroyed_; }
+    std::uint32_t mainLandings() const { return mainLandings_; }
     std::size_t mainBulletCount() const { return mainBulletCount_; }
     const MainBulletState& mainBulletAt(std::size_t index) const {
         return mainBullets_[index];
@@ -271,6 +272,7 @@ private:
     int mainShootLeg_ = -1;
     std::uint32_t mainShotsFired_ = 0;
     std::uint32_t mainBlocksDestroyed_ = 0;
+    std::uint32_t mainLandings_ = 0;
     std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
     std::size_t mainBulletCount_ = 0;
     bool mainBuilderInitialized_ = false;
