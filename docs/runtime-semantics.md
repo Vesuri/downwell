@@ -125,7 +125,9 @@ bindings before it joins Room Start.
 
 The translated `ditherFade` Create code freezes animation and arms Alarm 0 for
 30 ticks. Its recovered Alarm 0 then sets image speed to 0.2 and clears the
-global control lock. Animation End destruction and Draw remain untranslated.
+global control lock. Its Draw event targets the off-screen `surfaceDissipate`;
+it must not be tiled directly onto the application surface. Animation End
+destruction and surface compositing remain untranslated.
 
 `DeferredInstanceQueue` now provides the bounded, allocation-free command
 primitive for that next step. It validates an entire create batch before

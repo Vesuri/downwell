@@ -21,6 +21,10 @@ public:
                                  std::uint32_t frame,
                                  int x,
                                  int y) = 0;
+    virtual void drawSprite(std::int32_t spriteId,
+                            std::uint32_t frame,
+                            int x,
+                            int y) = 0;
 };
 
 } // namespace downwell

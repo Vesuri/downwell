@@ -120,6 +120,30 @@ void PlatformSDL::drawSpriteTiled(std::int32_t spriteId,
     }
 }
 
+void PlatformSDL::drawSprite(std::int32_t spriteId,
+                             std::uint32_t frame,
+                             int x,
+                             int y) {
+    if (spritePack_ == nullptr || spriteId < 0)
+        return;
+    PackedSprite sprite;
+    if (!spritePack_->sprite(static_cast<std::uint32_t>(spriteId), sprite) ||
+        sprite.frameCount == 0)
+        return;
+    PackedTexturePageItem item;
+    if (!spritePack_->spriteFrame(sprite, frame % sprite.frameCount, item))
+        return;
+    SDL_Texture* texture = texturePages_[static_cast<std::size_t>(item.texturePageId)];
+    if (texture == nullptr)
+        return;
+    const SDL_Rect source{item.sourceX, item.sourceY,
+                          item.sourceWidth, item.sourceHeight};
+    const SDL_Rect destination{x + item.targetX - sprite.originX,
+                               y + item.targetY - sprite.originY,
+                               item.targetWidth, item.targetHeight};
+    SDL_RenderCopy(renderer_, texture, &source, &destination);
+}
+
 void PlatformSDL::present() {
     SDL_RenderPresent(renderer_);
 }

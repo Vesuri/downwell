@@ -26,6 +26,8 @@ public:
     void fillRect(int x, int y, int width, int height, Color color) override;
     void drawSpriteTiled(std::int32_t spriteId, std::uint32_t frame,
                          int x, int y) override;
+    void drawSprite(std::int32_t spriteId, std::uint32_t frame,
+                    int x, int y) override;
 
 private:
     SDL_Window* window_ = nullptr;
