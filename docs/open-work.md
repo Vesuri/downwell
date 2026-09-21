@@ -43,6 +43,8 @@
 - [x] Add an endian-safe sprite-pack reader with full reference validation.
 - [x] Load recovered texture atlases in SDL and draw a recovered player frame.
 - [x] Replace the splash-bar placeholder with recovered splash sprites.
+- [x] Define and generate an endian-safe native pack for recovered builder
+  patterns, beginning with all five area-one entrance fragments.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.

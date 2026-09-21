@@ -54,3 +54,8 @@ make verify-extraction
 `generate-room-pack.py` lowers schema-3 room data into the deterministic `DWRM`
 format documented in `docs/room-pack.md`. The copyrighted payload is generated
 locally under ignored `generated/`; only the generator and format are committed.
+
+`generate-builder-pattern-pack.py` lowers recovered level-fragment strings into
+the deterministic `DWBP` format documented in `docs/builder-pattern-pack.md`.
+It verifies the pinned Steam build through the extraction manifest and keeps
+the derived cell payload under ignored `generated/`.

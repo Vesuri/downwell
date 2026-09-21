@@ -11,6 +11,7 @@ CXXFLAGS := -std=c++17 -g -O0 -Wall -Wextra -Wpedantic -MMD -MP
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
+	src/core/BuilderPatternPack.cpp \
 	src/core/Game.cpp \
 	src/core/GameMakerRandom.cpp \
 	src/core/FontPack.cpp \
@@ -45,13 +46,15 @@ SPRITE_PACK_TEST_TARGET := build/sprite-pack-test
 SPRITE_PACK_TEST_SOURCES := tests/core/SpritePackTest.cpp src/core/SpritePack.cpp
 FONT_PACK_TEST_TARGET := build/font-pack-test
 FONT_PACK_TEST_SOURCES := tests/core/FontPackTest.cpp src/core/FontPack.cpp
+BUILDER_PATTERN_PACK_TEST_TARGET := build/builder-pattern-pack-test
+BUILDER_PATTERN_PACK_TEST_SOURCES := tests/core/BuilderPatternPackTest.cpp src/core/BuilderPatternPack.cpp
 DEFERRED_INSTANCE_TEST_TARGET := build/deferred-instance-queue-test
 DEFERRED_INSTANCE_TEST_SOURCES := tests/core/DeferredInstanceQueueTest.cpp src/core/ObjectPack.cpp
 RANDOM_TEST_TARGET := build/game-maker-random-test
 RANDOM_TEST_SOURCES := tests/core/GameMakerRandomTest.cpp src/core/GameMakerRandom.cpp
-TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(FONT_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET) $(RANDOM_TEST_TARGET)
+TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(FONT_PACK_TEST_TARGET) $(BUILDER_PATTERN_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET) $(RANDOM_TEST_TARGET)
 
-.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack verify-native-data amiga clean
+.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack generate-builder-pattern-pack verify-builder-pattern-pack verify-native-data amiga clean
 
 all: $(TARGET)
 
@@ -63,7 +66,7 @@ build/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-run: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack $(TARGET)
+run: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(TARGET)
 	./$(TARGET)
 
 $(STARTUP_TEST_TARGET): $(STARTUP_TEST_SOURCES)
@@ -106,6 +109,10 @@ $(FONT_PACK_TEST_TARGET): $(FONT_PACK_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(FONT_PACK_TEST_SOURCES)
 
+$(BUILDER_PATTERN_PACK_TEST_TARGET): $(BUILDER_PATTERN_PACK_TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(BUILDER_PATTERN_PACK_TEST_SOURCES)
+
 $(DEFERRED_INSTANCE_TEST_TARGET): $(DEFERRED_INSTANCE_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(DEFERRED_INSTANCE_TEST_SOURCES)
@@ -114,7 +121,7 @@ $(RANDOM_TEST_TARGET): $(RANDOM_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(RANDOM_TEST_SOURCES)
 
-test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack $(TEST_TARGETS)
+test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 	./$(REPLAY_TEST_TARGET)
 	./$(ALARM_TEST_TARGET)
@@ -125,6 +132,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./$(OBJECT_PACK_TEST_TARGET) generated/downwell-objects.dwob
 	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp
 	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
+	./$(BUILDER_PATTERN_PACK_TEST_TARGET) generated/downwell-builder-patterns.dwbp
 	./$(DEFERRED_INSTANCE_TEST_TARGET)
 	./$(RANDOM_TEST_TARGET)
 
@@ -164,7 +172,14 @@ verify-font-pack: $(FONT_PACK_TEST_TARGET)
 	tools/generate-font-pack.py --check
 	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
 
-verify-native-data: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack $(STARTUP_TEST_TARGET)
+generate-builder-pattern-pack:
+	tools/generate-builder-pattern-pack.py
+
+verify-builder-pattern-pack: $(BUILDER_PATTERN_PACK_TEST_TARGET)
+	tools/generate-builder-pattern-pack.py --check
+	./$(BUILDER_PATTERN_PACK_TEST_TARGET) generated/downwell-builder-patterns.dwbp
+
+verify-native-data: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(STARTUP_TEST_TARGET)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 
 amiga:
