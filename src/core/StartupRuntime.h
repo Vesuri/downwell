@@ -115,6 +115,7 @@ public:
     float mainPlayerY() const { return mainPlayerY_; }
     float mainPlayerSpeedX() const { return mainPlayerSpeedX_; }
     float mainPlayerSpeedY() const { return mainPlayerSpeedY_; }
+    bool mainPlayerGrounded() const { return mainPlayerGrounded_; }
     int mainPlayerFacing() const { return mainPlayerFacing_; }
     int mainPlayerSpriteId() const { return mainPlayerSpriteId_; }
     float mainPlayerImageIndex() const { return mainPlayerImageIndex_; }

@@ -394,6 +394,31 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "the fragment creates its exact walls and breakable blocks");
         require(runtime.randomDrawCount() == drawsBeforeStart + 83,
                 "box Create RNG ordering includes the reference gem-tile branch");
+
+        downwell::Input steerToPlatform;
+        steerToPlatform.left = true;
+        for (int tick = 0; tick < 8; ++tick)
+            runtime.step(steerToPlatform, false);
+        for (int tick = 0; tick < 120 && !runtime.mainPlayerGrounded(); ++tick)
+            runtime.step(releasedMain, false);
+        require(runtime.mainPlayerGrounded(),
+                "the player lands on solid recovered entrance geometry");
+        require(runtime.mainPlayerY() >= 1191.0F &&
+                    runtime.mainPlayerY() <= 1193.0F &&
+                    runtime.mainPlayerSpeedY() == 0.0F &&
+                    runtime.mainPlayerSpriteId() == 31,
+                "landing settles at the recovered block top without sinking");
+        bool standingOnEntranceBlock = false;
+        for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
+            const downwell::InstanceRecord& instance = runtime.instanceAt(index);
+            if (instance.active && instance.objectId == 92 &&
+                instance.y == 1216 &&
+                runtime.mainPlayerX() + 3.0F >= instance.x - 16.0F &&
+                runtime.mainPlayerX() - 4.0F <= instance.x + 15.0F)
+                standingOnEntranceBlock = true;
+        }
+        require(standingOnEntranceBlock,
+                "grounded state is backed by a generated breakable block");
     }
 }
 
