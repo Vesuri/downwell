@@ -121,6 +121,13 @@ deterministic core state. They establish the 160x284 camera, select sound 193
 to create object 382 (`ditherFade`). The spawn remains a request until deferred
 instance creation is implemented; no synthetic instance ID is invented.
 
+`DeferredInstanceQueue` now provides the bounded, allocation-free command
+primitive for that next step. It validates an entire create batch before
+changing instance storage or the `GEN8.LastObj`-seeded allocator, preserves
+command order, imports object persistence/depth, and invokes a lifecycle hook
+for each new instance. Applying it at the precise room-entry boundary remains
+separate from the primitive itself.
+
 Room-entry callbacks currently may not create or destroy instances. That
 behavior will use the same deferred command mechanism needed for safe mutation
 during step/collision dispatch rather than being guessed inside the loader.

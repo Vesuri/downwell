@@ -35,6 +35,7 @@
 - [x] Translate `rmInit`/`rmMenu` room creation into deterministic camera,
   audio, control-lock, and deferred-spawn state.
 - [x] Carry `GEN8.LastObj` in the native room pack and validate its boundary.
+- [x] Add an atomic fixed-capacity deferred instance-creation queue.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.
