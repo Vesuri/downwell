@@ -24,8 +24,11 @@ public:
     const StartupRuntime& startup() const { return startup_; }
 
 private:
+    void renderMenu(Renderer& renderer) const;
+
     std::uint64_t tick_ = 0;
     StartupRuntime startup_;
+    const ObjectPack* objectPack_ = nullptr;
     bool fire_ = false;
     bool finished_ = false;
 };

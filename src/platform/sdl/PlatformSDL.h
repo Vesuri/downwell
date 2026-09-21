@@ -28,6 +28,9 @@ public:
                          int x, int y) override;
     void drawSprite(std::int32_t spriteId, std::uint32_t frame,
                     int x, int y) override;
+    void drawSpriteTransformed(std::int32_t spriteId, std::uint32_t frame,
+                               float x, float y, float scaleX, float scaleY,
+                               float rotation) override;
 
 private:
     SDL_Window* window_ = nullptr;

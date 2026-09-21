@@ -50,6 +50,9 @@ public:
     const InstanceRecord* instance(std::uint32_t instanceId) const {
         return instances_.find(instanceId);
     }
+    const InstanceRecord& instanceAt(std::size_t index) const {
+        return instances_.at(index);
+    }
     bool roomDestinationSet() const { return roomDestinationSet_; }
     bool roomLoadSucceeded() const { return roomLoadSucceeded_; }
     bool recoveredEventBindingsActive() const { return objectPack_ != nullptr; }

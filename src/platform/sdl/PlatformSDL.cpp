@@ -2,6 +2,8 @@
 #include "core/Game.h"
 #include "core/SpritePack.h"
 #include <SDL_image.h>
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace downwell {
@@ -124,6 +126,17 @@ void PlatformSDL::drawSprite(std::int32_t spriteId,
                              std::uint32_t frame,
                              int x,
                              int y) {
+    drawSpriteTransformed(spriteId, frame, static_cast<float>(x),
+                          static_cast<float>(y), 1.0F, 1.0F, 0.0F);
+}
+
+void PlatformSDL::drawSpriteTransformed(std::int32_t spriteId,
+                                        std::uint32_t frame,
+                                        float x,
+                                        float y,
+                                        float scaleX,
+                                        float scaleY,
+                                        float rotation) {
     if (spritePack_ == nullptr || spriteId < 0)
         return;
     PackedSprite sprite;
@@ -134,14 +147,28 @@ void PlatformSDL::drawSprite(std::int32_t spriteId,
     if (!spritePack_->spriteFrame(sprite, frame % sprite.frameCount, item))
         return;
     SDL_Texture* texture = texturePages_[static_cast<std::size_t>(item.texturePageId)];
-    if (texture == nullptr)
+    if (texture == nullptr || scaleX == 0.0F || scaleY == 0.0F)
         return;
     const SDL_Rect source{item.sourceX, item.sourceY,
                           item.sourceWidth, item.sourceHeight};
-    const SDL_Rect destination{x + item.targetX - sprite.originX,
-                               y + item.targetY - sprite.originY,
-                               item.targetWidth, item.targetHeight};
-    SDL_RenderCopy(renderer_, texture, &source, &destination);
+    const float left = static_cast<float>(item.targetX - sprite.originX);
+    const float top = static_cast<float>(item.targetY - sprite.originY);
+    const float right = left + static_cast<float>(item.targetWidth);
+    const float bottom = top + static_cast<float>(item.targetHeight);
+    const float transformedLeft = std::min(left * scaleX, right * scaleX);
+    const float transformedTop = std::min(top * scaleY, bottom * scaleY);
+    const SDL_FRect destination{x + transformedLeft,
+                                y + transformedTop,
+                                std::abs(scaleX) * item.targetWidth,
+                                std::abs(scaleY) * item.targetHeight};
+    const SDL_FPoint origin{-transformedLeft, -transformedTop};
+    SDL_RendererFlip flip = SDL_FLIP_NONE;
+    if (scaleX < 0.0F)
+        flip = static_cast<SDL_RendererFlip>(flip | SDL_FLIP_HORIZONTAL);
+    if (scaleY < 0.0F)
+        flip = static_cast<SDL_RendererFlip>(flip | SDL_FLIP_VERTICAL);
+    SDL_RenderCopyExF(renderer_, texture, &source, &destination,
+                      -static_cast<double>(rotation), &origin, flip);
 }
 
 void PlatformSDL::present() {
