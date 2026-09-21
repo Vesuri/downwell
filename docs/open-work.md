@@ -44,7 +44,8 @@
 - [x] Load recovered texture atlases in SDL and draw a recovered player frame.
 - [x] Replace the splash-bar placeholder with recovered splash sprites.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
-- Select and verify the deterministic RNG algorithm against GameMaker output.
+- [x] Recover the Windows runner's WELL512 stream and integer-range semantics
+  from `Downwell.exe`, then pin portable test vectors.
 - Implement object lifecycle and event ordering.
 - Execute recovered object/instance creation logic; implement collision and draw ordering.
 - Add texture/font/audio resource loaders from generated manifests.

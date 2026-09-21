@@ -111,6 +111,20 @@ Object-specific PreCreate, Create, instance-creation-code, Game Start, and Room
 Start handlers beyond the two startup objects are not implemented yet; room
 entry currently records those instances without executing their game logic.
 
+## Windows random stream
+
+The source-of-truth `Downwell.exe` runner implements its random stream as a
+16-word WELL512 generator. `random_set_seed` expands the supplied 32-bit seed
+with the Microsoft LCG constants `0x343fd` and `0x269ec3`, storing each upper
+16-bit result. `random()` scales one WELL output by exactly 2^-32. The runner's
+`irandom()` consumes two outputs, masks the second to 31 bits, joins them into a
+positive 63-bit integer, and takes an inclusive-range modulus.
+
+`GameMakerRandom` is the portable transcription of those runner routines. Its
+tests pin raw WELL output plus `random` and `irandom` behavior. This is
+intentionally Windows-runner compatibility: GameMaker documents that seeded
+results can differ between target platforms.
+
 When both native packs are supplied, lifecycle and step dispatch resolve the
 object's recovered event binding (including inheritance) to a VM code-entry ID
 before selecting a native handler. The four implemented `objInitRm`/

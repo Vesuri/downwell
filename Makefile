@@ -12,6 +12,7 @@ LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
 	src/core/Game.cpp \
+	src/core/GameMakerRandom.cpp \
 	src/core/FontPack.cpp \
 	src/core/ObjectPack.cpp \
 	src/core/Replay.cpp \
@@ -46,7 +47,9 @@ FONT_PACK_TEST_TARGET := build/font-pack-test
 FONT_PACK_TEST_SOURCES := tests/core/FontPackTest.cpp src/core/FontPack.cpp
 DEFERRED_INSTANCE_TEST_TARGET := build/deferred-instance-queue-test
 DEFERRED_INSTANCE_TEST_SOURCES := tests/core/DeferredInstanceQueueTest.cpp src/core/ObjectPack.cpp
-TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(FONT_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET)
+RANDOM_TEST_TARGET := build/game-maker-random-test
+RANDOM_TEST_SOURCES := tests/core/GameMakerRandomTest.cpp src/core/GameMakerRandom.cpp
+TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(FONT_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET) $(RANDOM_TEST_TARGET)
 
 .PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack verify-native-data amiga clean
 
@@ -107,6 +110,10 @@ $(DEFERRED_INSTANCE_TEST_TARGET): $(DEFERRED_INSTANCE_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(DEFERRED_INSTANCE_TEST_SOURCES)
 
+$(RANDOM_TEST_TARGET): $(RANDOM_TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(RANDOM_TEST_SOURCES)
+
 test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 	./$(REPLAY_TEST_TARGET)
@@ -119,6 +126,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp
 	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
 	./$(DEFERRED_INSTANCE_TEST_TARGET)
+	./$(RANDOM_TEST_TARGET)
 
 extract:
 	tools/extract.sh
