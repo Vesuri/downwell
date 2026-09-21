@@ -473,8 +473,8 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     if (builderPatternPack_ == nullptr || !builderPatternPack_->valid() ||
         builderPatternPack_->patternCount() == 0)
         return;
-    const std::uint16_t selected = static_cast<std::uint16_t>(
-        random_.irandom(builderPatternPack_->patternCount() - 1));
+    // scrStartPat1 stores its final valid index (four) in partStart[100].
+    const std::uint16_t selected = static_cast<std::uint16_t>(random_.irandom(4));
     PackedBuilderPattern pattern;
     if (!builderPatternPack_->findPattern(
             BuilderPatternFamily::areaOneStart, selected, pattern)) {

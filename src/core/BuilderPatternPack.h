@@ -11,7 +11,10 @@ enum class BuilderPatternPackError {
     badSourceHash, wrongSize, badPattern
 };
 
-enum class BuilderPatternFamily : std::uint16_t { areaOneStart = 1 };
+enum class BuilderPatternFamily : std::uint16_t {
+    areaOneStart = 1,
+    areaOneMain = 2
+};
 
 struct PackedBuilderPattern {
     BuilderPatternFamily family;

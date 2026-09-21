@@ -45,13 +45,19 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
         error_ = BuilderPatternPackError::wrongSize; return;
     }
     error_ = BuilderPatternPackError::none;
+    std::uint16_t nextStartIndex = 0;
+    std::uint16_t nextMainIndex = 0;
     for (std::uint32_t id = 0; id < patternCount_; ++id) {
         PackedBuilderPattern value;
         pattern(id, value);
         const std::uint32_t expectedCells =
             static_cast<std::uint32_t>(value.width) * value.rowCount;
-        if (value.family != BuilderPatternFamily::areaOneStart ||
-            value.sourceIndex != id || value.width == 0 || value.rowCount == 0 ||
+        bool ordered = false;
+        if (value.family == BuilderPatternFamily::areaOneStart)
+            ordered = value.sourceIndex == nextStartIndex++;
+        if (value.family == BuilderPatternFamily::areaOneMain)
+            ordered = value.sourceIndex == nextMainIndex++;
+        if (!ordered || value.width == 0 || value.rowCount == 0 ||
             value.cellCount != expectedCells ||
             !range(value.firstCell, value.cellCount, cellCount_)) {
             error_ = BuilderPatternPackError::badPattern; return;

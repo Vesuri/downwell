@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     downwell::BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated builder-pattern pack validates");
-    require(pack.patternCount() == 5 && pack.cellCount() == 288,
-            "recovered area-one start pattern counts are pinned");
+    require(pack.patternCount() == 46 && pack.cellCount() == 4599,
+            "recovered area-one pattern counts are pinned");
 
     downwell::PackedBuilderPattern pattern;
     require(pack.findPattern(downwell::BuilderPatternFamily::areaOneStart, 0,
@@ -38,6 +38,19 @@ int main(int argc, char** argv) {
     require(!pack.findPattern(downwell::BuilderPatternFamily::areaOneStart, 5,
                               pattern),
             "unrecovered pattern indices are rejected");
+    require(pack.findPattern(downwell::BuilderPatternFamily::areaOneMain, 0,
+                             pattern) && pattern.width == 9 &&
+                pattern.rowCount == 8,
+            "first regular area-one fragment metadata is exact");
+    require(pack.cell(pattern, 8, 0, cell) && cell == '1' &&
+                pack.cell(pattern, 1, 2, cell) && cell == '%',
+            "regular fragment wall and enemy markers are exact");
+    require(pack.findPattern(downwell::BuilderPatternFamily::areaOneMain, 40,
+                             pattern) && pattern.rowCount == 10,
+            "last regular area-one fragment is addressable");
+    require(!pack.findPattern(downwell::BuilderPatternFamily::areaOneMain, 41,
+                              pattern),
+            "out-of-range regular fragment indices are rejected");
 
     std::vector<std::uint8_t> damaged = bytes;
     damaged[40] = 0xff;
