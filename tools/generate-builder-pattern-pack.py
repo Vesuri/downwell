@@ -12,16 +12,18 @@ from pathlib import Path
 
 
 MAGIC = b"DWBP"
-VERSION = 1
+VERSION = 2
 MANIFEST_SCHEMA = 3
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 AREA_ONE_START = 1
 AREA_ONE_MAIN = 2
+AREA_ONE_RIGHT = 3
 EXPECTED_START_PATTERNS = 5
 EXPECTED_MAIN_PATTERNS = 41
-EXPECTED_PATTERNS = 46
-EXPECTED_ROWS = 511
-EXPECTED_CELLS = 4599
+EXPECTED_RIGHT_PATTERNS = 10
+EXPECTED_PATTERNS = 56
+EXPECTED_ROWS = 659
+EXPECTED_CELLS = 7411
 
 HEADER = struct.Struct("<4sHHIIIQI")
 PATTERN = struct.Struct("<HHHHII")
@@ -49,7 +51,7 @@ def decode_gml_string(value):
     return "".join(output)
 
 
-def parse_patterns(source, array_name, expected_count):
+def parse_patterns(source, array_name, expected_count, expected_width):
     assignment = re.compile(
         rf'{re.escape(array_name)}\[i\]\s*=\s*"((?:\\.|[^"\\])*)";')
     values = assignment.findall(source)
@@ -70,7 +72,8 @@ def parse_patterns(source, array_name, expected_count):
         rows = [row[1:] if row.startswith("\t") else row for row in rows]
         require(rows, f"pattern {source_index} is empty")
         width = len(rows[0])
-        require(width == 9, f"pattern {source_index} width is not nine cells")
+        require(width == expected_width,
+                f"pattern {source_index} width is not {expected_width} cells")
         require(all(len(row) == width for row in rows),
                 f"pattern {source_index} has inconsistent row widths")
         require(all(0x20 <= ord(cell) <= 0x7e for row in rows for cell in row),
@@ -79,7 +82,7 @@ def parse_patterns(source, array_name, expected_count):
     return patterns
 
 
-def build_pack(manifest, start_source, main_source):
+def build_pack(manifest, start_source, main_source, right_source):
     require(manifest.get("schemaVersion") == MANIFEST_SCHEMA,
             f"expected manifest schema {MANIFEST_SCHEMA}")
     require(manifest.get("source", {}).get("sha256") == SOURCE_SHA256,
@@ -89,9 +92,11 @@ def build_pack(manifest, start_source, main_source):
     cells = bytearray()
     families = (
         (AREA_ONE_START, parse_patterns(
-            start_source, "partStart", EXPECTED_START_PATTERNS)),
+            start_source, "partStart", EXPECTED_START_PATTERNS, 9)),
         (AREA_ONE_MAIN, parse_patterns(
-            main_source, "partMain", EXPECTED_MAIN_PATTERNS)),
+            main_source, "partMain", EXPECTED_MAIN_PATTERNS, 9)),
+        (AREA_ONE_RIGHT, parse_patterns(
+            right_source, "partRight", EXPECTED_RIGHT_PATTERNS, 19)),
     )
     row_count = 0
     for family, patterns in families:
@@ -137,6 +142,9 @@ def main():
     parser.add_argument("--main-source", type=Path, default=root /
                         "extracted/utmt-0.9.2.0/CodeEntries/"
                         "gml_GlobalScript_scrLevelPat1.gml")
+    parser.add_argument("--right-source", type=Path, default=root /
+                        "extracted/utmt-0.9.2.0/CodeEntries/"
+                        "gml_GlobalScript_scrRightPat1.gml")
     parser.add_argument("--output", type=Path,
                         default=root / "generated/downwell-builder-patterns.dwbp")
     parser.add_argument("--check", action="store_true")
@@ -144,7 +152,8 @@ def main():
     payload = build_pack(
         json.loads(args.manifest.read_text(encoding="utf-8")),
         args.start_source.read_text(encoding="utf-8"),
-        args.main_source.read_text(encoding="utf-8"))
+        args.main_source.read_text(encoding="utf-8"),
+        args.right_source.read_text(encoding="utf-8"))
     digest = hashlib.sha256(payload).hexdigest()
     if args.check:
         require(args.output.is_file(), f"missing builder-pattern pack: {args.output}")

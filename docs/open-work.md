@@ -61,6 +61,8 @@
   damage, turtle immunity, death, and native animation independently per enemy.
 - [x] Make the shared fire/up control jump from solid ground, apply variable
   jump-height release, then unlock gunboot fire on the next airborne press.
+- [x] Extend the native builder pack with all ten recovered 19-cell-wide
+  area-one right-room layouts and their special doorway/object symbols.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

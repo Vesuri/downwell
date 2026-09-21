@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     downwell::BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated builder-pattern pack validates");
-    require(pack.patternCount() == 46 && pack.cellCount() == 4599,
+    require(pack.patternCount() == 56 && pack.cellCount() == 7411,
             "recovered area-one pattern counts are pinned");
 
     downwell::PackedBuilderPattern pattern;
@@ -51,6 +51,17 @@ int main(int argc, char** argv) {
     require(!pack.findPattern(downwell::BuilderPatternFamily::areaOneMain, 41,
                               pattern),
             "out-of-range regular fragment indices are rejected");
+    require(pack.findPattern(downwell::BuilderPatternFamily::areaOneRight, 0,
+                             pattern) && pattern.width == 19 &&
+                pattern.rowCount == 12,
+            "first recovered right room preserves its wider layout");
+    require(pack.cell(pattern, 10, 0, cell) && cell == '{' &&
+                pack.cell(pattern, 9, 7, cell) && cell == 'O' &&
+                pack.cell(pattern, 17, 6, cell) && cell == '@',
+            "right-room doorway, opening, and occupant markers are exact");
+    require(pack.findPattern(downwell::BuilderPatternFamily::areaOneRight, 9,
+                             pattern) && pattern.rowCount == 18,
+            "last recovered right room is addressable");
 
     std::vector<std::uint8_t> damaged = bytes;
     damaged[40] = 0xff;

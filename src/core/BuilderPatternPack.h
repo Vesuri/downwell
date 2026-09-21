@@ -13,7 +13,8 @@ enum class BuilderPatternPackError {
 
 enum class BuilderPatternFamily : std::uint16_t {
     areaOneStart = 1,
-    areaOneMain = 2
+    areaOneMain = 2,
+    areaOneRight = 3
 };
 
 struct PackedBuilderPattern {
@@ -24,7 +25,7 @@ struct PackedBuilderPattern {
 
 class BuilderPatternPack {
 public:
-    static constexpr std::uint16_t formatVersion = 1;
+    static constexpr std::uint16_t formatVersion = 2;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 32;
