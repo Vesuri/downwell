@@ -42,7 +42,8 @@ native 160x284 application-surface size; original art is not yet loaded.
 
 Space or Z advances the splash sequence, and Escape quits. `make test` checks
 the automatic 731-tick desktop transition, input-driven skipping, the
-non-desktop path, and key recovered initialization state without SDL.
+non-desktop path, key recovered initialization state, alarms, instance
+lifecycle, event phases, replay validation, and the state oracle without SDL.
 
 The cross-target replay and state-comparison contract is documented in
 [docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional

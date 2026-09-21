@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "EventScheduler.h"
 #include "StateDigest.h"
 
 namespace downwell {
@@ -43,15 +44,21 @@ void StartupRuntime::initRoomCreate() {
 void StartupRuntime::step(bool advancePressed) {
     ++tick_;
 
-    // GameMaker alarms count down once per step and dispatch on reaching zero.
-    if (InstanceRecord* instance = initRoomInstance()) {
-        const AlarmBank::FiredMask firedAlarms = instance->alarms.advance();
-        if (AlarmBank::fired(firedAlarms, 0))
+    const auto alarmEvents = [](const InstanceRecord& instance) {
+        return instance.objectId == 36
+                   ? static_cast<AlarmBank::FiredMask>(1U << 0)
+                   : static_cast<AlarmBank::FiredMask>(0);
+    };
+    const auto handler = [this, advancePressed](InstanceRecord& instance,
+                                                 StepEvent event) {
+        if (instance.objectId != 36)
+            return;
+        if (event.phase == StepEventPhase::alarm && event.subtype == 0)
             initRoomAlarm0();
-    }
-
-    if (roomId_ == entryRoomId)
-        initRoomEndStep(advancePressed);
+        if (event.phase == StepEventPhase::endStep && roomId_ == entryRoomId)
+            initRoomEndStep(advancePressed);
+    };
+    EventScheduler<2>::runStep(instances_, alarmEvents, handler);
 }
 
 void StartupRuntime::initRoomAlarm0() {

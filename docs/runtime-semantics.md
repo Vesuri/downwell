@@ -28,12 +28,31 @@ existing tick-731 and golden-state-digest tests remain unchanged, which guards
 the refactor against behavior drift.
 
 The exact position of alarm dispatch relative to Begin Step, input, Step,
-collision, and End Step remains an explicit open item for the general scheduler.
-It must not be inferred merely from the fact that the startup slice passes.
+collision, and End Step is now represented through `EventScheduler`: all Begin
+Step handlers, alarms, all Step handlers, then all End Step handlers. Movement
+and collision phases have not yet been added.
 
 These rules and the Begin Step → alarms → Step placement are documented by the
 [GameMaker alarm reference](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Instances/Instance_Variables/alarm.htm)
 and [event-order reference](https://manual.gamemaker.io/lts/en/The_Asset_Editors/Object_Properties/Event_Order.htm).
+
+## Step dispatch
+
+`EventScheduler` is allocation-free and operates on stable instance IDs rather
+than keeping pointers across callbacks. Each phase snapshots currently active
+IDs, skips instances deleted before their turn, and allows instances created in
+an earlier phase to join later phases in the same tick. Alarm masks are supplied
+per object, so nonexistent Alarm events neither count down nor dispatch.
+
+The engine-defined phase order is documented. Ordering of instances within one
+phase is explicitly not guaranteed by GameMaker and can differ by runner or
+target. The portable runtime currently chooses stable creation order to remain
+deterministic; this is a port policy, not yet a claim about the Windows runner.
+Creation/deletion behavior across phase boundaries is similarly isolated behind
+tests and remains subject to targeted Windows tracing if Downwell depends on it.
+
+`StartupRuntime` now executes `objInitRm` Alarm 0 and End Step through this
+dispatcher. Its automatic timing, replay, and golden state remain unchanged.
 
 ## Instance and room order
 
