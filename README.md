@@ -80,7 +80,8 @@ make verify-room-pack
 ```
 
 Its endian-explicit format is documented in
-[docs/room-pack.md](docs/room-pack.md).
+[docs/room-pack.md](docs/room-pack.md). `make verify-room-pack` checks both
+deterministic generation and the portable C++ decoder against the full pack.
 
 ## Amiga toolchain
 

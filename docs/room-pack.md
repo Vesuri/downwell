@@ -59,3 +59,16 @@ Layer flag bit 0 is visibility. Membership entries are u32 instance IDs. Version
 
 Names stay in the auditable JSON manifest and are not duplicated in the runtime
 pack. Numeric IDs provide the traceability seam back to GameMaker resources.
+
+## Portable reader
+
+`src/core/RoomPack` reads fields byte-by-byte and converts explicit
+little-endian integers and IEEE-754 floats. It never casts the payload to a C++
+record, so alignment, compiler padding, and the Amiga's big-endian byte order do
+not affect decoding.
+
+Construction validates magic, format/schema versions, source-hash prefix,
+overflow-safe total size, and every room/layer slice before any view is exposed.
+Tests cover malformed synthetic packs and also open the complete locally
+generated payload, confirming the audited totals and the `rmInit`/`rmMenu`
+creation-order anchors.
