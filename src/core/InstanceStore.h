@@ -27,6 +27,16 @@ struct InstanceRecord {
     bool active = true;
     std::int32_t health = 0;
     std::int32_t reward = 0;
+    float preciseX = 0.0F;
+    float preciseY = 0.0F;
+    float velocityX = 0.0F;
+    float velocityY = 0.0F;
+    float direction = 0.0F;
+    float moveSpeed = 0.0F;
+    std::int32_t motionState = 0;
+    std::int32_t auxiliaryState = 0;
+    bool motionInitialized = false;
+    bool grounded = false;
     AlarmBank alarms;
 };
 

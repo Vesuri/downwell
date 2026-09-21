@@ -456,6 +456,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         bool standingOnGeneratedBlock = false;
         bool foundInitializedBlock = false;
         bool foundInitializedEnemy = false;
+        bool foundMovingEnemy = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);
             if (instance.active && instance.objectId == 92) {
@@ -485,9 +486,13 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             if (instance.objectId == 119) { expectedHealth = 3; expectedReward = 6; }
             if (expectedHealth != 0) {
                 require(instance.health == expectedHealth &&
-                            instance.reward == expectedReward,
+                            instance.reward == expectedReward &&
+                            instance.motionInitialized,
                         "generated enemies retain recovered combat values");
                 foundInitializedEnemy = true;
+                foundMovingEnemy = foundMovingEnemy ||
+                    instance.x % 16 != 0 || instance.y % 16 != 0 ||
+                    instance.velocityX != 0.0F || instance.velocityY != 0.0F;
             }
             if (instance.active && instance.objectId == 92 &&
                 instance.y == 1328 &&
@@ -499,6 +504,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "grounded state remains backed by a generated breakable block");
         require(foundInitializedEnemy,
                 "the deterministic area-one slice contains a native enemy");
+        require(foundMovingEnemy,
+                "area-one enemies advance native fractional movement state");
         require(runtime.mainBuilderMainPatternsGenerated() == 2 &&
                     runtime.mainBuilderLastMainPattern() == 30 &&
                     runtime.mainBuilderGenerationCount() == 2,

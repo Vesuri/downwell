@@ -390,6 +390,18 @@ bool StartupRuntime::mainPlayerCollides(float x, float y) const {
     return false;
 }
 
+bool StartupRuntime::mainSolidAt(float x, float y) const {
+    for (std::size_t index = 0; index < instances_.size(); ++index) {
+        const InstanceRecord& wall = instances_.at(index);
+        if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
+            continue;
+        if (x >= wall.x - 8.0F && x <= wall.x + 7.0F &&
+            y >= wall.y - 8.0F && y <= wall.y + 7.0F)
+            return true;
+    }
+    return false;
+}
+
 bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
     float remaining = amount;
     while (std::abs(remaining) > 0.0001F) {
@@ -531,6 +543,124 @@ void StartupRuntime::updateMainEnemies() {
                                  enemy.objectId == 119;
         if (!enemy.active || !enemyObject || enemy.health <= 0)
             continue;
+        if (!enemy.motionInitialized) {
+            enemy.preciseX = static_cast<float>(enemy.x);
+            enemy.preciseY = static_cast<float>(enemy.y);
+            enemy.motionInitialized = true;
+        }
+
+        if (enemy.objectId == 111 || enemy.objectId == 112) {
+            const float halfWidth = enemy.objectId == 112 ? 8.0F : 6.0F;
+            const float foot = enemy.objectId == 112 ? 8.0F : 5.0F;
+            enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.2F);
+            enemy.grounded = mainSolidAt(enemy.preciseX,
+                                         enemy.preciseY + foot + 1.0F);
+            if (enemy.grounded) {
+                enemy.velocityY = 0.0F;
+                const float ahead = enemy.preciseX +
+                    (enemy.velocityX < 0.0F ? -halfWidth - 1.0F
+                                             : halfWidth + 1.0F);
+                if (!mainSolidAt(ahead, enemy.preciseY + foot + 1.0F))
+                    enemy.velocityX *= -1.0F;
+            }
+            const float nextX = enemy.preciseX + enemy.velocityX;
+            const float edge = nextX + (enemy.velocityX < 0.0F
+                                             ? -halfWidth : halfWidth);
+            if (mainSolidAt(edge, enemy.preciseY))
+                enemy.velocityX *= -1.0F;
+            else
+                enemy.preciseX = nextX;
+            if (!enemy.grounded) {
+                const float nextY = enemy.preciseY + enemy.velocityY;
+                if (enemy.velocityY > 0.0F &&
+                    mainSolidAt(enemy.preciseX, nextY + foot)) {
+                    while (!mainSolidAt(enemy.preciseX,
+                                        enemy.preciseY + foot + 1.0F))
+                        enemy.preciseY += 1.0F;
+                    enemy.velocityY = 0.0F;
+                    enemy.grounded = true;
+                } else {
+                    enemy.preciseY = nextY;
+                }
+            }
+            enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
+        } else if (enemy.objectId == 113) {
+            enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.15F);
+            const float nextY = enemy.preciseY + enemy.velocityY;
+            if (enemy.velocityY > 0.0F &&
+                mainSolidAt(enemy.preciseX, nextY + 8.0F)) {
+                while (!mainSolidAt(enemy.preciseX,
+                                    enemy.preciseY + 9.0F))
+                    enemy.preciseY += 1.0F;
+                enemy.velocityY = 0.0F;
+                enemy.grounded = true;
+            } else {
+                enemy.preciseY = nextY;
+                enemy.grounded = false;
+                const float nextX = enemy.preciseX + enemy.velocityX;
+                if (mainSolidAt(nextX + (enemy.velocityX < 0 ? -6.0F : 6.0F),
+                                enemy.preciseY))
+                    enemy.velocityX *= -0.3F;
+                else
+                    enemy.preciseX = nextX;
+            }
+            if (enemy.velocityX != 0.0F)
+                enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
+        } else if (enemy.objectId == 116) {
+            constexpr float pi = 3.14159265358979323846F;
+            const float target = std::atan2(-(mainPlayerY_ - enemy.preciseY),
+                                            mainPlayerX_ - enemy.preciseX) *
+                                 180.0F / pi +
+                static_cast<float>(random_.random(40.0) - 20.0);
+            float difference = enemy.direction - target;
+            while (difference > 180.0F) difference -= 360.0F;
+            while (difference < -180.0F) difference += 360.0F;
+            if (std::abs(difference) < 20.0F)
+                enemy.moveSpeed = std::min(1.25F, enemy.moveSpeed + 0.05F);
+            else
+                enemy.moveSpeed = std::max(1.0F, enemy.moveSpeed - 0.025F);
+            enemy.direction += difference > 0.0F ? -10.0F : 10.0F;
+            const float radians = enemy.direction * pi / 180.0F;
+            enemy.velocityX = std::cos(radians) * enemy.moveSpeed;
+            enemy.velocityY = -std::sin(radians) * enemy.moveSpeed;
+            const float nextX = enemy.preciseX + enemy.velocityX;
+            const float nextY = enemy.preciseY + enemy.velocityY;
+            if (!mainSolidAt(nextX, enemy.preciseY)) enemy.preciseX = nextX;
+            if (!mainSolidAt(enemy.preciseX, nextY)) enemy.preciseY = nextY;
+            enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
+        } else if (enemy.objectId == 117) {
+            if (enemy.motionState == 0) {
+                if (mainSolidAt(enemy.preciseX + 8.0F, enemy.preciseY))
+                    enemy.motionState = 1;
+                else if (mainSolidAt(enemy.preciseX - 8.0F, enemy.preciseY))
+                    enemy.motionState = -1;
+                else
+                    enemy.active = false;
+                enemy.scaleX = static_cast<float>(enemy.motionState);
+            }
+            if (enemy.active) {
+                const float vertical = enemy.velocityY < 0.0F ? -1.0F : 1.0F;
+                if (mainSolidAt(enemy.preciseX, enemy.preciseY + vertical * 8.0F) ||
+                    !mainSolidAt(enemy.preciseX + enemy.motionState * 16.0F,
+                                 enemy.preciseY + vertical * 8.0F))
+                    enemy.velocityY *= -1.0F;
+                enemy.preciseY += enemy.velocityY;
+                enemy.scaleY = enemy.velocityY < 0.0F ? 1.0F : -1.0F;
+            }
+        } else if (enemy.objectId == 119 && !enemy.grounded) {
+            enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.2F);
+            const float nextY = enemy.preciseY + enemy.velocityY;
+            if (mainSolidAt(enemy.preciseX, nextY + 6.0F)) {
+                while (!mainSolidAt(enemy.preciseX, enemy.preciseY + 7.0F))
+                    enemy.preciseY += 1.0F;
+                enemy.velocityY = 0.0F;
+                enemy.grounded = true;
+            } else {
+                enemy.preciseY = nextY;
+            }
+        }
+        enemy.x = static_cast<std::int32_t>(std::round(enemy.preciseX));
+        enemy.y = static_cast<std::int32_t>(std::round(enemy.preciseY));
         enemy.imageIndex += enemy.imageSpeed;
         if (enemy.imageIndex >= 2.0F)
             enemy.imageIndex = std::fmod(enemy.imageIndex, 2.0F);
@@ -626,32 +756,45 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 command.imageIndex = 22.0F;
             }
         }
-        if (objectId == 111)
+        if (objectId == 111) {
             command.imageSpeed = 0.25F;
+            command.velocityX = 0.5F;
+            command.motionInitialized = true;
+            command.grounded = true;
+        }
         if (objectId == 112) {
             command.imageSpeed = 0.15F;
-            random_.irandom(1); // walking = choose(1, -1).
+            command.velocityX = 0.25F;
+            command.auxiliaryState = random_.irandom(1) == 0 ? 1 : -1;
+            command.motionInitialized = true;
+            command.grounded = true;
             command.alarms.set(1, 60 + static_cast<int>(random_.irandom(60)));
         }
         if (objectId == 113) {
             command.imageSpeed = 0.0F;
+            command.motionInitialized = true;
             command.alarms.set(1,
                 60 + static_cast<int>(random_.random(60.0)));
         }
         if (objectId == 116) {
             command.imageSpeed = 0.2F;
-            random_.random(0.5); // vel = random_range(1, 1.5).
-            random_.irandom(359);
+            random_.random(0.5); // Unused recovered vel = random_range(1, 1.5).
+            command.direction = static_cast<float>(random_.irandom(359));
+            command.moveSpeed = 1.25F;
+            command.motionInitialized = true;
             command.active = false;
         }
         if (objectId == 117) {
             command.imageSpeed = 0.1F;
-            random_.irandom(1); // ysp = choose(0.1, -0.1).
+            command.velocityY = random_.irandom(1) == 0 ? 0.1F : -0.1F;
+            command.motionInitialized = true;
             command.alarms.set(1, 60);
         }
         if (objectId == 119) {
             command.imageSpeed = 0.1F;
-            random_.irandom(1); // clockwise = choose(1, -1).
+            command.motionState = random_.irandom(1) == 0 ? 1 : -1;
+            command.moveSpeed = 1.0F;
+            command.motionInitialized = true;
             command.alarms.set(0, 2);
         }
         if (objectId == 289) {
@@ -1241,6 +1384,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->imageSpeed = 0.25F;
             instance->health = 5;
             instance->reward = 6;
+            if (!instance->motionInitialized) {
+                instance->preciseX = static_cast<float>(instance->x);
+                instance->preciseY = static_cast<float>(instance->y);
+                instance->velocityX = 0.5F;
+                instance->motionInitialized = true;
+                instance->grounded = true;
+            }
         }
         return;
     case 1198: // gml_Object_enmGroundTurtle_Create_0
@@ -1249,6 +1399,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->imageSpeed = 0.15F;
             instance->health = 5;
             instance->reward = 14;
+            if (!instance->motionInitialized) {
+                instance->preciseX = static_cast<float>(instance->x);
+                instance->preciseY = static_cast<float>(instance->y);
+                instance->velocityX = 0.25F;
+                instance->motionInitialized = true;
+                instance->grounded = true;
+            }
         }
         return;
     case 1204: // gml_Object_enmFrog_Create_0
@@ -1257,6 +1414,11 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->imageSpeed = 0.0F;
             instance->health = 35;
             instance->reward = 20;
+            if (!instance->motionInitialized) {
+                instance->preciseX = static_cast<float>(instance->x);
+                instance->preciseY = static_cast<float>(instance->y);
+                instance->motionInitialized = true;
+            }
         }
         return;
     case 1230: // gml_Object_enmBat_Create_0
@@ -1265,6 +1427,12 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->imageSpeed = 0.2F;
             instance->health = 15;
             instance->reward = 12;
+            if (!instance->motionInitialized) {
+                instance->preciseX = static_cast<float>(instance->x);
+                instance->preciseY = static_cast<float>(instance->y);
+                instance->moveSpeed = 1.25F;
+                instance->motionInitialized = true;
+            }
         }
         return;
     case 1237: // gml_Object_enmSnail_Create_0
@@ -1273,6 +1441,12 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->imageSpeed = 0.1F;
             instance->health = 20;
             instance->reward = 24;
+            if (!instance->motionInitialized) {
+                instance->preciseX = static_cast<float>(instance->x);
+                instance->preciseY = static_cast<float>(instance->y);
+                instance->velocityY = 0.1F;
+                instance->motionInitialized = true;
+            }
         }
         return;
     case 1252: // gml_Object_enmCrawler_Create_0
@@ -1281,6 +1455,69 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->imageSpeed = 0.1F;
             instance->health = 3;
             instance->reward = 6;
+            if (!instance->motionInitialized) {
+                instance->preciseX = static_cast<float>(instance->x);
+                instance->preciseY = static_cast<float>(instance->y);
+                instance->moveSpeed = 1.0F;
+                instance->motionState = 1;
+                instance->motionInitialized = true;
+            }
+        }
+        return;
+    case 1199: // gml_Object_enmGroundTurtle_Alarm_1
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            instance->auxiliaryState *= -1;
+            instance->alarms.set(1, 120 + static_cast<int>(random_.irandom(180)));
+        }
+        return;
+    case 1206: // gml_Object_enmFrog_Alarm_1
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            if (instance->grounded) {
+                instance->auxiliaryState = 1;
+                instance->velocityX = mainPlayerX_ > instance->preciseX ? 1.0F : -1.0F;
+                instance->motionState = mainPlayerX_ > instance->preciseX ? 2 : -2;
+                instance->alarms.set(0, 60);
+                ++soundPlayRequests_;
+            } else {
+                instance->alarms.set(1, 60);
+            }
+        }
+        return;
+    case 1207: // gml_Object_enmFrog_Alarm_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            if (instance->grounded) {
+                instance->velocityY = -4.0F;
+                instance->velocityX = static_cast<float>(instance->motionState);
+                ++soundPlayRequests_;
+            }
+            instance->auxiliaryState = 0;
+            instance->alarms.set(1, 60);
+        }
+        return;
+    case 1254: // gml_Object_enmCrawler_Alarm_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            if (instance->grounded) {
+                const float crawl = instance->motionState > 0 ? 1.0F : -1.0F;
+                if (mainSolidAt(instance->preciseX + crawl,
+                                instance->preciseY)) {
+                    instance->velocityX = 0.0F;
+                    instance->velocityY = -crawl;
+                } else {
+                    instance->velocityX = crawl;
+                    instance->velocityY = 0.0F;
+                }
+                const float nextX = instance->preciseX + instance->velocityX;
+                const float nextY = instance->preciseY + instance->velocityY;
+                if (!mainSolidAt(nextX, nextY)) {
+                    instance->preciseX = nextX;
+                    instance->preciseY = nextY;
+                }
+            }
+            instance->alarms.set(0, 2);
         }
         return;
     case 2385: // gml_Object_Scattered16_Create_0
@@ -1645,7 +1882,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(26); // Startup-state digest schema.
+    digest.addU32(27); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1776,6 +2013,16 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addBool(instance.active);
         digest.addI32(instance.health);
         digest.addI32(instance.reward);
+        digest.addF32(instance.preciseX);
+        digest.addF32(instance.preciseY);
+        digest.addF32(instance.velocityX);
+        digest.addF32(instance.velocityY);
+        digest.addF32(instance.direction);
+        digest.addF32(instance.moveSpeed);
+        digest.addI32(instance.motionState);
+        digest.addI32(instance.auxiliaryState);
+        digest.addBool(instance.motionInitialized);
+        digest.addBool(instance.grounded);
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm)
             digest.addI32(instance.alarms.get(alarm));
     }

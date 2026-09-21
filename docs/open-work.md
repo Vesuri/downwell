@@ -70,6 +70,8 @@
 - [x] Preserve both irregular recovered area-one shop patterns and implement
   their no-mirroring selection path, while retaining the original 1-1 shop
   suppression for the default play style.
+- [x] Give all six area-one enemies native fractional motion state and their
+  recovered ground, jump, steering, wall-crawl, and initial latch behaviours.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

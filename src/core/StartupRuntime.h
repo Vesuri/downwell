@@ -181,6 +181,7 @@ private:
     void updateMainCamera(InstanceRecord& instance);
     void updateMainBuilder(InstanceRecord& instance);
     bool mainPlayerCollides(float x, float y) const;
+    bool mainSolidAt(float x, float y) const;
     bool moveMainPlayerAxis(float amount, bool horizontal);
     void fireMainGun(InstanceRecord& instance);
     void updateMainBullets();

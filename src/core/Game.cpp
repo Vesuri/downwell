@@ -90,6 +90,13 @@ void Game::renderMain(Renderer& renderer) const {
         if (instance.objectId == 293) sprite = 569;
         if (instance.objectId == 296) sprite = 568;
         if (instance.objectId == 109) sprite = 139;
+        if (instance.objectId == 111 && !instance.grounded) sprite = 164;
+        if (instance.objectId == 112 && !instance.grounded) sprite = 187;
+        if (instance.objectId == 112 && instance.grounded &&
+            instance.auxiliaryState != 0) sprite = 188;
+        if (instance.objectId == 113 && !instance.grounded) sprite = 168;
+        if (instance.objectId == 113 && instance.grounded &&
+            instance.auxiliaryState != 0) sprite = 170;
         if (sprite >= 0)
             renderer.drawSpriteTransformed(
                 sprite, static_cast<std::uint32_t>(instance.imageIndex),
