@@ -16,6 +16,7 @@
 
 ## Host reference
 
+- [x] Implement and test the deterministic `rmInit` to `rmMenu` startup model.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Define deterministic RNG and input replay formats.
 - Implement object lifecycle and event ordering.

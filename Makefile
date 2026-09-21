@@ -12,14 +12,17 @@ LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
 	src/core/Game.cpp \
+	src/core/StartupRuntime.cpp \
 	src/platform/sdl/PlatformSDL.cpp \
 	src/main.cpp
 
 OBJECTS := $(patsubst %.cpp,build/%.o,$(SOURCES))
 DEPS    := $(OBJECTS:.o=.d)
 TARGET  := build/downwell-sdl
+TEST_TARGET := build/startup-runtime-test
+TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp
 
-.PHONY: all run extract verify-extraction amiga clean
+.PHONY: all run test extract verify-extraction amiga clean
 
 all: $(TARGET)
 
@@ -33,6 +36,13 @@ build/%.o: %.cpp
 
 run: $(TARGET)
 	./$(TARGET)
+
+$(TEST_TARGET): $(TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(TEST_SOURCES)
+
+test: $(TEST_TARGET)
+	./$(TEST_TARGET)
 
 extract:
 	tools/extract.sh

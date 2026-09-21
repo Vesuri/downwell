@@ -25,21 +25,24 @@ captures/             reference captures and replay evidence; ignored
 build/                host output; ignored
 ```
 
-## Host smoke build
+## Host reference build
 
 Requirements: a C++17 compiler, `pkg-config`, and SDL2.
 
 ```sh
 make
+make test
 make run
 ```
 
-The current executable is deliberately only a platform-boundary smoke test. It
-opens a logical 320x568 surface, runs a fixed 60 Hz update, and exercises the
-input/render seam without incorporating recovered game code or assets.
+The current executable runs a fixed 60 Hz model of the recovered startup path:
+the true `rmInit` entry room, desktop splash timing, and deterministic
+transition to `rmMenu`. It renders an asset-free diagnostic at GameMaker's
+native 160x284 application-surface size; original art is not yet loaded.
 
-Controls: left/right arrows move the marker, Space or Z toggles the input
-indicator, Escape quits.
+Space or Z advances the splash sequence, and Escape quits. `make test` checks
+the automatic 731-tick desktop transition, input-driven skipping, the
+non-desktop path, and key recovered initialization state without SDL.
 
 ## GameMaker extraction
 

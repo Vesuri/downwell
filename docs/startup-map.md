@@ -98,3 +98,11 @@ trying to render the complete menu. That keeps the slice small while exercising
 the parts of GameMaker semantics needed by the rest of the port: room ordering,
 instance creation, Create/End Step/Alarm events, persistence, globals, arrays,
 script calls and room transitions.
+
+## Host status
+
+`src/core/StartupRuntime` now implements this bounded state model independently
+of SDL. Tests pin the recovered initialization state, immediate non-desktop
+transition, input-driven splash skipping, alarm delays, and the automatic
+desktop transition at tick 731. The current SDL view is deliberately diagnostic
+and contains no extracted art.

@@ -10,7 +10,7 @@ PlatformSDL::PlatformSDL() {
         return;
     }
 
-    window_ = SDL_CreateWindow("Downwell port — SDL reference scaffold",
+    window_ = SDL_CreateWindow("Downwell port — recovered startup reference",
                                SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                480, 852, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!window_) {
