@@ -54,6 +54,15 @@ public:
     bool recoveredEventBindingsActive() const { return objectPack_ != nullptr; }
     std::uint32_t implementedCodeCalls() const { return implementedCodeCalls_; }
     std::uint32_t unimplementedCodeCalls() const { return unimplementedCodeCalls_; }
+    int cameraViewWidth() const { return cameraViewWidth_; }
+    int cameraViewHeight() const { return cameraViewHeight_; }
+    int backgroundMusicId() const { return backgroundMusicId_; }
+    bool controlsLocked() const { return controlsLocked_; }
+    std::uint32_t soundGainRequests() const { return soundGainRequests_; }
+    std::uint32_t soundPlayRequests() const { return soundPlayRequests_; }
+    std::uint32_t ditherFadeSpawnRequests() const {
+        return ditherFadeSpawnRequests_;
+    }
     bool inMenu() const { return roomId_ == menuRoomId; }
     std::uint64_t stateDigest() const;
 
@@ -91,6 +100,13 @@ private:
     bool roomLoadSucceeded_ = true;
     std::uint32_t implementedCodeCalls_ = 0;
     std::uint32_t unimplementedCodeCalls_ = 0;
+    int cameraViewWidth_ = 0;
+    int cameraViewHeight_ = 0;
+    int backgroundMusicId_ = -1;
+    bool controlsLocked_ = false;
+    std::uint32_t soundGainRequests_ = 0;
+    std::uint32_t soundPlayRequests_ = 0;
+    std::uint32_t ditherFadeSpawnRequests_ = 0;
 };
 
 } // namespace downwell

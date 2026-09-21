@@ -31,6 +31,8 @@ void testDesktopBootState() {
     require(runtime.initTimes() == 1, "scrInitialize increments initTimes");
     require(runtime.showSplash() == 1, "desktop enables splash sequence");
     require(!runtime.roomDestinationSet(), "destination starts unset");
+    require(runtime.cameraViewWidth() == 160 && runtime.cameraViewHeight() == 284,
+            "rmInit creation code configures recovered camera size");
 }
 
 void testNonDesktopSkipsSplash() {
@@ -42,6 +44,13 @@ void testNonDesktopSkipsSplash() {
     require(runtime.activeInstanceCount() == 1, "room transition removes room-owned instance");
     require(runtime.hasInstance(100065), "persistent controller survives room transition");
     require(!runtime.hasInstance(100066), "rmInit transition object is removed");
+    require(runtime.backgroundMusicId() == 193,
+            "rmMenu selects recovered bgmOverworld resource");
+    require(runtime.controlsLocked(), "rmMenu locks player control");
+    require(runtime.soundGainRequests() == 1 && runtime.soundPlayRequests() == 1,
+            "rmMenu emits deterministic audio requests");
+    require(runtime.ditherFadeSpawnRequests() == 1,
+            "rmMenu records its deferred ditherFade spawn");
 }
 
 void testRecoveredDesktopTiming() {
@@ -114,8 +123,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     if (objects != nullptr) {
         require(runtime.recoveredEventBindingsActive(),
                 "recovered event bindings are active");
-        require(runtime.implementedCodeCalls() == 2,
-                "both implemented Create handlers route by recovered code ID");
+        require(runtime.implementedCodeCalls() == 3,
+                "rmInit room code and both Create handlers route by code ID");
         require(runtime.unimplementedCodeCalls() > 0,
                 "unsupported recovered startup code is measured explicitly");
     }
@@ -133,8 +142,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     require(player->objectId == 35, "rmMenu player has recovered object ID");
     require(player->roomId == 20, "rmMenu player belongs to recovered room");
     if (objects != nullptr)
-        require(runtime.implementedCodeCalls() == 3,
-                "End Step transition routes by recovered code ID");
+        require(runtime.implementedCodeCalls() == 5,
+                "End Step and rmMenu room code route by recovered code ID");
 }
 
 } // namespace

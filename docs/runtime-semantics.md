@@ -115,6 +115,12 @@ before selecting a native handler. The four implemented `objInitRm`/
 object ID. Every resolved but untranslated code call is counted explicitly;
 the runtime does not silently treat broader menu behavior as implemented.
 
+Room creation code IDs 648 (`rmInit`) and 714 (`rmMenu`) are translated as
+deterministic core state. They establish the 160x284 camera, select sound 193
+(`bgmOverworld`), emit gain/play requests, lock control, and enqueue the intent
+to create object 382 (`ditherFade`). The spawn remains a request until deferred
+instance creation is implemented; no synthetic instance ID is invented.
+
 Room-entry callbacks currently may not create or destroy instances. That
 behavior will use the same deferred command mechanism needed for safe mutation
 during step/collision dispatch rather than being guessed inside the loader.

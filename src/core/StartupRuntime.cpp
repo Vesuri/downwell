@@ -28,6 +28,13 @@ void StartupRuntime::reset(PlatformProfile profile) {
     roomLoadSucceeded_ = true;
     implementedCodeCalls_ = 0;
     unimplementedCodeCalls_ = 0;
+    cameraViewWidth_ = 0;
+    cameraViewHeight_ = 0;
+    backgroundMusicId_ = -1;
+    controlsLocked_ = false;
+    soundGainRequests_ = 0;
+    soundPlayRequests_ = 0;
+    ditherFadeSpawnRequests_ = 0;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -153,17 +160,39 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
 }
 
 void StartupRuntime::dispatchRoomCreation(std::int32_t roomId) {
-    if (objectPack_ == nullptr || roomPack_ == nullptr)
-        return;
-    PackedRoom room;
-    if (roomPack_->findRoom(roomId, room) && room.creationCodeId != -1)
-        executeCode(nullptr, room.creationCodeId);
+    std::int32_t codeId = -1;
+    if (roomPack_ != nullptr) {
+        PackedRoom room;
+        if (roomPack_->findRoom(roomId, room))
+            codeId = room.creationCodeId;
+    } else if (roomId == entryRoomId) {
+        codeId = 648;
+    } else if (roomId == menuRoomId) {
+        codeId = 714;
+    }
+    if (codeId != -1)
+        executeCode(nullptr, codeId);
 }
 
 void StartupRuntime::executeCode(InstanceRecord*,
                                  std::int32_t codeId,
                                  bool advancePressed) {
     switch (codeId) {
+    case 648: // gml_Room_rmInit_Create
+        ++implementedCodeCalls_;
+        cameraViewWidth_ = surfaceWidth;
+        cameraViewHeight_ = surfaceHeight;
+        return;
+    case 714: // gml_Room_rmMenu_Create
+        ++implementedCodeCalls_;
+        cameraViewWidth_ = surfaceWidth;
+        cameraViewHeight_ = surfaceHeight;
+        backgroundMusicId_ = 193; // bgmOverworld
+        ++soundGainRequests_;
+        ++soundPlayRequests_;
+        ++ditherFadeSpawnRequests_; // object 382; applied by deferred creation later.
+        controlsLocked_ = true;
+        return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;
         initRoomCreate();
@@ -266,7 +295,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(5); // Startup-state digest schema.
+    digest.addU32(6); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -276,6 +305,13 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(splashSpeed_);
     digest.addBool(roomDestinationSet_);
     digest.addBool(roomLoadSucceeded_);
+    digest.addI32(cameraViewWidth_);
+    digest.addI32(cameraViewHeight_);
+    digest.addI32(backgroundMusicId_);
+    digest.addBool(controlsLocked_);
+    digest.addU32(soundGainRequests_);
+    digest.addU32(soundPlayRequests_);
+    digest.addU32(ditherFadeSpawnRequests_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

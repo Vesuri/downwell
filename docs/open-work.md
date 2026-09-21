@@ -31,6 +31,8 @@
 - [x] Add an endian-safe object-pack reader with inherited-event lookup.
 - [x] Route implemented startup lifecycle and step handlers through recovered
   object-event code IDs.
+- [x] Translate `rmInit`/`rmMenu` room creation into deterministic camera,
+  audio, control-lock, and deferred-spawn state.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.
