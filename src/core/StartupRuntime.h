@@ -215,7 +215,7 @@ private:
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
     float mainCameraY_ = 176.0F;
-    float mainCameraMemorizeY_ = 0.0F;
+    float mainCameraTargetY_ = 176.0F;
 };
 
 } // namespace downwell

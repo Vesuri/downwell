@@ -279,8 +279,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainPlayerSpriteId() == 37 &&
                     runtime.mainPlayerImageIndex() == 4.0F,
                 "fall speed selects the recovered airborne animation frame");
-        require(runtime.mainCameraViewY() < 34.0F,
-                "rmMain camera biases the falling player toward the lower view");
+        require(runtime.mainCameraViewY() > 50.0F &&
+                    runtime.mainCameraViewY() < 70.0F,
+                "rmMain camera follows the fall with recovered smoothing and bias");
         for (int tick = 0; tick < 20; ++tick)
             runtime.step(fallRight, false);
         require(runtime.mainPlayerX() < 285.0F,

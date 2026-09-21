@@ -94,7 +94,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
-    mainCameraMemorizeY_ = 0.0F;
+    mainCameraTargetY_ = 176.0F;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -406,21 +406,23 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
 void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     if (!mainCameraInitialized_ || !mainPlayerInitialized_)
         return;
-    float targetX = 240.0F;
-    float targetY = mainPlayerY_;
-    float slowdownY = 5.0F;
-    if (mainPlayerX_ >= 160.0F) {
-        if (mainCameraMemorizeY_ == 0.0F)
-            mainCameraMemorizeY_ = mainPlayerY_;
-        targetY = mainCameraMemorizeY_ - 104.0F;
-        slowdownY = mainCameraX_ == 240.0F ? 3.0F : 1.0F;
+    float targetX = mainCameraX_;
+    float slowdownX = 1.0F;
+    if (mainPlayerX_ > 160.0F && mainPlayerX_ < 320.0F) {
+        // camMain follows the playable center shaft with its recovered +24
+        // downward bias. For this 480-pixel room, the horizontal clamps both
+        // resolve to 240 while the player remains in the center section.
+        targetX = 240.0F;
+        mainCameraTargetY_ = mainPlayerY_ + 24.0F;
+        slowdownX = mainCameraX_ > 160.0F && mainCameraX_ < 320.0F
+                        ? 10.0F : 1.0F;
     } else {
-        mainCameraMemorizeY_ = 0.0F;
-        targetX = 80.0F;
-        slowdownY = mainCameraX_ == 80.0F ? 5.0F : 1.0F;
+        targetX = mainPlayerX_ < 160.0F ? 80.0F : 400.0F;
     }
-    mainCameraX_ += (targetX - mainCameraX_) / 10.0F;
-    mainCameraY_ += ((targetY + 48.0F) - mainCameraY_) / slowdownY;
+    mainCameraX_ += (targetX - mainCameraX_) / slowdownX;
+    mainCameraY_ += (mainCameraTargetY_ - mainCameraY_) / 5.0F;
+    if (mainCameraY_ < 142.0F)
+        mainCameraY_ = 142.0F;
     instance.x = static_cast<std::int32_t>(std::round(mainCameraX_));
     instance.y = static_cast<std::int32_t>(std::round(mainCameraY_));
 }
@@ -698,7 +700,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainCameraInitialized_ = true;
             mainCameraX_ = static_cast<float>(instance->x);
             mainCameraY_ = static_cast<float>(instance->y);
-            mainCameraMemorizeY_ = 0.0F;
+            mainCameraTargetY_ = mainCameraY_;
         }
         return;
     case 999: // gml_Object_camMain_Step_0 (menu/rmMain camera subsets)
@@ -956,7 +958,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);
-    digest.addF32(mainCameraMemorizeY_);
+    digest.addF32(mainCameraTargetY_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);
