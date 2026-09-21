@@ -111,6 +111,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainActivationY_ = 0;
     mainEnemiesActivated_ = 0;
     mainInstancesRetired_ = 0;
+    mainEnemiesDefeated_ = 0;
     mainBulletCount_ = 0;
     mainBuilderInitialized_ = false;
     mainBuilderY_ = 704;
@@ -236,6 +237,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         flushDeferredInstances(instances_, roomId_);
     if (roomId_ == mainRoomId) {
         updateMainBullets();
+        updateMainEnemies();
         updateMainLifecycle();
     }
 }
@@ -420,6 +422,24 @@ InstanceRecord* StartupRuntime::mainBulletCollision(float x, float y) {
     return nullptr;
 }
 
+InstanceRecord* StartupRuntime::mainBulletEnemyCollision(float x, float y) {
+    for (std::size_t index = 0; index < instances_.size(); ++index) {
+        InstanceRecord& enemy = instances_.at(index);
+        const bool enemyObject = enemy.objectId == 111 ||
+                                 enemy.objectId == 112 ||
+                                 enemy.objectId == 113 ||
+                                 enemy.objectId == 116 ||
+                                 enemy.objectId == 117 ||
+                                 enemy.objectId == 119;
+        if (!enemy.active || !enemyObject || enemy.health <= 0)
+            continue;
+        if (x >= enemy.x - 8.0F && x <= enemy.x + 7.0F &&
+            y >= enemy.y - 8.0F && y <= enemy.y + 7.0F)
+            return &enemy;
+    }
+    return nullptr;
+}
+
 void StartupRuntime::fireMainGun(InstanceRecord& instance) {
     if (mainAmmo_ <= 0) {
         if (mainPlayerSpeedY_ > 3.0F)
@@ -452,6 +472,21 @@ void StartupRuntime::updateMainBullets() {
         bool alive = true;
         for (int pixel = 0; pixel < 8; ++pixel) {
             bullet.y += 1.0F;
+            InstanceRecord* enemy = mainBulletEnemyCollision(bullet.x, bullet.y);
+            if (enemy != nullptr) {
+                // Ground turtles are bulletImmune in their recovered Create
+                // event. Other area-one enemies take the usual gun's 10 dmg.
+                if (enemy->objectId != 112) {
+                    enemy->health -= 10;
+                    if (enemy->health <= 0) {
+                        enemy->active = false;
+                        ++mainEnemiesDefeated_;
+                    }
+                }
+                ++soundPlayRequests_;
+                alive = false;
+                break;
+            }
             InstanceRecord* wall = mainBulletCollision(bullet.x, bullet.y);
             if (wall != nullptr) {
                 if (wall->objectId == 92) {
@@ -472,6 +507,23 @@ void StartupRuntime::updateMainBullets() {
             mainBullets_[write++] = bullet;
     }
     mainBulletCount_ = write;
+}
+
+void StartupRuntime::updateMainEnemies() {
+    for (std::size_t index = 0; index < instances_.size(); ++index) {
+        InstanceRecord& enemy = instances_.at(index);
+        const bool enemyObject = enemy.objectId == 111 ||
+                                 enemy.objectId == 112 ||
+                                 enemy.objectId == 113 ||
+                                 enemy.objectId == 116 ||
+                                 enemy.objectId == 117 ||
+                                 enemy.objectId == 119;
+        if (!enemy.active || !enemyObject || enemy.health <= 0)
+            continue;
+        enemy.imageIndex += enemy.imageSpeed;
+        if (enemy.imageIndex >= 2.0F)
+            enemy.imageIndex = std::fmod(enemy.imageIndex, 2.0F);
+    }
 }
 
 void StartupRuntime::updateMainLifecycle() {
@@ -973,6 +1025,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainActivationY_ = 0;
                 mainEnemiesActivated_ = 0;
                 mainInstancesRetired_ = 0;
+                mainEnemiesDefeated_ = 0;
                 mainBulletCount_ = 0;
                 instance->alarms.set(2, 30);
             }
@@ -1054,33 +1107,51 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 1193: // gml_Object_enmSnake_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
             instance->imageSpeed = 0.25F;
+            instance->health = 5;
+            instance->reward = 6;
+        }
         return;
     case 1198: // gml_Object_enmGroundTurtle_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
             instance->imageSpeed = 0.15F;
+            instance->health = 5;
+            instance->reward = 14;
+        }
         return;
     case 1204: // gml_Object_enmFrog_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
             instance->imageSpeed = 0.0F;
+            instance->health = 35;
+            instance->reward = 20;
+        }
         return;
     case 1230: // gml_Object_enmBat_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
             instance->imageSpeed = 0.2F;
+            instance->health = 15;
+            instance->reward = 12;
+        }
         return;
     case 1237: // gml_Object_enmSnail_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
             instance->imageSpeed = 0.1F;
+            instance->health = 20;
+            instance->reward = 24;
+        }
         return;
     case 1252: // gml_Object_enmCrawler_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
             instance->imageSpeed = 0.1F;
+            instance->health = 3;
+            instance->reward = 6;
+        }
         return;
     case 2385: // gml_Object_Scattered16_Create_0
         ++implementedCodeCalls_;
@@ -1444,7 +1515,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(21); // Startup-state digest schema.
+    digest.addU32(22); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1523,6 +1594,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainActivationY_);
     digest.addU32(mainEnemiesActivated_);
     digest.addU32(mainInstancesRetired_);
+    digest.addU32(mainEnemiesDefeated_);
     digest.addU32(static_cast<std::uint32_t>(mainBulletCount_));
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         digest.addF32(mainBullets_[index].x);
@@ -1563,6 +1635,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(instance.depth);
         digest.addBool(instance.persistent);
         digest.addBool(instance.active);
+        digest.addI32(instance.health);
+        digest.addI32(instance.reward);
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm)
             digest.addI32(instance.alarms.get(alarm));
     }

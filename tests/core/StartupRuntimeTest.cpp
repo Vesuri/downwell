@@ -455,6 +455,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "the airborne-to-grounded edge fully recharges the gunboots");
         bool standingOnGeneratedBlock = false;
         bool foundInitializedBlock = false;
+        bool foundInitializedEnemy = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);
             if (instance.active && instance.objectId == 92) {
@@ -474,6 +475,20 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                             (instance.scaleX == 1.0F || instance.scaleX == -1.0F) &&
                             instance.imageIndex >= 0.0F && instance.imageIndex <= 16.0F,
                         "generated scenery retains its recovered random Create state");
+            int expectedHealth = 0;
+            int expectedReward = 0;
+            if (instance.objectId == 111) { expectedHealth = 5; expectedReward = 6; }
+            if (instance.objectId == 112) { expectedHealth = 5; expectedReward = 14; }
+            if (instance.objectId == 113) { expectedHealth = 35; expectedReward = 20; }
+            if (instance.objectId == 116) { expectedHealth = 15; expectedReward = 12; }
+            if (instance.objectId == 117) { expectedHealth = 20; expectedReward = 24; }
+            if (instance.objectId == 119) { expectedHealth = 3; expectedReward = 6; }
+            if (expectedHealth != 0) {
+                require(instance.health == expectedHealth &&
+                            instance.reward == expectedReward,
+                        "generated enemies retain recovered combat values");
+                foundInitializedEnemy = true;
+            }
             if (instance.active && instance.objectId == 92 &&
                 instance.y == 1328 &&
                 runtime.mainPlayerX() + 3.0F >= instance.x - 8.0F &&
@@ -482,6 +497,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         require(foundInitializedBlock && standingOnGeneratedBlock,
                 "grounded state remains backed by a generated breakable block");
+        require(foundInitializedEnemy,
+                "the deterministic area-one slice contains a native enemy");
         require(runtime.mainBuilderMainPatternsGenerated() == 2 &&
                     runtime.mainBuilderLastMainPattern() == 30 &&
                     runtime.mainBuilderGenerationCount() == 2,

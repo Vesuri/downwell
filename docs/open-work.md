@@ -57,6 +57,8 @@
   shot gating, recoil state, landing detection, and full charge restoration.
 - [x] Add the recovered downward activation frontier and out-of-view cleanup
   window for generated area-one geometry, scenery, and enemies.
+- [x] Carry recovered area-one enemy health/reward state and resolve usual-gun
+  damage, turtle immunity, death, and native animation independently per enemy.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry
