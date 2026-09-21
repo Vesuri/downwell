@@ -10,8 +10,9 @@ namespace downwell {
 
 class Game {
 public:
-    static constexpr int logicalWidth = StartupRuntime::surfaceWidth;
+    static constexpr int logicalWidth = 380;
     static constexpr int logicalHeight = StartupRuntime::surfaceHeight;
+    static constexpr int playfieldX = (logicalWidth - StartupRuntime::surfaceWidth) / 2;
     static constexpr int ticksPerSecond = 60;
 
     explicit Game(const RoomPack* roomPack = nullptr,
@@ -28,6 +29,7 @@ private:
     void renderMenu(Renderer& renderer) const;
     void renderPlayMenu(Renderer& renderer) const;
     void renderMain(Renderer& renderer) const;
+    void renderLandscapeHud(Renderer& renderer) const;
 
     std::uint64_t tick_ = 0;
     StartupRuntime startup_;

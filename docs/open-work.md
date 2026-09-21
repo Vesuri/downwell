@@ -74,6 +74,9 @@
   recovered ground, jump, steering, wall-crawl, and initial latch behaviours.
 - [x] Split defeated-enemy rewards into recovered two- and ten-value physical
   gems with bounce, attraction, collection, expiry, and fixed-capacity state.
+- [x] Switch SDL to the recovered PC 380x284 presentation, centring the
+  unchanged 160x284 playfield and moving health, currency, ammo, and streak
+  presentation into the 4:3 HUD paths.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

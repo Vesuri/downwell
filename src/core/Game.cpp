@@ -4,6 +4,36 @@
 #include <cmath>
 #include <string>
 namespace downwell {
+namespace {
+class OffsetRenderer final : public Renderer {
+public:
+    OffsetRenderer(Renderer& renderer, int x) : renderer_(renderer), x_(x) {}
+    void clear(Color color) override { renderer_.clear(color); }
+    void fillRect(int x, int y, int width, int height, Color color) override {
+        renderer_.fillRect(x + x_, y, width, height, color);
+    }
+    void drawSpriteTiled(std::int32_t id, std::uint32_t frame,
+                         int x, int y) override {
+        renderer_.drawSpriteTiled(id, frame, x + x_, y);
+    }
+    void drawSprite(std::int32_t id, std::uint32_t frame,
+                    int x, int y) override {
+        renderer_.drawSprite(id, frame, x + x_, y);
+    }
+    void drawSpriteTransformed(std::int32_t id, std::uint32_t frame,
+                               float x, float y, float sx, float sy,
+                               float rotation) override {
+        renderer_.drawSpriteTransformed(id, frame, x + x_, y, sx, sy, rotation);
+    }
+    void drawText(std::int32_t id, const char* text, float x, float y,
+                  Color color, TextAlign align) override {
+        renderer_.drawText(id, text, x + x_, y, color, align);
+    }
+private:
+    Renderer& renderer_;
+    int x_;
+};
+} // namespace
 
 Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
            const BuilderPatternPack* builderPatternPack)
@@ -20,20 +50,22 @@ void Game::update(const Input& input) {
 
 void Game::render(Renderer& renderer) const {
     renderer.clear({10, 10, 12, 255});
+    OffsetRenderer playfield(renderer, playfieldX);
     if (startup_.inMenu()) {
-        renderMenu(renderer);
+        renderMenu(playfield);
     } else if (startup_.inPlayMenu()) {
-        renderPlayMenu(renderer);
+        renderPlayMenu(playfield);
     } else if (startup_.inMainRoom()) {
-        renderMain(renderer);
+        renderMain(playfield);
+        renderLandscapeHud(renderer);
     } else {
         const int stage = startup_.showSplash();
         if (stage == 2)
-            renderer.drawSprite(696, 0, 80, 140); // sprDevolverLogo
+            playfield.drawSprite(696, 0, 80, 140); // sprDevolverLogo
         if (stage == 4 || stage == 5)
-            renderer.drawSprite(695, 0, 80, 140); // sprControls
+            playfield.drawSprite(695, 0, 80, 140); // sprControls
         if (stage == 5 || stage == 6)
-            renderer.drawSpriteTiled(733, 11, -300, 0); // sprDitherFade
+            playfield.drawSpriteTiled(733, 11, -300, 0); // sprDitherFade
     }
 }
 
@@ -125,45 +157,50 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<int>(gem.y - viewY));
     }
 
-    // scrDrawHud's default 160-pixel charge gauge. The animated fill and pop
-    // frames settle on these frames; retaining the one-pixel construction also
-    // preserves the original eight-charge divider positions.
-    constexpr int chargePixels = 123;
-    constexpr int chargeX = 33;
-    constexpr int gaugeY = 21;
-    const float filledPixels = chargePixels * (startup_.mainAmmo() / 8.0F);
-    renderer.drawSprite(373, 0, 0, gaugeY); // sprNewHudGauge
-    for (int pixel = 0; pixel < chargePixels; ++pixel) {
-        if (pixel == 0 && pixel < filledPixels) {
-            renderer.drawSprite(381, 1, chargeX, gaugeY - 3);
-        } else if (pixel < filledPixels) {
-            renderer.drawSprite(379, 7, chargeX + pixel, gaugeY - 3);
-        } else {
-            renderer.drawSprite(382, 0, chargeX + pixel, gaugeY - 3);
-        }
-    }
-    constexpr float chargeWidth = chargePixels / 8.0F;
-    for (float divide = chargePixels; divide > 0.0F; divide -= chargeWidth) {
-        if (divide < filledPixels)
-            renderer.drawSprite(381, 0,
-                                chargeX + static_cast<int>(divide),
-                                gaugeY - 3);
-    }
-    renderer.drawSprite(373, 1, 0, gaugeY);
+}
 
-    const std::string ammo = std::to_string(startup_.mainAmmo());
-    constexpr float textX = 16.0F;
-    constexpr float textY = gaugeY + 3.0F;
-    renderer.drawText(2, ammo.c_str(), textX - 1.0F, textY,
-                      {255, 0, 0, 255}, TextAlign::center);
-    renderer.drawText(2, ammo.c_str(), textX, textY - 1.0F,
-                      {255, 0, 0, 255}, TextAlign::center);
-    renderer.drawText(2, ammo.c_str(), textX + 1.0F, textY,
-                      {0, 0, 0, 255}, TextAlign::center);
-    renderer.drawText(2, ammo.c_str(), textX, textY + 1.0F,
-                      {0, 0, 0, 255}, TextAlign::center);
-    renderer.drawText(2, ammo.c_str(), textX, textY,
+void Game::renderLandscapeHud(Renderer& renderer) const {
+    constexpr int origin = playfieldX;
+    renderer.drawSprite(408, 0, origin - 2, 0);
+    renderer.drawSpriteTransformed(408, 0, origin + 162, 0,
+                                   -1.0F, 1.0F, 0.0F);
+
+    // Recovered scrDrawHud4x3 coordinates use the playfield's left edge as
+    // zero, so its negative left HUD and positive right HUD land naturally in
+    // the 110-pixel side regions after adding origin.
+    renderer.drawSprite(415, 1, origin - 102, 6);
+    renderer.fillRect(origin - 98, 11, 80, 6, {255, 0, 0, 255});
+    renderer.drawSprite(415, 0, origin - 102, 6);
+    renderer.drawText(2, "4/4", origin - 58, 15,
                       {255, 255, 255, 255}, TextAlign::center);
+
+    constexpr int gaugeX = origin + 174;
+    constexpr int gaugeTop = 43;
+    constexpr int gaugeBottom = 233;
+    constexpr int meterLength = 184;
+    const int filled = static_cast<int>(meterLength *
+        (static_cast<float>(startup_.mainAmmo()) / 8.0F));
+    renderer.drawSprite(416, 0, gaugeX, gaugeTop);
+    if (filled > 0)
+        renderer.fillRect(gaugeX + 5, gaugeBottom - filled,
+                          10, filled, {255, 255, 255, 255});
+    renderer.drawSprite(416, 1, gaugeX, gaugeTop);
+    const std::string ammo = std::to_string(startup_.mainAmmo());
+    renderer.drawText(2, ammo.c_str(), gaugeX + 6, 239,
+                      {255, 255, 255, 255}, TextAlign::center);
+
+    constexpr int currencyX = origin + 252;
+    renderer.drawSprite(376, 0, currencyX, 18);
+    const std::string currency = std::to_string(startup_.mainCurrencyTotal());
+    renderer.drawText(2, currency.c_str(), currencyX - 8, 18,
+                      {255, 255, 255, 255}, TextAlign::right);
+
+    if (startup_.mainGemStreak() > 0) {
+        const std::string streak = std::to_string(startup_.mainGemStreak());
+        renderer.drawSprite(133, 0, origin + 65, 55);
+        renderer.drawText(2, streak.c_str(), origin + 81, 51,
+                          {255, 255, 255, 255}, TextAlign::center);
+    }
 }
 
 void Game::renderMenu(Renderer& renderer) const {
