@@ -12,6 +12,8 @@ struct Color {
     std::uint8_t a;
 };
 
+enum class TextAlign { left, center, right };
+
 class Renderer {
 public:
     virtual ~Renderer() = default;
@@ -32,6 +34,12 @@ public:
                                        float scaleX,
                                        float scaleY,
                                        float rotation) = 0;
+    virtual void drawText(std::int32_t fontId,
+                          const char* text,
+                          float x,
+                          float y,
+                          Color color,
+                          TextAlign align) = 0;
 };
 
 } // namespace downwell

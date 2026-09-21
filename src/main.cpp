@@ -1,4 +1,5 @@
 #include "core/Game.h"
+#include "core/FontPack.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
 #include "core/SpritePack.h"
@@ -38,6 +39,14 @@ int main() {
         !platform.loadSpriteAssets(spritePack,
             "extracted/utmt-0.9.2.0/TexturePages"))
         std::fprintf(stderr, "warning: recovered sprite assets unavailable\n");
+
+    std::ifstream fontFile("generated/downwell-fonts.dwfn", std::ios::binary);
+    const std::vector<std::uint8_t> fontBytes(
+        (std::istreambuf_iterator<char>(fontFile)),
+        std::istreambuf_iterator<char>());
+    const downwell::FontPack fontPack(fontBytes.data(), fontBytes.size());
+    if (!fontPack.valid() || !platform.loadFontAssets(fontPack))
+        std::fprintf(stderr, "warning: recovered font assets unavailable\n");
 
     downwell::Game game(roomPack.valid() ? &roomPack : nullptr,
                         objectPack.valid() ? &objectPack : nullptr);

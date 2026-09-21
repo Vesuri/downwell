@@ -156,7 +156,7 @@ verify-font-pack: $(FONT_PACK_TEST_TARGET)
 	tools/generate-font-pack.py --check
 	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
 
-verify-native-data: generate-room-pack generate-object-pack $(STARTUP_TEST_TARGET)
+verify-native-data: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack $(STARTUP_TEST_TARGET)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 
 amiga:

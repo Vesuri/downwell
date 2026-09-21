@@ -134,6 +134,31 @@ void Game::renderPlayMenu(Renderer& renderer) const {
     if (startup_.playMenuCursor() > 0)
         renderer.drawSpriteTransformed(44, 0, 64.0F, centerY - 10.0F,
                                        -1.0F, 1.0F, 0.0F);
+
+    constexpr const char* styleNames[] = {
+        "USUAL STYLE", "ARM SPIN STYLE", "BOULDER STYLE",
+        "LEVITATE STYLE", "HANDSTAND STYLE"
+    };
+    constexpr const char* styleDescriptions[] = {
+        "standard", "only finds\ngun modules\n\nshops are rare",
+        "starts with\nmore HP\n\nless upgrade\noptions", "floaty",
+        "no upgrades\n\ncheaper\nshop items"
+    };
+    const int cursor = startup_.playMenuCursor();
+    const float titleY = centerY - 70.0F;
+    renderer.drawText(2, "STYLE SELECT", 80.0F, titleY + 1.0F,
+                      {255, 0, 0, 255}, TextAlign::center);
+    renderer.drawText(2, "STYLE SELECT", 80.0F, titleY,
+                      {255, 255, 255, 255}, TextAlign::center);
+    const float textY = centerY + 10.0F;
+    const char* styleName = cursor == 0 ? styleNames[cursor] : "LOCKED!";
+    renderer.drawText(2, styleName, 80.0F, textY + 1.0F,
+                      {255, 0, 0, 255}, TextAlign::center);
+    renderer.drawText(2, styleName, 80.0F, textY,
+                      {255, 255, 255, 255}, TextAlign::center);
+    if (cursor == 0)
+        renderer.drawText(2, styleDescriptions[cursor], 80.0F, textY + 22.0F,
+                          {255, 255, 255, 255}, TextAlign::center);
     renderer.drawSprite(129, 0, 80,
                         static_cast<int>(startup_.playMenuDitherY()));
 }

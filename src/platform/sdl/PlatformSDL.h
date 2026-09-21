@@ -10,6 +10,7 @@
 namespace downwell {
 
 class SpritePack;
+class FontPack;
 
 class PlatformSDL final : public Renderer {
 public:
@@ -21,6 +22,7 @@ public:
     void present();
     void waitForNextTick();
     bool loadSpriteAssets(const SpritePack& pack, const std::string& directory);
+    bool loadFontAssets(const FontPack& pack);
 
     void clear(Color color) override;
     void fillRect(int x, int y, int width, int height, Color color) override;
@@ -31,11 +33,14 @@ public:
     void drawSpriteTransformed(std::int32_t spriteId, std::uint32_t frame,
                                float x, float y, float scaleX, float scaleY,
                                float rotation) override;
+    void drawText(std::int32_t fontId, const char* text, float x, float y,
+                  Color color, TextAlign align) override;
 
 private:
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
     const SpritePack* spritePack_ = nullptr;
+    const FontPack* fontPack_ = nullptr;
     std::array<SDL_Texture*, 8> texturePages_{};
     std::uint64_t nextTick_ = 0;
 };

@@ -1,5 +1,6 @@
 #include "PlatformSDL.h"
 #include "core/Game.h"
+#include "core/FontPack.h"
 #include "core/SpritePack.h"
 #include <SDL_image.h>
 #include <algorithm>
@@ -62,6 +63,13 @@ bool PlatformSDL::loadSpriteAssets(const SpritePack& pack,
         SDL_SetTextureBlendMode(texturePages_[page], SDL_BLENDMODE_BLEND);
     }
     spritePack_ = &pack;
+    return true;
+}
+
+bool PlatformSDL::loadFontAssets(const FontPack& pack) {
+    if (!pack.valid() || spritePack_ == nullptr)
+        return false;
+    fontPack_ = &pack;
     return true;
 }
 
@@ -169,6 +177,78 @@ void PlatformSDL::drawSpriteTransformed(std::int32_t spriteId,
         flip = static_cast<SDL_RendererFlip>(flip | SDL_FLIP_VERTICAL);
     SDL_RenderCopyExF(renderer_, texture, &source, &destination,
                       -static_cast<double>(rotation), &origin, flip);
+}
+
+void PlatformSDL::drawText(std::int32_t fontId,
+                           const char* text,
+                           float x,
+                           float y,
+                           Color color,
+                           TextAlign align) {
+    if (fontPack_ == nullptr || spritePack_ == nullptr || text == nullptr ||
+        fontId < 0)
+        return;
+    PackedFont font;
+    PackedTexturePageItem atlas;
+    if (!fontPack_->font(static_cast<std::uint32_t>(fontId), font) ||
+        !spritePack_->pageItem(static_cast<std::uint32_t>(font.texturePageItemId),
+                               atlas))
+        return;
+    SDL_Texture* texture = texturePages_[static_cast<std::size_t>(atlas.texturePageId)];
+    if (texture == nullptr)
+        return;
+    SDL_SetTextureColorMod(texture, color.r, color.g, color.b);
+    SDL_SetTextureAlphaMod(texture, color.a);
+
+    const auto lineWidth = [this, &font](const char* begin, const char* end) {
+        int width = 0;
+        for (const char* cursor = begin; cursor < end && *cursor; ++cursor) {
+            PackedGlyph glyph;
+            if (!fontPack_->findGlyph(font,
+                    static_cast<unsigned char>(*cursor), glyph))
+                continue;
+            const std::uint32_t next = cursor + 1 < end
+                                           ? static_cast<unsigned char>(cursor[1])
+                                           : 0;
+            width += glyph.shift + fontPack_->kerningShift(glyph, next);
+        }
+        return width;
+    };
+
+    const char* line = text;
+    float drawY = y;
+    while (true) {
+        const char* end = line;
+        while (*end && *end != '\n')
+            ++end;
+        const int width = lineWidth(line, end);
+        float drawX = x;
+        if (align == TextAlign::center) drawX -= width / 2.0F;
+        if (align == TextAlign::right) drawX -= static_cast<float>(width);
+        for (const char* cursor = line; cursor < end; ++cursor) {
+            PackedGlyph glyph;
+            if (!fontPack_->findGlyph(font,
+                    static_cast<unsigned char>(*cursor), glyph))
+                continue;
+            const SDL_Rect source{atlas.sourceX + glyph.sourceX,
+                                  atlas.sourceY + glyph.sourceY,
+                                  glyph.sourceWidth, glyph.sourceHeight};
+            const SDL_FRect destination{drawX + glyph.offset, drawY,
+                                        static_cast<float>(glyph.sourceWidth),
+                                        static_cast<float>(glyph.sourceHeight)};
+            SDL_RenderCopyF(renderer_, texture, &source, &destination);
+            const std::uint32_t next = cursor + 1 < end
+                                           ? static_cast<unsigned char>(cursor[1])
+                                           : 0;
+            drawX += glyph.shift + fontPack_->kerningShift(glyph, next);
+        }
+        if (!*end)
+            break;
+        line = end + 1;
+        drawY += 12.0F;
+    }
+    SDL_SetTextureColorMod(texture, 255, 255, 255);
+    SDL_SetTextureAlphaMod(texture, 255);
 }
 
 void PlatformSDL::present() {
