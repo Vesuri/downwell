@@ -35,7 +35,9 @@ ROOM_TEST_TARGET := build/room-loader-test
 ROOM_TEST_SOURCES := tests/core/RoomLoaderTest.cpp
 ROOM_PACK_TEST_TARGET := build/room-pack-test
 ROOM_PACK_TEST_SOURCES := tests/core/RoomPackTest.cpp src/core/RoomPack.cpp
-TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET)
+OBJECT_PACK_TEST_TARGET := build/object-pack-test
+OBJECT_PACK_TEST_SOURCES := tests/core/ObjectPackTest.cpp src/core/ObjectPack.cpp
+TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET)
 
 .PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack amiga clean
 
@@ -80,6 +82,10 @@ $(ROOM_PACK_TEST_TARGET): $(ROOM_PACK_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ROOM_PACK_TEST_SOURCES)
 
+$(OBJECT_PACK_TEST_TARGET): $(OBJECT_PACK_TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(OBJECT_PACK_TEST_SOURCES)
+
 test: $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET)
 	./$(REPLAY_TEST_TARGET)
@@ -88,6 +94,7 @@ test: $(TEST_TARGETS)
 	./$(EVENT_TEST_TARGET)
 	./$(ROOM_TEST_TARGET)
 	./$(ROOM_PACK_TEST_TARGET)
+	./$(OBJECT_PACK_TEST_TARGET)
 
 extract:
 	tools/extract.sh
@@ -107,8 +114,9 @@ verify-room-pack: $(ROOM_PACK_TEST_TARGET)
 generate-object-pack:
 	tools/generate-object-pack.py
 
-verify-object-pack:
+verify-object-pack: $(OBJECT_PACK_TEST_TARGET)
 	tools/generate-object-pack.py --check
+	./$(OBJECT_PACK_TEST_TARGET) generated/downwell-objects.dwob
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'

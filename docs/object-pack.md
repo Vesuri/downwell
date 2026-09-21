@@ -51,3 +51,12 @@ the generator verifies that invariant rather than silently flattening a more
 general action list. The code ID is the traceability seam to both the recovered
 GML and exact VM assembly. Inheritance remains explicit through `parentId` and
 will be resolved by the native event dispatcher, not baked into this data.
+
+## Portable reader
+
+`src/core/ObjectPack` decodes every field explicitly and validates total size,
+object IDs, event slices, parent IDs, and inheritance cycles before exposing
+the pack. Event lookup first checks the requested object and then walks its
+parent chain, returning both the recovered code ID and the object that owns the
+binding. That owner is required to implement `event_inherited()` without
+conflating it with ordinary inherited event lookup.

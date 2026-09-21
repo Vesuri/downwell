@@ -97,7 +97,9 @@ make verify-object-pack
 
 The `DWOB` format is documented in
 [docs/object-pack.md](docs/object-pack.md). Its code-entry IDs retain an exact
-link to recovered GML and VM assembly for the native event dispatcher.
+link to recovered GML and VM assembly for the native event dispatcher. The
+portable reader validates inheritance and resolves inherited bindings without
+host-endian or structure-layout assumptions.
 
 ## Amiga toolchain
 
