@@ -39,8 +39,9 @@ enum class LoadRoomResult {
 };
 
 // Loads ordered room definitions after validating the whole transition. Event
-// handlers must not mutate the instance store during entry; runtime creation
-// and destruction semantics will be handled by a later command queue.
+// Instance and room-code handlers must not mutate storage. The optional
+// deferred-command handler is the one mutation boundary: it runs after room
+// creation code and before Room Start.
 template <std::size_t Capacity>
 class RoomLoader {
 public:
@@ -52,6 +53,23 @@ public:
                                 bool firstGameRoom,
                                 InstanceHandler instanceHandler,
                                 RoomCreationHandler roomCreationHandler) {
+        const auto noDeferredCommands = [](InstanceStore<Capacity>&) {};
+        return enter(instances, roomId, definitions, definitionCount,
+                     firstGameRoom, instanceHandler, roomCreationHandler,
+                     noDeferredCommands);
+    }
+
+    template <typename InstanceHandler,
+              typename RoomCreationHandler,
+              typename DeferredCommandHandler>
+    static LoadRoomResult enter(InstanceStore<Capacity>& instances,
+                                std::int32_t roomId,
+                                const RoomInstanceDefinition* definitions,
+                                std::size_t definitionCount,
+                                bool firstGameRoom,
+                                InstanceHandler instanceHandler,
+                                RoomCreationHandler roomCreationHandler,
+                                DeferredCommandHandler deferredCommandHandler) {
         const LoadRoomResult validation =
             validate(instances, definitions, definitionCount);
         if (validation != LoadRoomResult::success)
@@ -84,6 +102,7 @@ public:
         if (firstGameRoom)
             dispatchAll(instances, RoomInstancePhase::gameStart, instanceHandler);
         roomCreationHandler(roomId);
+        deferredCommandHandler(instances);
         dispatchAll(instances, RoomInstancePhase::roomStart, instanceHandler);
         return LoadRoomResult::success;
     }

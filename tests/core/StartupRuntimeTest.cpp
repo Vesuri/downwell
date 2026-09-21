@@ -132,8 +132,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     runtime.step(false);
     require(runtime.inMenu(), "packed startup reaches rmMenu");
     require(runtime.roomLoadSucceeded(), "packed rmMenu loads");
-    require(runtime.activeInstanceCount() == 193,
-            "rmMenu has 192 recovered instances plus persistent controller");
+    require(runtime.activeInstanceCount() == (objects != nullptr ? 194U : 193U),
+            "rmMenu contains recovered, persistent, and translated instances");
     require(runtime.hasInstance(100065), "controller persists into packed rmMenu");
     require(!runtime.hasInstance(100066), "rmInit object leaves packed rmMenu");
 
@@ -144,6 +144,16 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     if (objects != nullptr)
         require(runtime.implementedCodeCalls() == 5,
                 "End Step and rmMenu room code route by recovered code ID");
+    if (objects != nullptr) {
+        const downwell::InstanceRecord* fade = runtime.instance(105186);
+        require(fade != nullptr && fade->objectId == 382 && fade->roomId == 20 &&
+                    fade->x == 0 && fade->y == 0,
+                "rmMenu creates ditherFade with the authoritative runtime ID");
+        require(runtime.nextRuntimeInstanceId() == 105187,
+                "runtime allocator advances after deferred creation");
+        require(runtime.deferredCommandsSucceeded(),
+                "deferred room-creation commands apply successfully");
+    }
 }
 
 } // namespace

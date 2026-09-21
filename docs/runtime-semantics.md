@@ -117,16 +117,17 @@ the runtime does not silently treat broader menu behavior as implemented.
 
 Room creation code IDs 648 (`rmInit`) and 714 (`rmMenu`) are translated as
 deterministic core state. They establish the 160x284 camera, select sound 193
-(`bgmOverworld`), emit gain/play requests, lock control, and enqueue the intent
-to create object 382 (`ditherFade`). The spawn remains a request until deferred
-instance creation is implemented; no synthetic instance ID is invented.
+(`bgmOverworld`), emit gain/play requests, lock control, and enqueue creation of
+object 382 (`ditherFade`). With the complete native packs, the command flushes
+between room creation code and Room Start, producing instance 105186 from the
+source-backed allocator boundary and running its recovered PreCreate/Create
+bindings before it joins Room Start.
 
 `DeferredInstanceQueue` now provides the bounded, allocation-free command
 primitive for that next step. It validates an entire create batch before
 changing instance storage or the `GEN8.LastObj`-seeded allocator, preserves
 command order, imports object persistence/depth, and invokes a lifecycle hook
-for each new instance. Applying it at the precise room-entry boundary remains
-separate from the primitive itself.
+for each new instance.
 
 Room-entry callbacks currently may not create or destroy instances. That
 behavior will use the same deferred command mechanism needed for safe mutation

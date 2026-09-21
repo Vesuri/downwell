@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_STARTUP_RUNTIME_H
 
 #include "InstanceStore.h"
+#include "DeferredInstanceQueue.h"
 #include <cstdint>
 
 namespace downwell {
@@ -63,6 +64,8 @@ public:
     std::uint32_t ditherFadeSpawnRequests() const {
         return ditherFadeSpawnRequests_;
     }
+    std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
+    bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
     bool inMenu() const { return roomId_ == menuRoomId; }
     std::uint64_t stateDigest() const;
 
@@ -78,6 +81,8 @@ private:
                              std::int32_t eventSubtype,
                              bool advancePressed = false);
     void dispatchRoomCreation(std::int32_t roomId);
+    void flushDeferredInstances(InstanceStore<instanceCapacity>& instances,
+                                std::int32_t roomId);
     void executeCode(InstanceRecord* instance,
                      std::int32_t codeId,
                      bool advancePressed = false);
@@ -107,6 +112,9 @@ private:
     std::uint32_t soundGainRequests_ = 0;
     std::uint32_t soundPlayRequests_ = 0;
     std::uint32_t ditherFadeSpawnRequests_ = 0;
+    DeferredInstanceQueue<8> deferredInstances_;
+    std::uint32_t nextRuntimeInstanceId_ = 105186;
+    bool deferredCommandsSucceeded_ = true;
 };
 
 } // namespace downwell

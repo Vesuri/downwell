@@ -39,8 +39,9 @@ The current executable runs a fixed 60 Hz model of the recovered startup path:
 the true `rmInit` entry room, desktop splash timing, and deterministic
 transition to `rmMenu`. `make run` regenerates the native room pack and loads
 the recovered room definitions, so the transition creates all 192 serialized
-`rmMenu` instances alongside the persistent controller. Their object event
-logic is not executed yet. The program renders an asset-free diagnostic at
+`rmMenu` instances alongside the persistent controller, then applies the room
+code's runtime-created `ditherFade` as instance 105186. Most object event logic
+is not translated yet. The program renders an asset-free diagnostic at
 GameMaker's native 160x284 application-surface size; original art is not yet
 loaded.
 

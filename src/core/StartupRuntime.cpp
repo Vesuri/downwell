@@ -35,6 +35,11 @@ void StartupRuntime::reset(PlatformProfile profile) {
     soundGainRequests_ = 0;
     soundPlayRequests_ = 0;
     ditherFadeSpawnRequests_ = 0;
+    deferredInstances_.clear();
+    nextRuntimeInstanceId_ = roomPack_ != nullptr
+                                 ? roomPack_->nextRuntimeInstanceId()
+                                 : 105186;
+    deferredCommandsSucceeded_ = true;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -48,14 +53,19 @@ void StartupRuntime::reset(PlatformProfile profile) {
     const auto roomCreationHandler = [this](std::int32_t roomId) {
         dispatchRoomCreation(roomId);
     };
+    const auto deferredHandler = [this](InstanceStore<instanceCapacity>& instances) {
+        flushDeferredInstances(instances, entryRoomId);
+    };
     if (roomPack_ != nullptr) {
         roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
             instances_, *roomPack_, entryRoomId, true,
-            instanceHandler, roomCreationHandler) == PackedRoomLoadResult::success;
+            instanceHandler, roomCreationHandler,
+            deferredHandler) == PackedRoomLoadResult::success;
     } else {
         roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
             instances_, entryRoomId, definitions, 2, true,
-            instanceHandler, roomCreationHandler) == LoadRoomResult::success;
+            instanceHandler, roomCreationHandler,
+            deferredHandler) == LoadRoomResult::success;
     }
 }
 
@@ -191,6 +201,9 @@ void StartupRuntime::executeCode(InstanceRecord*,
         ++soundGainRequests_;
         ++soundPlayRequests_;
         ++ditherFadeSpawnRequests_; // object 382; applied by deferred creation later.
+        if (objectPack_ != nullptr &&
+            !deferredInstances_.enqueueCreate(382, 0, 0))
+            deferredCommandsSucceeded_ = false;
         controlsLocked_ = true;
         return;
     case 865: // gml_Object_objInitRm_Create_0
@@ -214,6 +227,21 @@ void StartupRuntime::executeCode(InstanceRecord*,
         ++unimplementedCodeCalls_;
         return;
     }
+}
+
+void StartupRuntime::flushDeferredInstances(
+    InstanceStore<instanceCapacity>& instances,
+    std::int32_t roomId) {
+    if (objectPack_ == nullptr || deferredInstances_.size() == 0)
+        return;
+    const auto createHandler = [this](InstanceRecord& instance) {
+        dispatchInstancePhase(instance, RoomInstancePhase::preCreate);
+        dispatchInstancePhase(instance, RoomInstancePhase::create);
+    };
+    const ApplyInstanceCommandsResult result = deferredInstances_.apply(
+        instances, *objectPack_, roomId, nextRuntimeInstanceId_, createHandler);
+    deferredCommandsSucceeded_ = deferredCommandsSucceeded_ &&
+                                 result == ApplyInstanceCommandsResult::success;
 }
 
 void StartupRuntime::initRoomAlarm0() {
@@ -262,14 +290,20 @@ void StartupRuntime::gotoRoom(int roomId) {
     const auto roomCreationHandler = [this](std::int32_t loadedRoomId) {
         dispatchRoomCreation(loadedRoomId);
     };
+    const auto deferredHandler = [this, roomId](
+                                     InstanceStore<instanceCapacity>& instances) {
+        flushDeferredInstances(instances, roomId);
+    };
     if (roomPack_ != nullptr) {
         roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
             instances_, *roomPack_, roomId, false,
-            instanceHandler, roomCreationHandler) == PackedRoomLoadResult::success;
+            instanceHandler, roomCreationHandler,
+            deferredHandler) == PackedRoomLoadResult::success;
     } else {
         roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
             instances_, roomId, nullptr, 0, false,
-            instanceHandler, roomCreationHandler) == LoadRoomResult::success;
+            instanceHandler, roomCreationHandler,
+            deferredHandler) == LoadRoomResult::success;
     }
     if (roomLoadSucceeded_)
         roomId_ = roomId;
@@ -295,7 +329,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(6); // Startup-state digest schema.
+    digest.addU32(7); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -312,6 +346,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(soundGainRequests_);
     digest.addU32(soundPlayRequests_);
     digest.addU32(ditherFadeSpawnRequests_);
+    digest.addU32(nextRuntimeInstanceId_);
+    digest.addBool(deferredCommandsSucceeded_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

@@ -120,12 +120,52 @@ void testValidationIsAtomic() {
             "duplicate failure leaves source room untouched");
 }
 
+void testDeferredCreationPrecedesRoomStart() {
+    downwell::InstanceStore<3> instances;
+    const downwell::RoomInstanceDefinition definitions[] = {
+        {1, 10, false}
+    };
+    std::vector<TraceEntry> trace;
+    bool roomCodeRan = false;
+    const auto instanceHandler = [&trace](downwell::InstanceRecord& instance,
+                                          downwell::RoomInstancePhase phase) {
+        trace.push_back({instance.instanceId, phase});
+    };
+    const auto roomHandler = [&roomCodeRan](std::int32_t) {
+        roomCodeRan = true;
+    };
+    const auto deferredHandler = [&trace, &roomCodeRan](
+                                     downwell::InstanceStore<3>& store) {
+        require(roomCodeRan, "deferred commands follow room creation code");
+        store.create(2, 20, 20, false);
+        downwell::InstanceRecord& created = *store.find(2);
+        trace.push_back({created.instanceId, downwell::RoomInstancePhase::preCreate});
+        trace.push_back({created.instanceId, downwell::RoomInstancePhase::create});
+    };
+
+    require(downwell::RoomLoader<3>::enter(
+                instances, 20, definitions, 1, false,
+                instanceHandler, roomHandler, deferredHandler) ==
+                downwell::LoadRoomResult::success,
+            "room with deferred creation loads");
+    require(trace.size() == 7, "deferred instance joins the lifecycle trace");
+    require(trace[3].instanceId == 2 &&
+                trace[3].phase == downwell::RoomInstancePhase::preCreate &&
+                trace[4].phase == downwell::RoomInstancePhase::create,
+            "deferred instance creation runs after room code");
+    require(trace[5].instanceId == 1 && trace[6].instanceId == 2 &&
+                trace[5].phase == downwell::RoomInstancePhase::roomStart &&
+                trace[6].phase == downwell::RoomInstancePhase::roomStart,
+            "existing and deferred instances receive Room Start afterward");
+}
+
 } // namespace
 
 int main() {
     testFirstRoomOrder();
     testDestinationRoomKeepsPersistentFirst();
     testValidationIsAtomic();
+    testDeferredCreationPrecedesRoomStart();
     std::cout << "room loader tests passed\n";
     return 0;
 }

@@ -41,12 +41,12 @@ padding, native booleans, or host-endian memory.
 
 Each state family starts with its own schema number and appends fields in a
 documented fixed order. Changing the field order or meaning requires a schema
-increment and a deliberate golden-digest update. Startup-state schema 6 includes
+increment and a deliberate golden-digest update. Startup-state schema 7 includes
 the room-load result, room-created camera/audio/control/spawn-request state, the
-stable instance list, transforms, creation-code references, layer/depth state,
-and all twelve alarm slots for every instance. The bounded-fixture startup
-replay has a pinned digest of `b81100fa2e77d891` after 13 ticks and transition
-to `rmMenu`.
+runtime instance allocator/deferred-command result, the stable instance list,
+transforms, creation-code references, layer/depth state, and all twelve alarm
+slots for every instance. The bounded-fixture startup replay has a pinned digest
+of `d1120f2eb0dc00fc` after 13 ticks and transition to `rmMenu`.
 
 The current code provides memory encoding/decoding and state comparison. File
 recording/playback in the SDL platform layer will be added once the shared RNG

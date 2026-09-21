@@ -28,6 +28,21 @@ public:
                                       bool firstGameRoom,
                                       InstanceHandler instanceHandler,
                                       RoomCreationHandler roomCreationHandler) {
+        const auto noDeferredCommands = [](InstanceStore<Capacity>&) {};
+        return enter(instances, pack, roomId, firstGameRoom, instanceHandler,
+                     roomCreationHandler, noDeferredCommands);
+    }
+
+    template <typename InstanceHandler,
+              typename RoomCreationHandler,
+              typename DeferredCommandHandler>
+    static PackedRoomLoadResult enter(InstanceStore<Capacity>& instances,
+                                      const RoomPack& pack,
+                                      std::int32_t roomId,
+                                      bool firstGameRoom,
+                                      InstanceHandler instanceHandler,
+                                      RoomCreationHandler roomCreationHandler,
+                                      DeferredCommandHandler deferredCommandHandler) {
         if (!pack.valid())
             return PackedRoomLoadResult::invalidPack;
 
@@ -67,7 +82,8 @@ public:
 
         const LoadRoomResult result = RoomLoader<Capacity>::enter(
             instances, roomId, definitions.data(), room.instanceCount,
-            firstGameRoom, instanceHandler, roomCreationHandler);
+            firstGameRoom, instanceHandler, roomCreationHandler,
+            deferredCommandHandler);
         if (result == LoadRoomResult::capacityExceeded)
             return PackedRoomLoadResult::capacityExceeded;
         if (result == LoadRoomResult::duplicateInstanceId)

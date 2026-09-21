@@ -84,5 +84,6 @@ changed.
 The SDL startup runtime opens the generated pack once and uses this bridge for
 both `rmInit` and the transition to `rmMenu`. The integration test confirms 192
 recovered menu instances plus the persistent controller, including the first
-player instance/object anchor. This milestone instantiates recovered state; it
-does not yet execute the menu objects' recovered event bytecode.
+player instance/object anchor. Room creation then adds `ditherFade` from the
+pack's runtime allocator boundary. Most recovered menu event code remains
+untranslated.
