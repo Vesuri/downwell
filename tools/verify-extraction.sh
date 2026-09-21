@@ -11,6 +11,8 @@ EXPECTED_SHA256=c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8
 for path in "$INPUT" "$MANIFEST" "$OUTPUT/assembly-status.json" "$ROUNDTRIP"; do
     [ -e "$path" ] || { echo "missing extraction output: $path" >&2; exit 1; }
 done
+[ -s "$OUTPUT/TexturePages/0.png" ] || { echo "missing texture page 0" >&2; exit 1; }
+[ -s "$OUTPUT/TexturePages/1.png" ] || { echo "missing texture page 1" >&2; exit 1; }
 
 INPUT_SHA256=$(shasum -a 256 "$INPUT" | awk '{print $1}')
 ROUNDTRIP_SHA256=$(shasum -a 256 "$ROUNDTRIP" | awk '{print $1}')
@@ -103,3 +105,4 @@ echo "  root code entries:         $ASSEMBLY_EXPECTED"
 echo "  object events:             $OBJECT_EVENTS"
 echo "  room instances:            $ROOM_INSTANCES"
 echo "  room layers:               $ROOM_LAYERS"
+echo "  embedded texture pages:    $(find "$OUTPUT/TexturePages" -type f -name '*.png' | wc -l | tr -d ' ')"

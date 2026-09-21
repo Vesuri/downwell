@@ -19,6 +19,7 @@ The extraction produced:
 - 2,075 object-event bindings;
 - 5,186 placed room instances across 25 rooms;
 - 132 room layers.
+- two losslessly decoded embedded texture-page PNGs.
 
 Manifest schema 3 also records sprite dimensions/origins/frame-to-texture-page
 links, texture atlas rectangles and pages, sound/audio-group relationships,

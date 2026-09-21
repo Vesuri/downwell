@@ -26,6 +26,7 @@ tools/bootstrap-utmt.sh
 `extract.sh` first verifies the exact `data.win` SHA-256, then exports:
 
 - UndertaleModTool's parsed build information;
+- decoded PNGs for every embedded texture page;
 - all root decompiled GML entries and strings;
 - exact VM assembly for every root code entry;
 - a schema-3 JSON manifest containing resource IDs, symbols, authoritative room

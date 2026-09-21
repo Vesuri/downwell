@@ -15,6 +15,15 @@ outputRoot = Path.GetFullPath(outputRoot);
 Directory.CreateDirectory(outputRoot);
 string assemblyRoot = Path.Combine(outputRoot, "Assembly");
 Directory.CreateDirectory(assemblyRoot);
+string textureRoot = Path.Combine(outputRoot, "TexturePages");
+Directory.CreateDirectory(textureRoot);
+
+for (int textureId = 0; textureId < Data.EmbeddedTextures.Count; ++textureId)
+{
+    string texturePath = Path.Combine(textureRoot, $"{textureId}.png");
+    using FileStream textureOutput = new(texturePath, FileMode.Create);
+    Data.EmbeddedTextures[textureId].TextureData.Image.SavePng(textureOutput);
+}
 
 string inputSha256 = Environment.GetEnvironmentVariable("DOWNWELL_DATA_WIN_SHA256") ?? "unknown";
 
