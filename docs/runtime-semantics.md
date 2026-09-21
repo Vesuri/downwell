@@ -79,8 +79,11 @@ and room IDs, transform/image state, creation-code references, resolved layer
 ID/depth, persistence/active flags, and its own `AlarmBank`. Erasure and room
 changes compact the array without reordering survivors.
 
-The startup model uses a 256-slot specialization sized for the current startup
-slice. With the generated room pack, `rmInit` is populated from recovered data.
+The host reference uses a provisional 2048-slot specialization sized to admit
+`rmMain`'s serialized 244 instances plus procedural builder output. This is a
+measurement aid, not the eventual Amiga memory budget; the target specialization
+will be selected after instance lifetimes and deactivation are implemented.
+With the generated room pack, `rmInit` is populated from recovered data.
 Transitioning to `rmMenu` removes instance 100066 (`objInitRm`), preserves
 instance 100065 (`objControlerN`), and creates all 192 serialized menu-room
 instances with their recovered native fields. The smaller hard-coded `rmInit`

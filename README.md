@@ -55,6 +55,8 @@ and right acceleration, wall collision bounds, fall animation, and camera bias.
 Space or Z now fires the default eight-charge machine gun while airborne, with
 the recovered seven-tick cadence, recoil, shoot pose, downward bullets, and
 on-screen charge gauge.
+The first-run `objBuilder` prelude now extends the recovered shaft walls ahead
+of the descending camera; randomized room templates are not selected yet.
 `make test` checks the automatic 731-tick desktop transition, input-driven
 skipping, the non-desktop path, key recovered initialization state, alarms,
 instance lifecycle, event phases, replay validation, and the state oracle

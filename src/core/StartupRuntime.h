@@ -27,7 +27,7 @@ public:
         float y = 0.0F;
     };
 
-    static constexpr std::size_t instanceCapacity = 256;
+    static constexpr std::size_t instanceCapacity = 2048;
     static constexpr std::size_t mainBulletCapacity = 16;
     static constexpr int entryRoomId = 7;
     static constexpr int playMenuRoomId = 8;
@@ -121,6 +121,12 @@ public:
     const MainBulletState& mainBulletAt(std::size_t index) const {
         return mainBullets_[index];
     }
+    bool mainBuilderInitialized() const { return mainBuilderInitialized_; }
+    int mainBuilderY() const { return mainBuilderY_; }
+    int mainBuilderGenerationCount() const { return mainBuilderGenerationCount_; }
+    std::uint32_t mainBuilderRowsGenerated() const {
+        return mainBuilderRowsGenerated_;
+    }
     std::uint64_t stateDigest() const;
 
 private:
@@ -134,6 +140,7 @@ private:
     void updateMenuCamera();
     void updateMainPlayer(InstanceRecord& instance);
     void updateMainCamera(InstanceRecord& instance);
+    void updateMainBuilder(InstanceRecord& instance);
     bool mainPlayerCollides(float x, float y) const;
     bool moveMainPlayerAxis(float amount, bool horizontal);
     void fireMainGun(InstanceRecord& instance);
@@ -239,6 +246,10 @@ private:
     std::uint32_t mainShotsFired_ = 0;
     std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
     std::size_t mainBulletCount_ = 0;
+    bool mainBuilderInitialized_ = false;
+    int mainBuilderY_ = 704;
+    int mainBuilderGenerationCount_ = -30;
+    std::uint32_t mainBuilderRowsGenerated_ = 0;
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
     float mainCameraY_ = 176.0F;

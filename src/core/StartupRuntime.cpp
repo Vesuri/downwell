@@ -100,6 +100,10 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
     mainBulletCount_ = 0;
+    mainBuilderInitialized_ = false;
+    mainBuilderY_ = 704;
+    mainBuilderGenerationCount_ = -30;
+    mainBuilderRowsGenerated_ = 0;
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
@@ -421,6 +425,30 @@ void StartupRuntime::updateMainBullets() {
     mainBulletCount_ = write;
 }
 
+void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
+    if (!mainBuilderInitialized_ || mainBuilderGenerationCount_ >= -1)
+        return;
+
+    // scrBuilder only stays 128 pixels ahead of the visible bottom. On the
+    // first boot, genCount -30..-2 selects a two-line empty pattern. Adjacent
+    // patterns share their last row, so each call advances one 16-pixel row
+    // and creates the two boundary pillars at the builder's current y.
+    const float viewBottom = mainCameraViewY() + surfaceHeight;
+    if (static_cast<float>(instance.y) - viewBottom >= 128.0F)
+        return;
+
+    const bool left = deferredInstances_.enqueueCreate(60, 160, instance.y);
+    const bool right = deferredInstances_.enqueueCreate(60, 320, instance.y);
+    if (!left || !right) {
+        deferredCommandsSucceeded_ = false;
+        return;
+    }
+    instance.y += 16;
+    mainBuilderY_ = instance.y;
+    ++mainBuilderGenerationCount_;
+    ++mainBuilderRowsGenerated_;
+}
+
 void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!mainPlayerInitialized_)
         return;
@@ -672,6 +700,23 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 845: // gml_Object_objPlayer_n_Alarm_2
         ++implementedCodeCalls_;
         mainShotDelayed_ = false;
+        return;
+    case 1002: // gml_Object_objBuilder_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr && instance->roomId == mainRoomId) {
+            mainBuilderInitialized_ = true;
+            mainBuilderY_ = instance->y;
+            mainBuilderGenerationCount_ = -30; // area 1, level 1, first boot
+            mainBuilderRowsGenerated_ = 0;
+        }
+        return;
+    case 1003: // gml_Object_objBuilder_Step_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr && instance->roomId == mainRoomId)
+            updateMainBuilder(*instance);
+        return;
+    case 1004: // gml_Object_objBuilder_PreCreate_0 (event_inherited; no parent)
+        ++implementedCodeCalls_;
         return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;
@@ -988,7 +1033,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(14); // Startup-state digest schema.
+    digest.addU32(15); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1062,6 +1107,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(mainBullets_[index].x);
         digest.addF32(mainBullets_[index].y);
     }
+    digest.addBool(mainBuilderInitialized_);
+    digest.addI32(mainBuilderY_);
+    digest.addI32(mainBuilderGenerationCount_);
+    digest.addU32(mainBuilderRowsGenerated_);
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);

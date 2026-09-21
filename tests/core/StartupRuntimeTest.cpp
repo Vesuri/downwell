@@ -261,6 +261,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainPlayerX() == 240.0F &&
                     runtime.mainPlayerY() == 176.0F,
                 "rmMain initializes player motion from the recovered spawn");
+        require(runtime.mainBuilderInitialized() &&
+                    runtime.mainBuilderY() == 704 &&
+                    runtime.mainBuilderGenerationCount() == -30,
+                "rmMain initializes the recovered first-boot builder prelude");
         downwell::Input fallRight;
         fallRight.right = true;
         for (int tick = 0; tick < 10; ++tick)
@@ -307,6 +311,47 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         runtime.step(fireMain, false);
         require(runtime.mainAmmo() == 6 && runtime.mainShotsFired() == 2,
                 "held fire repeats when Alarm 2 clears the shot delay");
+
+        downwell::Input releasedMain;
+        const std::uint32_t rowsBefore = runtime.mainBuilderRowsGenerated();
+        const int builderYBefore = runtime.mainBuilderY();
+        const std::size_t instancesBefore = runtime.activeInstanceCount();
+        for (int tick = 0;
+             tick < 120 && runtime.mainBuilderRowsGenerated() == rowsBefore;
+             ++tick)
+            runtime.step(releasedMain, false);
+        require(runtime.mainBuilderRowsGenerated() == rowsBefore + 1 &&
+                    runtime.mainBuilderY() == builderYBefore + 16 &&
+                    runtime.mainBuilderGenerationCount() ==
+                        -30 + static_cast<int>(rowsBefore) + 1,
+                "the first-boot builder advances one shared pattern row");
+        require(runtime.activeInstanceCount() == instancesBefore + 2,
+                "one builder row creates exactly two shaft-wall instances");
+        bool foundLeftWall = false;
+        bool foundRightWall = false;
+        for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
+            const downwell::InstanceRecord& instance = runtime.instanceAt(index);
+            if (instance.objectId != 60 || instance.y != builderYBefore)
+                continue;
+            foundLeftWall = foundLeftWall || instance.x == 160;
+            foundRightWall = foundRightWall || instance.x == 320;
+        }
+        require(foundLeftWall && foundRightWall,
+                "the generated row preserves the recovered shaft boundaries");
+        for (int tick = 0;
+             tick < 300 && runtime.mainBuilderRowsGenerated() < 29;
+             ++tick)
+            runtime.step(releasedMain, false);
+        require(runtime.mainBuilderRowsGenerated() == 29 &&
+                    runtime.mainBuilderY() == 1168 &&
+                    runtime.mainBuilderGenerationCount() == -1,
+                "the deterministic first-boot prelude emits all 29 shared rows");
+        require(runtime.activeInstanceCount() == instancesBefore + 58,
+                "the complete prelude retains its 58 generated boundary walls");
+        for (int tick = 0; tick < 30; ++tick)
+            runtime.step(releasedMain, false);
+        require(runtime.mainBuilderRowsGenerated() == 29,
+                "generation pauses at the unrecovered random start selection");
     }
 }
 
