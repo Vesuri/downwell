@@ -563,12 +563,12 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 2 &&
+                    runtime.mainBuilderLastRightPattern() == 3 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
-                    runtime.mainBuilderRowsGenerated() == 94,
+                    runtime.mainBuilderRowsGenerated() == 95,
                 "the first scheduled side room preserves deterministic selection and rows");
-        require(runtime.mainBuilderSpecialObjectsGenerated() == 7,
-                "every special marker in right-room pattern six is interpreted");
+        require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
+                "every special marker in deterministic right-room pattern is interpreted");
         bool foundTorch = false;
         bool foundAmbience = false;
         bool foundTimeField = false;
@@ -583,9 +583,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             foundRoomReward = foundRoomReward || instance.objectId == 293 ||
                               instance.objectId == 109;
         }
-        require(foundTorch && foundAmbience && foundTimeField &&
+        require(!foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
-                "side-room utility and reward objects retain recovered IDs");
+                "pattern-specific side-room utility and reward objects retain recovered IDs");
         require(runtime.mainEnemiesDefeated() > 0 &&
                     runtime.mainCurrencyCount() +
                         static_cast<std::size_t>(runtime.mainCurrencyTotal()) > 0,

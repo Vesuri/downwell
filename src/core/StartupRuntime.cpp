@@ -105,6 +105,8 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainShotDelayed_ = true;
     mainAirborneShot_ = false;
     mainAmmo_ = 8;
+    mainPlayerHealth_ = 4;
+    mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
     mainBlocksDestroyed_ = 0;
@@ -254,6 +256,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if (roomId_ == mainRoomId) {
         updateMainBullets();
         updateMainEnemies();
+        updateMainEnemyInteractions();
         updateMainCurrency();
         updateMainLifecycle();
     }
@@ -541,7 +544,8 @@ void StartupRuntime::updateMainBullets() {
     mainBulletCount_ = write;
 }
 
-void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount) {
+void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
+                                       bool attracted) {
     while (amount > 0 && mainCurrencyCount_ < mainCurrencyCapacity) {
         MainCurrencyState& gem = mainCurrencyItems_[mainCurrencyCount_++];
         gem = MainCurrencyState{};
@@ -549,6 +553,7 @@ void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount) {
         gem.y = y;
         gem.large = amount >= 10;
         gem.amount = gem.large ? 10 : 2;
+        gem.attracted = attracted;
         gem.speedX = static_cast<float>(random_.random(4.0) - 2.0);
         gem.speedY = static_cast<float>(random_.random(4.0) - 2.0);
         random_.irandom(3); // imgSp = choose(-0.5, -0.3, 0.3, 0.5).
@@ -749,6 +754,45 @@ void StartupRuntime::updateMainEnemies() {
         enemy.imageIndex += enemy.imageSpeed;
         if (enemy.imageIndex >= 2.0F)
             enemy.imageIndex = std::fmod(enemy.imageIndex, 2.0F);
+    }
+}
+
+void StartupRuntime::updateMainEnemyInteractions() {
+    if (mainPlayerInvulnerability_ > 0)
+        --mainPlayerInvulnerability_;
+    for (std::size_t index = 0; index < instances_.size(); ++index) {
+        InstanceRecord& enemy = instances_.at(index);
+        const bool stompable = enemy.objectId == 111 || enemy.objectId == 112 ||
+                               enemy.objectId == 113 || enemy.objectId == 116;
+        const bool contactOnly = enemy.objectId == 117 || enemy.objectId == 119;
+        if (!enemy.active || enemy.health <= 0 || (!stompable && !contactOnly))
+            continue;
+        if (std::abs(mainPlayerX_ - enemy.preciseX) > 10.0F ||
+            std::abs(mainPlayerY_ - enemy.preciseY) > 11.0F)
+            continue;
+        if (stompable && enemy.preciseY > mainPlayerY_ + 2.0F) {
+            spawnMainCurrency(enemy.preciseX, enemy.preciseY,
+                              enemy.reward, true);
+            enemy.health = 0;
+            enemy.active = false;
+            ++mainEnemiesDefeated_;
+            mainPlayerGrounded_ = false;
+            mainPlayerSpeedY_ = -2.5F;
+            mainAmmo_ = 8;
+            ++soundPlayRequests_;
+            continue;
+        }
+        if (mainPlayerInvulnerability_ == 0 && mainPlayerHealth_ > 0) {
+            --mainPlayerHealth_;
+            mainPlayerInvulnerability_ = 90;
+            const float dx = mainPlayerX_ - enemy.preciseX;
+            const float dy = mainPlayerY_ - enemy.preciseY;
+            const float distance = std::sqrt(dx * dx + dy * dy);
+            mainPlayerSpeedX_ = distance > 0.001F ? dx / distance * 3.0F : 0.0F;
+            mainPlayerSpeedY_ = -2.0F;
+            mainPlayerGrounded_ = false;
+            ++soundPlayRequests_;
+        }
     }
 }
 
@@ -1367,6 +1411,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainShotDelayed_ = true;
                 mainAirborneShot_ = false;
                 mainAmmo_ = 8;
+                mainPlayerHealth_ = 4;
+                mainPlayerInvulnerability_ = 0;
                 mainShootLeg_ = -1;
                 mainShotsFired_ = 0;
                 mainBlocksDestroyed_ = 0;
@@ -1972,7 +2018,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(28); // Startup-state digest schema.
+    digest.addU32(29); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2044,6 +2090,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainShotDelayed_);
     digest.addBool(mainAirborneShot_);
     digest.addI32(mainAmmo_);
+    digest.addI32(mainPlayerHealth_);
+    digest.addI32(mainPlayerInvulnerability_);
     digest.addI32(mainShootLeg_);
     digest.addU32(mainShotsFired_);
     digest.addU32(mainBlocksDestroyed_);

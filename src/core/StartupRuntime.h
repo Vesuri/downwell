@@ -132,6 +132,8 @@ public:
     float mainCameraViewX() const { return mainCameraX_ - surfaceWidth / 2.0F; }
     float mainCameraViewY() const { return mainCameraY_ - surfaceHeight / 2.0F; }
     int mainAmmo() const { return mainAmmo_; }
+    int mainPlayerHealth() const { return mainPlayerHealth_; }
+    int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
     std::uint32_t mainBlocksDestroyed() const { return mainBlocksDestroyed_; }
     std::uint32_t mainLandings() const { return mainLandings_; }
@@ -200,10 +202,12 @@ private:
     bool moveMainPlayerAxis(float amount, bool horizontal);
     void fireMainGun(InstanceRecord& instance);
     void updateMainBullets();
-    void spawnMainCurrency(float x, float y, std::int32_t amount);
+    void spawnMainCurrency(float x, float y, std::int32_t amount,
+                           bool attracted = false);
     void updateMainCurrency();
     void updateMainLifecycle();
     void updateMainEnemies();
+    void updateMainEnemyInteractions();
     InstanceRecord* mainBulletEnemyCollision(float x, float y);
     InstanceRecord* mainBulletCollision(float x, float y);
     void dispatchInstancePhase(InstanceRecord& instance,
@@ -308,6 +312,8 @@ private:
     bool mainShotDelayed_ = true;
     bool mainAirborneShot_ = false;
     int mainAmmo_ = 8;
+    int mainPlayerHealth_ = 4;
+    int mainPlayerInvulnerability_ = 0;
     int mainShootLeg_ = -1;
     std::uint32_t mainShotsFired_ = 0;
     std::uint32_t mainBlocksDestroyed_ = 0;

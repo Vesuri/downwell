@@ -169,9 +169,13 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     // zero, so its negative left HUD and positive right HUD land naturally in
     // the 110-pixel side regions after adding origin.
     renderer.drawSprite(415, 1, origin - 102, 6);
-    renderer.fillRect(origin - 98, 11, 80, 6, {255, 0, 0, 255});
+    renderer.fillRect(origin - 98, 11,
+                      20 * startup_.mainPlayerHealth(), 6,
+                      {255, 0, 0, 255});
     renderer.drawSprite(415, 0, origin - 102, 6);
-    renderer.drawText(2, "4/4", origin - 58, 15,
+    const std::string health =
+        std::to_string(startup_.mainPlayerHealth()) + "/4";
+    renderer.drawText(2, health.c_str(), origin - 58, 15,
                       {255, 255, 255, 255}, TextAlign::center);
 
     constexpr int gaugeX = origin + 174;
