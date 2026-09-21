@@ -27,3 +27,5 @@
 .claude/*.lock
 .codex/
 /tools/vendor/
+__pycache__/
+*.pyc

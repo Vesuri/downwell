@@ -72,6 +72,16 @@ The current verified result is summarized in
 [docs/extraction-report.md](docs/extraction-report.md). Tool pinning and output
 details are in [tools/README.md](tools/README.md).
 
+The audited room metadata can then be lowered into the ignored native room pack:
+
+```sh
+make generate-room-pack
+make verify-room-pack
+```
+
+Its endian-explicit format is documented in
+[docs/room-pack.md](docs/room-pack.md).
+
 ## Amiga toolchain
 
 ```sh

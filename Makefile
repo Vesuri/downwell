@@ -34,7 +34,7 @@ ROOM_TEST_TARGET := build/room-loader-test
 ROOM_TEST_SOURCES := tests/core/RoomLoaderTest.cpp
 TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET)
 
-.PHONY: all run test extract verify-extraction amiga clean
+.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack amiga clean
 
 all: $(TARGET)
 
@@ -87,6 +87,12 @@ extract:
 
 verify-extraction:
 	tools/verify-extraction.sh
+
+generate-room-pack:
+	tools/generate-room-pack.py
+
+verify-room-pack:
+	tools/generate-room-pack.py --check
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'

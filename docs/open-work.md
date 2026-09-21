@@ -22,6 +22,7 @@
 - [x] Add fixed-capacity instance storage and persistent room-transfer behavior.
 - [x] Dispatch Begin Step, implemented alarms, Step, and End Step in fixed phases.
 - [x] Add atomic room entry with serialized creation order and lifecycle phases.
+- [x] Define and generate a deterministic native room-data pack.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.

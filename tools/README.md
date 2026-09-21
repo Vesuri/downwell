@@ -47,3 +47,9 @@ decompiler/disassembler failures. Run it directly or with:
 ```sh
 make verify-extraction
 ```
+
+## Native room pack
+
+`generate-room-pack.py` lowers schema-3 room data into the deterministic `DWRM`
+format documented in `docs/room-pack.md`. The copyrighted payload is generated
+locally under ignored `generated/`; only the generator and format are committed.
