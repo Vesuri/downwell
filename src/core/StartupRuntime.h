@@ -3,6 +3,7 @@
 
 #include "InstanceStore.h"
 #include "DeferredInstanceQueue.h"
+#include "Input.h"
 #include <cstdint>
 
 namespace downwell {
@@ -34,6 +35,7 @@ public:
 
     void reset(PlatformProfile profile);
     void step(bool advancePressed);
+    void step(const Input& input, bool advancePressed);
 
     std::uint64_t tick() const { return tick_; }
     int roomId() const { return roomId_; }
@@ -70,6 +72,13 @@ public:
     std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
     bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
     bool inMenu() const { return roomId_ == menuRoomId; }
+    bool menuPlayerNapping() const { return menuPlayerNapping_; }
+    int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
+    float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }
+    int menuPlayerFacing() const { return menuPlayerFacing_; }
+    float menuPlayerX() const { return menuPlayerX_; }
+    float menuCameraViewX() const { return menuCameraX_ - surfaceWidth / 2.0F; }
+    float menuCameraViewY() const { return menuCameraY_ - surfaceHeight / 2.0F; }
     std::uint64_t stateDigest() const;
 
 private:
@@ -77,6 +86,9 @@ private:
     void initRoomCreate();
     void initRoomAlarm0();
     void initRoomEndStep(bool advancePressed);
+    void stepInternal(bool advancePressed, bool left, bool right, bool anyInput);
+    void updateMenuPlayer(InstanceRecord& instance);
+    void updateMenuCamera();
     void dispatchInstancePhase(InstanceRecord& instance,
                                RoomInstancePhase phase);
     bool dispatchObjectEvent(InstanceRecord& instance,
@@ -118,6 +130,20 @@ private:
     DeferredInstanceQueue<8> deferredInstances_;
     std::uint32_t nextRuntimeInstanceId_ = 105186;
     bool deferredCommandsSucceeded_ = true;
+    bool inputLeft_ = false;
+    bool inputRight_ = false;
+    bool anyInput_ = false;
+    bool menuPlayerInitialized_ = false;
+    bool menuPlayerNapping_ = false;
+    float menuPlayerX_ = 112.0F;
+    float menuPlayerY_ = 512.0F;
+    float menuPlayerSpeedX_ = 0.0F;
+    int menuPlayerFacing_ = 1;
+    int menuPlayerSpriteId_ = 31;
+    float menuPlayerImageIndex_ = 0.0F;
+    float menuPlayerImageSpeed_ = 0.1F;
+    float menuCameraX_ = 112.0F;
+    float menuCameraY_ = 512.0F;
 };
 
 } // namespace downwell

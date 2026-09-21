@@ -86,13 +86,14 @@ void testReplayProducesStableStartupState() {
     for (std::uint32_t i = 0; i < reader.frameCount(); ++i) {
         downwell::Input input;
         require(reader.frame(i, input), "replay frame is available");
-        runtime.step(input.fire && !previousFire);
+        runtime.step(input, input.fire && !previousFire);
         previousFire = input.fire;
     }
 
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
-    require(runtime.stateDigest() == 0xd1120f2eb0dc00fcULL,
+    const std::uint64_t digest = runtime.stateDigest();
+    require(digest == 0x20163e80de987a33ULL,
             "startup state digest remains wire-stable");
 }
 

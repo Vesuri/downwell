@@ -173,6 +173,24 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "ditherFade Alarm 0 starts recovered animation speed");
         require(!runtime.controlsLocked(),
                 "ditherFade Alarm 0 restores player control");
+
+        require(runtime.menuPlayerNapping(),
+                "groundPlayerSet starts the menu player asleep");
+        downwell::Input wake;
+        wake.right = true;
+        runtime.step(wake, false);
+        require(!runtime.menuPlayerNapping(),
+                "the first enabled direction input wakes the player");
+        require(runtime.menuPlayerSpriteId() == 31,
+                "waking selects the default idle sprite");
+        for (int tick = 0; tick < 10; ++tick)
+            runtime.step(wake, false);
+        require(runtime.menuPlayerX() > 122.9F && runtime.menuPlayerX() < 123.1F,
+                "recovered ground acceleration reaches max speed over ten ticks");
+        require(runtime.menuPlayerSpriteId() == 27,
+                "horizontal movement selects the default run sprite");
+        require(runtime.menuCameraViewX() > 32.0F,
+                "free cam begins following the moving player");
     }
 }
 

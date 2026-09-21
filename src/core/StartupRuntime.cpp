@@ -4,6 +4,7 @@
 #include "PackedRoomLoader.h"
 #include "RoomLoader.h"
 #include "StateDigest.h"
+#include <cmath>
 
 namespace downwell {
 
@@ -40,6 +41,20 @@ void StartupRuntime::reset(PlatformProfile profile) {
                                  ? roomPack_->nextRuntimeInstanceId()
                                  : 105186;
     deferredCommandsSucceeded_ = true;
+    inputLeft_ = false;
+    inputRight_ = false;
+    anyInput_ = false;
+    menuPlayerInitialized_ = false;
+    menuPlayerNapping_ = false;
+    menuPlayerX_ = 112.0F;
+    menuPlayerY_ = 512.0F;
+    menuPlayerSpeedX_ = 0.0F;
+    menuPlayerFacing_ = 1;
+    menuPlayerSpriteId_ = 31;
+    menuPlayerImageIndex_ = 0.0F;
+    menuPlayerImageSpeed_ = 0.1F;
+    menuCameraX_ = 112.0F;
+    menuCameraY_ = 512.0F;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -85,7 +100,22 @@ void StartupRuntime::initRoomCreate() {
 }
 
 void StartupRuntime::step(bool advancePressed) {
+    stepInternal(advancePressed, false, false, advancePressed);
+}
+
+void StartupRuntime::step(const Input& input, bool advancePressed) {
+    stepInternal(advancePressed, input.left, input.right,
+                 input.left || input.right || input.fire || input.pause);
+}
+
+void StartupRuntime::stepInternal(bool advancePressed,
+                                  bool left,
+                                  bool right,
+                                  bool anyInput) {
     ++tick_;
+    inputLeft_ = left;
+    inputRight_ = right;
+    anyInput_ = anyInput;
 
     const auto alarmEvents = [this](const InstanceRecord& instance) {
         if (objectPack_ == nullptr)
@@ -125,6 +155,82 @@ void StartupRuntime::step(bool advancePressed) {
         }
     };
     EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler);
+}
+
+void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
+    if (!menuPlayerInitialized_)
+        return;
+
+    if (menuPlayerNapping_) {
+        // groundPlayerSet() chooses one of six valid poses. The host reference
+        // fixes choice zero until the recovered RNG stream is wired in.
+        menuPlayerX_ = 112.0F;
+        menuPlayerY_ = 506.0F;
+        menuPlayerSpriteId_ = 11; // sprPlayerNap
+        menuPlayerImageSpeed_ = 0.015F;
+        if (anyInput_ && !controlsLocked_) {
+            menuPlayerNapping_ = false;
+            menuPlayerY_ = 512.0F;
+            menuPlayerSpriteId_ = 31; // sprPlayerIdle
+            menuPlayerImageIndex_ = 0.0F;
+            menuPlayerImageSpeed_ = 0.1F;
+        }
+    } else {
+        if (controlsLocked_ || (inputLeft_ && inputRight_)) {
+            menuPlayerSpeedX_ = 0.0F;
+        } else if (inputLeft_) {
+            menuPlayerSpeedX_ -= 0.2F;
+            if (menuPlayerSpeedX_ > 0.0F)
+                menuPlayerSpeedX_ -= 2.0F;
+            if (menuPlayerSpeedX_ < -2.0F)
+                menuPlayerSpeedX_ = -2.0F;
+            menuPlayerFacing_ = -1;
+        } else if (inputRight_) {
+            menuPlayerSpeedX_ += 0.2F;
+            if (menuPlayerSpeedX_ < 0.0F)
+                menuPlayerSpeedX_ += 2.0F;
+            if (menuPlayerSpeedX_ > 2.0F)
+                menuPlayerSpeedX_ = 2.0F;
+            menuPlayerFacing_ = 1;
+        } else if (menuPlayerSpeedX_ > 0.0F) {
+            menuPlayerSpeedX_ = menuPlayerSpeedX_ > 0.4F
+                                    ? menuPlayerSpeedX_ - 0.4F : 0.0F;
+        } else if (menuPlayerSpeedX_ < 0.0F) {
+            menuPlayerSpeedX_ = menuPlayerSpeedX_ < -0.4F
+                                    ? menuPlayerSpeedX_ + 0.4F : 0.0F;
+        }
+
+        menuPlayerX_ += menuPlayerSpeedX_;
+        if (menuPlayerX_ < 16.0F)
+            menuPlayerX_ = 16.0F;
+        if (menuPlayerX_ > 400.0F)
+            menuPlayerX_ = 400.0F;
+        menuPlayerSpriteId_ = menuPlayerSpeedX_ == 0.0F ? 31 : 27;
+        menuPlayerImageSpeed_ = menuPlayerSpeedX_ == 0.0F ? 0.1F : 0.3F;
+    }
+
+    menuPlayerImageIndex_ += menuPlayerImageSpeed_;
+    instance.x = static_cast<std::int32_t>(std::round(menuPlayerX_));
+    instance.y = static_cast<std::int32_t>(std::round(menuPlayerY_));
+    instance.imageIndex = menuPlayerImageIndex_;
+    instance.imageSpeed = menuPlayerImageSpeed_;
+}
+
+void StartupRuntime::updateMenuCamera() {
+    if (!menuPlayerInitialized_)
+        return;
+    float targetX = menuPlayerX_;
+    if (menuPlayerSpeedX_ != 0.0F)
+        targetX += 16.0F * menuPlayerFacing_;
+    if (targetX < 80.0F)
+        targetX = 80.0F;
+    if (targetX > 336.0F)
+        targetX = 336.0F;
+    const float targetY = menuPlayerY_ - 32.0F;
+    menuCameraX_ += (targetX - menuCameraX_) / 10.0F;
+    menuCameraY_ += (targetY - menuCameraY_) / 5.0F;
+    if (menuCameraY_ < 142.0F)
+        menuCameraY_ = 142.0F;
 }
 
 void StartupRuntime::dispatchInstancePhase(InstanceRecord& instance,
@@ -209,12 +315,25 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 836: // gml_Object_objPlayer_n_Create_0 (startup-visible subset)
         ++implementedCodeCalls_;
         if (instance != nullptr && objectPack_ != nullptr) {
+            if (instance->roomId == menuRoomId) {
+                menuPlayerInitialized_ = true;
+                menuPlayerNapping_ = true;
+                menuPlayerX_ = static_cast<float>(instance->x);
+                menuPlayerY_ = static_cast<float>(instance->y);
+                menuCameraX_ = menuPlayerX_;
+                menuCameraY_ = menuPlayerY_;
+            }
             // scrPlayerInit's full state comes later. These are the two
             // instance_create calls made directly by the recovered event.
             if (!deferredInstances_.enqueueCreate(66, -100, instance->y) ||
                 !deferredInstances_.enqueueCreate(64, instance->x, instance->y))
                 deferredCommandsSucceeded_ = false;
         }
+        return;
+    case 849: // gml_Object_objPlayer_n_Step_1 (ground-room subset)
+        ++implementedCodeCalls_;
+        if (instance != nullptr && instance->roomId == menuRoomId)
+            updateMenuPlayer(*instance);
         return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;
@@ -232,6 +351,17 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 869: // gml_Object_objControlerN_Create_0
         ++implementedCodeCalls_;
         controllerCreate(profile_);
+        return;
+    case 997: // gml_Object_camMain_Create_0 (ground-room subset)
+        ++implementedCodeCalls_;
+        if (menuPlayerInitialized_) {
+            menuCameraX_ = menuPlayerX_;
+            menuCameraY_ = menuPlayerY_;
+        }
+        return;
+    case 999: // gml_Object_camMain_Step_0 (free-camera ground-room subset)
+        ++implementedCodeCalls_;
+        updateMenuCamera();
         return;
     case 2490: // gml_Object_objWell_Create_0
         ++implementedCodeCalls_;
@@ -374,7 +504,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(7); // Startup-state digest schema.
+    digest.addU32(8); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -393,6 +523,17 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(ditherFadeSpawnRequests_);
     digest.addU32(nextRuntimeInstanceId_);
     digest.addBool(deferredCommandsSucceeded_);
+    digest.addBool(menuPlayerInitialized_);
+    digest.addBool(menuPlayerNapping_);
+    digest.addF32(menuPlayerX_);
+    digest.addF32(menuPlayerY_);
+    digest.addF32(menuPlayerSpeedX_);
+    digest.addI32(menuPlayerFacing_);
+    digest.addI32(menuPlayerSpriteId_);
+    digest.addF32(menuPlayerImageIndex_);
+    digest.addF32(menuPlayerImageSpeed_);
+    digest.addF32(menuCameraX_);
+    digest.addF32(menuCameraY_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

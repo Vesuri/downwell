@@ -10,7 +10,7 @@ Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack)
 
 void Game::update(const Input& input) {
     finished_ = finished_ || input.quit;
-    startup_.step(input.fire && !fire_);
+    startup_.step(input, input.fire && !fire_);
     fire_ = input.fire;
     ++tick_;
 }
@@ -34,11 +34,8 @@ void Game::renderMenu(Renderer& renderer) const {
     if (objectPack_ == nullptr)
         return;
 
-    // camMain follows the recovered player position (112, 512). groundRoom()
-    // changes its vertical target by -32, so the settled 160x284 view begins
-    // at (32, 338). Camera interpolation will be added with player movement.
-    constexpr float viewX = 32.0F;
-    constexpr float viewY = 338.0F;
+    const float viewX = startup_.menuCameraViewX();
+    const float viewY = startup_.menuCameraViewY();
 
     std::array<std::size_t, StartupRuntime::instanceCapacity> order{};
     std::size_t count = 0;
@@ -79,18 +76,25 @@ void Game::renderMenu(Renderer& renderer) const {
             roomX = std::floor(120.0F + viewX / 1.2F);
             roomY = std::floor((viewY + logicalHeight / 2.0F) / 1.1F);
         }
-        const float imageIndex = instance.imageIndex < 0.0F
-                                     ? 0.0F
-                                     : instance.imageIndex;
+        const bool isPlayer = instance.objectId == 35;
+        const std::int32_t spriteId = isPlayer
+                                          ? startup_.menuPlayerSpriteId()
+                                          : object.spriteId;
+        const float runtimeImageIndex = isPlayer
+                                            ? startup_.menuPlayerImageIndex()
+                                            : instance.imageIndex;
+        const float imageIndex = runtimeImageIndex < 0.0F
+                                     ? 0.0F : runtimeImageIndex;
         if (instance.objectId == 315) { // objWell Draw: black shaft behind sprite
             renderer.fillRect(static_cast<int>(roomX - 24.0F - viewX),
                               static_cast<int>(roomY + 64.0F - viewY),
                               160, 1000, {0, 0, 0, 255});
         }
         renderer.drawSpriteTransformed(
-            object.spriteId, static_cast<std::uint32_t>(imageIndex),
+            spriteId, static_cast<std::uint32_t>(imageIndex),
             roomX - viewX, roomY - viewY,
-            instance.scaleX, instance.scaleY, instance.rotation);
+            instance.scaleX * (isPlayer ? startup_.menuPlayerFacing() : 1),
+            instance.scaleY, instance.rotation);
     }
 }
 
