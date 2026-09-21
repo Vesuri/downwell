@@ -23,6 +23,7 @@ class StartupRuntime {
 public:
     static constexpr std::size_t instanceCapacity = 256;
     static constexpr int entryRoomId = 7;
+    static constexpr int playMenuRoomId = 8;
     static constexpr int menuRoomId = 20;
     static constexpr std::uint32_t controllerInstanceId = 100065;
     static constexpr std::uint32_t initRoomInstanceId = 100066;
@@ -72,6 +73,7 @@ public:
     std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
     bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
     bool inMenu() const { return roomId_ == menuRoomId; }
+    bool inPlayMenu() const { return roomId_ == playMenuRoomId; }
     bool menuPlayerNapping() const { return menuPlayerNapping_; }
     int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }
@@ -83,6 +85,14 @@ public:
     float menuCameraViewY() const { return menuCameraY_ - surfaceHeight / 2.0F; }
     bool menuTitleReady() const { return menuTitleReady_; }
     bool menuTeleportActive() const { return menuTeleportActive_; }
+    bool enterSequenceActive() const { return enterSequenceActive_; }
+    float enterSequenceY() const { return enterSequenceY_; }
+    float playMenuYOffset() const { return playMenuYOffset_; }
+    float playMenuTileY() const { return playMenuTileY_; }
+    float playMenuDitherY() const { return playMenuDitherY_; }
+    float playMenuRunFrame() const { return playMenuRunFrame_; }
+    float playMenuSmoothX() const { return playMenuSmoothX_; }
+    int playMenuCursor() const { return playMenuCursor_; }
     std::uint64_t stateDigest() const;
 
 private:
@@ -136,6 +146,8 @@ private:
     bool deferredCommandsSucceeded_ = true;
     bool inputLeft_ = false;
     bool inputRight_ = false;
+    bool inputLeftPressed_ = false;
+    bool inputRightPressed_ = false;
     bool anyInput_ = false;
     bool menuPlayerInitialized_ = false;
     bool menuPlayerNapping_ = false;
@@ -156,6 +168,17 @@ private:
     float menuTitleStartY_ = 432.0F;
     bool menuTeleportActive_ = false;
     bool menuTeleportSequenceStarted_ = false;
+    float menuCameraLockerY_ = 448.0F;
+    bool enterSequenceActive_ = false;
+    bool enterSequenceBlackSet_ = false;
+    float enterSequenceY_ = 448.0F;
+    float enterSequenceSpeedY_ = 0.0F;
+    float playMenuYOffset_ = -128.0F;
+    float playMenuTileY_ = 0.0F;
+    float playMenuDitherY_ = 80.0F;
+    float playMenuRunFrame_ = 0.0F;
+    float playMenuSmoothX_ = 0.0F;
+    int playMenuCursor_ = 0;
 };
 
 } // namespace downwell

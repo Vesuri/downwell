@@ -43,6 +43,8 @@ void StartupRuntime::reset(PlatformProfile profile) {
     deferredCommandsSucceeded_ = true;
     inputLeft_ = false;
     inputRight_ = false;
+    inputLeftPressed_ = false;
+    inputRightPressed_ = false;
     anyInput_ = false;
     menuPlayerInitialized_ = false;
     menuPlayerNapping_ = false;
@@ -63,6 +65,17 @@ void StartupRuntime::reset(PlatformProfile profile) {
     menuTitleStartY_ = 432.0F;
     menuTeleportActive_ = false;
     menuTeleportSequenceStarted_ = false;
+    menuCameraLockerY_ = 448.0F;
+    enterSequenceActive_ = false;
+    enterSequenceBlackSet_ = false;
+    enterSequenceY_ = 448.0F;
+    enterSequenceSpeedY_ = 0.0F;
+    playMenuYOffset_ = -128.0F;
+    playMenuTileY_ = 0.0F;
+    playMenuDitherY_ = 80.0F;
+    playMenuRunFrame_ = 0.0F;
+    playMenuSmoothX_ = 0.0F;
+    playMenuCursor_ = 0;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -121,6 +134,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool right,
                                   bool anyInput) {
     ++tick_;
+    inputLeftPressed_ = left && !inputLeft_;
+    inputRightPressed_ = right && !inputRight_;
     inputLeft_ = left;
     inputRight_ = right;
     anyInput_ = anyInput;
@@ -163,6 +178,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
         }
     };
     EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler);
+    if (deferredInstances_.size() != 0)
+        flushDeferredInstances(instances_, roomId_);
 }
 
 void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
@@ -287,7 +304,8 @@ void StartupRuntime::updateMenuCamera() {
         targetX = 80.0F;
     if (targetX > 336.0F)
         targetX = 336.0F;
-    const float targetY = inCameraLocker ? 448.0F : menuPlayerY_ - 32.0F;
+    const float targetY = inCameraLocker ? menuCameraLockerY_
+                                         : menuPlayerY_ - 32.0F;
     menuCameraX_ += (targetX - menuCameraX_) /
                     (inCameraLocker ? 15.0F : 10.0F);
     menuCameraY_ += (targetY - menuCameraY_) / 5.0F;
@@ -356,6 +374,11 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                                  std::int32_t codeId,
                                  bool advancePressed) {
     switch (codeId) {
+    case 649: // gml_Room_rmPlayMenu_Create
+        ++implementedCodeCalls_;
+        cameraViewWidth_ = surfaceWidth;
+        cameraViewHeight_ = surfaceHeight;
+        return;
     case 648: // gml_Room_rmInit_Create
         ++implementedCodeCalls_;
         cameraViewWidth_ = surfaceWidth;
@@ -419,12 +442,75 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         menuTeleportActive_ = false;
         menuTeleportSequenceStarted_ = false;
         return;
+    case 2436: // gml_Object_objTeleportMain_Alarm_1
+        ++implementedCodeCalls_;
+        if (objectPack_ != nullptr &&
+            !deferredInstances_.enqueueCreate(69, 0, 0))
+            deferredCommandsSucceeded_ = false;
+        return;
     case 2438: // gml_Object_objTeleportMain_Step_1
         ++implementedCodeCalls_;
         if (instance != nullptr && menuTeleportActive_ && menuTitleReady_ &&
             !menuTeleportSequenceStarted_) {
             instance->alarms.set(1, 30);
             menuTeleportSequenceStarted_ = true;
+        }
+        return;
+    case 967: // gml_Object_PlayMenu_Create_0 (no-save default)
+        ++implementedCodeCalls_;
+        playMenuCursor_ = 0;
+        playMenuYOffset_ = -128.0F;
+        playMenuTileY_ = 0.0F;
+        playMenuDitherY_ = 80.0F;
+        playMenuRunFrame_ = 0.0F;
+        playMenuSmoothX_ = 0.0F;
+        return;
+    case 968: // gml_Object_PlayMenu_Step_1 plus deterministic Draw state
+        ++implementedCodeCalls_;
+        playMenuYOffset_ -= playMenuYOffset_ / 15.0F;
+        if (std::abs(playMenuYOffset_) < 1.0F)
+            playMenuYOffset_ = 0.0F;
+        playMenuRunFrame_ += 0.25F;
+        playMenuTileY_ -= 6.0F;
+        if (playMenuTileY_ <= -16.0F)
+            playMenuTileY_ += 16.0F;
+        playMenuDitherY_ += 16.0F;
+        if (playMenuYOffset_ == 0.0F) {
+            if (inputRightPressed_ && playMenuCursor_ < 4)
+                ++playMenuCursor_;
+            if (inputLeftPressed_ && playMenuCursor_ > 0)
+                --playMenuCursor_;
+        }
+        playMenuSmoothX_ +=
+            (playMenuCursor_ * 48.0F - playMenuSmoothX_) / 5.0F;
+        if (std::abs(playMenuCursor_ * 48.0F - playMenuSmoothX_) < 1.0F)
+            playMenuSmoothX_ = playMenuCursor_ * 48.0F;
+        return;
+    case 1014: // gml_Object_EnterSequence_Create_0
+        ++implementedCodeCalls_;
+        enterSequenceActive_ = true;
+        enterSequenceBlackSet_ = false;
+        enterSequenceY_ = menuCameraLockerY_;
+        enterSequenceSpeedY_ = 0.0F;
+        if (instance != nullptr)
+            instance->y = static_cast<std::int32_t>(enterSequenceY_);
+        return;
+    case 1015: // gml_Object_EnterSequence_Alarm_0
+        ++implementedCodeCalls_;
+        gotoRoom(playMenuRoomId);
+        return;
+    case 1016: // gml_Object_EnterSequence_Step_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr && enterSequenceActive_) {
+            if (enterSequenceY_ < 1000.0F) {
+                enterSequenceY_ += enterSequenceSpeedY_;
+            } else if (!enterSequenceBlackSet_) {
+                enterSequenceBlackSet_ = true;
+                instance->alarms.set(0, 5);
+            }
+            enterSequenceSpeedY_ += 0.25F;
+            menuCameraLockerY_ = enterSequenceY_;
+            instance->y = static_cast<std::int32_t>(std::round(enterSequenceY_));
         }
         return;
     case 997: // gml_Object_camMain_Create_0 (ground-room subset)
@@ -620,7 +706,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(10); // Startup-state digest schema.
+    digest.addU32(11); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -658,6 +744,17 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addF32(menuTitleStartY_);
     digest.addBool(menuTeleportActive_);
     digest.addBool(menuTeleportSequenceStarted_);
+    digest.addF32(menuCameraLockerY_);
+    digest.addBool(enterSequenceActive_);
+    digest.addBool(enterSequenceBlackSet_);
+    digest.addF32(enterSequenceY_);
+    digest.addF32(enterSequenceSpeedY_);
+    digest.addF32(playMenuYOffset_);
+    digest.addF32(playMenuTileY_);
+    digest.addF32(playMenuDitherY_);
+    digest.addF32(playMenuRunFrame_);
+    digest.addF32(playMenuSmoothX_);
+    digest.addI32(playMenuCursor_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

@@ -211,6 +211,23 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             runtime.step(wake, false);
         require(runtime.menuTitleReady(),
                 "title completion eventually enables the teleporter sequence");
+
+        for (int tick = 0; tick < 140 && !runtime.inPlayMenu(); ++tick)
+            runtime.step(wake, false);
+        require(runtime.inPlayMenu(),
+                "EnterSequence acceleration reaches rmPlayMenu");
+        require(runtime.hasInstance(100067),
+                "rmPlayMenu creates its recovered PlayMenu instance");
+        require(runtime.activeInstanceCount() == 2,
+                "only the persistent controller and PlayMenu survive transition");
+        downwell::Input released;
+        for (int tick = 0; tick < 100; ++tick)
+            runtime.step(released, false);
+        require(runtime.playMenuYOffset() == 0.0F,
+                "style menu entrance easing settles exactly");
+        runtime.step(wake, false);
+        require(runtime.playMenuCursor() == 1,
+                "a right press advances the recovered style carousel");
     }
 }
 

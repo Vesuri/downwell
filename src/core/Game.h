@@ -25,6 +25,7 @@ public:
 
 private:
     void renderMenu(Renderer& renderer) const;
+    void renderPlayMenu(Renderer& renderer) const;
 
     std::uint64_t tick_ = 0;
     StartupRuntime startup_;

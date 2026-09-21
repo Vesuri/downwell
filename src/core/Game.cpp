@@ -19,6 +19,8 @@ void Game::render(Renderer& renderer) const {
     renderer.clear({10, 10, 12, 255});
     if (startup_.inMenu()) {
         renderMenu(renderer);
+    } else if (startup_.inPlayMenu()) {
+        renderPlayMenu(renderer);
     } else {
         const int stage = startup_.showSplash();
         if (stage == 2)
@@ -44,6 +46,7 @@ void Game::renderMenu(Renderer& renderer) const {
         PackedObject object;
         if (instance.active &&
             instance.objectId != 382 && // ditherFade draws a captured surface
+            instance.objectId != 69 &&  // EnterSequence has a custom Draw event
             objectPack_->findObject(instance.objectId, object) &&
             object.visible() && object.spriteId >= 0) {
             order[count++] = index;
@@ -77,9 +80,11 @@ void Game::renderMenu(Renderer& renderer) const {
             roomY = std::floor((viewY + logicalHeight / 2.0F) / 1.1F);
         }
         const bool isPlayer = instance.objectId == 35;
-        const std::int32_t spriteId = isPlayer
-                                          ? startup_.menuPlayerSpriteId()
-                                          : object.spriteId;
+        std::int32_t spriteId = isPlayer
+                                    ? startup_.menuPlayerSpriteId()
+                                    : object.spriteId;
+        if (instance.objectId == 60) // objWall_n Create selects wallTile
+            spriteId = 76; // global.levelTile[0] / sprTileSurface
         const float runtimeImageIndex = isPlayer
                                             ? startup_.menuPlayerImageIndex()
                                             : instance.imageIndex;
@@ -96,6 +101,41 @@ void Game::renderMenu(Renderer& renderer) const {
             instance.scaleX * (isPlayer ? startup_.menuPlayerFacing() : 1),
             instance.scaleY, instance.rotation);
     }
+}
+
+void Game::renderPlayMenu(Renderer& renderer) const {
+    renderer.clear({0, 0, 0, 255});
+    const float yOffset = startup_.playMenuYOffset();
+    const float centerY = logicalHeight / 2.0F + yOffset;
+    const float smoothX = startup_.playMenuSmoothX();
+    constexpr std::int32_t styleRuns[] = {27, 25, 26, 28, 29};
+
+    for (int style = 0; style < 5; ++style) {
+        const float drawX = 80.0F + style * 48.0F - smoothX;
+        const float distance = drawX - 80.0F;
+        const float drawY = centerY - 14.0F - distance * distance / 200.0F;
+        // Only the default style is unlocked in the no-save reference state.
+        const std::int32_t sprite = style == 0 ? styleRuns[style] : 43;
+        const std::uint32_t frame = style == startup_.playMenuCursor()
+                                        ? static_cast<std::uint32_t>(
+                                              startup_.playMenuRunFrame())
+                                        : 0U;
+        renderer.drawSpriteTransformed(sprite, frame, drawX, drawY,
+                                       1.0F, 1.0F, 0.0F);
+    }
+
+    const int tileY = static_cast<int>(startup_.playMenuTileY());
+    for (int row = 0; row <= 36; ++row) {
+        renderer.drawSprite(51, 13, 0, tileY + row * 16);
+        renderer.drawSprite(51, 7, 160, tileY + row * 16);
+    }
+    if (startup_.playMenuCursor() < 4)
+        renderer.drawSprite(44, 0, 96, static_cast<int>(centerY - 10.0F));
+    if (startup_.playMenuCursor() > 0)
+        renderer.drawSpriteTransformed(44, 0, 64.0F, centerY - 10.0F,
+                                       -1.0F, 1.0F, 0.0F);
+    renderer.drawSprite(129, 0, 80,
+                        static_cast<int>(startup_.playMenuDitherY()));
 }
 
 } // namespace downwell
