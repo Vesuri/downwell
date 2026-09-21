@@ -3,6 +3,7 @@
 #include "EventScheduler.h"
 #include "ObjectPack.h"
 #include "PackedRoomLoader.h"
+#include "PlayerCollision.h"
 #include "RoomLoader.h"
 #include "StateDigest.h"
 #include <algorithm>
@@ -355,10 +356,10 @@ bool StartupRuntime::mainPlayerCollides(float x, float y) const {
         const InstanceRecord& wall = instances_.at(index);
         if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
             continue;
-        const float wallLeft = wall.x - 16.0F;
-        const float wallRight = wall.x + 15.0F;
-        const float wallTop = wall.y - 16.0F;
-        const float wallBottom = wall.y + 15.0F;
+        const float wallLeft = wall.x - 8.0F;
+        const float wallRight = wall.x + 7.0F;
+        const float wallTop = wall.y - 8.0F;
+        const float wallBottom = wall.y + 7.0F;
         if (playerRight >= wallLeft && playerLeft <= wallRight &&
             playerBottom >= wallTop && playerTop <= wallBottom)
             return true;
@@ -374,6 +375,20 @@ bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
                                : std::max(-1.0F, remaining);
         const float nextX = mainPlayerX_ + (horizontal ? move : 0.0F);
         const float nextY = mainPlayerY_ + (horizontal ? 0.0F : move);
+        if (!horizontal && move > 0.0F) {
+            for (std::size_t index = 0; index < instances_.size(); ++index) {
+                const InstanceRecord& platform = instances_.at(index);
+                float landingY = mainPlayerY_;
+                if (platform.active && platform.objectId == 93 &&
+                    resolveDownwardThinPlatform(
+                        mainPlayerX_, mainPlayerY_, nextY,
+                        static_cast<float>(platform.x),
+                        static_cast<float>(platform.y), landingY)) {
+                    mainPlayerY_ = landingY;
+                    return false;
+                }
+            }
+        }
         if (mainPlayerCollides(nextX, nextY))
             return false;
         mainPlayerX_ = nextX;
@@ -388,8 +403,8 @@ bool StartupRuntime::mainBulletCollides(float x, float y) const {
         const InstanceRecord& wall = instances_.at(index);
         if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
             continue;
-        if (x >= wall.x - 16.0F && x <= wall.x + 15.0F &&
-            y >= wall.y - 16.0F && y <= wall.y + 15.0F)
+        if (x >= wall.x - 8.0F && x <= wall.x + 7.0F &&
+            y >= wall.y - 8.0F && y <= wall.y + 7.0F)
             return true;
     }
     return false;

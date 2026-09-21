@@ -51,6 +51,8 @@
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry
   generated from the recovered area-one entrance fragment.
+- [x] Implement recovered 16×2 one-way thin-platform collision and correct
+  area-one wall/block rendering and collision to the native 16×16 mask.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.

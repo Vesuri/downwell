@@ -318,8 +318,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "rmMain camera follows the fall with recovered smoothing and bias");
         for (int tick = 0; tick < 20; ++tick)
             runtime.step(fallRight, false);
-        require(runtime.mainPlayerX() < 285.0F,
-                "the recovered player mask cannot cross the shaft wall mask");
+        require(runtime.mainPlayerX() > 292.7F &&
+                    runtime.mainPlayerX() < 292.9F,
+                "the recovered masks stop the player at the shaft wall");
         downwell::Input fireMain;
         fireMain.fire = true;
         runtime.step(fireMain, true);
@@ -397,14 +398,14 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
         downwell::Input steerToPlatform;
         steerToPlatform.left = true;
-        for (int tick = 0; tick < 8; ++tick)
+        for (int tick = 0; tick < 20; ++tick)
             runtime.step(steerToPlatform, false);
         for (int tick = 0; tick < 120 && !runtime.mainPlayerGrounded(); ++tick)
             runtime.step(releasedMain, false);
         require(runtime.mainPlayerGrounded(),
                 "the player lands on solid recovered entrance geometry");
-        require(runtime.mainPlayerY() >= 1191.0F &&
-                    runtime.mainPlayerY() <= 1193.0F &&
+        require(runtime.mainPlayerY() >= 1199.0F &&
+                    runtime.mainPlayerY() <= 1201.0F &&
                     runtime.mainPlayerSpeedY() == 0.0F &&
                     runtime.mainPlayerSpriteId() == 31,
                 "landing settles at the recovered block top without sinking");
@@ -413,8 +414,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);
             if (instance.active && instance.objectId == 92 &&
                 instance.y == 1216 &&
-                runtime.mainPlayerX() + 3.0F >= instance.x - 16.0F &&
-                runtime.mainPlayerX() - 4.0F <= instance.x + 15.0F)
+                runtime.mainPlayerX() + 3.0F >= instance.x - 8.0F &&
+                runtime.mainPlayerX() - 4.0F <= instance.x + 7.0F)
                 standingOnEntranceBlock = true;
         }
         require(standingOnEntranceBlock,

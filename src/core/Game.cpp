@@ -55,7 +55,7 @@ void Game::renderMain(Renderer& renderer) const {
     };
 
     // objWall_n computes this four-neighbour bit mask on its first End Step.
-    // Area one uses sprTile1 (resource 51) at the recovered 2x scale.
+    // Area one uses sprTile1 (resource 51) with its native 16-pixel mask.
     for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
         const InstanceRecord& instance = startup_.instanceAt(index);
         if (!instance.active || instance.objectId != 60)
@@ -68,7 +68,7 @@ void Game::renderMain(Renderer& renderer) const {
         renderer.drawSpriteTransformed(51, frame,
                                        instance.x - viewX,
                                        instance.y - viewY,
-                                       2.0F, 2.0F, 0.0F);
+                                       1.0F, 1.0F, 0.0F);
     }
 
     // The first translated pattern family currently exposes its structural
@@ -81,8 +81,8 @@ void Game::renderMain(Renderer& renderer) const {
         std::int32_t sprite = -1;
         std::uint32_t frame = 0;
         float scale = 1.0F;
-        if (instance.objectId == 93) { sprite = 51; frame = 23; scale = 2.0F; }
-        if (instance.objectId == 92) { sprite = 51; frame = 16; scale = 2.0F; }
+        if (instance.objectId == 93) { sprite = 51; frame = 23; }
+        if (instance.objectId == 92) { sprite = 51; frame = 16; }
         if (instance.objectId == 113) sprite = 166;
         if (instance.objectId == 289) sprite = 550;
         if (sprite >= 0)
