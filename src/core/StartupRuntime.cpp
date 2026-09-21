@@ -106,6 +106,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainAmmo_ = 8;
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
+    mainBlocksDestroyed_ = 0;
     mainBulletCount_ = 0;
     mainBuilderInitialized_ = false;
     mainBuilderY_ = 704;
@@ -401,16 +402,16 @@ bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
     return true;
 }
 
-bool StartupRuntime::mainBulletCollides(float x, float y) const {
+InstanceRecord* StartupRuntime::mainBulletCollision(float x, float y) {
     for (std::size_t index = 0; index < instances_.size(); ++index) {
-        const InstanceRecord& wall = instances_.at(index);
+        InstanceRecord& wall = instances_.at(index);
         if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
             continue;
         if (x >= wall.x - 8.0F && x <= wall.x + 7.0F &&
             y >= wall.y - 8.0F && y <= wall.y + 7.0F)
-            return true;
+            return &wall;
     }
-    return false;
+    return nullptr;
 }
 
 void StartupRuntime::fireMainGun(InstanceRecord& instance) {
@@ -445,7 +446,15 @@ void StartupRuntime::updateMainBullets() {
         bool alive = true;
         for (int pixel = 0; pixel < 8; ++pixel) {
             bullet.y += 1.0F;
-            if (mainBulletCollides(bullet.x, bullet.y)) {
+            InstanceRecord* wall = mainBulletCollision(bullet.x, bullet.y);
+            if (wall != nullptr) {
+                if (wall->objectId == 92) {
+                    // objBox_n starts with wallHp = 1. The usual gun's bdmg
+                    // exhausts it on contact; its Step event destroys it.
+                    wall->active = false;
+                    ++mainBlocksDestroyed_;
+                    ++soundPlayRequests_;
+                }
                 alive = false;
                 break;
             }
@@ -901,6 +910,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainAmmo_ = 8;
                 mainShootLeg_ = -1;
                 mainShotsFired_ = 0;
+                mainBlocksDestroyed_ = 0;
                 mainBulletCount_ = 0;
                 instance->alarms.set(2, 30);
             }
@@ -1372,7 +1382,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(18); // Startup-state digest schema.
+    digest.addU32(19); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1446,6 +1456,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainAmmo_);
     digest.addI32(mainShootLeg_);
     digest.addU32(mainShotsFired_);
+    digest.addU32(mainBlocksDestroyed_);
     digest.addU32(static_cast<std::uint32_t>(mainBulletCount_));
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         digest.addF32(mainBullets_[index].x);

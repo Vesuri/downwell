@@ -434,16 +434,24 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         steerToPlatform.left = true;
         for (int tick = 0; tick < 20; ++tick)
             runtime.step(steerToPlatform, false);
+        for (int tick = 0; tick < 9; ++tick)
+            runtime.step(steerToPlatform, false);
+        const std::uint32_t shotsBeforeBlock = runtime.mainShotsFired();
+        runtime.step(fireMain, true);
+        downwell::Input steerToRemainingBlock;
+        steerToRemainingBlock.right = true;
+        for (int tick = 0; tick < 20; ++tick)
+            runtime.step(steerToRemainingBlock, false);
         for (int tick = 0; tick < 120 && !runtime.mainPlayerGrounded(); ++tick)
             runtime.step(releasedMain, false);
         require(runtime.mainPlayerGrounded(),
-                "the player lands on solid recovered entrance geometry");
-        require(runtime.mainPlayerY() >= 1199.0F &&
-                    runtime.mainPlayerY() <= 1201.0F &&
+                "the player lands on solid generated geometry");
+        require(runtime.mainPlayerY() >= 1311.0F &&
+                    runtime.mainPlayerY() <= 1313.0F &&
                     runtime.mainPlayerSpeedY() == 0.0F &&
                     runtime.mainPlayerSpriteId() == 31,
-                "landing settles at the recovered block top without sinking");
-        bool standingOnEntranceBlock = false;
+                "landing settles on lower generated geometry after the shot");
+        bool standingOnGeneratedBlock = false;
         bool foundInitializedBlock = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);
@@ -465,19 +473,23 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                             instance.imageIndex >= 0.0F && instance.imageIndex <= 16.0F,
                         "generated scenery retains its recovered random Create state");
             if (instance.active && instance.objectId == 92 &&
-                instance.y == 1216 &&
+                instance.y == 1328 &&
                 runtime.mainPlayerX() + 3.0F >= instance.x - 8.0F &&
                 runtime.mainPlayerX() - 4.0F <= instance.x + 7.0F)
-                standingOnEntranceBlock = true;
+                standingOnGeneratedBlock = true;
         }
-        require(foundInitializedBlock && standingOnEntranceBlock,
-                "grounded state is backed by a generated breakable block");
-        require(runtime.mainBuilderMainPatternsGenerated() == 1 &&
-                    runtime.mainBuilderLastMainPattern() == 32 &&
-                    runtime.mainBuilderGenerationCount() == 1,
-                "the builder continues into the first deterministic regular fragment");
-        require(runtime.mainBuilderRowsGenerated() == 48,
-                "regular fragments preserve row overlap and append three pillar rows");
+        require(foundInitializedBlock && standingOnGeneratedBlock,
+                "grounded state remains backed by a generated breakable block");
+        require(runtime.mainBuilderMainPatternsGenerated() == 2 &&
+                    runtime.mainBuilderLastMainPattern() == 30 &&
+                    runtime.mainBuilderGenerationCount() == 2,
+                "the builder continues through two deterministic regular fragments");
+        require(runtime.mainBuilderRowsGenerated() == 67,
+                "regular fragments preserve row overlap and append pillar rows");
+        require(runtime.mainShotsFired() == shotsBeforeBlock + 1 &&
+                    runtime.mainBlocksDestroyed() == 1 &&
+                    runtime.mainBulletCount() == 0,
+                "a usual gunboot shot destroys one block and opens its cell");
     }
 }
 

@@ -51,6 +51,8 @@
   overlap, mirroring, boundary walls, padding pillars, and RNG ordering.
 - [x] Preserve generated-object Create results across deferred insertion,
   including block variants, scenery orientation, enemy alarms, and activation.
+- [x] Apply usual-gun bullet collision to one-hit breakable blocks while
+  retaining indestructible area walls and opening the resulting terrain cell.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

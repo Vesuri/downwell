@@ -125,6 +125,7 @@ public:
     float mainCameraViewY() const { return mainCameraY_ - surfaceHeight / 2.0F; }
     int mainAmmo() const { return mainAmmo_; }
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
+    std::uint32_t mainBlocksDestroyed() const { return mainBlocksDestroyed_; }
     std::size_t mainBulletCount() const { return mainBulletCount_; }
     const MainBulletState& mainBulletAt(std::size_t index) const {
         return mainBullets_[index];
@@ -167,7 +168,7 @@ private:
     bool moveMainPlayerAxis(float amount, bool horizontal);
     void fireMainGun(InstanceRecord& instance);
     void updateMainBullets();
-    bool mainBulletCollides(float x, float y) const;
+    InstanceRecord* mainBulletCollision(float x, float y);
     void dispatchInstancePhase(InstanceRecord& instance,
                                RoomInstancePhase phase);
     bool dispatchObjectEvent(InstanceRecord& instance,
@@ -269,6 +270,7 @@ private:
     int mainAmmo_ = 8;
     int mainShootLeg_ = -1;
     std::uint32_t mainShotsFired_ = 0;
+    std::uint32_t mainBlocksDestroyed_ = 0;
     std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
     std::size_t mainBulletCount_ = 0;
     bool mainBuilderInitialized_ = false;
