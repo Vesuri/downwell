@@ -21,6 +21,8 @@ void Game::render(Renderer& renderer) const {
         renderMenu(renderer);
     } else if (startup_.inPlayMenu()) {
         renderPlayMenu(renderer);
+    } else if (startup_.inMainRoom()) {
+        renderMain(renderer);
     } else {
         const int stage = startup_.showSplash();
         if (stage == 2)
@@ -30,6 +32,48 @@ void Game::render(Renderer& renderer) const {
         if (stage == 5 || stage == 6)
             renderer.drawSpriteTiled(733, 11, -300, 0); // sprDitherFade
     }
+}
+
+void Game::renderMain(Renderer& renderer) const {
+    const InstanceRecord* player = startup_.instance(100855);
+    if (player == nullptr)
+        return;
+
+    // camMain is created on the player. This is the authoritative first view;
+    // camera movement will replace it when the rmMain step slice is translated.
+    const float viewX = static_cast<float>(player->x) - logicalWidth / 2.0F;
+    const float viewY = static_cast<float>(player->y) - logicalHeight / 2.0F;
+    const auto hasWallAt = [this](std::int32_t x, std::int32_t y) {
+        for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
+            const InstanceRecord& candidate = startup_.instanceAt(index);
+            if (candidate.active && candidate.objectId == 60 &&
+                candidate.x == x && candidate.y == y)
+                return true;
+        }
+        return false;
+    };
+
+    // objWall_n computes this four-neighbour bit mask on its first End Step.
+    // Area one uses sprTile1 (resource 51) at the recovered 2x scale.
+    for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
+        const InstanceRecord& instance = startup_.instanceAt(index);
+        if (!instance.active || instance.objectId != 60)
+            continue;
+        std::uint32_t frame = 0;
+        frame |= hasWallAt(instance.x, instance.y - 16) ? 1U : 0U;
+        frame |= hasWallAt(instance.x + 16, instance.y) ? 2U : 0U;
+        frame |= hasWallAt(instance.x, instance.y + 16) ? 4U : 0U;
+        frame |= hasWallAt(instance.x - 16, instance.y) ? 8U : 0U;
+        renderer.drawSpriteTransformed(51, frame,
+                                       instance.x - viewX,
+                                       instance.y - viewY,
+                                       2.0F, 2.0F, 0.0F);
+    }
+
+    constexpr std::int32_t styleIdle[] = {31, 33, 34, 35, 32};
+    renderer.drawSprite(styleIdle[startup_.playStyle()], 0,
+                        static_cast<int>(player->x - viewX),
+                        static_cast<int>(player->y - viewY));
 }
 
 void Game::renderMenu(Renderer& renderer) const {
