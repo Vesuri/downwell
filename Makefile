@@ -26,9 +26,9 @@ OBJECTS := $(patsubst %.cpp,build/%.o,$(SOURCES))
 DEPS    := $(OBJECTS:.o=.d)
 TARGET  := build/downwell-sdl
 STARTUP_TEST_TARGET := build/startup-runtime-test
-STARTUP_TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp
+STARTUP_TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp
 REPLAY_TEST_TARGET := build/replay-test
-REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp
+REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp
 ALARM_TEST_TARGET := build/alarm-bank-test
 ALARM_TEST_SOURCES := tests/core/AlarmBankTest.cpp
 INSTANCE_TEST_TARGET := build/instance-store-test

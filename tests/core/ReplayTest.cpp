@@ -81,7 +81,8 @@ void testReplayProducesStableStartupState() {
 
     const std::vector<std::uint8_t> bytes = downwell::encodeReplay(frames, 0xdecafbad);
     const downwell::ReplayReader reader(bytes.data(), bytes.size());
-    downwell::StartupRuntime runtime;
+    downwell::StartupRuntime runtime(downwell::PlatformProfile::desktop,
+                                     nullptr, nullptr, reader.randomSeed());
     bool previousFire = false;
     for (std::uint32_t i = 0; i < reader.frameCount(); ++i) {
         downwell::Input input;
@@ -93,7 +94,7 @@ void testReplayProducesStableStartupState() {
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
     const std::uint64_t digest = runtime.stateDigest();
-    require(digest == 0x30c63979ef725749ULL,
+    require(digest == 0x32b7d2d60b909e50ULL,
             "startup state digest remains wire-stable");
 }
 

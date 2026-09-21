@@ -141,9 +141,12 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     require(player != nullptr, "first recovered rmMenu player exists");
     require(player->objectId == 35, "rmMenu player has recovered object ID");
     require(player->roomId == 20, "rmMenu player belongs to recovered room");
+    require(runtime.randomSeed() == downwell::StartupRuntime::defaultRandomSeed &&
+                runtime.randomDrawCount() == 92,
+            "menu creation preserves all recovered shared-stream RNG draws");
     if (objects != nullptr)
-        require(runtime.implementedCodeCalls() == 12,
-                "room transition and translated Create events route by code ID");
+        require(runtime.implementedCodeCalls() == 29,
+                "room transition and RNG-consuming Create events route by code ID");
     if (objects != nullptr) {
         require(runtime.instance(105186) != nullptr &&
                     runtime.instance(105186)->objectId == 66,
@@ -176,6 +179,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
         require(runtime.menuPlayerNapping(),
                 "groundPlayerSet starts the menu player asleep");
+        require(runtime.menuPlayerX() == 112.0F &&
+                    runtime.menuPlayerY() == 512.0F &&
+                    runtime.menuPlayerSpriteId() == 12,
+                "the reference seed selects its recovered sleeping pose");
         downwell::Input wake;
         wake.right = true;
         runtime.step(wake, false);
@@ -265,6 +272,13 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainBuilderY() == 704 &&
                     runtime.mainBuilderGenerationCount() == -30,
                 "rmMain initializes the recovered first-boot builder prelude");
+        require(runtime.mainBuilderRightRoom(0) >= 3 &&
+                    runtime.mainBuilderRightRoom(0) <= 15 &&
+                    runtime.mainBuilderRightRoom(1) >= 3 &&
+                    runtime.mainBuilderRightRoom(1) <= 15 &&
+                    std::abs(runtime.mainBuilderRightRoom(0) -
+                             runtime.mainBuilderRightRoom(1)) > 2,
+                "builder creation consumes the stream for valid side-room rows");
         downwell::Input fallRight;
         fallRight.right = true;
         for (int tick = 0; tick < 10; ++tick)

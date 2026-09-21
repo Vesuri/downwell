@@ -14,9 +14,11 @@ void GameMakerRandom::setSeed(std::uint32_t seed) {
         word = value >> 16U;
     }
     stateIndex_ = 0;
+    drawCount_ = 0;
 }
 
 std::uint32_t GameMakerRandom::nextU32() {
+    ++drawCount_;
     const std::uint32_t a = state_[stateIndex_];
     std::uint32_t c = state_[(stateIndex_ + 13U) & 15U];
     const std::uint32_t b = a ^ c ^ (a << 16U) ^ (c << 15U);

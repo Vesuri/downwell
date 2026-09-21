@@ -3,6 +3,7 @@
 
 #include "InstanceStore.h"
 #include "DeferredInstanceQueue.h"
+#include "GameMakerRandom.h"
 #include "Input.h"
 #include <array>
 #include <cstdint>
@@ -37,10 +38,12 @@ public:
     static constexpr std::uint32_t initRoomInstanceId = 100066;
     static constexpr int surfaceWidth = 160;
     static constexpr int surfaceHeight = 284;
+    static constexpr std::uint32_t defaultRandomSeed = 2;
 
     explicit StartupRuntime(PlatformProfile profile = PlatformProfile::desktop,
                             const RoomPack* roomPack = nullptr,
-                            const ObjectPack* objectPack = nullptr);
+                            const ObjectPack* objectPack = nullptr,
+                            std::uint32_t randomSeed = defaultRandomSeed);
 
     void reset(PlatformProfile profile);
     void step(bool advancePressed);
@@ -127,6 +130,11 @@ public:
     std::uint32_t mainBuilderRowsGenerated() const {
         return mainBuilderRowsGenerated_;
     }
+    int mainBuilderRightRoom(std::size_t index) const {
+        return mainBuilderRightRooms_[index];
+    }
+    std::uint32_t randomSeed() const { return random_.seed(); }
+    std::uint64_t randomDrawCount() const { return random_.drawCount(); }
     std::uint64_t stateDigest() const;
 
 private:
@@ -169,6 +177,8 @@ private:
     InstanceStore<instanceCapacity> instances_;
     const RoomPack* roomPack_ = nullptr;
     const ObjectPack* objectPack_ = nullptr;
+    std::uint32_t randomSeed_ = defaultRandomSeed;
+    GameMakerRandom random_;
     PlatformProfile profile_ = PlatformProfile::desktop;
     int initTimes_ = 0;
     int achievementLoginCalls_ = 0;
@@ -250,6 +260,7 @@ private:
     int mainBuilderY_ = 704;
     int mainBuilderGenerationCount_ = -30;
     std::uint32_t mainBuilderRowsGenerated_ = 0;
+    std::array<int, 2> mainBuilderRightRooms_{{-1, -1}};
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
     float mainCameraY_ = 176.0F;

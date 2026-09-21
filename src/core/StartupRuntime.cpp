@@ -11,14 +11,17 @@ namespace downwell {
 
 StartupRuntime::StartupRuntime(PlatformProfile profile,
                                const RoomPack* roomPack,
-                               const ObjectPack* objectPack)
-    : roomPack_(roomPack), objectPack_(objectPack) {
+                               const ObjectPack* objectPack,
+                               std::uint32_t randomSeed)
+    : roomPack_(roomPack), objectPack_(objectPack),
+      randomSeed_(randomSeed), random_(randomSeed) {
     reset(profile);
 }
 
 void StartupRuntime::reset(PlatformProfile profile) {
     tick_ = 0;
     profile_ = profile;
+    random_.setSeed(randomSeed_); // Result of the Windows runner's randomize().
     roomId_ = entryRoomId;
     roomDestination_ = 0;
     showSplash_ = 0;
@@ -104,6 +107,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderY_ = 704;
     mainBuilderGenerationCount_ = -30;
     mainBuilderRowsGenerated_ = 0;
+    mainBuilderRightRooms_ = {{-1, -1}};
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
@@ -224,13 +228,9 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
         return;
 
     if (menuPlayerNapping_) {
-        // groundPlayerSet() chooses one of six valid poses. The host reference
-        // fixes choice zero until the recovered RNG stream is wired in.
-        menuPlayerX_ = 112.0F;
-        menuPlayerY_ = 506.0F;
-        menuPlayerSpriteId_ = 11; // sprPlayerNap
-        menuPlayerImageSpeed_ = 0.015F;
         if (anyInput_ && !controlsLocked_) {
+            if (menuPlayerGrounded_)
+                random_.irandom(3); // soundLand foliage-sample selection.
             menuPlayerNapping_ = false;
             menuPlayerY_ = 512.0F;
             menuPlayerSpriteId_ = 31; // sprPlayerIdle
@@ -321,6 +321,16 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
 
     if (menuPlayerImageSpeed_ > 0.0F)
         menuPlayerImageIndex_ += menuPlayerImageSpeed_;
+    if (!menuPlayerNapping_ && menuPlayerGrounded_ &&
+        menuPlayerSpriteId_ == 27) {
+        if (menuPlayerImageIndex_ >= 8.0F)
+            menuPlayerImageIndex_ = std::fmod(menuPlayerImageIndex_, 8.0F);
+        const int frame = static_cast<int>(std::floor(menuPlayerImageIndex_));
+        const int priorFrame = static_cast<int>(std::floor(
+            menuPlayerImageIndex_ - menuPlayerImageSpeed_));
+        if ((frame == 1 || frame == 5) && frame != priorFrame)
+            random_.irandom(3); // soundFootstep foliage-sample selection.
+    }
     instance.x = static_cast<std::int32_t>(std::round(menuPlayerX_));
     instance.y = static_cast<std::int32_t>(std::round(menuPlayerY_));
     instance.imageIndex = menuPlayerImageIndex_;
@@ -656,10 +666,20 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         if (instance != nullptr && objectPack_ != nullptr) {
             if (instance->roomId == menuRoomId) {
+                const int napPose = static_cast<int>(random_.irandom(5));
+                constexpr int napSprites[] = {11, 12, 14, 13, 15, 14};
+                constexpr float napX[] = {112, 112, 290, 80, 295, 290};
+                constexpr float napY[] = {506, 512, 496, 512, 496, 496};
+                constexpr float napSpeed[] = {0.015F, 0.15F, 0.0F,
+                                               0.0F, 0.25F, 0.0F};
                 menuPlayerInitialized_ = true;
                 menuPlayerNapping_ = true;
-                menuPlayerX_ = static_cast<float>(instance->x);
-                menuPlayerY_ = static_cast<float>(instance->y);
+                menuPlayerX_ = napX[napPose];
+                menuPlayerY_ = napY[napPose];
+                menuPlayerSpriteId_ = napSprites[napPose];
+                menuPlayerImageSpeed_ = napSpeed[napPose];
+                instance->x = static_cast<int>(menuPlayerX_);
+                instance->y = static_cast<int>(menuPlayerY_);
                 menuCameraX_ = menuPlayerX_;
                 menuCameraY_ = menuPlayerY_;
             } else if (instance->roomId == mainRoomId) {
@@ -708,6 +728,19 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderY_ = instance->y;
             mainBuilderGenerationCount_ = -30; // area 1, level 1, first boot
             mainBuilderRowsGenerated_ = 0;
+            random_.irandom(2); // choose(2, 2, 3), then overridden to two.
+            mainBuilderRightRooms_[0] =
+                3 + static_cast<int>(random_.irandom(12));
+            int attempts = 0;
+            do {
+                mainBuilderRightRooms_[1] =
+                    3 + static_cast<int>(random_.irandom(12));
+                ++attempts;
+            } while (attempts <= 100 &&
+                     std::abs(mainBuilderRightRooms_[1] -
+                              mainBuilderRightRooms_[0]) <= 2);
+            if (attempts > 100)
+                mainBuilderRightRooms_[1] = 9999;
         }
         return;
     case 1003: // gml_Object_objBuilder_Step_0
@@ -851,6 +884,33 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         else
             updateMenuCamera();
         return;
+    case 2478: { // gml_Object_objTree_Create_0
+        ++implementedCodeCalls_;
+        const std::uint64_t choice = random_.irandom(5);
+        if (instance != nullptr) {
+            instance->imageIndex = choice == 5 ? 1.0F : 0.0F;
+            instance->imageSpeed = 0.0F;
+        }
+        return;
+    }
+    case 2480: // gml_Object_groundTrees_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            instance->imageSpeed = 0.0F;
+            instance->imageIndex = static_cast<float>(random_.irandom(3));
+        }
+        return;
+    case 2486: // gml_Object_objGrass_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            random_.irandom(3); // Sprite choice; all four sprites have 4 frames.
+            instance->imageSpeed =
+                static_cast<float>(0.15 + random_.random(0.1));
+            instance->imageIndex = static_cast<float>(random_.irandom(3));
+            if (random_.random(10.0) < 1.0)
+                instance->active = false;
+        }
+        return;
     case 2490: // gml_Object_objWell_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr && objectPack_ != nullptr) {
@@ -886,8 +946,16 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 2498: // gml_Object_objTitle_Alarm_0 (visual effects omitted)
         ++implementedCodeCalls_;
-        if (instance != nullptr)
+        if (instance != nullptr) {
+            for (int effect = 0; effect < 20; ++effect) {
+                random_.random(140.0);
+                random_.random(32.0);
+                random_.irandom(1);
+                random_.random(0.165);
+                random_.random(0.1);
+            }
             instance->alarms.set(1, 75);
+        }
         return;
     case 2499: // gml_Object_objTitle_Step_0
         ++implementedCodeCalls_;
@@ -898,6 +966,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 !menuTitleFirstBoot_) {
                 instance->alarms.set(2, 15);
                 menuTitleFirstBoot_ = true;
+            }
+            if (menuTitleFirstBoot_ && instance->imageIndex < 9.0F &&
+                random_.irandom(1) != 0) {
+                random_.random(132.0);
+                random_.random(32.0);
+                random_.irandom(1);
+                random_.random(0.4);
             }
             if (instance->imageSpeed > 0.0F) {
                 instance->imageIndex += instance->imageSpeed;
@@ -1033,7 +1108,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(15); // Startup-state digest schema.
+    digest.addU32(16); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1052,6 +1127,11 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(ditherFadeSpawnRequests_);
     digest.addU32(nextRuntimeInstanceId_);
     digest.addBool(deferredCommandsSucceeded_);
+    digest.addU32(random_.seed());
+    digest.addU64(random_.drawCount());
+    digest.addU32(static_cast<std::uint32_t>(random_.stateIndex()));
+    for (std::size_t index = 0; index < 16; ++index)
+        digest.addU32(random_.stateWord(index));
     digest.addBool(menuPlayerInitialized_);
     digest.addBool(menuPlayerNapping_);
     digest.addF32(menuPlayerX_);
@@ -1111,6 +1191,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainBuilderY_);
     digest.addI32(mainBuilderGenerationCount_);
     digest.addU32(mainBuilderRowsGenerated_);
+    digest.addI32(mainBuilderRightRooms_[0]);
+    digest.addI32(mainBuilderRightRooms_[1]);
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);

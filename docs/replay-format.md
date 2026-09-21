@@ -41,13 +41,12 @@ padding, native booleans, or host-endian memory.
 
 Each state family starts with its own schema number and appends fields in a
 documented fixed order. Changing the field order or meaning requires a schema
-increment and a deliberate golden-digest update. Startup-state schema 7 includes
-the room-load result, room-created camera/audio/control/spawn-request state, the
-runtime instance allocator/deferred-command result, the stable instance list,
-transforms, creation-code references, layer/depth state, and all twelve alarm
-slots for every instance. The bounded-fixture startup replay has a pinned digest
-of `d1120f2eb0dc00fc` after 13 ticks and transition to `rmMenu`.
+increment and a deliberate golden-digest update. Startup-state schema 16
+includes the room-load result, runtime instance state, gameplay/player/builder
+state, and the complete Windows-runner RNG state and draw count. The bounded
+startup replay seeded with `decafbad` has a pinned digest of
+`32b7d2d60b909e50` after 13 ticks and transition to `rmMenu`.
 
-The current code provides memory encoding/decoding and state comparison. File
-recording/playback in the SDL platform layer will be added once the shared RNG
-and command-line runner are in place.
+The current code provides memory encoding/decoding, seeded RNG initialization,
+and state comparison. File recording/playback in the SDL platform layer and a
+command-line replay runner remain to be added.

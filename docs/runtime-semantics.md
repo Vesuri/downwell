@@ -125,6 +125,13 @@ tests pin raw WELL output plus `random` and `irandom` behavior. This is
 intentionally Windows-runner compatibility: GameMaker documents that seeded
 results can differ between target platforms.
 
+The replay seed is treated as the value produced by the runner's startup
+`randomize()` call. The translated path now consumes the shared stream for the
+menu sleeping pose, decorative grass and trees, landing/footstep sample
+selection, title particles (even though those particles are not drawn yet), and
+the initial area-one side-room rows. The interactive SDL reference uses seed 2
+when no replay supplies one, giving a stable development run.
+
 When both native packs are supplied, lifecycle and step dispatch resolve the
 object's recovered event binding (including inheritance) to a VM code-entry ID
 before selecting a native handler. The four implemented `objInitRm`/

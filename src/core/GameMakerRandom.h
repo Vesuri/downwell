@@ -22,6 +22,7 @@ public:
 
     std::size_t stateIndex() const { return stateIndex_; }
     std::uint32_t stateWord(std::size_t index) const { return state_[index]; }
+    std::uint64_t drawCount() const { return drawCount_; }
 
 private:
     static constexpr std::uint32_t wellMask = 0xda442d24U;
@@ -29,6 +30,7 @@ private:
     std::array<std::uint32_t, 16> state_{};
     std::size_t stateIndex_ = 0;
     std::uint32_t seed_ = 0;
+    std::uint64_t drawCount_ = 0;
 };
 
 } // namespace downwell

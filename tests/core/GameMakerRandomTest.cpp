@@ -21,6 +21,8 @@ void testWell512Vector() {
     for (std::uint32_t value : expected)
         require(random.nextU32() == value,
                 "WELL512 output matches the recovered Windows runner vector");
+    require(random.drawCount() == 8,
+            "the adapter exposes the exact shared-stream consumption count");
     require(random.seed() == 0x12345678U,
             "random_get_seed retains the seed rather than the stream position");
 }
@@ -34,7 +36,8 @@ void testIntegerRangeAndReset() {
                 "irandom uses two outputs and an inclusive modulus");
 
     random.setSeed(0x12345678U);
-    require(random.irandom(4) == expected[0],
+    require(random.drawCount() == 0 && random.irandom(4) == expected[0] &&
+                random.drawCount() == 2,
             "random_set_seed reproduces the integer stream");
 }
 
