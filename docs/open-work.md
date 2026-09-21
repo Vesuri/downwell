@@ -59,6 +59,8 @@
   window for generated area-one geometry, scenery, and enemies.
 - [x] Carry recovered area-one enemy health/reward state and resolve usual-gun
   damage, turtle immunity, death, and native animation independently per enemy.
+- [x] Make the shared fire/up control jump from solid ground, apply variable
+  jump-height release, then unlock gunboot fire on the next airborne press.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

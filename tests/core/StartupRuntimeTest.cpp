@@ -528,6 +528,19 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                             instance.y <= runtime.mainCameraViewY() + 3000.0F,
                         "active generated objects stay inside the lifecycle window");
         }
+
+        const float groundedY = runtime.mainPlayerY();
+        const std::uint32_t shotsBeforeJump = runtime.mainShotsFired();
+        runtime.step(fireMain, true);
+        require(runtime.mainJumps() == 1 && !runtime.mainPlayerGrounded() &&
+                    runtime.mainPlayerY() < groundedY &&
+                    runtime.mainShotsFired() == shotsBeforeJump,
+                "pressing fire on solid ground performs the recovered jump");
+        runtime.step(releasedMain, false);
+        runtime.step(fireMain, true);
+        require(runtime.mainShotsFired() == shotsBeforeJump + 1 &&
+                    runtime.mainAmmo() == 7 && runtime.mainBulletCount() == 1,
+                "releasing after the jump unlocks an airborne gunboot shot");
     }
 }
 

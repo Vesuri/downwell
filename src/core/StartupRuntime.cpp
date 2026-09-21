@@ -54,6 +54,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     inputLeftPressed_ = false;
     inputRightPressed_ = false;
     inputFire_ = false;
+    inputFirePressed_ = false;
     inputFireReleased_ = false;
     anyInput_ = false;
     menuPlayerInitialized_ = false;
@@ -112,6 +113,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainEnemiesActivated_ = 0;
     mainInstancesRetired_ = 0;
     mainEnemiesDefeated_ = 0;
+    mainJumps_ = 0;
     mainBulletCount_ = 0;
     mainBuilderInitialized_ = false;
     mainBuilderY_ = 704;
@@ -189,6 +191,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
+    inputFirePressed_ = fire && !inputFire_;
     inputFireReleased_ = !fire && inputFire_;
     inputLeft_ = left;
     inputRight_ = right;
@@ -779,6 +782,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     const bool wasGrounded = mainPlayerGrounded_;
     mainPlayerSpeedY_ = std::min(7.0F, mainPlayerSpeedY_ + 0.2F);
     if (inputFireReleased_) {
+        if (mainPlayerSpeedY_ < 0.0F)
+            mainPlayerSpeedY_ *= 0.5F;
         mainJumpShootLocked_ = false;
         mainShotDelayed_ = false; // pBulDelayKill is set for the default gun.
     }
@@ -804,6 +809,16 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         mainPlayerSpeedX_ = std::min(0.0F, mainPlayerSpeedX_ + 0.1F);
         if (mainPlayerSpeedX_ > -0.3F)
             mainPlayerSpeedX_ = 0.0F;
+    }
+
+    if (!controlsLocked_ && inputFirePressed_ && mainPlayerGrounded_) {
+        // The shared up/fire button calls scrJump while grounded. It does not
+        // emit a bullet until the button is released and pressed in the air.
+        mainPlayerSpeedY_ = -4.4F;
+        mainPlayerGrounded_ = false;
+        mainJumpShootLocked_ = true;
+        ++mainJumps_;
+        ++soundPlayRequests_;
     }
 
     if (inputFire_ && !mainPlayerGrounded_ && !mainShotDelayed_ &&
@@ -1026,6 +1041,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainEnemiesActivated_ = 0;
                 mainInstancesRetired_ = 0;
                 mainEnemiesDefeated_ = 0;
+                mainJumps_ = 0;
                 mainBulletCount_ = 0;
                 instance->alarms.set(2, 30);
             }
@@ -1515,7 +1531,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(22); // Startup-state digest schema.
+    digest.addU32(23); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1595,6 +1611,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(mainEnemiesActivated_);
     digest.addU32(mainInstancesRetired_);
     digest.addU32(mainEnemiesDefeated_);
+    digest.addU32(mainJumps_);
     digest.addU32(static_cast<std::uint32_t>(mainBulletCount_));
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         digest.addF32(mainBullets_[index].x);

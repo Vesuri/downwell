@@ -130,6 +130,7 @@ public:
     std::uint32_t mainEnemiesActivated() const { return mainEnemiesActivated_; }
     std::uint32_t mainInstancesRetired() const { return mainInstancesRetired_; }
     std::uint32_t mainEnemiesDefeated() const { return mainEnemiesDefeated_; }
+    std::uint32_t mainJumps() const { return mainJumps_; }
     std::size_t mainBulletCount() const { return mainBulletCount_; }
     const MainBulletState& mainBulletAt(std::size_t index) const {
         return mainBullets_[index];
@@ -225,6 +226,7 @@ private:
     bool inputLeftPressed_ = false;
     bool inputRightPressed_ = false;
     bool inputFire_ = false;
+    bool inputFirePressed_ = false;
     bool inputFireReleased_ = false;
     bool anyInput_ = false;
     bool menuPlayerInitialized_ = false;
@@ -283,6 +285,7 @@ private:
     std::uint32_t mainEnemiesActivated_ = 0;
     std::uint32_t mainInstancesRetired_ = 0;
     std::uint32_t mainEnemiesDefeated_ = 0;
+    std::uint32_t mainJumps_ = 0;
     std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
     std::size_t mainBulletCount_ = 0;
     bool mainBuilderInitialized_ = false;
