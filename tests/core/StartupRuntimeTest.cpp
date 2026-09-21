@@ -142,7 +142,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     require(player->objectId == 35, "rmMenu player has recovered object ID");
     require(player->roomId == 20, "rmMenu player belongs to recovered room");
     if (objects != nullptr)
-        require(runtime.implementedCodeCalls() == 10,
+        require(runtime.implementedCodeCalls() == 12,
                 "room transition and translated Create events route by code ID");
     if (objects != nullptr) {
         require(runtime.instance(105186) != nullptr &&

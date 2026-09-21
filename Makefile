@@ -107,16 +107,16 @@ $(DEFERRED_INSTANCE_TEST_TARGET): $(DEFERRED_INSTANCE_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(DEFERRED_INSTANCE_TEST_SOURCES)
 
-test: generate-font-pack $(TEST_TARGETS)
-	./$(STARTUP_TEST_TARGET)
+test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack $(TEST_TARGETS)
+	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 	./$(REPLAY_TEST_TARGET)
 	./$(ALARM_TEST_TARGET)
 	./$(INSTANCE_TEST_TARGET)
 	./$(EVENT_TEST_TARGET)
 	./$(ROOM_TEST_TARGET)
-	./$(ROOM_PACK_TEST_TARGET)
-	./$(OBJECT_PACK_TEST_TARGET)
-	./$(SPRITE_PACK_TEST_TARGET)
+	./$(ROOM_PACK_TEST_TARGET) generated/downwell-rooms.dwrm
+	./$(OBJECT_PACK_TEST_TARGET) generated/downwell-objects.dwob
+	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp
 	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
 	./$(DEFERRED_INSTANCE_TEST_TARGET)
 
