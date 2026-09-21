@@ -42,7 +42,7 @@ DEFERRED_INSTANCE_TEST_TARGET := build/deferred-instance-queue-test
 DEFERRED_INSTANCE_TEST_SOURCES := tests/core/DeferredInstanceQueueTest.cpp src/core/ObjectPack.cpp
 TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET)
 
-.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack verify-native-data amiga clean
+.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack verify-native-data amiga clean
 
 all: $(TARGET)
 
@@ -125,6 +125,12 @@ generate-object-pack:
 verify-object-pack: $(OBJECT_PACK_TEST_TARGET)
 	tools/generate-object-pack.py --check
 	./$(OBJECT_PACK_TEST_TARGET) generated/downwell-objects.dwob
+
+generate-sprite-pack:
+	tools/generate-sprite-pack.py
+
+verify-sprite-pack:
+	tools/generate-sprite-pack.py --check
 
 verify-native-data: generate-room-pack generate-object-pack $(STARTUP_TEST_TARGET)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob

@@ -102,6 +102,11 @@ link to recovered GML and VM assembly for the native event dispatcher. The
 portable reader validates inheritance and resolves inherited bindings without
 host-endian or structure-layout assumptions.
 
+Sprite/frame/atlas metadata has its own deterministic `DWSP` lowering,
+documented in [docs/sprite-pack.md](docs/sprite-pack.md). The corresponding
+decoded texture-page PNGs are produced by the guarded extraction and remain
+ignored alongside other copyrighted derived data.
+
 `make run` loads both packs. Implemented startup events are now selected through
 their recovered object/event bindings and VM code IDs; resolved event calls
 without a native translation remain visible in runtime diagnostics rather than
