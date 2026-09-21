@@ -1,0 +1,29 @@
+# Local GameMaker/Steam build. Copyrighted source material: never commit.
+/data/
+
+# Extracted or mechanically derived GameMaker resources.
+/extracted/
+/generated/
+/captures/
+/tmp/
+
+# Host build output.
+/build/
+*.o
+*.d
+
+# Amiga build, emulator, and debugger output.
+/amiga/obj/
+/amiga/out/
+/amiga/.run/
+*.elf
+*.exe
+*.map
+*.uaem
+*.uss
+
+# Local tools and editor state.
+.DS_Store
+.claude/*.lock
+.codex/
+/tools/vendor/
