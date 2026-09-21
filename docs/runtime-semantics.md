@@ -16,10 +16,12 @@ The portable `AlarmBank` currently models the required runner behavior:
 - twelve signed 32-bit slots with no allocation;
 - reset value `-1` for every slot;
 - positive values decrease once per simulation tick;
-- reaching zero returns the alarm in a dispatch bitmask and makes the slot
-  inactive before its handler runs;
+- reaching zero returns the alarm in a dispatch bitmask and leaves the visible
+  value at zero for that event;
+- an unrearmed zero becomes `-1` on the following step;
 - a handler may immediately rearm the same slot;
-- zero and negative values do not count down.
+- assigning zero does not dispatch an event and becomes `-1` next step;
+- slots without corresponding Alarm events do not count down.
 
 `StartupRuntime` now uses this primitive for the recovered splash cadence. Its
 existing tick-731 and golden-state-digest tests remain unchanged, which guards
@@ -28,6 +30,10 @@ the refactor against behavior drift.
 The exact position of alarm dispatch relative to Begin Step, input, Step,
 collision, and End Step remains an explicit open item for the general scheduler.
 It must not be inferred merely from the fact that the startup slice passes.
+
+These rules and the Begin Step → alarms → Step placement are documented by the
+[GameMaker alarm reference](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Instances/Instance_Variables/alarm.htm)
+and [event-order reference](https://manual.gamemaker.io/lts/en/The_Asset_Editors/Object_Properties/Event_Order.htm).
 
 ## Instance and room order
 

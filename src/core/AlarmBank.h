@@ -14,6 +14,7 @@ public:
     static constexpr std::size_t count = 12;
     static constexpr std::int32_t inactive = -1;
     using FiredMask = std::uint16_t;
+    static constexpr FiredMask allEvents = (1U << count) - 1;
 
     AlarmBank() { reset(); }
 
@@ -21,15 +22,19 @@ public:
     std::int32_t get(std::size_t index) const { return values_[index]; }
     void set(std::size_t index, std::int32_t value) { values_[index] = value; }
 
-    FiredMask advance() {
+    FiredMask advance(FiredMask implementedEvents = allEvents) {
         FiredMask fired = 0;
         for (std::size_t index = 0; index < count; ++index) {
-            if (values_[index] <= 0)
+            const FiredMask eventBit = static_cast<FiredMask>(1U << index);
+            if ((implementedEvents & eventBit) == 0 || values_[index] < 0)
                 continue;
-            --values_[index];
             if (values_[index] == 0) {
                 values_[index] = inactive;
-                fired |= static_cast<FiredMask>(1U << index);
+                continue;
+            }
+            --values_[index];
+            if (values_[index] == 0) {
+                fired |= eventBit;
             }
         }
         return fired;

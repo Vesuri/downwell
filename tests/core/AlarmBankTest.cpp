@@ -21,8 +21,9 @@ void testResetAndCountdown() {
     require(alarms.get(0) == 1, "alarm counts down by one");
     const auto fired = alarms.advance();
     require(downwell::AlarmBank::fired(fired, 0), "alarm fires on reaching zero");
-    require(alarms.get(0) == -1, "fired alarm becomes inactive");
+    require(alarms.get(0) == 0, "fired alarm remains at zero for its event");
     require(alarms.advance() == 0, "inactive alarm remains quiet");
+    require(alarms.get(0) == -1, "fired alarm becomes inactive next step");
 }
 
 void testSimultaneousAndRearm() {
@@ -47,8 +48,16 @@ void testZeroAndNegativeDoNotCount() {
     alarms.set(3, 0);
     alarms.set(4, -5);
     require(alarms.advance() == 0, "non-positive alarms do not dispatch");
-    require(alarms.get(3) == 0, "zero alarm remains unchanged");
+    require(alarms.get(3) == -1, "zero alarm becomes inactive without dispatch");
     require(alarms.get(4) == -5, "negative alarm remains unchanged");
+}
+
+void testMissingEventDoesNotCountDown() {
+    downwell::AlarmBank alarms;
+    alarms.set(2, 3);
+    const auto onlyAlarmZero = static_cast<downwell::AlarmBank::FiredMask>(1U << 0);
+    require(alarms.advance(onlyAlarmZero) == 0, "missing alarm event does not fire");
+    require(alarms.get(2) == 3, "missing alarm event does not count down");
 }
 
 } // namespace
@@ -57,6 +66,7 @@ int main() {
     testResetAndCountdown();
     testSimultaneousAndRearm();
     testZeroAndNegativeDoNotCount();
+    testMissingEventDoesNotCountDown();
     std::cout << "alarm bank tests passed\n";
     return 0;
 }
