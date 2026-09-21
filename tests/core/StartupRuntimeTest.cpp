@@ -164,6 +164,36 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.implementedCodeCalls() == 29,
                 "room transition and RNG-consuming Create events route by code ID");
     if (objects != nullptr) {
+        downwell::StartupRuntime edgeEntry(
+            downwell::PlatformProfile::nonDesktop, &pack, objects,
+            downwell::StartupRuntime::defaultRandomSeed, patterns);
+        edgeEntry.step(false);
+        stepMany(edgeEntry, 30);
+        downwell::Input enterAtLeftEdge;
+        enterAtLeftEdge.right = true;
+        for (int tick = 0;
+             tick < 160 && edgeEntry.menuPlayerX() < 300.0F;
+             ++tick)
+            edgeEntry.step(enterAtLeftEdge, false);
+        downwell::Input noInput;
+        for (int tick = 0;
+             tick < 100 && !edgeEntry.menuTeleportActive();
+             ++tick)
+            edgeEntry.step(noInput, false);
+        require(edgeEntry.menuTeleportActive() &&
+                    edgeEntry.menuPlayerX() < 324.0F,
+                "left-edge well entry reproduces the missed player-X title trigger");
+        for (int tick = 0;
+             tick < 180 && !edgeEntry.menuTitleRevealStarted();
+             ++tick)
+            edgeEntry.step(noInput, false);
+        require(edgeEntry.menuTitleRevealStarted(),
+                "camera centering starts the title after edge-entry goalStop");
+        for (int tick = 0; tick < 300 && !edgeEntry.inPlayMenu(); ++tick)
+            edgeEntry.step(noInput, false);
+        require(edgeEntry.inPlayMenu(),
+                "edge entry completes the title and well transition without input");
+
         require(runtime.instance(105186) != nullptr &&
                     runtime.instance(105186)->objectId == 66,
                 "player Create spawns the depth meter first");

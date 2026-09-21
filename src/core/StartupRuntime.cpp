@@ -346,8 +346,8 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
 
 bool StartupRuntime::mainPlayerCollides(float x, float y) const {
     // objPlayer_n keeps sprPlayerIdle as its collision mask: an 8x12 box at
-    // offsets (-4,-4)..(+3,+7). objWall_n uses mask16 at its recovered 2x
-    // scale, producing a 32x32 box centered on each room position.
+    // offsets (-4,-4)..(+3,+7). objWall_n and objBox_n use the recovered
+    // 16x16 mask centered on each room position.
     const float playerLeft = x - 4.0F;
     const float playerRight = x + 3.0F;
     const float playerTop = y - 4.0F;
@@ -1069,8 +1069,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         if (instance != nullptr) {
             if (!menuPlayerNapping_ &&
-                menuPlayerX_ > instance->x - 4.0F &&
-                menuPlayerX_ < instance->x + 4.0F &&
+                instance->x > menuCameraX_ - 4.0F &&
+                instance->x < menuCameraX_ + 4.0F &&
                 !menuTitleFirstBoot_) {
                 instance->alarms.set(2, 15);
                 menuTitleFirstBoot_ = true;

@@ -98,6 +98,7 @@ public:
     float menuCameraViewX() const { return menuCameraX_ - surfaceWidth / 2.0F; }
     float menuCameraViewY() const { return menuCameraY_ - surfaceHeight / 2.0F; }
     bool menuTitleReady() const { return menuTitleReady_; }
+    bool menuTitleRevealStarted() const { return menuTitleFirstBoot_; }
     bool menuTeleportActive() const { return menuTeleportActive_; }
     bool enterSequenceActive() const { return enterSequenceActive_; }
     float enterSequenceY() const { return enterSequenceY_; }
