@@ -46,7 +46,7 @@ void Game::renderMenu(Renderer& renderer) const {
         const InstanceRecord& instance = startup_.instanceAt(index);
         PackedObject object;
         if (instance.active &&
-            instance.instanceId < startup_.nextRuntimeInstanceId() &&
+            instance.objectId != 382 && // ditherFade draws a captured surface
             objectPack_->findObject(instance.objectId, object) &&
             object.visible() && object.spriteId >= 0) {
             order[count++] = index;
@@ -82,6 +82,11 @@ void Game::renderMenu(Renderer& renderer) const {
         const float imageIndex = instance.imageIndex < 0.0F
                                      ? 0.0F
                                      : instance.imageIndex;
+        if (instance.objectId == 315) { // objWell Draw: black shaft behind sprite
+            renderer.fillRect(static_cast<int>(roomX - 24.0F - viewX),
+                              static_cast<int>(roomY + 64.0F - viewY),
+                              160, 1000, {0, 0, 0, 255});
+        }
         renderer.drawSpriteTransformed(
             object.spriteId, static_cast<std::uint32_t>(imageIndex),
             roomX - viewX, roomY - viewY,

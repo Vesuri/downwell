@@ -206,6 +206,16 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             deferredCommandsSucceeded_ = false;
         controlsLocked_ = true;
         return;
+    case 836: // gml_Object_objPlayer_n_Create_0 (startup-visible subset)
+        ++implementedCodeCalls_;
+        if (instance != nullptr && objectPack_ != nullptr) {
+            // scrPlayerInit's full state comes later. These are the two
+            // instance_create calls made directly by the recovered event.
+            if (!deferredInstances_.enqueueCreate(66, -100, instance->y) ||
+                !deferredInstances_.enqueueCreate(64, instance->x, instance->y))
+                deferredCommandsSucceeded_ = false;
+        }
+        return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;
         initRoomCreate();
@@ -222,6 +232,25 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 869: // gml_Object_objControlerN_Create_0
         ++implementedCodeCalls_;
         controllerCreate(profile_);
+        return;
+    case 2490: // gml_Object_objWell_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr && objectPack_ != nullptr) {
+            const bool enqueued =
+                deferredInstances_.enqueueCreate(98, instance->x, instance->y) &&
+                deferredInstances_.enqueueCreate(98, instance->x + 16, instance->y) &&
+                deferredInstances_.enqueueCreate(98, instance->x + 96, instance->y) &&
+                deferredInstances_.enqueueCreate(98, instance->x + 112, instance->y) &&
+                deferredInstances_.enqueueCreate(317, instance->x + 56,
+                                                  instance->y - 80);
+            if (!enqueued)
+                deferredCommandsSucceeded_ = false;
+        }
+        return;
+    case 2495: // gml_Object_objTitle_Create_0 (first-boot path)
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.0F;
         return;
     case 2790: // gml_Object_ditherFade_Create_0
         ++implementedCodeCalls_;
