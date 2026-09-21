@@ -34,6 +34,7 @@ public:
     bool controllerPersistent() const { return controllerPersistent_; }
     bool roomDestinationSet() const { return roomDestinationSet_; }
     bool inMenu() const { return roomId_ == menuRoomId; }
+    std::uint64_t stateDigest() const;
 
 private:
     void controllerCreate(PlatformProfile profile);

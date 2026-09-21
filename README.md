@@ -44,6 +44,9 @@ Space or Z advances the splash sequence, and Escape quits. `make test` checks
 the automatic 731-tick desktop transition, input-driven skipping, the
 non-desktop path, and key recovered initialization state without SDL.
 
+The cross-target replay and state-comparison contract is documented in
+[docs/replay-format.md](docs/replay-format.md).
+
 ## GameMaker extraction
 
 The extractor verifies the known Steam `data.win` hash before doing any work

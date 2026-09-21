@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "StateDigest.h"
 
 namespace downwell {
 
@@ -92,6 +93,22 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
 void StartupRuntime::gotoRoom(int roomId) {
     roomId_ = roomId;
     alarm0_ = -1;
+}
+
+std::uint64_t StartupRuntime::stateDigest() const {
+    StateDigest digest;
+    digest.addU32(1); // Startup-state digest schema.
+    digest.addU64(tick_);
+    digest.addI32(roomId_);
+    digest.addI32(roomDestination_);
+    digest.addI32(showSplash_);
+    digest.addI32(alarm0_);
+    digest.addI32(initTimes_);
+    digest.addI32(achievementLoginCalls_);
+    digest.addI32(splashSpeed_);
+    digest.addBool(controllerPersistent_);
+    digest.addBool(roomDestinationSet_);
+    return digest.value();
 }
 
 } // namespace downwell

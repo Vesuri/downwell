@@ -17,8 +17,9 @@
 ## Host reference
 
 - [x] Implement and test the deterministic `rmInit` to `rmMenu` startup model.
+- [x] Define a portable input-replay wire format and stable state digest.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
-- Define deterministic RNG and input replay formats.
+- Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.
 - Implement room loading, collision, and draw ordering.
 - Add texture/font/audio resource loaders from generated manifests.

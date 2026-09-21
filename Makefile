@@ -12,6 +12,7 @@ LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
 	src/core/Game.cpp \
+	src/core/Replay.cpp \
 	src/core/StartupRuntime.cpp \
 	src/platform/sdl/PlatformSDL.cpp \
 	src/main.cpp
@@ -19,8 +20,11 @@ SOURCES := \
 OBJECTS := $(patsubst %.cpp,build/%.o,$(SOURCES))
 DEPS    := $(OBJECTS:.o=.d)
 TARGET  := build/downwell-sdl
-TEST_TARGET := build/startup-runtime-test
-TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp
+STARTUP_TEST_TARGET := build/startup-runtime-test
+STARTUP_TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp
+REPLAY_TEST_TARGET := build/replay-test
+REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp
+TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET)
 
 .PHONY: all run test extract verify-extraction amiga clean
 
@@ -37,12 +41,17 @@ build/%.o: %.cpp
 run: $(TARGET)
 	./$(TARGET)
 
-$(TEST_TARGET): $(TEST_SOURCES)
+$(STARTUP_TEST_TARGET): $(STARTUP_TEST_SOURCES)
 	@mkdir -p $(@D)
-	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(TEST_SOURCES)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(STARTUP_TEST_SOURCES)
 
-test: $(TEST_TARGET)
-	./$(TEST_TARGET)
+$(REPLAY_TEST_TARGET): $(REPLAY_TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(REPLAY_TEST_SOURCES)
+
+test: $(TEST_TARGETS)
+	./$(STARTUP_TEST_TARGET)
+	./$(REPLAY_TEST_TARGET)
 
 extract:
 	tools/extract.sh
