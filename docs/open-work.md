@@ -47,6 +47,8 @@
   patterns, including all entrance and regular area-one fragments.
 - [x] Select, mirror, interpret, and render the first recovered area-one
   entrance fragment after the deterministic empty-shaft prelude.
+- [x] Continue into recovered regular area-one fragments with shared row
+  overlap, mirroring, boundary walls, padding pillars, and RNG ordering.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

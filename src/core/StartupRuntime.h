@@ -143,6 +143,10 @@ public:
     std::uint32_t mainBuilderStartRowsGenerated() const {
         return mainBuilderStartRowsGenerated_;
     }
+    int mainBuilderLastMainPattern() const { return mainBuilderLastMainPattern_; }
+    std::uint32_t mainBuilderMainPatternsGenerated() const {
+        return mainBuilderMainPatternsGenerated_;
+    }
     std::uint32_t randomSeed() const { return random_.seed(); }
     std::uint64_t randomDrawCount() const { return random_.drawCount(); }
     std::uint64_t stateDigest() const;
@@ -275,6 +279,9 @@ private:
     int mainBuilderStartPattern_ = -1;
     bool mainBuilderStartReversed_ = false;
     std::uint32_t mainBuilderStartRowsGenerated_ = 0;
+    int mainBuilderLastMainPattern_ = -1;
+    std::uint32_t mainBuilderMainPatternsGenerated_ = 0;
+    bool mainBuilderSpawnerMade_ = false;
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
     float mainCameraY_ = 176.0F;

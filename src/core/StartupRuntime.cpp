@@ -115,6 +115,9 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderStartPattern_ = -1;
     mainBuilderStartReversed_ = false;
     mainBuilderStartRowsGenerated_ = 0;
+    mainBuilderLastMainPattern_ = -1;
+    mainBuilderMainPatternsGenerated_ = 0;
+    mainBuilderSpawnerMade_ = false;
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
@@ -457,7 +460,7 @@ void StartupRuntime::updateMainBullets() {
 }
 
 void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
-    if (!mainBuilderInitialized_ || mainBuilderGenerationCount_ >= 0)
+    if (!mainBuilderInitialized_ || mainBuilderGenerationCount_ > 15)
         return;
 
     // scrBuilder only stays 128 pixels ahead of the visible bottom. On the
@@ -488,80 +491,136 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     if (builderPatternPack_ == nullptr || !builderPatternPack_->valid() ||
         builderPatternPack_->patternCount() == 0)
         return;
-    // scrStartPat1 stores its final valid index (four) in partStart[100].
-    const std::uint16_t selected = static_cast<std::uint16_t>(random_.irandom(4));
-    PackedBuilderPattern pattern;
-    if (!builderPatternPack_->findPattern(
-            BuilderPatternFamily::areaOneStart, selected, pattern)) {
-        deferredCommandsSucceeded_ = false;
-        return;
-    }
-    const bool reversed = random_.irandom(1) != 0; // choose(0, 1).
-    mainBuilderStartPattern_ = selected;
-    mainBuilderStartReversed_ = reversed;
-
-    for (std::uint16_t row = 0; row < pattern.rowCount; ++row) {
-        const int rowY = instance.y + row * 16;
-        for (std::uint16_t column = 0; column < pattern.width; ++column) {
-            char symbol = 0;
-            if (!builderPatternPack_->cell(pattern, column, row, symbol)) {
-                deferredCommandsSucceeded_ = false;
-                return;
-            }
-            const int ordinal = column + 1;
-            const int buildX = reversed ? 320 - ordinal * 16
-                                        : 160 + ordinal * 16;
-
-            // builderCavern handles '^' before its universal area-one roll.
-            if (symbol == '^' && random_.irandom(4) != 0 &&
-                !deferredInstances_.enqueueCreate(289, buildX, rowY)) {
-                deferredCommandsSucceeded_ = false;
-                return;
-            }
-            const double enemyRoll = random_.random(3.0);
-            if (symbol == 'd' && enemyRoll <= 1.0 &&
-                !deferredInstances_.enqueueCreate(113, buildX, rowY)) {
-                deferredCommandsSucceeded_ = false;
-                return;
-            }
-
-            std::int32_t objectId = -1;
-            if (symbol == '1') objectId = 60;
-            if (symbol == '-') objectId = 93;
-            if (symbol == 'B') objectId = 92;
-            if (symbol == '3' && random_.irandom(1) != 0) objectId = 92;
-            if (objectId == 92) {
-                // objBox_n Create runs synchronously inside instance_create:
-                // break sample, tile variant, and gem chance. rmMain is not a
-                // ground room, so a successful gem roll also chooses 18/19.
-                random_.irandom(3);
+    const auto enqueueObject = [this](std::int32_t objectId, int x, int y) {
+        if (objectId == 92) {
+            // objBox_n Create runs synchronously inside instance_create:
+            // break sample, tile variant, and gem chance. rmMain is not a
+            // ground room, so a successful gem roll also chooses 18/19.
+            random_.irandom(3);
+            random_.irandom(1);
+            if (random_.irandom(50) < 1)
                 random_.irandom(1);
-                if (random_.irandom(50) < 1)
-                    random_.irandom(1);
+        }
+        return deferredInstances_.enqueueCreate(objectId, x, y);
+    };
+    const auto emitPattern = [this, &instance, &enqueueObject](
+                                 const PackedBuilderPattern& pattern,
+                                 bool reversed,
+                                 bool appendPillarRows,
+                                 std::uint32_t& advancedRows) {
+        for (std::uint16_t row = 0; row < pattern.rowCount; ++row) {
+            const int rowY = instance.y + row * 16;
+            for (std::uint16_t column = 0; column < pattern.width; ++column) {
+                char symbol = 0;
+                if (!builderPatternPack_->cell(pattern, column, row, symbol)) {
+                    return false;
+                }
+                const int ordinal = column + 1;
+                const int buildX = reversed ? 320 - ordinal * 16
+                                            : 160 + ordinal * 16;
+
+                // builderCavern handles '^' before its universal area-one roll.
+                if (symbol == '^' && random_.irandom(4) != 0 &&
+                    !enqueueObject(289, buildX, rowY))
+                    return false;
+                const double enemyRoll = random_.random(3.0);
+                if (enemyRoll <= 1.0) {
+                    std::int32_t enemyId = -1;
+                    if (symbol == 'a') enemyId = 111;
+                    if (symbol == 'b') enemyId = 116;
+                    if (symbol == 'd') enemyId = 113;
+                    if (symbol == 'e') enemyId = 117;
+                    if (symbol == 't') enemyId = 112;
+                    if (symbol == '%') {
+                        constexpr std::int32_t enemies[] = {113, 111, 119, 112};
+                        enemyId = enemies[random_.irandom(3)];
+                    }
+                    if (enemyId >= 0 && !enqueueObject(enemyId, buildX, rowY))
+                        return false;
+                }
+
+                std::int32_t objectId = -1;
+                if (symbol == '1') objectId = 60;
+                if (symbol == '2' && random_.irandom(1) != 0) objectId = 60;
+                if (symbol == '-') objectId = 93;
+                if (symbol == 'B') objectId = 92;
+                if (symbol == '3' && random_.irandom(1) != 0) objectId = 92;
+                if (objectId >= 0 && !enqueueObject(objectId, buildX, rowY))
+                    return false;
             }
-            if (objectId >= 0 &&
-                !deferredInstances_.enqueueCreate(objectId, buildX, rowY)) {
-                deferredCommandsSucceeded_ = false;
-                return;
+            if (row + 1 < pattern.rowCount) {
+                random_.random(3.0); // builderCavern sees the row newline.
+                const int firstX = reversed ? 160 : 320;
+                const int secondX = reversed ? 320 : 160;
+                if (!enqueueObject(60, firstX, rowY) ||
+                    !enqueueObject(60, secondX, rowY))
+                    return false;
             }
         }
-        if (row + 1 < pattern.rowCount) {
-            random_.random(3.0); // builderCavern also sees the row newline.
+        advancedRows = pattern.rowCount - 1U;
+        instance.y += static_cast<std::int32_t>(advancedRows * 16U);
+        if (appendPillarRows) {
             const int firstX = reversed ? 160 : 320;
             const int secondX = reversed ? 320 : 160;
-            if (!deferredInstances_.enqueueCreate(60, firstX, rowY) ||
-                !deferredInstances_.enqueueCreate(60, secondX, rowY)) {
+            for (int padding = 0; padding < 3; ++padding) {
+                if (!enqueueObject(60, firstX, instance.y) ||
+                    !enqueueObject(60, secondX, instance.y))
+                    return false;
+                instance.y += 16;
+                ++advancedRows;
+            }
+        }
+        return true;
+    };
+
+    PackedBuilderPattern pattern;
+    std::uint32_t advancedRows = 0;
+    if (mainBuilderGenerationCount_ == -1) {
+        // scrStartPat1 stores its final valid index (four) in partStart[100].
+        const std::uint16_t selected =
+            static_cast<std::uint16_t>(random_.irandom(4));
+        if (!builderPatternPack_->findPattern(
+                BuilderPatternFamily::areaOneStart, selected, pattern)) {
+            deferredCommandsSucceeded_ = false;
+            return;
+        }
+        const bool reversed = random_.irandom(1) != 0; // choose(0, 1).
+        mainBuilderStartPattern_ = selected;
+        mainBuilderStartReversed_ = reversed;
+        if (!emitPattern(pattern, reversed, false, advancedRows)) {
+            deferredCommandsSucceeded_ = false;
+            return;
+        }
+        mainBuilderGenerationCount_ = 0;
+        mainBuilderStartRowsGenerated_ = advancedRows;
+    } else {
+        if (!mainBuilderSpawnerMade_) {
+            if (!enqueueObject(78, instance.x - 100, instance.y)) {
                 deferredCommandsSucceeded_ = false;
                 return;
             }
+            mainBuilderSpawnerMade_ = true;
         }
+        std::uint16_t selected = 0;
+        do {
+            selected = static_cast<std::uint16_t>(random_.irandom(40));
+        } while (selected == mainBuilderLastMainPattern_);
+        if (!builderPatternPack_->findPattern(
+                BuilderPatternFamily::areaOneMain, selected, pattern)) {
+            deferredCommandsSucceeded_ = false;
+            return;
+        }
+        const bool reversed = random_.irandom(1) != 0;
+        if (!emitPattern(pattern, reversed, true, advancedRows)) {
+            deferredCommandsSucceeded_ = false;
+            return;
+        }
+        mainBuilderLastMainPattern_ = selected;
+        ++mainBuilderMainPatternsGenerated_;
+        ++mainBuilderGenerationCount_;
     }
-    const std::uint32_t advancedRows = pattern.rowCount - 1U;
-    instance.y += static_cast<std::int32_t>(advancedRows * 16U);
     mainBuilderY_ = instance.y;
-    mainBuilderGenerationCount_ = 0;
     mainBuilderRowsGenerated_ += advancedRows;
-    mainBuilderStartRowsGenerated_ = advancedRows;
 }
 
 void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
@@ -836,6 +895,9 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderStartPattern_ = -1;
             mainBuilderStartReversed_ = false;
             mainBuilderStartRowsGenerated_ = 0;
+            mainBuilderLastMainPattern_ = -1;
+            mainBuilderMainPatternsGenerated_ = 0;
+            mainBuilderSpawnerMade_ = false;
             random_.irandom(2); // choose(2, 2, 3), then overridden to two.
             mainBuilderRightRooms_[0] =
                 3 + static_cast<int>(random_.irandom(12));
@@ -1216,7 +1278,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(17); // Startup-state digest schema.
+    digest.addU32(18); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1304,6 +1366,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainBuilderStartPattern_);
     digest.addBool(mainBuilderStartReversed_);
     digest.addU32(mainBuilderStartRowsGenerated_);
+    digest.addI32(mainBuilderLastMainPattern_);
+    digest.addU32(mainBuilderMainPatternsGenerated_);
+    digest.addBool(mainBuilderSpawnerMade_);
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);

@@ -454,6 +454,12 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         require(standingOnEntranceBlock,
                 "grounded state is backed by a generated breakable block");
+        require(runtime.mainBuilderMainPatternsGenerated() == 1 &&
+                    runtime.mainBuilderLastMainPattern() == 32 &&
+                    runtime.mainBuilderGenerationCount() == 1,
+                "the builder continues into the first deterministic regular fragment");
+        require(runtime.mainBuilderRowsGenerated() == 48,
+                "regular fragments preserve row overlap and append three pillar rows");
     }
 }
 
