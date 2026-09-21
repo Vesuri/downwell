@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 MAGIC = b"DWRM"
-VERSION = 1
+VERSION = 2
 MANIFEST_SCHEMA = 3
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 EXPECTED_ROOMS = 25
@@ -44,6 +44,9 @@ def build_pack(manifest):
     rooms_by_id = {room["id"]: room for room in resources["rooms"]}
     objects_by_id = {obj["id"]: obj for obj in resources["objects"]}
     room_order = manifest["gameMaker"]["roomOrder"]
+    next_runtime_instance_id = manifest["gameMaker"]["lastObjectInstanceId"]
+    require(next_runtime_instance_id > 0,
+            "runtime object instance boundary must be positive")
 
     room_records = []
     instance_records = []
@@ -62,6 +65,8 @@ def build_pack(manifest):
             require(ordered["index"] == creation_index,
                     f"room {room['id']} creation index is not contiguous")
             instance = instances_by_id[ordered["instanceId"]]
+            require(instance["instanceId"] < next_runtime_instance_id,
+                    "serialized instance ID crosses runtime allocator boundary")
             require(instance["objectId"] == ordered["objectId"],
                     f"room {room['id']} object mismatch")
             obj = objects_by_id[instance["objectId"]]
@@ -129,7 +134,7 @@ def build_pack(manifest):
         len(layer_records),
         len(memberships),
         source_hash_prefix,
-        0,
+        next_runtime_instance_id,
     )
     return b"".join((
         header,

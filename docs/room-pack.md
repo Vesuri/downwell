@@ -21,7 +21,7 @@ No compiler padding is present.
 | Offset | Type | Meaning |
 | ---: | --- | --- |
 | 0 | char[4] | `DWRM` magic |
-| 4 | u16 | Format version, currently 1 |
+| 4 | u16 | Format version, currently 2 |
 | 6 | u16 | Header size, 40 |
 | 8 | u32 | Source manifest schema, currently 3 |
 | 12 | u32 | Room count |
@@ -29,7 +29,7 @@ No compiler padding is present.
 | 20 | u32 | Layer count |
 | 24 | u32 | Layer-membership count |
 | 28 | u64 | First eight source SHA-256 bytes |
-| 36 | u32 | Reserved, zero |
+| 36 | u32 | First runtime-created object ID (`GEN8.LastObj`) |
 
 Arrays immediately follow in this order: room records, instance records, layer
 records, then membership instance IDs. Rooms are stored in authoritative
@@ -68,7 +68,8 @@ record, so alignment, compiler padding, and the Amiga's big-endian byte order do
 not affect decoding.
 
 Construction validates magic, format/schema versions, source-hash prefix,
-overflow-safe total size, and every room/layer slice before any view is exposed.
+overflow-safe total size, every room/layer slice, and that every serialized
+instance ID is below the runtime allocator boundary before any view is exposed.
 Tests cover malformed synthetic packs and also open the complete locally
 generated payload, confirming the audited totals and the `rmInit`/`rmMenu`
 creation-order anchors.

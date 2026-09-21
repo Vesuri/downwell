@@ -17,7 +17,8 @@ enum class RoomPackError {
     sizeOverflow,
     wrongSize,
     badRoomRange,
-    badLayerRange
+    badLayerRange,
+    badInstanceIdBoundary
 };
 
 struct PackedRoom {
@@ -64,7 +65,7 @@ struct PackedRoomLayer {
 
 class RoomPack {
 public:
-    static constexpr std::uint16_t formatVersion = 1;
+    static constexpr std::uint16_t formatVersion = 2;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 40;
@@ -81,6 +82,7 @@ public:
     std::uint32_t instanceCount() const { return instanceCount_; }
     std::uint32_t layerCount() const { return layerCount_; }
     std::uint32_t membershipCount() const { return membershipCount_; }
+    std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
 
     bool room(std::uint32_t index, PackedRoom& output) const;
     bool findRoom(std::int32_t roomId, PackedRoom& output) const;
@@ -106,6 +108,7 @@ private:
     std::uint32_t instanceCount_ = 0;
     std::uint32_t layerCount_ = 0;
     std::uint32_t membershipCount_ = 0;
+    std::uint32_t nextRuntimeInstanceId_ = 0;
     RoomPackError error_ = RoomPackError::tooShort;
 };
 

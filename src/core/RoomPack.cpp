@@ -87,6 +87,7 @@ RoomPack::RoomPack(const std::uint8_t* bytes, std::size_t size)
     instanceCount_ = readU32(bytes + 16);
     layerCount_ = readU32(bytes + 20);
     membershipCount_ = readU32(bytes + 24);
+    nextRuntimeInstanceId_ = readU32(bytes + 36);
 
     roomsOffset_ = headerSize;
     std::size_t offset = roomsOffset_;
@@ -135,6 +136,14 @@ bool RoomPack::validateRanges() {
                         value.membershipCount,
                         membershipCount_)) {
             error_ = RoomPackError::badLayerRange;
+            return false;
+        }
+    }
+    for (std::uint32_t index = 0; index < instanceCount_; ++index) {
+        PackedRoomInstance value;
+        instance(index, value);
+        if (value.instanceId >= nextRuntimeInstanceId_) {
+            error_ = RoomPackError::badInstanceIdBoundary;
             return false;
         }
     }

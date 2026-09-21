@@ -70,7 +70,7 @@ std::vector<std::uint8_t> makePack() {
     appendU32(bytes, 1); // layers
     appendU32(bytes, 2); // memberships
     appendU64(bytes, downwell::RoomPack::sourceHashPrefix);
-    appendU32(bytes, 0);
+    appendU32(bytes, 105186); // GEN8.LastObj
 
     appendI32(bytes, 7);
     appendI32(bytes, 1000);
@@ -103,6 +103,8 @@ void testDecode() {
     require(pack.valid(), "valid pack is accepted");
     require(pack.roomCount() == 1 && pack.instanceCount() == 2,
             "header counts are decoded");
+    require(pack.nextRuntimeInstanceId() == 105186,
+            "runtime instance allocator boundary is decoded");
 
     downwell::PackedRoom room;
     require(pack.findRoom(7, room), "room is found by resource ID");
@@ -145,6 +147,17 @@ void testValidation() {
     require(downwell::RoomPack(bytes.data(), bytes.size()).error() ==
                 downwell::RoomPackError::badRoomRange,
             "out-of-range room slice is rejected");
+
+    bytes = makePack();
+    // First instance ID is 100065; move the runtime boundary down to it.
+    const std::size_t boundaryOffset = 36;
+    bytes[boundaryOffset + 0] = 0xe1;
+    bytes[boundaryOffset + 1] = 0x86;
+    bytes[boundaryOffset + 2] = 0x01;
+    bytes[boundaryOffset + 3] = 0x00;
+    require(downwell::RoomPack(bytes.data(), bytes.size()).error() ==
+                downwell::RoomPackError::badInstanceIdBoundary,
+            "serialized IDs crossing the runtime boundary are rejected");
 }
 
 void testPackedRoomLoader() {
@@ -195,6 +208,8 @@ void testGeneratedPack(const char* path) {
     require(pack.roomCount() == 25 && pack.instanceCount() == 5186 &&
                 pack.layerCount() == 132 && pack.membershipCount() == 5186,
             "generated room pack has audited totals");
+    require(pack.nextRuntimeInstanceId() == 105186,
+            "generated pack carries authoritative GEN8.LastObj");
 
     downwell::PackedRoom room;
     require(pack.room(0, room) && room.roomId == 7 && room.instanceCount == 2,
