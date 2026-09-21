@@ -18,6 +18,11 @@ Directory.CreateDirectory(assemblyRoot);
 
 string inputSha256 = Environment.GetEnvironmentVariable("DOWNWELL_DATA_WIN_SHA256") ?? "unknown";
 
+// In this 2022.5 format, creation order is the serialized GameObjects order.
+// UndertaleModLib's separate InstanceIDList is only populated for newer data.
+if (Data.Rooms.Any(room => room.InstanceCreationOrderIDs != null))
+    throw new InvalidOperationException("Unexpected explicit instance-order encoding");
+
 var objects = Data.GameObjects.Select((obj, id) => new
 {
     id,
@@ -58,6 +63,14 @@ var rooms = Data.Rooms.Select((room, id) => new
     metersPerPixel = room.MetersPerPixel,
     creationCodeId = Data.Code.IndexOf(room.CreationCodeId),
     creationCodeName = room.CreationCodeId?.Name?.Content,
+    instanceCreationOrderEncoding = "orderedGameObjects",
+    instanceCreationOrder = room.GameObjects.Select((instance, index) => new
+    {
+        index,
+        instanceId = instance.InstanceID,
+        objectId = Data.GameObjects.IndexOf(instance.ObjectDefinition),
+        objectName = instance.ObjectDefinition?.Name?.Content
+    }).ToArray(),
     views = room.Views.Select(view => new
     {
         enabled = view.Enabled,
@@ -95,7 +108,10 @@ var rooms = Data.Rooms.Select((room, id) => new
         name = layer.LayerName?.Content,
         id = layer.LayerId,
         type = layer.LayerType.ToString(),
-        depth = layer.LayerDepth
+        depth = layer.LayerDepth,
+        visible = layer.IsVisible,
+        instanceIds = layer.InstancesData?.Instances
+            .Select(instance => instance.InstanceID).ToArray() ?? Array.Empty<uint>()
     }).ToArray()
 }).ToArray();
 
@@ -150,7 +166,7 @@ var texturePageItems = Data.TexturePageItems.Select((item, id) => new
 
 var manifest = new
 {
-    schemaVersion = 2,
+    schemaVersion = 3,
     generatedUtc = DateTime.UtcNow.ToString("O"),
     source = new
     {

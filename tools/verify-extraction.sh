@@ -29,7 +29,7 @@ cmp -s "$INPUT" "$ROUNDTRIP" || {
 
 jq -e --arg hash "$INPUT_SHA256" '
     . as $root |
-    .schemaVersion == 2 and
+    .schemaVersion == 3 and
     .source.sha256 == $hash and
     .source.immutable == true and
     .gameMaker.bytecodeVersion == 17 and
@@ -65,7 +65,13 @@ jq -e --arg hash "$INPUT_SHA256" '
     (all(.resources.objects[].events[].actions[];
          .codeId >= -1 and .codeId < $root.counts.codeEntries)) and
     (all(.resources.rooms[].instances[];
-         .objectId >= -1 and .objectId < $root.counts.objects))
+         .objectId >= -1 and .objectId < $root.counts.objects)) and
+    (all(.resources.rooms[];
+         ([.instances[].instanceId] | sort) ==
+         ([.instanceCreationOrder[].instanceId] | sort))) and
+    (all(.resources.rooms[];
+         ([.instances[].instanceId] | sort) ==
+         ([.layers[].instanceIds[]] | sort)))
 ' "$MANIFEST" >/dev/null
 
 ASSEMBLY_EXPECTED=$(jq '[.resources.code[] | select(.parentId == -1)] | length' "$MANIFEST")

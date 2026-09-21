@@ -19,10 +19,11 @@ The extraction produced:
 - 5,186 placed room instances across 25 rooms;
 - 132 room layers.
 
-Manifest schema 2 also records sprite dimensions/origins/frame-to-texture-page
+Manifest schema 3 also records sprite dimensions/origins/frame-to-texture-page
 links, texture atlas rectangles and pages, sound/audio-group relationships,
-font metrics, script-to-code bindings, constants, room dimensions/views, and
-instance transforms. Numeric IDs are preserved throughout.
+font metrics, script-to-code bindings, constants, room dimensions/views,
+instance transforms, authoritative instance-creation order, and instance-layer
+membership. Numeric IDs are preserved throughout.
 
 There are 2,810 total `CODE` records. The remaining 309 records are child entries
 whose instruction streams belong to root entries; they remain represented in

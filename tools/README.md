@@ -28,8 +28,9 @@ tools/bootstrap-utmt.sh
 - UndertaleModTool's parsed build information;
 - all root decompiled GML entries and strings;
 - exact VM assembly for every root code entry;
-- a schema-2 JSON manifest containing resource IDs, symbols, authoritative room
-  order, object/event bindings, room instances/views/layers, sprite atlas links,
+- a schema-3 JSON manifest containing resource IDs, symbols, authoritative room
+  and instance-creation order, object/event bindings, room instances/views/layers,
+  layer membership, sprite atlas links,
   sound groups, font metrics, constants, code relationships, variables, and
   functions.
 
