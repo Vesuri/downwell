@@ -55,6 +55,8 @@
   retaining indestructible area walls and opening the resulting terrain cell.
 - [x] Complete the first player landing/gunboots loop with airborne firing,
   shot gating, recoil state, landing detection, and full charge restoration.
+- [x] Add the recovered downward activation frontier and out-of-view cleanup
+  window for generated area-one geometry, scenery, and enemies.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

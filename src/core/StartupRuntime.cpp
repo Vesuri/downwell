@@ -108,6 +108,9 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainShotsFired_ = 0;
     mainBlocksDestroyed_ = 0;
     mainLandings_ = 0;
+    mainActivationY_ = 0;
+    mainEnemiesActivated_ = 0;
+    mainInstancesRetired_ = 0;
     mainBulletCount_ = 0;
     mainBuilderInitialized_ = false;
     mainBuilderY_ = 704;
@@ -231,8 +234,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
     EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler);
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
-    if (roomId_ == mainRoomId)
+    if (roomId_ == mainRoomId) {
         updateMainBullets();
+        updateMainLifecycle();
+    }
 }
 
 void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
@@ -467,6 +472,49 @@ void StartupRuntime::updateMainBullets() {
             mainBullets_[write++] = bullet;
     }
     mainBulletCount_ = write;
+}
+
+void StartupRuntime::updateMainLifecycle() {
+    const float viewTop = mainCameraViewY();
+    const float viewBottom = viewTop + surfaceHeight;
+    if (viewBottom > static_cast<float>(mainActivationY_ - 112)) {
+        mainActivationY_ += 16;
+        for (std::size_t index = 0; index < instances_.size(); ++index) {
+            InstanceRecord& instance = instances_.at(index);
+            const bool enemy = instance.objectId == 111 ||
+                               instance.objectId == 112 ||
+                               instance.objectId == 113 ||
+                               instance.objectId == 116 ||
+                               instance.objectId == 117 ||
+                               instance.objectId == 119;
+            if (!instance.active && enemy && instance.y <= mainActivationY_) {
+                instance.active = true;
+                ++mainEnemiesActivated_;
+            }
+        }
+    }
+
+    for (std::size_t index = 0; index < instances_.size(); ++index) {
+        InstanceRecord& instance = instances_.at(index);
+        if (!instance.active)
+            continue;
+        const bool generated = instance.objectId == 60 ||
+                               instance.objectId == 92 ||
+                               instance.objectId == 93 ||
+                               instance.objectId == 111 ||
+                               instance.objectId == 112 ||
+                               instance.objectId == 113 ||
+                               instance.objectId == 116 ||
+                               instance.objectId == 117 ||
+                               instance.objectId == 119 ||
+                               instance.objectId == 289;
+        if (generated &&
+            (instance.y < viewTop - 160.0F ||
+             instance.y > viewTop + 3000.0F)) {
+            instance.active = false;
+            ++mainInstancesRetired_;
+        }
+    }
 }
 
 void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
@@ -922,6 +970,9 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainShotsFired_ = 0;
                 mainBlocksDestroyed_ = 0;
                 mainLandings_ = 0;
+                mainActivationY_ = 0;
+                mainEnemiesActivated_ = 0;
+                mainInstancesRetired_ = 0;
                 mainBulletCount_ = 0;
                 instance->alarms.set(2, 30);
             }
@@ -1393,7 +1444,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(20); // Startup-state digest schema.
+    digest.addU32(21); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1469,6 +1520,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(mainShotsFired_);
     digest.addU32(mainBlocksDestroyed_);
     digest.addU32(mainLandings_);
+    digest.addI32(mainActivationY_);
+    digest.addU32(mainEnemiesActivated_);
+    digest.addU32(mainInstancesRetired_);
     digest.addU32(static_cast<std::uint32_t>(mainBulletCount_));
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         digest.addF32(mainBullets_[index].x);

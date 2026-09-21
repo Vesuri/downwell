@@ -127,6 +127,8 @@ public:
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
     std::uint32_t mainBlocksDestroyed() const { return mainBlocksDestroyed_; }
     std::uint32_t mainLandings() const { return mainLandings_; }
+    std::uint32_t mainEnemiesActivated() const { return mainEnemiesActivated_; }
+    std::uint32_t mainInstancesRetired() const { return mainInstancesRetired_; }
     std::size_t mainBulletCount() const { return mainBulletCount_; }
     const MainBulletState& mainBulletAt(std::size_t index) const {
         return mainBullets_[index];
@@ -169,6 +171,7 @@ private:
     bool moveMainPlayerAxis(float amount, bool horizontal);
     void fireMainGun(InstanceRecord& instance);
     void updateMainBullets();
+    void updateMainLifecycle();
     InstanceRecord* mainBulletCollision(float x, float y);
     void dispatchInstancePhase(InstanceRecord& instance,
                                RoomInstancePhase phase);
@@ -273,6 +276,9 @@ private:
     std::uint32_t mainShotsFired_ = 0;
     std::uint32_t mainBlocksDestroyed_ = 0;
     std::uint32_t mainLandings_ = 0;
+    int mainActivationY_ = 0;
+    std::uint32_t mainEnemiesActivated_ = 0;
+    std::uint32_t mainInstancesRetired_ = 0;
     std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
     std::size_t mainBulletCount_ = 0;
     bool mainBuilderInitialized_ = false;

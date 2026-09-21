@@ -492,6 +492,25 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainBlocksDestroyed() == 1 &&
                     runtime.mainBulletCount() == 0,
                 "a usual gunboot shot destroys one block and opens its cell");
+        require(runtime.mainInstancesRetired() > 0,
+                "generated objects above the recovered view margin are retired");
+        for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
+            const downwell::InstanceRecord& instance = runtime.instanceAt(index);
+            const bool generated = instance.objectId == 60 ||
+                                   instance.objectId == 92 ||
+                                   instance.objectId == 93 ||
+                                   instance.objectId == 111 ||
+                                   instance.objectId == 112 ||
+                                   instance.objectId == 113 ||
+                                   instance.objectId == 116 ||
+                                   instance.objectId == 117 ||
+                                   instance.objectId == 119 ||
+                                   instance.objectId == 289;
+            if (instance.active && generated)
+                require(instance.y >= runtime.mainCameraViewY() - 160.0F &&
+                            instance.y <= runtime.mainCameraViewY() + 3000.0F,
+                        "active generated objects stay inside the lifecycle window");
+        }
     }
 }
 
