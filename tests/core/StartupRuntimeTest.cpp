@@ -258,6 +258,33 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "rmMain fits and loads from the recovered room pack");
         require(runtime.hasInstance(100855),
                 "rmMain creates its authoritative player instance");
+        require(runtime.mainPlayerX() == 240.0F &&
+                    runtime.mainPlayerY() == 176.0F,
+                "rmMain initializes player motion from the recovered spawn");
+        downwell::Input fallRight;
+        fallRight.right = true;
+        for (int tick = 0; tick < 10; ++tick)
+            runtime.step(fallRight, false);
+        require(runtime.mainPlayerX() > 250.9F &&
+                    runtime.mainPlayerX() < 251.1F,
+                "air control uses recovered acceleration over ten ticks");
+        require(runtime.mainPlayerY() > 186.9F &&
+                    runtime.mainPlayerY() < 187.1F,
+                "rmMain gravity advances the initial fall deterministically");
+        require(runtime.mainPlayerSpeedX() > 1.9F &&
+                    runtime.mainPlayerSpeedX() < 2.1F &&
+                    runtime.mainPlayerSpeedY() > 1.9F &&
+                    runtime.mainPlayerSpeedY() < 2.1F,
+                "air and gravity speeds retain recovered subpixel values");
+        require(runtime.mainPlayerSpriteId() == 37 &&
+                    runtime.mainPlayerImageIndex() == 4.0F,
+                "fall speed selects the recovered airborne animation frame");
+        require(runtime.mainCameraViewY() < 34.0F,
+                "rmMain camera biases the falling player toward the lower view");
+        for (int tick = 0; tick < 20; ++tick)
+            runtime.step(fallRight, false);
+        require(runtime.mainPlayerX() < 285.0F,
+                "the recovered player mask cannot cross the shaft wall mask");
     }
 }
 

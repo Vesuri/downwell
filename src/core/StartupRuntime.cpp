@@ -4,6 +4,7 @@
 #include "PackedRoomLoader.h"
 #include "RoomLoader.h"
 #include "StateDigest.h"
+#include <algorithm>
 #include <cmath>
 
 namespace downwell {
@@ -81,6 +82,19 @@ void StartupRuntime::reset(PlatformProfile profile) {
     playMenuPlayerDescent_ = 0.0F;
     playMenuPlayerSpeedY_ = 0.0F;
     playMenuVerticalDitherY_ = -320.0F;
+    mainPlayerInitialized_ = false;
+    mainPlayerX_ = 240.0F;
+    mainPlayerY_ = 176.0F;
+    mainPlayerSpeedX_ = 0.0F;
+    mainPlayerSpeedY_ = 0.0F;
+    mainPlayerGrounded_ = false;
+    mainPlayerFacing_ = 1;
+    mainPlayerSpriteId_ = 37;
+    mainPlayerImageIndex_ = 2.0F;
+    mainCameraInitialized_ = false;
+    mainCameraX_ = 240.0F;
+    mainCameraY_ = 176.0F;
+    mainCameraMemorizeY_ = 0.0F;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -295,6 +309,122 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
     instance.imageSpeed = menuPlayerImageSpeed_;
 }
 
+bool StartupRuntime::mainPlayerCollides(float x, float y) const {
+    // objPlayer_n keeps sprPlayerIdle as its collision mask: an 8x12 box at
+    // offsets (-4,-4)..(+3,+7). objWall_n uses mask16 at its recovered 2x
+    // scale, producing a 32x32 box centered on each room position.
+    const float playerLeft = x - 4.0F;
+    const float playerRight = x + 3.0F;
+    const float playerTop = y - 4.0F;
+    const float playerBottom = y + 7.0F;
+    for (std::size_t index = 0; index < instances_.size(); ++index) {
+        const InstanceRecord& wall = instances_.at(index);
+        if (!wall.active || wall.objectId != 60)
+            continue;
+        const float wallLeft = wall.x - 16.0F;
+        const float wallRight = wall.x + 15.0F;
+        const float wallTop = wall.y - 16.0F;
+        const float wallBottom = wall.y + 15.0F;
+        if (playerRight >= wallLeft && playerLeft <= wallRight &&
+            playerBottom >= wallTop && playerTop <= wallBottom)
+            return true;
+    }
+    return false;
+}
+
+bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
+    float remaining = amount;
+    while (std::abs(remaining) > 0.0001F) {
+        const float move = remaining > 0.0F
+                               ? std::min(1.0F, remaining)
+                               : std::max(-1.0F, remaining);
+        const float nextX = mainPlayerX_ + (horizontal ? move : 0.0F);
+        const float nextY = mainPlayerY_ + (horizontal ? 0.0F : move);
+        if (mainPlayerCollides(nextX, nextY))
+            return false;
+        mainPlayerX_ = nextX;
+        mainPlayerY_ = nextY;
+        remaining -= move;
+    }
+    return true;
+}
+
+void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
+    if (!mainPlayerInitialized_)
+        return;
+
+    mainPlayerSpeedY_ = std::min(7.0F, mainPlayerSpeedY_ + 0.2F);
+    if (!controlsLocked_ && inputLeft_ && !inputRight_) {
+        mainPlayerSpeedX_ -= 0.2F;
+        if (mainPlayerSpeedX_ > 0.0F)
+            mainPlayerSpeedX_ -= 1.0F;
+        mainPlayerSpeedX_ = std::max(-2.5F, mainPlayerSpeedX_);
+        mainPlayerFacing_ = -1;
+    } else if (!controlsLocked_ && inputRight_ && !inputLeft_) {
+        mainPlayerSpeedX_ += 0.2F;
+        if (mainPlayerSpeedX_ < 0.0F)
+            mainPlayerSpeedX_ += 1.0F;
+        mainPlayerSpeedX_ = std::min(2.5F, mainPlayerSpeedX_);
+        mainPlayerFacing_ = 1;
+    } else if (inputLeft_ && inputRight_) {
+        mainPlayerSpeedX_ = 0.0F;
+    } else if (mainPlayerSpeedX_ > 0.0F) {
+        mainPlayerSpeedX_ = std::max(0.0F, mainPlayerSpeedX_ - 0.1F);
+        if (mainPlayerSpeedX_ < 0.3F)
+            mainPlayerSpeedX_ = 0.0F;
+    } else if (mainPlayerSpeedX_ < 0.0F) {
+        mainPlayerSpeedX_ = std::min(0.0F, mainPlayerSpeedX_ + 0.1F);
+        if (mainPlayerSpeedX_ > -0.3F)
+            mainPlayerSpeedX_ = 0.0F;
+    }
+
+    if (!moveMainPlayerAxis(mainPlayerSpeedX_, true))
+        mainPlayerSpeedX_ = 0.0F;
+    mainPlayerGrounded_ = false;
+    if (!moveMainPlayerAxis(mainPlayerSpeedY_, false)) {
+        mainPlayerGrounded_ = mainPlayerSpeedY_ > 0.0F;
+        mainPlayerSpeedY_ = 0.0F;
+    }
+
+    mainPlayerSpriteId_ = mainPlayerGrounded_ ? 31 : 37;
+    if (mainPlayerGrounded_) {
+        mainPlayerImageIndex_ = 0.0F;
+    } else if (mainPlayerSpeedY_ < 0.0F) {
+        mainPlayerImageIndex_ = std::abs(mainPlayerSpeedY_) >= 2.0F ? 0.0F : 1.0F;
+    } else if (mainPlayerSpeedY_ < 1.0F) {
+        mainPlayerImageIndex_ = 2.0F;
+    } else if (mainPlayerSpeedY_ < 2.0F) {
+        mainPlayerImageIndex_ = 3.0F;
+    } else {
+        mainPlayerImageIndex_ = 4.0F;
+    }
+    instance.x = static_cast<std::int32_t>(std::round(mainPlayerX_));
+    instance.y = static_cast<std::int32_t>(std::round(mainPlayerY_));
+    instance.imageIndex = mainPlayerImageIndex_;
+}
+
+void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
+    if (!mainCameraInitialized_ || !mainPlayerInitialized_)
+        return;
+    float targetX = 240.0F;
+    float targetY = mainPlayerY_;
+    float slowdownY = 5.0F;
+    if (mainPlayerX_ >= 160.0F) {
+        if (mainCameraMemorizeY_ == 0.0F)
+            mainCameraMemorizeY_ = mainPlayerY_;
+        targetY = mainCameraMemorizeY_ - 104.0F;
+        slowdownY = mainCameraX_ == 240.0F ? 3.0F : 1.0F;
+    } else {
+        mainCameraMemorizeY_ = 0.0F;
+        targetX = 80.0F;
+        slowdownY = mainCameraX_ == 80.0F ? 5.0F : 1.0F;
+    }
+    mainCameraX_ += (targetX - mainCameraX_) / 10.0F;
+    mainCameraY_ += ((targetY + 48.0F) - mainCameraY_) / slowdownY;
+    instance.x = static_cast<std::int32_t>(std::round(mainCameraX_));
+    instance.y = static_cast<std::int32_t>(std::round(mainCameraY_));
+}
+
 void StartupRuntime::updateMenuCamera() {
     if (!menuPlayerInitialized_)
         return;
@@ -384,6 +514,12 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         cameraViewWidth_ = surfaceWidth;
         cameraViewHeight_ = surfaceHeight;
         return;
+    case 674: // gml_Room_rmMain_Create
+        ++implementedCodeCalls_;
+        cameraViewWidth_ = surfaceWidth;
+        cameraViewHeight_ = surfaceHeight;
+        controlsLocked_ = false;
+        return;
     case 648: // gml_Room_rmInit_Create
         ++implementedCodeCalls_;
         cameraViewWidth_ = surfaceWidth;
@@ -412,6 +548,16 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 menuPlayerY_ = static_cast<float>(instance->y);
                 menuCameraX_ = menuPlayerX_;
                 menuCameraY_ = menuPlayerY_;
+            } else if (instance->roomId == mainRoomId) {
+                mainPlayerInitialized_ = true;
+                mainPlayerX_ = static_cast<float>(instance->x);
+                mainPlayerY_ = static_cast<float>(instance->y);
+                mainPlayerSpeedX_ = 0.0F;
+                mainPlayerSpeedY_ = 0.0F;
+                mainPlayerGrounded_ = false;
+                mainPlayerFacing_ = 1;
+                mainPlayerSpriteId_ = 37;
+                mainPlayerImageIndex_ = 2.0F;
             }
             // scrPlayerInit's full state comes later. These are the two
             // instance_create calls made directly by the recovered event.
@@ -420,10 +566,14 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 deferredCommandsSucceeded_ = false;
         }
         return;
-    case 849: // gml_Object_objPlayer_n_Step_1 (ground-room subset)
+    case 849: // gml_Object_objPlayer_n_Step_1 (menu/rmMain movement subsets)
         ++implementedCodeCalls_;
-        if (instance != nullptr && instance->roomId == menuRoomId)
-            updateMenuPlayer(*instance);
+        if (instance != nullptr) {
+            if (instance->roomId == menuRoomId)
+                updateMenuPlayer(*instance);
+            if (instance->roomId == mainRoomId)
+                updateMainPlayer(*instance);
+        }
         return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;
@@ -538,16 +688,25 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->y = static_cast<std::int32_t>(std::round(enterSequenceY_));
         }
         return;
-    case 997: // gml_Object_camMain_Create_0 (ground-room subset)
+    case 997: // gml_Object_camMain_Create_0 (menu/rmMain camera subsets)
         ++implementedCodeCalls_;
         if (menuPlayerInitialized_) {
             menuCameraX_ = menuPlayerX_;
             menuCameraY_ = menuPlayerY_;
         }
+        if (instance != nullptr && instance->roomId == mainRoomId) {
+            mainCameraInitialized_ = true;
+            mainCameraX_ = static_cast<float>(instance->x);
+            mainCameraY_ = static_cast<float>(instance->y);
+            mainCameraMemorizeY_ = 0.0F;
+        }
         return;
-    case 999: // gml_Object_camMain_Step_0 (free-camera ground-room subset)
+    case 999: // gml_Object_camMain_Step_0 (menu/rmMain camera subsets)
         ++implementedCodeCalls_;
-        updateMenuCamera();
+        if (instance != nullptr && instance->roomId == mainRoomId)
+            updateMainCamera(*instance);
+        else
+            updateMenuCamera();
         return;
     case 2490: // gml_Object_objWell_Create_0
         ++implementedCodeCalls_;
@@ -731,7 +890,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(12); // Startup-state digest schema.
+    digest.addU32(13); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -785,6 +944,19 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addF32(playMenuPlayerDescent_);
     digest.addF32(playMenuPlayerSpeedY_);
     digest.addF32(playMenuVerticalDitherY_);
+    digest.addBool(mainPlayerInitialized_);
+    digest.addF32(mainPlayerX_);
+    digest.addF32(mainPlayerY_);
+    digest.addF32(mainPlayerSpeedX_);
+    digest.addF32(mainPlayerSpeedY_);
+    digest.addBool(mainPlayerGrounded_);
+    digest.addI32(mainPlayerFacing_);
+    digest.addI32(mainPlayerSpriteId_);
+    digest.addF32(mainPlayerImageIndex_);
+    digest.addBool(mainCameraInitialized_);
+    digest.addF32(mainCameraX_);
+    digest.addF32(mainCameraY_);
+    digest.addF32(mainCameraMemorizeY_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

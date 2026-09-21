@@ -99,6 +99,15 @@ public:
     int playStyle() const { return playStyle_; }
     float playMenuPlayerDescent() const { return playMenuPlayerDescent_; }
     float playMenuVerticalDitherY() const { return playMenuVerticalDitherY_; }
+    float mainPlayerX() const { return mainPlayerX_; }
+    float mainPlayerY() const { return mainPlayerY_; }
+    float mainPlayerSpeedX() const { return mainPlayerSpeedX_; }
+    float mainPlayerSpeedY() const { return mainPlayerSpeedY_; }
+    int mainPlayerFacing() const { return mainPlayerFacing_; }
+    int mainPlayerSpriteId() const { return mainPlayerSpriteId_; }
+    float mainPlayerImageIndex() const { return mainPlayerImageIndex_; }
+    float mainCameraViewX() const { return mainCameraX_ - surfaceWidth / 2.0F; }
+    float mainCameraViewY() const { return mainCameraY_ - surfaceHeight / 2.0F; }
     std::uint64_t stateDigest() const;
 
 private:
@@ -109,6 +118,10 @@ private:
     void stepInternal(bool advancePressed, bool left, bool right, bool anyInput);
     void updateMenuPlayer(InstanceRecord& instance);
     void updateMenuCamera();
+    void updateMainPlayer(InstanceRecord& instance);
+    void updateMainCamera(InstanceRecord& instance);
+    bool mainPlayerCollides(float x, float y) const;
+    bool moveMainPlayerAxis(float amount, bool horizontal);
     void dispatchInstancePhase(InstanceRecord& instance,
                                RoomInstancePhase phase);
     bool dispatchObjectEvent(InstanceRecord& instance,
@@ -190,6 +203,19 @@ private:
     float playMenuPlayerDescent_ = 0.0F;
     float playMenuPlayerSpeedY_ = 0.0F;
     float playMenuVerticalDitherY_ = -320.0F;
+    bool mainPlayerInitialized_ = false;
+    float mainPlayerX_ = 240.0F;
+    float mainPlayerY_ = 176.0F;
+    float mainPlayerSpeedX_ = 0.0F;
+    float mainPlayerSpeedY_ = 0.0F;
+    bool mainPlayerGrounded_ = false;
+    int mainPlayerFacing_ = 1;
+    int mainPlayerSpriteId_ = 37;
+    float mainPlayerImageIndex_ = 2.0F;
+    bool mainCameraInitialized_ = false;
+    float mainCameraX_ = 240.0F;
+    float mainCameraY_ = 176.0F;
+    float mainCameraMemorizeY_ = 0.0F;
 };
 
 } // namespace downwell

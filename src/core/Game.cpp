@@ -39,10 +39,8 @@ void Game::renderMain(Renderer& renderer) const {
     if (player == nullptr)
         return;
 
-    // camMain is created on the player. This is the authoritative first view;
-    // camera movement will replace it when the rmMain step slice is translated.
-    const float viewX = static_cast<float>(player->x) - logicalWidth / 2.0F;
-    const float viewY = static_cast<float>(player->y) - logicalHeight / 2.0F;
+    const float viewX = startup_.mainCameraViewX();
+    const float viewY = startup_.mainCameraViewY();
     const auto hasWallAt = [this](std::int32_t x, std::int32_t y) {
         for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
             const InstanceRecord& candidate = startup_.instanceAt(index);
@@ -70,10 +68,11 @@ void Game::renderMain(Renderer& renderer) const {
                                        2.0F, 2.0F, 0.0F);
     }
 
-    constexpr std::int32_t styleIdle[] = {31, 33, 34, 35, 32};
-    renderer.drawSprite(styleIdle[startup_.playStyle()], 0,
-                        static_cast<int>(player->x - viewX),
-                        static_cast<int>(player->y - viewY));
+    renderer.drawSpriteTransformed(
+        startup_.mainPlayerSpriteId(),
+        static_cast<std::uint32_t>(startup_.mainPlayerImageIndex()),
+        startup_.mainPlayerX() - viewX, startup_.mainPlayerY() - viewY,
+        static_cast<float>(startup_.mainPlayerFacing()), 1.0F, 0.0F);
 }
 
 void Game::renderMenu(Renderer& renderer) const {
