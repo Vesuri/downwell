@@ -30,7 +30,9 @@ INSTANCE_TEST_TARGET := build/instance-store-test
 INSTANCE_TEST_SOURCES := tests/core/InstanceStoreTest.cpp
 EVENT_TEST_TARGET := build/event-scheduler-test
 EVENT_TEST_SOURCES := tests/core/EventSchedulerTest.cpp
-TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET)
+ROOM_TEST_TARGET := build/room-loader-test
+ROOM_TEST_SOURCES := tests/core/RoomLoaderTest.cpp
+TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET)
 
 .PHONY: all run test extract verify-extraction amiga clean
 
@@ -67,12 +69,17 @@ $(EVENT_TEST_TARGET): $(EVENT_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(EVENT_TEST_SOURCES)
 
+$(ROOM_TEST_TARGET): $(ROOM_TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ROOM_TEST_SOURCES)
+
 test: $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET)
 	./$(REPLAY_TEST_TARGET)
 	./$(ALARM_TEST_TARGET)
 	./$(INSTANCE_TEST_TARGET)
 	./$(EVENT_TEST_TARGET)
+	./$(ROOM_TEST_TARGET)
 
 extract:
 	tools/extract.sh

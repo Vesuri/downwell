@@ -44,6 +44,8 @@ Space or Z advances the splash sequence, and Escape quits. `make test` checks
 the automatic 731-tick desktop transition, input-driven skipping, the
 non-desktop path, key recovered initialization state, alarms, instance
 lifecycle, event phases, replay validation, and the state oracle without SDL.
+Room-entry tests also pin serialized creation order, persistence, lifecycle
+phases, and atomic failure behavior.
 
 The cross-target replay and state-comparison contract is documented in
 [docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional

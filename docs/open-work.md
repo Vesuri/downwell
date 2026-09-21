@@ -21,10 +21,11 @@
 - [x] Factor and test the fixed-size GameMaker alarm bank used by startup.
 - [x] Add fixed-capacity instance storage and persistent room-transfer behavior.
 - [x] Dispatch Begin Step, implemented alarms, Step, and End Step in fixed phases.
+- [x] Add atomic room entry with serialized creation order and lifecycle phases.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.
-- Implement room loading, collision, and draw ordering.
+- Import complete generated room definitions; implement collision and draw ordering.
 - Add texture/font/audio resource loaders from generated manifests.
 - Bring up the `rmInit` to `rmMenu` startup slice before broad resource coverage.
 

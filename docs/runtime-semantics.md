@@ -68,8 +68,8 @@ Confirmed startup order is:
 2. instance 100066, object 36, `objInitRm`.
 
 Confirmed `rmMenu` order begins with instance 104218, object 35,
-`objPlayer_n`. General event dispatch and the exact timing of deferred room
-changes are not yet implemented.
+`objPlayer_n`. Core step and room-entry phases are implemented; movement,
+collision, draw ordering, and the exact timing of deferred room changes remain.
 
 ## Instance storage
 
@@ -84,3 +84,27 @@ The startup model uses a two-slot specialization populated from the recovered
 per-instance state. Loading the 192 serialized `rmMenu` instances is a separate
 room-loader milestone; the startup store deliberately does not pretend they
 already exist.
+
+## Room entry
+
+`RoomLoader` now implements the documented entry sequence over ordered room
+definitions:
+
+1. validate the complete transition for capacity and duplicate instance IDs;
+2. retain persistent instances and discard source-room instances;
+3. for each new instance in serialized order, dispatch PreCreate, Create, then
+   instance creation code;
+4. dispatch Game Start to all instances only for the first game room;
+5. run room creation code once;
+6. dispatch Room Start to persistent and newly created instances.
+
+Validation is atomic: an invalid destination leaves the source store untouched.
+The startup model now enters `rmInit` through this loader, so its controller and
+transition-object initialization use the same event path intended for later
+rooms. Its bounded transition still loads no `rmMenu` definitions; importing
+those 192 records from generated resource tables remains the next room-data
+step.
+
+Room-entry callbacks currently may not create or destroy instances. That
+behavior will use the same deferred command mechanism needed for safe mutation
+during step/collision dispatch rather than being guessed inside the loader.

@@ -1,5 +1,6 @@
 #include "StartupRuntime.h"
 #include "EventScheduler.h"
+#include "RoomLoader.h"
 #include "StateDigest.h"
 
 namespace downwell {
@@ -20,10 +21,22 @@ void StartupRuntime::reset(PlatformProfile profile) {
     roomDestinationSet_ = false;
 
     // rmInit instance order in the recovered room data.
-    instances_.create(controllerInstanceId, 37, entryRoomId, true);
-    controllerCreate(profile);
-    instances_.create(initRoomInstanceId, 36, entryRoomId, false);
-    initRoomCreate();
+    const RoomInstanceDefinition definitions[] = {
+        {controllerInstanceId, 37, true},
+        {initRoomInstanceId, 36, false}
+    };
+    const auto instanceHandler = [this, profile](InstanceRecord& instance,
+                                                  RoomInstancePhase phase) {
+        if (phase != RoomInstancePhase::create)
+            return;
+        if (instance.objectId == 37)
+            controllerCreate(profile);
+        if (instance.objectId == 36)
+            initRoomCreate();
+    };
+    const auto roomCreationHandler = [](std::int32_t) {};
+    RoomLoader<2>::enter(instances_, entryRoomId, definitions, 2, true,
+                         instanceHandler, roomCreationHandler);
 }
 
 void StartupRuntime::controllerCreate(PlatformProfile profile) {
@@ -101,7 +114,10 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
 
 void StartupRuntime::gotoRoom(int roomId) {
     roomId_ = roomId;
-    instances_.enterRoom(roomId);
+    const auto instanceHandler = [](InstanceRecord&, RoomInstancePhase) {};
+    const auto roomCreationHandler = [](std::int32_t) {};
+    RoomLoader<2>::enter(instances_, roomId, nullptr, 0, false,
+                         instanceHandler, roomCreationHandler);
 }
 
 InstanceRecord* StartupRuntime::initRoomInstance() {
