@@ -18,7 +18,8 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     downwell::BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated builder-pattern pack validates");
-    require(pack.patternCount() == 56 && pack.cellCount() == 7411,
+    require(pack.patternCount() == 58 && pack.rowCount() == 691 &&
+                pack.cellCount() == 8021,
             "recovered area-one pattern counts are pinned");
 
     downwell::PackedBuilderPattern pattern;
@@ -62,6 +63,17 @@ int main(int argc, char** argv) {
     require(pack.findPattern(downwell::BuilderPatternFamily::areaOneRight, 9,
                              pattern) && pattern.rowCount == 18,
             "last recovered right room is addressable");
+    require(pack.findPattern(downwell::BuilderPatternFamily::areaOneShop, 1,
+                             pattern) && pattern.width == 21 &&
+                pattern.rowCount == 18,
+            "irregular recovered shop metadata is exact");
+    std::uint32_t rowWidth = 0;
+    require(pack.rowWidth(pattern, 13, rowWidth) && rowWidth == 21 &&
+                pack.cell(pattern, 20, 13, cell) && cell == '.',
+            "the anomalous long shop row is preserved verbatim");
+    require(pack.rowWidth(pattern, 12, rowWidth) && rowWidth == 19 &&
+                !pack.cell(pattern, 19, 12, cell),
+            "shop row bounds follow each recovered row");
 
     std::vector<std::uint8_t> damaged = bytes;
     damaged[40] = 0xff;

@@ -38,9 +38,12 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
     }
     patternCount_ = u32(bytes + 12);
     cellCount_ = u32(bytes + 16);
+    rowCount_ = u32(bytes + 28);
     patternsOffset_ = headerSize;
     if (patternCount_ > (size - patternsOffset_) / patternRecordSize) return;
-    cellsOffset_ = patternsOffset_ + patternCount_ * patternRecordSize;
+    rowsOffset_ = patternsOffset_ + patternCount_ * patternRecordSize;
+    if (rowCount_ > (size - rowsOffset_) / rowRecordSize) return;
+    cellsOffset_ = rowsOffset_ + rowCount_ * rowRecordSize;
     if (cellCount_ != size - cellsOffset_) {
         error_ = BuilderPatternPackError::wrongSize; return;
     }
@@ -48,11 +51,10 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
     std::uint16_t nextStartIndex = 0;
     std::uint16_t nextMainIndex = 0;
     std::uint16_t nextRightIndex = 0;
+    std::uint16_t nextShopIndex = 0;
     for (std::uint32_t id = 0; id < patternCount_; ++id) {
         PackedBuilderPattern value;
         pattern(id, value);
-        const std::uint32_t expectedCells =
-            static_cast<std::uint32_t>(value.width) * value.rowCount;
         bool ordered = false;
         if (value.family == BuilderPatternFamily::areaOneStart)
             ordered = value.sourceIndex == nextStartIndex++;
@@ -60,9 +62,26 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
             ordered = value.sourceIndex == nextMainIndex++;
         if (value.family == BuilderPatternFamily::areaOneRight)
             ordered = value.sourceIndex == nextRightIndex++;
+        if (value.family == BuilderPatternFamily::areaOneShop)
+            ordered = value.sourceIndex == nextShopIndex++;
         if (!ordered || value.width == 0 || value.rowCount == 0 ||
-            value.cellCount != expectedCells ||
+            !range(value.firstRow, value.rowCount, rowCount_) ||
             !range(value.firstCell, value.cellCount, cellCount_)) {
+            error_ = BuilderPatternPackError::badPattern; return;
+        }
+        std::uint32_t summedCells = 0;
+        for (std::uint32_t row = 0; row < value.rowCount; ++row) {
+            const std::uint8_t* r = bytes_ + rowsOffset_ +
+                (value.firstRow + row) * rowRecordSize;
+            const std::uint32_t first = u32(r), count = u32(r + 4);
+            if (count == 0 || count > value.width ||
+                !range(first, count, cellCount_) ||
+                first != value.firstCell + summedCells) {
+                error_ = BuilderPatternPackError::badPattern; return;
+            }
+            summedCells += count;
+        }
+        if (summedCells != value.cellCount) {
             error_ = BuilderPatternPackError::badPattern; return;
         }
         for (std::uint32_t offset = 0; offset < value.cellCount; ++offset) {
@@ -79,7 +98,7 @@ bool BuilderPatternPack::pattern(std::uint32_t id,
     if (!valid() || id >= patternCount_) return false;
     const std::uint8_t* p = bytes_ + patternsOffset_ + id * patternRecordSize;
     out = {static_cast<BuilderPatternFamily>(u16(p)), u16(p + 2), u16(p + 4),
-           u16(p + 6), u32(p + 8), u32(p + 12)};
+           u16(p + 6), u32(p + 8), u32(p + 12), u32(p + 16)};
     return true;
 }
 
@@ -97,12 +116,24 @@ bool BuilderPatternPack::findPattern(BuilderPatternFamily family,
 bool BuilderPatternPack::cell(const PackedBuilderPattern& value,
                               std::uint16_t x, std::uint16_t y,
                               char& out) const {
-    if (!valid() || x >= value.width || y >= value.rowCount ||
+    if (!valid() || y >= value.rowCount ||
         !range(value.firstCell, value.cellCount, cellCount_))
         return false;
-    const std::uint32_t offset = static_cast<std::uint32_t>(y) * value.width + x;
-    if (offset >= value.cellCount) return false;
-    out = static_cast<char>(bytes_[cellsOffset_ + value.firstCell + offset]);
+    const std::uint8_t* row = bytes_ + rowsOffset_ +
+        (value.firstRow + y) * rowRecordSize;
+    const std::uint32_t first = u32(row), width = u32(row + 4);
+    if (x >= width) return false;
+    out = static_cast<char>(bytes_[cellsOffset_ + first + x]);
+    return true;
+}
+
+bool BuilderPatternPack::rowWidth(const PackedBuilderPattern& value,
+                                  std::uint16_t y,
+                                  std::uint32_t& out) const {
+    if (!valid() || y >= value.rowCount ||
+        !range(value.firstRow, value.rowCount, rowCount_)) return false;
+    out = u32(bytes_ + rowsOffset_ +
+              (value.firstRow + y) * rowRecordSize + 4);
     return true;
 }
 
