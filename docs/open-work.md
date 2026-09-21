@@ -65,6 +65,8 @@
   area-one right-room layouts and their special doorway/object symbols.
 - [x] Substitute recovered right rooms at their scheduled generation counts,
   preserving no-repeat selection, mirroring, row overlap, and RNG order.
+- [x] Interpret right-room doorway caps, torches, ambience, time fields,
+  camera lockers, and alternating gem-chunk/gun-module occupants.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

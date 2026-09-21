@@ -558,6 +558,25 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainBuilderGenerationCount() == 4 &&
                     runtime.mainBuilderRowsGenerated() == 95,
                 "the first scheduled side room preserves deterministic selection and rows");
+        require(runtime.mainBuilderSpecialObjectsGenerated() == 7,
+                "every special marker in right-room pattern six is interpreted");
+        bool foundTorch = false;
+        bool foundAmbience = false;
+        bool foundTimeField = false;
+        bool foundSideCamera = false;
+        bool foundRoomReward = false;
+        for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
+            const downwell::InstanceRecord& instance = runtime.instanceAt(index);
+            foundTorch = foundTorch || instance.objectId == 296;
+            foundAmbience = foundAmbience || instance.objectId == 376;
+            foundTimeField = foundTimeField || instance.objectId == 82;
+            foundSideCamera = foundSideCamera || instance.objectId == 62;
+            foundRoomReward = foundRoomReward || instance.objectId == 293 ||
+                              instance.objectId == 109;
+        }
+        require(foundTorch && foundAmbience && foundTimeField &&
+                    foundSideCamera && foundRoomReward,
+                "side-room utility and reward objects retain recovered IDs");
     }
 }
 

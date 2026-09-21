@@ -87,6 +87,9 @@ void Game::renderMain(Renderer& renderer) const {
         if (instance.objectId == 117) sprite = 177;
         if (instance.objectId == 119) sprite = 278;
         if (instance.objectId == 289) sprite = 550;
+        if (instance.objectId == 293) sprite = 569;
+        if (instance.objectId == 296) sprite = 568;
+        if (instance.objectId == 109) sprite = 139;
         if (sprite >= 0)
             renderer.drawSpriteTransformed(
                 sprite, static_cast<std::uint32_t>(instance.imageIndex),

@@ -128,6 +128,8 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderSpawnerMade_ = false;
     mainBuilderLastRightPattern_ = -1;
     mainBuilderSideRoomsGenerated_ = 0;
+    mainBuilderChunkOrCrate_ = 0;
+    mainBuilderSpecialObjectsGenerated_ = 0;
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
@@ -655,6 +657,22 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             if (random_.random(300.0) < 1.0)
                 command.imageIndex = 16.0F;
         }
+        if (objectId == 82)
+            random_.random(2.0); // parentTimeField radius 24..26.
+        if (objectId == 293) {
+            command.imageSpeed = 0.0F;
+            command.alarms.set(1, 30 + static_cast<int>(random_.irandom(30)));
+            command.alarms.set(2, 180 + static_cast<int>(random_.irandom(180)));
+        }
+        if (objectId == 109) {
+            command.imageSpeed = 0.0F;
+            command.alarms.set(0, 10);
+            command.alarms.set(3, 10);
+            random_.irandom(1); // moduleType = choose(0, 1).
+            std::uint64_t module = 2;
+            while (module == 2)
+                module = random_.irandom(6);
+        }
         return deferredInstances_.enqueueCreate(command);
     };
     const auto emitPattern = [this, &instance, &enqueueObject](
@@ -673,7 +691,11 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 const int buildX = reversed ? 320 - ordinal * 16
                                             : 160 + ordinal * 16;
 
-                // builderCavern handles '^' before its universal area-one roll.
+                // builderCavern handles these decorations before its universal
+                // area-one enemy roll.
+                if ((symbol == 'I' || symbol == 'J') &&
+                    !enqueueObject(296, buildX, rowY))
+                    return false;
                 if (symbol == '^' && random_.irandom(4) != 0 &&
                     !enqueueObject(289, buildX, rowY))
                     return false;
@@ -699,8 +721,37 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 if (symbol == '-') objectId = 93;
                 if (symbol == 'B') objectId = 92;
                 if (symbol == '3' && random_.irandom(1) != 0) objectId = 92;
+                if (symbol == '|') objectId = 60;
+                if (symbol == 'v') objectId = 376;
+                if (symbol == 'O') objectId = 82;
+                if (symbol == '_') objectId = 62;
+                if (symbol == '$') objectId = 277;
+                if (symbol == '\\') objectId = 285;
+                if (symbol == '@') {
+                    if (mainBuilderChunkOrCrate_ == 0) {
+                        constexpr std::int32_t choices[] = {293, 109};
+                        mainBuilderChunkOrCrate_ =
+                            choices[random_.irandom(1)];
+                    } else {
+                        mainBuilderChunkOrCrate_ =
+                            mainBuilderChunkOrCrate_ == 109 ? 293 : 109;
+                    }
+                    objectId = mainBuilderChunkOrCrate_;
+                }
+                if (symbol == '{' || symbol == '}') {
+                    objectId = 60;
+                    const int edgeX = reversed ? 16 : 464;
+                    if (!enqueueObject(objectId, edgeX, rowY))
+                        return false;
+                    ++mainBuilderSpecialObjectsGenerated_;
+                    objectId = -1;
+                }
                 if (objectId >= 0 && !enqueueObject(objectId, buildX, rowY))
                     return false;
+                if (symbol == 'I' || symbol == 'J' || symbol == 'v' ||
+                    symbol == 'O' || symbol == '_' || symbol == '$' ||
+                    symbol == '\\' || symbol == '@')
+                    ++mainBuilderSpecialObjectsGenerated_;
             }
             if (row + 1 < pattern.rowCount) {
                 random_.random(3.0); // builderCavern sees the row newline.
@@ -1103,6 +1154,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderSpawnerMade_ = false;
             mainBuilderLastRightPattern_ = -1;
             mainBuilderSideRoomsGenerated_ = 0;
+            mainBuilderChunkOrCrate_ = 0;
+            mainBuilderSpecialObjectsGenerated_ = 0;
             random_.irandom(2); // choose(2, 2, 3), then overridden to two.
             mainBuilderRightRooms_[0] =
                 3 + static_cast<int>(random_.irandom(12));
@@ -1556,7 +1609,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(24); // Startup-state digest schema.
+    digest.addU32(25); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1656,6 +1709,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainBuilderSpawnerMade_);
     digest.addI32(mainBuilderLastRightPattern_);
     digest.addU32(mainBuilderSideRoomsGenerated_);
+    digest.addI32(mainBuilderChunkOrCrate_);
+    digest.addU32(mainBuilderSpecialObjectsGenerated_);
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);
