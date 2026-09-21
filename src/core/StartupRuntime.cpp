@@ -139,6 +139,8 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderShopsGenerated_ = 0;
     mainBuilderRightRoomsMade_ = 0;
     mainBuilderShopMade_ = true;
+    mainBuilderEndReached_ = false;
+    mainBuilderEndPattern_ = -1;
     mainBuilderChunkOrCrate_ = 0;
     mainBuilderSpecialObjectsGenerated_ = 0;
     mainCameraInitialized_ = false;
@@ -840,7 +842,7 @@ void StartupRuntime::updateMainLifecycle() {
 }
 
 void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
-    if (!mainBuilderInitialized_ || mainBuilderGenerationCount_ > 15)
+    if (!mainBuilderInitialized_ || mainBuilderEndReached_)
         return;
 
     // scrBuilder only stays 128 pixels ahead of the visible bottom. On the
@@ -1006,6 +1008,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 if (symbol == '_') objectId = 62;
                 if (symbol == '$') objectId = 277;
                 if (symbol == '\\') objectId = 285;
+                if (symbol == '=') objectId = 306;
                 if (symbol == '@') {
                     if (mainBuilderChunkOrCrate_ == 0) {
                         constexpr std::int32_t choices[] = {293, 109};
@@ -1082,6 +1085,21 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
         }
         mainBuilderGenerationCount_ = 0;
         mainBuilderStartRowsGenerated_ = advancedRows;
+    } else if (mainBuilderGenerationCount_ > 16) {
+        const std::uint16_t selected =
+            static_cast<std::uint16_t>(random_.irandom(3));
+        if (!builderPatternPack_->findPattern(
+                BuilderPatternFamily::areaOneEnd, selected, pattern)) {
+            deferredCommandsSucceeded_ = false;
+            return;
+        }
+        const bool reversed = random_.irandom(1) != 0;
+        if (!emitPattern(pattern, reversed, true, advancedRows)) {
+            deferredCommandsSucceeded_ = false;
+            return;
+        }
+        mainBuilderEndPattern_ = selected;
+        mainBuilderEndReached_ = true;
     } else {
         if (!mainBuilderSpawnerMade_) {
             if (!enqueueObject(78, instance.x - 100, instance.y)) {
@@ -1469,6 +1487,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderShopsGenerated_ = 0;
             mainBuilderRightRoomsMade_ = 0;
             mainBuilderShopMade_ = true; // area 1, level 1, playStyle != 4.
+            mainBuilderEndReached_ = false;
+            mainBuilderEndPattern_ = -1;
             mainBuilderChunkOrCrate_ = 0;
             mainBuilderSpecialObjectsGenerated_ = 0;
             random_.irandom(2); // choose(2, 2, 3), then overridden to two.
@@ -2018,7 +2038,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(29); // Startup-state digest schema.
+    digest.addU32(30); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2140,6 +2160,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(mainBuilderShopsGenerated_);
     digest.addU32(mainBuilderRightRoomsMade_);
     digest.addBool(mainBuilderShopMade_);
+    digest.addBool(mainBuilderEndReached_);
+    digest.addI32(mainBuilderEndPattern_);
     digest.addI32(mainBuilderChunkOrCrate_);
     digest.addU32(mainBuilderSpecialObjectsGenerated_);
     digest.addBool(mainCameraInitialized_);

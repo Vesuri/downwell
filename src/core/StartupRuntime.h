@@ -178,6 +178,8 @@ public:
         return mainBuilderShopsGenerated_;
     }
     bool mainBuilderShopSuppressed() const { return mainBuilderShopMade_; }
+    bool mainBuilderEndReached() const { return mainBuilderEndReached_; }
+    int mainBuilderEndPattern() const { return mainBuilderEndPattern_; }
     std::uint32_t mainBuilderSpecialObjectsGenerated() const {
         return mainBuilderSpecialObjectsGenerated_;
     }
@@ -348,6 +350,8 @@ private:
     std::uint32_t mainBuilderShopsGenerated_ = 0;
     std::uint32_t mainBuilderRightRoomsMade_ = 0;
     bool mainBuilderShopMade_ = true;
+    bool mainBuilderEndReached_ = false;
+    int mainBuilderEndPattern_ = -1;
     int mainBuilderChunkOrCrate_ = 0;
     std::uint32_t mainBuilderSpecialObjectsGenerated_ = 0;
     bool mainCameraInitialized_ = false;

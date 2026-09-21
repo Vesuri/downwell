@@ -122,6 +122,7 @@ void Game::renderMain(Renderer& renderer) const {
         if (instance.objectId == 293) sprite = 569;
         if (instance.objectId == 296) sprite = 568;
         if (instance.objectId == 109) sprite = 139;
+        if (instance.objectId == 306) sprite = 127;
         if (instance.objectId == 111 && !instance.grounded) sprite = 164;
         if (instance.objectId == 112 && !instance.grounded) sprite = 187;
         if (instance.objectId == 112 && instance.grounded &&

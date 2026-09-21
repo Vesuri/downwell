@@ -79,6 +79,8 @@
   presentation into the 4:3 HUD paths.
 - [x] Resolve native player/enemy contacts with recovered stomp kills,
   gunboot recharge and bounce, contact damage, knockback, and invulnerability.
+- [x] Pack and emit all four recovered area-one endings after the exact 1-1
+  generation length, including the native result-line marker.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

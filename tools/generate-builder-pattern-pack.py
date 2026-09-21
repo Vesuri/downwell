@@ -19,13 +19,15 @@ AREA_ONE_START = 1
 AREA_ONE_MAIN = 2
 AREA_ONE_RIGHT = 3
 AREA_ONE_SHOP = 4
+AREA_ONE_END = 5
 EXPECTED_START_PATTERNS = 5
 EXPECTED_MAIN_PATTERNS = 41
 EXPECTED_RIGHT_PATTERNS = 10
 EXPECTED_SHOP_PATTERNS = 2
-EXPECTED_PATTERNS = 58
-EXPECTED_ROWS = 691
-EXPECTED_CELLS = 8021
+EXPECTED_END_PATTERNS = 4
+EXPECTED_PATTERNS = 62
+EXPECTED_ROWS = 737
+EXPECTED_CELLS = 8435
 
 HEADER = struct.Struct("<4sHHIIIQI")
 PATTERN = struct.Struct("<HHHHIII")
@@ -90,7 +92,8 @@ def parse_patterns(source, array_name, expected_count, expected_width,
     return patterns
 
 
-def build_pack(manifest, start_source, main_source, right_source, shop_source):
+def build_pack(manifest, start_source, main_source, right_source, shop_source,
+               end_source):
     require(manifest.get("schemaVersion") == MANIFEST_SCHEMA,
             f"expected manifest schema {MANIFEST_SCHEMA}")
     require(manifest.get("source", {}).get("sha256") == SOURCE_SHA256,
@@ -108,6 +111,8 @@ def build_pack(manifest, start_source, main_source, right_source, shop_source):
             right_source, "partRight", EXPECTED_RIGHT_PATTERNS, 19)),
         (AREA_ONE_SHOP, parse_patterns(
             shop_source, "partShopR", EXPECTED_SHOP_PATTERNS, 19, True)),
+        (AREA_ONE_END, parse_patterns(
+            end_source, "partEnd", EXPECTED_END_PATTERNS, 9)),
     )
     row_count = 0
     for family, patterns in families:
@@ -163,6 +168,9 @@ def main():
     parser.add_argument("--shop-source", type=Path, default=root /
                         "extracted/utmt-0.9.2.0/CodeEntries/"
                         "gml_GlobalScript_scrShopPat1.gml")
+    parser.add_argument("--end-source", type=Path, default=root /
+                        "extracted/utmt-0.9.2.0/CodeEntries/"
+                        "gml_GlobalScript_scrEndPat1.gml")
     parser.add_argument("--output", type=Path,
                         default=root / "generated/downwell-builder-patterns.dwbp")
     parser.add_argument("--check", action="store_true")
@@ -172,7 +180,8 @@ def main():
         args.start_source.read_text(encoding="utf-8"),
         args.main_source.read_text(encoding="utf-8"),
         args.right_source.read_text(encoding="utf-8"),
-        args.shop_source.read_text(encoding="utf-8"))
+        args.shop_source.read_text(encoding="utf-8"),
+        args.end_source.read_text(encoding="utf-8"))
     digest = hashlib.sha256(payload).hexdigest()
     if args.check:
         require(args.output.is_file(), f"missing builder-pattern pack: {args.output}")

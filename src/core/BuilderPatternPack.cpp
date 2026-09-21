@@ -52,6 +52,7 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
     std::uint16_t nextMainIndex = 0;
     std::uint16_t nextRightIndex = 0;
     std::uint16_t nextShopIndex = 0;
+    std::uint16_t nextEndIndex = 0;
     for (std::uint32_t id = 0; id < patternCount_; ++id) {
         PackedBuilderPattern value;
         pattern(id, value);
@@ -64,6 +65,8 @@ BuilderPatternPack::BuilderPatternPack(const std::uint8_t* bytes,
             ordered = value.sourceIndex == nextRightIndex++;
         if (value.family == BuilderPatternFamily::areaOneShop)
             ordered = value.sourceIndex == nextShopIndex++;
+        if (value.family == BuilderPatternFamily::areaOneEnd)
+            ordered = value.sourceIndex == nextEndIndex++;
         if (!ordered || value.width == 0 || value.rowCount == 0 ||
             !range(value.firstRow, value.rowCount, rowCount_) ||
             !range(value.firstCell, value.cellCount, cellCount_)) {

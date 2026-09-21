@@ -58,5 +58,5 @@ lossless while retaining a compact, endian-explicit representation.
 validates the magic, format/schema versions, pinned source-build hash, exact
 payload size, pattern dimensions and ranges, contiguous row spans, source
 indices, and printable cell data before exposing any pattern. The complete-pack
-test pins all 58 fragments, their 691 rows and 8,021 cells, including the
-irregular shop row.
+test pins all 62 fragments, their 737 rows and 8,435 cells, including the
+irregular shop row and four area-one endings.

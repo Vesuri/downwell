@@ -15,7 +15,8 @@ enum class BuilderPatternFamily : std::uint16_t {
     areaOneStart = 1,
     areaOneMain = 2,
     areaOneRight = 3,
-    areaOneShop = 4
+    areaOneShop = 4,
+    areaOneEnd = 5
 };
 
 struct PackedBuilderPattern {

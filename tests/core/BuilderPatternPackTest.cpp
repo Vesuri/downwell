@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     downwell::BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated builder-pattern pack validates");
-    require(pack.patternCount() == 58 && pack.rowCount() == 691 &&
-                pack.cellCount() == 8021,
+    require(pack.patternCount() == 62 && pack.rowCount() == 737 &&
+                pack.cellCount() == 8435,
             "recovered area-one pattern counts are pinned");
 
     downwell::PackedBuilderPattern pattern;
@@ -74,6 +74,14 @@ int main(int argc, char** argv) {
     require(pack.rowWidth(pattern, 12, rowWidth) && rowWidth == 19 &&
                 !pack.cell(pattern, 19, 12, cell),
             "shop row bounds follow each recovered row");
+    require(pack.findPattern(downwell::BuilderPatternFamily::areaOneEnd, 0,
+                             pattern) && pattern.width == 9 &&
+                pattern.rowCount == 16 &&
+                pack.cell(pattern, 4, 15, cell) && cell == '=',
+            "first recovered area-one ending preserves its result marker");
+    require(pack.findPattern(downwell::BuilderPatternFamily::areaOneEnd, 3,
+                             pattern) && pattern.rowCount == 10,
+            "last recovered area-one ending is addressable");
 
     std::vector<std::uint8_t> damaged = bytes;
     damaged[40] = 0xff;
