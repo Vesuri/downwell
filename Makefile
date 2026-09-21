@@ -12,6 +12,7 @@ LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
 	src/core/Game.cpp \
+	src/core/ObjectPack.cpp \
 	src/core/Replay.cpp \
 	src/core/RoomPack.cpp \
 	src/core/StartupRuntime.cpp \
@@ -22,9 +23,9 @@ OBJECTS := $(patsubst %.cpp,build/%.o,$(SOURCES))
 DEPS    := $(OBJECTS:.o=.d)
 TARGET  := build/downwell-sdl
 STARTUP_TEST_TARGET := build/startup-runtime-test
-STARTUP_TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp
+STARTUP_TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp
 REPLAY_TEST_TARGET := build/replay-test
-REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp
+REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp
 ALARM_TEST_TARGET := build/alarm-bank-test
 ALARM_TEST_SOURCES := tests/core/AlarmBankTest.cpp
 INSTANCE_TEST_TARGET := build/instance-store-test
@@ -39,7 +40,7 @@ OBJECT_PACK_TEST_TARGET := build/object-pack-test
 OBJECT_PACK_TEST_SOURCES := tests/core/ObjectPackTest.cpp src/core/ObjectPack.cpp
 TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET)
 
-.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack amiga clean
+.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack verify-native-data amiga clean
 
 all: $(TARGET)
 
@@ -51,7 +52,7 @@ build/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-run: generate-room-pack $(TARGET)
+run: generate-room-pack generate-object-pack $(TARGET)
 	./$(TARGET)
 
 $(STARTUP_TEST_TARGET): $(STARTUP_TEST_SOURCES)
@@ -117,6 +118,9 @@ generate-object-pack:
 verify-object-pack: $(OBJECT_PACK_TEST_TARGET)
 	tools/generate-object-pack.py --check
 	./$(OBJECT_PACK_TEST_TARGET) generated/downwell-objects.dwob
+
+verify-native-data: generate-room-pack generate-object-pack $(STARTUP_TEST_TARGET)
+	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'

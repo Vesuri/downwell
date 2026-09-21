@@ -101,6 +101,12 @@ link to recovered GML and VM assembly for the native event dispatcher. The
 portable reader validates inheritance and resolves inherited bindings without
 host-endian or structure-layout assumptions.
 
+`make run` loads both packs. Implemented startup events are now selected through
+their recovered object/event bindings and VM code IDs; resolved event calls
+without a native translation remain visible in runtime diagnostics rather than
+being mistaken for implemented behavior. `make verify-native-data` exercises
+the complete room-to-object-to-code routing path.
+
 ## Amiga toolchain
 
 ```sh

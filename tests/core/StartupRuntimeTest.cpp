@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "core/ObjectPack.h"
 #include "core/RoomPack.h"
 #include <cstdlib>
 #include <fstream>
@@ -85,19 +86,39 @@ void testAdvanceInputUsesPressEdges() {
     require(runtime.inMenu(), "six advance presses reach rmMenu");
 }
 
-void testGeneratedPackEntersRecoveredMenu(const char* path) {
-    std::ifstream input(path, std::ios::binary);
+void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
+                                          const char* objectPath) {
+    std::ifstream input(roomPath, std::ios::binary);
     const std::vector<std::uint8_t> bytes(
         (std::istreambuf_iterator<char>(input)),
         std::istreambuf_iterator<char>());
     const downwell::RoomPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated room pack is valid");
 
+    std::vector<std::uint8_t> objectBytes;
+    if (objectPath != nullptr) {
+        std::ifstream objectInput(objectPath, std::ios::binary);
+        objectBytes.assign(std::istreambuf_iterator<char>(objectInput),
+                           std::istreambuf_iterator<char>());
+    }
+    const downwell::ObjectPack objectPack(objectBytes.data(), objectBytes.size());
+    const downwell::ObjectPack* objects = objectPack.valid() ? &objectPack : nullptr;
+    if (objectPath != nullptr)
+        require(objects != nullptr, "generated object pack is valid");
+
     downwell::StartupRuntime runtime(
-        downwell::PlatformProfile::nonDesktop, &pack);
+        downwell::PlatformProfile::nonDesktop, &pack, objects);
     require(runtime.roomLoadSucceeded(), "packed rmInit loads");
     require(runtime.activeInstanceCount() == 2,
             "packed rmInit creates two instances");
+    if (objects != nullptr) {
+        require(runtime.recoveredEventBindingsActive(),
+                "recovered event bindings are active");
+        require(runtime.implementedCodeCalls() == 2,
+                "both implemented Create handlers route by recovered code ID");
+        require(runtime.unimplementedCodeCalls() > 0,
+                "unsupported recovered startup code is measured explicitly");
+    }
 
     runtime.step(false);
     require(runtime.inMenu(), "packed startup reaches rmMenu");
@@ -111,6 +132,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* path) {
     require(player != nullptr, "first recovered rmMenu player exists");
     require(player->objectId == 35, "rmMenu player has recovered object ID");
     require(player->roomId == 20, "rmMenu player belongs to recovered room");
+    if (objects != nullptr)
+        require(runtime.implementedCodeCalls() == 3,
+                "End Step transition routes by recovered code ID");
 }
 
 } // namespace
@@ -120,8 +144,8 @@ int main(int argc, char** argv) {
     testNonDesktopSkipsSplash();
     testRecoveredDesktopTiming();
     testAdvanceInputUsesPressEdges();
-    if (argc == 2)
-        testGeneratedPackEntersRecoveredMenu(argv[1]);
+    if (argc >= 2)
+        testGeneratedPackEntersRecoveredMenu(argv[1], argc >= 3 ? argv[2] : nullptr);
     std::cout << "startup runtime tests passed\n";
     return 0;
 }

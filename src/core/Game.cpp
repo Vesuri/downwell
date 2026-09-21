@@ -1,8 +1,8 @@
 #include "Game.h"
 namespace downwell {
 
-Game::Game(const RoomPack* roomPack)
-    : startup_(PlatformProfile::desktop, roomPack) {}
+Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack)
+    : startup_(PlatformProfile::desktop, roomPack, objectPack) {}
 
 void Game::update(const Input& input) {
     finished_ = finished_ || input.quit;

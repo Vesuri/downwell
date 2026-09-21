@@ -108,6 +108,13 @@ Object-specific PreCreate, Create, instance-creation-code, Game Start, and Room
 Start handlers beyond the two startup objects are not implemented yet; room
 entry currently records those instances without executing their game logic.
 
+When both native packs are supplied, lifecycle and step dispatch resolve the
+object's recovered event binding (including inheritance) to a VM code-entry ID
+before selecting a native handler. The four implemented `objInitRm`/
+`objControlerN` handlers are selected by code IDs 865–867 and 869 rather than by
+object ID. Every resolved but untranslated code call is counted explicitly;
+the runtime does not silently treat broader menu behavior as implemented.
+
 Room-entry callbacks currently may not create or destroy instances. That
 behavior will use the same deferred command mechanism needed for safe mutation
 during step/collision dispatch rather than being guessed inside the loader.

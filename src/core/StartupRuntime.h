@@ -7,6 +7,8 @@
 namespace downwell {
 
 class RoomPack;
+class ObjectPack;
+enum class RoomInstancePhase;
 
 enum class PlatformProfile {
     desktop,
@@ -26,7 +28,8 @@ public:
     static constexpr int surfaceHeight = 284;
 
     explicit StartupRuntime(PlatformProfile profile = PlatformProfile::desktop,
-                            const RoomPack* roomPack = nullptr);
+                            const RoomPack* roomPack = nullptr,
+                            const ObjectPack* objectPack = nullptr);
 
     void reset(PlatformProfile profile);
     void step(bool advancePressed);
@@ -48,6 +51,9 @@ public:
     }
     bool roomDestinationSet() const { return roomDestinationSet_; }
     bool roomLoadSucceeded() const { return roomLoadSucceeded_; }
+    bool recoveredEventBindingsActive() const { return objectPack_ != nullptr; }
+    std::uint32_t implementedCodeCalls() const { return implementedCodeCalls_; }
+    std::uint32_t unimplementedCodeCalls() const { return unimplementedCodeCalls_; }
     bool inMenu() const { return roomId_ == menuRoomId; }
     std::uint64_t stateDigest() const;
 
@@ -56,6 +62,16 @@ private:
     void initRoomCreate();
     void initRoomAlarm0();
     void initRoomEndStep(bool advancePressed);
+    void dispatchInstancePhase(InstanceRecord& instance,
+                               RoomInstancePhase phase);
+    bool dispatchObjectEvent(InstanceRecord& instance,
+                             std::int32_t eventType,
+                             std::int32_t eventSubtype,
+                             bool advancePressed = false);
+    void dispatchRoomCreation(std::int32_t roomId);
+    void executeCode(InstanceRecord* instance,
+                     std::int32_t codeId,
+                     bool advancePressed = false);
     void gotoRoom(int roomId);
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;
@@ -66,11 +82,15 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     const RoomPack* roomPack_ = nullptr;
+    const ObjectPack* objectPack_ = nullptr;
+    PlatformProfile profile_ = PlatformProfile::desktop;
     int initTimes_ = 0;
     int achievementLoginCalls_ = 0;
     int splashSpeed_ = 180;
     bool roomDestinationSet_ = false;
     bool roomLoadSucceeded_ = true;
+    std::uint32_t implementedCodeCalls_ = 0;
+    std::uint32_t unimplementedCodeCalls_ = 0;
 };
 
 } // namespace downwell
