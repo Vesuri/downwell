@@ -52,6 +52,8 @@ The first gameplay-room frame renders the recovered player and the room's
 authoritative wall layout, including its derived four-neighbour tile frames.
 The initial gameplay slice applies recovered subpixel gravity, airborne left
 and right acceleration, wall collision bounds, fall animation, and camera bias.
+Space or Z now fires the default eight-charge machine gun while airborne, with
+the recovered seven-tick cadence, recoil, shoot pose, and downward bullets.
 `make test` checks the automatic 731-tick desktop transition, input-driven
 skipping, the non-desktop path, key recovered initialization state, alarms,
 instance lifecycle, event phases, replay validation, and the state oracle

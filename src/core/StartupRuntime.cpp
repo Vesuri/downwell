@@ -46,6 +46,8 @@ void StartupRuntime::reset(PlatformProfile profile) {
     inputRight_ = false;
     inputLeftPressed_ = false;
     inputRightPressed_ = false;
+    inputFire_ = false;
+    inputFireReleased_ = false;
     anyInput_ = false;
     menuPlayerInitialized_ = false;
     menuPlayerNapping_ = false;
@@ -91,6 +93,13 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainPlayerFacing_ = 1;
     mainPlayerSpriteId_ = 37;
     mainPlayerImageIndex_ = 2.0F;
+    mainJumpShootLocked_ = false;
+    mainShotDelayed_ = true;
+    mainAirborneShot_ = false;
+    mainAmmo_ = 8;
+    mainShootLeg_ = -1;
+    mainShotsFired_ = 0;
+    mainBulletCount_ = 0;
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
@@ -140,23 +149,26 @@ void StartupRuntime::initRoomCreate() {
 }
 
 void StartupRuntime::step(bool advancePressed) {
-    stepInternal(advancePressed, false, false, advancePressed);
+    stepInternal(advancePressed, false, false, advancePressed, advancePressed);
 }
 
 void StartupRuntime::step(const Input& input, bool advancePressed) {
-    stepInternal(advancePressed, input.left, input.right,
+    stepInternal(advancePressed, input.left, input.right, input.fire,
                  input.left || input.right || input.fire || input.pause);
 }
 
 void StartupRuntime::stepInternal(bool advancePressed,
                                   bool left,
                                   bool right,
+                                  bool fire,
                                   bool anyInput) {
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
+    inputFireReleased_ = !fire && inputFire_;
     inputLeft_ = left;
     inputRight_ = right;
+    inputFire_ = fire;
     anyInput_ = anyInput;
 
     const auto alarmEvents = [this](const InstanceRecord& instance) {
@@ -199,6 +211,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
     EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler);
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
+    if (roomId_ == mainRoomId)
+        updateMainBullets();
 }
 
 void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
@@ -349,11 +363,73 @@ bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
     return true;
 }
 
+bool StartupRuntime::mainBulletCollides(float x, float y) const {
+    for (std::size_t index = 0; index < instances_.size(); ++index) {
+        const InstanceRecord& wall = instances_.at(index);
+        if (!wall.active || wall.objectId != 60)
+            continue;
+        if (x >= wall.x - 16.0F && x <= wall.x + 15.0F &&
+            y >= wall.y - 16.0F && y <= wall.y + 15.0F)
+            return true;
+    }
+    return false;
+}
+
+void StartupRuntime::fireMainGun(InstanceRecord& instance) {
+    if (mainAmmo_ <= 0) {
+        if (mainPlayerSpeedY_ > 3.0F)
+            mainPlayerSpeedY_ = 3.0F;
+        mainShotDelayed_ = true;
+        instance.alarms.set(2, 16);
+        return;
+    }
+    if (mainBulletCount_ < mainBulletCapacity) {
+        mainBullets_[mainBulletCount_++] = {
+            mainPlayerX_ + static_cast<float>(mainShootLeg_),
+            mainPlayerY_ + 4.0F
+        };
+    }
+    mainShootLeg_ *= -1;
+    if (mainPlayerSpeedY_ > 0.0F)
+        mainPlayerSpeedY_ = 0.0F; // Default machine-gun recoil is zero.
+    --mainAmmo_;
+    ++mainShotsFired_;
+    ++soundPlayRequests_;
+    mainAirborneShot_ = true;
+    mainShotDelayed_ = true;
+    instance.alarms.set(2, 7);
+}
+
+void StartupRuntime::updateMainBullets() {
+    std::size_t write = 0;
+    for (std::size_t index = 0; index < mainBulletCount_; ++index) {
+        MainBulletState bullet = mainBullets_[index];
+        bool alive = true;
+        for (int pixel = 0; pixel < 8; ++pixel) {
+            bullet.y += 1.0F;
+            if (mainBulletCollides(bullet.x, bullet.y)) {
+                alive = false;
+                break;
+            }
+        }
+        if (bullet.y > mainCameraViewY() + surfaceHeight + 32.0F ||
+            bullet.y < mainCameraViewY() - 100.0F)
+            alive = false;
+        if (alive)
+            mainBullets_[write++] = bullet;
+    }
+    mainBulletCount_ = write;
+}
+
 void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!mainPlayerInitialized_)
         return;
 
     mainPlayerSpeedY_ = std::min(7.0F, mainPlayerSpeedY_ + 0.2F);
+    if (inputFireReleased_) {
+        mainJumpShootLocked_ = false;
+        mainShotDelayed_ = false; // pBulDelayKill is set for the default gun.
+    }
     if (!controlsLocked_ && inputLeft_ && !inputRight_) {
         mainPlayerSpeedX_ -= 0.2F;
         if (mainPlayerSpeedX_ > 0.0F)
@@ -378,6 +454,10 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
             mainPlayerSpeedX_ = 0.0F;
     }
 
+    if (inputFire_ && !mainPlayerGrounded_ && !mainShotDelayed_ &&
+        !mainJumpShootLocked_)
+        fireMainGun(instance);
+
     if (!moveMainPlayerAxis(mainPlayerSpeedX_, true))
         mainPlayerSpeedX_ = 0.0F;
     mainPlayerGrounded_ = false;
@@ -386,8 +466,12 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         mainPlayerSpeedY_ = 0.0F;
     }
 
-    mainPlayerSpriteId_ = mainPlayerGrounded_ ? 31 : 37;
+    mainPlayerSpriteId_ = mainPlayerGrounded_ ? 31
+                                              : (mainAirborneShot_ ? 3 : 37);
     if (mainPlayerGrounded_) {
+        mainPlayerImageIndex_ = 0.0F;
+        mainAirborneShot_ = false;
+    } else if (mainAirborneShot_) {
         mainPlayerImageIndex_ = 0.0F;
     } else if (mainPlayerSpeedY_ < 0.0F) {
         mainPlayerImageIndex_ = std::abs(mainPlayerSpeedY_) >= 2.0F ? 0.0F : 1.0F;
@@ -560,6 +644,14 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainPlayerFacing_ = 1;
                 mainPlayerSpriteId_ = 37;
                 mainPlayerImageIndex_ = 2.0F;
+                mainJumpShootLocked_ = inputFire_;
+                mainShotDelayed_ = true;
+                mainAirborneShot_ = false;
+                mainAmmo_ = 8;
+                mainShootLeg_ = -1;
+                mainShotsFired_ = 0;
+                mainBulletCount_ = 0;
+                instance->alarms.set(2, 30);
             }
             // scrPlayerInit's full state comes later. These are the two
             // instance_create calls made directly by the recovered event.
@@ -576,6 +668,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             if (instance->roomId == mainRoomId)
                 updateMainPlayer(*instance);
         }
+        return;
+    case 845: // gml_Object_objPlayer_n_Alarm_2
+        ++implementedCodeCalls_;
+        mainShotDelayed_ = false;
         return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;
@@ -892,7 +988,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(13); // Startup-state digest schema.
+    digest.addU32(14); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -955,6 +1051,17 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainPlayerFacing_);
     digest.addI32(mainPlayerSpriteId_);
     digest.addF32(mainPlayerImageIndex_);
+    digest.addBool(mainJumpShootLocked_);
+    digest.addBool(mainShotDelayed_);
+    digest.addBool(mainAirborneShot_);
+    digest.addI32(mainAmmo_);
+    digest.addI32(mainShootLeg_);
+    digest.addU32(mainShotsFired_);
+    digest.addU32(static_cast<std::uint32_t>(mainBulletCount_));
+    for (std::size_t index = 0; index < mainBulletCount_; ++index) {
+        digest.addF32(mainBullets_[index].x);
+        digest.addF32(mainBullets_[index].y);
+    }
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);

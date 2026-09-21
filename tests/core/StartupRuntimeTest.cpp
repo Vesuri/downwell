@@ -286,6 +286,27 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             runtime.step(fallRight, false);
         require(runtime.mainPlayerX() < 285.0F,
                 "the recovered player mask cannot cross the shaft wall mask");
+        downwell::Input fireMain;
+        fireMain.fire = true;
+        runtime.step(fireMain, true);
+        require(runtime.mainAmmo() == 7 && runtime.mainShotsFired() == 1,
+                "fire consumes one default machine-gun charge");
+        require(runtime.mainPlayerSpeedY() == 0.0F &&
+                    runtime.mainPlayerSpriteId() == 3,
+                "default recoil arrests the fall and selects the shoot sprite");
+        require(runtime.mainBulletCount() == 1,
+                "the first gunboot shot creates a visible bullet");
+        const float firstBulletY = runtime.mainBulletAt(0).y;
+        for (int tick = 0; tick < 6; ++tick)
+            runtime.step(fireMain, false);
+        require(runtime.mainShotsFired() == 1,
+                "held fire waits for the recovered seven-tick rate");
+        require(runtime.mainBulletCount() == 1 &&
+                    runtime.mainBulletAt(0).y > firstBulletY,
+                "the machine-gun bullet travels downward each tick");
+        runtime.step(fireMain, false);
+        require(runtime.mainAmmo() == 6 && runtime.mainShotsFired() == 2,
+                "held fire repeats when Alarm 2 clears the shot delay");
     }
 }
 

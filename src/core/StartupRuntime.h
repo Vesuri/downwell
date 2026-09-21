@@ -4,6 +4,7 @@
 #include "InstanceStore.h"
 #include "DeferredInstanceQueue.h"
 #include "Input.h"
+#include <array>
 #include <cstdint>
 
 namespace downwell {
@@ -21,7 +22,13 @@ enum class PlatformProfile {
 // separate from presentation so its tick behavior can be tested exactly.
 class StartupRuntime {
 public:
+    struct MainBulletState {
+        float x = 0.0F;
+        float y = 0.0F;
+    };
+
     static constexpr std::size_t instanceCapacity = 256;
+    static constexpr std::size_t mainBulletCapacity = 16;
     static constexpr int entryRoomId = 7;
     static constexpr int playMenuRoomId = 8;
     static constexpr int mainRoomId = 11;
@@ -108,6 +115,12 @@ public:
     float mainPlayerImageIndex() const { return mainPlayerImageIndex_; }
     float mainCameraViewX() const { return mainCameraX_ - surfaceWidth / 2.0F; }
     float mainCameraViewY() const { return mainCameraY_ - surfaceHeight / 2.0F; }
+    int mainAmmo() const { return mainAmmo_; }
+    std::uint32_t mainShotsFired() const { return mainShotsFired_; }
+    std::size_t mainBulletCount() const { return mainBulletCount_; }
+    const MainBulletState& mainBulletAt(std::size_t index) const {
+        return mainBullets_[index];
+    }
     std::uint64_t stateDigest() const;
 
 private:
@@ -115,13 +128,17 @@ private:
     void initRoomCreate();
     void initRoomAlarm0();
     void initRoomEndStep(bool advancePressed);
-    void stepInternal(bool advancePressed, bool left, bool right, bool anyInput);
+    void stepInternal(bool advancePressed, bool left, bool right, bool fire,
+                      bool anyInput);
     void updateMenuPlayer(InstanceRecord& instance);
     void updateMenuCamera();
     void updateMainPlayer(InstanceRecord& instance);
     void updateMainCamera(InstanceRecord& instance);
     bool mainPlayerCollides(float x, float y) const;
     bool moveMainPlayerAxis(float amount, bool horizontal);
+    void fireMainGun(InstanceRecord& instance);
+    void updateMainBullets();
+    bool mainBulletCollides(float x, float y) const;
     void dispatchInstancePhase(InstanceRecord& instance,
                                RoomInstancePhase phase);
     bool dispatchObjectEvent(InstanceRecord& instance,
@@ -167,6 +184,8 @@ private:
     bool inputRight_ = false;
     bool inputLeftPressed_ = false;
     bool inputRightPressed_ = false;
+    bool inputFire_ = false;
+    bool inputFireReleased_ = false;
     bool anyInput_ = false;
     bool menuPlayerInitialized_ = false;
     bool menuPlayerNapping_ = false;
@@ -212,6 +231,14 @@ private:
     int mainPlayerFacing_ = 1;
     int mainPlayerSpriteId_ = 37;
     float mainPlayerImageIndex_ = 2.0F;
+    bool mainJumpShootLocked_ = false;
+    bool mainShotDelayed_ = true;
+    bool mainAirborneShot_ = false;
+    int mainAmmo_ = 8;
+    int mainShootLeg_ = -1;
+    std::uint32_t mainShotsFired_ = 0;
+    std::array<MainBulletState, mainBulletCapacity> mainBullets_{};
+    std::size_t mainBulletCount_ = 0;
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
     float mainCameraY_ = 176.0F;
