@@ -12,6 +12,7 @@ LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
 	src/core/Game.cpp \
+	src/core/FontPack.cpp \
 	src/core/ObjectPack.cpp \
 	src/core/Replay.cpp \
 	src/core/RoomPack.cpp \
@@ -41,11 +42,13 @@ OBJECT_PACK_TEST_TARGET := build/object-pack-test
 OBJECT_PACK_TEST_SOURCES := tests/core/ObjectPackTest.cpp src/core/ObjectPack.cpp
 SPRITE_PACK_TEST_TARGET := build/sprite-pack-test
 SPRITE_PACK_TEST_SOURCES := tests/core/SpritePackTest.cpp src/core/SpritePack.cpp
+FONT_PACK_TEST_TARGET := build/font-pack-test
+FONT_PACK_TEST_SOURCES := tests/core/FontPackTest.cpp src/core/FontPack.cpp
 DEFERRED_INSTANCE_TEST_TARGET := build/deferred-instance-queue-test
 DEFERRED_INSTANCE_TEST_SOURCES := tests/core/DeferredInstanceQueueTest.cpp src/core/ObjectPack.cpp
-TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET)
+TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(FONT_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET)
 
-.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack verify-native-data amiga clean
+.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack verify-native-data amiga clean
 
 all: $(TARGET)
 
@@ -57,7 +60,7 @@ build/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-run: generate-room-pack generate-object-pack generate-sprite-pack $(TARGET)
+run: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack $(TARGET)
 	./$(TARGET)
 
 $(STARTUP_TEST_TARGET): $(STARTUP_TEST_SOURCES)
@@ -96,11 +99,15 @@ $(SPRITE_PACK_TEST_TARGET): $(SPRITE_PACK_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(SPRITE_PACK_TEST_SOURCES)
 
+$(FONT_PACK_TEST_TARGET): $(FONT_PACK_TEST_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(FONT_PACK_TEST_SOURCES)
+
 $(DEFERRED_INSTANCE_TEST_TARGET): $(DEFERRED_INSTANCE_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(DEFERRED_INSTANCE_TEST_SOURCES)
 
-test: $(TEST_TARGETS)
+test: generate-font-pack $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET)
 	./$(REPLAY_TEST_TARGET)
 	./$(ALARM_TEST_TARGET)
@@ -110,6 +117,7 @@ test: $(TEST_TARGETS)
 	./$(ROOM_PACK_TEST_TARGET)
 	./$(OBJECT_PACK_TEST_TARGET)
 	./$(SPRITE_PACK_TEST_TARGET)
+	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
 	./$(DEFERRED_INSTANCE_TEST_TARGET)
 
 extract:
@@ -140,6 +148,13 @@ generate-sprite-pack:
 verify-sprite-pack: $(SPRITE_PACK_TEST_TARGET)
 	tools/generate-sprite-pack.py --check
 	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp
+
+generate-font-pack:
+	tools/generate-font-pack.py
+
+verify-font-pack: $(FONT_PACK_TEST_TARGET)
+	tools/generate-font-pack.py --check
+	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
 
 verify-native-data: generate-room-pack generate-object-pack $(STARTUP_TEST_TARGET)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob

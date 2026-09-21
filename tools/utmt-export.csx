@@ -287,7 +287,22 @@ var manifest = new
             scaleX = x.ScaleX,
             scaleY = x.ScaleY,
             texturePageItemId = Data.TexturePageItems.IndexOf(x.Texture),
-            glyphCount = x.Glyphs.Count
+            glyphCount = x.Glyphs.Count,
+            glyphs = x.Glyphs.Select(g => new
+            {
+                character = g.Character,
+                sourceX = g.SourceX,
+                sourceY = g.SourceY,
+                sourceWidth = g.SourceWidth,
+                sourceHeight = g.SourceHeight,
+                shift = g.Shift,
+                offset = g.Offset,
+                kernings = g.Kerning.Select(k => new
+                {
+                    character = k.Character,
+                    shiftModifier = k.ShiftModifier
+                }).ToArray()
+            }).ToArray()
         }).ToArray(),
         extensions = Data.Extensions.Select((x, id) => new { id, name = x.Name?.Content }).ToArray(),
         texturePageItems,
