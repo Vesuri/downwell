@@ -42,3 +42,9 @@ targetX, targetY, targetWidth, targetHeight, boundingWidth, boundingHeight`
 
 Source fields select pixels from an atlas. Target and bounding fields rebuild
 trimmed frames at their original logical size.
+
+`src/core/SpritePack` decodes fields without native structure casts and
+validates all sprite frame slices, frame-to-page-item references, page IDs, and
+resource-table IDs. The full-pack test pins `sprDitherFade` (sprite 733) to 12
+frames and frame zero to page item 2469 at atlas-page-1 rectangle
+`382,1640 8x8`.
