@@ -49,6 +49,9 @@ void StartupRuntime::reset(PlatformProfile profile) {
     menuPlayerX_ = 112.0F;
     menuPlayerY_ = 512.0F;
     menuPlayerSpeedX_ = 0.0F;
+    menuPlayerSpeedY_ = 0.0F;
+    menuPlayerGrounded_ = true;
+    menuPlayerGoalStop_ = false;
     menuPlayerFacing_ = 1;
     menuPlayerSpriteId_ = 31;
     menuPlayerImageIndex_ = 0.0F;
@@ -58,6 +61,8 @@ void StartupRuntime::reset(PlatformProfile profile) {
     menuTitleFirstBoot_ = false;
     menuTitleReady_ = false;
     menuTitleStartY_ = 432.0F;
+    menuTeleportActive_ = false;
+    menuTeleportSequenceStarted_ = false;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -177,18 +182,24 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
             menuPlayerSpriteId_ = 31; // sprPlayerIdle
             menuPlayerImageIndex_ = 0.0F;
             menuPlayerImageSpeed_ = 0.1F;
+            menuPlayerGrounded_ = true;
+            menuPlayerSpeedY_ = 0.0F;
         }
     } else {
+        if (menuPlayerGoalStop_) {
+            menuPlayerSpeedX_ = 0.0F;
+            menuPlayerSpeedY_ = 0.0F;
+        }
         if (controlsLocked_ || (inputLeft_ && inputRight_)) {
             menuPlayerSpeedX_ = 0.0F;
-        } else if (inputLeft_) {
+        } else if (!menuPlayerGoalStop_ && inputLeft_) {
             menuPlayerSpeedX_ -= 0.2F;
             if (menuPlayerSpeedX_ > 0.0F)
                 menuPlayerSpeedX_ -= 2.0F;
             if (menuPlayerSpeedX_ < -2.0F)
                 menuPlayerSpeedX_ = -2.0F;
             menuPlayerFacing_ = -1;
-        } else if (inputRight_) {
+        } else if (!menuPlayerGoalStop_ && inputRight_) {
             menuPlayerSpeedX_ += 0.2F;
             if (menuPlayerSpeedX_ < 0.0F)
                 menuPlayerSpeedX_ += 2.0F;
@@ -203,16 +214,59 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
                                     ? menuPlayerSpeedX_ + 0.4F : 0.0F;
         }
 
-        menuPlayerX_ += menuPlayerSpeedX_;
+        if (!menuPlayerGoalStop_)
+            menuPlayerX_ += menuPlayerSpeedX_;
         if (menuPlayerX_ < 16.0F)
             menuPlayerX_ = 16.0F;
         if (menuPlayerX_ > 400.0F)
             menuPlayerX_ = 400.0F;
-        menuPlayerSpriteId_ = menuPlayerSpeedX_ == 0.0F ? 31 : 27;
-        menuPlayerImageSpeed_ = menuPlayerSpeedX_ == 0.0F ? 0.1F : 0.3F;
+        const bool overWell = menuPlayerX_ >= 300.0F && menuPlayerX_ <= 356.0F;
+        if (menuPlayerGrounded_ && overWell)
+            menuPlayerGrounded_ = false;
+        if (!menuPlayerGrounded_ && !menuPlayerGoalStop_) {
+            menuPlayerSpeedY_ += 0.2F;
+            if (menuPlayerSpeedY_ > 7.0F)
+                menuPlayerSpeedY_ = 7.0F;
+            menuPlayerY_ += menuPlayerSpeedY_;
+            if (menuPlayerY_ > 512.0F) {
+                if (menuPlayerX_ < 300.0F) {
+                    menuPlayerX_ = 300.0F;
+                } else if (menuPlayerX_ > 356.0F) {
+                    menuPlayerX_ = 356.0F;
+                }
+            }
+        } else if (menuPlayerGrounded_) {
+            menuPlayerY_ = 512.0F;
+            menuPlayerSpeedY_ = 0.0F;
+        }
+
+        if (!menuPlayerGrounded_) {
+            menuPlayerSpriteId_ = 37; // sprPlayerAir
+            menuPlayerImageSpeed_ = 0.0F;
+            if (menuPlayerSpeedY_ < 1.0F)
+                menuPlayerImageIndex_ = 2.0F;
+            else if (menuPlayerSpeedY_ < 2.0F)
+                menuPlayerImageIndex_ = 3.0F;
+            else
+                menuPlayerImageIndex_ = 4.0F;
+        } else {
+            menuPlayerSpriteId_ = menuPlayerSpeedX_ == 0.0F ? 31 : 27;
+            menuPlayerImageSpeed_ = menuPlayerSpeedX_ == 0.0F ? 0.1F : 0.3F;
+        }
+
+        // objTeleportMain's 160x32 touch area spans the bottom of the shaft.
+        if (!menuTeleportActive_ && menuPlayerY_ >= 625.0F &&
+            menuPlayerX_ >= 240.0F && menuPlayerX_ <= 400.0F) {
+            menuTeleportActive_ = true;
+            menuPlayerGoalStop_ = true;
+            controlsLocked_ = true;
+            menuPlayerSpeedX_ = 0.0F;
+            menuPlayerSpeedY_ = 0.0F;
+        }
     }
 
-    menuPlayerImageIndex_ += menuPlayerImageSpeed_;
+    if (menuPlayerImageSpeed_ > 0.0F)
+        menuPlayerImageIndex_ += menuPlayerImageSpeed_;
     instance.x = static_cast<std::int32_t>(std::round(menuPlayerX_));
     instance.y = static_cast<std::int32_t>(std::round(menuPlayerY_));
     instance.imageIndex = menuPlayerImageIndex_;
@@ -222,15 +276,20 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
 void StartupRuntime::updateMenuCamera() {
     if (!menuPlayerInitialized_)
         return;
-    float targetX = menuPlayerX_;
-    if (menuPlayerSpeedX_ != 0.0F)
+    const bool inCameraLocker = menuPlayerX_ >= 238.0F &&
+                                menuPlayerX_ <= 418.0F &&
+                                menuPlayerY_ >= 248.0F &&
+                                menuPlayerY_ <= 648.0F;
+    float targetX = inCameraLocker ? 328.0F : menuPlayerX_;
+    if (!inCameraLocker && menuPlayerSpeedX_ != 0.0F)
         targetX += 16.0F * menuPlayerFacing_;
     if (targetX < 80.0F)
         targetX = 80.0F;
     if (targetX > 336.0F)
         targetX = 336.0F;
-    const float targetY = menuPlayerY_ - 32.0F;
-    menuCameraX_ += (targetX - menuCameraX_) / 10.0F;
+    const float targetY = inCameraLocker ? 448.0F : menuPlayerY_ - 32.0F;
+    menuCameraX_ += (targetX - menuCameraX_) /
+                    (inCameraLocker ? 15.0F : 10.0F);
     menuCameraY_ += (targetY - menuCameraY_) / 5.0F;
     if (menuCameraY_ < 142.0F)
         menuCameraY_ = 142.0F;
@@ -354,6 +413,19 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 869: // gml_Object_objControlerN_Create_0
         ++implementedCodeCalls_;
         controllerCreate(profile_);
+        return;
+    case 2435: // gml_Object_objTeleportMain_Create_0
+        ++implementedCodeCalls_;
+        menuTeleportActive_ = false;
+        menuTeleportSequenceStarted_ = false;
+        return;
+    case 2438: // gml_Object_objTeleportMain_Step_1
+        ++implementedCodeCalls_;
+        if (instance != nullptr && menuTeleportActive_ && menuTitleReady_ &&
+            !menuTeleportSequenceStarted_) {
+            instance->alarms.set(1, 30);
+            menuTeleportSequenceStarted_ = true;
+        }
         return;
     case 997: // gml_Object_camMain_Create_0 (ground-room subset)
         ++implementedCodeCalls_;
@@ -548,7 +620,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(9); // Startup-state digest schema.
+    digest.addU32(10); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -572,6 +644,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addF32(menuPlayerX_);
     digest.addF32(menuPlayerY_);
     digest.addF32(menuPlayerSpeedX_);
+    digest.addF32(menuPlayerSpeedY_);
+    digest.addBool(menuPlayerGrounded_);
+    digest.addBool(menuPlayerGoalStop_);
     digest.addI32(menuPlayerFacing_);
     digest.addI32(menuPlayerSpriteId_);
     digest.addF32(menuPlayerImageIndex_);
@@ -581,6 +656,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(menuTitleFirstBoot_);
     digest.addBool(menuTitleReady_);
     digest.addF32(menuTitleStartY_);
+    digest.addBool(menuTeleportActive_);
+    digest.addBool(menuTeleportSequenceStarted_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

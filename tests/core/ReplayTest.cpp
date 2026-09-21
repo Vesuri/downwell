@@ -93,7 +93,7 @@ void testReplayProducesStableStartupState() {
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
     const std::uint64_t digest = runtime.stateDigest();
-    require(digest == 0xe6342cfa8621151bULL,
+    require(digest == 0xe5cb65421ff7eb81ULL,
             "startup state digest remains wire-stable");
 }
 

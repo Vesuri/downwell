@@ -203,6 +203,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(title != nullptr && title->imageIndex == 9.0F &&
                     title->imageSpeed == 0.0F,
                 "title reveal reaches and holds its final recovered frame");
+        require(!runtime.menuPlayerGrounded() && runtime.menuPlayerY() >= 625.0F,
+                "player falls through the recovered 64-pixel well opening");
+        require(runtime.menuTeleportActive(),
+                "touching the shaft trigger activates objTeleportMain");
         for (int tick = 0; tick < 76; ++tick)
             runtime.step(wake, false);
         require(runtime.menuTitleReady(),

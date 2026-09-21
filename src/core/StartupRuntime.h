@@ -77,9 +77,12 @@ public:
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }
     int menuPlayerFacing() const { return menuPlayerFacing_; }
     float menuPlayerX() const { return menuPlayerX_; }
+    float menuPlayerY() const { return menuPlayerY_; }
+    bool menuPlayerGrounded() const { return menuPlayerGrounded_; }
     float menuCameraViewX() const { return menuCameraX_ - surfaceWidth / 2.0F; }
     float menuCameraViewY() const { return menuCameraY_ - surfaceHeight / 2.0F; }
     bool menuTitleReady() const { return menuTitleReady_; }
+    bool menuTeleportActive() const { return menuTeleportActive_; }
     std::uint64_t stateDigest() const;
 
 private:
@@ -139,6 +142,9 @@ private:
     float menuPlayerX_ = 112.0F;
     float menuPlayerY_ = 512.0F;
     float menuPlayerSpeedX_ = 0.0F;
+    float menuPlayerSpeedY_ = 0.0F;
+    bool menuPlayerGrounded_ = true;
+    bool menuPlayerGoalStop_ = false;
     int menuPlayerFacing_ = 1;
     int menuPlayerSpriteId_ = 31;
     float menuPlayerImageIndex_ = 0.0F;
@@ -148,6 +154,8 @@ private:
     bool menuTitleFirstBoot_ = false;
     bool menuTitleReady_ = false;
     float menuTitleStartY_ = 432.0F;
+    bool menuTeleportActive_ = false;
+    bool menuTeleportSequenceStarted_ = false;
 };
 
 } // namespace downwell
