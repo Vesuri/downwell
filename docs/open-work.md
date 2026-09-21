@@ -63,6 +63,8 @@
   jump-height release, then unlock gunboot fire on the next airborne press.
 - [x] Extend the native builder pack with all ten recovered 19-cell-wide
   area-one right-room layouts and their special doorway/object symbols.
+- [x] Substitute recovered right rooms at their scheduled generation counts,
+  preserving no-repeat selection, mirroring, row overlap, and RNG order.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

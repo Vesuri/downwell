@@ -126,6 +126,8 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderLastMainPattern_ = -1;
     mainBuilderMainPatternsGenerated_ = 0;
     mainBuilderSpawnerMade_ = false;
+    mainBuilderLastRightPattern_ = -1;
+    mainBuilderSideRoomsGenerated_ = 0;
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
@@ -702,7 +704,9 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             }
             if (row + 1 < pattern.rowCount) {
                 random_.random(3.0); // builderCavern sees the row newline.
-                const int firstX = reversed ? 160 : 320;
+                const int firstX = pattern.width == 19
+                                       ? (reversed ? 0 : 480)
+                                       : (reversed ? 160 : 320);
                 const int secondX = reversed ? 320 : 160;
                 if (!enqueueObject(60, firstX, rowY) ||
                     !enqueueObject(60, secondX, rowY))
@@ -753,22 +757,41 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             }
             mainBuilderSpawnerMade_ = true;
         }
+        const bool scheduledSideRoom =
+            mainBuilderGenerationCount_ == mainBuilderRightRooms_[0] ||
+            mainBuilderGenerationCount_ == mainBuilderRightRooms_[1];
         std::uint16_t selected = 0;
-        do {
-            selected = static_cast<std::uint16_t>(random_.irandom(40));
-        } while (selected == mainBuilderLastMainPattern_);
-        if (!builderPatternPack_->findPattern(
-                BuilderPatternFamily::areaOneMain, selected, pattern)) {
-            deferredCommandsSucceeded_ = false;
-            return;
+        if (scheduledSideRoom) {
+            do {
+                selected = static_cast<std::uint16_t>(random_.irandom(9));
+            } while (selected == mainBuilderLastRightPattern_);
+            if (!builderPatternPack_->findPattern(
+                    BuilderPatternFamily::areaOneRight, selected, pattern)) {
+                deferredCommandsSucceeded_ = false;
+                return;
+            }
+        } else {
+            do {
+                selected = static_cast<std::uint16_t>(random_.irandom(40));
+            } while (selected == mainBuilderLastMainPattern_);
+            if (!builderPatternPack_->findPattern(
+                    BuilderPatternFamily::areaOneMain, selected, pattern)) {
+                deferredCommandsSucceeded_ = false;
+                return;
+            }
         }
         const bool reversed = random_.irandom(1) != 0;
         if (!emitPattern(pattern, reversed, true, advancedRows)) {
             deferredCommandsSucceeded_ = false;
             return;
         }
-        mainBuilderLastMainPattern_ = selected;
-        ++mainBuilderMainPatternsGenerated_;
+        if (scheduledSideRoom) {
+            mainBuilderLastRightPattern_ = selected;
+            ++mainBuilderSideRoomsGenerated_;
+        } else {
+            mainBuilderLastMainPattern_ = selected;
+            ++mainBuilderMainPatternsGenerated_;
+        }
         ++mainBuilderGenerationCount_;
     }
     mainBuilderY_ = instance.y;
@@ -1078,6 +1101,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderLastMainPattern_ = -1;
             mainBuilderMainPatternsGenerated_ = 0;
             mainBuilderSpawnerMade_ = false;
+            mainBuilderLastRightPattern_ = -1;
+            mainBuilderSideRoomsGenerated_ = 0;
             random_.irandom(2); // choose(2, 2, 3), then overridden to two.
             mainBuilderRightRooms_[0] =
                 3 + static_cast<int>(random_.irandom(12));
@@ -1531,7 +1556,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(23); // Startup-state digest schema.
+    digest.addU32(24); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1629,6 +1654,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainBuilderLastMainPattern_);
     digest.addU32(mainBuilderMainPatternsGenerated_);
     digest.addBool(mainBuilderSpawnerMade_);
+    digest.addI32(mainBuilderLastRightPattern_);
+    digest.addU32(mainBuilderSideRoomsGenerated_);
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);

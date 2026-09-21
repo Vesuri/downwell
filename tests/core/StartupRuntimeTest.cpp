@@ -541,6 +541,23 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainShotsFired() == shotsBeforeJump + 1 &&
                     runtime.mainAmmo() == 7 && runtime.mainBulletCount() == 1,
                 "releasing after the jump unlocks an airborne gunboot shot");
+        runtime.step(releasedMain, false);
+        for (int tick = 0;
+             tick < 1200 && runtime.mainBuilderSideRoomsGenerated() == 0;
+             ++tick) {
+            if (runtime.mainPlayerGrounded()) {
+                runtime.step(fireMain, true);
+                runtime.step(releasedMain, false);
+                runtime.step(fireMain, true);
+            } else {
+                runtime.step(releasedMain, false);
+            }
+        }
+        require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
+                    runtime.mainBuilderLastRightPattern() == 6 &&
+                    runtime.mainBuilderGenerationCount() == 4 &&
+                    runtime.mainBuilderRowsGenerated() == 95,
+                "the first scheduled side room preserves deterministic selection and rows");
     }
 }
 
