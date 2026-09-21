@@ -228,6 +228,36 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         runtime.step(wake, false);
         require(runtime.playMenuCursor() == 1,
                 "a right press advances the recovered style carousel");
+
+        downwell::Input fire;
+        fire.fire = true;
+        runtime.step(fire, true);
+        require(!runtime.playMenuSelected(),
+                "confirming a locked style has no effect");
+        downwell::Input left;
+        left.left = true;
+        runtime.step(left, false);
+        require(runtime.playMenuCursor() == 0,
+                "a left press returns to the unlocked default style");
+        runtime.step(released, false);
+        runtime.step(fire, true);
+        require(runtime.playMenuSelected() && runtime.playStyle() == 0,
+                "fire confirms and stores the unlocked style");
+        require(runtime.playMenuPlayerDescent() > 0.0F &&
+                    runtime.playMenuVerticalDitherY() == -310.0F,
+                "confirmation starts the recovered falling dither transition");
+        for (int tick = 0; tick < 63; ++tick)
+            runtime.step(released, false);
+        require(runtime.inPlayMenu() &&
+                    runtime.playMenuVerticalDitherY() == 320.0F,
+                "the vertical dither takes exactly 64 frames to cross");
+        runtime.step(released, false);
+        require(runtime.inMainRoom(),
+                "the next frame enters the recovered rmMain room");
+        require(runtime.roomLoadSucceeded(),
+                "rmMain fits and loads from the recovered room pack");
+        require(runtime.hasInstance(100855),
+                "rmMain creates its authoritative player instance");
     }
 }
 

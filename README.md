@@ -46,10 +46,12 @@ application-surface size and now draws the recovered `sprPlayerIdle` frame
 directly from its original texture atlas in the diagnostic menu view. Placement
 remains centered until the recovered camera-spawn/follow behavior is translated.
 
-Space or Z advances the splash sequence, and Escape quits. `make test` checks
-the automatic 731-tick desktop transition, input-driven skipping, the
-non-desktop path, key recovered initialization state, alarms, instance
-lifecycle, event phases, replay validation, and the state oracle without SDL.
+Space or Z advances the splash sequence and confirms the unlocked style; the
+recovered falling-dither transition then enters `rmMain`. Escape quits.
+`make test` checks the automatic 731-tick desktop transition, input-driven
+skipping, the non-desktop path, key recovered initialization state, alarms,
+instance lifecycle, event phases, replay validation, and the state oracle
+without SDL.
 Room-entry tests also pin serialized creation order, persistence, lifecycle
 phases, and atomic failure behavior.
 

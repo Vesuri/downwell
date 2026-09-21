@@ -76,6 +76,11 @@ void StartupRuntime::reset(PlatformProfile profile) {
     playMenuRunFrame_ = 0.0F;
     playMenuSmoothX_ = 0.0F;
     playMenuCursor_ = 0;
+    playMenuSelected_ = false;
+    playStyle_ = 0;
+    playMenuPlayerDescent_ = 0.0F;
+    playMenuPlayerSpeedY_ = 0.0F;
+    playMenuVerticalDitherY_ = -320.0F;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -458,12 +463,16 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 967: // gml_Object_PlayMenu_Create_0 (no-save default)
         ++implementedCodeCalls_;
-        playMenuCursor_ = 0;
+        playMenuCursor_ = playStyle_;
         playMenuYOffset_ = -128.0F;
         playMenuTileY_ = 0.0F;
         playMenuDitherY_ = 80.0F;
         playMenuRunFrame_ = 0.0F;
         playMenuSmoothX_ = 0.0F;
+        playMenuSelected_ = false;
+        playMenuPlayerDescent_ = 0.0F;
+        playMenuPlayerSpeedY_ = 0.0F;
+        playMenuVerticalDitherY_ = -320.0F;
         return;
     case 968: // gml_Object_PlayMenu_Step_1 plus deterministic Draw state
         ++implementedCodeCalls_;
@@ -475,16 +484,32 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         if (playMenuTileY_ <= -16.0F)
             playMenuTileY_ += 16.0F;
         playMenuDitherY_ += 16.0F;
-        if (playMenuYOffset_ == 0.0F) {
+        if (playMenuYOffset_ == 0.0F && !playMenuSelected_) {
             if (inputRightPressed_ && playMenuCursor_ < 4)
                 ++playMenuCursor_;
             if (inputLeftPressed_ && playMenuCursor_ > 0)
                 --playMenuCursor_;
+            // global.dUp is the edge-triggered Space/gamepad confirm action.
+            // With no save data, only style zero is unlocked.
+            if (advancePressed && playMenuCursor_ == 0) {
+                playStyle_ = playMenuCursor_;
+                playMenuSelected_ = true;
+                ++soundPlayRequests_;
+            }
         }
         playMenuSmoothX_ +=
             (playMenuCursor_ * 48.0F - playMenuSmoothX_) / 5.0F;
         if (std::abs(playMenuCursor_ * 48.0F - playMenuSmoothX_) < 1.0F)
             playMenuSmoothX_ = playMenuCursor_ * 48.0F;
+        if (playMenuSelected_) {
+            playMenuPlayerSpeedY_ += 0.05F;
+            playMenuPlayerDescent_ += playMenuPlayerSpeedY_;
+            if (playMenuVerticalDitherY_ < 320.0F) {
+                playMenuVerticalDitherY_ += 10.0F;
+            } else {
+                gotoRoom(mainRoomId);
+            }
+        }
         return;
     case 1014: // gml_Object_EnterSequence_Create_0
         ++implementedCodeCalls_;
@@ -706,7 +731,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(11); // Startup-state digest schema.
+    digest.addU32(12); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -755,6 +780,11 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addF32(playMenuRunFrame_);
     digest.addF32(playMenuSmoothX_);
     digest.addI32(playMenuCursor_);
+    digest.addBool(playMenuSelected_);
+    digest.addI32(playStyle_);
+    digest.addF32(playMenuPlayerDescent_);
+    digest.addF32(playMenuPlayerSpeedY_);
+    digest.addF32(playMenuVerticalDitherY_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

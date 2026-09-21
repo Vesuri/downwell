@@ -110,57 +110,70 @@ void Game::renderPlayMenu(Renderer& renderer) const {
     const float smoothX = startup_.playMenuSmoothX();
     constexpr std::int32_t styleRuns[] = {27, 25, 26, 28, 29};
 
-    for (int style = 0; style < 5; ++style) {
-        const float drawX = 80.0F + style * 48.0F - smoothX;
-        const float distance = drawX - 80.0F;
-        const float drawY = centerY - 14.0F - distance * distance / 200.0F;
-        // Only the default style is unlocked in the no-save reference state.
-        const std::int32_t sprite = style == 0 ? styleRuns[style] : 43;
-        const std::uint32_t frame = style == startup_.playMenuCursor()
-                                        ? static_cast<std::uint32_t>(
-                                              startup_.playMenuRunFrame())
-                                        : 0U;
-        renderer.drawSpriteTransformed(sprite, frame, drawX, drawY,
-                                       1.0F, 1.0F, 0.0F);
-    }
+    if (!startup_.playMenuSelected()) {
+        for (int style = 0; style < 5; ++style) {
+            const float drawX = 80.0F + style * 48.0F - smoothX;
+            const float distance = drawX - 80.0F;
+            const float drawY = centerY - 14.0F - distance * distance / 200.0F;
+            // Only the default style is unlocked in the no-save reference state.
+            const std::int32_t sprite = style == 0 ? styleRuns[style] : 43;
+            const std::uint32_t frame = style == startup_.playMenuCursor()
+                                            ? static_cast<std::uint32_t>(
+                                                  startup_.playMenuRunFrame())
+                                            : 0U;
+            renderer.drawSpriteTransformed(sprite, frame, drawX, drawY,
+                                           1.0F, 1.0F, 0.0F);
+        }
 
-    const int tileY = static_cast<int>(startup_.playMenuTileY());
-    for (int row = 0; row <= 36; ++row) {
-        renderer.drawSprite(51, 13, 0, tileY + row * 16);
-        renderer.drawSprite(51, 7, 160, tileY + row * 16);
-    }
-    if (startup_.playMenuCursor() < 4)
-        renderer.drawSprite(44, 0, 96, static_cast<int>(centerY - 10.0F));
-    if (startup_.playMenuCursor() > 0)
-        renderer.drawSpriteTransformed(44, 0, 64.0F, centerY - 10.0F,
-                                       -1.0F, 1.0F, 0.0F);
+        const int tileY = static_cast<int>(startup_.playMenuTileY());
+        for (int row = 0; row <= 36; ++row) {
+            renderer.drawSprite(51, 13, 0, tileY + row * 16);
+            renderer.drawSprite(51, 7, 160, tileY + row * 16);
+        }
+        if (startup_.playMenuCursor() < 4)
+            renderer.drawSprite(44, 0, 96, static_cast<int>(centerY - 10.0F));
+        if (startup_.playMenuCursor() > 0)
+            renderer.drawSpriteTransformed(44, 0, 64.0F, centerY - 10.0F,
+                                           -1.0F, 1.0F, 0.0F);
 
-    constexpr const char* styleNames[] = {
-        "USUAL STYLE", "ARM SPIN STYLE", "BOULDER STYLE",
-        "LEVITATE STYLE", "HANDSTAND STYLE"
-    };
-    constexpr const char* styleDescriptions[] = {
-        "standard", "only finds\ngun modules\n\nshops are rare",
-        "starts with\nmore HP\n\nless upgrade\noptions", "floaty",
-        "no upgrades\n\ncheaper\nshop items"
-    };
-    const int cursor = startup_.playMenuCursor();
-    const float titleY = centerY - 70.0F;
-    renderer.drawText(2, "STYLE SELECT", 80.0F, titleY + 1.0F,
-                      {255, 0, 0, 255}, TextAlign::center);
-    renderer.drawText(2, "STYLE SELECT", 80.0F, titleY,
-                      {255, 255, 255, 255}, TextAlign::center);
-    const float textY = centerY + 10.0F;
-    const char* styleName = cursor == 0 ? styleNames[cursor] : "LOCKED!";
-    renderer.drawText(2, styleName, 80.0F, textY + 1.0F,
-                      {255, 0, 0, 255}, TextAlign::center);
-    renderer.drawText(2, styleName, 80.0F, textY,
-                      {255, 255, 255, 255}, TextAlign::center);
-    if (cursor == 0)
-        renderer.drawText(2, styleDescriptions[cursor], 80.0F, textY + 22.0F,
+        constexpr const char* styleNames[] = {
+            "USUAL STYLE", "ARM SPIN STYLE", "BOULDER STYLE",
+            "LEVITATE STYLE", "HANDSTAND STYLE"
+        };
+        constexpr const char* styleDescriptions[] = {
+            "standard", "only finds\ngun modules\n\nshops are rare",
+            "starts with\nmore HP\n\nless upgrade\noptions", "floaty",
+            "no upgrades\n\ncheaper\nshop items"
+        };
+        const int cursor = startup_.playMenuCursor();
+        const float titleY = centerY - 70.0F;
+        renderer.drawText(2, "STYLE SELECT", 80.0F, titleY + 1.0F,
+                          {255, 0, 0, 255}, TextAlign::center);
+        renderer.drawText(2, "STYLE SELECT", 80.0F, titleY,
                           {255, 255, 255, 255}, TextAlign::center);
+        const float textY = centerY + 10.0F;
+        const char* styleName = cursor == 0 ? styleNames[cursor] : "LOCKED!";
+        renderer.drawText(2, styleName, 80.0F, textY + 1.0F,
+                          {255, 0, 0, 255}, TextAlign::center);
+        renderer.drawText(2, styleName, 80.0F, textY,
+                          {255, 255, 255, 255}, TextAlign::center);
+        if (cursor == 0)
+            renderer.drawText(2, styleDescriptions[cursor], 80.0F,
+                              textY + 22.0F, {255, 255, 255, 255},
+                              TextAlign::center);
+    } else {
+        renderer.drawSprite(
+            styleRuns[startup_.playStyle()],
+            static_cast<std::uint32_t>(startup_.playMenuRunFrame()), 80,
+            static_cast<int>(centerY - 14.0F +
+                             startup_.playMenuPlayerDescent()));
+    }
     renderer.drawSprite(129, 0, 80,
                         static_cast<int>(startup_.playMenuDitherY()));
+    if (startup_.playMenuSelected())
+        renderer.drawSprite(128, 0, 80,
+                            static_cast<int>(
+                                startup_.playMenuVerticalDitherY()));
 }
 
 } // namespace downwell

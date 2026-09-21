@@ -24,6 +24,7 @@ public:
     static constexpr std::size_t instanceCapacity = 256;
     static constexpr int entryRoomId = 7;
     static constexpr int playMenuRoomId = 8;
+    static constexpr int mainRoomId = 11;
     static constexpr int menuRoomId = 20;
     static constexpr std::uint32_t controllerInstanceId = 100065;
     static constexpr std::uint32_t initRoomInstanceId = 100066;
@@ -74,6 +75,7 @@ public:
     bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
     bool inMenu() const { return roomId_ == menuRoomId; }
     bool inPlayMenu() const { return roomId_ == playMenuRoomId; }
+    bool inMainRoom() const { return roomId_ == mainRoomId; }
     bool menuPlayerNapping() const { return menuPlayerNapping_; }
     int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }
@@ -93,6 +95,10 @@ public:
     float playMenuRunFrame() const { return playMenuRunFrame_; }
     float playMenuSmoothX() const { return playMenuSmoothX_; }
     int playMenuCursor() const { return playMenuCursor_; }
+    bool playMenuSelected() const { return playMenuSelected_; }
+    int playStyle() const { return playStyle_; }
+    float playMenuPlayerDescent() const { return playMenuPlayerDescent_; }
+    float playMenuVerticalDitherY() const { return playMenuVerticalDitherY_; }
     std::uint64_t stateDigest() const;
 
 private:
@@ -179,6 +185,11 @@ private:
     float playMenuRunFrame_ = 0.0F;
     float playMenuSmoothX_ = 0.0F;
     int playMenuCursor_ = 0;
+    bool playMenuSelected_ = false;
+    int playStyle_ = 0;
+    float playMenuPlayerDescent_ = 0.0F;
+    float playMenuPlayerSpeedY_ = 0.0F;
+    float playMenuVerticalDitherY_ = -320.0F;
 };
 
 } // namespace downwell
