@@ -37,6 +37,7 @@
 - [x] Carry `GEN8.LastObj` in the native room pack and validate its boundary.
 - [x] Add an atomic fixed-capacity deferred instance-creation queue.
 - [x] Apply `rmMenu`'s deferred `ditherFade` creation before Room Start.
+- [x] Translate `ditherFade` PreCreate, Create, and Alarm 0 startup behavior.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.

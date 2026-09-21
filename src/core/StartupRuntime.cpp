@@ -184,7 +184,7 @@ void StartupRuntime::dispatchRoomCreation(std::int32_t roomId) {
         executeCode(nullptr, codeId);
 }
 
-void StartupRuntime::executeCode(InstanceRecord*,
+void StartupRuntime::executeCode(InstanceRecord* instance,
                                  std::int32_t codeId,
                                  bool advancePressed) {
     switch (codeId) {
@@ -222,6 +222,22 @@ void StartupRuntime::executeCode(InstanceRecord*,
     case 869: // gml_Object_objControlerN_Create_0
         ++implementedCodeCalls_;
         controllerCreate(profile_);
+        return;
+    case 2790: // gml_Object_ditherFade_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            instance->imageSpeed = 0.0F;
+            instance->alarms.set(0, 30);
+        }
+        return;
+    case 2791: // gml_Object_ditherFade_Alarm_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.2F;
+        controlsLocked_ = false;
+        return;
+    case 2794: // gml_Object_ditherFade_PreCreate_0 (event_inherited; no parent)
+        ++implementedCodeCalls_;
         return;
     default:
         ++unimplementedCodeCalls_;

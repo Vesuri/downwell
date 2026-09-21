@@ -142,17 +142,26 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     require(player->objectId == 35, "rmMenu player has recovered object ID");
     require(player->roomId == 20, "rmMenu player belongs to recovered room");
     if (objects != nullptr)
-        require(runtime.implementedCodeCalls() == 5,
-                "End Step and rmMenu room code route by recovered code ID");
+        require(runtime.implementedCodeCalls() == 7,
+                "room transition and dither creation route by recovered code ID");
     if (objects != nullptr) {
         const downwell::InstanceRecord* fade = runtime.instance(105186);
         require(fade != nullptr && fade->objectId == 382 && fade->roomId == 20 &&
                     fade->x == 0 && fade->y == 0,
                 "rmMenu creates ditherFade with the authoritative runtime ID");
+        require(fade->imageSpeed == 0.0F && fade->alarms.get(0) == 30,
+                "ditherFade Create freezes animation and arms Alarm 0");
         require(runtime.nextRuntimeInstanceId() == 105187,
                 "runtime allocator advances after deferred creation");
         require(runtime.deferredCommandsSucceeded(),
                 "deferred room-creation commands apply successfully");
+
+        stepMany(runtime, 30);
+        fade = runtime.instance(105186);
+        require(fade != nullptr && fade->imageSpeed == 0.2F,
+                "ditherFade Alarm 0 starts recovered animation speed");
+        require(!runtime.controlsLocked(),
+                "ditherFade Alarm 0 restores player control");
     }
 }
 
