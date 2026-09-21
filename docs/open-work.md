@@ -67,6 +67,9 @@
   preserving no-repeat selection, mirroring, row overlap, and RNG order.
 - [x] Interpret right-room doorway caps, torches, ambience, time fields,
   camera lockers, and alternating gem-chunk/gun-module occupants.
+- [x] Preserve both irregular recovered area-one shop patterns and implement
+  their no-mirroring selection path, while retaining the original 1-1 shop
+  suppression for the default play style.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry

@@ -554,6 +554,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             }
         }
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
+                    runtime.mainBuilderShopsGenerated() == 0 &&
+                    runtime.mainBuilderShopSuppressed() &&
                     runtime.mainBuilderLastRightPattern() == 6 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
                     runtime.mainBuilderRowsGenerated() == 95,

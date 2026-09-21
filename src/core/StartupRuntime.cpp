@@ -128,6 +128,10 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderSpawnerMade_ = false;
     mainBuilderLastRightPattern_ = -1;
     mainBuilderSideRoomsGenerated_ = 0;
+    mainBuilderLastShopPattern_ = -1;
+    mainBuilderShopsGenerated_ = 0;
+    mainBuilderRightRoomsMade_ = 0;
+    mainBuilderShopMade_ = true;
     mainBuilderChunkOrCrate_ = 0;
     mainBuilderSpecialObjectsGenerated_ = 0;
     mainCameraInitialized_ = false;
@@ -682,7 +686,10 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                                  std::uint32_t& advancedRows) {
         for (std::uint16_t row = 0; row < pattern.rowCount; ++row) {
             const int rowY = instance.y + row * 16;
-            for (std::uint16_t column = 0; column < pattern.width; ++column) {
+            std::uint32_t recoveredWidth = 0;
+            if (!builderPatternPack_->rowWidth(pattern, row, recoveredWidth))
+                return false;
+            for (std::uint16_t column = 0; column < recoveredWidth; ++column) {
                 char symbol = 0;
                 if (!builderPatternPack_->cell(pattern, column, row, symbol)) {
                     return false;
@@ -755,7 +762,10 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             }
             if (row + 1 < pattern.rowCount) {
                 random_.random(3.0); // builderCavern sees the row newline.
-                const int firstX = pattern.width == 19
+                const bool sideRoom =
+                    pattern.family == BuilderPatternFamily::areaOneRight ||
+                    pattern.family == BuilderPatternFamily::areaOneShop;
+                const int firstX = sideRoom
                                        ? (reversed ? 0 : 480)
                                        : (reversed ? 160 : 320);
                 const int secondX = reversed ? 320 : 160;
@@ -812,14 +822,30 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             mainBuilderGenerationCount_ == mainBuilderRightRooms_[0] ||
             mainBuilderGenerationCount_ == mainBuilderRightRooms_[1];
         std::uint16_t selected = 0;
+        bool makeShop = false;
         if (scheduledSideRoom) {
-            do {
-                selected = static_cast<std::uint16_t>(random_.irandom(9));
-            } while (selected == mainBuilderLastRightPattern_);
-            if (!builderPatternPack_->findPattern(
-                    BuilderPatternFamily::areaOneRight, selected, pattern)) {
-                deferredCommandsSucceeded_ = false;
-                return;
+            ++mainBuilderRightRoomsMade_;
+            // scrLevelPat1 marks the shop as already made in ordinary 1-1,
+            // deliberately suppressing it during the first playable slice.
+            // Later area-one levels reach this recovered 50/50 choice.
+            if (!mainBuilderShopMade_)
+                makeShop = random_.irandom(1) != 0; // choose(0, 1).
+            if (makeShop) {
+                selected = static_cast<std::uint16_t>(random_.irandom(1));
+                if (!builderPatternPack_->findPattern(
+                        BuilderPatternFamily::areaOneShop, selected, pattern)) {
+                    deferredCommandsSucceeded_ = false;
+                    return;
+                }
+            } else {
+                do {
+                    selected = static_cast<std::uint16_t>(random_.irandom(9));
+                } while (selected == mainBuilderLastRightPattern_);
+                if (!builderPatternPack_->findPattern(
+                        BuilderPatternFamily::areaOneRight, selected, pattern)) {
+                    deferredCommandsSucceeded_ = false;
+                    return;
+                }
             }
         } else {
             do {
@@ -831,14 +857,20 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 return;
             }
         }
-        const bool reversed = random_.irandom(1) != 0;
+        const bool reversed = makeShop ? false : random_.irandom(1) != 0;
         if (!emitPattern(pattern, reversed, true, advancedRows)) {
             deferredCommandsSucceeded_ = false;
             return;
         }
         if (scheduledSideRoom) {
-            mainBuilderLastRightPattern_ = selected;
-            ++mainBuilderSideRoomsGenerated_;
+            if (makeShop) {
+                mainBuilderLastShopPattern_ = selected;
+                ++mainBuilderShopsGenerated_;
+                mainBuilderShopMade_ = true;
+            } else {
+                mainBuilderLastRightPattern_ = selected;
+                ++mainBuilderSideRoomsGenerated_;
+            }
         } else {
             mainBuilderLastMainPattern_ = selected;
             ++mainBuilderMainPatternsGenerated_;
@@ -1154,6 +1186,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderSpawnerMade_ = false;
             mainBuilderLastRightPattern_ = -1;
             mainBuilderSideRoomsGenerated_ = 0;
+            mainBuilderLastShopPattern_ = -1;
+            mainBuilderShopsGenerated_ = 0;
+            mainBuilderRightRoomsMade_ = 0;
+            mainBuilderShopMade_ = true; // area 1, level 1, playStyle != 4.
             mainBuilderChunkOrCrate_ = 0;
             mainBuilderSpecialObjectsGenerated_ = 0;
             random_.irandom(2); // choose(2, 2, 3), then overridden to two.
@@ -1609,7 +1645,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(25); // Startup-state digest schema.
+    digest.addU32(26); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1709,6 +1745,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainBuilderSpawnerMade_);
     digest.addI32(mainBuilderLastRightPattern_);
     digest.addU32(mainBuilderSideRoomsGenerated_);
+    digest.addI32(mainBuilderLastShopPattern_);
+    digest.addU32(mainBuilderShopsGenerated_);
+    digest.addU32(mainBuilderRightRoomsMade_);
+    digest.addBool(mainBuilderShopMade_);
     digest.addI32(mainBuilderChunkOrCrate_);
     digest.addU32(mainBuilderSpecialObjectsGenerated_);
     digest.addBool(mainCameraInitialized_);
