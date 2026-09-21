@@ -161,8 +161,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 runtime.randomDrawCount() == 92,
             "menu creation preserves all recovered shared-stream RNG draws");
     if (objects != nullptr)
-        require(runtime.implementedCodeCalls() == 29,
-                "room transition and RNG-consuming Create events route by code ID");
+        require(runtime.implementedCodeCalls() == 191,
+                "room transition and recovered wall Create events route by code ID");
     if (objects != nullptr) {
         downwell::StartupRuntime edgeEntry(
             downwell::PlatformProfile::nonDesktop, &pack, objects,
@@ -444,15 +444,33 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainPlayerSpriteId() == 31,
                 "landing settles at the recovered block top without sinking");
         bool standingOnEntranceBlock = false;
+        bool foundInitializedBlock = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);
+            if (instance.active && instance.objectId == 92) {
+                require(instance.imageSpeed == 0.0F &&
+                            (instance.imageIndex == 16.0F ||
+                             instance.imageIndex == 17.0F ||
+                             instance.imageIndex == 22.0F),
+                        "generated blocks retain recovered Create presentation state");
+                foundInitializedBlock = true;
+            }
+            if (instance.active && instance.objectId == 93)
+                require(instance.imageSpeed == 0.0F &&
+                            instance.imageIndex == 23.0F,
+                        "generated thin platforms retain their recovered tile frame");
+            if (instance.active && instance.objectId == 289)
+                require(instance.imageSpeed == 0.0F &&
+                            (instance.scaleX == 1.0F || instance.scaleX == -1.0F) &&
+                            instance.imageIndex >= 0.0F && instance.imageIndex <= 16.0F,
+                        "generated scenery retains its recovered random Create state");
             if (instance.active && instance.objectId == 92 &&
                 instance.y == 1216 &&
                 runtime.mainPlayerX() + 3.0F >= instance.x - 8.0F &&
                 runtime.mainPlayerX() - 4.0F <= instance.x + 7.0F)
                 standingOnEntranceBlock = true;
         }
-        require(standingOnEntranceBlock,
+        require(foundInitializedBlock && standingOnEntranceBlock,
                 "grounded state is backed by a generated breakable block");
         require(runtime.mainBuilderMainPatternsGenerated() == 1 &&
                     runtime.mainBuilderLastMainPattern() == 32 &&

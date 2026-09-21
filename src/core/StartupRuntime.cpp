@@ -492,16 +492,55 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
         builderPatternPack_->patternCount() == 0)
         return;
     const auto enqueueObject = [this](std::int32_t objectId, int x, int y) {
+        DeferredCreateInstance command{objectId, x, y};
         if (objectId == 92) {
             // objBox_n Create runs synchronously inside instance_create:
             // break sample, tile variant, and gem chance. rmMain is not a
             // ground room, so a successful gem roll also chooses 18/19.
             random_.irandom(3);
-            random_.irandom(1);
-            if (random_.irandom(50) < 1)
+            command.imageSpeed = 0.0F;
+            command.imageIndex = 16.0F + random_.irandom(1);
+            if (random_.irandom(50) < 1) {
                 random_.irandom(1);
+                command.imageIndex = 22.0F;
+            }
         }
-        return deferredInstances_.enqueueCreate(objectId, x, y);
+        if (objectId == 111)
+            command.imageSpeed = 0.25F;
+        if (objectId == 112) {
+            command.imageSpeed = 0.15F;
+            random_.irandom(1); // walking = choose(1, -1).
+            command.alarms.set(1, 60 + static_cast<int>(random_.irandom(60)));
+        }
+        if (objectId == 113) {
+            command.imageSpeed = 0.0F;
+            command.alarms.set(1,
+                60 + static_cast<int>(random_.random(60.0)));
+        }
+        if (objectId == 116) {
+            command.imageSpeed = 0.2F;
+            random_.random(0.5); // vel = random_range(1, 1.5).
+            random_.irandom(359);
+            command.active = false;
+        }
+        if (objectId == 117) {
+            command.imageSpeed = 0.1F;
+            random_.irandom(1); // ysp = choose(0.1, -0.1).
+            command.alarms.set(1, 60);
+        }
+        if (objectId == 119) {
+            command.imageSpeed = 0.1F;
+            random_.irandom(1); // clockwise = choose(1, -1).
+            command.alarms.set(0, 2);
+        }
+        if (objectId == 289) {
+            command.imageSpeed = 0.0F;
+            command.scaleX = random_.irandom(1) == 0 ? 1.0F : -1.0F;
+            command.imageIndex = static_cast<float>(random_.irandom(15));
+            if (random_.random(300.0) < 1.0)
+                command.imageIndex = 16.0F;
+        }
+        return deferredInstances_.enqueueCreate(command);
     };
     const auto emitPattern = [this, &instance, &enqueueObject](
                                  const PackedBuilderPattern& pattern,
@@ -920,6 +959,61 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 1004: // gml_Object_objBuilder_PreCreate_0 (event_inherited; no parent)
         ++implementedCodeCalls_;
+        return;
+    case 985: // gml_Object_objWall_n_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.0F;
+        return;
+    case 1047: // gml_Object_Spawner_Create_0 / spawnerInit
+        ++implementedCodeCalls_;
+        return;
+    case 1085: // gml_Object_objBox_n_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.0F;
+        return;
+    case 1090: // gml_Object_objThinPlatform_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) {
+            instance->imageIndex = 23.0F;
+            instance->imageSpeed = 0.0F;
+        }
+        return;
+    case 1193: // gml_Object_enmSnake_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.25F;
+        return;
+    case 1198: // gml_Object_enmGroundTurtle_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.15F;
+        return;
+    case 1204: // gml_Object_enmFrog_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.0F;
+        return;
+    case 1230: // gml_Object_enmBat_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.2F;
+        return;
+    case 1237: // gml_Object_enmSnail_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.1F;
+        return;
+    case 1252: // gml_Object_enmCrawler_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.1F;
+        return;
+    case 2385: // gml_Object_Scattered16_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr)
+            instance->imageSpeed = 0.0F;
         return;
     case 865: // gml_Object_objInitRm_Create_0
         ++implementedCodeCalls_;

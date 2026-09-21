@@ -19,9 +19,21 @@ enum class ApplyInstanceCommandsResult {
 };
 
 struct DeferredCreateInstance {
+    DeferredCreateInstance() = default;
+    DeferredCreateInstance(std::int32_t requestedObjectId,
+                           std::int32_t requestedX,
+                           std::int32_t requestedY)
+        : objectId(requestedObjectId), x(requestedX), y(requestedY) {}
+
     std::int32_t objectId;
     std::int32_t x;
     std::int32_t y;
+    float scaleX = 1.0F;
+    float scaleY = 1.0F;
+    float imageSpeed = 1.0F;
+    float imageIndex = 0.0F;
+    bool active = true;
+    AlarmBank alarms;
 };
 
 template <std::size_t CommandCapacity>
@@ -34,13 +46,17 @@ public:
 
     std::size_t size() const { return count_; }
 
-    bool enqueueCreate(std::int32_t objectId, std::int32_t x, std::int32_t y) {
+    bool enqueueCreate(const DeferredCreateInstance& command) {
         if (count_ == CommandCapacity) {
             overflowed_ = true;
             return false;
         }
-        commands_[count_++] = {objectId, x, y};
+        commands_[count_++] = command;
         return true;
+    }
+
+    bool enqueueCreate(std::int32_t objectId, std::int32_t x, std::int32_t y) {
+        return enqueueCreate(DeferredCreateInstance(objectId, x, y));
     }
 
     template <std::size_t InstanceCapacity, typename CreateHandler>
@@ -76,6 +92,12 @@ public:
             InstanceRecord& instance = *instances.find(instanceId);
             instance.x = command.x;
             instance.y = command.y;
+            instance.scaleX = command.scaleX;
+            instance.scaleY = command.scaleY;
+            instance.imageSpeed = command.imageSpeed;
+            instance.imageIndex = command.imageIndex;
+            instance.active = command.active;
+            instance.alarms = command.alarms;
             instance.depth = definition.depth;
             createHandler(instance);
         }

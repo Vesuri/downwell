@@ -57,7 +57,7 @@ std::vector<std::uint8_t> makeObjectPack() {
 void testApplyIsOrderedAndAtomic() {
     const std::vector<std::uint8_t> bytes = makeObjectPack();
     const downwell::ObjectPack objects(bytes.data(), bytes.size());
-    downwell::InstanceStore<3> instances;
+    downwell::InstanceStore<4> instances;
     downwell::DeferredInstanceQueue<2> queue;
     require(queue.enqueueCreate(0, 10, 20), "first create is queued");
     require(queue.enqueueCreate(0, 30, 40), "second create is queued");
@@ -74,12 +74,30 @@ void testApplyIsOrderedAndAtomic() {
                 instances.at(0).persistent,
             "object properties and requested position populate native state");
 
+    downwell::DeferredInstanceQueue<1> configured;
+    downwell::DeferredCreateInstance command{0, 50, 60};
+    command.scaleX = -1.0F;
+    command.imageSpeed = 0.0F;
+    command.imageIndex = 22.0F;
+    command.active = false;
+    command.alarms.set(1, 73);
+    require(configured.enqueueCreate(command),
+            "configured runtime create is queued");
+    require(configured.apply(instances, objects, 20, nextId, onCreate) ==
+                downwell::ApplyInstanceCommandsResult::success,
+            "configured runtime create applies");
+    require(instances.at(2).scaleX == -1.0F &&
+                instances.at(2).imageSpeed == 0.0F &&
+                instances.at(2).imageIndex == 22.0F &&
+                !instances.at(2).active && instances.at(2).alarms.get(1) == 73,
+            "synchronous Create results survive deferred insertion");
+
     downwell::DeferredInstanceQueue<2> invalid;
     invalid.enqueueCreate(7, 0, 0);
     require(invalid.apply(instances, objects, 20, nextId, onCreate) ==
                 downwell::ApplyInstanceCommandsResult::unknownObject,
             "unknown object rejects the complete queue");
-    require(instances.size() == 2 && nextId == 105188,
+    require(instances.size() == 3 && nextId == 105189,
             "failed validation leaves storage and allocator unchanged");
 }
 

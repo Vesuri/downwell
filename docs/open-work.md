@@ -49,6 +49,8 @@
   entrance fragment after the deterministic empty-shaft prelude.
 - [x] Continue into recovered regular area-one fragments with shared row
   overlap, mirroring, boundary walls, padding pillars, and RNG ordering.
+- [x] Preserve generated-object Create results across deferred insertion,
+  including block variants, scenery orientation, enemy alarms, and activation.
 - [x] Preserve synchronous area-one breakable-block Create RNG consumption
   while native instance creation remains deferred.
 - [x] Reach playable `rmMain` and land the native player on solid geometry
