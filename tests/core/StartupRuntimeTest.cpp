@@ -378,6 +378,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "the deterministic first-boot prelude emits all 29 shared rows");
         require(runtime.activeInstanceCount() == instancesBefore + 58,
                 "the complete prelude retains its 58 generated boundary walls");
+        const std::uint64_t drawsBeforeStart = runtime.randomDrawCount();
         for (int tick = 0;
              tick < 120 && runtime.mainBuilderStartPattern() < 0;
              ++tick)
@@ -391,6 +392,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "the complete fragment advances its five shared row intervals");
         require(runtime.activeInstanceCount() == instancesBefore + 78,
                 "the fragment creates its exact walls and breakable blocks");
+        require(runtime.randomDrawCount() == drawsBeforeStart + 83,
+                "box Create RNG ordering includes the reference gem-tile branch");
     }
 }
 

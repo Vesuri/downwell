@@ -515,6 +515,15 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             if (symbol == '-') objectId = 93;
             if (symbol == 'B') objectId = 92;
             if (symbol == '3' && random_.irandom(1) != 0) objectId = 92;
+            if (objectId == 92) {
+                // objBox_n Create runs synchronously inside instance_create:
+                // break sample, tile variant, and gem chance. rmMain is not a
+                // ground room, so a successful gem roll also chooses 18/19.
+                random_.irandom(3);
+                random_.irandom(1);
+                if (random_.irandom(50) < 1)
+                    random_.irandom(1);
+            }
             if (objectId >= 0 &&
                 !deferredInstances_.enqueueCreate(objectId, buildX, rowY)) {
                 deferredCommandsSucceeded_ = false;
