@@ -45,7 +45,9 @@ the automatic 731-tick desktop transition, input-driven skipping, the
 non-desktop path, and key recovered initialization state without SDL.
 
 The cross-target replay and state-comparison contract is documented in
-[docs/replay-format.md](docs/replay-format.md).
+[docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional
+GameMaker behavior is tracked separately in
+[docs/runtime-semantics.md](docs/runtime-semantics.md).
 
 ## GameMaker extraction
 

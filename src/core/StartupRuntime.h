@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_STARTUP_RUNTIME_H
 #define DOWNWELL_CORE_STARTUP_RUNTIME_H
 
+#include "AlarmBank.h"
 #include <cstdint>
 
 namespace downwell {
@@ -28,7 +29,7 @@ public:
     int roomId() const { return roomId_; }
     int roomDestination() const { return roomDestination_; }
     int showSplash() const { return showSplash_; }
-    int alarm0() const { return alarm0_; }
+    int alarm0() const { return alarms_.get(0); }
     int initTimes() const { return initTimes_; }
     int achievementLoginCalls() const { return achievementLoginCalls_; }
     bool controllerPersistent() const { return controllerPersistent_; }
@@ -47,7 +48,7 @@ private:
     int roomId_ = entryRoomId;
     int roomDestination_ = 0;
     int showSplash_ = 0;
-    int alarm0_ = -1;
+    AlarmBank alarms_;
     int initTimes_ = 0;
     int achievementLoginCalls_ = 0;
     int splashSpeed_ = 180;

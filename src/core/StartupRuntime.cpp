@@ -12,7 +12,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     roomId_ = entryRoomId;
     roomDestination_ = 0;
     showSplash_ = 0;
-    alarm0_ = -1;
+    alarms_.reset();
     initTimes_ = 0;
     achievementLoginCalls_ = 0;
     splashSpeed_ = 180;
@@ -45,11 +45,9 @@ void StartupRuntime::step(bool advancePressed) {
     ++tick_;
 
     // GameMaker alarms count down once per step and dispatch on reaching zero.
-    if (alarm0_ > 0) {
-        --alarm0_;
-        if (alarm0_ == 0)
-            initRoomAlarm0();
-    }
+    const AlarmBank::FiredMask firedAlarms = alarms_.advance();
+    if (AlarmBank::fired(firedAlarms, 0))
+        initRoomAlarm0();
 
     if (roomId_ == entryRoomId)
         initRoomEndStep(advancePressed);
@@ -57,11 +55,11 @@ void StartupRuntime::step(bool advancePressed) {
 
 void StartupRuntime::initRoomAlarm0() {
     ++showSplash_;
-    alarm0_ = splashSpeed_;
+    alarms_.set(0, splashSpeed_);
     if (showSplash_ == 4)
-        alarm0_ = 240;
+        alarms_.set(0, 240);
     if (showSplash_ >= 5)
-        alarm0_ = 60;
+        alarms_.set(0, 60);
 }
 
 void StartupRuntime::initRoomEndStep(bool advancePressed) {
@@ -73,7 +71,7 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
         roomDestination_ = menuRoomId;
         roomDestinationSet_ = true;
         if (showSplash_ != 0)
-            alarm0_ = 10;
+            alarms_.set(0, 10);
         else
             gotoRoom(roomDestination_);
     }
@@ -81,7 +79,7 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
     if (showSplash_ != 0) {
         if (advancePressed) {
             ++showSplash_;
-            alarm0_ = 60;
+            alarms_.set(0, 60);
         }
         if (showSplash_ >= 7) {
             showSplash_ = 0;
@@ -92,17 +90,18 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
 
 void StartupRuntime::gotoRoom(int roomId) {
     roomId_ = roomId;
-    alarm0_ = -1;
+    alarms_.set(0, AlarmBank::inactive);
 }
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(1); // Startup-state digest schema.
+    digest.addU32(2); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
     digest.addI32(showSplash_);
-    digest.addI32(alarm0_);
+    for (std::size_t index = 0; index < AlarmBank::count; ++index)
+        digest.addI32(alarms_.get(index));
     digest.addI32(initTimes_);
     digest.addI32(achievementLoginCalls_);
     digest.addI32(splashSpeed_);

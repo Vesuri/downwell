@@ -41,8 +41,9 @@ padding, native booleans, or host-endian memory.
 
 Each state family starts with its own schema number and appends fields in a
 documented fixed order. Changing the field order or meaning requires a schema
-increment and a deliberate golden-digest update. The first startup replay has a
-pinned digest of `01a97da725cd17e3` after 13 ticks and transition to `rmMenu`.
+increment and a deliberate golden-digest update. Startup-state schema 2 includes
+all twelve alarm slots. The first startup replay has a pinned digest of
+`63db3f6728a368b4` after 13 ticks and transition to `rmMenu`.
 
 The current code provides memory encoding/decoding and state comparison. File
 recording/playback in the SDL platform layer will be added once the shared RNG

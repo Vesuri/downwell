@@ -18,6 +18,7 @@
 
 - [x] Implement and test the deterministic `rmInit` to `rmMenu` startup model.
 - [x] Define a portable input-replay wire format and stable state digest.
+- [x] Factor and test the fixed-size GameMaker alarm bank used by startup.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.
