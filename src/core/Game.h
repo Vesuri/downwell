@@ -14,6 +14,8 @@ public:
     static constexpr int logicalHeight = StartupRuntime::surfaceHeight;
     static constexpr int ticksPerSecond = 60;
 
+    explicit Game(const RoomPack* roomPack = nullptr);
+
     void update(const Input& input);
     void render(Renderer& renderer) const;
     bool finished() const { return finished_; }

@@ -37,8 +37,12 @@ make run
 
 The current executable runs a fixed 60 Hz model of the recovered startup path:
 the true `rmInit` entry room, desktop splash timing, and deterministic
-transition to `rmMenu`. It renders an asset-free diagnostic at GameMaker's
-native 160x284 application-surface size; original art is not yet loaded.
+transition to `rmMenu`. `make run` regenerates the native room pack and loads
+the recovered room definitions, so the transition creates all 192 serialized
+`rmMenu` instances alongside the persistent controller. Their object event
+logic is not executed yet. The program renders an asset-free diagnostic at
+GameMaker's native 160x284 application-surface size; original art is not yet
+loaded.
 
 Space or Z advances the splash sequence, and Escape quits. `make test` checks
 the automatic 731-tick desktop transition, input-driven skipping, the
@@ -81,7 +85,8 @@ make verify-room-pack
 
 Its endian-explicit format is documented in
 [docs/room-pack.md](docs/room-pack.md). `make verify-room-pack` checks both
-deterministic generation and the portable C++ decoder against the full pack.
+deterministic generation, the portable C++ decoder, and startup entry into the
+fully populated recovered `rmMenu` state.
 
 ## Amiga toolchain
 

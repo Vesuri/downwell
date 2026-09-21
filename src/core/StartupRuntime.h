@@ -6,6 +6,8 @@
 
 namespace downwell {
 
+class RoomPack;
+
 enum class PlatformProfile {
     desktop,
     nonDesktop
@@ -15,6 +17,7 @@ enum class PlatformProfile {
 // separate from presentation so its tick behavior can be tested exactly.
 class StartupRuntime {
 public:
+    static constexpr std::size_t instanceCapacity = 256;
     static constexpr int entryRoomId = 7;
     static constexpr int menuRoomId = 20;
     static constexpr std::uint32_t controllerInstanceId = 100065;
@@ -22,7 +25,8 @@ public:
     static constexpr int surfaceWidth = 160;
     static constexpr int surfaceHeight = 284;
 
-    explicit StartupRuntime(PlatformProfile profile = PlatformProfile::desktop);
+    explicit StartupRuntime(PlatformProfile profile = PlatformProfile::desktop,
+                            const RoomPack* roomPack = nullptr);
 
     void reset(PlatformProfile profile);
     void step(bool advancePressed);
@@ -39,7 +43,11 @@ public:
     bool hasInstance(std::uint32_t instanceId) const {
         return instances_.find(instanceId) != nullptr;
     }
+    const InstanceRecord* instance(std::uint32_t instanceId) const {
+        return instances_.find(instanceId);
+    }
     bool roomDestinationSet() const { return roomDestinationSet_; }
+    bool roomLoadSucceeded() const { return roomLoadSucceeded_; }
     bool inMenu() const { return roomId_ == menuRoomId; }
     std::uint64_t stateDigest() const;
 
@@ -56,11 +64,13 @@ private:
     int roomId_ = entryRoomId;
     int roomDestination_ = 0;
     int showSplash_ = 0;
-    InstanceStore<2> instances_;
+    InstanceStore<instanceCapacity> instances_;
+    const RoomPack* roomPack_ = nullptr;
     int initTimes_ = 0;
     int achievementLoginCalls_ = 0;
     int splashSpeed_ = 180;
     bool roomDestinationSet_ = false;
+    bool roomLoadSucceeded_ = true;
 };
 
 } // namespace downwell

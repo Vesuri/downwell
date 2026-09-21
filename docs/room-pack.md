@@ -79,3 +79,9 @@ identity, position, scale, rotation, image state, creation-code references,
 persistence, layer ID, and depth into native instance storage. A missing or
 duplicate layer membership rejects the complete room before runtime state is
 changed.
+
+The SDL startup runtime opens the generated pack once and uses this bridge for
+both `rmInit` and the transition to `rmMenu`. The integration test confirms 192
+recovered menu instances plus the persistent controller, including the first
+player instance/object anchor. This milestone instantiates recovered state; it
+does not yet execute the menu objects' recovered event bytecode.

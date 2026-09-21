@@ -1,11 +1,13 @@
 #include "StartupRuntime.h"
 #include "EventScheduler.h"
+#include "PackedRoomLoader.h"
 #include "RoomLoader.h"
 #include "StateDigest.h"
 
 namespace downwell {
 
-StartupRuntime::StartupRuntime(PlatformProfile profile) {
+StartupRuntime::StartupRuntime(PlatformProfile profile, const RoomPack* roomPack)
+    : roomPack_(roomPack) {
     reset(profile);
 }
 
@@ -19,6 +21,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     achievementLoginCalls_ = 0;
     splashSpeed_ = 180;
     roomDestinationSet_ = false;
+    roomLoadSucceeded_ = true;
 
     // rmInit instance order in the recovered room data.
     const RoomInstanceDefinition definitions[] = {
@@ -35,8 +38,15 @@ void StartupRuntime::reset(PlatformProfile profile) {
             initRoomCreate();
     };
     const auto roomCreationHandler = [](std::int32_t) {};
-    RoomLoader<2>::enter(instances_, entryRoomId, definitions, 2, true,
-                         instanceHandler, roomCreationHandler);
+    if (roomPack_ != nullptr) {
+        roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
+            instances_, *roomPack_, entryRoomId, true,
+            instanceHandler, roomCreationHandler) == PackedRoomLoadResult::success;
+    } else {
+        roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
+            instances_, entryRoomId, definitions, 2, true,
+            instanceHandler, roomCreationHandler) == LoadRoomResult::success;
+    }
 }
 
 void StartupRuntime::controllerCreate(PlatformProfile profile) {
@@ -71,7 +81,7 @@ void StartupRuntime::step(bool advancePressed) {
         if (event.phase == StepEventPhase::endStep && roomId_ == entryRoomId)
             initRoomEndStep(advancePressed);
     };
-    EventScheduler<2>::runStep(instances_, alarmEvents, handler);
+    EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler);
 }
 
 void StartupRuntime::initRoomAlarm0() {
@@ -113,11 +123,19 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
 }
 
 void StartupRuntime::gotoRoom(int roomId) {
-    roomId_ = roomId;
     const auto instanceHandler = [](InstanceRecord&, RoomInstancePhase) {};
     const auto roomCreationHandler = [](std::int32_t) {};
-    RoomLoader<2>::enter(instances_, roomId, nullptr, 0, false,
-                         instanceHandler, roomCreationHandler);
+    if (roomPack_ != nullptr) {
+        roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
+            instances_, *roomPack_, roomId, false,
+            instanceHandler, roomCreationHandler) == PackedRoomLoadResult::success;
+    } else {
+        roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
+            instances_, roomId, nullptr, 0, false,
+            instanceHandler, roomCreationHandler) == LoadRoomResult::success;
+    }
+    if (roomLoadSucceeded_)
+        roomId_ = roomId;
 }
 
 InstanceRecord* StartupRuntime::initRoomInstance() {
@@ -140,7 +158,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(4); // Startup-state digest schema.
+    digest.addU32(5); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -149,6 +167,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(achievementLoginCalls_);
     digest.addI32(splashSpeed_);
     digest.addBool(roomDestinationSet_);
+    digest.addBool(roomLoadSucceeded_);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

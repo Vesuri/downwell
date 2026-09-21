@@ -79,12 +79,12 @@ and room IDs, transform/image state, creation-code references, resolved layer
 ID/depth, persistence/active flags, and its own `AlarmBank`. Erasure and room
 changes compact the array without reordering survivors.
 
-The startup model uses a two-slot specialization populated from the recovered
-`rmInit` records. Transitioning to `rmMenu` now removes instance 100066
-(`objInitRm`) and preserves instance 100065 (`objControlerN`), including its
-per-instance state. Loading the 192 serialized `rmMenu` instances is a separate
-room-loader milestone; the startup store deliberately does not pretend they
-already exist.
+The startup model uses a 256-slot specialization sized for the current startup
+slice. With the generated room pack, `rmInit` is populated from recovered data.
+Transitioning to `rmMenu` removes instance 100066 (`objInitRm`), preserves
+instance 100065 (`objControlerN`), and creates all 192 serialized menu-room
+instances with their recovered native fields. The smaller hard-coded `rmInit`
+fixture remains only as a testable fallback when no pack is supplied.
 
 ## Room entry
 
@@ -100,11 +100,13 @@ definitions:
 6. dispatch Room Start to persistent and newly created instances.
 
 Validation is atomic: an invalid destination leaves the source store untouched.
-The startup model now enters `rmInit` through this loader, so its controller and
+The startup model now enters both `rmInit` and `rmMenu` through
+`PackedRoomLoader` when a valid pack is supplied. Its controller and
 transition-object initialization use the same event path intended for later
-rooms. Its bounded transition still loads no `rmMenu` definitions; importing
-those 192 records from generated resource tables remains the next room-data
-step.
+rooms, while the menu transition imports all recovered instance definitions.
+Object-specific PreCreate, Create, instance-creation-code, Game Start, and Room
+Start handlers beyond the two startup objects are not implemented yet; room
+entry currently records those instances without executing their game logic.
 
 Room-entry callbacks currently may not create or destroy instances. That
 behavior will use the same deferred command mechanism needed for safe mutation

@@ -1,6 +1,10 @@
 #include "core/StartupRuntime.h"
+#include "core/RoomPack.h"
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <iterator>
+#include <vector>
 
 namespace {
 
@@ -81,13 +85,43 @@ void testAdvanceInputUsesPressEdges() {
     require(runtime.inMenu(), "six advance presses reach rmMenu");
 }
 
+void testGeneratedPackEntersRecoveredMenu(const char* path) {
+    std::ifstream input(path, std::ios::binary);
+    const std::vector<std::uint8_t> bytes(
+        (std::istreambuf_iterator<char>(input)),
+        std::istreambuf_iterator<char>());
+    const downwell::RoomPack pack(bytes.data(), bytes.size());
+    require(pack.valid(), "generated room pack is valid");
+
+    downwell::StartupRuntime runtime(
+        downwell::PlatformProfile::nonDesktop, &pack);
+    require(runtime.roomLoadSucceeded(), "packed rmInit loads");
+    require(runtime.activeInstanceCount() == 2,
+            "packed rmInit creates two instances");
+
+    runtime.step(false);
+    require(runtime.inMenu(), "packed startup reaches rmMenu");
+    require(runtime.roomLoadSucceeded(), "packed rmMenu loads");
+    require(runtime.activeInstanceCount() == 193,
+            "rmMenu has 192 recovered instances plus persistent controller");
+    require(runtime.hasInstance(100065), "controller persists into packed rmMenu");
+    require(!runtime.hasInstance(100066), "rmInit object leaves packed rmMenu");
+
+    const downwell::InstanceRecord* player = runtime.instance(104218);
+    require(player != nullptr, "first recovered rmMenu player exists");
+    require(player->objectId == 35, "rmMenu player has recovered object ID");
+    require(player->roomId == 20, "rmMenu player belongs to recovered room");
+}
+
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
     testDesktopBootState();
     testNonDesktopSkipsSplash();
     testRecoveredDesktopTiming();
     testAdvanceInputUsesPressEdges();
+    if (argc == 2)
+        testGeneratedPackEntersRecoveredMenu(argv[1]);
     std::cout << "startup runtime tests passed\n";
     return 0;
 }

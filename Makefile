@@ -22,9 +22,9 @@ OBJECTS := $(patsubst %.cpp,build/%.o,$(SOURCES))
 DEPS    := $(OBJECTS:.o=.d)
 TARGET  := build/downwell-sdl
 STARTUP_TEST_TARGET := build/startup-runtime-test
-STARTUP_TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp
+STARTUP_TEST_SOURCES := tests/core/StartupRuntimeTest.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp
 REPLAY_TEST_TARGET := build/replay-test
-REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp
+REPLAY_TEST_SOURCES := tests/core/ReplayTest.cpp src/core/Replay.cpp src/core/StartupRuntime.cpp src/core/RoomPack.cpp
 ALARM_TEST_TARGET := build/alarm-bank-test
 ALARM_TEST_SOURCES := tests/core/AlarmBankTest.cpp
 INSTANCE_TEST_TARGET := build/instance-store-test
@@ -49,7 +49,7 @@ build/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
-run: $(TARGET)
+run: generate-room-pack $(TARGET)
 	./$(TARGET)
 
 $(STARTUP_TEST_TARGET): $(STARTUP_TEST_SOURCES)
@@ -102,6 +102,7 @@ generate-room-pack:
 verify-room-pack: $(ROOM_PACK_TEST_TARGET)
 	tools/generate-room-pack.py --check
 	./$(ROOM_PACK_TEST_TARGET) generated/downwell-rooms.dwrm
+	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'

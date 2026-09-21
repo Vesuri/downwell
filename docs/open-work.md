@@ -25,10 +25,12 @@
 - [x] Define and generate a deterministic native room-data pack.
 - [x] Add an endian-safe native room-pack reader with complete-pack validation.
 - [x] Bridge packed rooms into complete native instance definitions.
+- [x] Load recovered `rmInit` and all 192 `rmMenu` instances in the SDL startup
+  runtime.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - Select and verify the deterministic RNG algorithm against GameMaker output.
 - Implement object lifecycle and event ordering.
-- Import complete generated room definitions; implement collision and draw ordering.
+- Execute recovered object/instance creation logic; implement collision and draw ordering.
 - Add texture/font/audio resource loaders from generated manifests.
 - Bring up the `rmInit` to `rmMenu` startup slice before broad resource coverage.
 
