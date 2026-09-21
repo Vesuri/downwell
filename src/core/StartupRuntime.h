@@ -12,6 +12,7 @@ namespace downwell {
 
 class RoomPack;
 class ObjectPack;
+class BuilderPatternPack;
 enum class RoomInstancePhase;
 
 enum class PlatformProfile {
@@ -43,7 +44,8 @@ public:
     explicit StartupRuntime(PlatformProfile profile = PlatformProfile::desktop,
                             const RoomPack* roomPack = nullptr,
                             const ObjectPack* objectPack = nullptr,
-                            std::uint32_t randomSeed = defaultRandomSeed);
+                            std::uint32_t randomSeed = defaultRandomSeed,
+                            const BuilderPatternPack* builderPatternPack = nullptr);
 
     void reset(PlatformProfile profile);
     void step(bool advancePressed);
@@ -133,6 +135,11 @@ public:
     int mainBuilderRightRoom(std::size_t index) const {
         return mainBuilderRightRooms_[index];
     }
+    int mainBuilderStartPattern() const { return mainBuilderStartPattern_; }
+    bool mainBuilderStartReversed() const { return mainBuilderStartReversed_; }
+    std::uint32_t mainBuilderStartRowsGenerated() const {
+        return mainBuilderStartRowsGenerated_;
+    }
     std::uint32_t randomSeed() const { return random_.seed(); }
     std::uint64_t randomDrawCount() const { return random_.drawCount(); }
     std::uint64_t stateDigest() const;
@@ -177,6 +184,7 @@ private:
     InstanceStore<instanceCapacity> instances_;
     const RoomPack* roomPack_ = nullptr;
     const ObjectPack* objectPack_ = nullptr;
+    const BuilderPatternPack* builderPatternPack_ = nullptr;
     std::uint32_t randomSeed_ = defaultRandomSeed;
     GameMakerRandom random_;
     PlatformProfile profile_ = PlatformProfile::desktop;
@@ -194,7 +202,7 @@ private:
     std::uint32_t soundGainRequests_ = 0;
     std::uint32_t soundPlayRequests_ = 0;
     std::uint32_t ditherFadeSpawnRequests_ = 0;
-    DeferredInstanceQueue<8> deferredInstances_;
+    DeferredInstanceQueue<128> deferredInstances_;
     std::uint32_t nextRuntimeInstanceId_ = 105186;
     bool deferredCommandsSucceeded_ = true;
     bool inputLeft_ = false;
@@ -261,6 +269,9 @@ private:
     int mainBuilderGenerationCount_ = -30;
     std::uint32_t mainBuilderRowsGenerated_ = 0;
     std::array<int, 2> mainBuilderRightRooms_{{-1, -1}};
+    int mainBuilderStartPattern_ = -1;
+    bool mainBuilderStartReversed_ = false;
+    std::uint32_t mainBuilderStartRowsGenerated_ = 0;
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
     float mainCameraY_ = 176.0F;

@@ -45,6 +45,8 @@
 - [x] Replace the splash-bar placeholder with recovered splash sprites.
 - [x] Define and generate an endian-safe native pack for recovered builder
   patterns, beginning with all five area-one entrance fragments.
+- [x] Select, mirror, interpret, and render the first recovered area-one
+  entrance fragment after the deterministic empty-shaft prelude.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.

@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
 #include <cstdlib>
@@ -96,7 +97,8 @@ void testAdvanceInputUsesPressEdges() {
 }
 
 void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
-                                          const char* objectPath) {
+                                          const char* objectPath,
+                                          const char* builderPatternPath) {
     std::ifstream input(roomPath, std::ios::binary);
     const std::vector<std::uint8_t> bytes(
         (std::istreambuf_iterator<char>(input)),
@@ -115,8 +117,22 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     if (objectPath != nullptr)
         require(objects != nullptr, "generated object pack is valid");
 
+    std::vector<std::uint8_t> builderPatternBytes;
+    if (builderPatternPath != nullptr) {
+        std::ifstream patternInput(builderPatternPath, std::ios::binary);
+        builderPatternBytes.assign(std::istreambuf_iterator<char>(patternInput),
+                                   std::istreambuf_iterator<char>());
+    }
+    const downwell::BuilderPatternPack builderPatterns(
+        builderPatternBytes.data(), builderPatternBytes.size());
+    const downwell::BuilderPatternPack* patterns =
+        builderPatterns.valid() ? &builderPatterns : nullptr;
+    if (builderPatternPath != nullptr)
+        require(patterns != nullptr, "generated builder-pattern pack is valid");
+
     downwell::StartupRuntime runtime(
-        downwell::PlatformProfile::nonDesktop, &pack, objects);
+        downwell::PlatformProfile::nonDesktop, &pack, objects,
+        downwell::StartupRuntime::defaultRandomSeed, patterns);
     require(runtime.roomLoadSucceeded(), "packed rmInit loads");
     require(runtime.activeInstanceCount() == 2,
             "packed rmInit creates two instances");
@@ -362,10 +378,19 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "the deterministic first-boot prelude emits all 29 shared rows");
         require(runtime.activeInstanceCount() == instancesBefore + 58,
                 "the complete prelude retains its 58 generated boundary walls");
-        for (int tick = 0; tick < 30; ++tick)
+        for (int tick = 0;
+             tick < 120 && runtime.mainBuilderStartPattern() < 0;
+             ++tick)
             runtime.step(releasedMain, false);
-        require(runtime.mainBuilderRowsGenerated() == 29,
-                "generation pauses at the unrecovered random start selection");
+        require(runtime.mainBuilderStartPattern() == 3 &&
+                    runtime.mainBuilderStartReversed() &&
+                    runtime.mainBuilderGenerationCount() == 0,
+                "the reference stream selects and mirrors entrance fragment three");
+        require(runtime.mainBuilderStartRowsGenerated() == 5 &&
+                    runtime.mainBuilderRowsGenerated() == 34,
+                "the complete fragment advances its five shared row intervals");
+        require(runtime.activeInstanceCount() == instancesBefore + 78,
+                "the fragment creates its exact walls and breakable blocks");
     }
 }
 
@@ -377,7 +402,9 @@ int main(int argc, char** argv) {
     testRecoveredDesktopTiming();
     testAdvanceInputUsesPressEdges();
     if (argc >= 2)
-        testGeneratedPackEntersRecoveredMenu(argv[1], argc >= 3 ? argv[2] : nullptr);
+        testGeneratedPackEntersRecoveredMenu(
+            argv[1], argc >= 3 ? argv[2] : nullptr,
+            argc >= 4 ? argv[3] : nullptr);
     std::cout << "startup runtime tests passed\n";
     return 0;
 }

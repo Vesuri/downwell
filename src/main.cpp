@@ -1,4 +1,5 @@
 #include "core/Game.h"
+#include "core/BuilderPatternPack.h"
 #include "core/FontPack.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
@@ -48,8 +49,19 @@ int main() {
     if (!fontPack.valid() || !platform.loadFontAssets(fontPack))
         std::fprintf(stderr, "warning: recovered font assets unavailable\n");
 
+    std::ifstream builderPatternFile(
+        "generated/downwell-builder-patterns.dwbp", std::ios::binary);
+    const std::vector<std::uint8_t> builderPatternBytes(
+        (std::istreambuf_iterator<char>(builderPatternFile)),
+        std::istreambuf_iterator<char>());
+    const downwell::BuilderPatternPack builderPatternPack(
+        builderPatternBytes.data(), builderPatternBytes.size());
+    if (!builderPatternPack.valid())
+        std::fprintf(stderr, "warning: recovered builder patterns unavailable\n");
+
     downwell::Game game(roomPack.valid() ? &roomPack : nullptr,
-                        objectPack.valid() ? &objectPack : nullptr);
+                        objectPack.valid() ? &objectPack : nullptr,
+                        builderPatternPack.valid() ? &builderPatternPack : nullptr);
     while (!game.finished()) {
         game.update(platform.pollInput());
         game.render(platform);

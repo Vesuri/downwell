@@ -15,7 +15,8 @@ public:
     static constexpr int ticksPerSecond = 60;
 
     explicit Game(const RoomPack* roomPack = nullptr,
-                  const ObjectPack* objectPack = nullptr);
+                  const ObjectPack* objectPack = nullptr,
+                  const BuilderPatternPack* builderPatternPack = nullptr);
 
     void update(const Input& input);
     void render(Renderer& renderer) const;

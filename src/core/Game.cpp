@@ -5,8 +5,10 @@
 #include <string>
 namespace downwell {
 
-Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack)
-    : startup_(PlatformProfile::desktop, roomPack, objectPack),
+Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
+           const BuilderPatternPack* builderPatternPack)
+    : startup_(PlatformProfile::desktop, roomPack, objectPack,
+               StartupRuntime::defaultRandomSeed, builderPatternPack),
       objectPack_(objectPack) {}
 
 void Game::update(const Input& input) {
@@ -67,6 +69,27 @@ void Game::renderMain(Renderer& renderer) const {
                                        instance.x - viewX,
                                        instance.y - viewY,
                                        2.0F, 2.0F, 0.0F);
+    }
+
+    // The first translated pattern family currently exposes its structural
+    // objects directly. Their full Create/Step behavior will replace these
+    // fixed initial frames as those events are translated.
+    for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
+        const InstanceRecord& instance = startup_.instanceAt(index);
+        if (!instance.active)
+            continue;
+        std::int32_t sprite = -1;
+        std::uint32_t frame = 0;
+        float scale = 1.0F;
+        if (instance.objectId == 93) { sprite = 51; frame = 23; scale = 2.0F; }
+        if (instance.objectId == 92) { sprite = 51; frame = 16; scale = 2.0F; }
+        if (instance.objectId == 113) sprite = 166;
+        if (instance.objectId == 289) sprite = 550;
+        if (sprite >= 0)
+            renderer.drawSpriteTransformed(sprite, frame,
+                                           instance.x - viewX,
+                                           instance.y - viewY,
+                                           scale, scale, 0.0F);
     }
 
     renderer.drawSpriteTransformed(

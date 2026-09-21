@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "ObjectPack.h"
 #include "PackedRoomLoader.h"
@@ -12,8 +13,10 @@ namespace downwell {
 StartupRuntime::StartupRuntime(PlatformProfile profile,
                                const RoomPack* roomPack,
                                const ObjectPack* objectPack,
-                               std::uint32_t randomSeed)
+                               std::uint32_t randomSeed,
+                               const BuilderPatternPack* builderPatternPack)
     : roomPack_(roomPack), objectPack_(objectPack),
+      builderPatternPack_(builderPatternPack),
       randomSeed_(randomSeed), random_(randomSeed) {
     reset(profile);
 }
@@ -108,6 +111,9 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderGenerationCount_ = -30;
     mainBuilderRowsGenerated_ = 0;
     mainBuilderRightRooms_ = {{-1, -1}};
+    mainBuilderStartPattern_ = -1;
+    mainBuilderStartReversed_ = false;
+    mainBuilderStartRowsGenerated_ = 0;
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
     mainCameraY_ = 176.0F;
@@ -347,7 +353,7 @@ bool StartupRuntime::mainPlayerCollides(float x, float y) const {
     const float playerBottom = y + 7.0F;
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& wall = instances_.at(index);
-        if (!wall.active || wall.objectId != 60)
+        if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
             continue;
         const float wallLeft = wall.x - 16.0F;
         const float wallRight = wall.x + 15.0F;
@@ -380,7 +386,7 @@ bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
 bool StartupRuntime::mainBulletCollides(float x, float y) const {
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& wall = instances_.at(index);
-        if (!wall.active || wall.objectId != 60)
+        if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
             continue;
         if (x >= wall.x - 16.0F && x <= wall.x + 15.0F &&
             y >= wall.y - 16.0F && y <= wall.y + 15.0F)
@@ -436,7 +442,7 @@ void StartupRuntime::updateMainBullets() {
 }
 
 void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
-    if (!mainBuilderInitialized_ || mainBuilderGenerationCount_ >= -1)
+    if (!mainBuilderInitialized_ || mainBuilderGenerationCount_ >= 0)
         return;
 
     // scrBuilder only stays 128 pixels ahead of the visible bottom. On the
@@ -447,16 +453,91 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     if (static_cast<float>(instance.y) - viewBottom >= 128.0F)
         return;
 
-    const bool left = deferredInstances_.enqueueCreate(60, 160, instance.y);
-    const bool right = deferredInstances_.enqueueCreate(60, 320, instance.y);
-    if (!left || !right) {
+    if (mainBuilderGenerationCount_ < -1) {
+        random_.irandom(1); // choose(0, 1): unused orientation for empty rows.
+        for (int cell = 0; cell < 19; ++cell)
+            random_.random(3.0); // builderCavern on 18 cells and one newline.
+        const bool left = deferredInstances_.enqueueCreate(60, 160, instance.y);
+        const bool right = deferredInstances_.enqueueCreate(60, 320, instance.y);
+        if (!left || !right) {
+            deferredCommandsSucceeded_ = false;
+            return;
+        }
+        instance.y += 16;
+        mainBuilderY_ = instance.y;
+        ++mainBuilderGenerationCount_;
+        ++mainBuilderRowsGenerated_;
+        return;
+    }
+
+    if (builderPatternPack_ == nullptr || !builderPatternPack_->valid() ||
+        builderPatternPack_->patternCount() == 0)
+        return;
+    const std::uint16_t selected = static_cast<std::uint16_t>(
+        random_.irandom(builderPatternPack_->patternCount() - 1));
+    PackedBuilderPattern pattern;
+    if (!builderPatternPack_->findPattern(
+            BuilderPatternFamily::areaOneStart, selected, pattern)) {
         deferredCommandsSucceeded_ = false;
         return;
     }
-    instance.y += 16;
+    const bool reversed = random_.irandom(1) != 0; // choose(0, 1).
+    mainBuilderStartPattern_ = selected;
+    mainBuilderStartReversed_ = reversed;
+
+    for (std::uint16_t row = 0; row < pattern.rowCount; ++row) {
+        const int rowY = instance.y + row * 16;
+        for (std::uint16_t column = 0; column < pattern.width; ++column) {
+            char symbol = 0;
+            if (!builderPatternPack_->cell(pattern, column, row, symbol)) {
+                deferredCommandsSucceeded_ = false;
+                return;
+            }
+            const int ordinal = column + 1;
+            const int buildX = reversed ? 320 - ordinal * 16
+                                        : 160 + ordinal * 16;
+
+            // builderCavern handles '^' before its universal area-one roll.
+            if (symbol == '^' && random_.irandom(4) != 0 &&
+                !deferredInstances_.enqueueCreate(289, buildX, rowY)) {
+                deferredCommandsSucceeded_ = false;
+                return;
+            }
+            const double enemyRoll = random_.random(3.0);
+            if (symbol == 'd' && enemyRoll <= 1.0 &&
+                !deferredInstances_.enqueueCreate(113, buildX, rowY)) {
+                deferredCommandsSucceeded_ = false;
+                return;
+            }
+
+            std::int32_t objectId = -1;
+            if (symbol == '1') objectId = 60;
+            if (symbol == '-') objectId = 93;
+            if (symbol == 'B') objectId = 92;
+            if (symbol == '3' && random_.irandom(1) != 0) objectId = 92;
+            if (objectId >= 0 &&
+                !deferredInstances_.enqueueCreate(objectId, buildX, rowY)) {
+                deferredCommandsSucceeded_ = false;
+                return;
+            }
+        }
+        if (row + 1 < pattern.rowCount) {
+            random_.random(3.0); // builderCavern also sees the row newline.
+            const int firstX = reversed ? 160 : 320;
+            const int secondX = reversed ? 320 : 160;
+            if (!deferredInstances_.enqueueCreate(60, firstX, rowY) ||
+                !deferredInstances_.enqueueCreate(60, secondX, rowY)) {
+                deferredCommandsSucceeded_ = false;
+                return;
+            }
+        }
+    }
+    const std::uint32_t advancedRows = pattern.rowCount - 1U;
+    instance.y += static_cast<std::int32_t>(advancedRows * 16U);
     mainBuilderY_ = instance.y;
-    ++mainBuilderGenerationCount_;
-    ++mainBuilderRowsGenerated_;
+    mainBuilderGenerationCount_ = 0;
+    mainBuilderRowsGenerated_ += advancedRows;
+    mainBuilderStartRowsGenerated_ = advancedRows;
 }
 
 void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
@@ -728,6 +809,9 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderY_ = instance->y;
             mainBuilderGenerationCount_ = -30; // area 1, level 1, first boot
             mainBuilderRowsGenerated_ = 0;
+            mainBuilderStartPattern_ = -1;
+            mainBuilderStartReversed_ = false;
+            mainBuilderStartRowsGenerated_ = 0;
             random_.irandom(2); // choose(2, 2, 3), then overridden to two.
             mainBuilderRightRooms_[0] =
                 3 + static_cast<int>(random_.irandom(12));
@@ -1108,7 +1192,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(16); // Startup-state digest schema.
+    digest.addU32(17); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -1193,6 +1277,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addU32(mainBuilderRowsGenerated_);
     digest.addI32(mainBuilderRightRooms_[0]);
     digest.addI32(mainBuilderRightRooms_[1]);
+    digest.addI32(mainBuilderStartPattern_);
+    digest.addBool(mainBuilderStartReversed_);
+    digest.addU32(mainBuilderStartRowsGenerated_);
     digest.addBool(mainCameraInitialized_);
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);
