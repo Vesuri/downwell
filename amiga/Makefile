@@ -23,7 +23,8 @@ AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaRenderer.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
+	obj/AmigaRenderer.o \
 	obj/AmigaHardware.o \
 	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
 	obj/BuilderPatternPack.o obj/Replay.o \
@@ -55,6 +56,10 @@ obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaPlayer.o: $(AMIGA_SRC)/AmigaPlayer.cpp $(AMIGA_SRC)/AmigaPlayer.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

@@ -8,6 +8,7 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaPlayer.h"
 #include "AmigaRenderer.h"
 #include "framework/AmigaHardware.h"
 #include "framework/AmigaMemory.h"
@@ -315,7 +316,7 @@ int main(void) {
     unsigned front = 0;
     unsigned ringOrigin = initialRingOrigin;
     unsigned worldBottom;
-    int playerOffsetX = 0;
+    AmigaPlayer player;
     UWORD savedDmacon;
     UWORD savedIntena;
     const UWORD* osCopper;
@@ -436,15 +437,12 @@ int main(void) {
             packedInput = downwell::packReplayInput(liveInput);
             const downwell::Input input =
                 downwell::unpackReplayInput(packedInput);
-            int movement = 0;
-            if (input.left && !input.right && playerOffsetX > -60)
-                movement = -1;
-            if (input.right && !input.left && playerOffsetX < 60)
-                movement = 1;
-            if (movement) {
-                playerOffsetX += movement;
-                offsetHardwareSprite(memory.playerSprite(0), movement, 0);
-                offsetHardwareSprite(memory.playerSprite(1), movement, 0);
+            const AmigaPlayerMotion motion = player.step(input);
+            if (motion.deltaX || motion.deltaY) {
+                offsetHardwareSprite(memory.playerSprite(0),
+                                     motion.deltaX, motion.deltaY);
+                offsetHardwareSprite(memory.playerSprite(1),
+                                     motion.deltaX, motion.deltaY);
             }
         }
         if ((frame & 1u) == 0) {
@@ -462,7 +460,7 @@ int main(void) {
             front = back;
         }
         lastPortCheckpoint = downwell::portCheckpointDigest(
-            frame, packedInput, playerOffsetX, ringOrigin);
+            frame, packedInput, player.offsetX(), ringOrigin);
     }
 
     /* Stop our interrupt and display before handing either back to exec. */

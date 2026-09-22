@@ -27,7 +27,12 @@ circular PF1, the recovered 4:3 HUD on the fixed PF2, and the player on hardware
 sprite channel 0. It embeds and validates the recovered room, object/event, and
 builder-pattern packs with the same endian-safe readers as the SDL reference.
 The player alternates between recovered idle and air frames to make paired
-copper-list and sprite-pointer swaps visible.
+copper-list and sprite-pointer swaps visible. Port-1 joystick motion drives a
+small allocation-free 8.8 fixed-point player state: left/right accelerate and
+decelerate, the fire button jumps from the grounded state, releasing it shortens
+the jump, and later airborne press edges consume gunboot charge and add recoil.
+Landing restores all eight charges. This is the first target-specialized
+replacement for the host reference's floating-point GameMaker values.
 
 Its small `AmigaHardware` and `CopperList` classes are adapted from the proven
 sibling-port framework. Its machine lifecycle follows Rescue on Fractalus:
