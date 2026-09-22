@@ -456,6 +456,49 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                                 enemy.y + vertical * 8))
                 enemy.speedY = -enemy.speedY;
             enemy.preciseY += enemy.speedY;
+        } else if (enemy.objectId == 119) {
+            enum { foot = 6 };
+            if (alarm0Fired) {
+                if (enemy.grounded) {
+                    const int crawl = enemy.motionState > 0 ? 1 : -1;
+                    int nextX = enemy.x;
+                    int nextY = enemy.y;
+                    if (solidResolver_(solidResolverContext_,
+                                       enemy.x + crawl, enemy.y)) {
+                        enemy.speedX = 0;
+                        enemy.speedY = -crawl * 256;
+                        nextY -= crawl;
+                    } else {
+                        enemy.speedX = crawl * 256;
+                        enemy.speedY = 0;
+                        nextX += crawl;
+                    }
+                    if (!solidResolver_(solidResolverContext_, nextX, nextY)) {
+                        enemy.preciseX = (long)nextX * 256L;
+                        enemy.preciseY = (long)nextY * 256L;
+                    }
+                }
+                enemy.alarm0 = 2;
+            }
+            if (!enemy.grounded) {
+                enemy.speedY += 51;
+                if (enemy.speedY > 7 * 256)
+                    enemy.speedY = 7 * 256;
+                const int nextY =
+                    (int)((enemy.preciseY + enemy.speedY) / 256L);
+                if (solidResolver_(solidResolverContext_,
+                                   enemy.x, nextY + foot)) {
+                    while (!solidResolver_(solidResolverContext_, enemy.x,
+                                           enemy.y + foot + 1)) {
+                        ++enemy.y;
+                        enemy.preciseY = (long)enemy.y * 256L;
+                    }
+                    enemy.speedY = 0;
+                    enemy.grounded = true;
+                } else {
+                    enemy.preciseY += enemy.speedY;
+                }
+            }
         }
         enemy.x = (int)(enemy.preciseX / 256L);
         enemy.y = (int)(enemy.preciseY / 256L);

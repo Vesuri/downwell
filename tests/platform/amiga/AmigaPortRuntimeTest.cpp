@@ -26,6 +26,10 @@ bool shortRightWall(void*, int x, int y) {
     return x >= 8 && y < 16;
 }
 
+bool crawlerCorner(void*, int x, int y) {
+    return y >= 7 || x >= 2;
+}
+
 } // namespace
 
 int main() {
@@ -141,6 +145,24 @@ int main() {
     detachedSnail.step(0);
     require(!detachedSnail.enemyAt(0).active,
             "wall snail retires when neither recovered wall side exists");
+
+    AmigaPortRuntime crawler(300);
+    crawler.configureSolidResolver(crawlerCorner, 0);
+    require(crawler.configureEnemy(0, 119, 181, 0, 0,
+                                   0, 0, 3, 6,
+                                   1, 0, 2, -1),
+            "generated crawler can retain its recovered direction and alarm");
+    for (unsigned frame = 0;
+         frame < 30 && !crawler.enemyAt(0).grounded; ++frame)
+        crawler.step(0);
+    require(crawler.enemyAt(0).grounded,
+            "crawler falls onto terrain before beginning surface motion");
+    for (unsigned frame = 0; frame < 6; ++frame)
+        crawler.step(0);
+    require(crawler.enemyAt(0).preciseX == 256L &&
+                crawler.enemyAt(0).preciseY < 256L &&
+                crawler.enemyAt(0).alarm0 > 0,
+            "crawler advances along the floor then turns up the wall");
 
     AmigaPortRuntime stomp(300);
     require(stomp.configureEnemy(0, 111, 163, 0, 5,
