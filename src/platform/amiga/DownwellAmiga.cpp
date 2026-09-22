@@ -711,8 +711,10 @@ int main(void) {
                     if (presentationChanged)
                         drawSplash(&renderer, presentedSplash);
                 }
-                else if (presentedScene == AmigaScene::menu)
-                    drawMenu(&renderer, rooms, objects, scenes);
+                else if (presentedScene == AmigaScene::menu) {
+                    if (presentationChanged || !scenes.menuPlayerNapping())
+                        drawMenu(&renderer, rooms, objects, scenes);
+                }
                 else if (presentedScene == AmigaScene::styleSelect)
                     drawStyleSelect(&renderer, scenes);
                 else if (presentationChanged)
