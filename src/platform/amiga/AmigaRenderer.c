@@ -171,6 +171,45 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
     }
 }
 
+void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
+                               const UBYTE* pack, const UBYTE* packEnd,
+                               UWORD sprite, UWORD frame,
+                               int anchorX, int anchorY, int flipX,
+                               unsigned outputPen) {
+    const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
+    const UBYTE* data;
+    int originX;
+    int originY;
+    int width;
+    int height;
+    int dataWidth;
+    int planeBytes;
+    int y;
+    int x;
+    if (!record)
+        return;
+    originX = (WORD)readWord(record + 4);
+    originY = (WORD)readWord(record + 6);
+    width = readWord(record + 8);
+    height = readWord(record + 10);
+    dataWidth = readWord(record + 12);
+    planeBytes = dataWidth >> 3;
+    data = pack + readLong(record + 16);
+    if (data < pack || data + readLong(record + 20) > packEnd)
+        return;
+    for (y = 0; y < height; ++y) {
+        const UBYTE* row = data + y * planeBytes * 2;
+        for (x = 0; x < width; ++x) {
+            const UBYTE mask = (UBYTE)(0x80u >> (x & 7));
+            if ((row[x >> 3] | row[planeBytes + (x >> 3)]) & mask) {
+                const int drawX = flipX ? anchorX + originX - 1 - x
+                                        : anchorX - originX + x;
+                setPixel(renderer, drawX, anchorY - originY + y, outputPen);
+            }
+        }
+    }
+}
+
 int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      UWORD sprite, UWORD frame,
                                      int anchorX, int anchorY,

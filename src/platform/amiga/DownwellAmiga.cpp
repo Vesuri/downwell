@@ -103,6 +103,14 @@ static void drawGameAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
                            sprite, frame, anchorX, anchorY, flipX);
 }
 
+static void drawGameText(AmigaRenderer* renderer, UWORD text,
+                         int x, int y) {
+    amigaRendererDrawAssetPen(renderer, amiga_game_pack, amiga_game_pack_end,
+                              text, 0, x + 1, y + 1, 0, 2);
+    amigaRendererDrawAssetPen(renderer, amiga_game_pack, amiga_game_pack_end,
+                              text, 0, x, y, 0, 1);
+}
+
 static void drawHealthNumber(AmigaRenderer* renderer, int x, int y,
                              unsigned health, unsigned maximum) {
     const int slashX = x - 4;
@@ -324,6 +332,74 @@ static void drawMenu(AmigaRenderer* renderer,
                       downwellPlayfieldX + scenes.menuPlayerX() - viewX,
                       scenes.menuPlayerY() - viewY,
                       scenes.menuPlayerFacing() < 0);
+    }
+    amigaRendererClearClipRect(renderer);
+}
+
+static void drawStyleSelect(AmigaRenderer* renderer,
+                            const AmigaSceneRuntime& scenes) {
+    const int centerY = downwellDisplayHeight / 2 + scenes.styleYOffset();
+    const int smoothX = scenes.styleSmoothX();
+    int style;
+    int row;
+    amigaRendererClear(renderer, 0);
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
+                            downwellPlayfieldWidth, downwellDisplayHeight);
+    if (!scenes.styleSelected()) {
+        for (style = 0; style < 5; ++style) {
+            const int drawX = 80 + style * 48 - smoothX;
+            const int distance = drawX - 80;
+            const int drawY = centerY - 14 - distance * distance / 200;
+            drawGameAsset(renderer, style == 0 ? 27 : 43,
+                          style == scenes.styleCursor()
+                              ? (UWORD)scenes.styleRunFrame() : 0,
+                          downwellPlayfieldX + drawX, drawY, 0);
+        }
+        for (row = 0; row <= 36; ++row) {
+            drawGameAsset(renderer, 51, 13, downwellPlayfieldX,
+                          scenes.styleTileY() + row * 16, 0);
+            drawGameAsset(renderer, 51, 7,
+                          downwellPlayfieldX + downwellPlayfieldWidth,
+                          scenes.styleTileY() + row * 16, 0);
+        }
+        if (scenes.styleCursor() < 4)
+            drawGameAsset(renderer, 44, 0, downwellPlayfieldX + 96,
+                          centerY - 10, 0);
+        if (scenes.styleCursor() > 0)
+            drawGameAsset(renderer, 44, 0, downwellPlayfieldX + 64,
+                          centerY - 10, 1);
+        drawGameText(renderer, 65000, downwellPlayfieldX + 80,
+                     centerY - 70);
+        drawGameText(renderer, scenes.styleCursor() == 0 ? 65001 : 65003,
+                     downwellPlayfieldX + 80, centerY + 10);
+        if (scenes.styleCursor() == 0)
+            amigaRendererDrawAssetPen(
+                renderer, amiga_game_pack, amiga_game_pack_end,
+                65002, 0, downwellPlayfieldX + 80, centerY + 32,
+                0, 1);
+    } else {
+        drawGameAsset(renderer, 27, (UWORD)scenes.styleRunFrame(),
+                      downwellPlayfieldX + 80,
+                      centerY - 14 + scenes.stylePlayerDescent(), 0);
+    }
+    if (scenes.styleDitherY() < downwellDisplayHeight) {
+        int y;
+        int x;
+        for (y = scenes.styleDitherY(); y < downwellDisplayHeight; y += 8)
+            for (x = 0; x < downwellPlayfieldWidth; x += 8)
+                drawGameAsset(renderer, 733, 11,
+                              downwellPlayfieldX + x, y, 0);
+    }
+    if (scenes.styleSelected() && scenes.styleVerticalDitherY() > 0) {
+        int y;
+        int x;
+        int bottom = scenes.styleVerticalDitherY();
+        if (bottom > downwellDisplayHeight)
+            bottom = downwellDisplayHeight;
+        for (y = 0; y < bottom; y += 8)
+            for (x = 0; x < downwellPlayfieldWidth; x += 8)
+                drawGameAsset(renderer, 733, 11,
+                              downwellPlayfieldX + x, y, 0);
     }
     amigaRendererClearClipRect(renderer);
 }
@@ -575,6 +651,8 @@ int main(void) {
                 }
                 else if (presentedScene == AmigaScene::menu)
                     drawMenu(&renderer, rooms, objects, scenes);
+                else if (presentedScene == AmigaScene::styleSelect)
+                    drawStyleSelect(&renderer, scenes);
                 else if (presentationChanged)
                     buildReferencePicture(&renderer, builders, entrance);
                 if (presentationChanged) {

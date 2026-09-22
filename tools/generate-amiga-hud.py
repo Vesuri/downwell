@@ -51,6 +51,15 @@ SELECTIONS = {
     },
 }
 
+TEXT_SELECTIONS = {
+    "game": {
+        65000: "STYLE SELECT",
+        65001: "USUAL STYLE",
+        65002: "standard",
+        65003: "LOCKED!",
+    },
+}
+
 
 def require(condition, message):
     if not condition:
@@ -101,6 +110,33 @@ def encode_planar(pens, width, height):
     return dma_width, bytes(output)
 
 
+def render_text(manifest, pages, text):
+    font = manifest["resources"]["fonts"][2]
+    item = manifest["resources"]["texturePageItems"][font["texturePageItemId"]]
+    atlas = pages[item["texturePageId"]]
+    glyphs = {glyph["character"]: glyph for glyph in font["glyphs"]}
+    lines = text.split("\n")
+    widths = [sum(glyphs[ord(character)]["shift"] for character in line)
+              for line in lines]
+    width = max(widths)
+    height = 10 + 12 * (len(lines) - 1)
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    for line_index, line in enumerate(lines):
+        draw_x = 0
+        for character in line:
+            glyph = glyphs[ord(character)]
+            source = atlas.crop((
+                item["sourceX"] + glyph["sourceX"],
+                item["sourceY"] + glyph["sourceY"],
+                item["sourceX"] + glyph["sourceX"] + glyph["sourceWidth"],
+                item["sourceY"] + glyph["sourceY"] + glyph["sourceHeight"],
+            ))
+            canvas.alpha_composite(
+                source, (draw_x + glyph["offset"], line_index * 12))
+            draw_x += glyph["shift"]
+    return canvas
+
+
 def decode_planar(data, width, height, dma_width):
     plane_bytes = dma_width // 8
     pens = []
@@ -114,7 +150,7 @@ def decode_planar(data, width, height, dma_width):
     return pens
 
 
-def build_pack(manifest, extracted, selection):
+def build_pack(manifest, extracted, profile):
     require(manifest["schemaVersion"] == 3, "unexpected extraction schema")
     require(manifest["source"]["sha256"] == SOURCE_SHA256,
             "manifest does not describe the pinned Steam build")
@@ -125,7 +161,7 @@ def build_pack(manifest, extracted, selection):
              for index in range(manifest["counts"]["embeddedTextures"])]
 
     encoded = []
-    for sprite_id in selection:
+    for sprite_id in SELECTIONS[profile]:
         sprite = sprites[sprite_id]
         require(sprite["id"] == sprite_id, "sprite IDs are not stable")
         for frame_index, frame in enumerate(sprite["frames"]):
@@ -135,6 +171,19 @@ def build_pack(manifest, extracted, selection):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
+
+    for text_id, text in TEXT_SELECTIONS.get(profile, {}).items():
+        canvas = render_text(manifest, pages, text)
+        pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
+        dma_width, planar = encode_planar(pens, canvas.width, canvas.height)
+        sprite = {
+            "id": text_id,
+            "originX": canvas.width // 2,
+            "originY": 0,
+            "width": canvas.width,
+            "height": canvas.height,
+        }
+        encoded.append((sprite, 0, dma_width, planar))
 
     payload_offset = HEADER.size + RECORD.size * len(encoded)
     records = []
@@ -178,7 +227,7 @@ def main():
     manifest = json.loads((args.extracted / "manifest.json").read_text(encoding="utf-8"))
     if args.output is None:
         args.output = root / f"generated/amiga-{args.profile}.dwap"
-    data = build_pack(manifest, args.extracted, SELECTIONS[args.profile])
+    data = build_pack(manifest, args.extracted, args.profile)
     digest = hashlib.sha256(data).hexdigest()
     if args.check:
         require(args.output.is_file(), f"missing Amiga asset pack: {args.output}")

@@ -51,6 +51,11 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,
                             int anchorX, int anchorY, int flipX);
+void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
+                               const UBYTE* pack, const UBYTE* packEnd,
+                               UWORD sprite, UWORD frame,
+                               int anchorX, int anchorY, int flipX,
+                               unsigned pen);
 int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      UWORD sprite, UWORD frame,
                                      int anchorX, int anchorY,
