@@ -17,13 +17,12 @@ static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {
         x < 0 || x >= downwellVisibleWidth ||
         y < 0 || y >= downwellDisplayHeight)
         return;
-    x += downwellBackingBias;
-    row = renderer->target + y * downwellBytesPerLayerLine;
+    row = renderer->target + y * downwellBytesPerPlaneLine;
     mask = (UBYTE)(0x80u >> (x & 7));
     row[x >> 3] &= (UBYTE)~mask;
-    row[downwellBytesPerPlaneLine + (x >> 3)] &= (UBYTE)~mask;
+    row[downwellPlaneBytes + (x >> 3)] &= (UBYTE)~mask;
     if (pen & 1u) row[x >> 3] |= mask;
-    if (pen & 2u) row[downwellBytesPerPlaneLine + (x >> 3)] |= mask;
+    if (pen & 2u) row[downwellPlaneBytes + (x >> 3)] |= mask;
 }
 
 static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
@@ -175,8 +174,8 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
         return 0;
 
     cropX = (width - 16) >> 1;
-    startX = 0x63 + anchorX - originX + cropX;
-    startY = 0x12 + anchorY - originY;
+    startX = downwellDisplayHStart + anchorX - originX + cropX;
+    startY = downwellDisplayVStart + anchorY - originY;
     stopY = startY + height;
     control[0] = (UBYTE)startY;
     control[1] = (UBYTE)(startX >> 1);

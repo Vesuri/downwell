@@ -18,8 +18,20 @@ extern const UBYTE amiga_game_pack_end[];
 enum {
     copperWords = 128,
     playerSpriteHeight = 32,
-    playerSpriteBytes = (playerSpriteHeight + 2) * 4
+    playerSpriteBytes = (playerSpriteHeight + 2) * 4,
+    displayHStart = downwellDisplayHStart,
+    displayHStop = displayHStart + downwellVisibleWidth,
+    displayVStart = downwellDisplayVStart,
+    displayVStop = displayVStart + downwellDisplayHeight,
+    fetchWords = downwellDmaWidth / 16,
+    fetchStart = 0x28,
+    fetchStop = fetchStart + 8 * (fetchWords - 1)
 };
+
+_Static_assert(displayHStop == 0x1dd, "380-pixel display window");
+_Static_assert(displayVStop == 0x12e, "284-line display window");
+_Static_assert(fetchWords == 24, "384-pixel DMA fetch");
+_Static_assert(fetchStop == 0xe0, "24-word lores fetch stride");
 
 static volatile UWORD* const custom = (volatile UWORD*)0xdff000;
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
@@ -165,14 +177,14 @@ static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
     unsigned channel;
 
     copperMove(list, &count, regBplcon0, 0x4401);
-    copperMove(list, &count, regBpl1mod, downwellBytesPerPlaneLine);
-    copperMove(list, &count, regBpl2mod, downwellBytesPerPlaneLine);
+    copperMove(list, &count, regBpl1mod, 0);
+    copperMove(list, &count, regBpl2mod, 0);
     copperPointer(list, &count, regBpl1pth, game);
     copperPointer(list, &count, regBpl1pth + 4, hud);
     copperPointer(list, &count, regBpl1pth + 8,
-                  game + downwellBytesPerPlaneLine);
+                  game + downwellPlaneBytes);
     copperPointer(list, &count, regBpl1pth + 12,
-                  hud + downwellBytesPerPlaneLine);
+                  hud + downwellPlaneBytes);
 
     copperPointer(list, &count, regSpr0pth, playerSprite);
     for (channel = 1; channel < 8; ++channel)
@@ -195,10 +207,13 @@ static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
 }
 
 static void setDisplayRegisters(void) {
-    writeRegister(regDiwstrt, 0x1263);
-    writeRegister(regDiwstop, 0x2edf);
-    writeRegister(regDdfstrt, 0x0028);
-    writeRegister(regDdfstop, 0x00e0);
+    writeRegister(regDiwstrt,
+                  (UWORD)((displayVStart << 8) | (displayHStart & 0xff)));
+    writeRegister(regDiwstop,
+                  (UWORD)(((displayVStop & 0xff) << 8) |
+                          (displayHStop & 0xff)));
+    writeRegister(regDdfstrt, fetchStart);
+    writeRegister(regDdfstop, fetchStop);
     writeRegister(regFmode, 0x0000);
     writeRegister(regBplcon1, 0x0000);
     writeRegister(regBplcon2, 0x0064);

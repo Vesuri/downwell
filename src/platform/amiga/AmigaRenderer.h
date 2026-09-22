@@ -8,9 +8,10 @@ enum {
     downwellDmaWidth = 384,
     downwellDisplayHeight = 284,
     downwellBytesPerPlaneLine = downwellDmaWidth / 8,
-    downwellBytesPerLayerLine = downwellBytesPerPlaneLine * 2,
-    downwellLayerBytes = downwellBytesPerLayerLine * downwellDisplayHeight,
-    downwellBackingBias = 2,
+    downwellPlaneBytes = downwellBytesPerPlaneLine * downwellDisplayHeight,
+    downwellLayerBytes = downwellPlaneBytes * 2,
+    downwellDisplayHStart = 0x61,
+    downwellDisplayVStart = 0x12,
     downwellPlayfieldX = 110,
     downwellPlayfieldWidth = 160
 };

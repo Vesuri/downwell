@@ -7,9 +7,9 @@ stretching the 160-pixel game surface.
 
 - Visible canvas: 380x284 PAL lores pixels.
 - DMA backing width: 384 pixels (24 words, 48 bytes per plane per line).
-- The display window crops two fetched pixels from each horizontal edge.
-- Native visible coordinates therefore map to backing coordinates with a
-  two-pixel bias.
+- The display window exposes fetched pixels 0..379 and crops the four unused
+  pixels at the right edge.
+- Native visible coordinates map directly to backing coordinates.
 - The game well is 160x284 at visible x=110..269, matching the host reference.
 
 The display setup must derive and assert its DIW and DDF values in one place.
@@ -24,6 +24,11 @@ Four lores bitplanes are split 2+2:
 | --- | --- | --- | --- |
 | PF1 | BPL1, BPL3 | COLOR00..03 | Game well |
 | PF2 | BPL2, BPL4 | COLOR08..11 | HUD and side panels |
+
+Each 384x284 bitplane occupies its own contiguous 13,632-byte region. Every
+hardware pointer therefore advances directly from one 48-byte row to the next,
+so BPL1MOD and BPL2MOD are both zero. The two regions for each playfield remain
+in one allocation for simple ownership and cleanup.
 
 PF2 has priority over PF1. Pen zero remains transparent on both layers, with
 COLOR00 black, so the two layers can use white and red independently without
