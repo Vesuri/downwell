@@ -11,6 +11,9 @@ RUN=.run
 DH0="$RUN/dh0"
 DH1="$RUN/dh1"
 GDBHOME="$RUN/gdbhome"
+GDB_SOURCE="${GDB_SOURCE:-verify_startup.gdb}"
+READY_MARKER="${READY_MARKER:-DOWNWELL_MENU_SPRITE_READY}"
+READY_DESCRIPTION="${READY_DESCRIPTION:-splash and hardware-sprite menu loop}"
 
 [ -f out/Downwell.exe ] || { echo "normal build not found"; exit 1; }
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM"; exit 1; }
@@ -55,15 +58,15 @@ lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 || {
   exit 1
 }
 
-GDB_SCRIPT="$(fsuae_gdb_script verify_startup.gdb)"
+GDB_SCRIPT="$(fsuae_gdb_script "$GDB_SOURCE")"
 env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
   "$GDB" -q -batch -x "$GDB_SCRIPT" out/Downwell.elf \
   > "$RUN/gdb-startup.log" 2>&1
 
-grep -q '^DOWNWELL_MENU_SPRITE_READY$' "$RUN/gdb-startup.log" || {
-  echo "normal build did not reach its hardware-sprite menu loop"
+grep -q "^${READY_MARKER}$" "$RUN/gdb-startup.log" || {
+  echo "normal build did not reach ${READY_DESCRIPTION}"
   tail -80 "$RUN/gdb-startup.log"
   exit 1
 }
 
-echo "normal A500 splash and hardware-sprite menu loop passed"
+echo "normal A500 ${READY_DESCRIPTION} passed"

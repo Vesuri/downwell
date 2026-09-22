@@ -61,3 +61,10 @@ game behavior runs at five-sixths of the Windows version's wall-clock speed.
 verification build, executes the shared 64-frame replay on an emulated A500,
 and compares its rolling native-state digest with the host result. The normal
 68000 executable is rebuilt immediately after a passing comparison.
+
+`make verify-amiga-scenes` similarly substitutes deterministic input only in a
+temporary build. Under an emulated A500 it traverses the complete timed splash
+sequence, wakes the player, enters the well, waits for the title and camera
+sequence, accepts the default style, and stops only after the first gameplay
+picture and copper list have been published. It also restores the normal
+playable executable after passing.

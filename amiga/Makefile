@@ -9,12 +9,16 @@ SUPPORT  := $(abspath $(dir $(shell which $(CC)))../../support)
 REPO     := ..
 AMIGA_SRC := $(REPO)/src/platform/amiga
 REPLAY_VERIFY ?= 0
+SCENE_VERIFY ?= 0
 
 CFLAGS := -g -O2 -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA
 ifeq ($(REPLAY_VERIFY),1)
 CFLAGS += -DDOWNWELL_REPLAY_VERIFY
+endif
+ifeq ($(SCENE_VERIFY),1)
+CFLAGS += -DDOWNWELL_SCENE_VERIFY
 endif
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \

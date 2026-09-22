@@ -134,6 +134,23 @@ extern "C" __attribute__((noinline, used)) void downwellFrameLoopReady(void) {
 extern "C" __attribute__((noinline, used)) void downwellMenuSpriteReady(void) {
     __asm__ volatile("" ::: "memory");
 }
+
+extern "C" __attribute__((noinline, used)) void downwellSceneGameplayReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+#endif
+
+#ifdef DOWNWELL_SCENE_VERIFY
+static downwell::Input sceneVerificationInput(
+    const AmigaSceneRuntime& scenes) {
+    downwell::Input input;
+    if (scenes.scene() == AmigaScene::menu)
+        input.right = true;
+    else if (scenes.scene() == AmigaScene::styleSelect &&
+             scenes.styleYOffset() == 0 && !scenes.styleSelected())
+        input.fire = true;
+    return input;
+}
 #endif
 
 static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
@@ -960,7 +977,11 @@ int main(void) {
                 break;
             packedInput = downwell::packReplayInput(replayInput);
 #else
+#ifdef DOWNWELL_SCENE_VERIFY
+            const downwell::Input liveInput = sceneVerificationInput(scenes);
+#else
             const downwell::Input liveInput = AmigaInput::sample();
+#endif
             packedInput = downwell::packReplayInput(liveInput);
             scenes.step(liveInput);
             {
@@ -1034,8 +1055,12 @@ int main(void) {
                  * frame. Keep the native physics clock on that boundary.
                  */
                 if (presentationChanged &&
-                    presentedScene == AmigaScene::gameplay)
+                    presentedScene == AmigaScene::gameplay) {
+#ifdef DOWNWELL_SCENE_VERIFY
+                    downwellSceneGameplayReady();
+#endif
                     continue;
+                }
             }
             if (scenes.scene() != AmigaScene::gameplay)
                 continue;
