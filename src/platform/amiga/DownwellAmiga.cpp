@@ -79,6 +79,8 @@ struct NativeFragment {
 };
 
 struct TerrainCollisionContext {
+    const downwell::RoomPack* rooms;
+    const downwell::PackedRoom* room;
     const downwell::BuilderPatternPack* builders;
     const NativeFragment* fragments;
     unsigned fragmentCount;
@@ -300,6 +302,18 @@ static bool resolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
         *static_cast<const TerrainCollisionContext*>(opaque);
     const int worldX = 240 + offsetX;
     const int worldY = 176 + offsetY;
+    if (context.rooms != 0 && context.room != 0) {
+        for (unsigned index = 0; index < context.room->instanceCount;
+             ++index) {
+            downwell::PackedRoomInstance instance;
+            if (!context.rooms->roomInstance(*context.room, index, instance) ||
+                (instance.objectId != 60 && instance.objectId != 92))
+                continue;
+            if (worldX >= instance.x - 8 && worldX < instance.x + 8 &&
+                worldY >= instance.y - 8 && worldY < instance.y + 8)
+                return true;
+        }
+    }
     for (unsigned fragmentIndex = 0;
          fragmentIndex < context.fragmentCount; ++fragmentIndex) {
         const NativeFragment& fragment = context.fragments[fragmentIndex];
@@ -308,6 +322,15 @@ static bool resolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
             ULONG width = 0;
             if (worldY < tileY - 8 || worldY >= tileY + 8)
                 continue;
+            if (row + 1 < fragment.pattern.rowCount) {
+                const int firstX = fragment.sideRoom
+                                       ? (fragment.reversed ? 0 : 480)
+                                       : (fragment.reversed ? 160 : 320);
+                const int secondX = fragment.reversed ? 320 : 160;
+                if ((worldX >= firstX - 8 && worldX < firstX + 8) ||
+                    (worldX >= secondX - 8 && worldX < secondX + 8))
+                    return true;
+            }
             if (!context.builders->rowWidth(fragment.pattern, row, width))
                 break;
             for (unsigned column = 0; column < width; ++column) {
@@ -325,6 +348,20 @@ static bool resolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
                 if (symbol != 'B' || context.runtime == 0 ||
                     context.runtime->breakableActiveAt(
                         tileX - 240, tileY - 176))
+                    return true;
+            }
+        }
+        if (fragment.appendPillars) {
+            const int finalRowY = fragment.y +
+                ((int)fragment.pattern.rowCount - 1) * 16;
+            if (worldY >= finalRowY - 8 &&
+                worldY < finalRowY + 3 * 16 - 8) {
+                const int firstX = fragment.sideRoom
+                                       ? (fragment.reversed ? 0 : 480)
+                                       : (fragment.reversed ? 160 : 320);
+                const int secondX = fragment.reversed ? 320 : 160;
+                if ((worldX >= firstX - 8 && worldX < firstX + 8) ||
+                    (worldX >= secondX - 8 && worldX < secondX + 8))
                     return true;
             }
         }
@@ -873,6 +910,8 @@ int main(void) {
                 nativeBreakableCapacity);
         port.configureBreakables(breakableX, breakableY, breakableCount);
         terrainCollision.builders = &builders;
+        terrainCollision.rooms = &rooms;
+        terrainCollision.room = &mainRoom;
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = nativeFragmentCount;
         terrainCollision.runtime = &port;

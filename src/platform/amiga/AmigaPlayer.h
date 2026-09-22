@@ -11,6 +11,7 @@ struct AmigaPlayerMotion {
 class AmigaPlayer {
 public:
     typedef int (*LandingResolver)(void* context, int x, int minimumY);
+    typedef bool (*SolidResolver)(void* context, int x, int y);
 
     static constexpr int landingProfileLeft = -60;
     static constexpr unsigned landingProfileSize = 121;
@@ -22,6 +23,13 @@ public:
     void configureLandingResolver(LandingResolver resolver, void* context) {
         landingResolver_ = resolver;
         landingResolverContext_ = context;
+    }
+    void configureSolidResolver(SolidResolver resolver, void* context,
+                                int leftLimit, int rightLimit) {
+        solidResolver_ = resolver;
+        solidResolverContext_ = context;
+        horizontalLeftLimit_ = leftLimit;
+        horizontalRightLimit_ = rightLimit;
     }
 
     int offsetX() const { return pixelX_; }
@@ -48,6 +56,10 @@ private:
     int landingProfile_[landingProfileSize];
     LandingResolver landingResolver_;
     void* landingResolverContext_;
+    SolidResolver solidResolver_;
+    void* solidResolverContext_;
+    int horizontalLeftLimit_;
+    int horizontalRightLimit_;
     bool usesLandingProfile_;
     int pixelX_;
     int pixelY_;

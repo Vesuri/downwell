@@ -83,6 +83,7 @@ public:
     void configureSolidResolver(SolidResolver resolver, void* context) {
         solidResolver_ = resolver;
         solidResolverContext_ = context;
+        player_.configureSolidResolver(resolver, context, -236, 236);
     }
     bool configureEnemy(unsigned index, int objectId, int spriteId,
                         int x, int y, int speedX, int speedY,

@@ -3,7 +3,6 @@
 namespace {
 enum {
     fixedOne = 256,
-    horizontalLimit = 60 * fixedOne,
     horizontalAcceleration = 51,
     horizontalTurnBoost = fixedOne,
     horizontalFriction = 26,
@@ -19,7 +18,10 @@ enum {
 AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
     : x_(0), y_(0), speedX_(0), speedY_(0),
       landingY_(landingOffset * fixedOne), landingResolver_(0),
-      landingResolverContext_(0), usesLandingProfile_(false),
+      landingResolverContext_(0), solidResolver_(0),
+      solidResolverContext_(0),
+      horizontalLeftLimit_(-60), horizontalRightLimit_(60),
+      usesLandingProfile_(false),
       pixelX_(0), pixelY_(0), ammo_(maximumAmmo),
       grounded_(startsGrounded), priorFire_(false),
       jumpShootLocked_(false), airborneShot_(false),
@@ -98,9 +100,39 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         speedX_ -= horizontalFriction;
         if (speedX_ < horizontalStopThreshold) speedX_ = 0;
     }
-    x_ += speedX_;
-    if (x_ < -horizontalLimit) { x_ = -horizontalLimit; speedX_ = 0; }
-    if (x_ > horizontalLimit) { x_ = horizontalLimit; speedX_ = 0; }
+    if (solidResolver_ != 0) {
+        long remaining = speedX_;
+        while (remaining != 0) {
+            long movement = remaining;
+            if (movement < -fixedOne) movement = -fixedOne;
+            if (movement > fixedOne) movement = fixedOne;
+            const long nextX = x_ + movement;
+            const int nextPixelX = fixedToPixel(nextX);
+            if (solidResolver_(solidResolverContext_, nextPixelX - 4,
+                               pixelY_ - 4) ||
+                solidResolver_(solidResolverContext_, nextPixelX + 3,
+                               pixelY_ - 4) ||
+                solidResolver_(solidResolverContext_, nextPixelX - 4,
+                               pixelY_ + 7) ||
+                solidResolver_(solidResolverContext_, nextPixelX + 3,
+                               pixelY_ + 7)) {
+                speedX_ = 0;
+                break;
+            }
+            x_ = nextX;
+            remaining -= movement;
+        }
+    } else {
+        x_ += speedX_;
+    }
+    if (x_ < (long)horizontalLeftLimit_ * fixedOne) {
+        x_ = (long)horizontalLeftLimit_ * fixedOne;
+        speedX_ = 0;
+    }
+    if (x_ > (long)horizontalRightLimit_ * fixedOne) {
+        x_ = (long)horizontalRightLimit_ * fixedOne;
+        speedX_ = 0;
+    }
     if (landingResolver_ != 0) {
         landingY_ = landingResolver_(landingResolverContext_,
                                     fixedToPixel(x_), fixedToPixel(y_)) *

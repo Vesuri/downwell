@@ -12,6 +12,15 @@ void require(bool condition, const char* message) {
     }
 }
 
+struct SolidFixture {
+    bool wall;
+};
+
+bool resolveSolid(void* opaque, int x, int y) {
+    const SolidFixture& fixture = *static_cast<SolidFixture*>(opaque);
+    return fixture.wall && x >= 24 && x <= 39 && y >= -8 && y <= 15;
+}
+
 } // namespace
 
 int main() {
@@ -69,6 +78,21 @@ int main() {
     player.step(input);
     require(player.facing() == -1,
             "leftward input flips the native player presentation");
+
+    SolidFixture fixture = {true};
+    AmigaPlayer colliding;
+    colliding.configureSolidResolver(resolveSolid, &fixture, -236, 236);
+    input = downwell::Input{};
+    input.right = true;
+    for (unsigned frame = 0; frame < 60; ++frame)
+        colliding.step(input);
+    require(colliding.offsetX() == 20,
+            "recovered player mask stops immediately before a solid wall");
+    fixture.wall = false;
+    for (unsigned frame = 0; frame < 60; ++frame)
+        colliding.step(input);
+    require(colliding.offsetX() > 60 && colliding.offsetX() <= 236,
+            "decoded terrain replaces the old center-shaft movement clamp");
 
     AmigaPlayer falling(false, 58);
     downwell::Input neutral;
