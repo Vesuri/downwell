@@ -45,6 +45,7 @@ enum {
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
     bulletSpriteHeight = 8,
     bulletSpriteBytes = (bulletSpriteHeight + 2) * 4,
+    bulletSpriteBufferCount = 2 * AmigaPortRuntime::bulletCapacity,
     fetchCropBytes = 2,
     fetchWords = 22,
     fetchWidth = fetchWords * 16,
@@ -587,7 +588,7 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
 static bool buildCopper(CopperList& list,
                         const Bitmap& game, const Bitmap& hud,
                         const Sprite& playerSprite,
-                        const Sprite& bulletSprite,
+                        const Sprite* bulletSprites,
                         const Sprite& nullSprite,
                         const Palette& palette,
                         unsigned ringOrigin) {
@@ -601,8 +602,10 @@ static bool buildCopper(CopperList& list,
     list.showBitmap(hud, 2, 2, fetchCropBytes * 8, 0, 2);
 
     list.showSprite(0, playerSprite);
-    list.showSprite(1, bulletSprite);
-    for (channel = 2; channel < 8; ++channel)
+    for (channel = 0; channel < AmigaPortRuntime::bulletCapacity; ++channel)
+        list.showSprite((UWORD)(channel + 1), bulletSprites[channel]);
+    for (channel = AmigaPortRuntime::bulletCapacity + 1;
+         channel < 8; ++channel)
         list.showSprite((UWORD)channel, nullSprite);
 
     list.setPalette(palette);
@@ -701,7 +704,8 @@ int main(void) {
         (ULONG)(amiga_game_pack_end - amiga_game_pack);
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
-                         bulletSpriteBytes, gamePackBytes)) {
+                         bulletSpriteBytes * bulletSpriteBufferCount,
+                         gamePackBytes)) {
         return 1;
     }
     for (ULONG byte = 0; byte < gamePackBytes; ++byte)
@@ -758,21 +762,53 @@ int main(void) {
         Sprite(memory.playerSprite(0), playerSpriteHeight),
         Sprite(memory.playerSprite(1), playerSpriteHeight)
     };
-    Sprite bulletSprite(memory.bulletSprite(), bulletSpriteHeight);
+    const unsigned bulletSpriteWordStride =
+        bulletSpriteBytes / sizeof(UWORD);
+    Sprite bulletSprites[bulletSpriteBufferCount] = {
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 0,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 1,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 2,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 3,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 4,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 5,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 6,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 7,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 8,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 9,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 10,
+               bulletSpriteHeight),
+        Sprite(memory.bulletSprite() + bulletSpriteWordStride * 11,
+               bulletSpriteHeight)
+    };
     Sprite nullSprite(memory.nullSprite(), 0);
-    bulletSprite.hide();
+    for (unsigned bullet = 0; bullet < bulletSpriteBufferCount; ++bullet)
+        bulletSprites[bullet].hide();
     if (!buildCopper(copperLists[0], gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
-                     playerSprites[0], bulletSprite, nullSprite, palette,
+                     playerSprites[0], bulletSprites, nullSprite, palette,
 #else
-                     nullSprite, bulletSprite, nullSprite, palette,
+                     nullSprite, bulletSprites, nullSprite, palette,
 #endif
                      initialRingOrigin) ||
         !buildCopper(copperLists[1], gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
-                     playerSprites[1], bulletSprite, nullSprite, palette,
+                     playerSprites[1],
+                     bulletSprites + AmigaPortRuntime::bulletCapacity,
+                     nullSprite, palette,
 #else
-                     nullSprite, bulletSprite, nullSprite, palette,
+                     nullSprite,
+                     bulletSprites + AmigaPortRuntime::bulletCapacity,
+                     nullSprite, palette,
 #endif
                      initialRingOrigin)) {
         memory.release();
@@ -791,9 +827,9 @@ int main(void) {
     while ((*ciaaPra & 0x40u) != 0) {
         UBYTE packedInput;
         int scrollDelta = 0;
-        bool blockDestroyed = false;
-        int destroyedBlockX = 0;
-        int destroyedBlockY = 0;
+        unsigned destroyedBlockCount = 0;
+        int destroyedBlockX[AmigaPortRuntime::bulletCapacity] = {0};
+        int destroyedBlockY[AmigaPortRuntime::bulletCapacity] = {0};
         platform.waitVblank();
         {
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -829,7 +865,9 @@ int main(void) {
                     if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
                                      presentedScene == AmigaScene::gameplay
                                          ? playerSprites[0] : nullSprite,
-                                     bulletSprite, nullSprite, palette,
+                                     bulletSprites + back *
+                                         AmigaPortRuntime::bulletCapacity,
+                                     nullSprite, palette,
                                      port.ringOrigin()))
                         break;
                     platform.publish(copperLists[back]);
@@ -841,17 +879,10 @@ int main(void) {
 #endif
             const AmigaPortFrame result = port.step(packedInput);
             scrollDelta = result.scrollDelta;
-            blockDestroyed = result.blockDestroyed;
-            destroyedBlockX = result.blockX;
-            destroyedBlockY = result.blockY;
-            if (result.bulletChanged) {
-                if (port.bulletActive())
-                    buildBulletSprite(bulletSprite,
-                        downwellPlayfieldX + 80 + port.bulletX(),
-                        gameplayPlayerStartY + port.bulletY() -
-                            port.cameraOffsetY());
-                else
-                    bulletSprite.hide();
+            destroyedBlockCount = result.destroyedBlockCount;
+            for (unsigned block = 0; block < destroyedBlockCount; ++block) {
+                destroyedBlockX[block] = result.blockX[block];
+                destroyedBlockY[block] = result.blockY[block];
             }
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo());
@@ -884,23 +915,26 @@ int main(void) {
                         direction > 0 ? downwellDisplayHeight - 1 : 0);
                 }
             }
-            if (blockDestroyed) {
+            if (destroyedBlockCount != 0) {
                 int landingProfile[AmigaPlayer::landingProfileSize];
-                const int centerY = 176 + destroyedBlockY;
-                int line;
                 buildEntranceLandingProfile(
                     builders, entrance, true, &port, landingProfile);
                 port.configureLandingProfile(
                     landingProfile, AmigaPlayer::landingProfileSize);
-                for (line = centerY - 8; line <= centerY + 7; ++line) {
-                    const int screenY = line - worldViewY;
-                    if (screenY < 0 || screenY >= downwellDisplayHeight)
-                        continue;
-                    drawRevealedGameLine(
-                        &renderer, rooms, mainRoom, builders, entrance,
-                        &port, port.ringOrigin(), line, screenY);
+                for (unsigned block = 0;
+                     block < destroyedBlockCount; ++block) {
+                    const int centerY = 176 + destroyedBlockY[block];
+                    int line;
+                    for (line = centerY - 8; line <= centerY + 7; ++line) {
+                        const int screenY = line - worldViewY;
+                        if (screenY < 0 || screenY >= downwellDisplayHeight)
+                            continue;
+                        drawRevealedGameLine(
+                            &renderer, rooms, mainRoom, builders, entrance,
+                            &port, port.ringOrigin(), line, screenY);
+                    }
+                    (void)destroyedBlockX[block];
                 }
-                (void)destroyedBlockX;
             }
             if (!amigaRendererBuildHardwareSprite(
                     activeGamePack, activeGamePackEnd,
@@ -916,10 +950,27 @@ int main(void) {
                     port.player().facing() < 0,
                     memory.playerSprite(back), playerSpriteHeight))
                 frameReady = false;
+            for (unsigned bullet = 0;
+                 bullet < AmigaPortRuntime::bulletCapacity; ++bullet) {
+                Sprite& sprite = bulletSprites[
+                    back * AmigaPortRuntime::bulletCapacity + bullet];
+                const AmigaPortRuntime::BulletState& state =
+                    port.bulletAt(bullet);
+                if (state.active)
+                    buildBulletSprite(
+                        sprite,
+                        downwellPlayfieldX + 80 + state.x,
+                        gameplayPlayerStartY + state.y -
+                            port.cameraOffsetY());
+                else
+                    sprite.hide();
+            }
             if (frameReady &&
                 !buildCopper(copperLists[back], gameBitmap, hudBitmap,
                              playerSprites[back],
-                             bulletSprite, nullSprite, palette,
+                             bulletSprites + back *
+                                 AmigaPortRuntime::bulletCapacity,
+                             nullSprite, palette,
                              port.ringOrigin()))
                 frameReady = false;
             if (!frameReady)

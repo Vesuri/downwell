@@ -34,6 +34,15 @@ int main() {
     require(runtime.checkpoint() != 0 && runtime.trajectoryDigest() != 0,
             "port runtime exposes final and rolling checkpoints");
 
+    AmigaPortRuntime burst(300, false, 1000);
+    burst.step(4);
+    for (unsigned frame = 0; frame < 7; ++frame)
+        burst.step(4);
+    require(burst.player().shots() == 2 && burst.bulletCount() == 2 &&
+                burst.bulletAt(0).active && burst.bulletAt(1).active &&
+                burst.bulletAt(0).y > burst.bulletAt(1).y,
+            "held gunboots retain simultaneous seven-tick shots");
+
     AmigaPortRuntime destructible(300);
     const int blockX[] = {-1};
     const int blockY[] = {32};
@@ -45,7 +54,8 @@ int main() {
     for (unsigned frame = 0;
          frame < 16 && destructible.blocksDestroyed() == 0; ++frame)
         broken = destructible.step(0);
-    require(destructible.blocksDestroyed() == 1 && broken.blockDestroyed &&
+    require(destructible.blocksDestroyed() == 1 &&
+                broken.destroyedBlockCount == 1 &&
                 !destructible.breakableActiveAt(-1, 32) &&
                 !destructible.bulletActive(),
             "gunboot bullets destroy configured recovered blocks");
@@ -78,7 +88,7 @@ int main() {
                 "cross-target replay frame is available");
         replayRuntime.step(downwell::packReplayInput(replayInput));
     }
-    require(replayRuntime.trajectoryDigest() == 0x7216631c68e5cf4bULL,
+    require(replayRuntime.trajectoryDigest() == 0x96481e8ddead3798ULL,
             "cross-target trajectory digest remains pinned");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;

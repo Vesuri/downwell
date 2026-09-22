@@ -6,21 +6,30 @@
 
 #include <cstdint>
 
+enum { amigaPortBulletCapacity = 6 };
+
 struct AmigaPortFrame {
     AmigaPlayerMotion playerMotion;
     bool ammoChanged;
     bool bulletChanged;
     bool scrolled;
     int scrollDelta;
-    bool blockDestroyed;
-    int blockX;
-    int blockY;
+    unsigned destroyedBlockCount;
+    int blockX[amigaPortBulletCapacity];
+    int blockY[amigaPortBulletCapacity];
 };
 
 class AmigaPortRuntime {
 public:
     static constexpr unsigned ringHeight = 320;
+    static constexpr unsigned bulletCapacity = amigaPortBulletCapacity;
     static constexpr int bulletBottom = 284;
+
+    struct BulletState {
+        int x;
+        int y;
+        bool active;
+    };
 
     explicit AmigaPortRuntime(unsigned initialRingOrigin,
                               bool startsGrounded = true,
@@ -35,9 +44,11 @@ public:
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
     unsigned ringOrigin() const { return ringOrigin_; }
-    bool bulletActive() const { return bulletActive_; }
-    int bulletX() const { return bulletX_; }
-    int bulletY() const { return bulletY_; }
+    unsigned bulletCount() const;
+    const BulletState& bulletAt(unsigned index) const;
+    bool bulletActive() const { return bulletCount() != 0; }
+    int bulletX() const;
+    int bulletY() const;
     int cameraOffsetY() const { return cameraPixelY_; }
     bool breakableActiveAt(int x, int y) const;
     unsigned blocksDestroyed() const { return blocksDestroyed_; }
@@ -58,9 +69,7 @@ private:
     bool followCamera_;
     long cameraY_;
     int cameraPixelY_;
-    bool bulletActive_;
-    int bulletX_;
-    int bulletY_;
+    BulletState bullets_[bulletCapacity];
     Breakable breakables_[breakableCapacity];
     unsigned breakableCount_;
     unsigned blocksDestroyed_;

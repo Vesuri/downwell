@@ -10,9 +10,48 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
     : player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
-      bulletActive_(false), bulletX_(0), bulletY_(0),
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
+    unsigned index;
+    for (index = 0; index < bulletCapacity; ++index) {
+        bullets_[index].x = 0;
+        bullets_[index].y = 0;
+        bullets_[index].active = false;
+    }
+}
+
+unsigned AmigaPortRuntime::bulletCount() const
+{
+    unsigned count = 0;
+    unsigned index;
+    for (index = 0; index < bulletCapacity; ++index)
+        if (bullets_[index].active)
+            ++count;
+    return count;
+}
+
+const AmigaPortRuntime::BulletState&
+AmigaPortRuntime::bulletAt(unsigned index) const
+{
+    return bullets_[index < bulletCapacity ? index : 0];
+}
+
+int AmigaPortRuntime::bulletX() const
+{
+    unsigned index;
+    for (index = 0; index < bulletCapacity; ++index)
+        if (bullets_[index].active)
+            return bullets_[index].x;
+    return 0;
+}
+
+int AmigaPortRuntime::bulletY() const
+{
+    unsigned index;
+    for (index = 0; index < bulletCapacity; ++index)
+        if (bullets_[index].active)
+            return bullets_[index].y;
+    return 0;
 }
 
 void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
@@ -43,43 +82,61 @@ bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
 
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
-    const bool oldBulletActive = bulletActive_;
-    const int oldBulletX = bulletX_;
-    const int oldBulletY = bulletY_;
     const int oldAmmo = player_.ammo();
     const unsigned oldShots = player_.shots();
-    bool blockDestroyed = false;
-    int blockX = 0;
-    int blockY = 0;
+    bool bulletChanged = false;
+    unsigned destroyedBlockCount = 0;
+    int destroyedBlockX[bulletCapacity] = {0};
+    int destroyedBlockY[bulletCapacity] = {0};
 
     ++tick_;
-    if (bulletActive_) {
-        const int priorBulletY = bulletY_;
-        unsigned index;
-        bulletY_ += 8;
-        for (index = 0; index < breakableCount_ && bulletActive_; ++index) {
-            Breakable& block = breakables_[index];
-            if (block.active && bulletX_ >= block.x - 8 &&
-                bulletX_ <= block.x + 7 &&
-                priorBulletY <= block.y + 7 && bulletY_ >= block.y - 8) {
-                block.active = false;
-                bulletActive_ = false;
-                blockDestroyed = true;
-                blockX = block.x;
-                blockY = block.y;
-                ++blocksDestroyed_;
+    {
+        unsigned bulletIndex;
+        for (bulletIndex = 0; bulletIndex < bulletCapacity; ++bulletIndex) {
+            BulletState& bullet = bullets_[bulletIndex];
+            if (!bullet.active)
+                continue;
+            const int priorBulletY = bullet.y;
+            unsigned blockIndex;
+            bullet.y += 8;
+            bulletChanged = true;
+            for (blockIndex = 0;
+                 blockIndex < breakableCount_ && bullet.active;
+                 ++blockIndex) {
+                Breakable& block = breakables_[blockIndex];
+                if (block.active && bullet.x >= block.x - 8 &&
+                    bullet.x <= block.x + 7 &&
+                    priorBulletY <= block.y + 7 &&
+                    bullet.y >= block.y - 8) {
+                    block.active = false;
+                    bullet.active = false;
+                    if (destroyedBlockCount < bulletCapacity) {
+                        destroyedBlockX[destroyedBlockCount] = block.x;
+                        destroyedBlockY[destroyedBlockCount] = block.y;
+                        ++destroyedBlockCount;
+                    }
+                    ++blocksDestroyed_;
+                }
             }
+            if (bullet.y >= bulletBottom)
+                bullet.active = false;
         }
-        if (bulletY_ >= bulletBottom)
-            bulletActive_ = false;
     }
 
     const downwell::Input input = downwell::unpackReplayInput(packedInput);
     AmigaPlayerMotion motion = player_.step(input);
     if (player_.shots() != oldShots) {
-        bulletActive_ = true;
-        bulletX_ = player_.offsetX() - 1;
-        bulletY_ = player_.offsetY() + 8;
+        unsigned index;
+        for (index = 0; index < bulletCapacity; ++index) {
+            BulletState& bullet = bullets_[index];
+            if (!bullet.active) {
+                bullet.active = true;
+                bullet.x = player_.offsetX() - 1;
+                bullet.y = player_.offsetY() + 8;
+                bulletChanged = true;
+                break;
+            }
+        }
     }
 
     int scrollDelta = 0;
@@ -102,22 +159,24 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         ringOrigin_ = (unsigned)origin;
     }
 
+    const bool firstBulletActive = bulletActive();
     checkpoint_ = downwell::portCheckpointDigest(
         tick_, packedInput, player_.offsetX(), player_.offsetY(),
         (std::uint32_t)player_.ammo(), player_.grounded(), player_.jumps(),
-        player_.shots(), ringOrigin_, bulletActive_, bulletX_, bulletY_);
+        player_.shots(), ringOrigin_, firstBulletActive,
+        bulletX(), bulletY());
     trajectory_.addU64(checkpoint_);
 
-    AmigaPortFrame frame = {
-        motion,
-        player_.ammo() != oldAmmo,
-        bulletActive_ != oldBulletActive || bulletX_ != oldBulletX ||
-            bulletY_ != oldBulletY,
-        scrollDelta != 0,
-        scrollDelta,
-        blockDestroyed,
-        blockX,
-        blockY
-    };
+    AmigaPortFrame frame = {};
+    frame.playerMotion = motion;
+    frame.ammoChanged = player_.ammo() != oldAmmo;
+    frame.bulletChanged = bulletChanged;
+    frame.scrolled = scrollDelta != 0;
+    frame.scrollDelta = scrollDelta;
+    frame.destroyedBlockCount = destroyedBlockCount;
+    for (unsigned index = 0; index < destroyedBlockCount; ++index) {
+        frame.blockX[index] = destroyedBlockX[index];
+        frame.blockY[index] = destroyedBlockY[index];
+    }
     return frame;
 }
