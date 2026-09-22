@@ -85,6 +85,13 @@ published origin, the renderer clears and draws only the rows or complete
 rows provide the update lead. PF2 remains a fixed, single-buffered HUD raster;
 dynamic counters and gauges update only their small dirty regions.
 
+The scaffold exercises this contract continuously: every other PAL frame it
+draws one hidden bottom row, advances the ring origin by one, rebuilds the
+inactive copper list with the new top and wrap pointers, and publishes that
+list for the following vertical blank. It never copies or scrolls the raster
+contents. Gameplay will replace the scaffold's sparse row marker with recovered
+16-pixel terrain bands while retaining the same publication path.
+
 The first hardware milestone is a four-plane copper display which proves the
 crop, palettes, priorities, null sprites, and central aperture before it tries
 to render recovered assets.

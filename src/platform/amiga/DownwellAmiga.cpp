@@ -176,6 +176,28 @@ static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
     drawAmmoDigit(renderer, 290, 239, 8);
 }
 
+static void drawRevealedGameLine(AmigaRenderer* renderer,
+                                 unsigned ringOrigin,
+                                 unsigned worldY) {
+    const int y = downwellDisplayHeight - 1;
+    amigaRendererSetGameOrigin(renderer, ringOrigin);
+    amigaRendererClearGameRows(renderer, y, 1, 0);
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
+                            downwellPlayfieldWidth, downwellDisplayHeight);
+
+    /* The side walls are permanent world geometry, revealed a line at a time. */
+    amigaRendererFillRect(renderer, downwellPlayfieldX, y, 2, 1, 1);
+    amigaRendererFillRect(renderer,
+                          downwellPlayfieldX + downwellPlayfieldWidth - 2,
+                          y, 2, 1, 1);
+
+    /* A sparse marker makes the one-line update path visible in the scaffold. */
+    if ((worldY & 63u) < 4u)
+        amigaRendererFillRect(renderer, downwellPlayfieldX + 32,
+                              y, downwellPlayfieldWidth - 64, 1, 1);
+    amigaRendererClearClipRect(renderer);
+}
+
 static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
                         const UWORD* playerSprite,
                         const UWORD* nullSprite,
@@ -248,6 +270,8 @@ int main(void) {
     AmigaRenderer renderer;
     unsigned frame = 0;
     unsigned front = 0;
+    unsigned ringOrigin = initialRingOrigin;
+    unsigned worldBottom = downwellDisplayHeight - 1;
     UWORD savedDmacon;
     UWORD savedIntena;
     const UWORD* osCopper;
@@ -349,10 +373,18 @@ int main(void) {
     while ((*ciaaPra & 0x40u) != 0) {
         waitVblank();
         ++frame;
-        if ((frame & 15u) == 0) {
-            front ^= 1u;
+        if ((frame & 1u) == 0) {
+            const unsigned back = front ^ 1u;
+            ringOrigin = (ringOrigin + 1u) % downwellGameRingHeight;
+            ++worldBottom;
+            drawRevealedGameLine(&renderer, ringOrigin, worldBottom);
+            if (!buildCopper(copperLists[back], memory.game(), memory.hud(),
+                             memory.playerSprite((frame >> 4) & 1u),
+                             memory.nullSprite(), ringOrigin))
+                break;
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
-            AmigaHardware::setCopperList(copperLists[front].data());
+            AmigaHardware::setCopperList(copperLists[back].data());
+            front = back;
         }
     }
 

@@ -82,6 +82,27 @@ void amigaRendererClear(AmigaRenderer* renderer, unsigned pen) {
     renderer->clipHeight = savedHeight;
 }
 
+void amigaRendererClearGameRows(AmigaRenderer* renderer,
+                                int firstY, int height, unsigned pen) {
+    int y;
+    const UBYTE low = (pen & 1u) ? 0xff : 0;
+    const UBYTE high = (pen & 2u) ? 0xff : 0;
+    for (y = firstY; y < firstY + height; ++y) {
+        unsigned physicalY;
+        ULONG offset;
+        int byte;
+        if (y < 0 || y >= downwellDisplayHeight)
+            continue;
+        physicalY = (renderer->gameOrigin + (unsigned)y) %
+                    downwellGameRingHeight;
+        offset = physicalY * downwellBytesPerPlaneLine;
+        for (byte = 0; byte < downwellBytesPerPlaneLine; ++byte) {
+            renderer->game[offset + byte] = low;
+            renderer->game[downwellGameRingPlaneBytes + offset + byte] = high;
+        }
+    }
+}
+
 void amigaRendererSetClipRect(AmigaRenderer* renderer,
                               int x, int y, int width, int height) {
     renderer->target = renderer->game;

@@ -39,6 +39,8 @@ typedef struct AmigaRenderer {
 void amigaRendererInit(AmigaRenderer* renderer, UBYTE* game, UBYTE* hud);
 void amigaRendererSetGameOrigin(AmigaRenderer* renderer, unsigned origin);
 void amigaRendererClear(AmigaRenderer* renderer, unsigned pen);
+void amigaRendererClearGameRows(AmigaRenderer* renderer,
+                                int firstY, int height, unsigned pen);
 void amigaRendererSetClipRect(AmigaRenderer* renderer,
                               int x, int y, int width, int height);
 void amigaRendererClearClipRect(AmigaRenderer* renderer);
