@@ -68,6 +68,26 @@ void testSmallIntegerPath() {
     }
 }
 
+void testSmallScaledRealPath() {
+    constexpr std::uint32_t ranges[] = {
+        0, 1, 2, 3, 5, 60, 300, 359, 1024, 32767, 65535
+    };
+    for (std::uint32_t seed = 0; seed < 32; ++seed) {
+        downwell::GameMakerRandom reference(seed * 0x3141592U + 11U);
+        downwell::GameMakerRandom small(seed * 0x3141592U + 11U);
+        for (unsigned sample = 0; sample < 200; ++sample) {
+            const std::uint32_t range =
+                ranges[sample % (sizeof(ranges) / sizeof(ranges[0]))];
+            const std::uint32_t expected = static_cast<std::uint32_t>(
+                reference.random(static_cast<double>(range)));
+            require(small.randomIntegerSmall(range) == expected,
+                    "32-bit scaled integer matches floor(random(range))");
+        }
+        require(small.drawCount() == reference.drawCount(),
+                "scaled integer adapter consumes one stream word");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -75,6 +95,7 @@ int main() {
     testIntegerRangeAndReset();
     testRealRange();
     testSmallIntegerPath();
+    testSmallScaledRealPath();
     std::cout << "GameMaker random tests passed\n";
     return 0;
 }

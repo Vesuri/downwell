@@ -65,4 +65,15 @@ std::uint32_t GameMakerRandom::irandomSmall(
     return (highRemainder + low % divisor) % divisor;
 }
 
+std::uint32_t GameMakerRandom::randomIntegerSmall(
+    std::uint32_t upperExclusive) {
+    assert(upperExclusive <= 0xffffU);
+    const std::uint32_t value = nextU32();
+    const std::uint32_t highProduct =
+        (value >> 16U) * upperExclusive;
+    const std::uint32_t lowCarry =
+        ((value & 0xffffU) * upperExclusive) >> 16U;
+    return (highProduct + lowCarry) >> 16U;
+}
+
 } // namespace downwell

@@ -23,6 +23,10 @@ public:
     // generators. This preserves the runner's 63-bit modulus without asking
     // a 68000 target for 64-bit division.
     std::uint32_t irandomSmall(std::uint32_t upperInclusive);
+    // Exact floor(random(upperExclusive)) for the small positive ranges used
+    // by recovered Create events.  The multiply is split into 16-bit halves,
+    // avoiding both floating point and a 64-bit multiply on a 68000.
+    std::uint32_t randomIntegerSmall(std::uint32_t upperExclusive);
 
     std::size_t stateIndex() const { return stateIndex_; }
     std::uint32_t stateWord(std::size_t index) const { return state_[index]; }
