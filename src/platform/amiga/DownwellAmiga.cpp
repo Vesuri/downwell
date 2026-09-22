@@ -235,6 +235,99 @@ static void drawSplash(AmigaRenderer* renderer, int stage) {
     amigaRendererClearClipRect(renderer);
 }
 
+static void drawMenu(AmigaRenderer* renderer,
+                     const downwell::RoomPack& rooms,
+                     const downwell::ObjectPack& objects,
+                     const AmigaSceneRuntime& scenes) {
+    downwell::PackedRoom room;
+    UWORD order[256];
+    unsigned count = 0;
+    unsigned index;
+    const int viewX = scenes.menuCameraX() - 80;
+    const int viewY = scenes.menuCameraY() - 142;
+    if (!rooms.findRoom(20, room))
+        return;
+
+    for (index = 0; index < room.instanceCount && count < 256; ++index) {
+        downwell::PackedRoomInstance instance;
+        downwell::PackedObject object;
+        if (rooms.roomInstance(room, index, instance) &&
+            objects.findObject(instance.objectId, object) &&
+            object.visible() && object.spriteId >= 0 &&
+            instance.objectId != 35)
+            order[count++] = (UWORD)index;
+    }
+    for (index = 1; index < count; ++index) {
+        const UWORD value = order[index];
+        downwell::PackedRoomInstance valueInstance;
+        downwell::PackedObject valueObject;
+        unsigned destination = index;
+        rooms.roomInstance(room, value, valueInstance);
+        objects.findObject(valueInstance.objectId, valueObject);
+        while (destination > 0) {
+            downwell::PackedRoomInstance priorInstance;
+            downwell::PackedObject priorObject;
+            rooms.roomInstance(room, order[destination - 1], priorInstance);
+            objects.findObject(priorInstance.objectId, priorObject);
+            if (priorObject.depth >= valueObject.depth)
+                break;
+            order[destination] = order[destination - 1];
+            --destination;
+        }
+        order[destination] = value;
+    }
+
+    amigaRendererClear(renderer, 0);
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
+                            downwellPlayfieldWidth, downwellDisplayHeight);
+    for (index = 0; index < count; ++index) {
+        downwell::PackedRoomInstance instance;
+        downwell::PackedObject object;
+        int roomX;
+        int roomY;
+        int sprite;
+        if (!rooms.roomInstance(room, order[index], instance) ||
+            !objects.findObject(instance.objectId, object))
+            continue;
+        roomX = instance.x;
+        roomY = instance.y;
+        if (instance.objectId == 312) {
+            roomX = 120 + viewX * 5 / 6;
+            roomY = (viewY + 142) * 10 / 11;
+        }
+        sprite = instance.objectId == 60 ? 76 : object.spriteId;
+        if (instance.objectId == 315)
+            amigaRendererFillRect(renderer,
+                downwellPlayfieldX + roomX - 24 - viewX,
+                roomY + 64 - viewY, 160, 1000, 0);
+        drawGameAsset(renderer, (UWORD)sprite, 0,
+                      downwellPlayfieldX + roomX - viewX,
+                      roomY - viewY, 0);
+    }
+
+    drawGameAsset(renderer, 654, (UWORD)scenes.menuTitleFrame(),
+                  downwellPlayfieldX + 328 - viewX, 432 - viewY, 0);
+    if (scenes.menuPlayerVisible()) {
+        UWORD sprite = 31;
+        UWORD frame = (UWORD)((scenes.tick() / 10U) & 3U);
+        if (scenes.menuPlayerNapping()) {
+            sprite = 12;
+            frame = 0;
+        } else if (scenes.menuPlayerY() > 512) {
+            sprite = 37;
+            frame = 4;
+        } else if ((scenes.tick() & 7U) != 0) {
+            sprite = 27;
+            frame = (UWORD)((scenes.tick() / 3U) & 7U);
+        }
+        drawGameAsset(renderer, sprite, frame,
+                      downwellPlayfieldX + scenes.menuPlayerX() - viewX,
+                      scenes.menuPlayerY() - viewY,
+                      scenes.menuPlayerFacing() < 0);
+    }
+    amigaRendererClearClipRect(renderer);
+}
+
 static void drawRevealedGameLine(AmigaRenderer* renderer,
                                  const downwell::BuilderPatternPack& builders,
                                  const downwell::PackedBuilderPattern& pattern,
@@ -469,23 +562,31 @@ int main(void) {
             const downwell::Input liveInput = AmigaInput::sample();
             packedInput = downwell::packReplayInput(liveInput);
             scenes.step(liveInput);
-            if (scenes.scene() != presentedScene ||
-                scenes.splashStage() != presentedSplash) {
+            {
+                const bool presentationChanged =
+                    scenes.scene() != presentedScene ||
+                    scenes.splashStage() != presentedSplash;
                 const unsigned back = front ^ 1u;
                 presentedScene = scenes.scene();
                 presentedSplash = scenes.splashStage();
-                if (presentedScene == AmigaScene::splash)
-                    drawSplash(&renderer, presentedSplash);
-                else
+                if (presentedScene == AmigaScene::splash) {
+                    if (presentationChanged)
+                        drawSplash(&renderer, presentedSplash);
+                }
+                else if (presentedScene == AmigaScene::menu)
+                    drawMenu(&renderer, rooms, objects, scenes);
+                else if (presentationChanged)
                     buildReferencePicture(&renderer, builders, entrance);
-                if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
-                                 presentedScene == AmigaScene::splash
-                                     ? nullSprite : playerSprites[0],
-                                 bulletSprite, nullSprite, palette,
-                                 port.ringOrigin()))
-                    break;
-                platform.publish(copperLists[back]);
-                front = back;
+                if (presentationChanged) {
+                    if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
+                                     presentedScene == AmigaScene::gameplay
+                                         ? playerSprites[0] : nullSprite,
+                                     bulletSprite, nullSprite, palette,
+                                     port.ringOrigin()))
+                        break;
+                    platform.publish(copperLists[back]);
+                    front = back;
+                }
             }
             if (scenes.scene() != AmigaScene::gameplay)
                 continue;

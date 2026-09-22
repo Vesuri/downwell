@@ -29,9 +29,22 @@ SELECTIONS = {
         416: None,   # sprPcHudStammoGauge
     },
     "game": {
+        12: None,    # sprPlayerLegswing
+        27: None,    # sprPlayerRunExg
         31: None,    # sprPlayerIdle
         37: None,    # sprPlayerAir
+        43: None,    # sprLocked
+        44: None,    # sprSelectArrow
         51: None,    # sprTile1
+        76: None,    # sprTileSurface
+        369: None,   # bgNightsky
+        631: None,   # sprTree
+        635: None,   # sprGrass
+        640: None,   # sprBench
+        642: None,   # sprWell2
+        646: None,   # sprTrees
+        654: None,   # sprTitleFade
+        729: None,   # infosp
         695: None,   # sprControls
         696: None,   # sprDevolverLogo
         733: None,   # sprDitherFade
