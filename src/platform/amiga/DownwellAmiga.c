@@ -29,6 +29,7 @@ enum {
     regDdfstrt = 0x092,
     regDdfstop = 0x094,
     regDmacon = 0x096,
+    regCopjmp1 = 0x088,
     regBpl1pth = 0x0e0,
     regBplcon0 = 0x100,
     regBplcon1 = 0x102,
@@ -127,7 +128,7 @@ static void drawHorizontalTiles(AmigaRenderer* renderer,
     }
 }
 
-static void buildReferencePicture(AmigaRenderer* renderer) {
+static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
 
     amigaRendererClear(renderer, 0);
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
@@ -136,7 +137,10 @@ static void buildReferencePicture(AmigaRenderer* renderer) {
     drawHorizontalTiles(renderer, downwellPlayfieldX + 56, 180, 4);
     drawHorizontalTiles(renderer, downwellPlayfieldX + 8, 116, 3);
     drawHorizontalTiles(renderer, downwellPlayfieldX + 120, 100, 3);
-    drawGameAsset(renderer, 31, 0, downwellPlayfieldX + 80, 200, 0);
+    if (phase == 0)
+        drawGameAsset(renderer, 31, 0, downwellPlayfieldX + 80, 200, 0);
+    else
+        drawGameAsset(renderer, 37, 0, downwellPlayfieldX + 88, 192, 0);
 
     amigaRendererClearClipRect(renderer);
     drawAsset(renderer, 408, 0, 108, 0, 0);
@@ -197,35 +201,49 @@ static void setDisplayRegisters(void) {
     writeRegister(regBplcon3, 0x0c30);
 }
 
+static void selectCopper(const UWORD* list) {
+    custom[regCop1lc >> 1] = (UWORD)((ULONG)list >> 16);
+    custom[(regCop1lc + 2) >> 1] = (UWORD)(ULONG)list;
+    writeRegister(regCopjmp1, 0);
+}
+
 int main(void) {
     struct View* savedView;
-    UBYTE* game;
+    UBYTE* game[2];
     UBYTE* hud;
     UWORD* copper;
     UWORD* nullSprite;
     AmigaRenderer renderer;
+    unsigned frame = 0;
+    unsigned front = 0;
 
     SysBase = *(struct ExecBase**)4UL;
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
     if (!GfxBase)
         return 1;
 
-    game = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
+    game[0] = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
+    game[1] = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
     hud = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
-    copper = (UWORD*)AllocMem(copperWords * sizeof(UWORD), MEMF_CHIP | MEMF_CLEAR);
+    copper = (UWORD*)AllocMem(copperWords * 2 * sizeof(UWORD),
+                             MEMF_CHIP | MEMF_CLEAR);
     nullSprite = (UWORD*)AllocMem(8, MEMF_CHIP | MEMF_CLEAR);
-    if (!game || !hud || !copper || !nullSprite) {
+    if (!game[0] || !game[1] || !hud || !copper || !nullSprite) {
         if (nullSprite) FreeMem(nullSprite, 8);
-        if (copper) FreeMem(copper, copperWords * sizeof(UWORD));
+        if (copper) FreeMem(copper, copperWords * 2 * sizeof(UWORD));
         if (hud) FreeMem(hud, downwellLayerBytes);
-        if (game) FreeMem(game, downwellLayerBytes);
+        if (game[1]) FreeMem(game[1], downwellLayerBytes);
+        if (game[0]) FreeMem(game[0], downwellLayerBytes);
         CloseLibrary((struct Library*)GfxBase);
         return 1;
     }
 
-    amigaRendererInit(&renderer, game, hud);
-    buildReferencePicture(&renderer);
-    buildCopper(copper, game, hud, nullSprite);
+    amigaRendererInit(&renderer, game[0], hud);
+    buildReferencePicture(&renderer, 0);
+    amigaRendererInit(&renderer, game[1], hud);
+    buildReferencePicture(&renderer, 1);
+    buildCopper(copper, game[0], hud, nullSprite);
+    buildCopper(copper + copperWords, game[1], hud, nullSprite);
 
     savedView = GfxBase->ActiView;
     LoadView(0);
@@ -234,13 +252,19 @@ int main(void) {
     writeRegister(regDmacon, DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER);
     writeRegister(regBplcon0, 0x0000);
     setDisplayRegisters();
-    custom[regCop1lc >> 1] = (UWORD)((ULONG)copper >> 16);
-    custom[(regCop1lc + 2) >> 1] = (UWORD)(ULONG)copper;
+    selectCopper(copper);
     writeRegister(regDmacon, DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER |
                                 DMAF_RASTER | DMAF_SPRITE);
 
     while ((*ciaaPra & 0x40u) == 0) WaitTOF();
-    while ((*ciaaPra & 0x40u) != 0) WaitTOF();
+    while ((*ciaaPra & 0x40u) != 0) {
+        WaitTOF();
+        ++frame;
+        if ((frame & 15u) == 0) {
+            front ^= 1u;
+            selectCopper(copper + front * copperWords);
+        }
+    }
 
     writeRegister(regDmacon, DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER);
     writeRegister(regBplcon0, 0x0000);
@@ -249,9 +273,10 @@ int main(void) {
     WaitTOF();
 
     FreeMem(nullSprite, 8);
-    FreeMem(copper, copperWords * sizeof(UWORD));
+    FreeMem(copper, copperWords * 2 * sizeof(UWORD));
     FreeMem(hud, downwellLayerBytes);
-    FreeMem(game, downwellLayerBytes);
+    FreeMem(game[1], downwellLayerBytes);
+    FreeMem(game[0], downwellLayerBytes);
     CloseLibrary((struct Library*)GfxBase);
     GfxBase = 0;
     return 0;
