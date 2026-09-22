@@ -74,6 +74,30 @@ int main() {
                 !combat.enemyAt(0).active,
             "usual gun bullet defeats the recovered five-health snake");
 
+    AmigaPortRuntime stomp(300);
+    require(stomp.configureEnemy(0, 111, 163, 0, 5,
+                                 0, 0, 5, 6),
+            "stomp enemy configuration succeeds");
+    stomp.step(0);
+    require(stomp.enemiesDefeated() == 1 &&
+                !stomp.enemyAt(0).active &&
+                !stomp.player().grounded() &&
+                stomp.player().ammo() == 8,
+            "descending contact stomps a snake, bounces and refills gunboots");
+
+    AmigaPortRuntime contact(300);
+    require(contact.configureEnemy(0, 117, 177, 0, 0,
+                                   0, 0, 20, 24),
+            "contact enemy configuration succeeds");
+    AmigaPortFrame contactFrame = contact.step(0);
+    require(contact.health() == 3 && contactFrame.healthChanged &&
+                contact.invulnerability() == 90,
+            "side contact removes one health and starts invulnerability");
+    contactFrame = contact.step(0);
+    require(contact.health() == 3 && !contactFrame.healthChanged &&
+                contact.invulnerability() == 89,
+            "invulnerability suppresses repeated overlap damage");
+
     AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
     int accumulatedScroll = 0;
     for (unsigned frame = 0;

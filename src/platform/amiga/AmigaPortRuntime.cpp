@@ -10,7 +10,8 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
     : player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
-      enemyCount_(0), enemiesDefeated_(0), solidResolver_(0),
+      enemyCount_(0), enemiesDefeated_(0), health_(4), invulnerability_(0),
+      solidResolver_(0),
       solidResolverContext_(0),
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
@@ -132,6 +133,7 @@ bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
     const int oldAmmo = player_.ammo();
+    const int oldHealth = health_;
     const unsigned oldShots = player_.shots();
     bool bulletChanged = false;
     unsigned destroyedBlockCount = 0;
@@ -283,6 +285,30 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
     }
 
+    if (invulnerability_ > 0)
+        --invulnerability_;
+    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+        EnemyState& enemy = enemies_[enemyIndex];
+        if (!enemy.active || !enemy.awake || enemy.health <= 0)
+            continue;
+        const int dx = player_.offsetX() - enemy.x;
+        const int dy = player_.offsetY() - enemy.y;
+        if (dx < -10 || dx > 10 || dy < -11 || dy > 11)
+            continue;
+        if (enemy.objectId == 111 && enemy.y > player_.offsetY() + 2) {
+            enemy.health = 0;
+            enemy.active = false;
+            ++enemiesDefeated_;
+            player_.stompBounce();
+            continue;
+        }
+        if (invulnerability_ == 0 && health_ > 0) {
+            --health_;
+            invulnerability_ = 90;
+            player_.contactKnockback(enemy.x);
+        }
+    }
+
     const bool firstBulletActive = bulletActive();
     checkpoint_ = downwell::portCheckpointDigest(
         tick_, packedInput, player_.offsetX(), player_.offsetY(),
@@ -294,6 +320,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     AmigaPortFrame frame = {};
     frame.playerMotion = motion;
     frame.ammoChanged = player_.ammo() != oldAmmo;
+    frame.healthChanged = health_ != oldHealth;
     frame.bulletChanged = bulletChanged;
     frame.scrolled = scrollDelta != 0;
     frame.scrollDelta = scrollDelta;

@@ -210,6 +210,15 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo) {
     drawAmmoDigit(renderer, 290, 239, ammo);
 }
 
+static void redrawHealth(AmigaRenderer* renderer, unsigned health) {
+    amigaRendererClearClipRect(renderer);
+    amigaRendererFillRect(renderer, 8, 6, 92, 28, 0);
+    drawAsset(renderer, 415, 1, 8, 6, 0);
+    amigaRendererFillRect(renderer, 12, 11, (int)health * 20, 6, 2);
+    drawAsset(renderer, 415, 0, 8, 6, 0);
+    drawHealthNumber(renderer, 52, 15, health, 4);
+}
+
 static bool isTerrainSymbol(char symbol) {
     return symbol == '1' || symbol == '2' || symbol == '3' ||
            symbol == 'B' || symbol == '-' || symbol == '|';
@@ -1052,6 +1061,8 @@ int main(void) {
             }
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo());
+            if (result.healthChanged)
+                redrawHealth(&renderer, (unsigned)port.health());
         }
         {
             const unsigned back = front ^ 1u;

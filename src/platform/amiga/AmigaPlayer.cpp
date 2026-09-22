@@ -46,6 +46,20 @@ int AmigaPlayer::fixedToPixel(long value)
     return value >= 0 ? (int)(value >> 8) : -(int)((-value) >> 8);
 }
 
+void AmigaPlayer::stompBounce()
+{
+    speedY_ = -640;
+    grounded_ = false;
+    ammo_ = maximumAmmo;
+}
+
+void AmigaPlayer::contactKnockback(int enemyX)
+{
+    speedX_ = pixelX_ < enemyX ? -3 * fixedOne : 3 * fixedOne;
+    speedY_ = -2 * fixedOne;
+    grounded_ = false;
+}
+
 AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
 {
     const int oldPixelX = pixelX_;

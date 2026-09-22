@@ -34,6 +34,8 @@ public:
     unsigned spriteFrame() const;
     unsigned jumps() const { return jumps_; }
     unsigned shots() const { return shots_; }
+    void stompBounce();
+    void contactKnockback(int enemyX);
 
 private:
     static int fixedToPixel(long value);

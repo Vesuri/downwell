@@ -11,6 +11,7 @@ enum { amigaPortBulletCapacity = 6, amigaPortEnemyCapacity = 3 };
 struct AmigaPortFrame {
     AmigaPlayerMotion playerMotion;
     bool ammoChanged;
+    bool healthChanged;
     bool bulletChanged;
     bool scrolled;
     int scrollDelta;
@@ -77,6 +78,8 @@ public:
     const EnemyState& enemyAt(unsigned index) const;
     unsigned enemyCount() const { return enemyCount_; }
     unsigned enemiesDefeated() const { return enemiesDefeated_; }
+    int health() const { return health_; }
+    unsigned invulnerability() const { return invulnerability_; }
     bool bulletActive() const { return bulletCount() != 0; }
     int bulletX() const;
     int bulletY() const;
@@ -104,6 +107,8 @@ private:
     EnemyState enemies_[enemyCapacity];
     unsigned enemyCount_;
     unsigned enemiesDefeated_;
+    int health_;
+    unsigned invulnerability_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;
     Breakable breakables_[breakableCapacity];
