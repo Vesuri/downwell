@@ -246,7 +246,8 @@ int main() {
             "contact enemy configuration succeeds");
     AmigaPortFrame contactFrame = contact.step(0);
     require(contact.health() == 3 && contactFrame.healthChanged &&
-                contact.invulnerability() == 90,
+                contact.invulnerability() == 90 &&
+                contact.player().speedXFixed() == 0,
             "side contact removes one health and starts invulnerability");
     contactFrame = contact.step(0);
     require(contact.health() == 3 && !contactFrame.healthChanged &&

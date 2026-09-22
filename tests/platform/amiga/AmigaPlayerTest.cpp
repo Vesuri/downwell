@@ -101,6 +101,15 @@ int main() {
     require(falling.grounded() && falling.offsetY() == 58,
             "gameplay spawn falls to the configured first platform");
 
+    AmigaPlayer overlapping;
+    overlapping.contactKnockback(0, 0);
+    require(overlapping.speedXFixed() == 0 && !overlapping.grounded(),
+            "exact enemy overlap has no invented horizontal knockback");
+    AmigaPlayer diagonal;
+    diagonal.contactKnockback(6, 8);
+    require(diagonal.speedXFixed() == -460,
+            "diagonal contact normalizes recovered horizontal knockback");
+
     int landingProfile[AmigaPlayer::landingProfileSize];
     for (unsigned index = 0; index < AmigaPlayer::landingProfileSize; ++index)
         landingProfile[index] = index < 60 ? 42 : 74;

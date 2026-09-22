@@ -35,6 +35,7 @@ public:
     int offsetX() const { return pixelX_; }
     int offsetY() const { return pixelY_; }
     long offsetYFixed() const { return y_; }
+    long speedXFixed() const { return speedX_; }
     int ammo() const { return ammo_; }
     bool grounded() const { return grounded_; }
     int facing() const { return facing_; }
@@ -43,10 +44,11 @@ public:
     unsigned jumps() const { return jumps_; }
     unsigned shots() const { return shots_; }
     void stompBounce();
-    void contactKnockback(int enemyX);
+    void contactKnockback(int enemyX, int enemyY);
 
 private:
     static int fixedToPixel(long value);
+    static unsigned integerSquareRoot(unsigned value);
 
     long x_;
     long y_;

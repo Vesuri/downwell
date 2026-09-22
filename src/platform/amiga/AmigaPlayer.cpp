@@ -48,6 +48,24 @@ int AmigaPlayer::fixedToPixel(long value)
     return value >= 0 ? (int)(value >> 8) : -(int)((-value) >> 8);
 }
 
+unsigned AmigaPlayer::integerSquareRoot(unsigned value)
+{
+    unsigned result = 0;
+    unsigned bit = 1u << 30;
+    while (bit > value)
+        bit >>= 2;
+    while (bit != 0) {
+        if (value >= result + bit) {
+            value -= result + bit;
+            result = (result >> 1) + bit;
+        } else {
+            result >>= 1;
+        }
+        bit >>= 2;
+    }
+    return result;
+}
+
 void AmigaPlayer::stompBounce()
 {
     speedY_ = -640;
@@ -55,9 +73,15 @@ void AmigaPlayer::stompBounce()
     ammo_ = maximumAmmo;
 }
 
-void AmigaPlayer::contactKnockback(int enemyX)
+void AmigaPlayer::contactKnockback(int enemyX, int enemyY)
 {
-    speedX_ = pixelX_ < enemyX ? -3 * fixedOne : 3 * fixedOne;
+    const int dx = pixelX_ - enemyX;
+    const int dy = pixelY_ - enemyY;
+    const unsigned distance = integerSquareRoot(
+        (unsigned)(dx * dx + dy * dy));
+    speedX_ = distance == 0
+                  ? 0
+                  : (long)dx * (3L * fixedOne) / (long)distance;
     speedY_ = -2 * fixedOne;
     grounded_ = false;
 }

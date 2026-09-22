@@ -657,7 +657,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         if (invulnerability_ == 0 && health_ > 0) {
             --health_;
             invulnerability_ = 90;
-            player_.contactKnockback(enemy.x);
+            player_.contactKnockback(enemy.x, enemy.y);
         }
     }
 
