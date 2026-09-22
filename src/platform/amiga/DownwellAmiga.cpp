@@ -1159,6 +1159,14 @@ int main(void) {
                     platform.publish(copperLists[back]);
                     front = back;
                 }
+                /*
+                 * GameMaker creates the rmMain player on the transition
+                 * frame, but its first movement Step runs on the following
+                 * frame. Keep the native physics clock on that boundary.
+                 */
+                if (presentationChanged &&
+                    presentedScene == AmigaScene::gameplay)
+                    continue;
             }
             if (scenes.scene() != AmigaScene::gameplay)
                 continue;

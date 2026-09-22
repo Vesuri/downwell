@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaSceneRuntime.h"
+#include "platform/amiga/AmigaPortRuntime.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
@@ -131,6 +132,29 @@ void compareStyle(const AmigaSceneRuntime& amiga,
                 "style exit dither follows decoded runtime");
 }
 
+void compareInitialGameplay(const AmigaPortRuntime& amiga,
+                            const downwell::StartupRuntime& reference) {
+    require(reference.inMainRoom(),
+            "reference remains in gameplay during comparison");
+    requireNear(static_cast<float>(240 + amiga.player().offsetX()),
+                reference.mainPlayerX(), 1.0F,
+                "gameplay player X follows decoded runtime");
+    requireNear(static_cast<float>(176 + amiga.player().offsetY()),
+                reference.mainPlayerY(), 4.0F,
+                "gameplay player Y follows decoded runtime");
+    requireNear(static_cast<float>(160 + amiga.cameraOffsetX()),
+                reference.mainCameraViewX(), 1.0F,
+                "gameplay camera X follows decoded runtime");
+    requireNear(static_cast<float>(34 + amiga.cameraOffsetY()),
+                reference.mainCameraViewY(), 5.0F,
+                "gameplay camera Y follows decoded runtime");
+    require(amiga.player().facing() == reference.mainPlayerFacing(),
+            "gameplay facing follows decoded runtime");
+    require(amiga.player().ammo() == reference.mainAmmo() &&
+                amiga.health() == reference.mainPlayerHealth(),
+            "initial gameplay HUD state follows decoded runtime");
+}
+
 void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                             const char* builderPatternPath) {
     const std::vector<std::uint8_t> roomBytes = readFile(roomPath);
@@ -233,6 +257,23 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     reference.step(released, false);
     require(amiga.scene() == AmigaScene::gameplay && reference.inMainRoom(),
             "both runtimes enter gameplay on the same frame");
+
+    AmigaPortRuntime gameplay(300, false, 1201 - 176, true);
+    compareInitialGameplay(gameplay, reference);
+    for (int tick = 0; tick < 220; ++tick) {
+        parityFrame = 534 + tick;
+        reference.step(released, false);
+        gameplay.step(0);
+        compareInitialGameplay(gameplay, reference);
+        if (gameplay.player().grounded() && reference.mainPlayerGrounded())
+            break;
+    }
+    require(gameplay.player().grounded() && reference.mainPlayerGrounded(),
+            "both gameplay runtimes land on the recovered entrance floor");
+    require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
+                gameplay.player().spriteFrame() ==
+                    static_cast<unsigned>(reference.mainPlayerImageIndex()),
+            "landed gameplay pose follows decoded runtime");
 }
 }
 
