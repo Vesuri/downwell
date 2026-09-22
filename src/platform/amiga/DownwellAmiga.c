@@ -12,6 +12,8 @@ struct GfxBase* GfxBase = 0;
 
 extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
+extern const UBYTE amiga_game_pack[];
+extern const UBYTE amiga_game_pack_end[];
 
 enum {
     copperWords = 128
@@ -57,6 +59,12 @@ static void copperPointer(UWORD* list, unsigned* count, UWORD reg, const void* p
 static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
                       int anchorX, int anchorY, int flipX) {
     amigaRendererDrawAsset(renderer, amiga_hud_pack, amiga_hud_pack_end,
+                           sprite, frame, anchorX, anchorY, flipX);
+}
+
+static void drawGameAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
+                          int anchorX, int anchorY, int flipX) {
+    amigaRendererDrawAsset(renderer, amiga_game_pack, amiga_game_pack_end,
                            sprite, frame, anchorX, anchorY, flipX);
 }
 
@@ -107,25 +115,28 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
     drawAsset(renderer, 413, digit, x, y, 0);
 }
 
-static void buildDiagnosticPicture(AmigaRenderer* renderer) {
-    int y;
-    int x;
+static void drawHorizontalTiles(AmigaRenderer* renderer,
+                                int firstX, int y, int count) {
+    int index;
+    for (index = 0; index < count; ++index) {
+        unsigned frame = 10;
+        if (index == 0) frame = 2;
+        if (index == count - 1) frame = 8;
+        if (count == 1) frame = 0;
+        drawGameAsset(renderer, 51, frame, firstX + index * 16, y, 0);
+    }
+}
+
+static void buildReferencePicture(AmigaRenderer* renderer) {
 
     amigaRendererClear(renderer, 0);
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
                             downwellPlayfieldWidth, downwellDisplayHeight);
-    amigaRendererFillRect(renderer, downwellPlayfieldX, 0,
-                          downwellPlayfieldWidth, downwellDisplayHeight, 1);
-    amigaRendererFillRect(renderer, downwellPlayfieldX + 4, 4,
-                          downwellPlayfieldWidth - 8,
-                          downwellDisplayHeight - 8, 0);
-    amigaRendererFillRect(renderer, downwellPlayfieldX + 24, 52,
-                          downwellPlayfieldWidth - 48, 40, 2);
-    for (y = 116; y < 244; y += 16)
-        for (x = downwellPlayfieldX + 8;
-             x < downwellPlayfieldX + downwellPlayfieldWidth - 8; x += 16)
-            amigaRendererFillRect(renderer, x, y, 8, 8,
-                                  ((x + y) >> 3) & 1 ? 1 : 2);
+    drawHorizontalTiles(renderer, downwellPlayfieldX + 8, 228, 10);
+    drawHorizontalTiles(renderer, downwellPlayfieldX + 56, 180, 4);
+    drawHorizontalTiles(renderer, downwellPlayfieldX + 8, 116, 3);
+    drawHorizontalTiles(renderer, downwellPlayfieldX + 120, 100, 3);
+    drawGameAsset(renderer, 31, 0, downwellPlayfieldX + 80, 200, 0);
 
     amigaRendererClearClipRect(renderer);
     drawAsset(renderer, 408, 0, 108, 0, 0);
@@ -165,7 +176,7 @@ static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
     copperMove(list, &count, regColor00 + 0 * 2, 0x000);
     copperMove(list, &count, regColor00 + 1 * 2, 0xfff);
     copperMove(list, &count, regColor00 + 2 * 2, 0xf00);
-    copperMove(list, &count, regColor00 + 3 * 2, 0x888);
+    copperMove(list, &count, regColor00 + 3 * 2, 0x000);
     copperMove(list, &count, regColor00 + 9 * 2, 0xfff);
     copperMove(list, &count, regColor00 + 10 * 2, 0xf00);
     copperMove(list, &count, regColor00 + 11 * 2, 0x000);
@@ -213,7 +224,7 @@ int main(void) {
     }
 
     amigaRendererInit(&renderer, game, hud);
-    buildDiagnosticPicture(&renderer);
+    buildReferencePicture(&renderer);
     buildCopper(copper, game, hud, nullSprite);
 
     savedView = GfxBase->ActiView;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert the recovered 4:3 HUD subset to interleaved Amiga 2bpp data."""
+"""Convert selected recovered art to interleaved Amiga 2bpp data."""
 
 import argparse
 import hashlib
@@ -18,14 +18,24 @@ SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb
 HEADER = struct.Struct(">4sHHI8s")
 RECORD = struct.Struct(">HHhhHHHHII")
 
-# Exact resources used by scrDrawHud4x3 and its sprite-number helpers.
-SELECTION = {
-    376: None,       # sprHudCurrency
-    408: None,       # sprTabletBorder
-    413: None,       # sprSpriteNumber (white/red/black digit banks)
-    414: None,       # sprSpriteSlash
-    415: None,       # sprPcHudHpGauge
-    416: None,       # sprPcHudStammoGauge
+# Exact resources needed by the first native HUD and gameplay milestones.
+SELECTIONS = {
+    "hud": {
+        376: None,   # sprHudCurrency
+        408: None,   # sprTabletBorder
+        413: None,   # sprSpriteNumber (white/red/black digit banks)
+        414: None,   # sprSpriteSlash
+        415: None,   # sprPcHudHpGauge
+        416: None,   # sprPcHudStammoGauge
+    },
+    "game": {
+        31: None,    # sprPlayerIdle
+        37: None,    # sprPlayerAir
+        51: None,    # sprTile1
+        695: None,   # sprControls
+        696: None,   # sprDevolverLogo
+        733: None,   # sprDitherFade
+    },
 }
 
 
@@ -91,7 +101,7 @@ def decode_planar(data, width, height, dma_width):
     return pens
 
 
-def build_pack(manifest, extracted):
+def build_pack(manifest, extracted, selection):
     require(manifest["schemaVersion"] == 3, "unexpected extraction schema")
     require(manifest["source"]["sha256"] == SOURCE_SHA256,
             "manifest does not describe the pinned Steam build")
@@ -102,7 +112,7 @@ def build_pack(manifest, extracted):
              for index in range(manifest["counts"]["embeddedTextures"])]
 
     encoded = []
-    for sprite_id in SELECTION:
+    for sprite_id in selection:
         sprite = sprites[sprite_id]
         require(sprite["id"] == sprite_id, "sprite IDs are not stable")
         for frame_index, frame in enumerate(sprite["frames"]):
@@ -147,21 +157,24 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--extracted", type=Path,
                         default=root / "extracted/utmt-0.9.2.0")
-    parser.add_argument("--output", type=Path,
-                        default=root / "generated/amiga-hud.dwap")
+    parser.add_argument("--profile", choices=SELECTIONS, default="hud")
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
     manifest = json.loads((args.extracted / "manifest.json").read_text(encoding="utf-8"))
-    data = build_pack(manifest, args.extracted)
+    if args.output is None:
+        args.output = root / f"generated/amiga-{args.profile}.dwap"
+    data = build_pack(manifest, args.extracted, SELECTIONS[args.profile])
     digest = hashlib.sha256(data).hexdigest()
     if args.check:
-        require(args.output.is_file(), f"missing Amiga HUD pack: {args.output}")
-        require(args.output.read_bytes() == data, "Amiga HUD pack is not reproducible")
-        print(f"Amiga HUD pack verified: {len(data)} bytes sha256 {digest}")
+        require(args.output.is_file(), f"missing Amiga asset pack: {args.output}")
+        require(args.output.read_bytes() == data,
+                "Amiga asset pack is not reproducible")
+        print(f"Amiga {args.profile} pack verified: {len(data)} bytes sha256 {digest}")
     else:
         atomic_write(args.output, data)
-        print(f"Amiga HUD pack written: {len(data)} bytes sha256 {digest}")
+        print(f"Amiga {args.profile} pack written: {len(data)} bytes sha256 {digest}")
 
 
 if __name__ == "__main__":

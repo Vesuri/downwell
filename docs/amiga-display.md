@@ -64,13 +64,15 @@ The first hardware milestone is a four-plane copper display which proves the
 crop, palettes, priorities, null sprites, and central aperture before it tries
 to render recovered assets.
 
-## Recovered HUD asset format
+## Recovered asset format
 
-`tools/generate-amiga-hud.py` converts the exact HUD resources used by the
-landscape path into `generated/amiga-hud.dwap`. The generated payload remains
-uncommitted copyrighted material. Each frame record retains its stable sprite
-and frame IDs, origin, logical dimensions, word-aligned DMA width, payload
-offset, and size.
+`tools/generate-amiga-hud.py` has deterministic `hud` and `game` profiles. It
+converts the exact HUD resources used by the landscape path, plus the first
+player, area-one tile, and startup resources, into `generated/amiga-hud.dwap`
+and `generated/amiga-game.dwap`. The generated payloads remain uncommitted
+copyrighted material. Each frame record retains its stable sprite and frame
+IDs, origin, logical dimensions, word-aligned DMA width, payload offset, and
+size.
 
 Rows are stored as two interleaved planes. The four pens deliberately
 distinguish transparency from black:

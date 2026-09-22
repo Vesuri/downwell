@@ -17,5 +17,6 @@ contract: setting a clip rectangle selects PF1 and limits game drawing to the
 central well; clearing the clip selects PF2 and restores the full 380x284 HUD
 canvas.  Its drawing coordinates never include the two-pixel DMA backing bias.
 
-The current executable displays a two-layer diagnostic picture through that
-boundary and exits back to Workbench on a fresh left-mouse click.
+The current executable displays recovered player and area-one wall art on PF1,
+plus the recovered 4:3 HUD on PF2, through that boundary.  It exits back to
+Workbench on a fresh left-mouse click.

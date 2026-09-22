@@ -16,6 +16,7 @@ ASFLAGS := -mcpu=68020 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
+AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 OBJECTS := obj/DownwellAmiga.o obj/AmigaRenderer.o obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
 
@@ -50,7 +51,10 @@ obj/AmigaRenderer.o: $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h
 $(AMIGA_HUD):
 	$(MAKE) -C $(REPO) generate-amiga-hud
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD)
+$(AMIGA_GAME):
+	$(MAKE) -C $(REPO) generate-amiga-game
+
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 
