@@ -26,8 +26,7 @@ extern "C" int amigaBlitterDrawPlanarMasked(
         destinationX, destinationY,
         sourceX, sourceY, sourceX, sourceY,
         width, height, false);
-    while (AmigaHardware::isBlitterBusy() || AmigaHardware::hasQueuedBlits) {
-    }
+    AmigaHardware::blitterDrain();
     return 1;
 }
 
