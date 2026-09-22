@@ -80,6 +80,7 @@ public:
         long speedX;
         long speedY;
         bool large;
+        bool attracted;
         bool active;
     };
 
@@ -171,7 +172,7 @@ private:
     std::uint64_t checkpoint_;
     downwell::StateDigest trajectory_;
 
-    void spawnReward(const EnemyState& enemy);
+    void spawnReward(const EnemyState& enemy, bool attracted);
     static unsigned integerSquareRoot(unsigned value);
 };
 

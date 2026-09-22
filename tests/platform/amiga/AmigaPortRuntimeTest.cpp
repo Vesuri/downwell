@@ -89,6 +89,11 @@ int main() {
     require(combat.enemiesDefeated() == 1 &&
                 !combat.enemyAt(0).active,
             "usual gun bullet defeats the recovered five-health snake");
+    require(combat.gemCount() == 3 &&
+                !combat.gemAt(0).attracted &&
+                (combat.gemAt(0).speedX != 0 ||
+                 combat.gemAt(0).speedY != 0),
+            "gun-kill rewards launch freely with recovered random velocity");
 
     AmigaPortRuntime turtle(300);
     turtle.configureSolidResolver(flatGround, 0);
@@ -216,6 +221,7 @@ int main() {
                 stomp.player().ammo() == 8 && stomp.gemCount() == 3,
             "descending contact stomps a snake, bounces and refills gunboots");
     require(stomp.gemAt(0).amount == 2 && !stomp.gemAt(0).large &&
+                stomp.gemAt(0).attracted &&
                 stomp.gemAt(1).amount == 2 &&
                 stomp.gemAt(2).amount == 2,
             "six-value snake reward splits into three recovered small gems");

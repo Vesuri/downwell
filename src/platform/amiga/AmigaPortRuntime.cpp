@@ -99,6 +99,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         gems_[index].speedX = 0;
         gems_[index].speedY = 0;
         gems_[index].large = false;
+        gems_[index].attracted = false;
         gems_[index].active = false;
     }
 }
@@ -121,7 +122,7 @@ unsigned AmigaPortRuntime::integerSquareRoot(unsigned value)
     return result;
 }
 
-void AmigaPortRuntime::spawnReward(const EnemyState& enemy)
+void AmigaPortRuntime::spawnReward(const EnemyState& enemy, bool attracted)
 {
     int remaining = enemy.reward;
     for (unsigned index = 0; index < gemCapacity && remaining > 0; ++index) {
@@ -135,8 +136,14 @@ void AmigaPortRuntime::spawnReward(const EnemyState& enemy)
         gem.y = enemy.y;
         gem.preciseX = (long)enemy.x * 256L;
         gem.preciseY = (long)enemy.y * 256L;
-        gem.speedX = 0;
-        gem.speedY = 0;
+        /* fixed8(random(4) - 2), preserving one runner draw per component */
+        gem.speedX = (long)(enemyRandom_.nextU32() >> 22) - 512L;
+        gem.speedY = (long)(enemyRandom_.nextU32() >> 22) - 512L;
+        enemyRandom_.irandomSmall(3);  /* recovered imgSp choice */
+        enemyRandom_.irandomSmall(70); /* first gemdir candidate */
+        enemyRandom_.irandomSmall(70); /* second gemdir candidate */
+        enemyRandom_.irandomSmall(1);  /* candidate choice */
+        gem.attracted = attracted;
         gem.active = true;
         remaining -= gem.amount;
     }
@@ -348,7 +355,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 if (enemy.objectId != 112) {
                     enemy.health -= 10;
                     if (enemy.health <= 0) {
-                        spawnReward(enemy);
+                        spawnReward(enemy, false);
                         enemy.active = false;
                         ++enemiesDefeated_;
                     }
@@ -641,7 +648,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                                enemy.objectId == 116;
         if (stompable && enemy.y > player_.offsetY() + 2) {
             enemy.health = 0;
-            spawnReward(enemy);
+            spawnReward(enemy, true);
             enemy.active = false;
             ++enemiesDefeated_;
             player_.stompBounce();
@@ -666,19 +673,52 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         ++gem.age;
         const int dx = player_.offsetX() - gem.x;
         const int dy = player_.offsetY() - gem.y;
-        const unsigned distance = integerSquareRoot(
-            (unsigned)(dx * dx + dy * dy));
-        long speed = 4L * 256L + ((long)gem.age - 15L) * 32L;
-        if (speed > 9L * 256L)
-            speed = 9L * 256L;
-        if (speed < 0)
-            speed = 0;
-        if (distance != 0) {
-            gem.speedX = (long)dx * speed / (long)distance;
-            gem.speedY = (long)dy * speed / (long)distance;
+        if (!gem.attracted && gem.age >= 15 &&
+            absoluteInt(dx) < 24 && absoluteInt(dy) < 24)
+            gem.attracted = true;
+        if (gem.attracted) {
+            const unsigned distance = integerSquareRoot(
+                (unsigned)(dx * dx + dy * dy));
+            /*
+             * The recovered uint16 age subtraction saturates the early
+             * immediately-attracted stomp path at the nine-pixel cap.
+             */
+            long speed = gem.age < 15
+                             ? 9L * 256L
+                             : 4L * 256L + ((long)gem.age - 15L) * 32L;
+            if (speed > 9L * 256L)
+                speed = 9L * 256L;
+            if (distance != 0) {
+                gem.speedX = (long)dx * speed / (long)distance;
+                gem.speedY = (long)dy * speed / (long)distance;
+            }
+            gem.preciseX += gem.speedX;
+            gem.preciseY += gem.speedY;
+        } else {
+            gem.speedY += 9; /* recovered gravity 0.035 in fixed8 */
+            if (gem.speedY > 4L * 256L)
+                gem.speedY = 4L * 256L;
+            const long nextX = gem.preciseX + gem.speedX;
+            if (solidResolver_ != 0 && solidResolver_(
+                    solidResolverContext_, (int)(nextX / 256L), gem.y))
+                gem.speedX = -(gem.speedX * 179L) / 256L;
+            else
+                gem.preciseX = nextX;
+            const long nextY = gem.preciseY + gem.speedY;
+            if (gem.speedY > 0 && solidResolver_ != 0 && solidResolver_(
+                    solidResolverContext_,
+                    (int)(gem.preciseX / 256L),
+                    (int)(nextY / 256L) + 4)) {
+                const long bounce =
+                    (long)enemyRandom_.randomIntegerSmall(180);
+                gem.speedY = -128L - bounce;
+                gem.speedX = (gem.speedX * 179L) / 256L;
+            } else {
+                gem.preciseY = nextY;
+            }
+            if (absoluteInt((int)gem.speedX) < 13)
+                gem.speedX = gem.speedX < 0 ? -13 : 13;
         }
-        gem.preciseX += gem.speedX;
-        gem.preciseY += gem.speedY;
         gem.x = (int)(gem.preciseX / 256L);
         gem.y = (int)(gem.preciseY / 256L);
         const int collectX = player_.offsetX() - gem.x;
