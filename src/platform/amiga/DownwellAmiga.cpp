@@ -346,72 +346,77 @@ static void drawSplash(AmigaRenderer* renderer, int stage) {
     amigaRendererClearClipRect(renderer);
 }
 
-static void drawMenu(AmigaRenderer* renderer,
-                     const downwell::RoomPack& rooms,
-                     const downwell::ObjectPack& objects,
-                     const AmigaSceneRuntime& scenes) {
+struct MenuDrawItem {
+    int x;
+    int y;
+    int objectId;
+    int spriteId;
+    int depth;
+};
+
+struct MenuDrawList {
+    MenuDrawItem items[256];
+    unsigned count;
+};
+
+static bool buildMenuDrawList(const downwell::RoomPack& rooms,
+                              const downwell::ObjectPack& objects,
+                              MenuDrawList& list) {
     downwell::PackedRoom room;
-    UWORD order[256];
-    unsigned count = 0;
+    unsigned index;
+    list.count = 0;
+    if (!rooms.findRoom(20, room))
+        return false;
+    for (index = 0; index < room.instanceCount && list.count < 256; ++index) {
+        downwell::PackedRoomInstance instance;
+        downwell::PackedObject object;
+        if (!rooms.roomInstance(room, index, instance) ||
+            !objects.findObject(instance.objectId, object) ||
+            !object.visible() || object.spriteId < 0 ||
+            instance.objectId == 35)
+            continue;
+        MenuDrawItem item = {
+            instance.x,
+            instance.y,
+            instance.objectId,
+            instance.objectId == 60 ? 76 : object.spriteId,
+            object.depth
+        };
+        unsigned destination = list.count;
+        while (destination > 0 &&
+               list.items[destination - 1].depth < item.depth) {
+            list.items[destination] = list.items[destination - 1];
+            --destination;
+        }
+        list.items[destination] = item;
+        ++list.count;
+    }
+    return true;
+}
+
+static void drawMenu(AmigaRenderer* renderer,
+                     const MenuDrawList& list,
+                     const AmigaSceneRuntime& scenes) {
     unsigned index;
     const int viewX = scenes.menuCameraX() - 80;
     const int viewY = scenes.menuCameraY() - 142;
-    if (!rooms.findRoom(20, room))
-        return;
-
-    for (index = 0; index < room.instanceCount && count < 256; ++index) {
-        downwell::PackedRoomInstance instance;
-        downwell::PackedObject object;
-        if (rooms.roomInstance(room, index, instance) &&
-            objects.findObject(instance.objectId, object) &&
-            object.visible() && object.spriteId >= 0 &&
-            instance.objectId != 35)
-            order[count++] = (UWORD)index;
-    }
-    for (index = 1; index < count; ++index) {
-        const UWORD value = order[index];
-        downwell::PackedRoomInstance valueInstance;
-        downwell::PackedObject valueObject;
-        unsigned destination = index;
-        rooms.roomInstance(room, value, valueInstance);
-        objects.findObject(valueInstance.objectId, valueObject);
-        while (destination > 0) {
-            downwell::PackedRoomInstance priorInstance;
-            downwell::PackedObject priorObject;
-            rooms.roomInstance(room, order[destination - 1], priorInstance);
-            objects.findObject(priorInstance.objectId, priorObject);
-            if (priorObject.depth >= valueObject.depth)
-                break;
-            order[destination] = order[destination - 1];
-            --destination;
-        }
-        order[destination] = value;
-    }
 
     amigaRendererClear(renderer, 0);
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
                             downwellPlayfieldWidth, downwellDisplayHeight);
-    for (index = 0; index < count; ++index) {
-        downwell::PackedRoomInstance instance;
-        downwell::PackedObject object;
-        int roomX;
-        int roomY;
-        int sprite;
-        if (!rooms.roomInstance(room, order[index], instance) ||
-            !objects.findObject(instance.objectId, object))
-            continue;
-        roomX = instance.x;
-        roomY = instance.y;
-        if (instance.objectId == 312) {
+    for (index = 0; index < list.count; ++index) {
+        const MenuDrawItem& item = list.items[index];
+        int roomX = item.x;
+        int roomY = item.y;
+        if (item.objectId == 312) {
             roomX = 120 + viewX * 5 / 6;
             roomY = (viewY + 142) * 10 / 11;
         }
-        sprite = instance.objectId == 60 ? 76 : object.spriteId;
-        if (instance.objectId == 315)
+        if (item.objectId == 315)
             amigaRendererFillRect(renderer,
                 downwellPlayfieldX + roomX - 24 - viewX,
                 roomY + 64 - viewY, 160, 1000, 0);
-        drawGameAsset(renderer, (UWORD)sprite, 0,
+        drawGameAsset(renderer, (UWORD)item.spriteId, 0,
                       downwellPlayfieldX + roomX - viewX,
                       roomY - viewY, 0);
     }
@@ -646,6 +651,7 @@ int main(void) {
     AmigaPlatform platform;
     AmigaMemory memory;
     AmigaRenderer renderer;
+    MenuDrawList menuDrawList;
     unsigned front = 0;
     int worldViewY = mainInitialViewY;
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -682,6 +688,7 @@ int main(void) {
         !verificationReplay.valid() ||
 #endif
         !rooms.findRoom(11, mainRoom) ||
+        !buildMenuDrawList(rooms, objects, menuDrawList) ||
         !builders.findPattern(downwell::BuilderPatternFamily::areaOneStart,
                               3, entrance)) {
         return 1;
@@ -854,7 +861,7 @@ int main(void) {
                 }
                 else if (presentedScene == AmigaScene::menu) {
                     if (presentationChanged || !scenes.menuPlayerNapping())
-                        drawMenu(&renderer, rooms, objects, scenes);
+                        drawMenu(&renderer, menuDrawList, scenes);
                 }
                 else if (presentedScene == AmigaScene::styleSelect)
                     drawStyleSelect(&renderer, scenes);
