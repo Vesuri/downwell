@@ -16,13 +16,22 @@ in `UPSTREAM.md`.
 contract: setting a clip rectangle selects PF1 and limits game drawing to the
 central well; clearing the clip selects PF2 and restores the full 380x284 HUD
 canvas. Its drawing coordinates map directly to pixels 0..379 of each
-384-pixel-wide bitplane; the hardware window also exposes the four black
-padding pixels at the right edge so its width matches the DMA fetch exactly.
-The fetch is shifted left to the legal `$20..$d8` 24-word range; `$e0` exceeds
-the chipset's documented right-hand data-fetch limit.
+384-pixel-wide bitplane. The hardware fetch presents logical pixels 16..367:
+each bitplane pointer skips the first two bytes, a four-byte modulo skips the
+two bytes at each row's far edge, and `$30..$d8` fetches the intervening 22
+words. The backing geometry remains 384 pixels wide for direct host-to-Amiga
+coordinate mapping.
 
 The current executable displays recovered area-one wall art on a double-
 buffered PF1, the recovered 4:3 HUD on the single-buffered PF2, and the player
 on hardware sprite channel 0. The player alternates between recovered idle and
-air frames to make paired copper-list and sprite-pointer swaps visible. It
-exits back to Workbench on a fresh left-mouse click.
+air frames to make paired copper-list and sprite-pointer swaps visible.
+
+Its machine lifecycle follows Rescue on Fractalus: allocation and the two
+`WaitTOF()` calls which retire the Workbench display happen before takeover;
+the live program owns the raw VERTB vector, forbids multitasking, and waits on
+its own interrupt counter. Normal copper swaps publish COP1LC without a
+COPJMP1 strobe and therefore become live at the next vertical blank. Teardown
+stops the display, restores `graphics.library`'s startup copper and the saved
+interrupt/DMA state, permits multitasking, and only then restores the View.
+It exits back to Workbench on a fresh left-mouse click.

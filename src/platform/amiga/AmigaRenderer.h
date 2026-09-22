@@ -10,7 +10,8 @@ enum {
     downwellBytesPerPlaneLine = downwellDmaWidth / 8,
     downwellPlaneBytes = downwellBytesPerPlaneLine * downwellDisplayHeight,
     downwellLayerBytes = downwellPlaneBytes * 2,
-    downwellDisplayHStart = 0x51,
+    /* Beam-space origin for logical x=0 after the 16-pixel left crop. */
+    downwellDisplayHStart = 0x61,
     downwellDisplayVStart = 0x12,
     downwellPlayfieldX = 110,
     downwellPlayfieldWidth = 160

@@ -5,22 +5,29 @@ stretching the 160-pixel game surface.
 
 ## Geometry
 
-- Hardware display window: 384x284 PAL lores pixels.
-- Logical canvas: 380x284 pixels; its four right-hand padding pixels are black.
+- Hardware display window: 352x284 PAL lores pixels.
+- Logical canvas: 380x284 pixels, retained for one-to-one porting.
 - DMA backing width: 384 pixels (24 words, 48 bytes per plane per line).
-- The display window exposes all fetched pixels 0..383.
-- Native visible coordinates map directly to backing coordinates.
+- The display window exposes logical pixels 16..367.
+- Native drawing coordinates still map directly to backing coordinates.
 - The game well is 160x284 at visible x=110..269, matching the host reference.
 
 The display setup must derive and assert its DIW and DDF values in one place.
-The intended OCS/ECS 16-bit fetch is 24 words per line; it must not inherit an
+The intended OCS/ECS 16-bit fetch is 22 words per line; it must not inherit an
 AGA fetch mode from the operating system.
 
-The 24-word fetch is positioned at DDFSTRT=$20 and DDFSTOP=$D8, the documented
-rightmost hardware limit. Its matching 384-pixel window is HSTART=$51 through
-HSTOP=$1D1. A fetch at $28..$E0 is not equivalent: the hardware clips it at
-$D8, consumes only 46 bytes, and produces a two-byte scanline skew against a
-48-byte plane.
+The 22-word fetch is positioned at DDFSTRT=$30 and DDFSTOP=$D8, the documented
+rightmost hardware limit. Its matching 352-pixel window is HSTART=$71 through
+HSTOP=$1D1 in the extended horizontal coordinates. Logical x=0 has beam-space
+origin $61, so logical x=16 begins at the window's $71 left edge. Each
+bitplane pointer begins two bytes into its 48-byte backing row and each modulo
+is four, thereby omitting one 16-pixel word at both edges.
+
+This fetch has an explicit sprite cost. The Hardware Reference Manual states
+that moving DDFSTRT from the normal $38 to $30 disables sprite DMA channel 7.
+Thus the 22-word layout preserves automatic DMA for channels 0..6. Preserving
+all eight requires the 21-word, 336-pixel `$38..$D8` fetch; channel 7 cannot be
+claimed as an automatic-DMA sprite while the 352-pixel fetch is active.
 
 ## Dual playfield ownership
 
@@ -55,7 +62,7 @@ Hardware sprites sit in front of both playfields. Initial channel allocation:
 
 - player: one attached pair when four colours are insufficient, otherwise one
   channel;
-- bullets, gems, and small effects: remaining single channels where their
+- bullets, gems, and small effects: remaining channels 0..6 where their
   width, palette, and multiplexing lifetime fit;
 - enemies: candidates only after the playfield implementation is correct.
 
