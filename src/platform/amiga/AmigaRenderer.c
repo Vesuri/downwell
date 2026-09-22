@@ -140,3 +140,67 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
         }
     }
 }
+
+int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
+                                     UWORD sprite, UWORD frame,
+                                     int anchorX, int anchorY,
+                                     UWORD* destination,
+                                     unsigned destinationHeight) {
+    const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
+    const UBYTE* data;
+    UBYTE* control = (UBYTE*)destination;
+    int originX;
+    int originY;
+    int width;
+    int height;
+    int dataWidth;
+    int planeBytes;
+    int cropX;
+    int startX;
+    int startY;
+    int stopY;
+    int y;
+    int x;
+    if (!record)
+        return 0;
+    originX = (WORD)readWord(record + 4);
+    originY = (WORD)readWord(record + 6);
+    width = readWord(record + 8);
+    height = readWord(record + 10);
+    dataWidth = readWord(record + 12);
+    planeBytes = dataWidth >> 3;
+    data = pack + readLong(record + 16);
+    if (height > (int)destinationHeight || width < 16 ||
+        data < pack || data + readLong(record + 20) > packEnd)
+        return 0;
+
+    cropX = (width - 16) >> 1;
+    startX = 0x63 + anchorX - originX + cropX;
+    startY = 0x12 + anchorY - originY;
+    stopY = startY + height;
+    control[0] = (UBYTE)startY;
+    control[1] = (UBYTE)(startX >> 1);
+    control[2] = (UBYTE)stopY;
+    control[3] = (UBYTE)((startX & 1) |
+                         (stopY > 255 ? 2 : 0) |
+                         (startY > 255 ? 4 : 0));
+
+    for (y = 0; y < height; ++y) {
+        const UBYTE* row = data + y * planeBytes * 2;
+        UWORD plane0 = 0;
+        UWORD plane1 = 0;
+        for (x = 0; x < 16; ++x) {
+            const int sourceX = cropX + x;
+            const UBYTE mask = (UBYTE)(0x80u >> (sourceX & 7));
+            if (row[sourceX >> 3] & mask)
+                plane0 |= (UWORD)(0x8000u >> x);
+            if (row[planeBytes + (sourceX >> 3)] & mask)
+                plane1 |= (UWORD)(0x8000u >> x);
+        }
+        destination[2 + y * 2] = plane0;
+        destination[3 + y * 2] = plane1;
+    }
+    destination[2 + height * 2] = 0;
+    destination[3 + height * 2] = 0;
+    return 1;
+}

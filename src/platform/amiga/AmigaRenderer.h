@@ -37,5 +37,10 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,
                             int anchorX, int anchorY, int flipX);
+int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
+                                     UWORD sprite, UWORD frame,
+                                     int anchorX, int anchorY,
+                                     UWORD* destination,
+                                     unsigned destinationHeight);
 
 #endif

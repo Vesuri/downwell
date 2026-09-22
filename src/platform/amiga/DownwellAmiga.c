@@ -16,7 +16,9 @@ extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_game_pack_end[];
 
 enum {
-    copperWords = 128
+    copperWords = 128,
+    playerSpriteHeight = 32,
+    playerSpriteBytes = (playerSpriteHeight + 2) * 4
 };
 
 static volatile UWORD* const custom = (volatile UWORD*)0xdff000;
@@ -137,10 +139,7 @@ static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
     drawHorizontalTiles(renderer, downwellPlayfieldX + 56, 180, 4);
     drawHorizontalTiles(renderer, downwellPlayfieldX + 8, 116, 3);
     drawHorizontalTiles(renderer, downwellPlayfieldX + 120, 100, 3);
-    if (phase == 0)
-        drawGameAsset(renderer, 31, 0, downwellPlayfieldX + 80, 200, 0);
-    else
-        drawGameAsset(renderer, 37, 0, downwellPlayfieldX + 88, 192, 0);
+    (void)phase;
 
     amigaRendererClearClipRect(renderer);
     drawAsset(renderer, 408, 0, 108, 0, 0);
@@ -160,6 +159,7 @@ static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
 }
 
 static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
+                            const UWORD* playerSprite,
                             const UWORD* nullSprite) {
     unsigned count = 0;
     unsigned channel;
@@ -174,7 +174,8 @@ static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
     copperPointer(list, &count, regBpl1pth + 12,
                   hud + downwellBytesPerPlaneLine);
 
-    for (channel = 0; channel < 8; ++channel)
+    copperPointer(list, &count, regSpr0pth, playerSprite);
+    for (channel = 1; channel < 8; ++channel)
         copperPointer(list, &count, regSpr0pth + channel * 4, nullSprite);
 
     copperMove(list, &count, regColor00 + 0 * 2, 0x000);
@@ -184,6 +185,9 @@ static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
     copperMove(list, &count, regColor00 + 9 * 2, 0xfff);
     copperMove(list, &count, regColor00 + 10 * 2, 0xf00);
     copperMove(list, &count, regColor00 + 11 * 2, 0x000);
+    copperMove(list, &count, regColor00 + 17 * 2, 0xfff);
+    copperMove(list, &count, regColor00 + 18 * 2, 0xf00);
+    copperMove(list, &count, regColor00 + 19 * 2, 0x000);
 
     list[count++] = 0xffff;
     list[count++] = 0xfffe;
@@ -213,6 +217,7 @@ int main(void) {
     UBYTE* hud;
     UWORD* copper;
     UWORD* nullSprite;
+    UWORD* playerSprite[2];
     AmigaRenderer renderer;
     unsigned frame = 0;
     unsigned front = 0;
@@ -228,7 +233,14 @@ int main(void) {
     copper = (UWORD*)AllocMem(copperWords * 2 * sizeof(UWORD),
                              MEMF_CHIP | MEMF_CLEAR);
     nullSprite = (UWORD*)AllocMem(8, MEMF_CHIP | MEMF_CLEAR);
-    if (!game[0] || !game[1] || !hud || !copper || !nullSprite) {
+    playerSprite[0] = (UWORD*)AllocMem(playerSpriteBytes,
+                                      MEMF_CHIP | MEMF_CLEAR);
+    playerSprite[1] = (UWORD*)AllocMem(playerSpriteBytes,
+                                      MEMF_CHIP | MEMF_CLEAR);
+    if (!game[0] || !game[1] || !hud || !copper || !nullSprite ||
+        !playerSprite[0] || !playerSprite[1]) {
+        if (playerSprite[1]) FreeMem(playerSprite[1], playerSpriteBytes);
+        if (playerSprite[0]) FreeMem(playerSprite[0], playerSpriteBytes);
         if (nullSprite) FreeMem(nullSprite, 8);
         if (copper) FreeMem(copper, copperWords * 2 * sizeof(UWORD));
         if (hud) FreeMem(hud, downwellLayerBytes);
@@ -242,8 +254,27 @@ int main(void) {
     buildReferencePicture(&renderer, 0);
     amigaRendererInit(&renderer, game[1], hud);
     buildReferencePicture(&renderer, 1);
-    buildCopper(copper, game[0], hud, nullSprite);
-    buildCopper(copper + copperWords, game[1], hud, nullSprite);
+    if (!amigaRendererBuildHardwareSprite(
+            amiga_game_pack, amiga_game_pack_end, 31, 0,
+            downwellPlayfieldX + 80, 200,
+            playerSprite[0], playerSpriteHeight) ||
+        !amigaRendererBuildHardwareSprite(
+            amiga_game_pack, amiga_game_pack_end, 37, 0,
+            downwellPlayfieldX + 88, 192,
+            playerSprite[1], playerSpriteHeight)) {
+        FreeMem(playerSprite[1], playerSpriteBytes);
+        FreeMem(playerSprite[0], playerSpriteBytes);
+        FreeMem(nullSprite, 8);
+        FreeMem(copper, copperWords * 2 * sizeof(UWORD));
+        FreeMem(hud, downwellLayerBytes);
+        FreeMem(game[1], downwellLayerBytes);
+        FreeMem(game[0], downwellLayerBytes);
+        CloseLibrary((struct Library*)GfxBase);
+        return 1;
+    }
+    buildCopper(copper, game[0], hud, playerSprite[0], nullSprite);
+    buildCopper(copper + copperWords, game[1], hud,
+                playerSprite[1], nullSprite);
 
     savedView = GfxBase->ActiView;
     LoadView(0);
@@ -272,6 +303,8 @@ int main(void) {
     WaitTOF();
     WaitTOF();
 
+    FreeMem(playerSprite[1], playerSpriteBytes);
+    FreeMem(playerSprite[0], playerSpriteBytes);
     FreeMem(nullSprite, 8);
     FreeMem(copper, copperWords * 2 * sizeof(UWORD));
     FreeMem(hud, downwellLayerBytes);

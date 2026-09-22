@@ -17,7 +17,8 @@ contract: setting a clip rectangle selects PF1 and limits game drawing to the
 central well; clearing the clip selects PF2 and restores the full 380x284 HUD
 canvas.  Its drawing coordinates never include the two-pixel DMA backing bias.
 
-The current executable displays recovered player and area-one wall art on a
-double-buffered PF1, plus the recovered 4:3 HUD on the single-buffered PF2.
-The player alternates between two recovered frames to make PF1 copper-list
-swaps visible. It exits back to Workbench on a fresh left-mouse click.
+The current executable displays recovered area-one wall art on a double-
+buffered PF1, the recovered 4:3 HUD on the single-buffered PF2, and the player
+on hardware sprite channel 0. The player alternates between recovered idle and
+air frames to make paired copper-list and sprite-pointer swaps visible. It
+exits back to Workbench on a fresh left-mouse click.
