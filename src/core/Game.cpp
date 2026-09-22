@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "HudNumbers.h"
 #include "ObjectPack.h"
 #include <array>
 #include <cmath>
@@ -185,10 +186,8 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
                       20 * startup_.mainPlayerHealth(), 6,
                       {255, 0, 0, 255});
     renderer.drawSprite(415, 0, origin - 102, 6);
-    const std::string health =
-        std::to_string(startup_.mainPlayerHealth()) + "/4";
-    renderer.drawText(2, health.c_str(), origin - 58, 15,
-                      {255, 255, 255, 255}, TextAlign::center);
+    drawHudHealthNumber(renderer, origin - 58, 15,
+                        startup_.mainPlayerHealth(), 4);
 
     constexpr int gaugeX = origin + 174;
     constexpr int gaugeTop = 43;
@@ -201,15 +200,12 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
         renderer.fillRect(gaugeX + 5, gaugeBottom - filled,
                           10, filled, {255, 255, 255, 255});
     renderer.drawSprite(416, 1, gaugeX, gaugeTop);
-    const std::string ammo = std::to_string(startup_.mainAmmo());
-    renderer.drawText(2, ammo.c_str(), gaugeX + 6, 239,
-                      {255, 255, 255, 255}, TextAlign::center);
+    drawHudAmmoNumber(renderer, gaugeX + 6, 239, startup_.mainAmmo());
 
     constexpr int currencyX = origin + 252;
     renderer.drawSprite(376, 0, currencyX, 18);
-    const std::string currency = std::to_string(startup_.mainCurrencyTotal());
-    renderer.drawText(2, currency.c_str(), currencyX - 8, 18,
-                      {255, 255, 255, 255}, TextAlign::right);
+    drawHudCurrencyNumber(renderer, currencyX - 8, 18,
+                          startup_.mainCurrencyTotal());
 
     if (startup_.mainGemStreak() > 0) {
         const std::string streak = std::to_string(startup_.mainGemStreak());
