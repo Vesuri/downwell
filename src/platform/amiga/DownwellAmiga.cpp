@@ -241,9 +241,13 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
     }
 }
 
-static bool isTerrainSymbol(char symbol) {
+static bool isLandingTerrainSymbol(char symbol) {
     return symbol == '1' || symbol == '2' || symbol == '3' ||
            symbol == 'B' || symbol == '-' || symbol == '|';
+}
+
+static bool isSolidTerrainSymbol(char symbol) {
+    return symbol != '-' && isLandingTerrainSymbol(symbol);
 }
 
 static UWORD terrainFrame(char symbol) {
@@ -286,7 +290,7 @@ static int resolveTerrainLanding(void* opaque, int offsetX,
                     context.runtime->breakableActiveAt(
                         tileX - 240,
                         fragment.y + (int)row * 16 - 176);
-                if (active && isTerrainSymbol(symbol) &&
+                if (active && isLandingTerrainSymbol(symbol) &&
                     worldX >= tileX - 8 && worldX < tileX + 8) {
                     landing = candidate;
                     break;
@@ -343,7 +347,7 @@ static bool resolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
                                             row, symbol))
                     break;
                 if (worldX < tileX - 8 || worldX >= tileX + 8 ||
-                    !isTerrainSymbol(symbol))
+                    !isSolidTerrainSymbol(symbol))
                     continue;
                 if (symbol != 'B' || context.runtime == 0 ||
                     context.runtime->breakableActiveAt(
@@ -747,7 +751,7 @@ static void drawMainWorldLine(
                         !runtime->breakableActiveAt(
                             worldX - 240, centerY - 176))
                         continue;
-                    if (isTerrainSymbol(symbol))
+                    if (isLandingTerrainSymbol(symbol))
                         drawGameAsset(
                             renderer, 51, terrainFrame(symbol),
                             downwellPlayfieldX + worldX - viewX,
