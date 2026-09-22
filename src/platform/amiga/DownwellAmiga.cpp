@@ -130,6 +130,10 @@ extern "C" __attribute__((noinline, used)) void downwellStartupReady(void) {
 extern "C" __attribute__((noinline, used)) void downwellFrameLoopReady(void) {
     __asm__ volatile("" ::: "memory");
 }
+
+extern "C" __attribute__((noinline, used)) void downwellMenuSpriteReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
 #endif
 
 static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
@@ -453,13 +457,6 @@ static void drawMenu(AmigaRenderer* renderer,
     drawGameAsset(renderer, 654, (UWORD)scenes.menuTitleFrame(),
                   downwellPlayfieldX + 328 - viewX,
                   scenes.menuTitleY() - viewY, 0);
-    if (scenes.menuPlayerVisible()) {
-        drawGameAsset(renderer, (UWORD)scenes.menuPlayerSprite(),
-                      (UWORD)scenes.menuPlayerFrame(),
-                      downwellPlayfieldX + scenes.menuPlayerX() - viewX,
-                      scenes.menuPlayerY() - viewY,
-                      scenes.menuPlayerFacing() < 0);
-    }
     amigaRendererClearClipRect(renderer);
 }
 
@@ -733,6 +730,7 @@ int main(void) {
     AmigaScene presentedScene = scenes.scene();
     int presentedSplash = scenes.splashStage();
     unsigned liveFrameCount = 0;
+    unsigned menuSpriteFrameCount = 0;
     worldViewY += port.cameraOffsetY();
 #endif
 
@@ -986,6 +984,38 @@ int main(void) {
                     buildReferencePicture(&renderer, rooms, builders,
                                           fragments[0].pattern,
                                           worldViewY);
+                if (presentedScene == AmigaScene::menu) {
+                    bool menuFrameReady = true;
+                    if (scenes.menuPlayerVisible()) {
+                        menuFrameReady = amigaRendererBuildHardwareSprite(
+                            activeGamePack, activeGamePackEnd,
+                            (UWORD)scenes.menuPlayerSprite(),
+                            (UWORD)scenes.menuPlayerFrame(),
+                            downwellPlayfieldX + scenes.menuPlayerX() -
+                                (scenes.menuCameraX() - 80),
+                            scenes.menuPlayerY() -
+                                (scenes.menuCameraY() - 142),
+                            scenes.menuPlayerFacing() < 0,
+                            memory.playerSprite(back), playerSpriteHeight);
+                    } else {
+                        playerSprites[back].hide();
+                    }
+                    if (menuFrameReady)
+                        menuFrameReady = buildCopper(
+                            copperLists[back], gameBitmap, hudBitmap,
+                            playerSprites[back],
+                            bulletSprites + back *
+                                AmigaPortRuntime::bulletCapacity,
+                            enemySprites[back], palette,
+                            port.ringOrigin());
+                    if (!menuFrameReady)
+                        break;
+                    platform.publish(copperLists[back]);
+                    front = back;
+                    if (++menuSpriteFrameCount == 2)
+                        downwellMenuSpriteReady();
+                    continue;
+                }
                 if (presentationChanged) {
                     if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
                                      presentedScene == AmigaScene::gameplay

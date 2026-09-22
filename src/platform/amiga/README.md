@@ -26,7 +26,10 @@ coordinate mapping.
 
 The current executable displays recovered area-one wall art on a 320-line
 circular PF1, the recovered 4:3 HUD on the fixed PF2, and the player on hardware
-sprite channel 0. It embeds and validates the recovered room, object/event, and
+sprite channel 0 in both the garden and gameplay. The garden background remains
+static while that sprite advances the recovered sleeping animation, then the
+existing camera redraw path takes over when the player wakes. It embeds and
+validates the recovered room, object/event, and
 builder-pattern packs with the same endian-safe readers as the SDL reference.
 The player alternates between recovered idle and air frames to make paired
 copper-list and sprite-pointer swaps visible. Port-1 joystick motion drives a
