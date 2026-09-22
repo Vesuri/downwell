@@ -34,6 +34,22 @@ int main() {
     require(runtime.checkpoint() != 0 && runtime.trajectoryDigest() != 0,
             "port runtime exposes final and rolling checkpoints");
 
+    AmigaPortRuntime destructible(300);
+    const int blockX[] = {-1};
+    const int blockY[] = {32};
+    destructible.configureBreakables(blockX, blockY, 1);
+    destructible.step(4);
+    destructible.step(0);
+    destructible.step(4);
+    AmigaPortFrame broken{};
+    for (unsigned frame = 0;
+         frame < 16 && destructible.blocksDestroyed() == 0; ++frame)
+        broken = destructible.step(0);
+    require(destructible.blocksDestroyed() == 1 && broken.blockDestroyed &&
+                !destructible.breakableActiveAt(-1, 32) &&
+                !destructible.bulletActive(),
+            "gunboot bullets destroy configured recovered blocks");
+
     AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
     int accumulatedScroll = 0;
     for (unsigned frame = 0;

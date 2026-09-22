@@ -10,8 +10,35 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
     : player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
-      bulletActive_(false), bulletX_(0), bulletY_(0), checkpoint_(0)
+      bulletActive_(false), bulletX_(0), bulletY_(0),
+      breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
+}
+
+void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
+                                            unsigned count)
+{
+    unsigned index;
+    if (x == 0 || y == 0)
+        return;
+    if (count > breakableCapacity)
+        count = breakableCapacity;
+    breakableCount_ = count;
+    blocksDestroyed_ = 0;
+    for (index = 0; index < count; ++index) {
+        breakables_[index].x = x[index];
+        breakables_[index].y = y[index];
+        breakables_[index].active = true;
+    }
+}
+
+bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
+{
+    unsigned index;
+    for (index = 0; index < breakableCount_; ++index)
+        if (breakables_[index].x == x && breakables_[index].y == y)
+            return breakables_[index].active;
+    return false;
 }
 
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
@@ -21,10 +48,28 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     const int oldBulletY = bulletY_;
     const int oldAmmo = player_.ammo();
     const unsigned oldShots = player_.shots();
+    bool blockDestroyed = false;
+    int blockX = 0;
+    int blockY = 0;
 
     ++tick_;
     if (bulletActive_) {
+        const int priorBulletY = bulletY_;
+        unsigned index;
         bulletY_ += 8;
+        for (index = 0; index < breakableCount_ && bulletActive_; ++index) {
+            Breakable& block = breakables_[index];
+            if (block.active && bulletX_ >= block.x - 8 &&
+                bulletX_ <= block.x + 7 &&
+                priorBulletY <= block.y + 7 && bulletY_ >= block.y - 8) {
+                block.active = false;
+                bulletActive_ = false;
+                blockDestroyed = true;
+                blockX = block.x;
+                blockY = block.y;
+                ++blocksDestroyed_;
+            }
+        }
         if (bulletY_ >= bulletBottom)
             bulletActive_ = false;
     }
@@ -69,7 +114,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         bulletActive_ != oldBulletActive || bulletX_ != oldBulletX ||
             bulletY_ != oldBulletY,
         scrollDelta != 0,
-        scrollDelta
+        scrollDelta,
+        blockDestroyed,
+        blockX,
+        blockY
     };
     return frame;
 }

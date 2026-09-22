@@ -187,7 +187,7 @@ static UWORD terrainFrame(char symbol) {
 static void buildEntranceLandingProfile(
     const downwell::BuilderPatternPack& builders,
     const downwell::PackedBuilderPattern& pattern,
-    bool reversed, int* offsets) {
+    bool reversed, const AmigaPortRuntime* runtime, int* offsets) {
     unsigned profile;
     for (profile = 0; profile < AmigaPlayer::landingProfileSize; ++profile) {
         const int offsetX = AmigaPlayer::landingProfileLeft + (int)profile;
@@ -206,7 +206,10 @@ static void buildEntranceLandingProfile(
                                            : 160 + ordinal * 16;
                 if (!builders.cell(pattern, (UWORD)column, row, symbol))
                     break;
-                if (isTerrainSymbol(symbol) &&
+                const bool active = symbol != 'B' || runtime == 0 ||
+                    runtime->breakableActiveAt(tileX - 240,
+                        mainBuilderStartY + (int)row * 16 - 176);
+                if (active && isTerrainSymbol(symbol) &&
                     worldX >= tileX - 8 && worldX < tileX + 8) {
                     landing = mainBuilderStartY + (int)row * 16 - 15 - 176;
                     break;
@@ -217,6 +220,33 @@ static void buildEntranceLandingProfile(
         }
         offsets[profile] = landing;
     }
+}
+
+static unsigned buildEntranceBreakables(
+    const downwell::BuilderPatternPack& builders,
+    const downwell::PackedBuilderPattern& pattern,
+    bool reversed, int* x, int* y, unsigned capacity) {
+    unsigned count = 0;
+    UWORD row;
+    for (row = 0; row < pattern.rowCount && count < capacity; ++row) {
+        ULONG width = 0;
+        unsigned column;
+        if (!builders.rowWidth(pattern, row, width))
+            break;
+        for (column = 0; column < width && count < capacity; ++column) {
+            char symbol = 0;
+            const int ordinal = (int)column + 1;
+            if (!builders.cell(pattern, (UWORD)column, row, symbol))
+                break;
+            if (symbol != 'B')
+                continue;
+            x[count] = (reversed ? 320 - ordinal * 16
+                                 : 160 + ordinal * 16) - 240;
+            y[count] = mainBuilderStartY + (int)row * 16 - 176;
+            ++count;
+        }
+    }
+    return count;
 }
 
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -482,6 +512,7 @@ static void drawMainWorldLine(
     const downwell::PackedRoom& room,
     const downwell::BuilderPatternPack& builders,
     const downwell::PackedBuilderPattern& pattern,
+    const AmigaPortRuntime* runtime,
     int worldY, int screenY) {
     unsigned index;
     const int centerY = ((worldY + 8) / 16) * 16;
@@ -524,6 +555,10 @@ static void drawMainWorldLine(
                 const int worldX = 320 - ((int)column + 1) * 16;
                 if (!builders.cell(pattern, (UWORD)column, row, symbol))
                     break;
+                if (symbol == 'B' && runtime != 0 &&
+                    !runtime->breakableActiveAt(
+                        worldX - 240, centerY - 176))
+                    continue;
                 if (isTerrainSymbol(symbol))
                     drawGameAsset(renderer, 51, terrainFrame(symbol),
                                   downwellPlayfieldX + worldX - mainViewX,
@@ -539,12 +574,13 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
                                  const downwell::PackedRoom& room,
                                  const downwell::BuilderPatternPack& builders,
                                  const downwell::PackedBuilderPattern& pattern,
+                                 const AmigaPortRuntime* runtime,
                                  unsigned ringOrigin,
                                  int worldY,
                                  int y) {
     amigaRendererSetGameOrigin(renderer, ringOrigin);
     amigaRendererClearGameRows(renderer, y, 1, 0);
-    drawMainWorldLine(renderer, rooms, room, builders, pattern,
+    drawMainWorldLine(renderer, rooms, room, builders, pattern, runtime,
                       worldY, y);
 }
 
@@ -650,7 +686,13 @@ int main(void) {
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
         int landingProfile[AmigaPlayer::landingProfileSize];
-        buildEntranceLandingProfile(builders, entrance, true, landingProfile);
+        int breakableX[16];
+        int breakableY[16];
+        const unsigned breakableCount = buildEntranceBreakables(
+            builders, entrance, true, breakableX, breakableY, 16);
+        port.configureBreakables(breakableX, breakableY, breakableCount);
+        buildEntranceLandingProfile(
+            builders, entrance, true, &port, landingProfile);
         port.configureLandingProfile(
             landingProfile, AmigaPlayer::landingProfileSize);
     }
@@ -749,6 +791,9 @@ int main(void) {
     while ((*ciaaPra & 0x40u) != 0) {
         UBYTE packedInput;
         int scrollDelta = 0;
+        bool blockDestroyed = false;
+        int destroyedBlockX = 0;
+        int destroyedBlockY = 0;
         platform.waitVblank();
         {
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -796,6 +841,9 @@ int main(void) {
 #endif
             const AmigaPortFrame result = port.step(packedInput);
             scrollDelta = result.scrollDelta;
+            blockDestroyed = result.blockDestroyed;
+            destroyedBlockX = result.blockX;
+            destroyedBlockY = result.blockY;
             if (result.bulletChanged) {
                 if (port.bulletActive())
                     buildBulletSprite(bulletSprite,
@@ -828,12 +876,31 @@ int main(void) {
                         origin -= downwellGameRingHeight;
                     drawRevealedGameLine(
                         &renderer, rooms, mainRoom, builders, entrance,
+                        &port,
                         (unsigned)origin,
                         direction > 0
                             ? worldViewY + downwellDisplayHeight - 1
                             : worldViewY,
                         direction > 0 ? downwellDisplayHeight - 1 : 0);
                 }
+            }
+            if (blockDestroyed) {
+                int landingProfile[AmigaPlayer::landingProfileSize];
+                const int centerY = 176 + destroyedBlockY;
+                int line;
+                buildEntranceLandingProfile(
+                    builders, entrance, true, &port, landingProfile);
+                port.configureLandingProfile(
+                    landingProfile, AmigaPlayer::landingProfileSize);
+                for (line = centerY - 8; line <= centerY + 7; ++line) {
+                    const int screenY = line - worldViewY;
+                    if (screenY < 0 || screenY >= downwellDisplayHeight)
+                        continue;
+                    drawRevealedGameLine(
+                        &renderer, rooms, mainRoom, builders, entrance,
+                        &port, port.ringOrigin(), line, screenY);
+                }
+                (void)destroyedBlockX;
             }
             if (!amigaRendererBuildHardwareSprite(
                     activeGamePack, activeGamePackEnd,

@@ -12,6 +12,9 @@ struct AmigaPortFrame {
     bool bulletChanged;
     bool scrolled;
     int scrollDelta;
+    bool blockDestroyed;
+    int blockX;
+    int blockY;
 };
 
 class AmigaPortRuntime {
@@ -27,6 +30,7 @@ public:
     void configureLandingProfile(const int* offsets, unsigned count) {
         player_.configureLandingProfile(offsets, count);
     }
+    void configureBreakables(const int* x, const int* y, unsigned count);
 
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
@@ -35,10 +39,19 @@ public:
     int bulletX() const { return bulletX_; }
     int bulletY() const { return bulletY_; }
     int cameraOffsetY() const { return cameraPixelY_; }
+    bool breakableActiveAt(int x, int y) const;
+    unsigned blocksDestroyed() const { return blocksDestroyed_; }
     std::uint64_t checkpoint() const { return checkpoint_; }
     std::uint64_t trajectoryDigest() const { return trajectory_.value(); }
 
 private:
+    struct Breakable {
+        int x;
+        int y;
+        bool active;
+    };
+    static constexpr unsigned breakableCapacity = 16;
+
     AmigaPlayer player_;
     unsigned tick_;
     unsigned ringOrigin_;
@@ -48,6 +61,9 @@ private:
     bool bulletActive_;
     int bulletX_;
     int bulletY_;
+    Breakable breakables_[breakableCapacity];
+    unsigned breakableCount_;
+    unsigned blocksDestroyed_;
     std::uint64_t checkpoint_;
     downwell::StateDigest trajectory_;
 };
