@@ -43,6 +43,7 @@ SELECTIONS = {
         163: None,   # sprEnmSnake
         177: None,   # sprEnmSnail
         369: None,   # bgNightsky
+        569: None,   # sprGemChunk
         631: None,   # sprTree
         635: None,   # sprGrass
         640: None,   # sprBench

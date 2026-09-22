@@ -755,6 +755,36 @@ static void drawMainWorldLine(
                 }
             }
         }
+        if (fragment.sideRoom && fragment.pattern.sourceIndex == 3) {
+            for (UWORD specialRow = 0;
+                 specialRow < fragment.pattern.rowCount; ++specialRow) {
+                ULONG specialWidth = 0;
+                if (!builders.rowWidth(fragment.pattern, specialRow,
+                                       specialWidth))
+                    break;
+                for (unsigned specialColumn = 0;
+                     specialColumn < specialWidth; ++specialColumn) {
+                    char symbol = 0;
+                    if (!builders.cell(fragment.pattern,
+                                       (UWORD)specialColumn,
+                                       specialRow, symbol))
+                        break;
+                    if (symbol != '@')
+                        continue;
+                    const int ordinal = (int)specialColumn + 1;
+                    const int rewardX = fragment.reversed
+                                            ? 320 - ordinal * 16
+                                            : 160 + ordinal * 16;
+                    const int rewardY = fragment.y +
+                        (int)specialRow * 16;
+                    if (worldY >= rewardY - 16 && worldY < rewardY + 16)
+                        drawGameAsset(
+                            renderer, 569, 0,
+                            downwellPlayfieldX + rewardX - viewX,
+                            screenY + rewardY - worldY, 0);
+                }
+            }
+        }
         break;
     }
     amigaRendererClearClipRect(renderer);
