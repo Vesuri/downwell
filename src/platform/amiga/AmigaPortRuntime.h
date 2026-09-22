@@ -24,6 +24,9 @@ public:
                               int landingOffset = 0,
                               bool followCamera = false);
     AmigaPortFrame step(std::uint8_t packedInput);
+    void configureLandingProfile(const int* offsets, unsigned count) {
+        player_.configureLandingProfile(offsets, count);
+    }
 
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }

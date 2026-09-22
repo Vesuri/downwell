@@ -18,13 +18,26 @@ enum {
 
 AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
     : x_(0), y_(0), speedX_(0), speedY_(0),
-      landingY_(landingOffset * fixedOne), pixelX_(0), pixelY_(0),
-      ammo_(maximumAmmo),
+      landingY_(landingOffset * fixedOne), usesLandingProfile_(false),
+      pixelX_(0), pixelY_(0), ammo_(maximumAmmo),
       grounded_(startsGrounded), priorFire_(false),
       jumpShootLocked_(false), airborneShot_(false),
       shotDelay_(startsGrounded ? 0u : 1u), facing_(1),
       jumps_(0), shots_(0)
 {
+    unsigned index;
+    for (index = 0; index < landingProfileSize; ++index)
+        landingProfile_[index] = landingOffset;
+}
+
+void AmigaPlayer::configureLandingProfile(const int* offsets, unsigned count)
+{
+    unsigned index;
+    if (offsets == 0 || count != landingProfileSize)
+        return;
+    for (index = 0; index < landingProfileSize; ++index)
+        landingProfile_[index] = offsets[index];
+    usesLandingProfile_ = true;
 }
 
 int AmigaPlayer::fixedToPixel(long value)
@@ -73,6 +86,13 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     x_ += speedX_;
     if (x_ < -horizontalLimit) { x_ = -horizontalLimit; speedX_ = 0; }
     if (x_ > horizontalLimit) { x_ = horizontalLimit; speedX_ = 0; }
+    if (usesLandingProfile_) {
+        int profileX = fixedToPixel(x_) - landingProfileLeft;
+        if (profileX < 0) profileX = 0;
+        if (profileX >= (int)landingProfileSize)
+            profileX = (int)landingProfileSize - 1;
+        landingY_ = landingProfile_[profileX] * fixedOne;
+    }
 
     if (firePressed && grounded_) {
         grounded_ = false;

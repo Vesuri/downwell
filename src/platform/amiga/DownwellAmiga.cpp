@@ -174,6 +174,41 @@ static bool isTerrainSymbol(char symbol) {
            symbol == 'B' || symbol == '-' || symbol == '|';
 }
 
+static void buildEntranceLandingProfile(
+    const downwell::BuilderPatternPack& builders,
+    const downwell::PackedBuilderPattern& pattern,
+    bool reversed, int* offsets) {
+    unsigned profile;
+    for (profile = 0; profile < AmigaPlayer::landingProfileSize; ++profile) {
+        const int offsetX = AmigaPlayer::landingProfileLeft + (int)profile;
+        const int worldX = 240 + offsetX;
+        int landing = 4096 - 176;
+        UWORD row;
+        for (row = 0; row < pattern.rowCount; ++row) {
+            ULONG width = 0;
+            unsigned column;
+            if (!builders.rowWidth(pattern, row, width))
+                break;
+            for (column = 0; column < width; ++column) {
+                char symbol = 0;
+                const int ordinal = (int)column + 1;
+                const int tileX = reversed ? 320 - ordinal * 16
+                                           : 160 + ordinal * 16;
+                if (!builders.cell(pattern, (UWORD)column, row, symbol))
+                    break;
+                if (isTerrainSymbol(symbol) &&
+                    worldX >= tileX - 8 && worldX < tileX + 8) {
+                    landing = mainBuilderStartY + (int)row * 16 - 15 - 176;
+                    break;
+                }
+            }
+            if (landing != 4096 - 176)
+                break;
+        }
+        offsets[profile] = landing;
+    }
+}
+
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
                             const downwell::PackedRoom& room,
                             int x, int y) {
@@ -602,6 +637,14 @@ int main(void) {
                               3, entrance)) {
         return 1;
     }
+#ifndef DOWNWELL_REPLAY_VERIFY
+    {
+        int landingProfile[AmigaPlayer::landingProfileSize];
+        buildEntranceLandingProfile(builders, entrance, true, landingProfile);
+        port.configureLandingProfile(
+            landingProfile, AmigaPlayer::landingProfileSize);
+    }
+#endif
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
                          bulletSpriteBytes)) {

@@ -77,6 +77,19 @@ int main() {
     require(falling.grounded() && falling.offsetY() == 58,
             "gameplay spawn falls to the configured first platform");
 
+    int landingProfile[AmigaPlayer::landingProfileSize];
+    for (unsigned index = 0; index < AmigaPlayer::landingProfileSize; ++index)
+        landingProfile[index] = index < 60 ? 42 : 74;
+    AmigaPlayer profiled(false, 200);
+    profiled.configureLandingProfile(
+        landingProfile, AmigaPlayer::landingProfileSize);
+    input = downwell::Input{};
+    input.left = true;
+    for (unsigned frame = 0; frame < 120 && !profiled.grounded(); ++frame)
+        profiled.step(input);
+    require(profiled.grounded() && profiled.offsetY() == 42,
+            "horizontal position selects the recovered landing profile");
+
     std::cout << "Amiga player tests passed\n";
     return 0;
 }

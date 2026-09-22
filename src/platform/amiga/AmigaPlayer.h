@@ -10,9 +10,13 @@ struct AmigaPlayerMotion {
 
 class AmigaPlayer {
 public:
+    static constexpr int landingProfileLeft = -60;
+    static constexpr unsigned landingProfileSize = 121;
+
     explicit AmigaPlayer(bool startsGrounded = true,
                          int landingOffset = 0);
     AmigaPlayerMotion step(const downwell::Input& input);
+    void configureLandingProfile(const int* offsets, unsigned count);
 
     int offsetX() const { return pixelX_; }
     int offsetY() const { return pixelY_; }
@@ -33,6 +37,8 @@ private:
     long speedX_;
     long speedY_;
     long landingY_;
+    int landingProfile_[landingProfileSize];
+    bool usesLandingProfile_;
     int pixelX_;
     int pixelY_;
     int ammo_;
