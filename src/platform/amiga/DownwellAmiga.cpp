@@ -9,6 +9,7 @@
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
 #include "AmigaPlayer.h"
+#include "AmigaPortRuntime.h"
 #include "AmigaRenderer.h"
 #include "framework/AmigaHardware.h"
 #include "framework/AmigaMemory.h"
@@ -347,14 +348,9 @@ int main(void) {
     struct View* savedView;
     AmigaMemory memory;
     AmigaRenderer renderer;
-    unsigned frame = 0;
     unsigned front = 0;
-    unsigned ringOrigin = initialRingOrigin;
     unsigned worldBottom;
-    AmigaPlayer player;
-    bool bulletActive = false;
-    int bulletX = 0;
-    int bulletY = 0;
+    AmigaPortRuntime port(initialRingOrigin);
     UWORD savedDmacon;
     UWORD savedIntena;
     const UWORD* osCopper;
@@ -473,56 +469,44 @@ int main(void) {
     while ((*ciaaPra & 0x40u) != 0) {
         UBYTE packedInput;
         waitVblank();
-        ++frame;
         {
-            if (bulletActive) {
-                bulletY += 6;
-                if (bulletY >= downwellDisplayHeight) {
-                    bulletActive = false;
-                    hideHardwareSprite(memory.bulletSprite());
-                } else {
-                    buildBulletSprite(memory.bulletSprite(), bulletX, bulletY);
-                }
-            }
             const downwell::Input liveInput = AmigaInput::sample();
             packedInput = downwell::packReplayInput(liveInput);
-            const downwell::Input input =
-                downwell::unpackReplayInput(packedInput);
-            const unsigned priorShots = player.shots();
-            const int priorAmmo = player.ammo();
-            const AmigaPlayerMotion motion = player.step(input);
+            const AmigaPortFrame result = port.step(packedInput);
+            const AmigaPlayerMotion motion = result.playerMotion;
             if (motion.deltaX || motion.deltaY) {
                 offsetHardwareSprite(memory.playerSprite(0),
                                      motion.deltaX, motion.deltaY);
                 offsetHardwareSprite(memory.playerSprite(1),
                                      motion.deltaX, motion.deltaY);
             }
-            if (player.shots() != priorShots) {
-                bulletActive = true;
-                bulletX = downwellPlayfieldX + 80 + player.offsetX() - 1;
-                bulletY = 200 + player.offsetY() + 8;
-                buildBulletSprite(memory.bulletSprite(), bulletX, bulletY);
+            if (result.bulletChanged) {
+                if (port.bulletActive())
+                    buildBulletSprite(memory.bulletSprite(),
+                        downwellPlayfieldX + 80 + port.bulletX(),
+                        200 + port.bulletY());
+                else
+                    hideHardwareSprite(memory.bulletSprite());
             }
-            if (player.ammo() != priorAmmo)
-                redrawAmmo(&renderer, (unsigned)player.ammo());
+            if (result.ammoChanged)
+                redrawAmmo(&renderer, (unsigned)port.player().ammo());
         }
-        if ((frame & 1u) == 0) {
+        if ((port.tick() & 1u) == 0) {
             const unsigned back = front ^ 1u;
-            ringOrigin = (ringOrigin + 1u) % downwellGameRingHeight;
             ++worldBottom;
             drawRevealedGameLine(&renderer, builders, entrance,
-                                 ringOrigin, worldBottom);
+                                 port.ringOrigin(), worldBottom);
             if (!buildCopper(copperLists[back], memory.game(), memory.hud(),
-                             memory.playerSprite(player.grounded() ? 0u : 1u),
+                             memory.playerSprite(
+                                 port.player().grounded() ? 0u : 1u),
                              memory.bulletSprite(),
-                             memory.nullSprite(), ringOrigin))
+                             memory.nullSprite(), port.ringOrigin()))
                 break;
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
             AmigaHardware::setCopperList(copperLists[back].data());
             front = back;
         }
-        lastPortCheckpoint = downwell::portCheckpointDigest(
-            frame, packedInput, player.offsetX(), ringOrigin);
+        lastPortCheckpoint = port.trajectoryDigest();
     }
 
     /* Stop our interrupt and display before handing either back to exec. */

@@ -100,8 +100,9 @@ void testReplayProducesStableStartupState() {
 }
 
 void testPortCheckpointIsStable() {
-    require(downwell::portCheckpointDigest(50, 5, -12, 30) ==
-                0x2fa5462ba3ec64faULL,
+    require(downwell::portCheckpointDigest(
+                50, 5, -12, 7, 6, false, 2, 3, 30, true, -1, 15) ==
+                0x0fbb9033af57691fULL,
             "port checkpoint remains endian-stable");
 }
 
