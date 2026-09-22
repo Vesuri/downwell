@@ -176,6 +176,14 @@ static bool isTerrainSymbol(char symbol) {
            symbol == 'B' || symbol == '-' || symbol == '|';
 }
 
+static UWORD terrainFrame(char symbol) {
+    if (symbol == 'B' || symbol == '3')
+        return 16;
+    if (symbol == '-')
+        return 23;
+    return 0;
+}
+
 static void buildEntranceLandingProfile(
     const downwell::BuilderPatternPack& builders,
     const downwell::PackedBuilderPattern& pattern,
@@ -517,7 +525,7 @@ static void drawMainWorldLine(
                 if (!builders.cell(pattern, (UWORD)column, row, symbol))
                     break;
                 if (isTerrainSymbol(symbol))
-                    drawGameAsset(renderer, 51, 0,
+                    drawGameAsset(renderer, 51, terrainFrame(symbol),
                                   downwellPlayfieldX + worldX - mainViewX,
                                   screenY + centerY - worldY, 0);
             }
