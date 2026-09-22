@@ -33,7 +33,8 @@ public:
     static constexpr unsigned bulletCapacity = amigaPortBulletCapacity;
     static constexpr unsigned enemyCapacity = amigaPortEnemyCapacity;
     static constexpr unsigned gemCapacity = amigaPortGemCapacity;
-    static constexpr int bulletBottom = 284;
+    /* Player-relative Y at the recovered 284-pixel view bottom plus 32. */
+    static constexpr int bulletBottom = 174;
     typedef bool (*SolidResolver)(void* context, int x, int y);
 
     struct BulletState {

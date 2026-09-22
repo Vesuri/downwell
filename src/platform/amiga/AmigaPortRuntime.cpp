@@ -220,6 +220,53 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     int destroyedBlockY[bulletCapacity] = {0};
 
     ++tick_;
+    const downwell::Input input = downwell::unpackReplayInput(packedInput);
+    AmigaPlayerMotion motion = player_.step(input);
+    if (player_.shots() != oldShots) {
+        unsigned index;
+        for (index = 0; index < bulletCapacity; ++index) {
+            BulletState& bullet = bullets_[index];
+            if (!bullet.active) {
+                bullet.active = true;
+                bullet.x = player_.offsetX() - 1;
+                bullet.y = player_.offsetY() + 4;
+                bulletChanged = true;
+                break;
+            }
+        }
+    }
+
+    int scrollDelta = 0;
+    int cameraXDelta = 0;
+    if (followCamera_) {
+        const int oldCameraPixelX = cameraPixelX_;
+        const int oldCameraPixelY = cameraPixelY_;
+        const int playerWorldX = 240 + player_.offsetX();
+        cameraPixelX_ = playerWorldX < 160 ? -160
+                        : playerWorldX > 320 ? 160 : 0;
+        cameraXDelta = cameraPixelX_ - oldCameraPixelX;
+        const long target = player_.offsetYFixed() + 24L * 256L;
+        cameraY_ += (target - cameraY_) / 5L;
+        cameraPixelY_ = cameraY_ >= 0
+                            ? (int)(cameraY_ >> 8)
+                            : -(int)((-cameraY_) >> 8);
+        scrollDelta = cameraPixelY_ - oldCameraPixelY;
+        motion.deltaY -= scrollDelta;
+    } else if ((tick_ & 1u) == 0) {
+        scrollDelta = 1;
+    }
+    if (scrollDelta != 0) {
+        int origin = (int)ringOrigin_ + scrollDelta;
+        origin %= (int)ringHeight;
+        if (origin < 0) origin += (int)ringHeight;
+        ringOrigin_ = (unsigned)origin;
+    }
+
+    /*
+     * objBullet_n receives its Step later in the same GameMaker phase in
+     * which objPlayer_n creates it. Existing and newly-created shots therefore
+     * advance together after player movement and firing.
+     */
     {
         unsigned bulletIndex;
         for (bulletIndex = 0; bulletIndex < bulletCapacity; ++bulletIndex) {
@@ -265,51 +312,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     ++blocksDestroyed_;
                 }
             }
-            if (bullet.y >= bulletBottom)
+            if (bullet.y >= cameraPixelY_ + bulletBottom)
                 bullet.active = false;
         }
-    }
-
-    const downwell::Input input = downwell::unpackReplayInput(packedInput);
-    AmigaPlayerMotion motion = player_.step(input);
-    if (player_.shots() != oldShots) {
-        unsigned index;
-        for (index = 0; index < bulletCapacity; ++index) {
-            BulletState& bullet = bullets_[index];
-            if (!bullet.active) {
-                bullet.active = true;
-                bullet.x = player_.offsetX() - 1;
-                bullet.y = player_.offsetY() + 8;
-                bulletChanged = true;
-                break;
-            }
-        }
-    }
-
-    int scrollDelta = 0;
-    int cameraXDelta = 0;
-    if (followCamera_) {
-        const int oldCameraPixelX = cameraPixelX_;
-        const int oldCameraPixelY = cameraPixelY_;
-        const int playerWorldX = 240 + player_.offsetX();
-        cameraPixelX_ = playerWorldX < 160 ? -160
-                        : playerWorldX > 320 ? 160 : 0;
-        cameraXDelta = cameraPixelX_ - oldCameraPixelX;
-        const long target = player_.offsetYFixed() + 24L * 256L;
-        cameraY_ += (target - cameraY_) / 5L;
-        cameraPixelY_ = cameraY_ >= 0
-                            ? (int)(cameraY_ >> 8)
-                            : -(int)((-cameraY_) >> 8);
-        scrollDelta = cameraPixelY_ - oldCameraPixelY;
-        motion.deltaY -= scrollDelta;
-    } else if ((tick_ & 1u) == 0) {
-        scrollDelta = 1;
-    }
-    if (scrollDelta != 0) {
-        int origin = (int)ringOrigin_ + scrollDelta;
-        origin %= (int)ringHeight;
-        if (origin < 0) origin += (int)ringHeight;
-        ringOrigin_ = (unsigned)origin;
     }
 
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {

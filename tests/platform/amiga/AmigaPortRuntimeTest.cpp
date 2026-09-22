@@ -152,7 +152,7 @@ int main() {
                 "cross-target replay frame is available");
         replayRuntime.step(downwell::packReplayInput(replayInput));
     }
-    require(replayRuntime.trajectoryDigest() == 0x96481e8ddead3798ULL,
+    require(replayRuntime.trajectoryDigest() == 0x95d0aaea1be7256fULL,
             "cross-target trajectory digest remains pinned");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;

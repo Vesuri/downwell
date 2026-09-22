@@ -2,6 +2,7 @@
 #include "platform/amiga/AmigaPortRuntime.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
+#include "core/Replay.h"
 #include "core/RoomPack.h"
 #include "core/StartupRuntime.h"
 #include <cmath>
@@ -155,6 +156,24 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             "initial gameplay HUD state follows decoded runtime");
 }
 
+void compareGameplayShot(const AmigaPortRuntime& amiga,
+                         const downwell::StartupRuntime& reference) {
+    require(amiga.player().jumps() == reference.mainJumps() &&
+                amiga.player().shots() == reference.mainShotsFired(),
+            "gameplay jump and shot counts follow decoded runtime");
+    require(amiga.bulletCount() == reference.mainBulletCount(),
+            "gameplay bullet count follows decoded runtime");
+    if (amiga.bulletCount() != 0) {
+        const AmigaPortRuntime::BulletState& bullet = amiga.bulletAt(0);
+        requireNear(static_cast<float>(240 + bullet.x),
+                    reference.mainBulletAt(0).x, 1.0F,
+                    "gameplay bullet X follows decoded runtime");
+        requireNear(static_cast<float>(176 + bullet.y),
+                    reference.mainBulletAt(0).y, 2.0F,
+                    "gameplay bullet Y follows decoded runtime");
+    }
+}
+
 void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                             const char* builderPatternPath) {
     const std::vector<std::uint8_t> roomBytes = readFile(roomPath);
@@ -274,6 +293,23 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 gameplay.player().spriteFrame() ==
                     static_cast<unsigned>(reference.mainPlayerImageIndex()),
             "landed gameplay pose follows decoded runtime");
+
+    downwell::Input gameplayFire;
+    gameplayFire.fire = true;
+    gameplay.step(downwell::packReplayInput(gameplayFire));
+    reference.step(gameplayFire, true);
+    compareInitialGameplay(gameplay, reference);
+    compareGameplayShot(gameplay, reference);
+    gameplay.step(0);
+    reference.step(released, false);
+    compareInitialGameplay(gameplay, reference);
+    compareGameplayShot(gameplay, reference);
+    gameplay.step(downwell::packReplayInput(gameplayFire));
+    reference.step(gameplayFire, true);
+    compareInitialGameplay(gameplay, reference);
+    compareGameplayShot(gameplay, reference);
+    require(gameplay.player().ammo() == 7,
+            "first airborne gunboot shot consumes one charge in both runtimes");
 }
 }
 
