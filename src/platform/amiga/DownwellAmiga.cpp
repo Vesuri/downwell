@@ -1212,7 +1212,7 @@ int main(void) {
                 if (!amigaRendererBuildHardwareSprite(
                         activeGamePack, activeGamePackEnd,
                         (UWORD)enemy.spriteId,
-                        (UWORD)((port.tick() >> 2) & 1u),
+                        (UWORD)enemy.imageFrame,
                         downwellPlayfieldX + 80 + enemy.x -
                             port.cameraOffsetX(),
                         screenY, enemy.facing < 0,

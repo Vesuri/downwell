@@ -81,6 +81,9 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].alarm1 = -1;
         enemies_[index].direction = 0;
         enemies_[index].moveSpeed = 0;
+        enemies_[index].imagePhase = 0;
+        enemies_[index].imageSpeed = 0;
+        enemies_[index].imageFrame = 0;
         enemies_[index].active = false;
         enemies_[index].awake = false;
         enemies_[index].grounded = false;
@@ -183,6 +186,13 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.alarm1 = alarm1;
     enemy.direction = direction;
     enemy.moveSpeed = moveSpeed;
+    enemy.imagePhase = 0;
+    enemy.imageSpeed = objectId == 111 ? 64u
+                       : objectId == 112 ? 38u
+                       : objectId == 116 ? 51u
+                       : objectId == 117 || objectId == 119 ? 26u
+                       : 0u;
+    enemy.imageFrame = 0;
     enemy.active = active;
     enemy.awake = false;
     enemy.grounded = false;
@@ -374,6 +384,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
             continue;
+        enemy.imagePhase += enemy.imageSpeed;
+        while (enemy.imagePhase >= 2u * 256u)
+            enemy.imagePhase -= 2u * 256u;
+        enemy.imageFrame = enemy.imagePhase >> 8;
         if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
             alarm0Fired[enemyIndex] = true;
         if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
@@ -595,6 +609,20 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         enemy.y = (int)(enemy.preciseY / 256L);
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
+        if (enemy.objectId == 111)
+            enemy.spriteId = enemy.grounded ? 163 : 164;
+        if (enemy.objectId == 112)
+            enemy.spriteId = !enemy.grounded ? 187
+                             : enemy.auxiliaryState != 0 ? 188 : 186;
+        if (enemy.objectId == 113)
+            enemy.spriteId = !enemy.grounded ? 168
+                             : enemy.auxiliaryState != 0 ? 170 : 166;
+        if (enemy.objectId == 116)
+            enemy.spriteId = 153;
+        if (enemy.objectId == 117)
+            enemy.spriteId = 177;
+        if (enemy.objectId == 119)
+            enemy.spriteId = 278;
     }
 
     if (invulnerability_ > 0)

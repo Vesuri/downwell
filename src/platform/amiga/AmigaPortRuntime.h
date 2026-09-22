@@ -62,6 +62,9 @@ public:
         int alarm1;
         int direction;
         int moveSpeed;
+        unsigned imagePhase;
+        unsigned imageSpeed;
+        unsigned imageFrame;
         bool active;
         bool awake;
         bool grounded;

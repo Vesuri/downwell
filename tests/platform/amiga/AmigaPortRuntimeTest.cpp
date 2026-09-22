@@ -102,7 +102,8 @@ int main() {
                 turtle.enemyAt(0).active &&
                 turtle.enemyAt(0).auxiliaryState == -1 &&
                 turtle.enemyAt(0).alarm1 >= 117 &&
-                turtle.enemyAt(0).alarm1 <= 297,
+                turtle.enemyAt(0).alarm1 <= 297 &&
+                turtle.enemyAt(0).spriteId == 188,
             "ground turtle walks and reschedules its recovered animation alarm");
 
     AmigaPortRuntime frog(300);
@@ -114,21 +115,24 @@ int main() {
     frog.step(0);
     require(frog.enemyAt(0).grounded &&
                 frog.enemyAt(0).auxiliaryState == 0 &&
-                frog.enemyAt(0).alarm1 == 60,
+                frog.enemyAt(0).alarm1 == 60 &&
+                frog.enemyAt(0).spriteId == 166,
             "frog alarm observes prior ground state before its Step event");
     for (unsigned frame = 0; frame < 60; ++frame)
         frog.step(0);
     require(frog.enemyAt(0).grounded &&
                 frog.enemyAt(0).auxiliaryState == 1 &&
                 frog.enemyAt(0).motionState == -2 &&
-                frog.enemyAt(0).alarm0 == 60,
+                frog.enemyAt(0).alarm0 == 60 &&
+                frog.enemyAt(0).spriteId == 170,
             "frog alarm enters its grounded crouch toward the player");
     for (unsigned frame = 0; frame < 60; ++frame)
         frog.step(0);
     require(!frog.enemyAt(0).grounded &&
                 frog.enemyAt(0).auxiliaryState == 0 &&
                 frog.enemyAt(0).speedY < 0 &&
-                frog.enemyAt(0).preciseX < 40L * 256L,
+                frog.enemyAt(0).preciseX < 40L * 256L &&
+                frog.enemyAt(0).spriteId == 168,
             "frog alarm launches its recovered directional jump");
 
     AmigaPortRuntime snail(300);
