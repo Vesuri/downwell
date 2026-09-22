@@ -15,7 +15,8 @@ CFLAGS := -g -O2 -m68020 -msoft-float -nostdlib -MP -MMD \
 ASFLAGS := -mcpu=68020 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
-OBJECTS := obj/DownwellAmiga.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
+OBJECTS := obj/DownwellAmiga.o obj/AmigaAssets.o obj/gcc8_c_support.o obj/gcc8_a_support.o
 
 .PHONY: all check clean audit
 
@@ -40,6 +41,13 @@ $(OUT).elf: $(OBJECTS)
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(AMIGA_HUD):
+	$(MAKE) -C $(REPO) generate-amiga-hud
+
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD)
+	@mkdir -p $(@D)
+	$(AS) $(ASFLAGS) -o $@ $<
 
 obj/gcc8_c_support.o: $(SUPPORT)/gcc8_c_support.c
 	@mkdir -p $(@D)
