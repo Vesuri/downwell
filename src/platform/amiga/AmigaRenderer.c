@@ -6,6 +6,8 @@ extern int amigaBlitterDrawPlanarMasked(
     UBYTE* destination, UWORD destinationHeight,
     UWORD destinationX, UWORD destinationY,
     UWORD sourceX, UWORD sourceY, UWORD width, UWORD height);
+extern int amigaBlitterClearPlanar(UBYTE* destination,
+                                   UWORD height, UWORD planes);
 
 static UWORD readWord(const UBYTE* data) {
     return (UWORD)(((UWORD)data[0] << 8) | data[1]);
@@ -217,6 +219,10 @@ void amigaRendererClear(AmigaRenderer* renderer, unsigned pen) {
     int savedY = renderer->clipY;
     int savedWidth = renderer->clipWidth;
     int savedHeight = renderer->clipHeight;
+    if (renderer->blitterEnabled && pen == 0 &&
+        amigaBlitterClearPlanar(renderer->game, downwellGameRingHeight, 2) &&
+        amigaBlitterClearPlanar(renderer->hud, downwellDisplayHeight, 2))
+        return;
     for (index = 0; index < downwellGameRingPlaneBytes; ++index) {
         renderer->game[index] = (pen & 1u) ? 0xff : 0;
         renderer->game[downwellGameRingPlaneBytes + index] =

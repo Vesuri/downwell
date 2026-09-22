@@ -30,3 +30,14 @@ extern "C" int amigaBlitterDrawPlanarMasked(
     }
     return 1;
 }
+
+extern "C" int amigaBlitterClearPlanar(UBYTE* destination,
+                                         UWORD height, UWORD planes)
+{
+    if ((ULONG)destination >= 0x200000UL || height == 0 || planes == 0)
+        return 0;
+    AmigaHardware::blitterClear(
+        (UWORD*)destination, 384 / 16, (UWORD)(height * planes), 0);
+    AmigaHardware::blitterWait();
+    return 1;
+}
