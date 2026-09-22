@@ -824,6 +824,12 @@ static bool buildCopper(CopperList& list,
     return list.finish();
 }
 
+static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
+                            unsigned index) {
+    return index < AmigaPortRuntime::bulletCapacity
+               ? regular[index] : overflow;
+}
+
 int main(void) {
     AmigaPlatform platform;
     AmigaMemory memory;
@@ -1296,7 +1302,8 @@ int main(void) {
                 const AmigaPortRuntime::BulletState& state =
                     port.bulletAt(bullet);
                 if (state.active) {
-                    Sprite& sprite = actorSprites[actorCount];
+                    Sprite& sprite = actorSpriteAt(
+                        actorSprites, enemySprites[back], actorCount);
                     const int spriteResult =
                         amigaRendererBuildHardwareSprite(
                         activeGamePack, activeGamePackEnd, 459, 0,
@@ -1323,22 +1330,34 @@ int main(void) {
                 if (!enemy.active || !enemy.awake || screenY < 16 ||
                     screenY >= downwellDisplayHeight)
                     continue;
-                Sprite& sprite = actorCount < AmigaPortRuntime::bulletCapacity
-                                     ? actorSprites[actorCount]
-                                     : enemySprites[back];
-                const int spriteResult =
-                    amigaRendererBuildHardwareSprite(
+                const unsigned partCount =
+                    amigaRendererHardwareSpritePartCount(
                         activeGamePack, activeGamePackEnd,
-                        (UWORD)enemy.spriteId,
-                        (UWORD)enemy.imageFrame,
-                        downwellPlayfieldX + 80 + enemy.x -
-                            port.cameraOffsetX(),
-                        screenY, enemy.facing < 0,
-                        sprite.data(), enemySpriteHeight);
-                if (spriteResult == 0)
+                        (UWORD)enemy.spriteId, (UWORD)enemy.imageFrame);
+                if (partCount == 0) {
                     frameReady = false;
-                else if (spriteResult == 1)
-                    ++actorCount;
+                    continue;
+                }
+                for (unsigned part = 0;
+                     part < partCount &&
+                     actorCount <= AmigaPortRuntime::bulletCapacity;
+                     ++part) {
+                    Sprite& sprite = actorSpriteAt(
+                        actorSprites, enemySprites[back], actorCount);
+                    const int spriteResult =
+                        amigaRendererBuildHardwareSpritePart(
+                            activeGamePack, activeGamePackEnd,
+                            (UWORD)enemy.spriteId,
+                            (UWORD)enemy.imageFrame, part,
+                            downwellPlayfieldX + 80 + enemy.x -
+                                port.cameraOffsetX(),
+                            screenY, enemy.facing < 0,
+                            sprite.data(), enemySpriteHeight);
+                    if (spriteResult == 0)
+                        frameReady = false;
+                    else if (spriteResult == 1)
+                        ++actorCount;
+                }
             }
             for (unsigned gemIndex = 0;
                  gemIndex < AmigaPortRuntime::gemCapacity &&
@@ -1351,9 +1370,8 @@ int main(void) {
                 if (!gem.active || screenY < 16 ||
                     screenY >= downwellDisplayHeight)
                     continue;
-                Sprite& sprite = actorCount < AmigaPortRuntime::bulletCapacity
-                                     ? actorSprites[actorCount]
-                                     : enemySprites[back];
+                Sprite& sprite = actorSpriteAt(
+                    actorSprites, enemySprites[back], actorCount);
                 const int spriteResult =
                     amigaRendererBuildHardwareSprite(
                         activeGamePack, activeGamePackEnd,
@@ -1370,7 +1388,7 @@ int main(void) {
 #endif
             while (actorCount < AmigaPortRuntime::bulletCapacity)
                 actorSprites[actorCount++].hide();
-            if (actorCount == AmigaPortRuntime::bulletCapacity)
+            if (actorCount <= AmigaPortRuntime::bulletCapacity)
                 enemySprites[back].hide();
             if (frameReady &&
                 !buildCopper(copperLists[back], gameBitmap, hudBitmap,

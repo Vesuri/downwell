@@ -68,6 +68,13 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      int anchorX, int anchorY, int flipX,
                                      UWORD* destination,
                                      unsigned destinationHeight);
+unsigned amigaRendererHardwareSpritePartCount(
+    const UBYTE* pack, const UBYTE* packEnd, UWORD sprite, UWORD frame);
+int amigaRendererBuildHardwareSpritePart(
+    const UBYTE* pack, const UBYTE* packEnd,
+    UWORD sprite, UWORD frame, unsigned part,
+    int anchorX, int anchorY, int flipX,
+    UWORD* destination, unsigned destinationHeight);
 
 #ifdef __cplusplus
 }

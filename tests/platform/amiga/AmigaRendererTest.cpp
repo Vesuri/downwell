@@ -112,6 +112,30 @@ int main(int argc, char** argv) {
     for (const auto& requirement : runtimeSprites)
         requireRuntimeSprite(gamePack, requirement[0], requirement[1]);
 
+    require(amigaRendererHardwareSpritePartCount(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                163, 0) == 1,
+            "sixteen-pixel snake artwork keeps one hardware sprite");
+    require(amigaRendererHardwareSpritePartCount(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                186, 0) == 2,
+            "wide turtle artwork requests two hardware sprites");
+    UWORD turtleLeft[2 + 2 * 32 + 2] = {};
+    UWORD turtleRight[2 + 2 * 32 + 2] = {};
+    require(amigaRendererBuildHardwareSpritePart(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                186, 0, 0, downwellPlayfieldX + 80, 40, 0,
+                turtleLeft, 32) == 1 &&
+            amigaRendererBuildHardwareSpritePart(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                186, 0, 1, downwellPlayfieldX + 80, 40, 0,
+                turtleRight, 32) == 1 &&
+            reinterpret_cast<UBYTE*>(turtleRight)[0] ==
+                reinterpret_cast<UBYTE*>(turtleLeft)[0] &&
+            reinterpret_cast<UBYTE*>(turtleRight)[1] ==
+                reinterpret_cast<UBYTE*>(turtleLeft)[1] + 8,
+            "wide turtle halves occupy adjacent sixteen-pixel slices");
+
     std::cout << "Amiga renderer tests passed\n";
     return 0;
 }

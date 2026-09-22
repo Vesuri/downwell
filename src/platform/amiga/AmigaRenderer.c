@@ -429,11 +429,58 @@ void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
     }
 }
 
-int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
-                                     UWORD sprite, UWORD frame,
-                                     int anchorX, int anchorY, int flipX,
-                                     UWORD* destination,
-                                     unsigned destinationHeight) {
+static int hardwareSpriteOpaqueBounds(const UBYTE* record,
+                                      const UBYTE* pack,
+                                      const UBYTE* packEnd,
+                                      int* left, int* right) {
+    const int width = readWord(record + 8);
+    const int height = readWord(record + 10);
+    const int planeBytes = readWord(record + 12) >> 3;
+    const ULONG planeSize = (ULONG)planeBytes * (ULONG)height;
+    const UBYTE* data = pack + readLong(record + 16);
+    int minimum = width;
+    int maximum = -1;
+    int y;
+    int x;
+    if (data < pack || data + readLong(record + 20) > packEnd ||
+        readLong(record + 20) < planeSize * 2)
+        return 0;
+    for (y = 0; y < height; ++y) {
+        const UBYTE* plane0 = data + y * planeBytes;
+        const UBYTE* plane1 = plane0 + planeSize;
+        for (x = 0; x < width; ++x) {
+            const UBYTE mask = (UBYTE)(0x80u >> (x & 7));
+            if (((plane0[x >> 3] | plane1[x >> 3]) & mask) == 0)
+                continue;
+            if (x < minimum) minimum = x;
+            if (x > maximum) maximum = x;
+        }
+    }
+    if (maximum < minimum) {
+        minimum = 0;
+        maximum = 0;
+    }
+    *left = minimum;
+    *right = maximum;
+    return 1;
+}
+
+unsigned amigaRendererHardwareSpritePartCount(
+    const UBYTE* pack, const UBYTE* packEnd, UWORD sprite, UWORD frame) {
+    const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
+    int left;
+    int right;
+    if (!record || !hardwareSpriteOpaqueBounds(
+            record, pack, packEnd, &left, &right))
+        return 0;
+    return right - left + 1 > 16 ? 2u : 1u;
+}
+
+int amigaRendererBuildHardwareSpritePart(
+    const UBYTE* pack, const UBYTE* packEnd,
+    UWORD sprite, UWORD frame, unsigned part,
+    int anchorX, int anchorY, int flipX,
+    UWORD* destination, unsigned destinationHeight) {
     const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
     const UBYTE* data;
     UBYTE* control = (UBYTE*)destination;
@@ -444,6 +491,11 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
     int dataWidth;
     int planeBytes;
     int cropX;
+    int opaqueLeft;
+    int opaqueRight;
+    int displayedLeft;
+    int displayedRight;
+    unsigned partCount;
     int logicalStartX;
     int visibleLeft;
     int visibleRight;
@@ -465,7 +517,22 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
         data < pack || data + readLong(record + 20) > packEnd)
         return 0;
 
-    cropX = (width - 16) >> 1;
+    if (!hardwareSpriteOpaqueBounds(record, pack, packEnd,
+                                    &opaqueLeft, &opaqueRight))
+        return 0;
+    displayedLeft = flipX ? width - 1 - opaqueRight : opaqueLeft;
+    displayedRight = flipX ? width - 1 - opaqueLeft : opaqueRight;
+    partCount = displayedRight - displayedLeft + 1 > 16 ? 2u : 1u;
+    if (part >= partCount)
+        return 0;
+    if (partCount == 1) {
+        cropX = displayedLeft -
+                (16 - (displayedRight - displayedLeft + 1)) / 2;
+        if (cropX < 0) cropX = 0;
+        if (cropX > width - 16) cropX = width - 16;
+    } else {
+        cropX = displayedLeft + (int)part * 16;
+    }
     logicalStartX = flipX ? anchorX + originX - width + cropX
                           : anchorX - originX + cropX;
     visibleLeft = logicalStartX;
@@ -500,9 +567,11 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
             const int logicalX = logicalStartX + x;
             const int sourceX = flipX ? width - 1 - (cropX + x)
                                       : cropX + x;
-            const UBYTE mask = (UBYTE)(0x80u >> (sourceX & 7));
             if (logicalX < visibleLeft || logicalX >= visibleRight)
                 continue;
+            if (sourceX < 0 || sourceX >= width)
+                continue;
+            const UBYTE mask = (UBYTE)(0x80u >> (sourceX & 7));
             if (row[sourceX >> 3] & mask)
                 plane0 |= (UWORD)(0x8000u >> x);
             if (row[sourcePlaneBytes + (sourceX >> 3)] & mask)
@@ -514,4 +583,14 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
     destination[2 + height * 2] = 0;
     destination[3 + height * 2] = 0;
     return 1;
+}
+
+int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
+                                     UWORD sprite, UWORD frame,
+                                     int anchorX, int anchorY, int flipX,
+                                     UWORD* destination,
+                                     unsigned destinationHeight) {
+    return amigaRendererBuildHardwareSpritePart(
+        pack, packEnd, sprite, frame, 0,
+        anchorX, anchorY, flipX, destination, destinationHeight);
 }
