@@ -20,7 +20,7 @@ enum {
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
     displayHStart = downwellDisplayHStart,
-    displayHStop = displayHStart + downwellVisibleWidth,
+    displayHStop = displayHStart + downwellDmaWidth,
     displayVStart = downwellDisplayVStart,
     displayVStop = displayVStart + downwellDisplayHeight,
     fetchWords = downwellDmaWidth / 16,
@@ -28,7 +28,7 @@ enum {
     fetchStop = fetchStart + 8 * (fetchWords - 1)
 };
 
-_Static_assert(displayHStop == 0x1dd, "380-pixel display window");
+_Static_assert(displayHStop == 0x1e1, "384-pixel display window");
 _Static_assert(displayVStop == 0x12e, "284-line display window");
 _Static_assert(fetchWords == 24, "384-pixel DMA fetch");
 _Static_assert(fetchStop == 0xe0, "24-word lores fetch stride");

@@ -5,10 +5,10 @@ stretching the 160-pixel game surface.
 
 ## Geometry
 
-- Visible canvas: 380x284 PAL lores pixels.
+- Hardware display window: 384x284 PAL lores pixels.
+- Logical canvas: 380x284 pixels; its four right-hand padding pixels are black.
 - DMA backing width: 384 pixels (24 words, 48 bytes per plane per line).
-- The display window exposes fetched pixels 0..379 and crops the four unused
-  pixels at the right edge.
+- The display window exposes all fetched pixels 0..383.
 - Native visible coordinates map directly to backing coordinates.
 - The game well is 160x284 at visible x=110..269, matching the host reference.
 

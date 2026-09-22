@@ -16,7 +16,8 @@ in `UPSTREAM.md`.
 contract: setting a clip rectangle selects PF1 and limits game drawing to the
 central well; clearing the clip selects PF2 and restores the full 380x284 HUD
 canvas. Its drawing coordinates map directly to pixels 0..379 of each
-384-pixel-wide bitplane; the four padding pixels remain at the right edge.
+384-pixel-wide bitplane; the hardware window also exposes the four black
+padding pixels at the right edge so its width matches the DMA fetch exactly.
 
 The current executable displays recovered area-one wall art on a double-
 buffered PF1, the recovered 4:3 HUD on the single-buffered PF2, and the player
