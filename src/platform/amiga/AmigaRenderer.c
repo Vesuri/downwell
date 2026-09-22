@@ -180,19 +180,30 @@ static void drawAssetNormal(AmigaRenderer* renderer,
 
 static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
                               UWORD sprite, UWORD frame) {
-    const UBYTE* record;
+    const UBYTE* records;
+    const ULONG wanted = ((ULONG)sprite << 16) | frame;
     ULONG count;
-    ULONG index;
+    ULONG first = 0;
+    ULONG last;
     if (packEnd - pack < 20 || readLong(pack) != 0x44574150UL ||
         readWord(pack + 4) != 2)
         return 0;
     count = readLong(pack + 8);
-    record = pack + readWord(pack + 6);
-    if (record < pack || record + count * 24 > packEnd)
+    records = pack + readWord(pack + 6);
+    if (records < pack || records + count * 24 > packEnd)
         return 0;
-    for (index = 0; index < count; ++index, record += 24)
-        if (readWord(record) == sprite && readWord(record + 2) == frame)
+    last = count;
+    while (first < last) {
+        const ULONG middle = first + (last - first) / 2;
+        const UBYTE* record = records + middle * 24;
+        const ULONG key = readLong(record);
+        if (key < wanted)
+            first = middle + 1;
+        else if (key > wanted)
+            last = middle;
+        else
             return record;
+    }
     return 0;
 }
 

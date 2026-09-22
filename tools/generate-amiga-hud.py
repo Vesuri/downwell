@@ -192,6 +192,11 @@ def build_pack(manifest, extracted, profile):
         }
         encoded.append((sprite, 0, dma_width, planar))
 
+    # Keep the on-disk directory ordered so the 68000 renderer can locate a
+    # frame with a short binary search instead of repeatedly walking records
+    # in Chip RAM.
+    encoded.sort(key=lambda item: (item[0]["id"], item[1]))
+
     payload_offset = HEADER.size + RECORD.size * len(encoded)
     records = []
     payload = bytearray()
