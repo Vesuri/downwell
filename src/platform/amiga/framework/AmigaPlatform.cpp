@@ -86,7 +86,8 @@ bool AmigaPlatform::takeover(const CopperList& firstCopper,
     AmigaHardware::setCopperList(firstCopper);
     AmigaHardware::setInterrupts(INTF_INTEN | INTF_VERTB, true);
     AmigaHardware::setDMAChannels(DMAF_MASTER | DMAF_COPPER |
-                                  DMAF_RASTER | DMAF_SPRITE, true);
+                                  DMAF_RASTER | DMAF_SPRITE |
+                                  DMAF_BLITTER, true);
     Forbid();
     active_ = true;
     return true;

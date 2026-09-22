@@ -74,6 +74,8 @@ static_assert(fetchStart == (displayHStart >> 1) - 8,
 
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile unsigned long long lastPortCheckpoint;
+static const UBYTE* activeGamePack = amiga_game_pack;
+static const UBYTE* activeGamePackEnd = amiga_game_pack_end;
 
 static const uint16_t downwellPaletteData[20] = {
     0x000, 0xfff, 0xf00, 0x000,
@@ -104,15 +106,15 @@ static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
 
 static void drawGameAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
                           int anchorX, int anchorY, int flipX) {
-    amigaRendererDrawAsset(renderer, amiga_game_pack, amiga_game_pack_end,
+    amigaRendererDrawAsset(renderer, activeGamePack, activeGamePackEnd,
                            sprite, frame, anchorX, anchorY, flipX);
 }
 
 static void drawGameText(AmigaRenderer* renderer, UWORD text,
                          int x, int y) {
-    amigaRendererDrawAssetPen(renderer, amiga_game_pack, amiga_game_pack_end,
+    amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
                               text, 0, x + 1, y + 1, 0, 2);
-    amigaRendererDrawAssetPen(renderer, amiga_game_pack, amiga_game_pack_end,
+    amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
                               text, 0, x, y, 0, 1);
 }
 
@@ -436,7 +438,7 @@ static void drawStyleSelect(AmigaRenderer* renderer,
                      downwellPlayfieldX + 80, centerY + 10);
         if (scenes.styleCursor() == 0)
             amigaRendererDrawAssetPen(
-                renderer, amiga_game_pack, amiga_game_pack_end,
+                renderer, activeGamePack, activeGamePackEnd,
                 65002, 0, downwellPlayfieldX + 80, centerY + 32,
                 0, 1);
     } else {
@@ -645,11 +647,17 @@ int main(void) {
             landingProfile, AmigaPlayer::landingProfileSize);
     }
 #endif
+    const ULONG gamePackBytes =
+        (ULONG)(amiga_game_pack_end - amiga_game_pack);
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
-                         bulletSpriteBytes)) {
+                         bulletSpriteBytes, gamePackBytes)) {
         return 1;
     }
+    for (ULONG byte = 0; byte < gamePackBytes; ++byte)
+        memory.assets()[byte] = amiga_game_pack[byte];
+    activeGamePack = memory.assets();
+    activeGamePackEnd = activeGamePack + gamePackBytes;
 
     CopperList copperLists[2] = {
         CopperList(memory.copper(), copperWords),
@@ -674,7 +682,7 @@ int main(void) {
     drawSplash(&renderer, scenes.splashStage());
 #endif
     if (!amigaRendererBuildHardwareSprite(
-            amiga_game_pack, amiga_game_pack_end, 31, 0,
+            activeGamePack, activeGamePackEnd, 31, 0,
             downwellPlayfieldX + 80,
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
@@ -684,7 +692,7 @@ int main(void) {
             0,
             memory.playerSprite(0), playerSpriteHeight) ||
         !amigaRendererBuildHardwareSprite(
-            amiga_game_pack, amiga_game_pack_end, 37, 0,
+            activeGamePack, activeGamePackEnd, 37, 0,
             downwellPlayfieldX + 80,
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
@@ -728,6 +736,7 @@ int main(void) {
         memory.release();
         return 1;
     }
+    amigaRendererEnableBlitter(&renderer);
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
     while ((*ciaaPra & 0x40u) != 0) {
         UBYTE packedInput;
@@ -819,7 +828,7 @@ int main(void) {
                 }
             }
             if (!amigaRendererBuildHardwareSprite(
-                    amiga_game_pack, amiga_game_pack_end,
+                    activeGamePack, activeGamePackEnd,
                     (UWORD)port.player().spriteId(),
                     (UWORD)port.player().spriteFrame(),
                     downwellPlayfieldX + 80 + port.player().offsetX(),

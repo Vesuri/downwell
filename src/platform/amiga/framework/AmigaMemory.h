@@ -10,7 +10,7 @@ public:
 
     bool allocate(ULONG gameBytes, ULONG hudBytes,
                   ULONG copperBytes, ULONG playerSpriteBytes,
-                  ULONG bulletSpriteBytes);
+                  ULONG bulletSpriteBytes, ULONG assetBytes = 0);
     void release();
 
     UBYTE* game() const { return game_; }
@@ -21,6 +21,7 @@ public:
         return index < 2 ? playerSprite_[index] : 0;
     }
     UWORD* bulletSprite() const { return bulletSprite_; }
+    UBYTE* assets() const { return assets_; }
 
 private:
     AmigaMemory(const AmigaMemory&);
@@ -32,11 +33,13 @@ private:
     UWORD* nullSprite_;
     UWORD* playerSprite_[2];
     UWORD* bulletSprite_;
+    UBYTE* assets_;
     ULONG gameBytes_;
     ULONG hudBytes_;
     ULONG copperBytes_;
     ULONG playerSpriteBytes_;
     ULONG bulletSpriteBytes_;
+    ULONG assetBytes_;
 };
 
 #endif

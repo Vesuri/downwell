@@ -1,5 +1,12 @@
 #include "AmigaRenderer.h"
 
+extern int amigaBlitterDrawPlanarMasked(
+    const UBYTE* source, const UBYTE* mask,
+    UWORD sourceWidth, UWORD sourceHeight, UWORD sourceDataWidth,
+    UBYTE* destination, UWORD destinationHeight,
+    UWORD destinationX, UWORD destinationY,
+    UWORD sourceX, UWORD sourceY, UWORD width, UWORD height);
+
 static UWORD readWord(const UBYTE* data) {
     return (UWORD)(((UWORD)data[0] << 8) | data[1]);
 }
@@ -96,10 +103,39 @@ static void drawAssetNormal(AmigaRenderer* renderer,
     destinationPlaneBytes = renderer->target == renderer->game
                                 ? downwellGameRingPlaneBytes
                                 : downwellPlaneBytes;
+    if (renderer->blitterEnabled) {
+        const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
+        int remaining = lastY - firstY;
+        int sourceY = firstY - top;
+        unsigned targetY = (unsigned)firstY;
+        const unsigned targetHeight = renderer->target == renderer->game
+                                          ? downwellGameRingHeight
+                                          : downwellDisplayHeight;
+        if (renderer->target == renderer->game)
+            targetY = (renderer->gameOrigin + targetY) % targetHeight;
+        while (remaining > 0) {
+            int rows = remaining;
+            if (rows > (int)(targetHeight - targetY))
+                rows = (int)(targetHeight - targetY);
+            if (!amigaBlitterDrawPlanarMasked(
+                    data, data + sourcePlaneBytes * 2,
+                    (UWORD)width, (UWORD)height, (UWORD)(planeBytes * 8),
+                    renderer->target, (UWORD)targetHeight,
+                    (UWORD)clipLeft, (UWORD)targetY,
+                    (UWORD)(clipLeft - left), (UWORD)sourceY,
+                    (UWORD)(clipRight - clipLeft), (UWORD)rows))
+                break;
+            remaining -= rows;
+            sourceY += rows;
+            targetY = 0;
+        }
+        if (remaining == 0)
+            return;
+    }
     for (y = firstY; y < lastY; ++y) {
-        const UBYTE* source = data + (y - top) * planeBytes * 2;
-        const UBYTE* source0 = source;
-        const UBYTE* source1 = source + planeBytes;
+        const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
+        const UBYTE* source0 = data + (y - top) * planeBytes;
+        const UBYTE* source1 = source0 + sourcePlaneBytes;
         unsigned targetY = (unsigned)y;
         ULONG rowOffset;
         int destinationByte;
@@ -146,7 +182,7 @@ static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
     ULONG count;
     ULONG index;
     if (packEnd - pack < 20 || readLong(pack) != 0x44574150UL ||
-        readWord(pack + 4) != 1)
+        readWord(pack + 4) != 2)
         return 0;
     count = readLong(pack + 8);
     record = pack + readWord(pack + 6);
@@ -162,11 +198,16 @@ void amigaRendererInit(AmigaRenderer* renderer, UBYTE* game, UBYTE* hud) {
     renderer->game = game;
     renderer->hud = hud;
     renderer->gameOrigin = 0;
+    renderer->blitterEnabled = 0;
     amigaRendererClearClipRect(renderer);
 }
 
 void amigaRendererSetGameOrigin(AmigaRenderer* renderer, unsigned origin) {
     renderer->gameOrigin = origin % downwellGameRingHeight;
+}
+
+void amigaRendererEnableBlitter(AmigaRenderer* renderer) {
+    renderer->blitterEnabled = 1;
 }
 
 void amigaRendererClear(AmigaRenderer* renderer, unsigned pen) {
@@ -316,11 +357,12 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
     }
 
     for (y = 0; y < height; ++y) {
-        const UBYTE* row = data + y * planeBytes * 2;
+        const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
+        const UBYTE* row = data + y * planeBytes;
         for (x = 0; x < width; ++x) {
             const UBYTE mask = (UBYTE)(0x80u >> (x & 7));
             unsigned pen = (row[x >> 3] & mask) ? 1u : 0u;
-            pen |= (row[planeBytes + (x >> 3)] & mask) ? 2u : 0u;
+            pen |= (row[sourcePlaneBytes + (x >> 3)] & mask) ? 2u : 0u;
             if (pen) {
                 const int drawX = flipX ? anchorX + originX - 1 - x
                                         : anchorX - originX + x;
@@ -357,10 +399,11 @@ void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
     if (data < pack || data + readLong(record + 20) > packEnd)
         return;
     for (y = 0; y < height; ++y) {
-        const UBYTE* row = data + y * planeBytes * 2;
+        const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
+        const UBYTE* row = data + y * planeBytes;
         for (x = 0; x < width; ++x) {
             const UBYTE mask = (UBYTE)(0x80u >> (x & 7));
-            if ((row[x >> 3] | row[planeBytes + (x >> 3)]) & mask) {
+            if ((row[x >> 3] | row[sourcePlaneBytes + (x >> 3)]) & mask) {
                 const int drawX = flipX ? anchorX + originX - 1 - x
                                         : anchorX - originX + x;
                 setPixel(renderer, drawX, anchorY - originY + y, outputPen);
@@ -416,7 +459,8 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                          (startY > 255 ? 4 : 0));
 
     for (y = 0; y < height; ++y) {
-        const UBYTE* row = data + y * planeBytes * 2;
+        const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
+        const UBYTE* row = data + y * planeBytes;
         UWORD plane0 = 0;
         UWORD plane1 = 0;
         for (x = 0; x < 16; ++x) {
@@ -425,7 +469,7 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
             const UBYTE mask = (UBYTE)(0x80u >> (sourceX & 7));
             if (row[sourceX >> 3] & mask)
                 plane0 |= (UWORD)(0x8000u >> x);
-            if (row[planeBytes + (sourceX >> 3)] & mask)
+            if (row[sourcePlaneBytes + (sourceX >> 3)] & mask)
                 plane1 |= (UWORD)(0x8000u >> x);
         }
         destination[2 + y * 2] = plane0;

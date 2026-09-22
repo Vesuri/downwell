@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert selected recovered art to interleaved Amiga 2bpp data."""
+"""Convert selected recovered art to planar Amiga 2bpp data plus a mask."""
 
 import argparse
 import hashlib
@@ -13,7 +13,7 @@ from PIL import Image
 
 
 MAGIC = b"DWAP"
-VERSION = 1
+VERSION = 2
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 HEADER = struct.Struct(">4sHHI8s")
 RECORD = struct.Struct(">HHhhHHHHII")
@@ -98,16 +98,19 @@ def frame_canvas(sprite, frame, items, pages):
 def encode_planar(pens, width, height):
     dma_width = (width + 15) & ~15
     plane_bytes = dma_width // 8
-    output = bytearray(plane_bytes * 2 * height)
+    plane_size = plane_bytes * height
+    output = bytearray(plane_size * 3)
     for y in range(height):
-        row = y * plane_bytes * 2
+        row = y * plane_bytes
         for x in range(width):
             pen = pens[y * width + x]
             mask = 0x80 >> (x & 7)
             if pen & 1:
                 output[row + x // 8] |= mask
             if pen & 2:
-                output[row + plane_bytes + x // 8] |= mask
+                output[plane_size + row + x // 8] |= mask
+            if pen:
+                output[plane_size * 2 + row + x // 8] |= mask
     return dma_width, bytes(output)
 
 
@@ -140,13 +143,16 @@ def render_text(manifest, pages, text):
 
 def decode_planar(data, width, height, dma_width):
     plane_bytes = dma_width // 8
+    plane_size = plane_bytes * height
     pens = []
     for y in range(height):
-        row = y * plane_bytes * 2
+        row = y * plane_bytes
         for x in range(width):
             mask = 0x80 >> (x & 7)
             pen = int(bool(data[row + x // 8] & mask))
-            pen |= int(bool(data[row + plane_bytes + x // 8] & mask)) << 1
+            pen |= int(bool(data[plane_size + row + x // 8] & mask)) << 1
+            require(bool(data[plane_size * 2 + row + x // 8] & mask) ==
+                    (pen != 0), "generated mask does not match color planes")
             pens.append(pen)
     return pens
 
@@ -192,7 +198,7 @@ def build_pack(manifest, extracted, profile):
     for sprite, frame_index, dma_width, planar in encoded:
         records.append(RECORD.pack(
             sprite["id"], frame_index, sprite["originX"], sprite["originY"],
-            sprite["width"], sprite["height"], dma_width, 2,
+            sprite["width"], sprite["height"], dma_width, 3,
             payload_offset + len(payload), len(planar)))
         payload.extend(planar)
 

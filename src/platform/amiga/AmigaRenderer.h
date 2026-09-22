@@ -34,10 +34,12 @@ typedef struct AmigaRenderer {
     int clipY;
     int clipWidth;
     int clipHeight;
+    int blitterEnabled;
 } AmigaRenderer;
 
 void amigaRendererInit(AmigaRenderer* renderer, UBYTE* game, UBYTE* hud);
 void amigaRendererSetGameOrigin(AmigaRenderer* renderer, unsigned origin);
+void amigaRendererEnableBlitter(AmigaRenderer* renderer);
 void amigaRendererClear(AmigaRenderer* renderer, unsigned pen);
 void amigaRendererClearGameRows(AmigaRenderer* renderer,
                                 int firstY, int height, unsigned pen);
