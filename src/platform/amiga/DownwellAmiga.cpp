@@ -47,7 +47,8 @@ enum {
     copperWords = 160,
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
-    bulletSpriteHeight = 16,
+    /* Channels 1..6 are shared by bullets, enemies and gems each frame. */
+    bulletSpriteHeight = 32,
     bulletSpriteBytes = (bulletSpriteHeight + 2) * 4,
     bulletSpriteBufferCount = 2 * AmigaPortRuntime::bulletCapacity,
     enemySpriteHeight = 32,
@@ -1245,13 +1246,15 @@ int main(void) {
                     port.player().facing() < 0,
                     memory.playerSprite(back), playerSpriteHeight))
                 frameReady = false;
+            unsigned actorCount = 0;
+            Sprite* actorSprites = bulletSprites +
+                back * AmigaPortRuntime::bulletCapacity;
             for (unsigned bullet = 0;
                  bullet < AmigaPortRuntime::bulletCapacity; ++bullet) {
-                Sprite& sprite = bulletSprites[
-                    back * AmigaPortRuntime::bulletCapacity + bullet];
                 const AmigaPortRuntime::BulletState& state =
                     port.bulletAt(bullet);
                 if (state.active) {
+                    Sprite& sprite = actorSprites[actorCount++];
                     if (!amigaRendererBuildHardwareSprite(
                         activeGamePack, activeGamePackEnd, 459, 0,
                         downwellPlayfieldX + 80 + state.x -
@@ -1260,15 +1263,13 @@ int main(void) {
                             port.cameraOffsetY(),
                         0, sprite.data(), bulletSpriteHeight))
                         frameReady = false;
-                } else {
-                    sprite.hide();
                 }
             }
 #ifndef DOWNWELL_REPLAY_VERIFY
-            enemySprites[back].hide();
-            bool actorDrawn = false;
             for (unsigned enemyIndex = 0;
-                 enemyIndex < port.enemyCount(); ++enemyIndex) {
+                 enemyIndex < port.enemyCount() &&
+                 actorCount <= AmigaPortRuntime::bulletCapacity;
+                 ++enemyIndex) {
                 const AmigaPortRuntime::EnemyState& enemy =
                     port.enemyAt(enemyIndex);
                 const int screenY = gameplayPlayerStartY + enemy.y -
@@ -1276,6 +1277,9 @@ int main(void) {
                 if (!enemy.active || !enemy.awake || screenY < 16 ||
                     screenY >= downwellDisplayHeight)
                     continue;
+                Sprite& sprite = actorCount < AmigaPortRuntime::bulletCapacity
+                                     ? actorSprites[actorCount]
+                                     : enemySprites[back];
                 if (!amigaRendererBuildHardwareSprite(
                         activeGamePack, activeGamePackEnd,
                         (UWORD)enemy.spriteId,
@@ -1283,34 +1287,39 @@ int main(void) {
                         downwellPlayfieldX + 80 + enemy.x -
                             port.cameraOffsetX(),
                         screenY, enemy.facing < 0,
-                        memory.enemySprite(back), enemySpriteHeight))
+                        sprite.data(), enemySpriteHeight))
                     frameReady = false;
-                actorDrawn = true;
-                break;
+                ++actorCount;
             }
-            if (!actorDrawn) {
-                for (unsigned gemIndex = 0;
-                     gemIndex < AmigaPortRuntime::gemCapacity; ++gemIndex) {
-                    const AmigaPortRuntime::GemState& gem =
-                        port.gemAt(gemIndex);
-                    const int screenY = gameplayPlayerStartY + gem.y -
-                        port.cameraOffsetY();
-                    if (!gem.active || screenY < 16 ||
-                        screenY >= downwellDisplayHeight)
-                        continue;
-                    if (!amigaRendererBuildHardwareSprite(
-                            activeGamePack, activeGamePackEnd,
-                            (UWORD)(gem.large ? 134 : 133),
-                            (UWORD)((gem.age / 2u) & 3u),
-                            downwellPlayfieldX + 80 + gem.x -
-                                port.cameraOffsetX(),
-                            screenY, 0,
-                            memory.enemySprite(back), enemySpriteHeight))
-                        frameReady = false;
-                    break;
-                }
+            for (unsigned gemIndex = 0;
+                 gemIndex < AmigaPortRuntime::gemCapacity &&
+                 actorCount <= AmigaPortRuntime::bulletCapacity;
+                 ++gemIndex) {
+                const AmigaPortRuntime::GemState& gem =
+                    port.gemAt(gemIndex);
+                const int screenY = gameplayPlayerStartY + gem.y -
+                    port.cameraOffsetY();
+                if (!gem.active || screenY < 16 ||
+                    screenY >= downwellDisplayHeight)
+                    continue;
+                Sprite& sprite = actorCount < AmigaPortRuntime::bulletCapacity
+                                     ? actorSprites[actorCount]
+                                     : enemySprites[back];
+                if (!amigaRendererBuildHardwareSprite(
+                        activeGamePack, activeGamePackEnd,
+                        (UWORD)(gem.large ? 134 : 133),
+                        (UWORD)((gem.age / 2u) & 3u),
+                        downwellPlayfieldX + 80 + gem.x -
+                            port.cameraOffsetX(),
+                        screenY, 0, sprite.data(), enemySpriteHeight))
+                    frameReady = false;
+                ++actorCount;
             }
 #endif
+            while (actorCount < AmigaPortRuntime::bulletCapacity)
+                actorSprites[actorCount++].hide();
+            if (actorCount == AmigaPortRuntime::bulletCapacity)
+                enemySprites[back].hide();
             if (frameReady &&
                 !buildCopper(copperLists[back], gameBitmap, hudBitmap,
                              playerSprites[back],
