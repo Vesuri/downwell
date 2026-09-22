@@ -304,11 +304,15 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     AmigaPortRuntime gameplay(300, false, 1201 - 176, true);
     downwell::PackedRoom terrainRoom;
     AmigaTerrainFragment terrain[amigaInitialTerrainFragmentCount];
+    AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
+    unsigned generatedEnemyCount = 0;
     int breakableX[amigaTerrainBreakableCapacity];
     int breakableY[amigaTerrainBreakableCapacity];
     require(rooms.findRoom(11, terrainRoom) &&
                 amigaBuildInitialAreaOneTerrain(
-                    patterns, terrain, amigaInitialTerrainFragmentCount),
+                    patterns, terrain, amigaInitialTerrainFragmentCount,
+                    generatedEnemies, AmigaPortRuntime::enemyCapacity,
+                    generatedEnemyCount),
             "native gameplay terrain is recovered for parity");
     const unsigned breakableCount = amigaCollectTerrainBreakables(
         patterns, terrain, amigaInitialTerrainFragmentCount,
@@ -324,13 +328,21 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                                       &terrainContext);
     gameplay.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainContext);
-    require(gameplay.configureEnemy(0, 111, 163, -16, 1122,
-                                    128, 0, 5, 6) &&
-                gameplay.configureEnemy(1, 111, 163, 48, 1426,
-                                        128, 0, 5, 6) &&
-                gameplay.configureEnemy(2, 117, 177, 64, 1840,
-                                        0, 26, 20, 24),
-            "native gameplay enemies are configured for parity");
+    require(generatedEnemyCount > 3 &&
+                generatedEnemyCount <= AmigaPortRuntime::enemyCapacity,
+            "complete recovered enemy population fits native storage");
+    for (unsigned enemyIndex = 0;
+         enemyIndex < generatedEnemyCount; ++enemyIndex) {
+        downwell::PackedObject definition;
+        const AmigaTerrainEnemy& enemy = generatedEnemies[enemyIndex];
+        require(objects.findObject(enemy.objectId, definition) &&
+                    gameplay.configureEnemy(
+                        enemyIndex, enemy.objectId, definition.spriteId,
+                        enemy.x, enemy.y, enemy.speedX, enemy.speedY,
+                        amigaEnemyHealth(enemy.objectId),
+                        amigaEnemyReward(enemy.objectId)),
+                "generated native enemy is configured from recovered data");
+    }
     compareInitialGameplay(gameplay, reference);
     for (int tick = 0; tick < 220; ++tick) {
         parityFrame = 534 + tick;

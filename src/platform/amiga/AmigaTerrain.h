@@ -19,6 +19,14 @@ struct AmigaTerrainFragment {
     bool appendPillars;
 };
 
+struct AmigaTerrainEnemy {
+    int objectId;
+    int x;
+    int y;
+    int speedX;
+    int speedY;
+};
+
 struct AmigaTerrainCollisionContext {
     const downwell::RoomPack* rooms;
     const downwell::PackedRoom* room;
@@ -31,6 +39,14 @@ struct AmigaTerrainCollisionContext {
 bool amigaBuildInitialAreaOneTerrain(
     const downwell::BuilderPatternPack& builders,
     AmigaTerrainFragment* fragments, unsigned capacity);
+bool amigaBuildInitialAreaOneTerrain(
+    const downwell::BuilderPatternPack& builders,
+    AmigaTerrainFragment* fragments, unsigned capacity,
+    AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
+    unsigned& enemyCount);
+
+int amigaEnemyHealth(int objectId);
+int amigaEnemyReward(int objectId);
 
 unsigned amigaCollectTerrainBreakables(
     const downwell::BuilderPatternPack& builders,

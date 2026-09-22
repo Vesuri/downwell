@@ -792,6 +792,8 @@ int main(void) {
         downwell::portReplayBytes, downwell::portReplaySize);
 #endif
     AmigaTerrainFragment fragments[amigaInitialTerrainFragmentCount];
+    static AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
+    unsigned generatedEnemyCount = 0;
     downwell::PackedRoom mainRoom;
     if (!rooms.valid() || !objects.valid() || !builders.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -800,7 +802,9 @@ int main(void) {
         !rooms.findRoom(11, mainRoom) ||
         !buildMenuDrawList(rooms, objects, menuDrawList) ||
         !amigaBuildInitialAreaOneTerrain(
-            builders, fragments, amigaInitialTerrainFragmentCount)) {
+            builders, fragments, amigaInitialTerrainFragmentCount,
+            generatedEnemies, AmigaPortRuntime::enemyCapacity,
+            generatedEnemyCount)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -824,12 +828,22 @@ int main(void) {
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision);
-        port.configureEnemy(0, 111, 163, -16, 1122,
-                            128, 0, 5, 6);
-        port.configureEnemy(1, 111, 163, 48, 1426,
-                            128, 0, 5, 6);
-        port.configureEnemy(2, 117, 177, 64, 1840,
-                            0, 26, 20, 24);
+        for (unsigned enemyIndex = 0;
+             enemyIndex < generatedEnemyCount; ++enemyIndex) {
+            const AmigaTerrainEnemy& enemy = generatedEnemies[enemyIndex];
+            downwell::PackedObject definition;
+            if (!objects.findObject(enemy.objectId, definition) ||
+                !port.configureEnemy(
+                    enemyIndex, enemy.objectId, definition.spriteId,
+                    enemy.x, enemy.y, enemy.speedX, enemy.speedY,
+                    amigaEnemyHealth(enemy.objectId),
+                    amigaEnemyReward(enemy.objectId))) {
+                platform.restore();
+                FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+                memory.release();
+                return 1;
+            }
+        }
     }
 #endif
     for (ULONG byte = 0; byte < gamePackBytes; ++byte)

@@ -70,12 +70,14 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     if (objectId == 111) {
         command.imageSpeed = 0.25F;
         command.velocityX = 0.5F;
+        command.integerVelocityX = 128;
         command.motionInitialized = true;
         command.grounded = true;
     }
     if (objectId == 112) {
         command.imageSpeed = 0.15F;
         command.velocityX = 0.25F;
+        command.integerVelocityX = 64;
         command.auxiliaryState = random.irandomSmall(1) == 0 ? 1 : -1;
         command.motionInitialized = true;
         command.grounded = true;
@@ -100,7 +102,8 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     if (objectId == 117) {
         command.imageSpeed = 0.1F;
-        command.velocityY = random.irandomSmall(1) == 0 ? 0.1F : -0.1F;
+        command.integerVelocityY = random.irandomSmall(1) == 0 ? 26 : -26;
+        command.velocityY = command.integerVelocityY > 0 ? 0.1F : -0.1F;
         command.motionInitialized = true;
         command.alarms.set(1, 60);
     }

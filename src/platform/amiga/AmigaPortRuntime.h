@@ -8,7 +8,7 @@
 
 enum {
     amigaPortBulletCapacity = 6,
-    amigaPortEnemyCapacity = 3,
+    amigaPortEnemyCapacity = 64,
     amigaPortGemCapacity = 12
 };
 

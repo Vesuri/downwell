@@ -35,6 +35,8 @@ struct DeferredCreateInstance {
     std::int32_t integerImageIndex = 0;
     float velocityX = 0.0F;
     float velocityY = 0.0F;
+    std::int32_t integerVelocityX = 0;
+    std::int32_t integerVelocityY = 0;
     float direction = 0.0F;
     std::int32_t integerDirection = 0;
     float moveSpeed = 0.0F;
