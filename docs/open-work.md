@@ -101,8 +101,12 @@
 
 ## Amiga
 
-- Choose and document the dA JoRMaS framework fork to vendor.
-- Fix display/chipset assumptions for a 320x568 source game on the target mode.
-- Link a minimal 68020 executable and run/debug it under FS-UAE.
-- Establish memory budgets and an asset conversion plan.
+- [x] Choose and document the dA JoRMaS framework fork to vendor.
+- [x] Fix display/chipset assumptions for the recovered 380x284 4:3 mode.
+- [x] Link a minimal 68020 executable and run/debug it under FS-UAE.
+- [x] Establish the initial Chip RAM budget and asset residency rules.
+- [x] Embed and validate room, object/event, and builder-pattern packs with the
+  shared endian-safe readers.
+- [x] Establish PF1 as a copper-wrapped vertical circular buffer while PF2
+  remains fixed for the HUD.
 - Define the host/Amiga replay and state-digest seam before gameplay code moves.

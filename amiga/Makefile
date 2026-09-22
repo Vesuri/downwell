@@ -23,7 +23,8 @@ ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaRenderer.o obj/AmigaHardware.o \
-	obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o obj/BuilderPatternPack.o \
+	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
+	obj/BuilderPatternPack.o \
 	obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
 
@@ -53,6 +54,11 @@ obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp
 
 obj/AmigaHardware.o: $(AMIGA_SRC)/framework/AmigaHardware.cpp \
 		$(AMIGA_SRC)/framework/AmigaHardware.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaMemory.o: $(AMIGA_SRC)/framework/AmigaMemory.cpp \
+		$(AMIGA_SRC)/framework/AmigaMemory.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

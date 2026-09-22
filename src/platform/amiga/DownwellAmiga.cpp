@@ -9,6 +9,7 @@
 #include <hardware/intbits.h>
 #include "AmigaRenderer.h"
 #include "framework/AmigaHardware.h"
+#include "framework/AmigaMemory.h"
 #include "framework/CopperList.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
@@ -243,11 +244,7 @@ static bool validateNativeData(void) {
 
 int main(void) {
     struct View* savedView;
-    UBYTE* game;
-    UBYTE* hud;
-    UWORD* copper;
-    UWORD* nullSprite;
-    UWORD* playerSprite[2];
+    AmigaMemory memory;
     AmigaRenderer renderer;
     unsigned frame = 0;
     unsigned front = 0;
@@ -265,63 +262,43 @@ int main(void) {
         return 1;
     }
 
-    game = (UBYTE*)AllocMem(downwellGameRingBytes, MEMF_CHIP | MEMF_CLEAR);
-    hud = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
-    copper = (UWORD*)AllocMem(copperWords * 2 * sizeof(UWORD),
-                             MEMF_CHIP | MEMF_CLEAR);
-    nullSprite = (UWORD*)AllocMem(8, MEMF_CHIP | MEMF_CLEAR);
-    playerSprite[0] = (UWORD*)AllocMem(playerSpriteBytes,
-                                      MEMF_CHIP | MEMF_CLEAR);
-    playerSprite[1] = (UWORD*)AllocMem(playerSpriteBytes,
-                                      MEMF_CHIP | MEMF_CLEAR);
-    if (!game || !hud || !copper || !nullSprite ||
-        !playerSprite[0] || !playerSprite[1]) {
-        if (playerSprite[1]) FreeMem(playerSprite[1], playerSpriteBytes);
-        if (playerSprite[0]) FreeMem(playerSprite[0], playerSpriteBytes);
-        if (nullSprite) FreeMem(nullSprite, 8);
-        if (copper) FreeMem(copper, copperWords * 2 * sizeof(UWORD));
-        if (hud) FreeMem(hud, downwellLayerBytes);
-        if (game) FreeMem(game, downwellGameRingBytes);
+    if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
+                         copperWords * 2 * sizeof(UWORD), playerSpriteBytes)) {
         CloseLibrary((struct Library*)GfxBase);
+        GfxBase = 0;
         return 1;
     }
 
     CopperList copperLists[2] = {
-        CopperList(copper, copperWords),
-        CopperList(copper + copperWords, copperWords)
+        CopperList(memory.copper(), copperWords),
+        CopperList(memory.copper() + copperWords, copperWords)
     };
 
-    amigaRendererInit(&renderer, game, hud);
+    amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
     buildReferencePicture(&renderer, 0);
     if (!amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 31, 0,
             downwellPlayfieldX + 80, 200,
-            playerSprite[0], playerSpriteHeight) ||
+            memory.playerSprite(0), playerSpriteHeight) ||
         !amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 37, 0,
             downwellPlayfieldX + 88, 192,
-            playerSprite[1], playerSpriteHeight)) {
-        FreeMem(playerSprite[1], playerSpriteBytes);
-        FreeMem(playerSprite[0], playerSpriteBytes);
-        FreeMem(nullSprite, 8);
-        FreeMem(copper, copperWords * 2 * sizeof(UWORD));
-        FreeMem(hud, downwellLayerBytes);
-        FreeMem(game, downwellGameRingBytes);
+            memory.playerSprite(1), playerSpriteHeight)) {
+        memory.release();
         CloseLibrary((struct Library*)GfxBase);
+        GfxBase = 0;
         return 1;
     }
-    if (!buildCopper(copperLists[0], game, hud,
-                     playerSprite[0], nullSprite, initialRingOrigin) ||
-        !buildCopper(copperLists[1], game, hud,
-                     playerSprite[1], nullSprite, initialRingOrigin)) {
-        FreeMem(playerSprite[1], playerSpriteBytes);
-        FreeMem(playerSprite[0], playerSpriteBytes);
-        FreeMem(nullSprite, 8);
-        FreeMem(copper, copperWords * 2 * sizeof(UWORD));
-        FreeMem(hud, downwellLayerBytes);
-        FreeMem(game, downwellGameRingBytes);
+    if (!buildCopper(copperLists[0], memory.game(), memory.hud(),
+                     memory.playerSprite(0), memory.nullSprite(),
+                     initialRingOrigin) ||
+        !buildCopper(copperLists[1], memory.game(), memory.hud(),
+                     memory.playerSprite(1), memory.nullSprite(),
+                     initialRingOrigin)) {
+        memory.release();
         CloseLibrary((struct Library*)GfxBase);
+        GfxBase = 0;
         return 1;
     }
 
@@ -408,12 +385,7 @@ int main(void) {
     WaitTOF();
     WaitTOF();
 
-    FreeMem(playerSprite[1], playerSpriteBytes);
-    FreeMem(playerSprite[0], playerSpriteBytes);
-    FreeMem(nullSprite, 8);
-    FreeMem(copper, copperWords * 2 * sizeof(UWORD));
-    FreeMem(hud, downwellLayerBytes);
-    FreeMem(game, downwellGameRingBytes);
+    memory.release();
     CloseLibrary((struct Library*)GfxBase);
     GfxBase = 0;
     return 0;
