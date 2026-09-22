@@ -146,7 +146,7 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                 reference.mainCameraViewX(), 1.0F,
                 "gameplay camera X follows decoded runtime");
     requireNear(static_cast<float>(34 + amiga.cameraOffsetY()),
-                reference.mainCameraViewY(), 5.0F,
+                reference.mainCameraViewY(), 2.0F,
                 "gameplay camera Y follows decoded runtime");
     require(amiga.player().facing() == reference.mainPlayerFacing(),
             "gameplay facing follows decoded runtime");

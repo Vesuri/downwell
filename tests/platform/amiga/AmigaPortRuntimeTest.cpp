@@ -125,7 +125,7 @@ int main() {
             "crossing the recovered shaft edge snaps to the right-room camera");
 
     AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
-    int accumulatedScroll = 0;
+    int accumulatedScroll = fallingRuntime.cameraOffsetY();
     for (unsigned frame = 0;
          frame < 300 && !fallingRuntime.player().grounded(); ++frame) {
         const AmigaPortFrame fallingFrame = fallingRuntime.step(0);

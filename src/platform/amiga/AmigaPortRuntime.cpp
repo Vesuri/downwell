@@ -18,6 +18,16 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
     unsigned index;
+    if (followCamera_) {
+        /*
+         * camMain receives one Step on rmMain's creation frame, before the
+         * player receives movement. Its recovered +24 target and /5 easing
+         * therefore establish the first visible camera/ring position here.
+         */
+        cameraY_ = (24L * 256L) / 5L;
+        cameraPixelY_ = (int)(cameraY_ >> 8);
+        ringOrigin_ = (ringOrigin_ + (unsigned)cameraPixelY_) % ringHeight;
+    }
     for (index = 0; index < bulletCapacity; ++index) {
         bullets_[index].x = 0;
         bullets_[index].y = 0;

@@ -876,6 +876,7 @@ int main(void) {
     AmigaSceneRuntime scenes;
     AmigaScene presentedScene = scenes.scene();
     int presentedSplash = scenes.splashStage();
+    worldViewY += port.cameraOffsetY();
 #endif
 
     if (!platform.available())
@@ -1003,7 +1004,7 @@ int main(void) {
                     sizeof(downwellPaletteData) / sizeof(downwellPaletteData[0]));
 
     amigaRendererInit(&renderer, memory.game(), memory.hud());
-    amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
+    amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
     amigaRendererEnableBlitter(&renderer);
     if (!amigaRendererBuildHardwareSprite(
             activeGamePack, activeGamePackEnd, 31, 0,
@@ -1011,7 +1012,7 @@ int main(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
 #else
-            gameplayPlayerStartY,
+            gameplayPlayerStartY - port.cameraOffsetY(),
 #endif
             0,
             memory.playerSprite(0), playerSpriteHeight) ||
@@ -1021,7 +1022,7 @@ int main(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
 #else
-            gameplayPlayerStartY,
+            gameplayPlayerStartY - port.cameraOffsetY(),
 #endif
             0,
             memory.playerSprite(1), playerSpriteHeight)) {
@@ -1077,7 +1078,7 @@ int main(void) {
 #else
                      nullSprite, bulletSprites, enemySprites[0], palette,
 #endif
-                     initialRingOrigin)) {
+                     port.ringOrigin())) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1096,7 +1097,7 @@ int main(void) {
                      bulletSprites + AmigaPortRuntime::bulletCapacity,
                      enemySprites[1], palette,
 #endif
-                     initialRingOrigin)) {
+                     port.ringOrigin())) {
         platform.restore();
         memory.release();
         return 1;
@@ -1146,7 +1147,7 @@ int main(void) {
                     drawStyleSelect(&renderer, scenes);
                 else if (presentationChanged)
                     buildReferencePicture(&renderer, rooms, builders, entrance,
-                                          mainInitialViewY);
+                                          worldViewY);
                 if (presentationChanged) {
                     if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
                                      presentedScene == AmigaScene::gameplay
