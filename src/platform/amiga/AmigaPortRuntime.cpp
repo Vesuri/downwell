@@ -3,6 +3,35 @@
 #include "core/PortCheckpoint.h"
 #include "core/Replay.h"
 
+namespace {
+
+const short headingX[36] = {
+     256,  252,  241,  222,  196,  165,  128,   88,   44,
+       0,  -44,  -88, -128, -165, -196, -222, -241, -252,
+    -256, -252, -241, -222, -196, -165, -128,  -88,  -44,
+       0,   44,   88,  128,  165,  196,  222,  241,  252
+};
+
+const short headingY[36] = {
+       0,   44,   88,  128,  165,  196,  222,  241,  252,
+     256,  252,  241,  222,  196,  165,  128,   88,   44,
+       0,  -44,  -88, -128, -165, -196, -222, -241, -252,
+    -256, -252, -241, -222, -196, -165, -128,  -88,  -44
+};
+
+int positiveDirection(int direction)
+{
+    direction %= 360;
+    return direction < 0 ? direction + 360 : direction;
+}
+
+int absoluteInt(int value)
+{
+    return value < 0 ? -value : value;
+}
+
+} // namespace
+
 AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
                                    bool startsGrounded,
                                    int landingOffset,
@@ -11,7 +40,8 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       cameraPixelX_(0),
-      enemyCount_(0), enemiesDefeated_(0), health_(4), invulnerability_(0),
+      enemyCount_(0), enemiesDefeated_(0), enemyRandom_(2),
+      health_(4), invulnerability_(0),
       currency_(0), gemStreak_(0), gemStreakTimer_(0),
       solidResolver_(0),
       solidResolverContext_(0),
@@ -49,9 +79,12 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].auxiliaryState = 0;
         enemies_[index].alarm0 = -1;
         enemies_[index].alarm1 = -1;
+        enemies_[index].direction = 0;
+        enemies_[index].moveSpeed = 0;
         enemies_[index].active = false;
         enemies_[index].awake = false;
         enemies_[index].grounded = false;
+        enemies_[index].activationPending = false;
     }
     for (index = 0; index < gemCapacity; ++index) {
         gems_[index].x = 0;
@@ -126,7 +159,9 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
                                       int speedX, int speedY,
                                       int health, int reward,
                                       int motionState, int auxiliaryState,
-                                      int alarm0, int alarm1)
+                                      int alarm0, int alarm1,
+                                      int direction, int moveSpeed,
+                                      bool active)
 {
     if (index >= enemyCapacity)
         return false;
@@ -146,9 +181,12 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.auxiliaryState = auxiliaryState;
     enemy.alarm0 = alarm0;
     enemy.alarm1 = alarm1;
-    enemy.active = true;
+    enemy.direction = direction;
+    enemy.moveSpeed = moveSpeed;
+    enemy.active = active;
     enemy.awake = false;
     enemy.grounded = false;
+    enemy.activationPending = !active;
     if (enemyCount_ <= index)
         enemyCount_ = index + 1;
     return true;
@@ -332,8 +370,15 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
-        if (!enemy.active)
-            continue;
+        if (!enemy.active) {
+            if (enemy.activationPending &&
+                enemy.y - cameraPixelY_ <= 254) {
+                enemy.active = true;
+                enemy.activationPending = false;
+            } else {
+                continue;
+            }
+        }
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
         if (!enemy.awake || solidResolver_ == 0)
@@ -384,6 +429,46 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     enemy.preciseY += enemy.speedY;
                 }
             }
+        } else if (enemy.objectId == 116) {
+            const int dx = player_.offsetX() - enemy.x;
+            const int dy = enemy.y - player_.offsetY();
+            const int distance = absoluteInt(dx) + absoluteInt(dy);
+            const int headingIndex =
+                ((positiveDirection(enemy.direction) + 5) / 10) % 36;
+            const int currentX = headingX[headingIndex];
+            const int currentY = headingY[headingIndex];
+            const int jitter =
+                (int)enemyRandom_.randomIntegerSmall(40) - 20;
+            long cross = (long)currentX * dy - (long)currentY * dx;
+            cross += (long)jitter * distance * 4L;
+            const long dot = (long)currentX * dx + (long)currentY * dy;
+            if (dot > 0 && (cross < 0 ? -cross : cross) <
+                               (long)distance * 88L) {
+                enemy.moveSpeed += 13;
+                if (enemy.moveSpeed > 320)
+                    enemy.moveSpeed = 320;
+            } else {
+                enemy.moveSpeed -= 6;
+                if (enemy.moveSpeed < 256)
+                    enemy.moveSpeed = 256;
+            }
+            enemy.direction = positiveDirection(
+                enemy.direction + (cross > 0 ? 10 : -10));
+            const int nextHeading =
+                ((enemy.direction + 5) / 10) % 36;
+            enemy.speedX =
+                (long)headingX[nextHeading] * enemy.moveSpeed / 256L;
+            enemy.speedY =
+                -(long)headingY[nextHeading] * enemy.moveSpeed / 256L;
+            const long nextPreciseX = enemy.preciseX + enemy.speedX;
+            const long nextPreciseY = enemy.preciseY + enemy.speedY;
+            if (!solidResolver_(solidResolverContext_,
+                                (int)(nextPreciseX / 256L), enemy.y))
+                enemy.preciseX = nextPreciseX;
+            if (!solidResolver_(solidResolverContext_,
+                                (int)(enemy.preciseX / 256L),
+                                (int)(nextPreciseY / 256L)))
+                enemy.preciseY = nextPreciseY;
         } else if (enemy.objectId == 113) {
             enum { halfWidth = 7, foot = 8 };
             enemy.grounded = solidResolver_(

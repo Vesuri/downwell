@@ -97,6 +97,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.direction = static_cast<float>(command.integerDirection);
 #endif
         command.moveSpeed = 1.25F;
+        command.integerMoveSpeed = 320;
         command.motionInitialized = true;
         command.active = false;
     }
@@ -111,6 +112,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.imageSpeed = 0.1F;
         command.motionState = random.irandomSmall(1) == 0 ? 1 : -1;
         command.moveSpeed = 1.0F;
+        command.integerMoveSpeed = 256;
         command.motionInitialized = true;
         command.alarms.set(0, 2);
     }

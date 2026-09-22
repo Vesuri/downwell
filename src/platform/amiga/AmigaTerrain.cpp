@@ -49,6 +49,8 @@ bool collectGeneratedObject(
     output.y = command.y - 176;
     output.speedX = command.integerVelocityX;
     output.speedY = command.integerVelocityY;
+    output.direction = command.integerDirection;
+    output.moveSpeed = command.integerMoveSpeed;
     output.motionState = command.motionState;
     output.auxiliaryState = command.auxiliaryState;
     output.alarm0 = command.alarms.get(0);
@@ -79,7 +81,7 @@ bool amigaBuildInitialAreaOneTerrain(
     const downwell::BuilderPatternPack& builders,
     AmigaTerrainFragment* fragments, unsigned capacity,
     AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
-    unsigned& enemyCount) {
+    unsigned& enemyCount, downwell::GameMakerRandom* randomAfter) {
     enemyCount = 0;
     if (fragments == 0 || capacity < amigaInitialTerrainFragmentCount)
         return false;
@@ -116,9 +118,12 @@ bool amigaBuildInitialAreaOneTerrain(
             result.appendPillars};
     }
     enemyCount = context.count;
-    return !context.overflowed && builder.endReached() &&
-           fragmentCount == amigaInitialTerrainFragmentCount &&
-           random.drawCount() == 4770;
+    const bool valid = !context.overflowed && builder.endReached() &&
+        fragmentCount == amigaInitialTerrainFragmentCount &&
+        random.drawCount() == 4770;
+    if (valid && randomAfter != 0)
+        *randomAfter = random;
+    return valid;
 }
 
 unsigned amigaCollectTerrainBreakables(

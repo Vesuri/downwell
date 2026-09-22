@@ -306,13 +306,14 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     AmigaTerrainFragment terrain[amigaInitialTerrainFragmentCount];
     AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
     unsigned generatedEnemyCount = 0;
+    downwell::GameMakerRandom gameplayRandom(2);
     int breakableX[amigaTerrainBreakableCapacity];
     int breakableY[amigaTerrainBreakableCapacity];
     require(rooms.findRoom(11, terrainRoom) &&
                 amigaBuildInitialAreaOneTerrain(
                     patterns, terrain, amigaInitialTerrainFragmentCount,
                     generatedEnemies, AmigaPortRuntime::enemyCapacity,
-                    generatedEnemyCount),
+                    generatedEnemyCount, &gameplayRandom),
             "native gameplay terrain is recovered for parity");
     const unsigned breakableCount = amigaCollectTerrainBreakables(
         patterns, terrain, amigaInitialTerrainFragmentCount,
@@ -328,6 +329,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                                       &terrainContext);
     gameplay.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainContext);
+    gameplay.configureEnemyRandom(gameplayRandom);
     require(generatedEnemyCount > 3 &&
                 generatedEnemyCount <= AmigaPortRuntime::enemyCapacity,
             "complete recovered enemy population fits native storage");
@@ -340,7 +342,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                         enemyIndex, enemy.objectId, definition.spriteId,
                         enemy.x, enemy.y, enemy.speedX, enemy.speedY,
                         amigaEnemyHealth(enemy.objectId),
-                        amigaEnemyReward(enemy.objectId)),
+                        amigaEnemyReward(enemy.objectId),
+                        enemy.motionState, enemy.auxiliaryState,
+                        enemy.alarm0, enemy.alarm1,
+                        enemy.direction, enemy.moveSpeed,
+                        enemy.objectId != 116),
                 "generated native enemy is configured from recovered data");
     }
     compareInitialGameplay(gameplay, reference);

@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_PORT_RUNTIME_H
 
 #include "AmigaPlayer.h"
+#include "core/GameMakerRandom.h"
 #include "core/StateDigest.h"
 
 #include <cstdint>
@@ -59,9 +60,12 @@ public:
         int auxiliaryState;
         int alarm0;
         int alarm1;
+        int direction;
+        int moveSpeed;
         bool active;
         bool awake;
         bool grounded;
+        bool activationPending;
     };
     struct GemState {
         int x;
@@ -98,7 +102,12 @@ public:
                         int x, int y, int speedX, int speedY,
                         int health, int reward,
                         int motionState = 0, int auxiliaryState = 0,
-                        int alarm0 = -1, int alarm1 = -1);
+                        int alarm0 = -1, int alarm1 = -1,
+                        int direction = 0, int moveSpeed = 0,
+                        bool active = true);
+    void configureEnemyRandom(const downwell::GameMakerRandom& random) {
+        enemyRandom_ = random;
+    }
 
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
@@ -145,6 +154,7 @@ private:
     GemState gems_[gemCapacity];
     unsigned enemyCount_;
     unsigned enemiesDefeated_;
+    downwell::GameMakerRandom enemyRandom_;
     int health_;
     unsigned invulnerability_;
     unsigned currency_;

@@ -794,6 +794,7 @@ int main(void) {
     AmigaTerrainFragment fragments[amigaInitialTerrainFragmentCount];
     static AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
     unsigned generatedEnemyCount = 0;
+    downwell::GameMakerRandom enemyRandom(2);
     downwell::PackedRoom mainRoom;
     if (!rooms.valid() || !objects.valid() || !builders.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -804,7 +805,7 @@ int main(void) {
         !amigaBuildInitialAreaOneTerrain(
             builders, fragments, amigaInitialTerrainFragmentCount,
             generatedEnemies, AmigaPortRuntime::enemyCapacity,
-            generatedEnemyCount)) {
+            generatedEnemyCount, &enemyRandom)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -828,6 +829,7 @@ int main(void) {
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision);
+        port.configureEnemyRandom(enemyRandom);
         for (unsigned enemyIndex = 0;
              enemyIndex < generatedEnemyCount; ++enemyIndex) {
             const AmigaTerrainEnemy& enemy = generatedEnemies[enemyIndex];
@@ -839,7 +841,9 @@ int main(void) {
                     amigaEnemyHealth(enemy.objectId),
                     amigaEnemyReward(enemy.objectId),
                     enemy.motionState, enemy.auxiliaryState,
-                    enemy.alarm0, enemy.alarm1)) {
+                    enemy.alarm0, enemy.alarm1,
+                    enemy.direction, enemy.moveSpeed,
+                    enemy.objectId != 116)) {
                 platform.restore();
                 FreeMem(startupCopperWords, 4 * sizeof(UWORD));
                 memory.release();

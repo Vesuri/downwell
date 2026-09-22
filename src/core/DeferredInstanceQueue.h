@@ -40,6 +40,7 @@ struct DeferredCreateInstance {
     float direction = 0.0F;
     std::int32_t integerDirection = 0;
     float moveSpeed = 0.0F;
+    std::int32_t integerMoveSpeed = 0;
     std::int32_t motionState = 0;
     std::int32_t auxiliaryState = 0;
     bool motionInitialized = false;

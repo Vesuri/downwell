@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_TERRAIN_H
 
 #include "core/BuilderPatternPack.h"
+#include "core/GameMakerRandom.h"
 #include "core/RoomPack.h"
 
 class AmigaPortRuntime;
@@ -25,6 +26,8 @@ struct AmigaTerrainEnemy {
     int y;
     int speedX;
     int speedY;
+    int direction;
+    int moveSpeed;
     int motionState;
     int auxiliaryState;
     int alarm0;
@@ -47,7 +50,8 @@ bool amigaBuildInitialAreaOneTerrain(
     const downwell::BuilderPatternPack& builders,
     AmigaTerrainFragment* fragments, unsigned capacity,
     AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
-    unsigned& enemyCount);
+    unsigned& enemyCount,
+    downwell::GameMakerRandom* randomAfter = 0);
 
 int amigaEnemyHealth(int objectId);
 int amigaEnemyReward(int objectId);

@@ -164,6 +164,30 @@ int main() {
                 crawler.enemyAt(0).alarm0 > 0,
             "crawler advances along the floor then turns up the wall");
 
+    AmigaPortRuntime bat(300);
+    bat.configureSolidResolver(noSolid, 0);
+    require(bat.configureEnemy(0, 116, 175, 40, 0,
+                               0, 0, 15, 12,
+                               0, 0, -1, -1, 180, 320, false),
+            "generated bat retains direction and deferred activation");
+    bat.step(0);
+    require(bat.enemyAt(0).active && !bat.enemyAt(0).activationPending &&
+                bat.enemyAt(0).preciseX < 40L * 256L &&
+                bat.enemyAt(0).moveSpeed >= 256 &&
+                bat.enemyAt(0).moveSpeed <= 320,
+            "visible bat activates and steers toward the player in fixed point");
+
+    AmigaPortRuntime distantBat(300);
+    distantBat.configureSolidResolver(noSolid, 0);
+    require(distantBat.configureEnemy(0, 116, 175, 40, 500,
+                                      0, 0, 15, 12,
+                                      0, 0, -1, -1, 180, 320, false),
+            "distant bat configuration succeeds");
+    distantBat.step(0);
+    require(!distantBat.enemyAt(0).active &&
+                distantBat.enemyAt(0).activationPending,
+            "off-screen bat remains dormant until the camera reaches it");
+
     AmigaPortRuntime stomp(300);
     require(stomp.configureEnemy(0, 111, 163, 0, 5,
                                  0, 0, 5, 6),
