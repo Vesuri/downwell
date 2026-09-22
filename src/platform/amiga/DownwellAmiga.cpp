@@ -11,6 +11,7 @@
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
 #include "AmigaRenderer.h"
+#include "AmigaSceneRuntime.h"
 #include "framework/AmigaHardware.h"
 #include "framework/AmigaMemory.h"
 #include "framework/AmigaPlatform.h"
@@ -213,6 +214,27 @@ static void buildReferencePicture(
     drawAmmoDigit(renderer, 290, 239, 8);
 }
 
+static void drawSplash(AmigaRenderer* renderer, int stage) {
+    amigaRendererClear(renderer, 0);
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
+                            downwellPlayfieldWidth, downwellDisplayHeight);
+    if (stage == 2)
+        drawGameAsset(renderer, 696, 0,
+                      downwellPlayfieldX + 80, 140, 0);
+    if (stage == 4 || stage == 5)
+        drawGameAsset(renderer, 695, 0,
+                      downwellPlayfieldX + 80, 140, 0);
+    if (stage == 5 || stage == 6) {
+        int y;
+        int x;
+        for (y = 0; y < downwellDisplayHeight; y += 8)
+            for (x = downwellPlayfieldX;
+                 x < downwellPlayfieldX + downwellPlayfieldWidth; x += 8)
+                drawGameAsset(renderer, 733, 11, x, y, 0);
+    }
+    amigaRendererClearClipRect(renderer);
+}
+
 static void drawRevealedGameLine(AmigaRenderer* renderer,
                                  const downwell::BuilderPatternPack& builders,
                                  const downwell::PackedBuilderPattern& pattern,
@@ -331,6 +353,11 @@ int main(void) {
     unsigned front = 0;
     unsigned worldBottom;
     AmigaPortRuntime port(initialRingOrigin);
+#ifndef DOWNWELL_REPLAY_VERIFY
+    AmigaSceneRuntime scenes;
+    AmigaScene presentedScene = scenes.scene();
+    int presentedSplash = scenes.splashStage();
+#endif
 
     if (!platform.available())
         return 1;
@@ -380,7 +407,11 @@ int main(void) {
 
     amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
+#ifdef DOWNWELL_REPLAY_VERIFY
     buildReferencePicture(&renderer, builders, entrance);
+#else
+    drawSplash(&renderer, scenes.splashStage());
+#endif
     if (!amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 31, 0,
             downwellPlayfieldX + 80, 200,
@@ -400,10 +431,18 @@ int main(void) {
     Sprite nullSprite(memory.nullSprite(), 0);
     bulletSprite.hide();
     if (!buildCopper(copperLists[0], gameBitmap, hudBitmap,
+#ifdef DOWNWELL_REPLAY_VERIFY
                      playerSprites[0], bulletSprite, nullSprite, palette,
+#else
+                     nullSprite, bulletSprite, nullSprite, palette,
+#endif
                      initialRingOrigin) ||
         !buildCopper(copperLists[1], gameBitmap, hudBitmap,
+#ifdef DOWNWELL_REPLAY_VERIFY
                      playerSprites[1], bulletSprite, nullSprite, palette,
+#else
+                     nullSprite, bulletSprite, nullSprite, palette,
+#endif
                      initialRingOrigin)) {
         memory.release();
         return 1;
@@ -429,6 +468,27 @@ int main(void) {
 #else
             const downwell::Input liveInput = AmigaInput::sample();
             packedInput = downwell::packReplayInput(liveInput);
+            scenes.step(liveInput);
+            if (scenes.scene() != presentedScene ||
+                scenes.splashStage() != presentedSplash) {
+                const unsigned back = front ^ 1u;
+                presentedScene = scenes.scene();
+                presentedSplash = scenes.splashStage();
+                if (presentedScene == AmigaScene::splash)
+                    drawSplash(&renderer, presentedSplash);
+                else
+                    buildReferencePicture(&renderer, builders, entrance);
+                if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
+                                 presentedScene == AmigaScene::splash
+                                     ? nullSprite : playerSprites[0],
+                                 bulletSprite, nullSprite, palette,
+                                 port.ringOrigin()))
+                    break;
+                platform.publish(copperLists[back]);
+                front = back;
+            }
+            if (scenes.scene() != AmigaScene::gameplay)
+                continue;
 #endif
             const AmigaPortFrame result = port.step(packedInput);
             const AmigaPlayerMotion motion = result.playerMotion;
