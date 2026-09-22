@@ -18,6 +18,10 @@ bool noSolid(void*, int, int) {
     return false;
 }
 
+bool flatGround(void*, int, int y) {
+    return y >= 9;
+}
+
 } // namespace
 
 int main() {
@@ -77,6 +81,17 @@ int main() {
     require(combat.enemiesDefeated() == 1 &&
                 !combat.enemyAt(0).active,
             "usual gun bullet defeats the recovered five-health snake");
+
+    AmigaPortRuntime turtle(300);
+    turtle.configureSolidResolver(flatGround, 0);
+    require(turtle.configureEnemy(0, 112, 169, 40, 0,
+                                  64, 0, 5, 14),
+            "generated ground turtle can enter native actor storage");
+    for (unsigned frame = 0; frame < 4; ++frame)
+        turtle.step(0);
+    require(turtle.enemyAt(0).preciseX > 40L * 256L &&
+                turtle.enemyAt(0).active,
+            "ground turtle uses its recovered quarter-pixel walking speed");
 
     AmigaPortRuntime stomp(300);
     require(stomp.configureEnemy(0, 111, 163, 0, 5,

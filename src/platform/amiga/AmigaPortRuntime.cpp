@@ -326,15 +326,17 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.awake = true;
         if (!enemy.awake || solidResolver_ == 0)
             continue;
-        if (enemy.objectId == 111) {
+        if (enemy.objectId == 111 || enemy.objectId == 112) {
+            const int halfWidth = enemy.objectId == 112 ? 8 : 6;
+            const int foot = enemy.objectId == 112 ? 8 : 5;
             const int direction = enemy.speedX < 0 ? -1 : 1;
             const bool grounded = solidResolver_(
-                solidResolverContext_, enemy.x, enemy.y + 6);
+                solidResolverContext_, enemy.x, enemy.y + foot + 1);
             if (grounded) {
                 enemy.speedY = 0;
                 if (!solidResolver_(solidResolverContext_,
-                                    enemy.x + direction * 7,
-                                    enemy.y + 6))
+                                    enemy.x + direction * (halfWidth + 1),
+                                    enemy.y + foot + 1))
                     enemy.speedX = -enemy.speedX;
             } else {
                 enemy.speedY += 51;
@@ -342,7 +344,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     enemy.speedY = 7 * 256;
             }
             const int nextX = (int)((enemy.preciseX + enemy.speedX) / 256L);
-            const int edge = nextX + (enemy.speedX < 0 ? -6 : 6);
+            const int edge = nextX +
+                (enemy.speedX < 0 ? -halfWidth : halfWidth);
             if (solidResolver_(solidResolverContext_, edge, enemy.y))
                 enemy.speedX = -enemy.speedX;
             else
@@ -351,9 +354,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 const int nextY =
                     (int)((enemy.preciseY + enemy.speedY) / 256L);
                 if (enemy.speedY > 0 && solidResolver_(
-                        solidResolverContext_, enemy.x, nextY + 5)) {
+                        solidResolverContext_, enemy.x, nextY + foot)) {
                     while (!solidResolver_(solidResolverContext_, enemy.x,
-                                           enemy.y + 6)) {
+                                           enemy.y + foot + 1)) {
                         ++enemy.y;
                         enemy.preciseY = (long)enemy.y * 256L;
                     }
@@ -387,7 +390,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         const int dy = player_.offsetY() - enemy.y;
         if (dx < -10 || dx > 10 || dy < -11 || dy > 11)
             continue;
-        if (enemy.objectId == 111 && enemy.y > player_.offsetY() + 2) {
+        const bool stompable = enemy.objectId == 111 ||
+                               enemy.objectId == 112 ||
+                               enemy.objectId == 113 ||
+                               enemy.objectId == 116;
+        if (stompable && enemy.y > player_.offsetY() + 2) {
             enemy.health = 0;
             spawnReward(enemy);
             enemy.active = false;
