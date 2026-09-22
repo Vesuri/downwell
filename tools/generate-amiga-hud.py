@@ -43,6 +43,7 @@ SELECTIONS = {
         163: None,   # sprEnmSnake
         177: None,   # sprEnmSnail
         369: None,   # bgNightsky
+        459: [0],    # sprBulScatter1 (usual gunboot projectile)
         569: None,   # sprGemChunk
         631: None,   # sprTree
         635: None,   # sprGrass
@@ -199,7 +200,10 @@ def build_pack(manifest, extracted, profile):
     for sprite_id in SELECTIONS[profile]:
         sprite = sprites[sprite_id]
         require(sprite["id"] == sprite_id, "sprite IDs are not stable")
+        selected_frames = SELECTIONS[profile][sprite_id]
         for frame_index, frame in enumerate(sprite["frames"]):
+            if selected_frames is not None and frame_index not in selected_frames:
+                continue
             canvas = frame_canvas(sprite, frame, items, pages)
             pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
             dma_width, planar = encode_planar(pens, sprite["width"], sprite["height"])

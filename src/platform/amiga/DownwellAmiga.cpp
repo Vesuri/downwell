@@ -47,7 +47,7 @@ enum {
     copperWords = 160,
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
-    bulletSpriteHeight = 8,
+    bulletSpriteHeight = 16,
     bulletSpriteBytes = (bulletSpriteHeight + 2) * 4,
     bulletSpriteBufferCount = 2 * AmigaPortRuntime::bulletCapacity,
     enemySpriteHeight = 32,
@@ -843,21 +843,6 @@ static bool buildCopper(CopperList& list,
     return list.finish();
 }
 
-static void buildBulletSprite(Sprite& sprite, int x, int y) {
-    UWORD* data = sprite.data();
-    const int startX = downwellDisplayHStart + x;
-    const int startY = downwellDisplayVStart + y;
-    unsigned line;
-    sprite.setX((uint16_t)startX);
-    sprite.setY((uint16_t)startY);
-    for (line = 0; line < bulletSpriteHeight; ++line) {
-        data[2 + line * 2] = line < 2 ? 0xc000 : 0;
-        data[3 + line * 2] = 0xc000;
-    }
-    data[2 + bulletSpriteHeight * 2] = 0;
-    data[3 + bulletSpriteHeight * 2] = 0;
-}
-
 int main(void) {
     AmigaPlatform platform;
     AmigaMemory memory;
@@ -1266,15 +1251,18 @@ int main(void) {
                     back * AmigaPortRuntime::bulletCapacity + bullet];
                 const AmigaPortRuntime::BulletState& state =
                     port.bulletAt(bullet);
-                if (state.active)
-                    buildBulletSprite(
-                        sprite,
+                if (state.active) {
+                    if (!amigaRendererBuildHardwareSprite(
+                        activeGamePack, activeGamePackEnd, 459, 0,
                         downwellPlayfieldX + 80 + state.x -
                             port.cameraOffsetX(),
                         gameplayPlayerStartY + state.y -
-                            port.cameraOffsetY());
-                else
+                            port.cameraOffsetY(),
+                        0, sprite.data(), bulletSpriteHeight))
+                        frameReady = false;
+                } else {
                     sprite.hide();
+                }
             }
 #ifndef DOWNWELL_REPLAY_VERIFY
             enemySprites[back].hide();
