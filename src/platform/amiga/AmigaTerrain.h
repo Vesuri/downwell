@@ -8,7 +8,7 @@ class AmigaPortRuntime;
 
 enum {
     amigaInitialTerrainFragmentCount = 19,
-    amigaTerrainBreakableCapacity = 96
+    amigaTerrainBreakableCapacity = 128
 };
 
 struct AmigaTerrainFragment {

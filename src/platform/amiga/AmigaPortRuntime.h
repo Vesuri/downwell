@@ -124,7 +124,7 @@ private:
         int y;
         bool active;
     };
-    static constexpr unsigned breakableCapacity = 96;
+    static constexpr unsigned breakableCapacity = 128;
 
     AmigaPlayer player_;
     unsigned tick_;

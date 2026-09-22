@@ -313,6 +313,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     const unsigned breakableCount = amigaCollectTerrainBreakables(
         patterns, terrain, amigaInitialTerrainFragmentCount,
         breakableX, breakableY, amigaTerrainBreakableCapacity);
+    require(breakableCount == 124,
+            "all recovered area-one breakables fit native storage");
     AmigaTerrainCollisionContext terrainContext = {
         &rooms, &terrainRoom, &patterns, terrain,
         amigaInitialTerrainFragmentCount, &gameplay
