@@ -138,6 +138,51 @@ static void drawAsset(UBYTE* layer, UWORD sprite, UWORD frame,
     }
 }
 
+static void drawHealthNumber(UBYTE* hud, int x, int y,
+                             unsigned health, unsigned maximum) {
+    const int slashX = x - 4;
+    const int digitY = y - 5;
+    const int healthX = slashX - 9;
+    const int maximumX = slashX + 9;
+    drawAsset(hud, 413, health + 20, healthX + 1, digitY, 0);
+    drawAsset(hud, 413, health + 20, healthX + 1, digitY + 1, 0);
+    drawAsset(hud, 413, health + 20, healthX, digitY + 1, 0);
+    drawAsset(hud, 413, health, healthX, digitY, 0);
+    drawAsset(hud, 414, 2, slashX + 1, digitY, 0);
+    drawAsset(hud, 414, 2, slashX + 1, digitY + 1, 0);
+    drawAsset(hud, 414, 2, slashX, digitY + 1, 0);
+    drawAsset(hud, 414, 0, slashX, digitY, 0);
+    drawAsset(hud, 413, maximum + 20, maximumX + 1, digitY, 0);
+    drawAsset(hud, 413, maximum + 20, maximumX + 1, digitY + 1, 0);
+    drawAsset(hud, 413, maximum + 20, maximumX, digitY + 1, 0);
+    drawAsset(hud, 413, maximum, maximumX, digitY, 0);
+}
+
+static void drawCurrencyDigit(UBYTE* hud, int x, int y, unsigned digit) {
+    const int digitX = x - 8;
+    const int digitY = y - 5;
+    drawAsset(hud, 413, digit + 10, digitX - 1, digitY, 0);
+    drawAsset(hud, 413, digit + 10, digitX, digitY - 1, 0);
+    drawAsset(hud, 413, digit + 20, digitX + 1, digitY, 0);
+    drawAsset(hud, 413, digit + 20, digitX, digitY + 1, 0);
+    drawAsset(hud, 413, digit, digitX, digitY, 0);
+}
+
+static void drawAmmoDigit(UBYTE* hud, int x, int y, unsigned digit) {
+    static const BYTE offsets[14][2] = {
+        {-1, 0}, {0, -1}, {1, 0}, {0, 1}, {-1, 1}, {0, 0}, {1, 1},
+        {0, 2}, {0, 0}, {1, -1}, {2, 0}, {1, 1}, {0, 1}, {1, 0}
+    };
+    unsigned index;
+    for (index = 0; index < 12; ++index)
+        drawAsset(hud, 413, digit + 20,
+                  x + offsets[index][0], y + offsets[index][1], 0);
+    for (; index < 14; ++index)
+        drawAsset(hud, 413, digit + 10,
+                  x + offsets[index][0], y + offsets[index][1], 0);
+    drawAsset(hud, 413, digit, x, y, 0);
+}
+
 static void fillRect(UBYTE* layer, int x, int y, int width, int height,
                      unsigned pen) {
     int py;
@@ -164,11 +209,14 @@ static void buildDiagnosticPicture(UBYTE* game, UBYTE* hud) {
     drawAsset(hud, 415, 1, 8, 6, 0);
     fillRect(hud, backingBias + 12, 11, 80, 6, 2);
     drawAsset(hud, 415, 0, 8, 6, 0);
+    drawHealthNumber(hud, 52, 15, 4, 4);
 
     drawAsset(hud, 416, 0, 284, 43, 0);
     fillRect(hud, backingBias + 289, 49, 10, 184, 1);
     drawAsset(hud, 416, 1, 284, 43, 0);
     drawAsset(hud, 376, 0, 362, 18, 0);
+    drawCurrencyDigit(hud, 354, 18, 0);
+    drawAmmoDigit(hud, 290, 239, 8);
 }
 
 static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
