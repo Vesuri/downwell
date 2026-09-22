@@ -142,17 +142,24 @@ extern "C" __attribute__((noinline, used)) void downwellSceneGameplayReady(void)
 extern "C" __attribute__((noinline, used)) void downwellSceneGameplayLanded(void) {
     __asm__ volatile("" ::: "memory");
 }
+
+extern "C" __attribute__((noinline, used)) void
+downwellSceneGameplayActive(void) {
+    __asm__ volatile("" ::: "memory");
+}
 #endif
 
 #ifdef DOWNWELL_SCENE_VERIFY
 static downwell::Input sceneVerificationInput(
-    const AmigaSceneRuntime& scenes) {
+    const AmigaSceneRuntime& scenes, bool gameplayLanded) {
     downwell::Input input;
     if (scenes.scene() == AmigaScene::menu)
         input.right = true;
     else if (scenes.scene() == AmigaScene::styleSelect &&
              scenes.styleYOffset() == 0 && !scenes.styleSelected())
         input.fire = true;
+    else if (scenes.scene() == AmigaScene::gameplay && gameplayLanded)
+        input.right = true;
     return input;
 }
 #endif
@@ -852,6 +859,8 @@ int main(void) {
     unsigned menuSpriteFrameCount = 0;
 #ifdef DOWNWELL_SCENE_VERIFY
     bool sceneGameplayLandedReported = false;
+    bool sceneGameplayActiveReported = false;
+    int sceneGameplayLandedCameraY = 0;
 #endif
     worldViewY += port.cameraOffsetY();
 #endif
@@ -1111,7 +1120,8 @@ int main(void) {
             packedInput = downwell::packReplayInput(replayInput);
 #else
 #ifdef DOWNWELL_SCENE_VERIFY
-            const downwell::Input liveInput = sceneVerificationInput(scenes);
+            const downwell::Input liveInput = sceneVerificationInput(
+                scenes, sceneGameplayLandedReported);
 #else
             const downwell::Input liveInput = AmigaInput::sample();
 #endif
@@ -1406,7 +1416,19 @@ int main(void) {
 #ifdef DOWNWELL_SCENE_VERIFY
             if (!sceneGameplayLandedReported && port.player().grounded()) {
                 sceneGameplayLandedReported = true;
+                sceneGameplayLandedCameraY = port.cameraOffsetY();
                 downwellSceneGameplayLanded();
+            } else if (sceneGameplayLandedReported &&
+                       !sceneGameplayActiveReported &&
+                       port.cameraOffsetY() >=
+                           sceneGameplayLandedCameraY + 256) {
+                bool awakeEnemy = false;
+                for (unsigned enemy = 0; enemy < port.enemyCount(); ++enemy)
+                    awakeEnemy = awakeEnemy || port.enemyAt(enemy).awake;
+                if (awakeEnemy) {
+                    sceneGameplayActiveReported = true;
+                    downwellSceneGameplayActive();
+                }
             }
 #endif
         }

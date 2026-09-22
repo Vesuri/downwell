@@ -138,7 +138,8 @@ void compareStyle(const AmigaSceneRuntime& amiga,
 void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             const downwell::StartupRuntime& reference,
                             float playerYTolerance = 4.0F,
-                            float cameraYTolerance = 2.0F) {
+                            float cameraYTolerance = 2.0F,
+                            bool allowGroundingPhase = false) {
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
     requireNear(static_cast<float>(240 + amiga.player().offsetX()),
@@ -150,17 +151,30 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
     requireNear(static_cast<float>(160 + amiga.cameraOffsetX()),
                 reference.mainCameraViewX(), 1.0F,
                 "gameplay camera X follows decoded runtime");
-    requireNear(static_cast<float>(34 + amiga.cameraOffsetY()),
-                reference.mainCameraViewY(), cameraYTolerance,
-                "gameplay camera Y follows decoded runtime");
+    const float amigaCameraY = static_cast<float>(34 + amiga.cameraOffsetY());
+    if (std::fabs(amigaCameraY - reference.mainCameraViewY()) >
+        cameraYTolerance) {
+        std::cerr << "FAILED: gameplay camera Y follows decoded runtime "
+                  << "(Amiga camera " << amigaCameraY << ", reference camera "
+                  << reference.mainCameraViewY() << ", Amiga player "
+                  << 176 + amiga.player().offsetY() << ", reference player "
+                  << reference.mainPlayerY() << ", parity frame "
+                  << parityFrame << ")\n";
+        std::exit(1);
+    }
     require(amiga.player().facing() == reference.mainPlayerFacing(),
             "gameplay facing follows decoded runtime");
-    if (amiga.player().grounded() != reference.mainPlayerGrounded()) {
+    if (amiga.player().grounded() != reference.mainPlayerGrounded() &&
+        !(allowGroundingPhase &&
+          std::fabs(static_cast<float>(176 + amiga.player().offsetY()) -
+                    reference.mainPlayerY()) <= playerYTolerance)) {
         std::cerr << "FAILED: gameplay grounded state follows decoded runtime "
                   << "(Amiga " << amiga.player().grounded()
-                  << " at " << 176 + amiga.player().offsetY()
+                  << " at " << 240 + amiga.player().offsetX() << ","
+                  << 176 + amiga.player().offsetY()
                   << ", reference " << reference.mainPlayerGrounded()
-                  << " at " << reference.mainPlayerY()
+                  << " at " << reference.mainPlayerX() << ","
+                  << reference.mainPlayerY()
                   << ", parity frame " << parityFrame << ")\n";
         std::exit(1);
     }
@@ -439,6 +453,29 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     }
     require(gameplay.player().offsetX() < groundedStartX,
             "native player traverses solid ground without floor snagging");
+
+    /*
+     * Keep walking off the recovered entrance platform.  This extends the
+     * parity tape beyond the first safe landing into real camera scrolling
+     * and the first generated actor activation frontier.
+     */
+    bool sawAwakeEnemy = false;
+    const int postLandingCameraY = gameplay.cameraOffsetY();
+    for (int tick = 0; tick < 600; ++tick) {
+        parityFrame += 1;
+        gameplay.step(downwell::packReplayInput(right));
+        reference.step(right, false);
+        compareInitialGameplay(gameplay, reference, 10.0F, 10.0F, true);
+        for (unsigned enemy = 0; enemy < gameplay.enemyCount(); ++enemy)
+            sawAwakeEnemy = sawAwakeEnemy || gameplay.enemyAt(enemy).awake;
+        if (sawAwakeEnemy &&
+            gameplay.cameraOffsetY() >= postLandingCameraY + 256)
+            break;
+    }
+    require(gameplay.cameraOffsetY() >= postLandingCameraY + 256,
+            "post-landing tape scrolls at least one circular-buffer page");
+    require(sawAwakeEnemy,
+            "post-landing tape reaches generated native enemy simulation");
 }
 }
 
