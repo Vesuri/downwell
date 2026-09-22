@@ -16,9 +16,11 @@ enum {
 };
 }
 
-AmigaPlayer::AmigaPlayer()
-    : x_(0), y_(0), speedX_(0), speedY_(0), pixelX_(0), pixelY_(0),
-      ammo_(maximumAmmo), grounded_(true), priorFire_(false),
+AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
+    : x_(0), y_(0), speedX_(0), speedY_(0),
+      landingY_(landingOffset * fixedOne), pixelX_(0), pixelY_(0),
+      ammo_(maximumAmmo),
+      grounded_(startsGrounded), priorFire_(false),
       jumps_(0), shots_(0)
 {
 }
@@ -66,8 +68,8 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         speedY_ += gravity;
         if (speedY_ > fallMaximum) speedY_ = fallMaximum;
         y_ += speedY_;
-        if (y_ >= 0) {
-            y_ = 0;
+        if (y_ >= landingY_) {
+            y_ = landingY_;
             speedY_ = 0;
             grounded_ = true;
             ammo_ = maximumAmmo;

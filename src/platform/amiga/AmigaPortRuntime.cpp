@@ -3,8 +3,11 @@
 #include "core/PortCheckpoint.h"
 #include "core/Replay.h"
 
-AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin)
-    : tick_(0), ringOrigin_(initialRingOrigin % ringHeight),
+AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
+                                   bool startsGrounded,
+                                   int landingOffset)
+    : player_(startsGrounded, landingOffset), tick_(0),
+      ringOrigin_(initialRingOrigin % ringHeight),
       bulletActive_(false), bulletX_(0), bulletY_(0), checkpoint_(0)
 {
 }

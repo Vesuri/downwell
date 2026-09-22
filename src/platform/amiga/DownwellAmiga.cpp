@@ -55,7 +55,9 @@ enum {
     fetchStart = 0x30,
     fetchStop = fetchStart + 8 * (fetchWords - 1),
     fetchModulo = downwellBytesPerPlaneLine - fetchWords * 2,
-    initialRingOrigin = 300
+    initialRingOrigin = 300,
+    gameplayPlayerStartY = 142,
+    gameplayPlayerGroundY = 200
 };
 
 static_assert(displayHStart == 0x71, "cropped display starts at logical x=16");
@@ -521,7 +523,12 @@ int main(void) {
     AmigaRenderer renderer;
     unsigned front = 0;
     unsigned worldBottom;
+#ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime port(initialRingOrigin);
+#else
+    AmigaPortRuntime port(initialRingOrigin, false,
+                          gameplayPlayerGroundY - gameplayPlayerStartY);
+#endif
 #ifndef DOWNWELL_REPLAY_VERIFY
     AmigaSceneRuntime scenes;
     AmigaScene presentedScene = scenes.scene();
@@ -583,11 +590,21 @@ int main(void) {
 #endif
     if (!amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 31, 0,
-            downwellPlayfieldX + 80, 200,
+            downwellPlayfieldX + 80,
+#ifdef DOWNWELL_REPLAY_VERIFY
+            gameplayPlayerGroundY,
+#else
+            gameplayPlayerStartY,
+#endif
             memory.playerSprite(0), playerSpriteHeight) ||
         !amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 37, 0,
-            downwellPlayfieldX + 88, 192,
+            downwellPlayfieldX + 88,
+#ifdef DOWNWELL_REPLAY_VERIFY
+            gameplayPlayerGroundY - 8,
+#else
+            gameplayPlayerStartY - 8,
+#endif
             memory.playerSprite(1), playerSpriteHeight)) {
         memory.release();
         return 1;
@@ -681,7 +698,7 @@ int main(void) {
                 if (port.bulletActive())
                     buildBulletSprite(bulletSprite,
                         downwellPlayfieldX + 80 + port.bulletX(),
-                        200 + port.bulletY());
+                        gameplayPlayerStartY + port.bulletY());
                 else
                     bulletSprite.hide();
             }

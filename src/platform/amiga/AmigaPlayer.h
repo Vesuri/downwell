@@ -10,7 +10,8 @@ struct AmigaPlayerMotion {
 
 class AmigaPlayer {
 public:
-    AmigaPlayer();
+    explicit AmigaPlayer(bool startsGrounded = true,
+                         int landingOffset = 0);
     AmigaPlayerMotion step(const downwell::Input& input);
 
     int offsetX() const { return pixelX_; }
@@ -27,6 +28,7 @@ private:
     long y_;
     long speedX_;
     long speedY_;
+    long landingY_;
     int pixelX_;
     int pixelY_;
     int ammo_;

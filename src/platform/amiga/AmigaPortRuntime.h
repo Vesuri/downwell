@@ -18,7 +18,9 @@ public:
     static constexpr unsigned ringHeight = 320;
     static constexpr int bulletBottom = 284;
 
-    explicit AmigaPortRuntime(unsigned initialRingOrigin);
+    explicit AmigaPortRuntime(unsigned initialRingOrigin,
+                              bool startsGrounded = true,
+                              int landingOffset = 0);
     AmigaPortFrame step(std::uint8_t packedInput);
 
     const AmigaPlayer& player() const { return player_; }

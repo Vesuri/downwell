@@ -50,6 +50,13 @@ int main() {
     require(player.offsetX() > 0 && laterMove.deltaX >= firstMove.deltaX,
             "horizontal input accelerates the fixed-point player");
 
+    AmigaPlayer falling(false, 58);
+    downwell::Input neutral;
+    for (unsigned frame = 0; frame < 120 && !falling.grounded(); ++frame)
+        falling.step(neutral);
+    require(falling.grounded() && falling.offsetY() == 58,
+            "gameplay spawn falls to the configured first platform");
+
     std::cout << "Amiga player tests passed\n";
     return 0;
 }
