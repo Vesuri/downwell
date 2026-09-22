@@ -167,6 +167,9 @@ public:
         return mainBuilderStartRowsGenerated_;
     }
     int mainBuilderLastMainPattern() const { return mainBuilderLastMainPattern_; }
+    bool mainBuilderLastPatternReversed() const {
+        return mainBuilderLastPatternReversed_;
+    }
     std::uint32_t mainBuilderMainPatternsGenerated() const {
         return mainBuilderMainPatternsGenerated_;
     }
@@ -186,6 +189,12 @@ public:
     std::uint32_t randomSeed() const { return random_.seed(); }
     std::uint64_t randomDrawCount() const { return random_.drawCount(); }
     std::uint64_t stateDigest() const;
+#ifdef DOWNWELL_TRACE_AREA_ONE
+    void traceSetMainCameraViewY(float viewY) {
+        mainCameraY_ = viewY + surfaceHeight / 2.0F;
+        mainCameraTargetY_ = mainCameraY_;
+    }
+#endif
 
 private:
     void controllerCreate(PlatformProfile profile);
@@ -342,6 +351,7 @@ private:
     bool mainBuilderStartReversed_ = false;
     std::uint32_t mainBuilderStartRowsGenerated_ = 0;
     int mainBuilderLastMainPattern_ = -1;
+    bool mainBuilderLastPatternReversed_ = false;
     std::uint32_t mainBuilderMainPatternsGenerated_ = 0;
     bool mainBuilderSpawnerMade_ = false;
     int mainBuilderLastRightPattern_ = -1;

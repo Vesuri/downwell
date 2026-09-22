@@ -131,6 +131,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderStartReversed_ = false;
     mainBuilderStartRowsGenerated_ = 0;
     mainBuilderLastMainPattern_ = -1;
+    mainBuilderLastPatternReversed_ = false;
     mainBuilderMainPatternsGenerated_ = 0;
     mainBuilderSpawnerMade_ = false;
     mainBuilderLastRightPattern_ = -1;
@@ -1079,6 +1080,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
         const bool reversed = random_.irandom(1) != 0; // choose(0, 1).
         mainBuilderStartPattern_ = selected;
         mainBuilderStartReversed_ = reversed;
+        mainBuilderLastPatternReversed_ = reversed;
         if (!emitPattern(pattern, reversed, false, advancedRows)) {
             deferredCommandsSucceeded_ = false;
             return;
@@ -1099,6 +1101,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             return;
         }
         mainBuilderEndPattern_ = selected;
+        mainBuilderLastPatternReversed_ = reversed;
         mainBuilderEndReached_ = true;
     } else {
         if (!mainBuilderSpawnerMade_) {
@@ -1148,6 +1151,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             }
         }
         const bool reversed = makeShop ? false : random_.irandom(1) != 0;
+        mainBuilderLastPatternReversed_ = reversed;
         if (!emitPattern(pattern, reversed, true, advancedRows)) {
             deferredCommandsSucceeded_ = false;
             return;
@@ -1479,6 +1483,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainBuilderStartReversed_ = false;
             mainBuilderStartRowsGenerated_ = 0;
             mainBuilderLastMainPattern_ = -1;
+            mainBuilderLastPatternReversed_ = false;
             mainBuilderMainPatternsGenerated_ = 0;
             mainBuilderSpawnerMade_ = false;
             mainBuilderLastRightPattern_ = -1;
