@@ -368,27 +368,74 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
+    bool alarm0Fired[enemyCapacity] = {false};
+    bool alarm1Fired[enemyCapacity] = {false};
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
-        if (!enemy.active) {
-            if (enemy.activationPending &&
-                enemy.y - cameraPixelY_ <= 254) {
-                enemy.active = true;
-                enemy.activationPending = false;
-            } else {
-                continue;
+        if (!enemy.active)
+            continue;
+        if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
+            alarm0Fired[enemyIndex] = true;
+        if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
+            alarm1Fired[enemyIndex] = true;
+
+        if (enemy.objectId == 112 && alarm1Fired[enemyIndex]) {
+            enemy.auxiliaryState = -enemy.auxiliaryState;
+            enemy.alarm1 = 120 + (int)enemyRandom_.irandomSmall(180);
+        } else if (enemy.objectId == 113) {
+            if (alarm1Fired[enemyIndex]) {
+                if (enemy.grounded) {
+                    enemy.auxiliaryState = 1;
+                    enemy.speedX =
+                        player_.offsetX() < enemy.x ? -256 : 256;
+                    enemy.motionState = enemy.speedX < 0 ? -2 : 2;
+                    enemy.alarm0 = 60;
+                } else {
+                    enemy.alarm1 = 60;
+                }
             }
+            if (alarm0Fired[enemyIndex]) {
+                if (enemy.grounded) {
+                    enemy.speedY = -4 * 256;
+                    enemy.speedX = enemy.motionState * 256;
+                    enemy.grounded = false;
+                }
+                enemy.auxiliaryState = 0;
+                enemy.alarm1 = 60;
+            }
+        } else if (enemy.objectId == 119 && alarm0Fired[enemyIndex]) {
+            if (enemy.grounded) {
+                const int crawl = enemy.motionState > 0 ? 1 : -1;
+                int nextX = enemy.x;
+                int nextY = enemy.y;
+                if (solidResolver_ != 0 && solidResolver_(
+                        solidResolverContext_, enemy.x + crawl, enemy.y)) {
+                    enemy.speedX = 0;
+                    enemy.speedY = -crawl * 256;
+                    nextY -= crawl;
+                } else {
+                    enemy.speedX = crawl * 256;
+                    enemy.speedY = 0;
+                    nextX += crawl;
+                }
+                if (solidResolver_ == 0 || !solidResolver_(
+                        solidResolverContext_, nextX, nextY)) {
+                    enemy.preciseX = (long)nextX * 256L;
+                    enemy.preciseY = (long)nextY * 256L;
+                }
+            }
+            enemy.alarm0 = 2;
         }
+    }
+
+    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+        EnemyState& enemy = enemies_[enemyIndex];
+        if (!enemy.active)
+            continue;
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
         if (!enemy.awake || solidResolver_ == 0)
             continue;
-        bool alarm0Fired = false;
-        bool alarm1Fired = false;
-        if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
-            alarm0Fired = true;
-        if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
-            alarm1Fired = true;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const int halfWidth = enemy.objectId == 112 ? 8 : 6;
             const int foot = enemy.objectId == 112 ? 8 : 5;
@@ -471,25 +518,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 enemy.preciseY = nextPreciseY;
         } else if (enemy.objectId == 113) {
             enum { halfWidth = 7, foot = 8 };
-            enemy.grounded = solidResolver_(
-                solidResolverContext_, enemy.x, enemy.y + foot + 1);
-            if (alarm1Fired) {
-                if (enemy.grounded) {
-                    enemy.auxiliaryState = 1;
-                    enemy.speedX = player_.offsetX() < enemy.x ? -256 : 256;
-                    enemy.motionState = enemy.speedX < 0 ? -2 : 2;
-                    enemy.alarm0 = 60;
-                } else {
-                    enemy.alarm1 = 60;
-                }
-            }
-            if (alarm0Fired && enemy.grounded) {
-                enemy.speedY = -4 * 256;
-                enemy.speedX = enemy.motionState * 256;
-                enemy.auxiliaryState = 0;
-                enemy.alarm1 = 60;
-                enemy.grounded = false;
-            }
             if (!enemy.grounded) {
                 enemy.speedY += 38;
                 if (enemy.speedY > 7 * 256)
@@ -543,28 +571,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.preciseY += enemy.speedY;
         } else if (enemy.objectId == 119) {
             enum { foot = 6 };
-            if (alarm0Fired) {
-                if (enemy.grounded) {
-                    const int crawl = enemy.motionState > 0 ? 1 : -1;
-                    int nextX = enemy.x;
-                    int nextY = enemy.y;
-                    if (solidResolver_(solidResolverContext_,
-                                       enemy.x + crawl, enemy.y)) {
-                        enemy.speedX = 0;
-                        enemy.speedY = -crawl * 256;
-                        nextY -= crawl;
-                    } else {
-                        enemy.speedX = crawl * 256;
-                        enemy.speedY = 0;
-                        nextX += crawl;
-                    }
-                    if (!solidResolver_(solidResolverContext_, nextX, nextY)) {
-                        enemy.preciseX = (long)nextX * 256L;
-                        enemy.preciseY = (long)nextY * 256L;
-                    }
-                }
-                enemy.alarm0 = 2;
-            }
             if (!enemy.grounded) {
                 enemy.speedY += 51;
                 if (enemy.speedY > 7 * 256)
@@ -657,6 +663,15 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             gem.active = false;
         } else if (gem.age >= 310) {
             gem.active = false;
+        }
+    }
+
+    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+        EnemyState& enemy = enemies_[enemyIndex];
+        if (!enemy.active && enemy.activationPending &&
+            enemy.y - cameraPixelY_ <= 254) {
+            enemy.active = true;
+            enemy.activationPending = false;
         }
     }
 

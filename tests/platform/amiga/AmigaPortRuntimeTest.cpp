@@ -93,21 +93,31 @@ int main() {
     AmigaPortRuntime turtle(300);
     turtle.configureSolidResolver(flatGround, 0);
     require(turtle.configureEnemy(0, 112, 169, 40, 0,
-                                  64, 0, 5, 14),
+                                  64, 0, 5, 14,
+                                  0, 1, -1, 1),
             "generated ground turtle can enter native actor storage");
     for (unsigned frame = 0; frame < 4; ++frame)
         turtle.step(0);
     require(turtle.enemyAt(0).preciseX > 40L * 256L &&
-                turtle.enemyAt(0).active,
-            "ground turtle uses its recovered quarter-pixel walking speed");
+                turtle.enemyAt(0).active &&
+                turtle.enemyAt(0).auxiliaryState == -1 &&
+                turtle.enemyAt(0).alarm1 >= 117 &&
+                turtle.enemyAt(0).alarm1 <= 297,
+            "ground turtle walks and reschedules its recovered animation alarm");
 
     AmigaPortRuntime frog(300);
     frog.configureSolidResolver(flatGround, 0);
-    require(frog.configureEnemy(0, 113, 171, 40, 0,
+    require(frog.configureEnemy(0, 113, 171, 40, 1,
                                 0, 0, 35, 20,
                                 0, 0, -1, 1),
             "generated frog can retain its recovered alarm state");
     frog.step(0);
+    require(frog.enemyAt(0).grounded &&
+                frog.enemyAt(0).auxiliaryState == 0 &&
+                frog.enemyAt(0).alarm1 == 60,
+            "frog alarm observes prior ground state before its Step event");
+    for (unsigned frame = 0; frame < 60; ++frame)
+        frog.step(0);
     require(frog.enemyAt(0).grounded &&
                 frog.enemyAt(0).auxiliaryState == 1 &&
                 frog.enemyAt(0).motionState == -2 &&
@@ -172,7 +182,10 @@ int main() {
             "generated bat retains direction and deferred activation");
     bat.step(0);
     require(bat.enemyAt(0).active && !bat.enemyAt(0).activationPending &&
-                bat.enemyAt(0).preciseX < 40L * 256L &&
+                bat.enemyAt(0).preciseX == 40L * 256L,
+            "visible dormant bat activates after the current simulation phase");
+    bat.step(0);
+    require(bat.enemyAt(0).preciseX < 40L * 256L &&
                 bat.enemyAt(0).moveSpeed >= 256 &&
                 bat.enemyAt(0).moveSpeed <= 320,
             "visible bat activates and steers toward the player in fixed point");
