@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-enum { amigaPortBulletCapacity = 6 };
+enum { amigaPortBulletCapacity = 6, amigaPortEnemyCapacity = 3 };
 
 struct AmigaPortFrame {
     AmigaPlayerMotion playerMotion;
@@ -23,12 +23,29 @@ class AmigaPortRuntime {
 public:
     static constexpr unsigned ringHeight = 320;
     static constexpr unsigned bulletCapacity = amigaPortBulletCapacity;
+    static constexpr unsigned enemyCapacity = amigaPortEnemyCapacity;
     static constexpr int bulletBottom = 284;
+    typedef bool (*SolidResolver)(void* context, int x, int y);
 
     struct BulletState {
         int x;
         int y;
         bool active;
+    };
+    struct EnemyState {
+        int objectId;
+        int spriteId;
+        int x;
+        int y;
+        int health;
+        int reward;
+        int facing;
+        long preciseX;
+        long preciseY;
+        long speedX;
+        long speedY;
+        bool active;
+        bool awake;
     };
 
     explicit AmigaPortRuntime(unsigned initialRingOrigin,
@@ -44,12 +61,22 @@ public:
         player_.configureLandingResolver(resolver, context);
     }
     void configureBreakables(const int* x, const int* y, unsigned count);
+    void configureSolidResolver(SolidResolver resolver, void* context) {
+        solidResolver_ = resolver;
+        solidResolverContext_ = context;
+    }
+    bool configureEnemy(unsigned index, int objectId, int spriteId,
+                        int x, int y, int speedX, int speedY,
+                        int health, int reward);
 
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
     unsigned ringOrigin() const { return ringOrigin_; }
     unsigned bulletCount() const;
     const BulletState& bulletAt(unsigned index) const;
+    const EnemyState& enemyAt(unsigned index) const;
+    unsigned enemyCount() const { return enemyCount_; }
+    unsigned enemiesDefeated() const { return enemiesDefeated_; }
     bool bulletActive() const { return bulletCount() != 0; }
     int bulletX() const;
     int bulletY() const;
@@ -74,6 +101,11 @@ private:
     long cameraY_;
     int cameraPixelY_;
     BulletState bullets_[bulletCapacity];
+    EnemyState enemies_[enemyCapacity];
+    unsigned enemyCount_;
+    unsigned enemiesDefeated_;
+    SolidResolver solidResolver_;
+    void* solidResolverContext_;
     Breakable breakables_[breakableCapacity];
     unsigned breakableCount_;
     unsigned blocksDestroyed_;

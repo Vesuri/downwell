@@ -10,6 +10,8 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
     : player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
+      enemyCount_(0), enemiesDefeated_(0), solidResolver_(0),
+      solidResolverContext_(0),
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
     unsigned index;
@@ -18,6 +20,53 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         bullets_[index].y = 0;
         bullets_[index].active = false;
     }
+    for (index = 0; index < enemyCapacity; ++index) {
+        enemies_[index].objectId = -1;
+        enemies_[index].spriteId = -1;
+        enemies_[index].x = 0;
+        enemies_[index].y = 0;
+        enemies_[index].health = 0;
+        enemies_[index].reward = 0;
+        enemies_[index].facing = 1;
+        enemies_[index].preciseX = 0;
+        enemies_[index].preciseY = 0;
+        enemies_[index].speedX = 0;
+        enemies_[index].speedY = 0;
+        enemies_[index].active = false;
+        enemies_[index].awake = false;
+    }
+}
+
+bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
+                                      int spriteId, int x, int y,
+                                      int speedX, int speedY,
+                                      int health, int reward)
+{
+    if (index >= enemyCapacity)
+        return false;
+    EnemyState& enemy = enemies_[index];
+    enemy.objectId = objectId;
+    enemy.spriteId = spriteId;
+    enemy.x = x;
+    enemy.y = y;
+    enemy.health = health;
+    enemy.reward = reward;
+    enemy.facing = speedX < 0 ? -1 : 1;
+    enemy.preciseX = (long)x * 256L;
+    enemy.preciseY = (long)y * 256L;
+    enemy.speedX = speedX;
+    enemy.speedY = speedY;
+    enemy.active = true;
+    enemy.awake = false;
+    if (enemyCount_ <= index)
+        enemyCount_ = index + 1;
+    return true;
+}
+
+const AmigaPortRuntime::EnemyState&
+AmigaPortRuntime::enemyAt(unsigned index) const
+{
+    return enemies_[index < enemyCount_ ? index : 0];
 }
 
 unsigned AmigaPortRuntime::bulletCount() const
@@ -100,6 +149,22 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             unsigned blockIndex;
             bullet.y += 8;
             bulletChanged = true;
+            for (unsigned enemyIndex = 0;
+                 enemyIndex < enemyCount_ && bullet.active; ++enemyIndex) {
+                EnemyState& enemy = enemies_[enemyIndex];
+                if (!enemy.active || !enemy.awake || enemy.health <= 0 ||
+                    bullet.x < enemy.x - 8 || bullet.x > enemy.x + 7 ||
+                    priorBulletY > enemy.y + 7 || bullet.y < enemy.y - 8)
+                    continue;
+                if (enemy.objectId != 112) {
+                    enemy.health -= 10;
+                    if (enemy.health <= 0) {
+                        enemy.active = false;
+                        ++enemiesDefeated_;
+                    }
+                }
+                bullet.active = false;
+            }
             for (blockIndex = 0;
                  blockIndex < breakableCount_ && bullet.active;
                  ++blockIndex) {
@@ -157,6 +222,65 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         origin %= (int)ringHeight;
         if (origin < 0) origin += (int)ringHeight;
         ringOrigin_ = (unsigned)origin;
+    }
+
+    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+        EnemyState& enemy = enemies_[enemyIndex];
+        if (!enemy.active)
+            continue;
+        if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
+            enemy.awake = true;
+        if (!enemy.awake || solidResolver_ == 0)
+            continue;
+        if (enemy.objectId == 111) {
+            const int direction = enemy.speedX < 0 ? -1 : 1;
+            const bool grounded = solidResolver_(
+                solidResolverContext_, enemy.x, enemy.y + 6);
+            if (grounded) {
+                enemy.speedY = 0;
+                if (!solidResolver_(solidResolverContext_,
+                                    enemy.x + direction * 7,
+                                    enemy.y + 6))
+                    enemy.speedX = -enemy.speedX;
+            } else {
+                enemy.speedY += 51;
+                if (enemy.speedY > 7 * 256)
+                    enemy.speedY = 7 * 256;
+            }
+            const int nextX = (int)((enemy.preciseX + enemy.speedX) / 256L);
+            const int edge = nextX + (enemy.speedX < 0 ? -6 : 6);
+            if (solidResolver_(solidResolverContext_, edge, enemy.y))
+                enemy.speedX = -enemy.speedX;
+            else
+                enemy.preciseX += enemy.speedX;
+            if (!grounded) {
+                const int nextY =
+                    (int)((enemy.preciseY + enemy.speedY) / 256L);
+                if (enemy.speedY > 0 && solidResolver_(
+                        solidResolverContext_, enemy.x, nextY + 5)) {
+                    while (!solidResolver_(solidResolverContext_, enemy.x,
+                                           enemy.y + 6)) {
+                        ++enemy.y;
+                        enemy.preciseY = (long)enemy.y * 256L;
+                    }
+                    enemy.speedY = 0;
+                } else {
+                    enemy.preciseY += enemy.speedY;
+                }
+            }
+        } else if (enemy.objectId == 117) {
+            const int vertical = enemy.speedY < 0 ? -1 : 1;
+            if (solidResolver_(solidResolverContext_, enemy.x,
+                               enemy.y + vertical * 8) ||
+                !solidResolver_(solidResolverContext_, enemy.x + 16,
+                                enemy.y + vertical * 8))
+                enemy.speedY = -enemy.speedY;
+            enemy.preciseY += enemy.speedY;
+        }
+        enemy.x = (int)(enemy.preciseX / 256L);
+        enemy.y = (int)(enemy.preciseY / 256L);
+        if (enemy.speedX != 0)
+            enemy.facing = enemy.speedX < 0 ? -1 : 1;
     }
 
     const bool firstBulletActive = bulletActive();

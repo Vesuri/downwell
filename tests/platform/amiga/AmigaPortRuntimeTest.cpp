@@ -60,6 +60,20 @@ int main() {
                 !destructible.bulletActive(),
             "gunboot bullets destroy configured recovered blocks");
 
+    AmigaPortRuntime combat(300);
+    require(combat.configureEnemy(0, 111, 163, -1, 12,
+                                  0, 0, 5, 6),
+            "bounded native enemy configuration succeeds");
+    combat.step(4);
+    combat.step(0);
+    combat.step(4);
+    for (unsigned frame = 0;
+         frame < 20 && combat.enemiesDefeated() == 0; ++frame)
+        combat.step(0);
+    require(combat.enemiesDefeated() == 1 &&
+                !combat.enemyAt(0).active,
+            "usual gun bullet defeats the recovered five-health snake");
+
     AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
     int accumulatedScroll = 0;
     for (unsigned frame = 0;
