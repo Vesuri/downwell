@@ -39,6 +39,10 @@ public:
     void configureLandingProfile(const int* offsets, unsigned count) {
         player_.configureLandingProfile(offsets, count);
     }
+    void configureLandingResolver(AmigaPlayer::LandingResolver resolver,
+                                  void* context) {
+        player_.configureLandingResolver(resolver, context);
+    }
     void configureBreakables(const int* x, const int* y, unsigned count);
 
     const AmigaPlayer& player() const { return player_; }

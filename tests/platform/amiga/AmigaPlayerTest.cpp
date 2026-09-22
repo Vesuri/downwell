@@ -90,6 +90,18 @@ int main() {
     require(profiled.grounded() && profiled.offsetY() == 42,
             "horizontal position selects the recovered landing profile");
 
+    for (unsigned index = 0; index < AmigaPlayer::landingProfileSize; ++index)
+        landingProfile[index] = index < 60 ? 42 : 74;
+    profiled.configureLandingProfile(
+        landingProfile, AmigaPlayer::landingProfileSize);
+    input = downwell::Input{};
+    input.right = true;
+    for (unsigned frame = 0; frame < 120 && profiled.offsetY() != 74;
+         ++frame)
+        profiled.step(input);
+    require(profiled.grounded() && profiled.offsetY() == 74,
+            "walking beyond a platform edge starts a fall to lower terrain");
+
     std::cout << "Amiga player tests passed\n";
     return 0;
 }

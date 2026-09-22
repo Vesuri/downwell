@@ -10,6 +10,8 @@ struct AmigaPlayerMotion {
 
 class AmigaPlayer {
 public:
+    typedef int (*LandingResolver)(void* context, int x, int minimumY);
+
     static constexpr int landingProfileLeft = -60;
     static constexpr unsigned landingProfileSize = 121;
 
@@ -17,6 +19,10 @@ public:
                          int landingOffset = 0);
     AmigaPlayerMotion step(const downwell::Input& input);
     void configureLandingProfile(const int* offsets, unsigned count);
+    void configureLandingResolver(LandingResolver resolver, void* context) {
+        landingResolver_ = resolver;
+        landingResolverContext_ = context;
+    }
 
     int offsetX() const { return pixelX_; }
     int offsetY() const { return pixelY_; }
@@ -38,6 +44,8 @@ private:
     long speedY_;
     long landingY_;
     int landingProfile_[landingProfileSize];
+    LandingResolver landingResolver_;
+    void* landingResolverContext_;
     bool usesLandingProfile_;
     int pixelX_;
     int pixelY_;

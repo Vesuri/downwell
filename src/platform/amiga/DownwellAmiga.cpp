@@ -72,7 +72,16 @@ struct NativeFragment {
     bool appendPillars;
 };
 
+struct TerrainCollisionContext {
+    const downwell::BuilderPatternPack* builders;
+    const NativeFragment* fragments;
+    unsigned fragmentCount;
+    const AmigaPortRuntime* runtime;
+};
+
 enum { nativeFragmentCount = 5, nativeBreakableCapacity = 96 };
+
+static TerrainCollisionContext terrainCollision;
 
 static_assert(displayHStart == 0x71, "cropped display starts at logical x=16");
 static_assert(displayHStop == 0x1d1, "352-pixel cropped display window");
@@ -195,42 +204,47 @@ static UWORD terrainFrame(char symbol) {
     return 0;
 }
 
-static void buildEntranceLandingProfile(
-    const downwell::BuilderPatternPack& builders,
-    const downwell::PackedBuilderPattern& pattern,
-    bool reversed, const AmigaPortRuntime* runtime, int* offsets) {
-    unsigned profile;
-    for (profile = 0; profile < AmigaPlayer::landingProfileSize; ++profile) {
-        const int offsetX = AmigaPlayer::landingProfileLeft + (int)profile;
-        const int worldX = 240 + offsetX;
-        int landing = 4096 - 176;
+static int resolveTerrainLanding(void* opaque, int offsetX,
+                                 int minimumOffsetY) {
+    const TerrainCollisionContext& context =
+        *static_cast<const TerrainCollisionContext*>(opaque);
+    const int worldX = 240 + offsetX;
+    int landing = 4096 - 176;
+    unsigned fragmentIndex;
+    for (fragmentIndex = 0; fragmentIndex < context.fragmentCount;
+         ++fragmentIndex) {
+        const NativeFragment& fragment = context.fragments[fragmentIndex];
         UWORD row;
-        for (row = 0; row < pattern.rowCount; ++row) {
+        for (row = 0; row < fragment.pattern.rowCount; ++row) {
             ULONG width = 0;
             unsigned column;
-            if (!builders.rowWidth(pattern, row, width))
+            const int candidate = fragment.y + (int)row * 16 - 15 - 176;
+            if (candidate < minimumOffsetY || candidate >= landing)
+                continue;
+            if (!context.builders->rowWidth(fragment.pattern, row, width))
                 break;
             for (column = 0; column < width; ++column) {
                 char symbol = 0;
                 const int ordinal = (int)column + 1;
-                const int tileX = reversed ? 320 - ordinal * 16
-                                           : 160 + ordinal * 16;
-                if (!builders.cell(pattern, (UWORD)column, row, symbol))
+                const int tileX = fragment.reversed
+                                      ? 320 - ordinal * 16
+                                      : 160 + ordinal * 16;
+                if (!context.builders->cell(fragment.pattern, (UWORD)column,
+                                            row, symbol))
                     break;
-                const bool active = symbol != 'B' || runtime == 0 ||
-                    runtime->breakableActiveAt(tileX - 240,
-                        mainBuilderStartY + (int)row * 16 - 176);
+                const bool active = symbol != 'B' || context.runtime == 0 ||
+                    context.runtime->breakableActiveAt(
+                        tileX - 240,
+                        fragment.y + (int)row * 16 - 176);
                 if (active && isTerrainSymbol(symbol) &&
                     worldX >= tileX - 8 && worldX < tileX + 8) {
-                    landing = mainBuilderStartY + (int)row * 16 - 15 - 176;
+                    landing = candidate;
                     break;
                 }
             }
-            if (landing != 4096 - 176)
-                break;
         }
-        offsets[profile] = landing;
     }
+    return landing;
 }
 
 static unsigned appendFragmentBreakables(
@@ -763,7 +777,6 @@ int main(void) {
     };
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
-        int landingProfile[AmigaPlayer::landingProfileSize];
         int breakableX[nativeBreakableCapacity];
         int breakableY[nativeBreakableCapacity];
         unsigned breakableCount = 0;
@@ -775,10 +788,12 @@ int main(void) {
                 breakableX, breakableY, breakableCount,
                 nativeBreakableCapacity);
         port.configureBreakables(breakableX, breakableY, breakableCount);
-        buildEntranceLandingProfile(
-            builders, entrance, true, &port, landingProfile);
-        port.configureLandingProfile(
-            landingProfile, AmigaPlayer::landingProfileSize);
+        terrainCollision.builders = &builders;
+        terrainCollision.fragments = fragments;
+        terrainCollision.fragmentCount = nativeFragmentCount;
+        terrainCollision.runtime = &port;
+        port.configureLandingResolver(resolveTerrainLanding,
+                                      &terrainCollision);
     }
 #endif
     const ULONG gamePackBytes =
@@ -998,11 +1013,6 @@ int main(void) {
                 }
             }
             if (destroyedBlockCount != 0) {
-                int landingProfile[AmigaPlayer::landingProfileSize];
-                buildEntranceLandingProfile(
-                    builders, entrance, true, &port, landingProfile);
-                port.configureLandingProfile(
-                    landingProfile, AmigaPlayer::landingProfileSize);
                 for (unsigned block = 0;
                      block < destroyedBlockCount; ++block) {
                     const int centerY = 176 + destroyedBlockY[block];
