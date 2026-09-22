@@ -34,6 +34,23 @@ int main() {
     require(runtime.checkpoint() != 0 && runtime.trajectoryDigest() != 0,
             "port runtime exposes final and rolling checkpoints");
 
+    AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
+    int accumulatedScroll = 0;
+    for (unsigned frame = 0;
+         frame < 300 && !fallingRuntime.player().grounded(); ++frame) {
+        const AmigaPortFrame fallingFrame = fallingRuntime.step(0);
+        accumulatedScroll += fallingFrame.scrollDelta;
+    }
+    require(fallingRuntime.player().grounded() &&
+                fallingRuntime.player().offsetY() == 1201 - 176,
+            "camera-follow gameplay falls to the recovered entrance height");
+    require(accumulatedScroll == fallingRuntime.cameraOffsetY() &&
+                fallingRuntime.cameraOffsetY() > 900,
+            "camera motion exactly accounts for circular-buffer scrolling");
+    require(fallingRuntime.ringOrigin() ==
+                static_cast<unsigned>((300 + accumulatedScroll) % 320),
+            "ring origin follows the signed accumulated camera displacement");
+
     const downwell::ReplayReader replay(downwell::portReplayBytes,
                                         downwell::portReplaySize);
     require(replay.valid() && replay.frameCount() == 64,

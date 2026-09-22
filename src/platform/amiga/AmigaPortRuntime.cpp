@@ -5,9 +5,11 @@
 
 AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
                                    bool startsGrounded,
-                                   int landingOffset)
+                                   int landingOffset,
+                                   bool followCamera)
     : player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
+      followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       bulletActive_(false), bulletX_(0), bulletY_(0), checkpoint_(0)
 {
 }
@@ -28,16 +30,32 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }
 
     const downwell::Input input = downwell::unpackReplayInput(packedInput);
-    const AmigaPlayerMotion motion = player_.step(input);
+    AmigaPlayerMotion motion = player_.step(input);
     if (player_.shots() != oldShots) {
         bulletActive_ = true;
         bulletX_ = player_.offsetX() - 1;
         bulletY_ = player_.offsetY() + 8;
     }
 
-    const bool scrolled = (tick_ & 1u) == 0;
-    if (scrolled)
-        ringOrigin_ = (ringOrigin_ + 1u) % ringHeight;
+    int scrollDelta = 0;
+    if (followCamera_) {
+        const int oldCameraPixelY = cameraPixelY_;
+        const long target = player_.offsetYFixed() + 24L * 256L;
+        cameraY_ += (target - cameraY_) / 5L;
+        cameraPixelY_ = cameraY_ >= 0
+                            ? (int)(cameraY_ >> 8)
+                            : -(int)((-cameraY_) >> 8);
+        scrollDelta = cameraPixelY_ - oldCameraPixelY;
+        motion.deltaY -= scrollDelta;
+    } else if ((tick_ & 1u) == 0) {
+        scrollDelta = 1;
+    }
+    if (scrollDelta != 0) {
+        int origin = (int)ringOrigin_ + scrollDelta;
+        origin %= (int)ringHeight;
+        if (origin < 0) origin += (int)ringHeight;
+        ringOrigin_ = (unsigned)origin;
+    }
 
     checkpoint_ = downwell::portCheckpointDigest(
         tick_, packedInput, player_.offsetX(), player_.offsetY(),
@@ -50,7 +68,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         player_.ammo() != oldAmmo,
         bulletActive_ != oldBulletActive || bulletX_ != oldBulletX ||
             bulletY_ != oldBulletY,
-        scrolled
+        scrollDelta != 0,
+        scrollDelta
     };
     return frame;
 }

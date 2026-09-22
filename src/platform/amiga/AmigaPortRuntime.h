@@ -11,6 +11,7 @@ struct AmigaPortFrame {
     bool ammoChanged;
     bool bulletChanged;
     bool scrolled;
+    int scrollDelta;
 };
 
 class AmigaPortRuntime {
@@ -20,7 +21,8 @@ public:
 
     explicit AmigaPortRuntime(unsigned initialRingOrigin,
                               bool startsGrounded = true,
-                              int landingOffset = 0);
+                              int landingOffset = 0,
+                              bool followCamera = false);
     AmigaPortFrame step(std::uint8_t packedInput);
 
     const AmigaPlayer& player() const { return player_; }
@@ -29,6 +31,7 @@ public:
     bool bulletActive() const { return bulletActive_; }
     int bulletX() const { return bulletX_; }
     int bulletY() const { return bulletY_; }
+    int cameraOffsetY() const { return cameraPixelY_; }
     std::uint64_t checkpoint() const { return checkpoint_; }
     std::uint64_t trajectoryDigest() const { return trajectory_.value(); }
 
@@ -36,6 +39,9 @@ private:
     AmigaPlayer player_;
     unsigned tick_;
     unsigned ringOrigin_;
+    bool followCamera_;
+    long cameraY_;
+    int cameraPixelY_;
     bool bulletActive_;
     int bulletX_;
     int bulletY_;

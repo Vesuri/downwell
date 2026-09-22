@@ -16,6 +16,7 @@ public:
 
     int offsetX() const { return pixelX_; }
     int offsetY() const { return pixelY_; }
+    long offsetYFixed() const { return y_; }
     int ammo() const { return ammo_; }
     bool grounded() const { return grounded_; }
     unsigned jumps() const { return jumps_; }
