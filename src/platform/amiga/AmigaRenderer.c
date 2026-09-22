@@ -32,6 +32,114 @@ static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {
     if (pen & 2u) row[planeBytes + (x >> 3)] |= mask;
 }
 
+static UBYTE sourceSpanByte(const UBYTE* row, int planeBytes, int sourceX) {
+    int sourceByte;
+    int shift;
+    UWORD window;
+    if (sourceX < 0)
+        return sourceX > -8 && planeBytes > 0
+                   ? (UBYTE)(row[0] >> -sourceX) : 0;
+    sourceByte = sourceX >> 3;
+    shift = sourceX & 7;
+    if (sourceByte >= planeBytes)
+        return 0;
+    window = (UWORD)row[sourceByte] << 8;
+    if (sourceByte + 1 < planeBytes)
+        window |= row[sourceByte + 1];
+    return (UBYTE)((window << shift) >> 8);
+}
+
+static UBYTE spanMask(int first, int last) {
+    UBYTE mask = 0;
+    int bit;
+    for (bit = first; bit < last; ++bit)
+        mask |= (UBYTE)(0x80u >> bit);
+    return mask;
+}
+
+/*
+ * The packed assets already contain native one-bit planes.  Compose one
+ * destination byte at a time instead of sending every set source pixel
+ * through setPixel().  Apart from the two clipped edge bytes this turns eight
+ * source tests and sixteen Chip-RAM read/modify/writes into one planar span.
+ */
+static void drawAssetNormal(AmigaRenderer* renderer,
+                            const UBYTE* data,
+                            int originX, int originY,
+                            int width, int height, int planeBytes,
+                            int anchorX, int anchorY) {
+    const int left = anchorX - originX;
+    const int top = anchorY - originY;
+    int clipLeft = renderer->clipX;
+    int clipTop = renderer->clipY;
+    int clipRight = renderer->clipX + renderer->clipWidth;
+    int clipBottom = renderer->clipY + renderer->clipHeight;
+    int firstY;
+    int lastY;
+    int y;
+    ULONG destinationPlaneBytes;
+
+    if (clipLeft < 0) clipLeft = 0;
+    if (clipTop < 0) clipTop = 0;
+    if (clipRight > downwellVisibleWidth) clipRight = downwellVisibleWidth;
+    if (clipBottom > downwellDisplayHeight)
+        clipBottom = downwellDisplayHeight;
+    if (clipLeft < left) clipLeft = left;
+    if (clipTop < top) clipTop = top;
+    if (clipRight > left + width) clipRight = left + width;
+    if (clipBottom > top + height) clipBottom = top + height;
+    if (clipLeft >= clipRight || clipTop >= clipBottom)
+        return;
+
+    firstY = clipTop;
+    lastY = clipBottom;
+    destinationPlaneBytes = renderer->target == renderer->game
+                                ? downwellGameRingPlaneBytes
+                                : downwellPlaneBytes;
+    for (y = firstY; y < lastY; ++y) {
+        const UBYTE* source = data + (y - top) * planeBytes * 2;
+        const UBYTE* source0 = source;
+        const UBYTE* source1 = source + planeBytes;
+        unsigned targetY = (unsigned)y;
+        ULONG rowOffset;
+        int destinationByte;
+        int firstByte = clipLeft >> 3;
+        int lastByte = (clipRight - 1) >> 3;
+        if (renderer->target == renderer->game)
+            targetY = (renderer->gameOrigin + targetY) %
+                      downwellGameRingHeight;
+        rowOffset = targetY * downwellBytesPerPlaneLine;
+        for (destinationByte = firstByte;
+             destinationByte <= lastByte; ++destinationByte) {
+            const int destinationX = destinationByte << 3;
+            int firstBit = clipLeft - destinationX;
+            int lastBit = clipRight - destinationX;
+            UBYTE clipMask;
+            UBYTE plane0;
+            UBYTE plane1;
+            UBYTE opaque;
+            UBYTE* target0;
+            UBYTE* target1;
+            if (firstBit < 0) firstBit = 0;
+            if (lastBit > 8) lastBit = 8;
+            clipMask = spanMask(firstBit, lastBit);
+            plane0 = sourceSpanByte(source0, planeBytes,
+                                    destinationX - left);
+            plane1 = sourceSpanByte(source1, planeBytes,
+                                    destinationX - left);
+            opaque = (UBYTE)((plane0 | plane1) & clipMask);
+            if (!opaque)
+                continue;
+            target0 = renderer->target + rowOffset + destinationByte;
+            target1 = target0 + destinationPlaneBytes;
+            *target0 = (UBYTE)((*target0 & (UBYTE)~opaque) |
+                               (plane0 & opaque));
+            *target1 = (UBYTE)((*target1 & (UBYTE)~opaque) |
+                               (plane1 & opaque));
+        }
+    }
+}
+
 static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
                               UWORD sprite, UWORD frame) {
     const UBYTE* record;
@@ -123,11 +231,56 @@ void amigaRendererClearClipRect(AmigaRenderer* renderer) {
 void amigaRendererFillRect(AmigaRenderer* renderer,
                            int x, int y, int width, int height,
                            unsigned pen) {
+    int left = x;
+    int top = y;
+    int right = x + width;
+    int bottom = y + height;
     int py;
-    int px;
-    for (py = y; py < y + height; ++py)
-        for (px = x; px < x + width; ++px)
-            setPixel(renderer, px, py, pen);
+    ULONG destinationPlaneBytes;
+    if (left < renderer->clipX) left = renderer->clipX;
+    if (top < renderer->clipY) top = renderer->clipY;
+    if (right > renderer->clipX + renderer->clipWidth)
+        right = renderer->clipX + renderer->clipWidth;
+    if (bottom > renderer->clipY + renderer->clipHeight)
+        bottom = renderer->clipY + renderer->clipHeight;
+    if (left < 0) left = 0;
+    if (top < 0) top = 0;
+    if (right > downwellVisibleWidth) right = downwellVisibleWidth;
+    if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+    if (left >= right || top >= bottom)
+        return;
+    destinationPlaneBytes = renderer->target == renderer->game
+                                ? downwellGameRingPlaneBytes
+                                : downwellPlaneBytes;
+    for (py = top; py < bottom; ++py) {
+        unsigned targetY = (unsigned)py;
+        ULONG rowOffset;
+        int destinationByte;
+        const int firstByte = left >> 3;
+        const int lastByte = (right - 1) >> 3;
+        if (renderer->target == renderer->game)
+            targetY = (renderer->gameOrigin + targetY) %
+                      downwellGameRingHeight;
+        rowOffset = targetY * downwellBytesPerPlaneLine;
+        for (destinationByte = firstByte;
+             destinationByte <= lastByte; ++destinationByte) {
+            const int destinationX = destinationByte << 3;
+            int firstBit = left - destinationX;
+            int lastBit = right - destinationX;
+            UBYTE mask;
+            UBYTE* target0;
+            UBYTE* target1;
+            if (firstBit < 0) firstBit = 0;
+            if (lastBit > 8) lastBit = 8;
+            mask = spanMask(firstBit, lastBit);
+            target0 = renderer->target + rowOffset + destinationByte;
+            target1 = target0 + destinationPlaneBytes;
+            *target0 = (UBYTE)((*target0 & (UBYTE)~mask) |
+                               ((pen & 1u) ? mask : 0));
+            *target1 = (UBYTE)((*target1 & (UBYTE)~mask) |
+                               ((pen & 2u) ? mask : 0));
+        }
+    }
 }
 
 void amigaRendererDrawAsset(AmigaRenderer* renderer,
@@ -155,6 +308,12 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
     data = pack + readLong(record + 16);
     if (data < pack || data + readLong(record + 20) > packEnd)
         return;
+
+    if (!flipX) {
+        drawAssetNormal(renderer, data, originX, originY,
+                        width, height, planeBytes, anchorX, anchorY);
+        return;
+    }
 
     for (y = 0; y < height; ++y) {
         const UBYTE* row = data + y * planeBytes * 2;
