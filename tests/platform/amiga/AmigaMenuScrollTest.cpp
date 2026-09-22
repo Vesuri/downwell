@@ -20,23 +20,24 @@ int main() {
             "intro modulo skips the unused cached row bytes");
 
     AmigaMenuScrollState state = amigaMenuScrollState(0, 284);
-    require(state.foregroundOffset == 0 && state.backgroundOffset == 0 &&
-                state.bplcon1 == 0,
-            "aligned intro origin needs no pointer or fine scroll");
+    require(state.foregroundOffset == 0 &&
+                state.backgroundOffset == 25 * 64 &&
+                state.scrollControl == 0,
+            "aligned intro origin preserves background vertical parallax");
 
     state = amigaMenuScrollState(95, 300);
     require(state.foregroundOffset == 16 * 64 + 10,
             "foreground pointer advances in sixteen-pixel words");
-    require(state.backgroundOffset == 16 * 64,
-            "background pointer retains its slower coarse position");
-    require(state.bplcon1 == 0xff,
+    require(state.backgroundOffset == 27 * 64,
+            "background pointer applies recovered slow vertical parallax");
+    require(state.scrollControl == 0xff,
             "independent fine-scroll nibbles preserve parallax remainder");
 
     state = amigaMenuScrollState(192, 384);
     require(state.foregroundOffset == 100 * 64 + 24 &&
-                state.backgroundOffset == 100 * 64 + 4,
-            "both cached planes share vertical pointer scrolling");
-    require(state.bplcon1 == 0,
+                state.backgroundOffset == 34 * 64 + 4,
+            "cached planes preserve independent parallax pointers");
+    require(state.scrollControl == 0,
             "word-aligned parallax offsets need no fine scroll");
 
     std::cout << "Amiga menu hardware-scroll tests passed\n";

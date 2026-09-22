@@ -9,6 +9,8 @@
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
 #include "AmigaMenu.h"
+#include "AmigaMenuCache.h"
+#include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
 #include "AmigaRenderer.h"
@@ -55,6 +57,7 @@ enum {
     bulletSpriteBufferCount = 2 * AmigaPortRuntime::bulletCapacity,
     enemySpriteHeight = 32,
     enemySpriteBytes = (enemySpriteHeight + 2) * 4,
+    menuPlaneBytes = amigaMenuCacheBytesPerRow * amigaMenuCacheHeight,
     fetchCropBytes = 2,
     fetchWords = 22,
     fetchWidth = fetchWords * 16,
@@ -754,7 +757,19 @@ static bool buildCopper(CopperList& list,
     unsigned channel;
     const unsigned firstSpan = downwellGameRingHeight - ringOrigin;
     list.reset();
+    /*
+     * The menu intro temporarily installs a narrow, independently scrolling
+     * display.  Restore every display and fetch register here rather than
+     * relying on the values left behind by platform takeover.
+     */
+    list.move(diwstrt, (UWORD)((displayVStart << 8) |
+                              (displayHStart & 0xff)));
+    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
+                              (displayHStop & 0xff)));
+    list.move(ddfstrt, fetchStart);
+    list.move(ddfstop, fetchStop);
     list.move(bplcon0, 0x4401);
+    list.move(bplcon1, 0);
     list.move(bpl1mod, fetchModulo);
     list.move(bpl2mod, fetchModulo);
     list.showBitmap(game, 1, 2, fetchCropBytes * 8, ringOrigin, 2);
@@ -784,6 +799,35 @@ static bool buildCopper(CopperList& list,
     return list.finish();
 }
 
+static bool buildMenuCopper(CopperList& list,
+                            const UBYTE* foreground,
+                            const UBYTE* background,
+                            const Sprite& playerSprite,
+                            const Sprite& nullSprite,
+                            const Palette& palette,
+                            const AmigaMenuScrollState& scroll) {
+    list.reset();
+    list.move(diwstrt, (UWORD)((displayVStart << 8) |
+                              (amigaMenuDisplayHStart & 0xff)));
+    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
+                              (amigaMenuDisplayHStop & 0xff)));
+    list.move(ddfstrt, amigaMenuFetchStart);
+    list.move(ddfstop, amigaMenuFetchStop);
+    list.move(bplcon0, 0x2001);
+    list.move(bplcon1, scroll.scrollControl);
+    list.move(bpl1mod, amigaMenuModulo);
+    list.move(bpl2mod, amigaMenuModulo);
+    list.pointer(bpl1pth, foreground + scroll.foregroundOffset);
+    list.pointer(bpl2pth, background + scroll.backgroundOffset);
+    list.showSprite(0, playerSprite);
+    for (unsigned channel = 1; channel < 8; ++channel)
+        list.showSprite((UWORD)channel, nullSprite);
+    list.setPalette(palette);
+    list.move(color02, 0xfff);
+    list.move(color03, 0xfff);
+    return list.finish();
+}
+
 static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                             unsigned index) {
     return index < AmigaPortRuntime::bulletCapacity
@@ -810,6 +854,7 @@ int main(void) {
     int presentedSplash = scenes.splashStage();
     unsigned liveFrameCount = 0;
     unsigned menuSpriteFrameCount = 0;
+    bool presentedMenuHardware = false;
 #ifdef DOWNWELL_SCENE_VERIFY
     bool sceneGameplayLandedReported = false;
     bool sceneGameplayActiveReported = false;
@@ -837,6 +882,7 @@ int main(void) {
     const ULONG gamePackBytes =
         (ULONG)(amiga_game_pack_end - amiga_game_pack);
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
+                         menuPlaneBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
@@ -928,6 +974,15 @@ int main(void) {
         memory.assets()[byte] = amiga_game_pack[byte];
     activeGamePack = memory.assets();
     activeGamePackEnd = activeGamePack + gamePackBytes;
+    if (!amigaRenderMenuCache(menuDrawList, activeGamePack,
+                              activeGamePackEnd,
+                              memory.menuForeground(),
+                              memory.menuBackground())) {
+        platform.restore();
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        memory.release();
+        return 1;
+    }
 
     CopperList copperLists[2] = {
         CopperList(memory.copper(), copperWords),
@@ -1085,6 +1140,12 @@ int main(void) {
                     scenes.scene() != presentedScene ||
                     scenes.splashStage() != presentedSplash;
                 const unsigned back = front ^ 1u;
+                const bool menuHardware =
+                    scenes.scene() == AmigaScene::menu &&
+                    scenes.menuTitleFrame() == 0 &&
+                    !scenes.menuTeleportActive();
+                const bool menuModeChanged =
+                    menuHardware != presentedMenuHardware;
                 presentedScene = scenes.scene();
                 presentedSplash = scenes.splashStage();
                 if (presentedScene == AmigaScene::splash) {
@@ -1092,7 +1153,9 @@ int main(void) {
                         drawSplash(&renderer, presentedSplash);
                 }
                 else if (presentedScene == AmigaScene::menu) {
-                    if (presentationChanged || !scenes.menuPlayerNapping())
+                    if (!menuHardware &&
+                        (presentationChanged || menuModeChanged ||
+                         !scenes.menuPlayerNapping()))
                         drawMenu(&renderer, menuDrawList, scenes);
                 }
                 else if (presentedScene == AmigaScene::styleSelect)
@@ -1119,18 +1182,31 @@ int main(void) {
                     } else {
                         playerSprites[back].hide();
                     }
-                    if (menuFrameReady)
-                        menuFrameReady = buildCopper(
-                            copperLists[back], gameBitmap, hudBitmap,
-                            playerSprites[back],
-                            bulletSprites + back *
-                                AmigaPortRuntime::bulletCapacity,
-                            enemySprites[back], palette,
-                            port.ringOrigin());
+                    if (menuFrameReady) {
+                        if (menuHardware) {
+                            const AmigaMenuScrollState scroll =
+                                amigaMenuScrollState(
+                                    scenes.menuCameraX() - 80,
+                                    scenes.menuCameraY() - 142);
+                            menuFrameReady = buildMenuCopper(
+                                copperLists[back], memory.menuForeground(),
+                                memory.menuBackground(), playerSprites[back],
+                                nullSprite, palette, scroll);
+                        } else {
+                            menuFrameReady = buildCopper(
+                                copperLists[back], gameBitmap, hudBitmap,
+                                playerSprites[back],
+                                bulletSprites + back *
+                                    AmigaPortRuntime::bulletCapacity,
+                                enemySprites[back], palette,
+                                port.ringOrigin());
+                        }
+                    }
                     if (!menuFrameReady)
                         break;
                     platform.publish(copperLists[back]);
                     front = back;
+                    presentedMenuHardware = menuHardware;
                     if (++menuSpriteFrameCount == 2)
                         downwellMenuSpriteReady();
                     continue;

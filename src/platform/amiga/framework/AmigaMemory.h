@@ -9,6 +9,7 @@ public:
     ~AmigaMemory();
 
     bool allocate(ULONG gameBytes, ULONG hudBytes,
+                  ULONG menuPlaneBytes,
                   ULONG copperBytes, ULONG playerSpriteBytes,
                   ULONG bulletSpriteBytes, ULONG enemySpriteBytes,
                   ULONG assetBytes = 0);
@@ -16,6 +17,8 @@ public:
 
     UBYTE* game() const { return game_; }
     UBYTE* hud() const { return hud_; }
+    UBYTE* menuForeground() const { return menu_; }
+    UBYTE* menuBackground() const { return menu_ + menuPlaneBytes_; }
     UWORD* copper() const { return copper_; }
     UWORD* nullSprite() const { return nullSprite_; }
     UWORD* playerSprite(unsigned index) const {
@@ -33,6 +36,7 @@ private:
 
     UBYTE* game_;
     UBYTE* hud_;
+    UBYTE* menu_;
     UWORD* copper_;
     UWORD* nullSprite_;
     UWORD* playerSprite_[2];
@@ -41,6 +45,7 @@ private:
     UBYTE* assets_;
     ULONG gameBytes_;
     ULONG hudBytes_;
+    ULONG menuPlaneBytes_;
     ULONG copperBytes_;
     ULONG playerSpriteBytes_;
     ULONG bulletSpriteBytes_;

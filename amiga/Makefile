@@ -33,7 +33,8 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
-	obj/AmigaTerrain.o obj/AmigaMenu.o \
+	obj/AmigaTerrain.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
+	obj/AmigaMenuCache.o \
 	obj/AmigaRenderer.o obj/AmigaBlitter.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
 	obj/GCCRuntime.o obj/AmigaPlatform.o \
@@ -94,6 +95,17 @@ obj/AmigaTerrain.o: $(AMIGA_SRC)/AmigaTerrain.cpp \
 obj/AmigaMenu.o: $(AMIGA_SRC)/AmigaMenu.cpp $(AMIGA_SRC)/AmigaMenu.h \
 		$(REPO)/src/core/RoomPack.h $(REPO)/src/core/ObjectPack.h \
 		$(REPO)/src/core/GameMakerRandom.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaMenuScroll.o: $(AMIGA_SRC)/AmigaMenuScroll.cpp \
+		$(AMIGA_SRC)/AmigaMenuScroll.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaMenuCache.o: $(AMIGA_SRC)/AmigaMenuCache.cpp \
+		$(AMIGA_SRC)/AmigaMenuCache.h $(AMIGA_SRC)/AmigaMenu.h \
+		$(AMIGA_SRC)/AmigaMenuScroll.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

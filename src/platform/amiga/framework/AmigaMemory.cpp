@@ -4,9 +4,9 @@
 #include <proto/exec.h>
 
 AmigaMemory::AmigaMemory()
-    : game_(0), hud_(0), copper_(0), nullSprite_(0), bulletSprite_(0),
+    : game_(0), hud_(0), menu_(0), copper_(0), nullSprite_(0), bulletSprite_(0),
       assets_(0),
-      gameBytes_(0), hudBytes_(0), copperBytes_(0),
+      gameBytes_(0), hudBytes_(0), menuPlaneBytes_(0), copperBytes_(0),
       playerSpriteBytes_(0), bulletSpriteBytes_(0), enemySpriteBytes_(0),
       assetBytes_(0)
 {
@@ -22,6 +22,7 @@ AmigaMemory::~AmigaMemory()
 }
 
 bool AmigaMemory::allocate(ULONG gameBytes, ULONG hudBytes,
+                           ULONG menuPlaneBytes,
                            ULONG copperBytes, ULONG playerSpriteBytes,
                            ULONG bulletSpriteBytes, ULONG enemySpriteBytes,
                            ULONG assetBytes)
@@ -29,6 +30,7 @@ bool AmigaMemory::allocate(ULONG gameBytes, ULONG hudBytes,
     release();
     gameBytes_ = gameBytes;
     hudBytes_ = hudBytes;
+    menuPlaneBytes_ = menuPlaneBytes;
     copperBytes_ = copperBytes;
     playerSpriteBytes_ = playerSpriteBytes;
     bulletSpriteBytes_ = bulletSpriteBytes;
@@ -36,6 +38,7 @@ bool AmigaMemory::allocate(ULONG gameBytes, ULONG hudBytes,
     assetBytes_ = assetBytes;
     game_ = (UBYTE*)AllocMem(gameBytes_, MEMF_CHIP | MEMF_CLEAR);
     hud_ = (UBYTE*)AllocMem(hudBytes_, MEMF_CHIP | MEMF_CLEAR);
+    menu_ = (UBYTE*)AllocMem(menuPlaneBytes_ * 2, MEMF_CHIP | MEMF_CLEAR);
     copper_ = (UWORD*)AllocMem(copperBytes_, MEMF_CHIP | MEMF_CLEAR);
     nullSprite_ = (UWORD*)AllocMem(8, MEMF_CHIP | MEMF_CLEAR);
     playerSprite_[0] =
@@ -50,7 +53,7 @@ bool AmigaMemory::allocate(ULONG gameBytes, ULONG hudBytes,
         (UWORD*)AllocMem(enemySpriteBytes_, MEMF_CHIP | MEMF_CLEAR);
     assets_ = assetBytes_ != 0
                   ? (UBYTE*)AllocMem(assetBytes_, MEMF_CHIP) : 0;
-    if (game_ && hud_ && copper_ && nullSprite_ &&
+    if (game_ && hud_ && menu_ && copper_ && nullSprite_ &&
         playerSprite_[0] && playerSprite_[1] && bulletSprite_ &&
         enemySprite_[0] && enemySprite_[1] &&
         (assetBytes_ == 0 || assets_))
@@ -69,10 +72,12 @@ void AmigaMemory::release()
     if (playerSprite_[0]) FreeMem(playerSprite_[0], playerSpriteBytes_);
     if (nullSprite_) FreeMem(nullSprite_, 8);
     if (copper_) FreeMem(copper_, copperBytes_);
+    if (menu_) FreeMem(menu_, menuPlaneBytes_ * 2);
     if (hud_) FreeMem(hud_, hudBytes_);
     if (game_) FreeMem(game_, gameBytes_);
     game_ = 0;
     hud_ = 0;
+    menu_ = 0;
     copper_ = 0;
     nullSprite_ = 0;
     playerSprite_[0] = 0;

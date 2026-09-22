@@ -21,7 +21,7 @@ enum {
 struct AmigaMenuScrollState {
     std::uint32_t foregroundOffset;
     std::uint32_t backgroundOffset;
-    std::uint16_t bplcon1;
+    std::uint16_t scrollControl;
 };
 
 AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY);

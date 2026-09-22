@@ -14,6 +14,12 @@ std::uint32_t planeOffset(int viewX, int viewY) {
            static_cast<std::uint32_t>((viewX >> 4) * 2);
 }
 
+std::uint32_t backgroundOffset(int viewX, int viewY) {
+    const int top = clamp(viewY / 11, 0, amigaMenuCacheHeight - 284);
+    return static_cast<std::uint32_t>(top) * amigaMenuCacheBytesPerRow +
+           static_cast<std::uint32_t>((viewX >> 4) * 2);
+}
+
 } // namespace
 
 AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY) {
@@ -24,8 +30,8 @@ AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY) {
     const int top = clamp(viewY, amigaMenuCacheWorldY, maximumY);
     AmigaMenuScrollState state;
     state.foregroundOffset = planeOffset(foregroundX, top);
-    state.backgroundOffset = planeOffset(backgroundX, top);
-    state.bplcon1 = static_cast<std::uint16_t>(
+    state.backgroundOffset = backgroundOffset(backgroundX, viewY);
+    state.scrollControl = static_cast<std::uint16_t>(
         (foregroundX & 15) | ((backgroundX & 15) << 4));
     return state;
 }
