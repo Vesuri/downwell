@@ -857,7 +857,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     if (mainBuilderGenerationCount_ < -1) {
         random_.irandom(1); // choose(0, 1): unused orientation for empty rows.
         for (int cell = 0; cell < 19; ++cell)
-            random_.random(3.0); // builderCavern on 18 cells and one newline.
+            random_.nextU32(); // builderCavern on 18 cells and one newline.
         const bool left = deferredInstances_.enqueueCreate(60, 160, instance.y);
         const bool right = deferredInstances_.enqueueCreate(60, 320, instance.y);
         if (!left || !right) {
@@ -906,11 +906,11 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             command.imageSpeed = 0.0F;
             command.motionInitialized = true;
             command.alarms.set(1,
-                60 + static_cast<int>(random_.random(60.0)));
+                60 + static_cast<int>(random_.randomIntegerSmall(60)));
         }
         if (objectId == 116) {
             command.imageSpeed = 0.2F;
-            random_.random(0.5); // Unused recovered vel = random_range(1, 1.5).
+            random_.nextU32(); // Unused recovered vel = random_range(1, 1.5).
             command.direction = static_cast<float>(random_.irandom(359));
             command.moveSpeed = 1.25F;
             command.motionInitialized = true;
@@ -933,11 +933,11 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             command.imageSpeed = 0.0F;
             command.scaleX = random_.irandom(1) == 0 ? 1.0F : -1.0F;
             command.imageIndex = static_cast<float>(random_.irandom(15));
-            if (random_.random(300.0) < 1.0)
+            if (random_.randomIntegerSmall(300) == 0)
                 command.imageIndex = 16.0F;
         }
         if (objectId == 82)
-            random_.random(2.0); // parentTimeField radius 24..26.
+            random_.nextU32(); // parentTimeField radius 24..26.
         if (objectId == 293) {
             command.imageSpeed = 0.0F;
             command.alarms.set(1, 30 + static_cast<int>(random_.irandom(30)));
@@ -981,8 +981,9 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 if (symbol == '^' && random_.irandom(4) != 0 &&
                     !enqueueObject(289, buildX, rowY))
                     return false;
-                const double enemyRoll = random_.random(3.0);
-                if (enemyRoll <= 1.0) {
+                // random(3) <= 1, compared directly in the recovered
+                // unsigned 2^-32 domain (floor(2^32 / 3) = 0x55555555).
+                if (random_.nextU32() <= 0x55555555U) {
                     std::int32_t enemyId = -1;
                     if (symbol == 'a') enemyId = 111;
                     if (symbol == 'b') enemyId = 116;
@@ -1037,7 +1038,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                     ++mainBuilderSpecialObjectsGenerated_;
             }
             if (row + 1 < pattern.rowCount) {
-                random_.random(3.0); // builderCavern sees the row newline.
+                random_.nextU32(); // builderCavern sees the row newline.
                 const bool sideRoom =
                     pattern.family == BuilderPatternFamily::areaOneRight ||
                     pattern.family == BuilderPatternFamily::areaOneShop;
