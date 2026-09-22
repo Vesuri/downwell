@@ -55,8 +55,13 @@ public:
         long preciseY;
         long speedX;
         long speedY;
+        int motionState;
+        int auxiliaryState;
+        int alarm0;
+        int alarm1;
         bool active;
         bool awake;
+        bool grounded;
     };
     struct GemState {
         int x;
@@ -91,7 +96,9 @@ public:
     }
     bool configureEnemy(unsigned index, int objectId, int spriteId,
                         int x, int y, int speedX, int speedY,
-                        int health, int reward);
+                        int health, int reward,
+                        int motionState = 0, int auxiliaryState = 0,
+                        int alarm0 = -1, int alarm1 = -1);
 
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }

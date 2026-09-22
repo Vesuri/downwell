@@ -93,6 +93,26 @@ int main() {
                 turtle.enemyAt(0).active,
             "ground turtle uses its recovered quarter-pixel walking speed");
 
+    AmigaPortRuntime frog(300);
+    frog.configureSolidResolver(flatGround, 0);
+    require(frog.configureEnemy(0, 113, 171, 40, 0,
+                                0, 0, 35, 20,
+                                0, 0, -1, 1),
+            "generated frog can retain its recovered alarm state");
+    frog.step(0);
+    require(frog.enemyAt(0).grounded &&
+                frog.enemyAt(0).auxiliaryState == 1 &&
+                frog.enemyAt(0).motionState == -2 &&
+                frog.enemyAt(0).alarm0 == 60,
+            "frog alarm enters its grounded crouch toward the player");
+    for (unsigned frame = 0; frame < 60; ++frame)
+        frog.step(0);
+    require(!frog.enemyAt(0).grounded &&
+                frog.enemyAt(0).auxiliaryState == 0 &&
+                frog.enemyAt(0).speedY < 0 &&
+                frog.enemyAt(0).preciseX < 40L * 256L,
+            "frog alarm launches its recovered directional jump");
+
     AmigaPortRuntime stomp(300);
     require(stomp.configureEnemy(0, 111, 163, 0, 5,
                                  0, 0, 5, 6),

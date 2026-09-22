@@ -45,8 +45,13 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].preciseY = 0;
         enemies_[index].speedX = 0;
         enemies_[index].speedY = 0;
+        enemies_[index].motionState = 0;
+        enemies_[index].auxiliaryState = 0;
+        enemies_[index].alarm0 = -1;
+        enemies_[index].alarm1 = -1;
         enemies_[index].active = false;
         enemies_[index].awake = false;
+        enemies_[index].grounded = false;
     }
     for (index = 0; index < gemCapacity; ++index) {
         gems_[index].x = 0;
@@ -119,7 +124,9 @@ AmigaPortRuntime::gemAt(unsigned index) const
 bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
                                       int spriteId, int x, int y,
                                       int speedX, int speedY,
-                                      int health, int reward)
+                                      int health, int reward,
+                                      int motionState, int auxiliaryState,
+                                      int alarm0, int alarm1)
 {
     if (index >= enemyCapacity)
         return false;
@@ -135,8 +142,13 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
     enemy.speedY = speedY;
+    enemy.motionState = motionState;
+    enemy.auxiliaryState = auxiliaryState;
+    enemy.alarm0 = alarm0;
+    enemy.alarm1 = alarm1;
     enemy.active = true;
     enemy.awake = false;
+    enemy.grounded = false;
     if (enemyCount_ <= index)
         enemyCount_ = index + 1;
     return true;
@@ -326,12 +338,19 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.awake = true;
         if (!enemy.awake || solidResolver_ == 0)
             continue;
+        bool alarm0Fired = false;
+        bool alarm1Fired = false;
+        if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
+            alarm0Fired = true;
+        if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
+            alarm1Fired = true;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const int halfWidth = enemy.objectId == 112 ? 8 : 6;
             const int foot = enemy.objectId == 112 ? 8 : 5;
             const int direction = enemy.speedX < 0 ? -1 : 1;
             const bool grounded = solidResolver_(
                 solidResolverContext_, enemy.x, enemy.y + foot + 1);
+            enemy.grounded = grounded;
             if (grounded) {
                 enemy.speedY = 0;
                 if (!solidResolver_(solidResolverContext_,
@@ -364,6 +383,56 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 } else {
                     enemy.preciseY += enemy.speedY;
                 }
+            }
+        } else if (enemy.objectId == 113) {
+            enum { halfWidth = 7, foot = 8 };
+            enemy.grounded = solidResolver_(
+                solidResolverContext_, enemy.x, enemy.y + foot + 1);
+            if (alarm1Fired) {
+                if (enemy.grounded) {
+                    enemy.auxiliaryState = 1;
+                    enemy.speedX = player_.offsetX() < enemy.x ? -256 : 256;
+                    enemy.motionState = enemy.speedX < 0 ? -2 : 2;
+                    enemy.alarm0 = 60;
+                } else {
+                    enemy.alarm1 = 60;
+                }
+            }
+            if (alarm0Fired && enemy.grounded) {
+                enemy.speedY = -4 * 256;
+                enemy.speedX = enemy.motionState * 256;
+                enemy.auxiliaryState = 0;
+                enemy.alarm1 = 60;
+                enemy.grounded = false;
+            }
+            if (!enemy.grounded) {
+                enemy.speedY += 38;
+                if (enemy.speedY > 7 * 256)
+                    enemy.speedY = 7 * 256;
+                const int nextX =
+                    (int)((enemy.preciseX + enemy.speedX) / 256L);
+                const int edge = nextX +
+                    (enemy.speedX < 0 ? -halfWidth : halfWidth);
+                if (solidResolver_(solidResolverContext_, edge, enemy.y))
+                    enemy.speedX = -(enemy.speedX * 77L) / 256L;
+                else
+                    enemy.preciseX += enemy.speedX;
+                const int nextY =
+                    (int)((enemy.preciseY + enemy.speedY) / 256L);
+                if (enemy.speedY > 0 && solidResolver_(
+                        solidResolverContext_, enemy.x, nextY + foot)) {
+                    while (!solidResolver_(solidResolverContext_, enemy.x,
+                                           enemy.y + foot + 1)) {
+                        ++enemy.y;
+                        enemy.preciseY = (long)enemy.y * 256L;
+                    }
+                    enemy.speedY = 0;
+                    enemy.grounded = true;
+                } else {
+                    enemy.preciseY += enemy.speedY;
+                }
+            } else {
+                enemy.speedY = 0;
             }
         } else if (enemy.objectId == 117) {
             const int vertical = enemy.speedY < 0 ? -1 : 1;

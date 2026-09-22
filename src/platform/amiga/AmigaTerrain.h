@@ -25,6 +25,10 @@ struct AmigaTerrainEnemy {
     int y;
     int speedX;
     int speedY;
+    int motionState;
+    int auxiliaryState;
+    int alarm0;
+    int alarm1;
 };
 
 struct AmigaTerrainCollisionContext {

@@ -49,6 +49,10 @@ bool collectGeneratedObject(
     output.y = command.y - 176;
     output.speedX = command.integerVelocityX;
     output.speedY = command.integerVelocityY;
+    output.motionState = command.motionState;
+    output.auxiliaryState = command.auxiliaryState;
+    output.alarm0 = command.alarms.get(0);
+    output.alarm1 = command.alarms.get(1);
     return true;
 }
 }

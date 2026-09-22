@@ -837,7 +837,9 @@ int main(void) {
                     enemyIndex, enemy.objectId, definition.spriteId,
                     enemy.x, enemy.y, enemy.speedX, enemy.speedY,
                     amigaEnemyHealth(enemy.objectId),
-                    amigaEnemyReward(enemy.objectId))) {
+                    amigaEnemyReward(enemy.objectId),
+                    enemy.motionState, enemy.auxiliaryState,
+                    enemy.alarm0, enemy.alarm1)) {
                 platform.restore();
                 FreeMem(startupCopperWords, 4 * sizeof(UWORD));
                 memory.release();
