@@ -35,9 +35,9 @@ decelerate, the fire button jumps from the grounded state, releasing it shortens
 the jump, and later airborne press edges consume gunboot charge and add recoil.
 Landing restores all eight charges. This is the first target-specialized
 replacement for the host reference's floating-point GameMaker values. An
-airborne press emits a bounded downward bullet on hardware sprite channel 1
-and redraws the side-panel ammo digit; channel 0 remains dedicated to the
-player.
+airborne press emits a bounded downward bullet on a shared actor sprite
+channel and redraws both the side-panel ammo digit and its bottom-up vertical
+meter; channel 0 remains dedicated to the player.
 
 Its machine lifecycle is owned by the shared-style `AmigaPlatform` class and
 follows Rescue on Fractalus: allocation and the two

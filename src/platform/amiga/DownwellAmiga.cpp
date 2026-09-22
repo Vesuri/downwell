@@ -200,7 +200,28 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
 }
 
 static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo) {
+    enum {
+        gaugeX = 289,
+        gaugeTop = 49,
+        gaugeWidth = 10,
+        gaugeLength = 184,
+        maximumAmmo = 8
+    };
+    if (ammo > maximumAmmo)
+        ammo = maximumAmmo;
+    const int filled = gaugeLength * (int)ammo / maximumAmmo;
     amigaRendererClearClipRect(renderer);
+    /*
+     * The frame is static on PF2, but its interior follows gunboot charge.
+     * Clear the previous white column before filling upward from the recovered
+     * 233-pixel bottom anchor, exactly like the desktop 4:3 HUD path.
+     */
+    amigaRendererFillRect(renderer, gaugeX, gaugeTop,
+                          gaugeWidth, gaugeLength, 0);
+    if (filled > 0)
+        amigaRendererFillRect(renderer, gaugeX,
+                              gaugeTop + gaugeLength - filled,
+                              gaugeWidth, filled, 1);
     amigaRendererFillRect(renderer, 282, 232, 20, 20, 0);
     drawAmmoDigit(renderer, 290, 239, ammo);
 }
