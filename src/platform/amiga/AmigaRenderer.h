@@ -3,6 +3,10 @@
 
 #include <exec/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 enum {
     downwellVisibleWidth = 380,
     downwellDmaWidth = 384,
@@ -44,5 +48,9 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      int anchorX, int anchorY,
                                      UWORD* destination,
                                      unsigned destinationHeight);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

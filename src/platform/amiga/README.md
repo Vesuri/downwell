@@ -27,7 +27,9 @@ buffered PF1, the recovered 4:3 HUD on the single-buffered PF2, and the player
 on hardware sprite channel 0. The player alternates between recovered idle and
 air frames to make paired copper-list and sprite-pointer swaps visible.
 
-Its machine lifecycle follows Rescue on Fractalus: allocation and the two
+Its small `AmigaHardware` and `CopperList` classes are adapted from the proven
+sibling-port framework. Its machine lifecycle follows Rescue on Fractalus:
+allocation and the two
 `WaitTOF()` calls which retire the Workbench display happen before takeover;
 the live program owns the raw VERTB vector, forbids multitasking, and waits on
 its own interrupt counter. Normal copper swaps publish COP1LC without a
@@ -35,3 +37,7 @@ COPJMP1 strobe and therefore become live at the next vertical blank. Teardown
 stops the display, restores `graphics.library`'s startup copper and the saved
 interrupt/DMA state, permits multitasking, and only then restores the View.
 It exits back to Workbench on a fresh left-mouse click.
+
+PAL timing is intentionally direct: one simulation step will run per 50 Hz
+VERTB. There is no 60-to-50 Hz catch-up scheduler, so the preserved per-step
+game behavior runs at five-sixths of the Windows version's wall-clock speed.

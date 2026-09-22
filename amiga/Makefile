@@ -12,12 +12,15 @@ AMIGA_SRC := $(REPO)/src/platform/amiga
 CFLAGS := -g -O2 -m68020 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DDOWNWELL_PLATFORM_AMIGA
+CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
+	-fno-use-cxa-atexit
 ASFLAGS := -mcpu=68020 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
 AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
-OBJECTS := obj/DownwellAmiga.o obj/AmigaRenderer.o obj/AmigaAssets.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaRenderer.o obj/AmigaHardware.o \
+	obj/CopperList.o obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
 
 .PHONY: all check clean audit
@@ -40,9 +43,19 @@ $(OUT).elf: $(OBJECTS)
 	$(OBJDUMP) --disassemble --no-show-raw-ins -S $@ > $(OUT).s
 	@$(MAKE) --no-print-directory audit
 
-obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.c
+obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaHardware.o: $(AMIGA_SRC)/framework/AmigaHardware.cpp \
+		$(AMIGA_SRC)/framework/AmigaHardware.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/CopperList.o: $(AMIGA_SRC)/framework/CopperList.cpp \
+		$(AMIGA_SRC)/framework/CopperList.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 obj/AmigaRenderer.o: $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h
 	@mkdir -p $(@D)

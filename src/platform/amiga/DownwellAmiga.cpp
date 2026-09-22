@@ -8,17 +8,21 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaRenderer.h"
+#include "framework/AmigaHardware.h"
+#include "framework/CopperList.h"
 
 struct ExecBase* SysBase = 0;
 struct GfxBase* GfxBase = 0;
 
-_Static_assert(__builtin_offsetof(struct ExecBase, IntVects) == 84,
-               "ExecBase IntVects layout must match the VERTB takeover");
+static_assert(__builtin_offsetof(struct ExecBase, IntVects) == 84,
+              "ExecBase IntVects layout must match the VERTB takeover");
 
+extern "C" {
 extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
 extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_game_pack_end[];
+}
 
 enum {
     copperWords = 128,
@@ -36,53 +40,23 @@ enum {
     fetchModulo = downwellBytesPerPlaneLine - fetchWords * 2
 };
 
-_Static_assert(displayHStart == 0x71, "cropped display starts at logical x=16");
-_Static_assert(displayHStop == 0x1d1, "352-pixel cropped display window");
-_Static_assert(displayVStop == 0x12e, "284-line display window");
-_Static_assert(fetchWords == 22, "352-pixel DMA fetch");
-_Static_assert(fetchStop == 0xd8, "22-word lores fetch at hardware limit");
-_Static_assert(fetchModulo == 4, "skip two bytes on each side per row");
-_Static_assert(fetchStart == (displayHStart >> 1) - 8,
-               "lores fetch/display alignment");
+static_assert(displayHStart == 0x71, "cropped display starts at logical x=16");
+static_assert(displayHStop == 0x1d1, "352-pixel cropped display window");
+static_assert(displayVStop == 0x12e, "284-line display window");
+static_assert(fetchWords == 22, "352-pixel DMA fetch");
+static_assert(fetchStop == 0xd8, "22-word lores fetch at hardware limit");
+static_assert(fetchModulo == 4, "skip two bytes on each side per row");
+static_assert(fetchStart == (displayHStart >> 1) - 8,
+              "lores fetch/display alignment");
 
-static volatile UWORD* const custom = (volatile UWORD*)0xdff000;
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile UWORD vblankCount;
 static struct Interrupt vblankServer;
 static struct IntVector savedVblankVector;
 
-enum {
-    regDmaconr = 0x002,
-    regIntenar = 0x01c,
-    regCop1lc = 0x080,
-    regDiwstrt = 0x08e,
-    regDiwstop = 0x090,
-    regDdfstrt = 0x092,
-    regDdfstop = 0x094,
-    regDmacon = 0x096,
-    regIntena = 0x09a,
-    regIntreq = 0x09c,
-    regCopjmp1 = 0x088,
-    regBpl1pth = 0x0e0,
-    regBplcon0 = 0x100,
-    regBplcon1 = 0x102,
-    regBplcon2 = 0x104,
-    regBplcon3 = 0x106,
-    regBpl1mod = 0x108,
-    regBpl2mod = 0x10a,
-    regSpr0pth = 0x120,
-    regColor00 = 0x180,
-    regFmode = 0x1fc
-};
-
-static void writeRegister(UWORD offset, UWORD value) {
-    custom[offset >> 1] = value;
-}
-
 static ULONG vblankHandler(void) {
     /* A raw IntVector owns acknowledgement; exec's server walker is absent. */
-    writeRegister(regIntreq, INTF_VERTB);
-    writeRegister(regIntreq, INTF_VERTB);
+    AmigaHardware::clearInterruptRequests(INTF_VERTB);
     ++vblankCount;
     return 0;
 }
@@ -90,17 +64,6 @@ static ULONG vblankHandler(void) {
 static void waitVblank(void) {
     const UWORD start = vblankCount;
     while (vblankCount == start) { }
-}
-
-static void copperMove(UWORD* list, unsigned* count, UWORD reg, UWORD value) {
-    list[(*count)++] = reg;
-    list[(*count)++] = value;
-}
-
-static void copperPointer(UWORD* list, unsigned* count, UWORD reg, const void* ptr) {
-    const ULONG address = (ULONG)ptr;
-    copperMove(list, count, reg, (UWORD)(address >> 16));
-    copperMove(list, count, reg + 2, (UWORD)address);
 }
 
 static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
@@ -202,61 +165,38 @@ static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
     drawAmmoDigit(renderer, 290, 239, 8);
 }
 
-static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
-                            const UWORD* playerSprite,
-                            const UWORD* nullSprite) {
-    unsigned count = 0;
+static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
+                        const UWORD* playerSprite,
+                        const UWORD* nullSprite) {
     unsigned channel;
 
-    copperMove(list, &count, regBplcon0, 0x4401);
-    copperMove(list, &count, regBpl1mod, fetchModulo);
-    copperMove(list, &count, regBpl2mod, fetchModulo);
-    copperPointer(list, &count, regBpl1pth, game + fetchCropBytes);
-    copperPointer(list, &count, regBpl1pth + 4, hud + fetchCropBytes);
-    copperPointer(list, &count, regBpl1pth + 8,
-                  game + downwellPlaneBytes + fetchCropBytes);
-    copperPointer(list, &count, regBpl1pth + 12,
-                  hud + downwellPlaneBytes + fetchCropBytes);
+    list.reset();
+    list.move(AmigaHardware::bplcon0, 0x4401);
+    list.move(AmigaHardware::bpl1mod, fetchModulo);
+    list.move(AmigaHardware::bpl2mod, fetchModulo);
+    list.pointer(AmigaHardware::bpl1pth, game + fetchCropBytes);
+    list.pointer(AmigaHardware::bpl1pth + 4, hud + fetchCropBytes);
+    list.pointer(AmigaHardware::bpl1pth + 8,
+                 game + downwellPlaneBytes + fetchCropBytes);
+    list.pointer(AmigaHardware::bpl1pth + 12,
+                 hud + downwellPlaneBytes + fetchCropBytes);
 
-    copperPointer(list, &count, regSpr0pth, playerSprite);
+    list.pointer(AmigaHardware::spr0pth, playerSprite);
     for (channel = 1; channel < 8; ++channel)
-        copperPointer(list, &count, regSpr0pth + channel * 4, nullSprite);
+        list.pointer((UWORD)(AmigaHardware::spr0pth + channel * 4), nullSprite);
 
-    copperMove(list, &count, regColor00 + 0 * 2, 0x000);
-    copperMove(list, &count, regColor00 + 1 * 2, 0xfff);
-    copperMove(list, &count, regColor00 + 2 * 2, 0xf00);
-    copperMove(list, &count, regColor00 + 3 * 2, 0x000);
-    copperMove(list, &count, regColor00 + 9 * 2, 0xfff);
-    copperMove(list, &count, regColor00 + 10 * 2, 0xf00);
-    copperMove(list, &count, regColor00 + 11 * 2, 0x000);
-    copperMove(list, &count, regColor00 + 17 * 2, 0xfff);
-    copperMove(list, &count, regColor00 + 18 * 2, 0xf00);
-    copperMove(list, &count, regColor00 + 19 * 2, 0x000);
+    list.move(AmigaHardware::color00 + 0 * 2, 0x000);
+    list.move(AmigaHardware::color00 + 1 * 2, 0xfff);
+    list.move(AmigaHardware::color00 + 2 * 2, 0xf00);
+    list.move(AmigaHardware::color00 + 3 * 2, 0x000);
+    list.move(AmigaHardware::color00 + 9 * 2, 0xfff);
+    list.move(AmigaHardware::color00 + 10 * 2, 0xf00);
+    list.move(AmigaHardware::color00 + 11 * 2, 0x000);
+    list.move(AmigaHardware::color00 + 17 * 2, 0xfff);
+    list.move(AmigaHardware::color00 + 18 * 2, 0xf00);
+    list.move(AmigaHardware::color00 + 19 * 2, 0x000);
 
-    list[count++] = 0xffff;
-    list[count++] = 0xfffe;
-    return count;
-}
-
-static void setDisplayRegisters(void) {
-    writeRegister(regDiwstrt,
-                  (UWORD)((displayVStart << 8) | (displayHStart & 0xff)));
-    writeRegister(regDiwstop,
-                  (UWORD)(((displayVStop & 0xff) << 8) |
-                          (displayHStop & 0xff)));
-    writeRegister(regDdfstrt, fetchStart);
-    writeRegister(regDdfstop, fetchStop);
-    writeRegister(regFmode, 0x0000);
-    writeRegister(regBplcon1, 0x0000);
-    writeRegister(regBplcon2, 0x0064);
-    writeRegister(regBplcon3, 0x0c30);
-}
-
-static void setCopperList(const UWORD* list, int immediate) {
-    custom[regCop1lc >> 1] = (UWORD)((ULONG)list >> 16);
-    custom[(regCop1lc + 2) >> 1] = (UWORD)(ULONG)list;
-    if (immediate)
-        writeRegister(regCopjmp1, 0);
+    return list.finish();
 }
 
 int main(void) {
@@ -301,6 +241,11 @@ int main(void) {
         return 1;
     }
 
+    CopperList copperLists[2] = {
+        CopperList(copper, copperWords),
+        CopperList(copper + copperWords, copperWords)
+    };
+
     amigaRendererInit(&renderer, game[0], hud);
     buildReferencePicture(&renderer, 0);
     amigaRendererInit(&renderer, game[1], hud);
@@ -323,9 +268,20 @@ int main(void) {
         CloseLibrary((struct Library*)GfxBase);
         return 1;
     }
-    buildCopper(copper, game[0], hud, playerSprite[0], nullSprite);
-    buildCopper(copper + copperWords, game[1], hud,
-                playerSprite[1], nullSprite);
+    if (!buildCopper(copperLists[0], game[0], hud,
+                     playerSprite[0], nullSprite) ||
+        !buildCopper(copperLists[1], game[1], hud,
+                     playerSprite[1], nullSprite)) {
+        FreeMem(playerSprite[1], playerSpriteBytes);
+        FreeMem(playerSprite[0], playerSpriteBytes);
+        FreeMem(nullSprite, 8);
+        FreeMem(copper, copperWords * 2 * sizeof(UWORD));
+        FreeMem(hud, downwellLayerBytes);
+        FreeMem(game[1], downwellLayerBytes);
+        FreeMem(game[0], downwellLayerBytes);
+        CloseLibrary((struct Library*)GfxBase);
+        return 1;
+    }
 
     /*
      * Follow the Rescue on Fractalus takeover boundary: all allocations and
@@ -334,19 +290,21 @@ int main(void) {
      */
     savedView = GfxBase->ActiView;
     osCopper = (const UWORD*)GfxBase->copinit;
-    savedDmacon = custom[regDmaconr >> 1];
-    savedIntena = custom[regIntenar >> 1];
+    savedDmacon = AmigaHardware::readRegister(AmigaHardware::dmaconr);
+    savedIntena = AmigaHardware::readRegister(AmigaHardware::intenar);
     LoadView(0);
     WaitTOF();
     WaitTOF();
-    writeRegister(regDmacon, DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER);
-    writeRegister(regBplcon0, 0x0000);
-    setDisplayRegisters();
+    AmigaHardware::setDMAChannels(DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER,
+                                  false);
+    AmigaHardware::writeRegister(AmigaHardware::bplcon0, 0x0000);
+    AmigaHardware::setDisplay(displayHStart, displayHStop,
+                              displayVStart, displayVStop,
+                              fetchStart, fetchStop);
 
     /* Nothing in this program consumes blit-done interrupts. */
-    writeRegister(regIntena, INTF_BLIT);
-    writeRegister(regIntreq, INTF_BLIT);
-    writeRegister(regIntreq, INTF_BLIT);
+    AmigaHardware::setInterrupts(INTF_BLIT, false);
+    AmigaHardware::clearInterruptRequests(INTF_BLIT);
 
     vblankServer.is_Node.ln_Type = NT_INTERRUPT;
     vblankServer.is_Node.ln_Pri = 127;
@@ -361,10 +319,10 @@ int main(void) {
     Enable();
 
     vblankCount = 0;
-    setCopperList(copper, 0);
-    writeRegister(regIntena, INTF_SETCLR | INTF_INTEN | INTF_VERTB);
-    writeRegister(regDmacon, DMAF_SETCLR | DMAF_MASTER | DMAF_COPPER |
-                                DMAF_RASTER | DMAF_SPRITE);
+    AmigaHardware::setCopperList(copperLists[0].data());
+    AmigaHardware::setInterrupts(INTF_INTEN | INTF_VERTB, true);
+    AmigaHardware::setDMAChannels(DMAF_MASTER | DMAF_COPPER |
+                                  DMAF_RASTER | DMAF_SPRITE, true);
 
     /* No scheduling or OS calls are permitted inside the takeover window. */
     Forbid();
@@ -375,34 +333,33 @@ int main(void) {
         if ((frame & 15u) == 0) {
             front ^= 1u;
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
-            setCopperList(copper + front * copperWords, 0);
+            AmigaHardware::setCopperList(copperLists[front].data());
         }
     }
 
     /* Stop our interrupt and display before handing either back to exec. */
-    writeRegister(regIntena, INTF_VERTB);
-    writeRegister(regIntreq, INTF_VERTB);
-    writeRegister(regIntreq, INTF_VERTB);
-    writeRegister(regDmacon, DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER);
-    writeRegister(regBplcon0, 0x0000);
+    AmigaHardware::setInterrupts(INTF_VERTB, false);
+    AmigaHardware::clearInterruptRequests(INTF_VERTB);
+    AmigaHardware::setDMAChannels(DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER,
+                                  false);
+    AmigaHardware::writeRegister(AmigaHardware::bplcon0, 0x0000);
 
     /* Restore graphics.library's startup copper, not merely its View list. */
-    setCopperList(osCopper, 1);
-    writeRegister(regBplcon3, 0x0c00);
+    AmigaHardware::setCopperList(osCopper, true);
+    AmigaHardware::writeRegister(AmigaHardware::bplcon3, 0x0c00);
 
     Disable();
     SysBase->IntVects[INTB_VERTB] = savedVblankVector;
     Enable();
 
     /* Restore the complete DMA and interrupt enable sets captured above. */
-    writeRegister(regDmacon, DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG);
-    writeRegister(regDmacon,
-                  DMAF_SETCLR | (savedDmacon &
-                  (DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG)));
-    writeRegister(regIntena, 0x7fffu);
-    writeRegister(regIntreq, INTF_BLIT | INTF_VERTB);
-    writeRegister(regIntreq, INTF_BLIT | INTF_VERTB);
-    writeRegister(regIntena, INTF_SETCLR | (savedIntena & 0x7fffu));
+    AmigaHardware::setDMAChannels(DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG,
+                                  false);
+    AmigaHardware::setDMAChannels(
+        (UWORD)(savedDmacon & (DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG)), true);
+    AmigaHardware::setInterrupts(0x7fffu, false);
+    AmigaHardware::clearInterruptRequests(INTF_BLIT | INTF_VERTB);
+    AmigaHardware::setInterrupts((UWORD)(savedIntena & 0x7fffu), true);
 
     Permit();
     LoadView(savedView);
