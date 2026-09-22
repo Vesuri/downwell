@@ -22,6 +22,10 @@ bool flatGround(void*, int, int y) {
     return y >= 9;
 }
 
+bool shortRightWall(void*, int x, int y) {
+    return x >= 8 && y < 16;
+}
+
 } // namespace
 
 int main() {
@@ -112,6 +116,31 @@ int main() {
                 frog.enemyAt(0).speedY < 0 &&
                 frog.enemyAt(0).preciseX < 40L * 256L,
             "frog alarm launches its recovered directional jump");
+
+    AmigaPortRuntime snail(300);
+    snail.configureSolidResolver(shortRightWall, 0);
+    require(snail.configureEnemy(0, 117, 177, 0, 0,
+                                 0, 26, 20, 24),
+            "generated wall snail can enter native actor storage");
+    snail.step(0);
+    require(snail.enemyAt(0).active &&
+                snail.enemyAt(0).motionState == 1 &&
+                snail.enemyAt(0).facing == 1,
+            "wall snail discovers and records its recovered wall side");
+    for (unsigned frame = 0;
+         frame < 120 && snail.enemyAt(0).speedY > 0; ++frame)
+        snail.step(0);
+    require(snail.enemyAt(0).speedY < 0,
+            "wall snail reverses at the end of its supporting wall");
+
+    AmigaPortRuntime detachedSnail(300);
+    detachedSnail.configureSolidResolver(noSolid, 0);
+    require(detachedSnail.configureEnemy(0, 117, 177, 0, 0,
+                                         0, 26, 20, 24),
+            "detached wall snail configuration succeeds");
+    detachedSnail.step(0);
+    require(!detachedSnail.enemyAt(0).active,
+            "wall snail retires when neither recovered wall side exists");
 
     AmigaPortRuntime stomp(300);
     require(stomp.configureEnemy(0, 111, 163, 0, 5,

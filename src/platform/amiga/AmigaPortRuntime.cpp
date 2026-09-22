@@ -435,10 +435,24 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 enemy.speedY = 0;
             }
         } else if (enemy.objectId == 117) {
+            if (enemy.motionState == 0) {
+                if (solidResolver_(solidResolverContext_,
+                                   enemy.x + 8, enemy.y))
+                    enemy.motionState = 1;
+                else if (solidResolver_(solidResolverContext_,
+                                        enemy.x - 8, enemy.y))
+                    enemy.motionState = -1;
+                else
+                    enemy.active = false;
+                enemy.facing = enemy.motionState;
+            }
+            if (!enemy.active)
+                continue;
             const int vertical = enemy.speedY < 0 ? -1 : 1;
             if (solidResolver_(solidResolverContext_, enemy.x,
                                enemy.y + vertical * 8) ||
-                !solidResolver_(solidResolverContext_, enemy.x + 16,
+                !solidResolver_(solidResolverContext_,
+                                enemy.x + enemy.motionState * 16,
                                 enemy.y + vertical * 8))
                 enemy.speedY = -enemy.speedY;
             enemy.preciseY += enemy.speedY;
