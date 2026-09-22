@@ -32,9 +32,11 @@ struct DeferredCreateInstance {
     float scaleY = 1.0F;
     float imageSpeed = 1.0F;
     float imageIndex = 0.0F;
+    std::int32_t integerImageIndex = 0;
     float velocityX = 0.0F;
     float velocityY = 0.0F;
     float direction = 0.0F;
+    std::int32_t integerDirection = 0;
     float moveSpeed = 0.0F;
     std::int32_t motionState = 0;
     std::int32_t auxiliaryState = 0;
@@ -78,7 +80,7 @@ public:
         if (count_ > InstanceCapacity - instances.size())
             return ApplyInstanceCommandsResult::instanceStoreFull;
         if (static_cast<std::uint64_t>(nextInstanceId) + count_ >
-            static_cast<std::uint64_t>(UINT32_MAX) + 1U)
+            static_cast<std::uint64_t>(0xffffffffU) + 1U)
             return ApplyInstanceCommandsResult::allocatorExhausted;
 
         std::array<PackedObject, CommandCapacity> definitions{};

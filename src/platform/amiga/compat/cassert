@@ -1,0 +1,9 @@
+#ifndef DOWNWELL_AMIGA_COMPAT_CASSERT
+#define DOWNWELL_AMIGA_COMPAT_CASSERT
+
+// Freestanding native code validates ranges at its public boundaries.  Keep
+// hosted assertions in tests without pulling an assertion runtime into A500
+// builds.
+#define assert(expression) ((void)0)
+
+#endif

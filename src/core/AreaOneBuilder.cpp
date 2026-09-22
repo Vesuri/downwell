@@ -39,6 +39,17 @@ void AreaOneBuilder::reset(int x, int y, GameMakerRandom& random) {
         rightRooms_[1] = 9999;
 }
 
+void AreaOneBuilder::restoreInitialCheckpoint(
+    int x, int y, int generationCount,
+    int firstRightRoom, int secondRightRoom) {
+    *this = AreaOneBuilder{};
+    x_ = x;
+    y_ = y;
+    generationCount_ = generationCount;
+    rightRooms_[0] = firstRightRoom;
+    rightRooms_[1] = secondRightRoom;
+}
+
 bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
                                 GameMakerRandom& random,
                                 EmitFunction emit, void* context) {
@@ -46,9 +57,13 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     if (objectId == 92) {
         random.irandomSmall(3);
         command.imageSpeed = 0.0F;
-        command.imageIndex = 16.0F + random.irandomSmall(1);
+        command.integerImageIndex = 16 + random.irandomSmall(1);
+#ifndef DOWNWELL_FREESTANDING
+        command.imageIndex = static_cast<float>(command.integerImageIndex);
+#endif
         if (random.irandomSmall(50) < 1) {
             random.irandomSmall(1);
+            command.integerImageIndex = 22;
             command.imageIndex = 22.0F;
         }
     }
@@ -75,7 +90,10 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     if (objectId == 116) {
         command.imageSpeed = 0.2F;
         random.nextU32();
-        command.direction = static_cast<float>(random.irandomSmall(359));
+        command.integerDirection = random.irandomSmall(359);
+#ifndef DOWNWELL_FREESTANDING
+        command.direction = static_cast<float>(command.integerDirection);
+#endif
         command.moveSpeed = 1.25F;
         command.motionInitialized = true;
         command.active = false;
@@ -96,9 +114,14 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     if (objectId == 289) {
         command.imageSpeed = 0.0F;
         command.scaleX = random.irandomSmall(1) == 0 ? 1.0F : -1.0F;
-        command.imageIndex = static_cast<float>(random.irandomSmall(15));
-        if (random.randomIntegerSmall(300) == 0)
+        command.integerImageIndex = random.irandomSmall(15);
+#ifndef DOWNWELL_FREESTANDING
+        command.imageIndex = static_cast<float>(command.integerImageIndex);
+#endif
+        if (random.randomIntegerSmall(300) == 0) {
+            command.integerImageIndex = 16;
             command.imageIndex = 16.0F;
+        }
     }
     if (objectId == 82)
         random.nextU32();

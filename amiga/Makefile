@@ -38,7 +38,8 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
 	obj/GCCRuntime.o obj/AmigaPlatform.o \
 	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
-	obj/BuilderPatternPack.o obj/Replay.o \
+	obj/BuilderPatternPack.o obj/AreaOneBuilder.o obj/GameMakerRandom.o \
+	obj/Replay.o \
 	obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
 
@@ -144,6 +145,16 @@ obj/ObjectPack.o: $(REPO)/src/core/ObjectPack.cpp $(REPO)/src/core/ObjectPack.h
 
 obj/BuilderPatternPack.o: $(REPO)/src/core/BuilderPatternPack.cpp \
 		$(REPO)/src/core/BuilderPatternPack.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AreaOneBuilder.o: $(REPO)/src/core/AreaOneBuilder.cpp \
+		$(REPO)/src/core/AreaOneBuilder.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/GameMakerRandom.o: $(REPO)/src/core/GameMakerRandom.cpp \
+		$(REPO)/src/core/GameMakerRandom.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

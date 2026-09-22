@@ -138,6 +138,12 @@ int main(int argc, char** argv) {
         downwell::PlatformProfile::nonDesktop, &rooms, &objects,
         downwell::StartupRuntime::defaultRandomSeed, &builders);
     enterMain(runtime);
+    std::cerr << "area-one entrance checkpoint: generation="
+              << runtime.mainBuilderGenerationCount()
+              << " y=" << runtime.mainBuilderY()
+              << " right=" << runtime.mainBuilderRightRoom(0)
+              << ',' << runtime.mainBuilderRightRoom(1)
+              << " RNG draws=" << runtime.randomDrawCount() << '\n';
 
     unsigned fragment = 0;
     std::cout << "fragment\ty\tfamily\tpattern\treversed\trows\n";

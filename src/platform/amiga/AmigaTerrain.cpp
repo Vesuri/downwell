@@ -1,6 +1,8 @@
 #include "AmigaTerrain.h"
 
 #include "AmigaPortRuntime.h"
+#include "core/AreaOneBuilder.h"
+#include "core/GameMakerRandom.h"
 
 bool amigaIsLandingTerrainSymbol(char symbol) {
     return symbol == '1' || symbol == '2' || symbol == '3' ||
@@ -18,28 +20,44 @@ bool amigaBuildInitialAreaOneTerrain(
     AmigaTerrainFragment* fragments, unsigned capacity) {
     if (fragments == 0 || capacity < amigaInitialTerrainFragmentCount)
         return false;
-    downwell::PackedBuilderPattern entrance;
-    downwell::PackedBuilderPattern main32;
-    downwell::PackedBuilderPattern main30;
-    downwell::PackedBuilderPattern main27;
-    downwell::PackedBuilderPattern right3;
-    if (!builders.findPattern(downwell::BuilderPatternFamily::areaOneStart,
-                              3, entrance) ||
-        !builders.findPattern(downwell::BuilderPatternFamily::areaOneMain,
-                              32, main32) ||
-        !builders.findPattern(downwell::BuilderPatternFamily::areaOneMain,
-                              30, main30) ||
-        !builders.findPattern(downwell::BuilderPatternFamily::areaOneMain,
-                              27, main27) ||
-        !builders.findPattern(downwell::BuilderPatternFamily::areaOneRight,
-                              3, right3))
-        return false;
-    fragments[0] = AmigaTerrainFragment{entrance, 1168, true, false, false};
-    fragments[1] = AmigaTerrainFragment{main32, 1248, true, false, true};
-    fragments[2] = AmigaTerrainFragment{main30, 1472, true, false, true};
-    fragments[3] = AmigaTerrainFragment{main27, 1776, true, false, true};
-    fragments[4] = AmigaTerrainFragment{right3, 1968, false, true, true};
-    return true;
+    enum {
+        recoveredSeed = 2,
+        entranceRandomDraws = 470,
+        builderX = 240,
+        builderY = 704,
+        firstRightRoom = 3,
+        secondRightRoom = 7
+    };
+    downwell::GameMakerRandom random(recoveredSeed);
+    for (unsigned draw = 0; draw < entranceRandomDraws; ++draw)
+        random.nextU32();
+    downwell::AreaOneBuilder builder;
+    builder.restoreInitialCheckpoint(builderX, builderY, -30,
+                                     firstRightRoom, secondRightRoom);
+    unsigned fragmentCount = 0;
+    for (unsigned step = 0; step < 64 && !builder.endReached(); ++step) {
+        downwell::AreaOneBuilderStep result;
+        if (!builder.step(
+                builders, random,
+                [](void*, const downwell::DeferredCreateInstance&) {
+                    return true;
+                },
+                0, result))
+            return false;
+        if (!result.patternGenerated)
+            continue;
+        if (fragmentCount >= capacity)
+            return false;
+        downwell::PackedBuilderPattern pattern;
+        if (!builders.findPattern(result.family, result.patternIndex, pattern))
+            return false;
+        fragments[fragmentCount++] = AmigaTerrainFragment{
+            pattern, result.patternY, result.reversed, result.sideRoom,
+            result.appendPillars};
+    }
+    return builder.endReached() &&
+           fragmentCount == amigaInitialTerrainFragmentCount &&
+           random.drawCount() == 4770;
 }
 
 unsigned amigaCollectTerrainBreakables(

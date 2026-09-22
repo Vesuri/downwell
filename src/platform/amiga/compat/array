@@ -1,0 +1,27 @@
+#ifndef DOWNWELL_AMIGA_COMPAT_ARRAY
+#define DOWNWELL_AMIGA_COMPAT_ARRAY
+
+#include <cstddef>
+
+namespace std {
+
+template <typename T, size_t Size>
+struct array {
+    T values[Size];
+
+    T& operator[](size_t index) { return values[index]; }
+    const T& operator[](size_t index) const { return values[index]; }
+    T* begin() { return values; }
+    const T* begin() const { return values; }
+    T* end() { return values + Size; }
+    const T* end() const { return values + Size; }
+
+    void fill(const T& value) {
+        for (size_t index = 0; index < Size; ++index)
+            values[index] = value;
+    }
+};
+
+} // namespace std
+
+#endif

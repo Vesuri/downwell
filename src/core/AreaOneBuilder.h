@@ -27,6 +27,8 @@ public:
     using EmitFunction = bool (*)(void*, const DeferredCreateInstance&);
 
     void reset(int x, int y, GameMakerRandom& random);
+    void restoreInitialCheckpoint(int x, int y, int generationCount,
+                                  int firstRightRoom, int secondRightRoom);
     bool step(const BuilderPatternPack& patterns, GameMakerRandom& random,
               EmitFunction emit, void* context, AreaOneBuilderStep& result);
 

@@ -7,7 +7,7 @@
 class AmigaPortRuntime;
 
 enum {
-    amigaInitialTerrainFragmentCount = 5,
+    amigaInitialTerrainFragmentCount = 19,
     amigaTerrainBreakableCapacity = 96
 };
 
