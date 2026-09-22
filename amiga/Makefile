@@ -206,7 +206,7 @@ audit:
 		'__(ashl|ashr|lshr|mul|u?div|u?mod)di3'; then \
 		echo "*** unexpected 64-bit software arithmetic in native executable"; exit 1; \
 	else echo "68000 64-bit helper audit: clean"; fi
-	@if $(OBJDUMP) -d $(OUT).elf | grep -qiE \
+	@if $(OBJDUMP) -d --no-show-raw-insn $(OUT).elf | grep -qiE \
 		'^[[:space:][:xdigit:]]+:[[:space:][:xdigit:]]+[[:space:]]+(bf[a-z]+|bkpt|callm|cas2?|chk2|cmp2|div[su]l|extb|move16|movec|moves|pack|rt[dm]|trap[a-z]{2}|unpk)([.[:space:]]|$$)'; then \
 		echo "*** instruction newer than 68000 in native executable"; exit 1; \
 	else echo "68000 instruction audit: clean"; fi
