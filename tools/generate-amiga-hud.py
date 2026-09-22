@@ -29,6 +29,7 @@ SELECTIONS = {
         416: None,   # sprPcHudStammoGauge
     },
     "game": {
+        3: None,     # sprPlayerShoot
         12: None,    # sprPlayerLegswing
         27: None,    # sprPlayerRunExg
         31: None,    # sprPlayerIdle

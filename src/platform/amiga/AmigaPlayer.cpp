@@ -21,7 +21,8 @@ AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
       landingY_(landingOffset * fixedOne), pixelX_(0), pixelY_(0),
       ammo_(maximumAmmo),
       grounded_(startsGrounded), priorFire_(false),
-      jumpShootLocked_(false), shotDelay_(startsGrounded ? 0u : 1u),
+      jumpShootLocked_(false), airborneShot_(false),
+      shotDelay_(startsGrounded ? 0u : 1u), facing_(1),
       jumps_(0), shots_(0)
 {
 }
@@ -59,6 +60,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
             speedX_ += horizontalAcceleration;
             if (speedX_ < 0) speedX_ += horizontalTurnBoost;
         }
+        facing_ = input.left ? -1 : 1;
         if (speedX_ < -horizontalMaximum) speedX_ = -horizontalMaximum;
         if (speedX_ > horizontalMaximum) speedX_ = horizontalMaximum;
     } else if (speedX_ < 0) {
@@ -83,6 +85,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         if (speedY_ > 0) speedY_ = 0;
         --ammo_;
         ++shots_;
+        airborneShot_ = true;
         shotDelay_ = 7;
     }
 
@@ -93,6 +96,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
             speedY_ = 0;
             grounded_ = true;
             ammo_ = maximumAmmo;
+            airborneShot_ = false;
         }
     }
 
@@ -101,4 +105,20 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     pixelY_ = fixedToPixel(y_);
     AmigaPlayerMotion motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
     return motion;
+}
+
+int AmigaPlayer::spriteId() const
+{
+    if (grounded_) return 31;
+    return airborneShot_ ? 3 : 37;
+}
+
+unsigned AmigaPlayer::spriteFrame() const
+{
+    if (grounded_ || airborneShot_) return 0;
+    if (speedY_ < -2 * fixedOne) return 0;
+    if (speedY_ < 0) return 1;
+    if (speedY_ < fixedOne) return 2;
+    if (speedY_ < 2 * fixedOne) return 3;
+    return 4;
 }

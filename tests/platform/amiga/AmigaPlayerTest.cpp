@@ -19,11 +19,15 @@ int main() {
     downwell::Input input;
     require(player.grounded() && player.ammo() == 8,
             "player starts grounded with a full gunboot charge");
+    require(player.spriteId() == 31 && player.spriteFrame() == 0,
+            "grounded player selects the recovered idle frame");
 
     input.fire = true;
     player.step(input);
     require(!player.grounded() && player.jumps() == 1 && player.shots() == 0,
             "grounded fire jumps without emitting a bullet");
+    require(player.spriteId() == 37 && player.spriteFrame() == 0,
+            "fast upward motion selects the first airborne frame");
 
     player.step(input);
     require(player.shots() == 0,
@@ -31,10 +35,14 @@ int main() {
 
     input.fire = false;
     player.step(input);
+    require(player.spriteFrame() == 1,
+            "variable-height release selects the slow upward frame");
     input.fire = true;
     player.step(input);
     require(player.shots() == 1 && player.ammo() == 7,
             "a later airborne press consumes one charge and shoots");
+    require(player.spriteId() == 3,
+            "airborne fire selects the recovered shooting pose");
     for (unsigned frame = 0; frame < 6; ++frame)
         player.step(input);
     require(player.shots() == 1,
@@ -56,6 +64,11 @@ int main() {
         laterMove = player.step(input);
     require(player.offsetX() > 0 && laterMove.deltaX >= firstMove.deltaX,
             "horizontal input accelerates the fixed-point player");
+    input.right = false;
+    input.left = true;
+    player.step(input);
+    require(player.facing() == -1,
+            "leftward input flips the native player presentation");
 
     AmigaPlayer falling(false, 58);
     downwell::Input neutral;

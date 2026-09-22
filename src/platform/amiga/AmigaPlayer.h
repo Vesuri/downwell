@@ -19,6 +19,9 @@ public:
     long offsetYFixed() const { return y_; }
     int ammo() const { return ammo_; }
     bool grounded() const { return grounded_; }
+    int facing() const { return facing_; }
+    int spriteId() const;
+    unsigned spriteFrame() const;
     unsigned jumps() const { return jumps_; }
     unsigned shots() const { return shots_; }
 
@@ -36,7 +39,9 @@ private:
     bool grounded_;
     bool priorFire_;
     bool jumpShootLocked_;
+    bool airborneShot_;
     unsigned shotDelay_;
+    int facing_;
     unsigned jumps_;
     unsigned shots_;
 };

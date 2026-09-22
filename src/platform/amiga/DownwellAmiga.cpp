@@ -558,22 +558,6 @@ static void buildBulletSprite(Sprite& sprite, int x, int y) {
     data[3 + bulletSpriteHeight * 2] = 0;
 }
 
-static void offsetHardwareSprite(UWORD* sprite, int deltaX, int deltaY) {
-    UBYTE* control = (UBYTE*)sprite;
-    int startX = ((int)control[1] << 1) | (control[3] & 1);
-    int startY = control[0] | ((control[3] & 4) << 6);
-    int stopY = control[2] | ((control[3] & 2) << 7);
-    startX += deltaX;
-    startY += deltaY;
-    stopY += deltaY;
-    control[0] = (UBYTE)startY;
-    control[1] = (UBYTE)(startX >> 1);
-    control[2] = (UBYTE)stopY;
-    control[3] = (UBYTE)((startX & 1) |
-                         (stopY > 255 ? 2 : 0) |
-                         (startY > 255 ? 4 : 0));
-}
-
 int main(void) {
     AmigaPlatform platform;
     AmigaMemory memory;
@@ -654,15 +638,17 @@ int main(void) {
 #else
             gameplayPlayerStartY,
 #endif
+            0,
             memory.playerSprite(0), playerSpriteHeight) ||
         !amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 37, 0,
-            downwellPlayfieldX + 88,
+            downwellPlayfieldX + 80,
 #ifdef DOWNWELL_REPLAY_VERIFY
-            gameplayPlayerGroundY - 8,
+            gameplayPlayerGroundY,
 #else
-            gameplayPlayerStartY - 8,
+            gameplayPlayerStartY,
 #endif
+            0,
             memory.playerSprite(1), playerSpriteHeight)) {
         memory.release();
         return 1;
@@ -747,14 +733,7 @@ int main(void) {
                 continue;
 #endif
             const AmigaPortFrame result = port.step(packedInput);
-            const AmigaPlayerMotion motion = result.playerMotion;
             scrollDelta = result.scrollDelta;
-            if (motion.deltaX || motion.deltaY) {
-                offsetHardwareSprite(memory.playerSprite(0),
-                                     motion.deltaX, motion.deltaY);
-                offsetHardwareSprite(memory.playerSprite(1),
-                                     motion.deltaX, motion.deltaY);
-            }
             if (result.bulletChanged) {
                 if (port.bulletActive())
                     buildBulletSprite(bulletSprite,
@@ -767,32 +746,54 @@ int main(void) {
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo());
         }
-        if (scrollDelta != 0) {
+        {
             const unsigned back = front ^ 1u;
-            const int direction = scrollDelta > 0 ? 1 : -1;
-            const int steps = scrollDelta > 0 ? scrollDelta : -scrollDelta;
-            int step;
-            int origin = (int)port.ringOrigin() - scrollDelta;
-            while (origin < 0) origin += downwellGameRingHeight;
-            origin %= downwellGameRingHeight;
-            for (step = 0; step < steps; ++step) {
-                worldViewY += direction;
-                origin += direction;
-                if (origin < 0) origin += downwellGameRingHeight;
-                if (origin >= downwellGameRingHeight)
-                    origin -= downwellGameRingHeight;
-                drawRevealedGameLine(
-                    &renderer, rooms, mainRoom, builders, entrance,
-                    (unsigned)origin,
-                    direction > 0
-                        ? worldViewY + downwellDisplayHeight - 1
-                        : worldViewY,
-                    direction > 0 ? downwellDisplayHeight - 1 : 0);
+            bool frameReady = true;
+            if (scrollDelta != 0) {
+                const int direction = scrollDelta > 0 ? 1 : -1;
+                const int steps = scrollDelta > 0 ? scrollDelta : -scrollDelta;
+                int step;
+                int origin = (int)port.ringOrigin() - scrollDelta;
+                while (origin < 0)
+                    origin += downwellGameRingHeight;
+                origin %= downwellGameRingHeight;
+                for (step = 0; step < steps; ++step) {
+                    worldViewY += direction;
+                    origin += direction;
+                    if (origin < 0)
+                        origin += downwellGameRingHeight;
+                    if (origin >= downwellGameRingHeight)
+                        origin -= downwellGameRingHeight;
+                    drawRevealedGameLine(
+                        &renderer, rooms, mainRoom, builders, entrance,
+                        (unsigned)origin,
+                        direction > 0
+                            ? worldViewY + downwellDisplayHeight - 1
+                            : worldViewY,
+                        direction > 0 ? downwellDisplayHeight - 1 : 0);
+                }
             }
-            if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
-                             playerSprites[port.player().grounded() ? 0u : 1u],
+            if (!amigaRendererBuildHardwareSprite(
+                    amiga_game_pack, amiga_game_pack_end,
+                    (UWORD)port.player().spriteId(),
+                    (UWORD)port.player().spriteFrame(),
+                    downwellPlayfieldX + 80 + port.player().offsetX(),
+#ifdef DOWNWELL_REPLAY_VERIFY
+                    gameplayPlayerGroundY + port.player().offsetY(),
+#else
+                    gameplayPlayerStartY + port.player().offsetY() -
+                        port.cameraOffsetY(),
+#endif
+                    port.player().facing() < 0,
+                    memory.playerSprite(back), playerSpriteHeight))
+                frameReady = false;
+            if (frameReady &&
+                !buildCopper(copperLists[back], gameBitmap, hudBitmap,
+                             playerSprites[back],
                              bulletSprite, nullSprite, palette,
                              port.ringOrigin()))
+                frameReady = false;
+            if (!frameReady)
                 break;
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
             platform.publish(copperLists[back]);

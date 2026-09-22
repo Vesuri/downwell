@@ -371,7 +371,7 @@ void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
 
 int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      UWORD sprite, UWORD frame,
-                                     int anchorX, int anchorY,
+                                     int anchorX, int anchorY, int flipX,
                                      UWORD* destination,
                                      unsigned destinationHeight) {
     const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
@@ -403,7 +403,9 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
         return 0;
 
     cropX = (width - 16) >> 1;
-    startX = downwellDisplayHStart + anchorX - originX + cropX;
+    startX = downwellDisplayHStart +
+             (flipX ? anchorX + originX - width + cropX
+                    : anchorX - originX + cropX);
     startY = downwellDisplayVStart + anchorY - originY;
     stopY = startY + height;
     control[0] = (UBYTE)startY;
@@ -418,7 +420,8 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
         UWORD plane0 = 0;
         UWORD plane1 = 0;
         for (x = 0; x < 16; ++x) {
-            const int sourceX = cropX + x;
+            const int sourceX = flipX ? width - 1 - (cropX + x)
+                                      : cropX + x;
             const UBYTE mask = (UBYTE)(0x80u >> (sourceX & 7));
             if (row[sourceX >> 3] & mask)
                 plane0 |= (UWORD)(0x8000u >> x);
