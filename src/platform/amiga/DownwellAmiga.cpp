@@ -138,6 +138,10 @@ extern "C" __attribute__((noinline, used)) void downwellMenuSpriteReady(void) {
 extern "C" __attribute__((noinline, used)) void downwellSceneGameplayReady(void) {
     __asm__ volatile("" ::: "memory");
 }
+
+extern "C" __attribute__((noinline, used)) void downwellSceneGameplayLanded(void) {
+    __asm__ volatile("" ::: "memory");
+}
 #endif
 
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -748,6 +752,9 @@ int main(void) {
     int presentedSplash = scenes.splashStage();
     unsigned liveFrameCount = 0;
     unsigned menuSpriteFrameCount = 0;
+#ifdef DOWNWELL_SCENE_VERIFY
+    bool sceneGameplayLandedReported = false;
+#endif
     worldViewY += port.cameraOffsetY();
 #endif
 
@@ -1262,6 +1269,12 @@ int main(void) {
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
             platform.publish(copperLists[back]);
             front = back;
+#ifdef DOWNWELL_SCENE_VERIFY
+            if (!sceneGameplayLandedReported && port.player().grounded()) {
+                sceneGameplayLandedReported = true;
+                downwellSceneGameplayLanded();
+            }
+#endif
         }
         lastPortCheckpoint = port.trajectoryDigest();
 #ifdef DOWNWELL_REPLAY_VERIFY
