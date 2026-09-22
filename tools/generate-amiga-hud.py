@@ -66,6 +66,16 @@ TEXT_SELECTIONS = {
     },
 }
 
+# The original 320x800 style-transition sprites are almost entirely opaque
+# black.  Only the 160x80 gradient edge that crosses the logical playfield
+# needs packed pixels; the native renderer supplies the black body as a fill.
+DITHER_STRIPS = {
+    "game": {
+        65004: (129, 80, 0),    # visible centre of sprEnterDither's top edge
+        65005: (128, 80, 720),  # visible centre of sprVertDither's bottom edge
+    },
+}
+
 
 def require(condition, message):
     if not condition:
@@ -146,6 +156,19 @@ def render_text(manifest, pages, text):
     return canvas
 
 
+def render_dither_strip(sprite, frame, items, pages, source_x, source_y):
+    canvas = frame_canvas(sprite, frame, items, pages).crop(
+        (source_x, source_y, source_x + 160, source_y + 80))
+    pixels = []
+    for red, green, blue, alpha in canvas.get_flattened_data():
+        pixels.append((255, 255, 255, 255)
+                      if alpha != 0 and (red, green, blue) == (255, 255, 255)
+                      else (0, 0, 0, 0))
+    output = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    output.putdata(pixels)
+    return output
+
+
 def decode_planar(data, width, height, dma_width):
     plane_bytes = dma_width // 8
     plane_size = plane_bytes * height
@@ -191,6 +214,23 @@ def build_pack(manifest, extracted, profile):
         sprite = {
             "id": text_id,
             "originX": canvas.width // 2,
+            "originY": 0,
+            "width": canvas.width,
+            "height": canvas.height,
+        }
+        encoded.append((sprite, 0, dma_width, planar))
+
+    for strip_id, (source_id, source_x, source_y) in \
+            DITHER_STRIPS.get(profile, {}).items():
+        source_sprite = sprites[source_id]
+        canvas = render_dither_strip(
+            source_sprite, source_sprite["frames"][0], items, pages,
+            source_x, source_y)
+        pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
+        dma_width, planar = encode_planar(pens, canvas.width, canvas.height)
+        sprite = {
+            "id": strip_id,
+            "originX": 0,
             "originY": 0,
             "width": canvas.width,
             "height": canvas.height,

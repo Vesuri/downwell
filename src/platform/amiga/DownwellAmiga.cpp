@@ -631,24 +631,20 @@ static void drawStyleSelect(AmigaRenderer* renderer,
                       downwellPlayfieldX + 80,
                       centerY - 14 + scenes.stylePlayerDescent(), 0);
     }
-    if (scenes.styleDitherY() < downwellDisplayHeight) {
-        int y;
-        int x;
-        for (y = scenes.styleDitherY(); y < downwellDisplayHeight; y += 8)
-            for (x = 0; x < downwellPlayfieldWidth; x += 8)
-                drawGameAsset(renderer, 733, 11,
-                              downwellPlayfieldX + x, y, 0);
+    {
+        const int enterTop = scenes.styleDitherY() - 400;
+        amigaRendererFillRect(renderer, downwellPlayfieldX, enterTop,
+                              downwellPlayfieldWidth, 800, 0);
+        drawGameAsset(renderer, 65004, 0,
+                      downwellPlayfieldX, enterTop, 0);
     }
-    if (scenes.styleSelected() && scenes.styleVerticalDitherY() > 0) {
-        int y;
-        int x;
-        int bottom = scenes.styleVerticalDitherY();
-        if (bottom > downwellDisplayHeight)
-            bottom = downwellDisplayHeight;
-        for (y = 0; y < bottom; y += 8)
-            for (x = 0; x < downwellPlayfieldWidth; x += 8)
-                drawGameAsset(renderer, 733, 11,
-                              downwellPlayfieldX + x, y, 0);
+    if (scenes.styleSelected()) {
+        const int verticalEdge = scenes.styleVerticalDitherY();
+        amigaRendererFillRect(renderer, downwellPlayfieldX,
+                              verticalEdge - 720,
+                              downwellPlayfieldWidth, 800, 0);
+        drawGameAsset(renderer, 65005, 0,
+                      downwellPlayfieldX, verticalEdge, 0);
     }
     amigaRendererClearClipRect(renderer);
 }
