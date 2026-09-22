@@ -255,6 +255,20 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
     }
 }
 
+static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
+    enum { streakTextBase = 65100, maximumPackedStreak = 99 };
+    amigaRendererClearClipRect(renderer);
+    /* PF2 is transparent here, so clearing reveals the scrolling PF1 again. */
+    amigaRendererFillRect(renderer, 160, 44, 64, 24, 0);
+    if (streak == 0)
+        return;
+    if (streak > maximumPackedStreak)
+        streak = maximumPackedStreak;
+    drawGameAsset(renderer, 133, 0, downwellPlayfieldX + 65, 55, 0);
+    drawGameText(renderer, (UWORD)(streakTextBase + streak),
+                 downwellPlayfieldX + 81, 51);
+}
+
 static UWORD terrainFrame(char symbol) {
     if (symbol == 'B' || symbol == '3')
         return 16;
@@ -1010,6 +1024,8 @@ int main(void) {
                 redrawHealth(&renderer, (unsigned)port.health());
             if (result.currencyChanged)
                 redrawCurrency(&renderer, port.currency());
+            if (result.streakChanged)
+                redrawStreak(&renderer, port.gemStreak());
         }
         {
             const unsigned back = front ^ 1u;

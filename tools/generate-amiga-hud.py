@@ -67,6 +67,12 @@ TEXT_SELECTIONS = {
     },
 }
 
+# The recovered streak counter uses font 2 and is drawn over the playfield by
+# the fixed HUD layer.  Pre-render the bounded two-digit forms so the 68000
+# never needs a glyph compositor in the frame loop.
+TEXT_SELECTIONS["game"].update({65100 + value: str(value)
+                                for value in range(100)})
+
 # The original 320x800 style-transition sprites are almost entirely opaque
 # black.  Only the 160x80 gradient edge that crosses the logical playfield
 # needs packed pixels; the native renderer supplies the black body as a fill.

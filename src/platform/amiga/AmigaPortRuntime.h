@@ -17,6 +17,7 @@ struct AmigaPortFrame {
     bool ammoChanged;
     bool healthChanged;
     bool currencyChanged;
+    bool streakChanged;
     bool bulletChanged;
     bool scrolled;
     int scrollDelta;
@@ -103,6 +104,8 @@ public:
     unsigned gemCount() const;
     const GemState& gemAt(unsigned index) const;
     unsigned currency() const { return currency_; }
+    unsigned gemStreak() const { return gemStreak_; }
+    unsigned gemStreakTimer() const { return gemStreakTimer_; }
     int health() const { return health_; }
     unsigned invulnerability() const { return invulnerability_; }
     bool bulletActive() const { return bulletCount() != 0; }
@@ -138,6 +141,8 @@ private:
     int health_;
     unsigned invulnerability_;
     unsigned currency_;
+    unsigned gemStreak_;
+    unsigned gemStreakTimer_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;
     Breakable breakables_[breakableCapacity];

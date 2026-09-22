@@ -37,7 +37,8 @@ Landing restores all eight charges. This is the first target-specialized
 replacement for the host reference's floating-point GameMaker values. An
 airborne press emits a bounded downward bullet on a shared actor sprite
 channel and redraws both the side-panel ammo digit and its bottom-up vertical
-meter; channel 0 remains dedicated to the player.
+meter; channel 0 remains dedicated to the player. Collected physical gems also
+update the recovered 300-frame streak overlay on the fixed HUD playfield.
 
 Its machine lifecycle is owned by the shared-style `AmigaPlatform` class and
 follows Rescue on Fractalus: allocation and the two

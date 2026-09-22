@@ -97,6 +97,15 @@ int main() {
         stomp.step(0);
     require(stomp.currency() == 6 && stomp.gemCount() == 0,
             "attracted stomp reward reaches the player and enters currency");
+    require(stomp.gemStreak() == 6 && stomp.gemStreakTimer() == 300,
+            "collected physical gems feed the recovered streak timer");
+    AmigaPortFrame expiredStreak{};
+    for (unsigned frame = 0;
+         frame < 301 && stomp.gemStreak() != 0; ++frame)
+        expiredStreak = stomp.step(0);
+    require(stomp.gemStreak() == 0 && stomp.gemStreakTimer() == 0 &&
+                expiredStreak.streakChanged,
+            "native streak expires after the recovered 300-frame hold");
 
     AmigaPortRuntime contact(300);
     require(contact.configureEnemy(0, 117, 177, 0, 0,

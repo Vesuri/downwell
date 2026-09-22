@@ -12,7 +12,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       cameraPixelX_(0),
       enemyCount_(0), enemiesDefeated_(0), health_(4), invulnerability_(0),
-      currency_(0),
+      currency_(0), gemStreak_(0), gemStreakTimer_(0),
       solidResolver_(0),
       solidResolverContext_(0),
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
@@ -213,6 +213,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     const int oldAmmo = player_.ammo();
     const int oldHealth = health_;
     const unsigned oldCurrency = currency_;
+    const unsigned oldGemStreak = gemStreak_;
     const unsigned oldShots = player_.shots();
     bool bulletChanged = false;
     unsigned destroyedBlockCount = 0;
@@ -401,6 +402,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
+    if (gemStreakTimer_ > 0)
+        --gemStreakTimer_;
+    else
+        gemStreak_ = 0;
+
     for (unsigned gemIndex = 0; gemIndex < gemCapacity; ++gemIndex) {
         GemState& gem = gems_[gemIndex];
         if (!gem.active)
@@ -428,6 +434,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         if (gem.age >= 10 && collectX >= -6 && collectX <= 6 &&
             collectY >= -8 && collectY <= 8) {
             currency_ += (unsigned)gem.amount;
+            gemStreak_ += (unsigned)gem.amount;
+            gemStreakTimer_ = 300;
             gem.active = false;
         } else if (gem.age >= 310) {
             gem.active = false;
@@ -447,6 +455,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     frame.ammoChanged = player_.ammo() != oldAmmo;
     frame.healthChanged = health_ != oldHealth;
     frame.currencyChanged = currency_ != oldCurrency;
+    frame.streakChanged = gemStreak_ != oldGemStreak;
     frame.bulletChanged = bulletChanged;
     frame.scrolled = scrollDelta != 0;
     frame.scrollDelta = scrollDelta;
