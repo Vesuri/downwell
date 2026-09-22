@@ -29,6 +29,7 @@ public:
     int menuCameraX() const { return roundedPixel(menuCameraX_); }
     int menuCameraY() const { return roundedPixel(menuCameraY_); }
     int menuTitleFrame() const { return menuTitleFrame_; }
+    int menuTitleY() const;
     bool menuTeleportActive() const { return menuTeleport_; }
     bool menuEnterSequenceActive() const { return menuEnterActive_; }
     int menuEnterSequenceY() const { return roundedPixel(menuCameraLockerY_); }
@@ -76,7 +77,8 @@ private:
     unsigned menuFallTicks_;
     bool menuTeleport_;
     int menuTitleDelay_;
-    long menuTitleImage_;
+    std::uint32_t menuTitleImage_;
+    unsigned menuTitleRevealTicks_;
     int menuTitleReadyTimer_;
     bool menuTitleReady_;
     int menuSequenceDelay_;

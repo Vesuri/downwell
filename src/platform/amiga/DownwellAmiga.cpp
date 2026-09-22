@@ -154,7 +154,7 @@ static void drawGameAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
 static void drawGameText(AmigaRenderer* renderer, UWORD text,
                          int x, int y) {
     amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
-                              text, 0, x + 1, y + 1, 0, 2);
+                              text, 0, x, y + 1, 0, 2);
     amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
                               text, 0, x, y, 0, 1);
 }
@@ -574,7 +574,8 @@ static void drawMenu(AmigaRenderer* renderer,
     }
 
     drawGameAsset(renderer, 654, (UWORD)scenes.menuTitleFrame(),
-                  downwellPlayfieldX + 328 - viewX, 432 - viewY, 0);
+                  downwellPlayfieldX + 328 - viewX,
+                  scenes.menuTitleY() - viewY, 0);
     if (scenes.menuPlayerVisible()) {
         drawGameAsset(renderer, (UWORD)scenes.menuPlayerSprite(),
                       (UWORD)scenes.menuPlayerFrame(),

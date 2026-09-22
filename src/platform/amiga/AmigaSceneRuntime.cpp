@@ -17,7 +17,8 @@ AmigaSceneRuntime::AmigaSceneRuntime()
       splashTimer_(10), menuTicks_(0), menuNapping_(true),
       menuGrounded_(true), menuFallTicks_(0), menuTeleport_(false),
       menuTitleDelay_(-1),
-      menuTitleImage_(0), menuTitleReadyTimer_(-1),
+      menuTitleImage_(0), menuTitleRevealTicks_(0),
+      menuTitleReadyTimer_(-1),
       menuTitleReady_(false), menuSequenceDelay_(-1),
       menuEnterActive_(false), menuEnterBlackDelay_(-1),
       menuFacing_(1), menuSprite_(12), menuImage_(0),
@@ -57,6 +58,14 @@ unsigned AmigaSceneRuntime::menuPlayerFrame() const
     else if (menuSprite_ == 37)
         count = 5;
     return frame % count;
+}
+
+int AmigaSceneRuntime::menuTitleY() const
+{
+    const int rise = menuTitleRevealTicks_ >= 24 ? 3
+                     : menuTitleRevealTicks_ >= 15 ? 2
+                     : menuTitleRevealTicks_ >= 5 ? 1 : 0;
+    return 432 - rise;
 }
 
 static std::uint32_t shiftRightJam(std::uint32_t value, unsigned distance)
@@ -284,14 +293,16 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
         menuTitleDelay_ = 15;
     if (menuTitleDelay_ > 0) {
         --menuTitleDelay_;
-    } else if (menuTitleDelay_ == 0 && menuTitleImage_ < 9 * fixedOne) {
-        menuTitleImage_ += 82;
-        if (menuTitleImage_ >= 9 * fixedOne) {
-            menuTitleImage_ = 9 * fixedOne;
+    } else if (menuTitleDelay_ == 0 &&
+               positiveFloatFloor(menuTitleImage_) < 9) {
+        menuTitleImage_ = addPositiveFloat(menuTitleImage_, 0x3ea3d70aUL);
+        ++menuTitleRevealTicks_;
+        if (positiveFloatFloor(menuTitleImage_) >= 9) {
+            menuTitleImage_ = 0x41100000UL;
             menuTitleReadyTimer_ = 76;
             menuTitleDelay_ = -2;
         }
-        menuTitleFrame_ = (int)(menuTitleImage_ >> 8);
+        menuTitleFrame_ = (int)positiveFloatFloor(menuTitleImage_);
     }
     if (menuTitleReadyTimer_ > 0) {
         --menuTitleReadyTimer_;

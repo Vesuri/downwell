@@ -87,6 +87,12 @@ void compareMenu(const AmigaSceneRuntime& amiga,
     }
     require(amiga.menuTeleportActive() == reference.menuTeleportActive(),
             "menu teleport follows decoded runtime");
+    const downwell::InstanceRecord* title = reference.instance(105192);
+    require(title != nullptr, "decoded menu title instance remains available");
+    require(amiga.menuTitleFrame() ==
+                static_cast<int>(title->imageIndex) &&
+            amiga.menuTitleY() == title->y,
+            "menu title animation follows decoded runtime");
     require(amiga.menuEnterSequenceActive() == reference.enterSequenceActive(),
             "well-entry sequence follows decoded runtime");
     if (amiga.menuEnterSequenceActive())
