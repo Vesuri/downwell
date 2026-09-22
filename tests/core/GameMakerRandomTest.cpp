@@ -48,12 +48,33 @@ void testRealRange() {
             "random scales one unsigned output by exactly 2^-32");
 }
 
+void testSmallIntegerPath() {
+    constexpr std::uint32_t maxima[] = {
+        0, 1, 2, 3, 4, 5, 6, 9, 12, 15, 30, 40, 50, 60,
+        70, 180, 359, 255, 1023, 65535
+    };
+    for (std::uint32_t seed = 0; seed < 32; ++seed) {
+        downwell::GameMakerRandom reference(seed * 0x1020304U + 7U);
+        downwell::GameMakerRandom small(seed * 0x1020304U + 7U);
+        for (unsigned sample = 0; sample < 200; ++sample) {
+            const std::uint32_t maximum =
+                maxima[sample % (sizeof(maxima) / sizeof(maxima[0]))];
+            require(small.irandomSmall(maximum) ==
+                        reference.irandom(maximum),
+                    "32-bit small-range modulus matches recovered irandom");
+        }
+        require(small.drawCount() == reference.drawCount(),
+                "small-range adapter consumes the same two stream words");
+    }
+}
+
 } // namespace
 
 int main() {
     testWell512Vector();
     testIntegerRangeAndReset();
     testRealRange();
+    testSmallIntegerPath();
     std::cout << "GameMaker random tests passed\n";
     return 0;
 }

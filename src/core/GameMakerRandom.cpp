@@ -48,4 +48,21 @@ std::uint64_t GameMakerRandom::irandom(std::uint64_t upperInclusive) {
     return positive63 % (upperInclusive + 1U);
 }
 
+std::uint32_t GameMakerRandom::irandomSmall(
+    std::uint32_t upperInclusive) {
+    assert(upperInclusive <= 0xffffU);
+    const std::uint32_t divisor = upperInclusive + 1U;
+    const std::uint32_t low = nextU32();
+    const std::uint32_t high = nextU32() & 0x7fffffffU;
+    /*
+     * (high << 32 | low) % divisor, reduced a word at a time.  With a
+     * divisor of at most 65536 every product remains inside uint32_t.
+     */
+    const std::uint32_t twoTo32Modulo =
+        ((0xffffffffU % divisor) + 1U) % divisor;
+    const std::uint32_t highRemainder =
+        ((high % divisor) * twoTo32Modulo) % divisor;
+    return (highRemainder + low % divisor) % divisor;
+}
+
 } // namespace downwell

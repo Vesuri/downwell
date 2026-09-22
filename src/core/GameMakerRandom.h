@@ -19,6 +19,10 @@ public:
     std::uint32_t nextU32();
     double random(double upperExclusive = 1.0);
     std::uint64_t irandom(std::uint64_t upperInclusive);
+    // Exact irandom path for the small inclusive ranges used by Downwell's
+    // generators. This preserves the runner's 63-bit modulus without asking
+    // a 68000 target for 64-bit division.
+    std::uint32_t irandomSmall(std::uint32_t upperInclusive);
 
     std::size_t stateIndex() const { return stateIndex_; }
     std::uint32_t stateWord(std::size_t index) const { return state_[index]; }
