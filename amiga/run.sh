@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")"
+. ./env.sh
 . "${FSUAE_COMMON:-$HOME/.local/share/amiga/fsuae_common.sh}"
 
 FSUAE="${FSUAE:-fs-uae}"

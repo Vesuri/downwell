@@ -139,6 +139,12 @@ __attribute__((noinline, used)) void downwellReplayComplete(void) {
 }
 #endif
 
+#ifndef DOWNWELL_REPLAY_VERIFY
+extern "C" __attribute__((noinline, used)) void downwellStartupReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+#endif
+
 static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
                       int anchorX, int anchorY, int flipX) {
     amigaRendererDrawAsset(renderer, amiga_hud_pack, amiga_hud_pack_end,
@@ -1100,6 +1106,7 @@ int main(void) {
                           mainInitialViewY);
 #else
     drawSplash(&renderer, scenes.splashStage());
+    downwellStartupReady();
 #endif
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
     while ((*ciaaPra & 0x40u) != 0) {
