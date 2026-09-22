@@ -21,6 +21,7 @@ std::uint32_t readU32(const std::uint8_t* bytes) {
            (static_cast<std::uint32_t>(bytes[3]) << 24);
 }
 
+#ifndef DOWNWELL_FREESTANDING
 void appendU16(std::vector<std::uint8_t>& bytes, std::uint16_t value) {
     bytes.push_back(static_cast<std::uint8_t>(value));
     bytes.push_back(static_cast<std::uint8_t>(value >> 8));
@@ -30,6 +31,7 @@ void appendU32(std::vector<std::uint8_t>& bytes, std::uint32_t value) {
     for (int shift = 0; shift < 32; shift += 8)
         bytes.push_back(static_cast<std::uint8_t>(value >> shift));
 }
+#endif
 
 } // namespace
 
@@ -88,6 +90,7 @@ Input unpackReplayInput(std::uint8_t packed) {
     return input;
 }
 
+#ifndef DOWNWELL_FREESTANDING
 std::vector<std::uint8_t> encodeReplay(const std::vector<Input>& frames,
                                        std::uint32_t randomSeed) {
     if (frames.size() > UINT32_MAX)
@@ -104,5 +107,6 @@ std::vector<std::uint8_t> encodeReplay(const std::vector<Input>& frames,
         bytes.push_back(packReplayInput(input));
     return bytes;
 }
+#endif
 
 } // namespace downwell

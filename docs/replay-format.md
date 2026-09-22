@@ -50,3 +50,10 @@ startup replay seeded with `decafbad` has a pinned digest of
 The current code provides memory encoding/decoding, seeded RNG initialization,
 and state comparison. File recording/playback in the SDL platform layer and a
 command-line replay runner remain to be added.
+
+The freestanding Amiga build compiles the same `ReplayReader`, input packer,
+and input unpacker, omitting only the host-side `std::vector` encoder. Live
+port-1 joystick levels are packed and immediately decoded through this boundary
+before use. A replay source can therefore replace the sampler without changing
+the eventual native runtime step function. PAL still consumes one replay input
+per displayed frame; it deliberately does not synthesize extra 60 Hz steps.

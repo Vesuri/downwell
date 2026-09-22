@@ -13,7 +13,8 @@ CFLAGS := -g -O2 -m68020 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DDOWNWELL_PLATFORM_AMIGA
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
-	-fno-use-cxa-atexit -I$(AMIGA_SRC)/compat -I$(REPO)/src
+	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
+	-I$(AMIGA_SRC)/compat -I$(REPO)/src
 ASFLAGS := -mcpu=68020 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
@@ -22,9 +23,10 @@ AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaRenderer.o obj/AmigaHardware.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaRenderer.o \
+	obj/AmigaHardware.o \
 	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
-	obj/BuilderPatternPack.o \
+	obj/BuilderPatternPack.o obj/Replay.o \
 	obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
 
@@ -49,6 +51,10 @@ $(OUT).elf: $(OBJECTS)
 	@$(MAKE) --no-print-directory audit
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
@@ -77,6 +83,11 @@ obj/ObjectPack.o: $(REPO)/src/core/ObjectPack.cpp $(REPO)/src/core/ObjectPack.h
 
 obj/BuilderPatternPack.o: $(REPO)/src/core/BuilderPatternPack.cpp \
 		$(REPO)/src/core/BuilderPatternPack.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/Replay.o: $(REPO)/src/core/Replay.cpp $(REPO)/src/core/Replay.h \
+		$(REPO)/src/core/Input.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

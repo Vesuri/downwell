@@ -109,4 +109,6 @@
   shared endian-safe readers.
 - [x] Establish PF1 as a copper-wrapped vertical circular buffer while PF2
   remains fixed for the HUD.
-- Define the host/Amiga replay and state-digest seam before gameplay code moves.
+- [x] Define the host/Amiga replay-input seam before gameplay code moves.
+- Cross-compile the shared simulation state digest and pin an Amiga replay
+  checkpoint against the host result.

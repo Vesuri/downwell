@@ -4,7 +4,9 @@
 #include "Input.h"
 #include <cstddef>
 #include <cstdint>
+#ifndef DOWNWELL_FREESTANDING
 #include <vector>
+#endif
 
 namespace downwell {
 
@@ -40,8 +42,10 @@ private:
 
 std::uint8_t packReplayInput(const Input& input);
 Input unpackReplayInput(std::uint8_t packed);
+#ifndef DOWNWELL_FREESTANDING
 std::vector<std::uint8_t> encodeReplay(const std::vector<Input>& frames,
                                        std::uint32_t randomSeed);
+#endif
 
 } // namespace downwell
 

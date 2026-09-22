@@ -7,6 +7,7 @@
 #include <graphics/view.h>
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
+#include "AmigaInput.h"
 #include "AmigaRenderer.h"
 #include "framework/AmigaHardware.h"
 #include "framework/AmigaMemory.h"
@@ -14,6 +15,7 @@
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
+#include "core/Replay.h"
 
 struct ExecBase* SysBase = 0;
 struct GfxBase* GfxBase = 0;
@@ -264,6 +266,22 @@ static bool validateNativeData(void) {
     return rooms.valid() && objects.valid() && builders.valid();
 }
 
+static void offsetHardwareSprite(UWORD* sprite, int deltaX, int deltaY) {
+    UBYTE* control = (UBYTE*)sprite;
+    int startX = ((int)control[1] << 1) | (control[3] & 1);
+    int startY = control[0] | ((control[3] & 4) << 6);
+    int stopY = control[2] | ((control[3] & 2) << 7);
+    startX += deltaX;
+    startY += deltaY;
+    stopY += deltaY;
+    control[0] = (UBYTE)startY;
+    control[1] = (UBYTE)(startX >> 1);
+    control[2] = (UBYTE)stopY;
+    control[3] = (UBYTE)((startX & 1) |
+                         (stopY > 255 ? 2 : 0) |
+                         (startY > 255 ? 4 : 0));
+}
+
 int main(void) {
     struct View* savedView;
     AmigaMemory memory;
@@ -272,6 +290,7 @@ int main(void) {
     unsigned front = 0;
     unsigned ringOrigin = initialRingOrigin;
     unsigned worldBottom = downwellDisplayHeight - 1;
+    int playerOffsetX = 0;
     UWORD savedDmacon;
     UWORD savedIntena;
     const UWORD* osCopper;
@@ -373,6 +392,21 @@ int main(void) {
     while ((*ciaaPra & 0x40u) != 0) {
         waitVblank();
         ++frame;
+        {
+            const downwell::Input liveInput = AmigaInput::sample();
+            const UBYTE packed = downwell::packReplayInput(liveInput);
+            const downwell::Input input = downwell::unpackReplayInput(packed);
+            int movement = 0;
+            if (input.left && !input.right && playerOffsetX > -60)
+                movement = -1;
+            if (input.right && !input.left && playerOffsetX < 60)
+                movement = 1;
+            if (movement) {
+                playerOffsetX += movement;
+                offsetHardwareSprite(memory.playerSprite(0), movement, 0);
+                offsetHardwareSprite(memory.playerSprite(1), movement, 0);
+            }
+        }
         if ((frame & 1u) == 0) {
             const unsigned back = front ^ 1u;
             ringOrigin = (ringOrigin + 1u) % downwellGameRingHeight;
