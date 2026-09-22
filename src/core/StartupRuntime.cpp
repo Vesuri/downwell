@@ -842,6 +842,32 @@ void StartupRuntime::updateMainLifecycle() {
     }
 }
 
+void StartupRuntime::syncMainBuilderState() {
+    mainBuilderY_ = areaOneBuilder_.y();
+    mainBuilderGenerationCount_ = areaOneBuilder_.generationCount();
+    mainBuilderRowsGenerated_ = areaOneBuilder_.rowsGenerated();
+    mainBuilderRightRooms_[0] = areaOneBuilder_.rightRoom(0);
+    mainBuilderRightRooms_[1] = areaOneBuilder_.rightRoom(1);
+    mainBuilderStartPattern_ = areaOneBuilder_.startPattern();
+    mainBuilderStartReversed_ = areaOneBuilder_.startReversed();
+    mainBuilderStartRowsGenerated_ = areaOneBuilder_.startRowsGenerated();
+    mainBuilderLastMainPattern_ = areaOneBuilder_.lastMainPattern();
+    mainBuilderLastPatternReversed_ = areaOneBuilder_.lastPatternReversed();
+    mainBuilderMainPatternsGenerated_ = areaOneBuilder_.mainPatternsGenerated();
+    mainBuilderSpawnerMade_ = areaOneBuilder_.spawnerMade();
+    mainBuilderLastRightPattern_ = areaOneBuilder_.lastRightPattern();
+    mainBuilderSideRoomsGenerated_ = areaOneBuilder_.sideRoomsGenerated();
+    mainBuilderLastShopPattern_ = areaOneBuilder_.lastShopPattern();
+    mainBuilderShopsGenerated_ = areaOneBuilder_.shopsGenerated();
+    mainBuilderRightRoomsMade_ = areaOneBuilder_.rightRoomsMade();
+    mainBuilderShopMade_ = areaOneBuilder_.shopMade();
+    mainBuilderEndReached_ = areaOneBuilder_.endReached();
+    mainBuilderEndPattern_ = areaOneBuilder_.endPattern();
+    mainBuilderChunkOrCrate_ = areaOneBuilder_.chunkOrCrate();
+    mainBuilderSpecialObjectsGenerated_ =
+        areaOneBuilder_.specialObjectsGenerated();
+}
+
 void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     if (!mainBuilderInitialized_ || mainBuilderEndReached_)
         return;
@@ -853,6 +879,24 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     const float viewBottom = mainCameraViewY() + surfaceHeight;
     if (static_cast<float>(instance.y) - viewBottom >= 128.0F)
         return;
+    if (builderPatternPack_ == nullptr)
+        return;
+
+    AreaOneBuilderStep result;
+    const bool generated = areaOneBuilder_.step(
+        *builderPatternPack_, random_,
+        [](void* opaque, const DeferredCreateInstance& command) {
+            StartupRuntime* runtime = static_cast<StartupRuntime*>(opaque);
+            return runtime->deferredInstances_.enqueueCreate(command);
+        },
+        this, result);
+    if (!generated) {
+        deferredCommandsSucceeded_ = false;
+        return;
+    }
+    instance.y = areaOneBuilder_.y();
+    syncMainBuilderState();
+    return;
 
     if (mainBuilderGenerationCount_ < -1) {
         random_.irandom(1); // choose(0, 1): unused orientation for empty rows.
@@ -1477,39 +1521,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         if (instance != nullptr && instance->roomId == mainRoomId) {
             mainBuilderInitialized_ = true;
-            mainBuilderY_ = instance->y;
-            mainBuilderGenerationCount_ = -30; // area 1, level 1, first boot
-            mainBuilderRowsGenerated_ = 0;
-            mainBuilderStartPattern_ = -1;
-            mainBuilderStartReversed_ = false;
-            mainBuilderStartRowsGenerated_ = 0;
-            mainBuilderLastMainPattern_ = -1;
-            mainBuilderLastPatternReversed_ = false;
-            mainBuilderMainPatternsGenerated_ = 0;
-            mainBuilderSpawnerMade_ = false;
-            mainBuilderLastRightPattern_ = -1;
-            mainBuilderSideRoomsGenerated_ = 0;
-            mainBuilderLastShopPattern_ = -1;
-            mainBuilderShopsGenerated_ = 0;
-            mainBuilderRightRoomsMade_ = 0;
-            mainBuilderShopMade_ = true; // area 1, level 1, playStyle != 4.
-            mainBuilderEndReached_ = false;
-            mainBuilderEndPattern_ = -1;
-            mainBuilderChunkOrCrate_ = 0;
-            mainBuilderSpecialObjectsGenerated_ = 0;
-            random_.irandom(2); // choose(2, 2, 3), then overridden to two.
-            mainBuilderRightRooms_[0] =
-                3 + static_cast<int>(random_.irandom(12));
-            int attempts = 0;
-            do {
-                mainBuilderRightRooms_[1] =
-                    3 + static_cast<int>(random_.irandom(12));
-                ++attempts;
-            } while (attempts <= 100 &&
-                     std::abs(mainBuilderRightRooms_[1] -
-                              mainBuilderRightRooms_[0]) <= 2);
-            if (attempts > 100)
-                mainBuilderRightRooms_[1] = 9999;
+            areaOneBuilder_.reset(instance->x, instance->y, random_);
+            syncMainBuilderState();
         }
         return;
     case 1003: // gml_Object_objBuilder_Step_0

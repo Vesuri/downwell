@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_STARTUP_RUNTIME_H
 #define DOWNWELL_CORE_STARTUP_RUNTIME_H
 
+#include "AreaOneBuilder.h"
 #include "InstanceStore.h"
 #include "DeferredInstanceQueue.h"
 #include "GameMakerRandom.h"
@@ -208,6 +209,7 @@ private:
     void updateMainPlayer(InstanceRecord& instance);
     void updateMainCamera(InstanceRecord& instance);
     void updateMainBuilder(InstanceRecord& instance);
+    void syncMainBuilderState();
     bool mainPlayerCollides(float x, float y) const;
     bool mainSolidAt(float x, float y) const;
     bool moveMainPlayerAxis(float amount, bool horizontal);
@@ -342,6 +344,7 @@ private:
     std::uint32_t mainGameGemTotal_ = 0;
     std::uint32_t mainGemStreak_ = 0;
     std::uint32_t mainGemStreakTimer_ = 0;
+    AreaOneBuilder areaOneBuilder_;
     bool mainBuilderInitialized_ = false;
     int mainBuilderY_ = 704;
     int mainBuilderGenerationCount_ = -30;
