@@ -13,19 +13,17 @@
 #include "AmigaRenderer.h"
 #include "framework/AmigaHardware.h"
 #include "framework/AmigaMemory.h"
+#include "framework/AmigaPlatform.h"
+#include "framework/Bitmap.h"
 #include "framework/CopperList.h"
+#include "framework/Palette.h"
+#include "framework/Sprite.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/PortCheckpoint.h"
 #include "core/PortReplay.h"
 #include "core/RoomPack.h"
 #include "core/Replay.h"
-
-struct ExecBase* SysBase = 0;
-struct GfxBase* GfxBase = 0;
-
-static_assert(__builtin_offsetof(struct ExecBase, IntVects) == 84,
-              "ExecBase IntVects layout must match the VERTB takeover");
 
 extern "C" {
 extern const UBYTE amiga_hud_pack[];
@@ -69,10 +67,15 @@ static_assert(fetchStart == (displayHStart >> 1) - 8,
               "lores fetch/display alignment");
 
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
-static volatile UWORD vblankCount;
-static struct Interrupt vblankServer;
-static struct IntVector savedVblankVector;
 static volatile unsigned long long lastPortCheckpoint;
+
+static const uint16_t downwellPaletteData[20] = {
+    0x000, 0xfff, 0xf00, 0x000,
+    0x000, 0x000, 0x000, 0x000,
+    0x000, 0xfff, 0xf00, 0x000,
+    0x000, 0x000, 0x000, 0x000,
+    0x000, 0xfff, 0xf00, 0x000
+};
 
 #ifdef DOWNWELL_REPLAY_VERIFY
 extern "C" {
@@ -86,18 +89,6 @@ __attribute__((noinline, used)) void downwellReplayComplete(void) {
 }
 }
 #endif
-
-static ULONG vblankHandler(void) {
-    /* A raw IntVector owns acknowledgement; exec's server walker is absent. */
-    AmigaHardware::clearInterruptRequests(INTF_VERTB);
-    ++vblankCount;
-    return 0;
-}
-
-static void waitVblank(void) {
-    const UWORD start = vblankCount;
-    while (vblankCount == start) { }
-}
 
 static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
                       int anchorX, int anchorY, int flipX) {
@@ -262,41 +253,28 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
     amigaRendererClearClipRect(renderer);
 }
 
-static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
-                        const UWORD* playerSprite,
-                        const UWORD* bulletSprite,
-                        const UWORD* nullSprite,
+static bool buildCopper(CopperList& list,
+                        const Bitmap& game, const Bitmap& hud,
+                        const Sprite& playerSprite,
+                        const Sprite& bulletSprite,
+                        const Sprite& nullSprite,
+                        const Palette& palette,
                         unsigned ringOrigin) {
     unsigned channel;
     const unsigned firstSpan = downwellGameRingHeight - ringOrigin;
-    UBYTE* gameStart = game + ringOrigin * downwellBytesPerPlaneLine;
-
     list.reset();
-    list.move(AmigaHardware::bplcon0, 0x4401);
-    list.move(AmigaHardware::bpl1mod, fetchModulo);
-    list.move(AmigaHardware::bpl2mod, fetchModulo);
-    list.pointer(AmigaHardware::bpl1pth, gameStart + fetchCropBytes);
-    list.pointer(AmigaHardware::bpl1pth + 4, hud + fetchCropBytes);
-    list.pointer(AmigaHardware::bpl1pth + 8,
-                 gameStart + downwellGameRingPlaneBytes + fetchCropBytes);
-    list.pointer(AmigaHardware::bpl1pth + 12,
-                 hud + downwellPlaneBytes + fetchCropBytes);
+    list.move(bplcon0, 0x4401);
+    list.move(bpl1mod, fetchModulo);
+    list.move(bpl2mod, fetchModulo);
+    list.showBitmap(game, 1, 2, fetchCropBytes * 8, ringOrigin, 2);
+    list.showBitmap(hud, 2, 2, fetchCropBytes * 8, 0, 2);
 
-    list.pointer(AmigaHardware::spr0pth, playerSprite);
-    list.pointer(AmigaHardware::spr0pth + 4, bulletSprite);
+    list.showSprite(0, playerSprite);
+    list.showSprite(1, bulletSprite);
     for (channel = 2; channel < 8; ++channel)
-        list.pointer((UWORD)(AmigaHardware::spr0pth + channel * 4), nullSprite);
+        list.showSprite((UWORD)channel, nullSprite);
 
-    list.move(AmigaHardware::color00 + 0 * 2, 0x000);
-    list.move(AmigaHardware::color00 + 1 * 2, 0xfff);
-    list.move(AmigaHardware::color00 + 2 * 2, 0xf00);
-    list.move(AmigaHardware::color00 + 3 * 2, 0x000);
-    list.move(AmigaHardware::color00 + 9 * 2, 0xfff);
-    list.move(AmigaHardware::color00 + 10 * 2, 0xf00);
-    list.move(AmigaHardware::color00 + 11 * 2, 0x000);
-    list.move(AmigaHardware::color00 + 17 * 2, 0xfff);
-    list.move(AmigaHardware::color00 + 18 * 2, 0xf00);
-    list.move(AmigaHardware::color00 + 19 * 2, 0x000);
+    list.setPalette(palette);
 
     if (firstSpan < downwellDisplayHeight) {
         const unsigned resetAfterLine =
@@ -309,37 +287,25 @@ static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
         if (resetAfterLine > 255)
             list.wait(255, 0xdf);
         list.wait((UWORD)resetAfterLine, 0xdf);
-        list.pointer(AmigaHardware::bpl1pth, game + fetchCropBytes);
-        list.pointer(AmigaHardware::bpl1pth + 8,
-                     game + downwellGameRingPlaneBytes + fetchCropBytes);
+        list.showBitmap(game, 1, 2, fetchCropBytes * 8, 0, 2);
     }
 
     return list.finish();
 }
 
-static void hideHardwareSprite(UWORD* sprite) {
-    sprite[0] = 0;
-    sprite[1] = 0;
-}
-
-static void buildBulletSprite(UWORD* sprite, int x, int y) {
-    UBYTE* control = (UBYTE*)sprite;
+static void buildBulletSprite(Sprite& sprite, int x, int y) {
+    UWORD* data = sprite.data();
     const int startX = downwellDisplayHStart + x;
     const int startY = downwellDisplayVStart + y;
-    const int stopY = startY + bulletSpriteHeight;
     unsigned line;
-    control[0] = (UBYTE)startY;
-    control[1] = (UBYTE)(startX >> 1);
-    control[2] = (UBYTE)stopY;
-    control[3] = (UBYTE)((startX & 1) |
-                         (stopY > 255 ? 2 : 0) |
-                         (startY > 255 ? 4 : 0));
+    sprite.setX((uint16_t)startX);
+    sprite.setY((uint16_t)startY);
     for (line = 0; line < bulletSpriteHeight; ++line) {
-        sprite[2 + line * 2] = line < 2 ? 0xc000 : 0;
-        sprite[3 + line * 2] = 0xc000;
+        data[2 + line * 2] = line < 2 ? 0xc000 : 0;
+        data[3 + line * 2] = 0xc000;
     }
-    sprite[2 + bulletSpriteHeight * 2] = 0;
-    sprite[3 + bulletSpriteHeight * 2] = 0;
+    data[2 + bulletSpriteHeight * 2] = 0;
+    data[3 + bulletSpriteHeight * 2] = 0;
 }
 
 static void offsetHardwareSprite(UWORD* sprite, int deltaX, int deltaY) {
@@ -359,19 +325,14 @@ static void offsetHardwareSprite(UWORD* sprite, int deltaX, int deltaY) {
 }
 
 int main(void) {
-    struct View* savedView;
+    AmigaPlatform platform;
     AmigaMemory memory;
     AmigaRenderer renderer;
     unsigned front = 0;
     unsigned worldBottom;
     AmigaPortRuntime port(initialRingOrigin);
-    UWORD savedDmacon;
-    UWORD savedIntena;
-    const UWORD* osCopper;
 
-    SysBase = *(struct ExecBase**)4UL;
-    GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
-    if (!GfxBase)
+    if (!platform.available())
         return 1;
     const downwell::RoomPack rooms(
         amiga_room_pack,
@@ -393,8 +354,6 @@ int main(void) {
 #endif
         !builders.findPattern(downwell::BuilderPatternFamily::areaOneStart,
                               0, entrance)) {
-        CloseLibrary((struct Library*)GfxBase);
-        GfxBase = 0;
         return 1;
     }
     worldBottom = entrance.rowCount * 16u - 1u;
@@ -402,8 +361,6 @@ int main(void) {
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
                          bulletSpriteBytes)) {
-        CloseLibrary((struct Library*)GfxBase);
-        GfxBase = 0;
         return 1;
     }
 
@@ -411,6 +368,15 @@ int main(void) {
         CopperList(memory.copper(), copperWords),
         CopperList(memory.copper() + copperWords, copperWords)
     };
+    Bitmap gameBitmap(memory.game(), downwellVisibleWidth,
+                      downwellGameRingHeight, 2, false, false,
+                      downwellDmaWidth);
+    Bitmap hudBitmap(memory.hud(), downwellVisibleWidth,
+                     downwellDisplayHeight, 2, false, false,
+                     downwellDmaWidth);
+    Palette::initialize();
+    Palette palette(downwellPaletteData,
+                    sizeof(downwellPaletteData) / sizeof(downwellPaletteData[0]));
 
     amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
@@ -424,72 +390,36 @@ int main(void) {
             downwellPlayfieldX + 88, 192,
             memory.playerSprite(1), playerSpriteHeight)) {
         memory.release();
-        CloseLibrary((struct Library*)GfxBase);
-        GfxBase = 0;
         return 1;
     }
-    hideHardwareSprite(memory.bulletSprite());
-    if (!buildCopper(copperLists[0], memory.game(), memory.hud(),
-                     memory.playerSprite(0), memory.bulletSprite(),
-                     memory.nullSprite(),
+    Sprite playerSprites[2] = {
+        Sprite(memory.playerSprite(0), playerSpriteHeight),
+        Sprite(memory.playerSprite(1), playerSpriteHeight)
+    };
+    Sprite bulletSprite(memory.bulletSprite(), bulletSpriteHeight);
+    Sprite nullSprite(memory.nullSprite(), 0);
+    bulletSprite.hide();
+    if (!buildCopper(copperLists[0], gameBitmap, hudBitmap,
+                     playerSprites[0], bulletSprite, nullSprite, palette,
                      initialRingOrigin) ||
-        !buildCopper(copperLists[1], memory.game(), memory.hud(),
-                     memory.playerSprite(1), memory.bulletSprite(),
-                     memory.nullSprite(),
+        !buildCopper(copperLists[1], gameBitmap, hudBitmap,
+                     playerSprites[1], bulletSprite, nullSprite, palette,
                      initialRingOrigin)) {
         memory.release();
-        CloseLibrary((struct Library*)GfxBase);
-        GfxBase = 0;
         return 1;
     }
 
-    /*
-     * Follow the Rescue on Fractalus takeover boundary: all allocations and
-     * construction happen while the OS owns the machine. WaitTOF is used only
-     * to retire its display before the raw VERTB vector is installed.
-     */
-    savedView = GfxBase->ActiView;
-    osCopper = (const UWORD*)GfxBase->copinit;
-    savedDmacon = AmigaHardware::readRegister(AmigaHardware::dmaconr);
-    savedIntena = AmigaHardware::readRegister(AmigaHardware::intenar);
-    LoadView(0);
-    WaitTOF();
-    WaitTOF();
-    AmigaHardware::setDMAChannels(DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER,
-                                  false);
-    AmigaHardware::writeRegister(AmigaHardware::bplcon0, 0x0000);
-    AmigaHardware::setDisplay(displayHStart, displayHStop,
-                              displayVStart, displayVStop,
-                              fetchStart, fetchStop);
-
-    /* Nothing in this program consumes blit-done interrupts. */
-    AmigaHardware::setInterrupts(INTF_BLIT, false);
-    AmigaHardware::clearInterruptRequests(INTF_BLIT);
-
-    vblankServer.is_Node.ln_Type = NT_INTERRUPT;
-    vblankServer.is_Node.ln_Pri = 127;
-    vblankServer.is_Node.ln_Name = (char*)"Downwell VBI";
-    vblankServer.is_Data = 0;
-    vblankServer.is_Code = (void (*)())vblankHandler;
-    Disable();
-    savedVblankVector = SysBase->IntVects[INTB_VERTB];
-    SysBase->IntVects[INTB_VERTB].iv_Data = 0;
-    SysBase->IntVects[INTB_VERTB].iv_Code = (void (*)())vblankHandler;
-    SysBase->IntVects[INTB_VERTB].iv_Node = &vblankServer.is_Node;
-    Enable();
-
-    vblankCount = 0;
-    AmigaHardware::setCopperList(copperLists[0].data());
-    AmigaHardware::setInterrupts(INTF_INTEN | INTF_VERTB, true);
-    AmigaHardware::setDMAChannels(DMAF_MASTER | DMAF_COPPER |
-                                  DMAF_RASTER | DMAF_SPRITE, true);
-
-    /* No scheduling or OS calls are permitted inside the takeover window. */
-    Forbid();
-    while ((*ciaaPra & 0x40u) == 0) waitVblank();
+    if (!platform.takeover(copperLists[0],
+                           displayHStart, displayHStop,
+                           displayVStart, displayVStop,
+                           fetchStart, fetchStop)) {
+        memory.release();
+        return 1;
+    }
+    while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
     while ((*ciaaPra & 0x40u) != 0) {
         UBYTE packedInput;
-        waitVblank();
+        platform.waitVblank();
         {
 #ifdef DOWNWELL_REPLAY_VERIFY
             downwell::Input replayInput;
@@ -510,11 +440,11 @@ int main(void) {
             }
             if (result.bulletChanged) {
                 if (port.bulletActive())
-                    buildBulletSprite(memory.bulletSprite(),
+                    buildBulletSprite(bulletSprite,
                         downwellPlayfieldX + 80 + port.bulletX(),
                         200 + port.bulletY());
                 else
-                    hideHardwareSprite(memory.bulletSprite());
+                    bulletSprite.hide();
             }
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo());
@@ -524,14 +454,13 @@ int main(void) {
             ++worldBottom;
             drawRevealedGameLine(&renderer, builders, entrance,
                                  port.ringOrigin(), worldBottom);
-            if (!buildCopper(copperLists[back], memory.game(), memory.hud(),
-                             memory.playerSprite(
-                                 port.player().grounded() ? 0u : 1u),
-                             memory.bulletSprite(),
-                             memory.nullSprite(), port.ringOrigin()))
+            if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
+                             playerSprites[port.player().grounded() ? 0u : 1u],
+                             bulletSprite, nullSprite, palette,
+                             port.ringOrigin()))
                 break;
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
-            AmigaHardware::setCopperList(copperLists[back].data());
+            platform.publish(copperLists[back]);
             front = back;
         }
         lastPortCheckpoint = port.trajectoryDigest();
@@ -542,42 +471,12 @@ int main(void) {
             gReplayDigestLow = (ULONG)lastPortCheckpoint;
             gReplayComplete = 1;
             downwellReplayComplete();
-            for (;;) waitVblank();
+            for (;;) platform.waitVblank();
         }
 #endif
     }
 
-    /* Stop our interrupt and display before handing either back to exec. */
-    AmigaHardware::setInterrupts(INTF_VERTB, false);
-    AmigaHardware::clearInterruptRequests(INTF_VERTB);
-    AmigaHardware::setDMAChannels(DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER,
-                                  false);
-    AmigaHardware::writeRegister(AmigaHardware::bplcon0, 0x0000);
-
-    /* Restore graphics.library's startup copper, not merely its View list. */
-    AmigaHardware::setCopperList(osCopper, true);
-    AmigaHardware::writeRegister(AmigaHardware::bplcon3, 0x0c00);
-
-    Disable();
-    SysBase->IntVects[INTB_VERTB] = savedVblankVector;
-    Enable();
-
-    /* Restore the complete DMA and interrupt enable sets captured above. */
-    AmigaHardware::setDMAChannels(DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG,
-                                  false);
-    AmigaHardware::setDMAChannels(
-        (UWORD)(savedDmacon & (DMAF_ALL | DMAF_MASTER | DMAF_BLITHOG)), true);
-    AmigaHardware::setInterrupts(0x7fffu, false);
-    AmigaHardware::clearInterruptRequests(INTF_BLIT | INTF_VERTB);
-    AmigaHardware::setInterrupts((UWORD)(savedIntena & 0x7fffu), true);
-
-    Permit();
-    LoadView(savedView);
-    WaitTOF();
-    WaitTOF();
-
+    platform.restore();
     memory.release();
-    CloseLibrary((struct Library*)GfxBase);
-    GfxBase = 0;
     return 0;
 }

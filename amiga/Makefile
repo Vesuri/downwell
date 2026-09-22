@@ -12,7 +12,7 @@ REPLAY_VERIFY ?= 0
 
 CFLAGS := -g -O2 -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
-	-Wall -Wextra -Wpedantic -DDOWNWELL_PLATFORM_AMIGA
+	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA
 ifeq ($(REPLAY_VERIFY),1)
 CFLAGS += -DDOWNWELL_REPLAY_VERIFY
 endif
@@ -30,7 +30,8 @@ BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o \
 	obj/AmigaRenderer.o \
-	obj/AmigaHardware.o \
+	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
+	obj/GCCRuntime.o obj/AmigaPlatform.o \
 	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
 	obj/BuilderPatternPack.o obj/Replay.o \
 	obj/AmigaAssets.o \
@@ -76,6 +77,35 @@ obj/AmigaPortRuntime.o: $(AMIGA_SRC)/AmigaPortRuntime.cpp \
 
 obj/AmigaHardware.o: $(AMIGA_SRC)/framework/AmigaHardware.cpp \
 		$(AMIGA_SRC)/framework/AmigaHardware.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/Bitmap.o: $(AMIGA_SRC)/framework/Bitmap.cpp \
+		$(AMIGA_SRC)/framework/Bitmap.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/Palette.o: $(AMIGA_SRC)/framework/Palette.cpp \
+		$(AMIGA_SRC)/framework/Palette.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/Sprite.o: $(AMIGA_SRC)/framework/Sprite.cpp \
+		$(AMIGA_SRC)/framework/Sprite.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/Util.o: $(AMIGA_SRC)/framework/Util.cpp \
+		$(AMIGA_SRC)/framework/Util.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -Wno-narrowing -Wno-overflow -c -o $@ $<
+
+obj/GCCRuntime.o: $(AMIGA_SRC)/framework/GCCRuntime.cpp
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaPlatform.o: $(AMIGA_SRC)/framework/AmigaPlatform.cpp \
+		$(AMIGA_SRC)/framework/AmigaPlatform.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

@@ -7,10 +7,12 @@ The display is specified in `docs/amiga-display.md`: a 380x284 visible canvas
 on a 384-pixel DMA backing raster, with PF1 assigned to the centred game well
 and PF2 assigned to the HUD and side panels.
 
-The initial target is deliberately smaller than the general dA JoRMaS C++
-framework: it establishes the exact display and lifecycle directly, then will
-adopt proven framework pieces as the renderer needs them. Provenance is tracked
-in `UPSTREAM.md`.
+The target uses the reusable dA JoRMaS Amiga framework layer: hardware access,
+bitmap views, copper lists, palettes, sprites, utilities, GCC runtime support,
+and a Rescue-style platform takeover/restore shell. Downwell keeps its own game
+runtime and memory layout; the demo-production timeline, `Part` hierarchy, and
+tracker player are applications of the framework rather than platform services.
+Provenance and the deliberate adaptations are tracked in `UPSTREAM.md`.
 
 `AmigaRenderer` mirrors the important state transition in the shared renderer
 contract: setting a clip rectangle selects PF1 and limits game drawing to the
@@ -37,9 +39,8 @@ airborne press emits a bounded downward bullet on hardware sprite channel 1
 and redraws the side-panel ammo digit; channel 0 remains dedicated to the
 player.
 
-Its small `AmigaHardware` and `CopperList` classes are adapted from the proven
-sibling-port framework. Its machine lifecycle follows Rescue on Fractalus:
-allocation and the two
+Its machine lifecycle is owned by the shared-style `AmigaPlatform` class and
+follows Rescue on Fractalus: allocation and the two
 `WaitTOF()` calls which retire the Workbench display happen before takeover;
 the live program owns the raw VERTB vector, forbids multitasking, and waits on
 its own interrupt counter. Normal copper swaps publish COP1LC without a
