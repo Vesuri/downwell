@@ -31,9 +31,18 @@ int main() {
     require(runtime.scene() == AmigaScene::menu && runtime.menuPlayerNapping(),
             "sixth advance enters the sleeping menu scene");
 
+    for (int tick = 0; tick < 29; ++tick)
+        runtime.step(downwell::Input{});
     downwell::Input right;
     right.right = true;
-    for (int tick = 0; tick < 400 && runtime.scene() == AmigaScene::menu; ++tick)
+    runtime.step(right);
+    require(!runtime.menuPlayerNapping(),
+            "the first enabled direction input wakes the player");
+    for (int tick = 0; tick < 10; ++tick)
+        runtime.step(right);
+    require(runtime.menuPlayerX() == 123,
+            "menu acceleration reaches the recovered ten-tick position");
+    for (int tick = 0; tick < 600 && runtime.scene() == AmigaScene::menu; ++tick)
         runtime.step(right);
     require(runtime.scene() == AmigaScene::styleSelect,
             "walking into the well reaches style select");

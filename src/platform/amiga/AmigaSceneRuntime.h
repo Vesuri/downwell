@@ -62,7 +62,13 @@ private:
     bool menuNapping_;
     bool menuGrounded_;
     bool menuTeleport_;
-    int menuTeleportTimer_;
+    int menuTitleDelay_;
+    long menuTitleImage_;
+    int menuTitleReadyTimer_;
+    bool menuTitleReady_;
+    int menuSequenceDelay_;
+    bool menuEnterActive_;
+    int menuEnterBlackDelay_;
     int menuFacing_;
     int menuTitleFrame_;
     long menuX_;
@@ -71,6 +77,7 @@ private:
     long menuSpeedY_;
     long menuCameraX_;
     long menuCameraY_;
+    long menuCameraLockerY_;
     long menuEnterSpeedY_;
 
     long styleYOffset_;

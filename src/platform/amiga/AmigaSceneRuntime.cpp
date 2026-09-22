@@ -14,11 +14,15 @@ AmigaSceneRuntime::AmigaSceneRuntime()
     : scene_(AmigaScene::splash), tick_(0), priorLeft_(false),
       priorRight_(false), priorFire_(false), splashStage_(1),
       splashTimer_(10), menuTicks_(0), menuNapping_(true),
-      menuGrounded_(true), menuTeleport_(false), menuTeleportTimer_(0),
+      menuGrounded_(true), menuTeleport_(false), menuTitleDelay_(-1),
+      menuTitleImage_(0), menuTitleReadyTimer_(-1),
+      menuTitleReady_(false), menuSequenceDelay_(-1),
+      menuEnterActive_(false), menuEnterBlackDelay_(-1),
       menuFacing_(1), menuTitleFrame_(0), menuX_(112 * fixedOne),
       menuY_(menuGroundY), menuSpeedX_(0), menuSpeedY_(0),
       menuCameraX_(112 * fixedOne), menuCameraY_(512 * fixedOne),
-      menuEnterSpeedY_(0), styleYOffset_(-128 * fixedOne),
+      menuCameraLockerY_(448 * fixedOne), menuEnterSpeedY_(0),
+      styleYOffset_(-128 * fixedOne),
       styleTileY_(0), styleDitherY_(80 * fixedOne), styleRunFrame_(0),
       styleSmoothX_(0), styleCursor_(0), styleSelected_(false),
       stylePlayerDescent_(0), stylePlayerSpeedY_(0),
@@ -79,6 +83,8 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
     } else if (!menuTeleport_) {
         if (!controlsLocked && input.left != input.right) {
             menuSpeedX_ += input.left ? -51 : 51;
+            if (input.left && menuSpeedX_ > 0) menuSpeedX_ -= 512;
+            if (input.right && menuSpeedX_ < 0) menuSpeedX_ += 512;
             if (menuSpeedX_ < -512) menuSpeedX_ = -512;
             if (menuSpeedX_ > 512) menuSpeedX_ = 512;
             menuFacing_ = input.left ? -1 : 1;
@@ -104,32 +110,71 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
             if (menuY_ >= menuTeleportY) {
                 menuY_ = menuTeleportY;
                 menuTeleport_ = true;
-                menuTeleportTimer_ = 76;
                 menuSpeedX_ = 0;
                 menuSpeedY_ = 0;
             }
         }
     }
 
-    if (menuTitleFrame_ < 9 && menuX_ >= 272 * fixedOne) {
-        if ((menuTicks_ & 3U) == 0)
-            ++menuTitleFrame_;
+    const bool inCameraLocker =
+        menuX_ >= 238 * fixedOne && menuX_ <= 418 * fixedOne &&
+        menuY_ >= 248 * fixedOne && menuY_ <= 648 * fixedOne;
+    long targetX = menuX_;
+    if (inCameraLocker) {
+        targetX = 328 * fixedOne;
+    } else if (menuSpeedX_ != 0) {
+        targetX += 16 * fixedOne * menuFacing_;
+    }
+    if (targetX < 80 * fixedOne) targetX = 80 * fixedOne;
+    if (targetX > 336 * fixedOne) targetX = 336 * fixedOne;
+    const long targetY = inCameraLocker
+                             ? menuCameraLockerY_
+                             : menuY_ - 32 * fixedOne;
+    menuCameraX_ += (targetX - menuCameraX_) /
+                    (inCameraLocker ? 15 : 10);
+    menuCameraY_ += (targetY - menuCameraY_) / 5;
+    if (menuCameraY_ < 142 * fixedOne)
+        menuCameraY_ = 142 * fixedOne;
+
+    if (!menuNapping_ && menuTitleDelay_ < 0 && menuTitleImage_ == 0 &&
+        menuCameraX_ > 324 * fixedOne && menuCameraX_ < 332 * fixedOne)
+        menuTitleDelay_ = 15;
+    if (menuTitleDelay_ > 0) {
+        --menuTitleDelay_;
+    } else if (menuTitleDelay_ == 0 && menuTitleImage_ < 9 * fixedOne) {
+        menuTitleImage_ += 82;
+        if (menuTitleImage_ >= 9 * fixedOne) {
+            menuTitleImage_ = 9 * fixedOne;
+            menuTitleReadyTimer_ = 76;
+            menuTitleDelay_ = -2;
+        }
+        menuTitleFrame_ = (int)(menuTitleImage_ >> 8);
+    }
+    if (menuTitleReadyTimer_ > 0) {
+        --menuTitleReadyTimer_;
+        if (menuTitleReadyTimer_ == 0)
+            menuTitleReady_ = true;
     }
 
-    if (!menuTeleport_) {
-        const long targetX = menuX_;
-        menuCameraX_ += (targetX - menuCameraX_) / 10;
-        if (menuY_ > menuGroundY)
-            menuCameraY_ += (menuY_ - menuCameraY_) / 5;
-    } else if (menuTeleportTimer_ > 0) {
-        --menuTeleportTimer_;
-        if (menuTitleFrame_ < 9)
-            menuTitleFrame_ = 9;
-    } else {
-        menuEnterSpeedY_ += 64;
-        menuCameraY_ += menuEnterSpeedY_;
-        if (menuCameraY_ >= 1000 * fixedOne)
+    if (menuTeleport_ && menuTitleReady_ && !menuEnterActive_) {
+        if (menuSequenceDelay_ < 0)
+            menuSequenceDelay_ = 30;
+        else if (menuSequenceDelay_ > 0)
+            --menuSequenceDelay_;
+        else
+            menuEnterActive_ = true;
+    }
+    if (menuEnterActive_) {
+        if (menuCameraLockerY_ < 1000 * fixedOne) {
+            menuCameraLockerY_ += menuEnterSpeedY_;
+            menuEnterSpeedY_ += 64;
+        } else if (menuEnterBlackDelay_ < 0) {
+            menuEnterBlackDelay_ = 5;
+        } else if (menuEnterBlackDelay_ > 0) {
+            --menuEnterBlackDelay_;
+        } else {
             enterStyleSelect();
+        }
     }
 }
 
