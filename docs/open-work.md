@@ -110,5 +110,5 @@
 - [x] Establish PF1 as a copper-wrapped vertical circular buffer while PF2
   remains fixed for the HUD.
 - [x] Define the host/Amiga replay-input seam before gameplay code moves.
-- Cross-compile the shared simulation state digest and pin an Amiga replay
-  checkpoint against the host result.
+- [x] Cross-compile the shared state-digest primitive and pin the initial Amiga
+  port checkpoint against the host result.

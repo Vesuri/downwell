@@ -1,4 +1,5 @@
 #include "core/Replay.h"
+#include "core/PortCheckpoint.h"
 #include "core/StartupRuntime.h"
 #include <cstdlib>
 #include <iostream>
@@ -98,12 +99,19 @@ void testReplayProducesStableStartupState() {
             "startup state digest remains wire-stable");
 }
 
+void testPortCheckpointIsStable() {
+    require(downwell::portCheckpointDigest(50, 5, -12, 30) ==
+                0x2fa5462ba3ec64faULL,
+            "port checkpoint remains endian-stable");
+}
+
 } // namespace
 
 int main() {
     testInputPacking();
     testHeaderAndValidation();
     testReplayProducesStableStartupState();
+    testPortCheckpointIsStable();
     std::cout << "replay tests passed\n";
     return 0;
 }

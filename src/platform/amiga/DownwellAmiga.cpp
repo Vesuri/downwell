@@ -14,6 +14,7 @@
 #include "framework/CopperList.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
+#include "core/PortCheckpoint.h"
 #include "core/RoomPack.h"
 #include "core/Replay.h"
 
@@ -66,6 +67,7 @@ static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile UWORD vblankCount;
 static struct Interrupt vblankServer;
 static struct IntVector savedVblankVector;
+static volatile unsigned long long lastPortCheckpoint;
 
 static ULONG vblankHandler(void) {
     /* A raw IntVector owns acknowledgement; exec's server walker is absent. */
@@ -390,12 +392,14 @@ int main(void) {
     Forbid();
     while ((*ciaaPra & 0x40u) == 0) waitVblank();
     while ((*ciaaPra & 0x40u) != 0) {
+        UBYTE packedInput;
         waitVblank();
         ++frame;
         {
             const downwell::Input liveInput = AmigaInput::sample();
-            const UBYTE packed = downwell::packReplayInput(liveInput);
-            const downwell::Input input = downwell::unpackReplayInput(packed);
+            packedInput = downwell::packReplayInput(liveInput);
+            const downwell::Input input =
+                downwell::unpackReplayInput(packedInput);
             int movement = 0;
             if (input.left && !input.right && playerOffsetX > -60)
                 movement = -1;
@@ -420,6 +424,8 @@ int main(void) {
             AmigaHardware::setCopperList(copperLists[back].data());
             front = back;
         }
+        lastPortCheckpoint = downwell::portCheckpointDigest(
+            frame, packedInput, playerOffsetX, ringOrigin);
     }
 
     /* Stop our interrupt and display before handing either back to exec. */

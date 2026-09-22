@@ -38,7 +38,10 @@ public:
 private:
     void addByte(std::uint8_t value) {
         value_ ^= value;
-        value_ *= 1099511628211ULL;
+        /* FNV prime = 2^40 + 435, expanded for freestanding 32-bit targets. */
+        const std::uint64_t prior = value_;
+        value_ = (prior << 40) + (prior << 8) + (prior << 7) +
+                 (prior << 5) + (prior << 4) + (prior << 1) + prior;
     }
 
     std::uint64_t value_ = 14695981039346656037ULL;
