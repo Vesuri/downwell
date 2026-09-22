@@ -28,7 +28,7 @@ ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
-	obj/AmigaPortRuntime.o \
+	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/AmigaRenderer.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
 	obj/GCCRuntime.o obj/AmigaPlatform.o \
@@ -72,6 +72,11 @@ obj/AmigaPlayer.o: $(AMIGA_SRC)/AmigaPlayer.cpp $(AMIGA_SRC)/AmigaPlayer.h
 
 obj/AmigaPortRuntime.o: $(AMIGA_SRC)/AmigaPortRuntime.cpp \
 		$(AMIGA_SRC)/AmigaPortRuntime.h $(AMIGA_SRC)/AmigaPlayer.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaSceneRuntime.o: $(AMIGA_SRC)/AmigaSceneRuntime.cpp \
+		$(AMIGA_SRC)/AmigaSceneRuntime.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
