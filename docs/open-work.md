@@ -116,3 +116,5 @@
   grounded fire to jump plus a later airborne press to gunboot recoil.
 - [x] Emit the first native gunboot bullet on a dedicated hardware sprite and
   update the 4:3 side-panel ammo display when a charge is consumed.
+- [x] Run one canonical replay through the shared native-port runtime on the
+  host and an emulated 68000 A500, and require identical rolling state digests.

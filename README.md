@@ -35,6 +35,11 @@ make test
 make run
 ```
 
+The native player/scroll slice also has a real host-versus-emulated-A500 replay
+gate. With the Amiga toolchain and FS-UAE installed, run
+`make verify-cross-replay`; both targets must produce the pinned 64-frame
+trajectory digest before the normal interactive Amiga executable is rebuilt.
+
 The current executable runs a fixed 60 Hz model of the recovered startup path:
 the true `rmInit` entry room, desktop splash timing, and deterministic
 transition to `rmMenu`. `make run` regenerates the native room pack and loads

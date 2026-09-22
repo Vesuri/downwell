@@ -8,10 +8,14 @@ SDKDIR   := $(abspath $(dir $(shell which $(CC)))../m68k-amiga-elf/sys-include)
 SUPPORT  := $(abspath $(dir $(shell which $(CC)))../../support)
 REPO     := ..
 AMIGA_SRC := $(REPO)/src/platform/amiga
+REPLAY_VERIFY ?= 0
 
 CFLAGS := -g -O2 -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DDOWNWELL_PLATFORM_AMIGA
+ifeq ($(REPLAY_VERIFY),1)
+CFLAGS += -DDOWNWELL_REPLAY_VERIFY
+endif
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
 	-I$(AMIGA_SRC)/compat -I$(REPO)/src
@@ -52,7 +56,8 @@ $(OUT).elf: $(OBJECTS)
 	$(OBJDUMP) --disassemble --no-show-raw-ins -S $@ > $(OUT).s
 	@$(MAKE) --no-print-directory audit
 
-obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp
+obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
+		$(REPO)/src/core/PortReplay.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

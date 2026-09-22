@@ -51,3 +51,8 @@ It exits back to Workbench on a fresh left-mouse click.
 PAL timing is intentionally direct: one simulation step will run per 50 Hz
 VERTB. There is no 60-to-50 Hz catch-up scheduler, so the preserved per-step
 game behavior runs at five-sixths of the Windows version's wall-clock speed.
+
+`make verify-cross-replay` replaces joystick sampling only in a temporary
+verification build, executes the shared 64-frame replay on an emulated A500,
+and compares its rolling native-state digest with the host result. The normal
+68000 executable is rebuilt immediately after a passing comparison.

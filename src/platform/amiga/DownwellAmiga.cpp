@@ -17,6 +17,7 @@
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/PortCheckpoint.h"
+#include "core/PortReplay.h"
 #include "core/RoomPack.h"
 #include "core/Replay.h"
 
@@ -72,6 +73,19 @@ static volatile UWORD vblankCount;
 static struct Interrupt vblankServer;
 static struct IntVector savedVblankVector;
 static volatile unsigned long long lastPortCheckpoint;
+
+#ifdef DOWNWELL_REPLAY_VERIFY
+extern "C" {
+volatile ULONG gReplayComplete;
+volatile ULONG gReplayFrames;
+volatile ULONG gReplayDigestHigh;
+volatile ULONG gReplayDigestLow;
+
+__attribute__((noinline, used)) void downwellReplayComplete(void) {
+    __asm__ volatile("" ::: "memory");
+}
+}
+#endif
 
 static ULONG vblankHandler(void) {
     /* A raw IntVector owns acknowledgement; exec's server walker is absent. */
@@ -368,8 +382,15 @@ int main(void) {
     const downwell::BuilderPatternPack builders(
         amiga_builder_pack,
         (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
+#ifdef DOWNWELL_REPLAY_VERIFY
+    const downwell::ReplayReader verificationReplay(
+        downwell::portReplayBytes, downwell::portReplaySize);
+#endif
     downwell::PackedBuilderPattern entrance;
     if (!rooms.valid() || !objects.valid() || !builders.valid() ||
+#ifdef DOWNWELL_REPLAY_VERIFY
+        !verificationReplay.valid() ||
+#endif
         !builders.findPattern(downwell::BuilderPatternFamily::areaOneStart,
                               0, entrance)) {
         CloseLibrary((struct Library*)GfxBase);
@@ -470,8 +491,15 @@ int main(void) {
         UBYTE packedInput;
         waitVblank();
         {
+#ifdef DOWNWELL_REPLAY_VERIFY
+            downwell::Input replayInput;
+            if (!verificationReplay.frame(port.tick(), replayInput))
+                break;
+            packedInput = downwell::packReplayInput(replayInput);
+#else
             const downwell::Input liveInput = AmigaInput::sample();
             packedInput = downwell::packReplayInput(liveInput);
+#endif
             const AmigaPortFrame result = port.step(packedInput);
             const AmigaPlayerMotion motion = result.playerMotion;
             if (motion.deltaX || motion.deltaY) {
@@ -507,6 +535,16 @@ int main(void) {
             front = back;
         }
         lastPortCheckpoint = port.trajectoryDigest();
+#ifdef DOWNWELL_REPLAY_VERIFY
+        if (port.tick() == verificationReplay.frameCount()) {
+            gReplayFrames = port.tick();
+            gReplayDigestHigh = (ULONG)(lastPortCheckpoint >> 32);
+            gReplayDigestLow = (ULONG)lastPortCheckpoint;
+            gReplayComplete = 1;
+            downwellReplayComplete();
+            for (;;) waitVblank();
+        }
+#endif
     }
 
     /* Stop our interrupt and display before handing either back to exec. */

@@ -63,9 +63,11 @@ AMIGA_PLAYER_TEST_TARGET := build/amiga-player-test
 AMIGA_PLAYER_TEST_SOURCES := tests/platform/amiga/AmigaPlayerTest.cpp src/platform/amiga/AmigaPlayer.cpp
 AMIGA_PORT_TEST_TARGET := build/amiga-port-runtime-test
 AMIGA_PORT_TEST_SOURCES := tests/platform/amiga/AmigaPortRuntimeTest.cpp src/platform/amiga/AmigaPortRuntime.cpp src/platform/amiga/AmigaPlayer.cpp src/core/Replay.cpp
+PORT_REPLAY_REFERENCE_TARGET := build/port-replay-reference
+PORT_REPLAY_REFERENCE_SOURCES := tools/port-replay-reference.cpp src/platform/amiga/AmigaPortRuntime.cpp src/platform/amiga/AmigaPlayer.cpp src/core/Replay.cpp
 TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET) $(INSTANCE_TEST_TARGET) $(EVENT_TEST_TARGET) $(ROOM_TEST_TARGET) $(ROOM_PACK_TEST_TARGET) $(OBJECT_PACK_TEST_TARGET) $(SPRITE_PACK_TEST_TARGET) $(FONT_PACK_TEST_TARGET) $(BUILDER_PATTERN_PACK_TEST_TARGET) $(DEFERRED_INSTANCE_TEST_TARGET) $(RANDOM_TEST_TARGET) $(PLAYER_COLLISION_TEST_TARGET) $(GAME_RENDER_TEST_TARGET) $(HUD_NUMBER_TEST_TARGET) $(AMIGA_PLAYER_TEST_TARGET) $(AMIGA_PORT_TEST_TARGET)
 
-.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack generate-builder-pattern-pack verify-builder-pattern-pack generate-amiga-hud verify-amiga-hud generate-amiga-game verify-amiga-game verify-native-data amiga clean
+.PHONY: all run test extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack generate-builder-pattern-pack verify-builder-pattern-pack generate-amiga-hud verify-amiga-hud generate-amiga-game verify-amiga-game verify-native-data verify-cross-replay amiga clean
 
 all: $(TARGET)
 
@@ -152,6 +154,10 @@ $(AMIGA_PORT_TEST_TARGET): $(AMIGA_PORT_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(AMIGA_PORT_TEST_SOURCES)
 
+$(PORT_REPLAY_REFERENCE_TARGET): $(PORT_REPLAY_REFERENCE_SOURCES)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(PORT_REPLAY_REFERENCE_SOURCES)
+
 test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)
@@ -229,6 +235,11 @@ verify-amiga-game: generate-amiga-game
 
 verify-native-data: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(STARTUP_TEST_TARGET)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+
+verify-cross-replay: $(PORT_REPLAY_REFERENCE_TARGET)
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga REPLAY_VERIFY=1'
+	bash -c '. amiga/env.sh && amiga/verify_replay.sh ../$(PORT_REPLAY_REFERENCE_TARGET)'
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'
