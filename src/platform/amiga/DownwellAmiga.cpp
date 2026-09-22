@@ -26,6 +26,10 @@
 #include "core/RoomPack.h"
 #include "core/Replay.h"
 
+inline void* operator new(__SIZE_TYPE__, void* address) noexcept {
+    return address;
+}
+
 extern "C" {
 extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
@@ -40,7 +44,7 @@ extern const UBYTE amiga_builder_pack_end[];
 }
 
 enum {
-    copperWords = 128,
+    copperWords = 160,
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
     bulletSpriteHeight = 8,
@@ -79,6 +83,9 @@ struct TerrainCollisionContext {
     const AmigaPortRuntime* runtime;
 };
 
+alignas(AmigaPortRuntime)
+static UBYTE portRuntimeStorage[sizeof(AmigaPortRuntime)];
+
 enum { nativeFragmentCount = 5, nativeBreakableCapacity = 96 };
 
 static TerrainCollisionContext terrainCollision;
@@ -107,6 +114,13 @@ static const uint16_t downwellPaletteData[32] = {
     0x000, 0xfff, 0xf00, 0x000,
     0x000, 0xfff, 0xf00, 0x000
 };
+
+static_assert(
+    copperWords >=
+        6u + 16u + 32u +
+        2u * (sizeof(downwellPaletteData) / sizeof(downwellPaletteData[0])) +
+        4u + 8u + 2u,
+    "copper storage must cover registers, planes, sprites, palette and split");
 
 #ifdef DOWNWELL_REPLAY_VERIFY
 extern "C" {
@@ -721,10 +735,11 @@ int main(void) {
     unsigned front = 0;
     int worldViewY = mainInitialViewY;
 #ifdef DOWNWELL_REPLAY_VERIFY
-    AmigaPortRuntime port(initialRingOrigin);
+    AmigaPortRuntime& port = *new (portRuntimeStorage)
+        AmigaPortRuntime(initialRingOrigin);
 #else
-    AmigaPortRuntime port(initialRingOrigin, false,
-                          1201 - 176, true);
+    AmigaPortRuntime& port = *new (portRuntimeStorage)
+        AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true);
 #endif
 #ifndef DOWNWELL_REPLAY_VERIFY
     AmigaSceneRuntime scenes;
@@ -780,8 +795,8 @@ int main(void) {
     };
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
-        int breakableX[nativeBreakableCapacity];
-        int breakableY[nativeBreakableCapacity];
+        static int breakableX[nativeBreakableCapacity];
+        static int breakableY[nativeBreakableCapacity];
         unsigned breakableCount = 0;
         for (unsigned fragment = 0;
              fragment < nativeFragmentCount; ++fragment)
