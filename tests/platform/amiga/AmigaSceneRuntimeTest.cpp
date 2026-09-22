@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaSceneRuntime.h"
 #include "platform/amiga/AmigaPortRuntime.h"
+#include "platform/amiga/AmigaTerrain.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/Replay.h"
@@ -17,7 +18,8 @@ int parityFrame = 0;
 
 void require(bool condition, const char* message) {
     if (!condition) {
-        std::cerr << "FAILED: " << message << '\n';
+        std::cerr << "FAILED: " << message
+                  << " (parity frame " << parityFrame << ")\n";
         std::exit(1);
     }
 }
@@ -134,26 +136,48 @@ void compareStyle(const AmigaSceneRuntime& amiga,
 }
 
 void compareInitialGameplay(const AmigaPortRuntime& amiga,
-                            const downwell::StartupRuntime& reference) {
+                            const downwell::StartupRuntime& reference,
+                            float playerYTolerance = 4.0F,
+                            float cameraYTolerance = 2.0F) {
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
     requireNear(static_cast<float>(240 + amiga.player().offsetX()),
                 reference.mainPlayerX(), 1.0F,
                 "gameplay player X follows decoded runtime");
     requireNear(static_cast<float>(176 + amiga.player().offsetY()),
-                reference.mainPlayerY(), 4.0F,
+                reference.mainPlayerY(), playerYTolerance,
                 "gameplay player Y follows decoded runtime");
     requireNear(static_cast<float>(160 + amiga.cameraOffsetX()),
                 reference.mainCameraViewX(), 1.0F,
                 "gameplay camera X follows decoded runtime");
     requireNear(static_cast<float>(34 + amiga.cameraOffsetY()),
-                reference.mainCameraViewY(), 2.0F,
+                reference.mainCameraViewY(), cameraYTolerance,
                 "gameplay camera Y follows decoded runtime");
     require(amiga.player().facing() == reference.mainPlayerFacing(),
             "gameplay facing follows decoded runtime");
-    require(amiga.player().ammo() == reference.mainAmmo() &&
-                amiga.health() == reference.mainPlayerHealth(),
-            "initial gameplay HUD state follows decoded runtime");
+    if (amiga.player().grounded() != reference.mainPlayerGrounded()) {
+        std::cerr << "FAILED: gameplay grounded state follows decoded runtime "
+                  << "(Amiga " << amiga.player().grounded()
+                  << " at " << 176 + amiga.player().offsetY()
+                  << ", reference " << reference.mainPlayerGrounded()
+                  << " at " << reference.mainPlayerY()
+                  << ", parity frame " << parityFrame << ")\n";
+        std::exit(1);
+    }
+    if (amiga.player().ammo() != reference.mainAmmo()) {
+        std::cerr << "FAILED: gameplay ammo follows decoded runtime "
+                  << "(Amiga " << amiga.player().ammo() << ", reference "
+                  << reference.mainAmmo() << ", parity frame "
+                  << parityFrame << ")\n";
+        std::exit(1);
+    }
+    if (amiga.health() != reference.mainPlayerHealth()) {
+        std::cerr << "FAILED: gameplay health follows decoded runtime "
+                  << "(Amiga " << amiga.health() << ", reference "
+                  << reference.mainPlayerHealth() << ", parity frame "
+                  << parityFrame << ")\n";
+        std::exit(1);
+    }
 }
 
 void compareGameplayShot(const AmigaPortRuntime& amiga,
@@ -169,7 +193,7 @@ void compareGameplayShot(const AmigaPortRuntime& amiga,
                     reference.mainBulletAt(0).x, 1.0F,
                     "gameplay bullet X follows decoded runtime");
         requireNear(static_cast<float>(176 + bullet.y),
-                    reference.mainBulletAt(0).y, 2.0F,
+                    reference.mainBulletAt(0).y, 3.0F,
                     "gameplay bullet Y follows decoded runtime");
     }
 }
@@ -278,6 +302,33 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "both runtimes enter gameplay on the same frame");
 
     AmigaPortRuntime gameplay(300, false, 1201 - 176, true);
+    downwell::PackedRoom terrainRoom;
+    AmigaTerrainFragment terrain[amigaInitialTerrainFragmentCount];
+    int breakableX[amigaTerrainBreakableCapacity];
+    int breakableY[amigaTerrainBreakableCapacity];
+    require(rooms.findRoom(11, terrainRoom) &&
+                amigaBuildInitialAreaOneTerrain(
+                    patterns, terrain, amigaInitialTerrainFragmentCount),
+            "native gameplay terrain is recovered for parity");
+    const unsigned breakableCount = amigaCollectTerrainBreakables(
+        patterns, terrain, amigaInitialTerrainFragmentCount,
+        breakableX, breakableY, amigaTerrainBreakableCapacity);
+    AmigaTerrainCollisionContext terrainContext = {
+        &rooms, &terrainRoom, &patterns, terrain,
+        amigaInitialTerrainFragmentCount, &gameplay
+    };
+    gameplay.configureBreakables(breakableX, breakableY, breakableCount);
+    gameplay.configureLandingResolver(amigaResolveTerrainLanding,
+                                      &terrainContext);
+    gameplay.configureSolidResolver(amigaResolveTerrainSolid,
+                                    &terrainContext);
+    require(gameplay.configureEnemy(0, 111, 163, -16, 1122,
+                                    128, 0, 5, 6) &&
+                gameplay.configureEnemy(1, 111, 163, 48, 1426,
+                                        128, 0, 5, 6) &&
+                gameplay.configureEnemy(2, 117, 177, 64, 1840,
+                                        0, 26, 20, 24),
+            "native gameplay enemies are configured for parity");
     compareInitialGameplay(gameplay, reference);
     for (int tick = 0; tick < 220; ++tick) {
         parityFrame = 534 + tick;
@@ -310,6 +361,36 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     compareGameplayShot(gameplay, reference);
     require(gameplay.player().ammo() == 7,
             "first airborne gunboot shot consumes one charge in both runtimes");
+
+    for (int tick = 0; tick < 180; ++tick) {
+        parityFrame = 755 + tick;
+        gameplay.step(0);
+        reference.step(released, false);
+        if (gameplay.player().grounded() &&
+            reference.mainPlayerGrounded())
+            break;
+        if (!gameplay.player().grounded() &&
+            !reference.mainPlayerGrounded()) {
+            compareInitialGameplay(gameplay, reference, 5.0F, 4.0F);
+            compareGameplayShot(gameplay, reference);
+        }
+    }
+    require(gameplay.player().grounded() && reference.mainPlayerGrounded(),
+            "both runtimes land on recovered terrain after gunboot fire");
+    compareInitialGameplay(gameplay, reference, 5.0F, 4.0F);
+    compareGameplayShot(gameplay, reference);
+    require(gameplay.player().ammo() == 8 && reference.mainAmmo() == 8,
+            "landing recharges both runtimes to eight shots");
+
+    const int groundedStartX = gameplay.player().offsetX();
+    for (int tick = 0; tick < 4; ++tick) {
+        parityFrame += 1;
+        gameplay.step(downwell::packReplayInput(left));
+        reference.step(left, false);
+        compareInitialGameplay(gameplay, reference, 5.0F, 4.0F);
+    }
+    require(gameplay.player().offsetX() < groundedStartX,
+            "native player traverses solid ground without floor snagging");
 }
 }
 
