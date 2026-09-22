@@ -140,28 +140,46 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
     drawAsset(renderer, 413, digit, x, y, 0);
 }
 
-static void drawHorizontalTiles(AmigaRenderer* renderer,
-                                int firstX, int y, int count) {
-    int index;
-    for (index = 0; index < count; ++index) {
-        unsigned frame = 10;
-        if (index == 0) frame = 2;
-        if (index == count - 1) frame = 8;
-        if (count == 1) frame = 0;
-        drawGameAsset(renderer, 51, frame, firstX + index * 16, y, 0);
+static bool isTerrainSymbol(char symbol) {
+    return symbol == '1' || symbol == '2' || symbol == '3' ||
+           symbol == 'B' || symbol == '-' || symbol == '|';
+}
+
+static void drawEntrancePattern(AmigaRenderer* renderer,
+                                const downwell::BuilderPatternPack& builders,
+                                const downwell::PackedBuilderPattern& pattern) {
+    const int baseY = downwellDisplayHeight - pattern.rowCount * 16;
+    unsigned row;
+    for (row = 0; row < pattern.rowCount; ++row) {
+        ULONG width = 0;
+        unsigned column;
+        if (!builders.rowWidth(pattern, (UWORD)row, width))
+            return;
+        for (column = 0; column < width; ++column) {
+            char symbol = 0;
+            if (!builders.cell(pattern, (UWORD)column, (UWORD)row, symbol))
+                return;
+            if (isTerrainSymbol(symbol))
+                drawGameAsset(renderer, 51, 0,
+                              downwellPlayfieldX + 8 + column * 16,
+                              baseY + row * 16, 0);
+            if (symbol == 'd')
+                drawGameAsset(renderer, 166, 0,
+                              downwellPlayfieldX + 8 + column * 16,
+                              baseY + row * 16, 0);
+        }
     }
 }
 
-static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
+static void buildReferencePicture(
+    AmigaRenderer* renderer,
+    const downwell::BuilderPatternPack& builders,
+    const downwell::PackedBuilderPattern& entrance) {
 
     amigaRendererClear(renderer, 0);
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
                             downwellPlayfieldWidth, downwellDisplayHeight);
-    drawHorizontalTiles(renderer, downwellPlayfieldX + 8, 228, 10);
-    drawHorizontalTiles(renderer, downwellPlayfieldX + 56, 180, 4);
-    drawHorizontalTiles(renderer, downwellPlayfieldX + 8, 116, 3);
-    drawHorizontalTiles(renderer, downwellPlayfieldX + 120, 100, 3);
-    (void)phase;
+    drawEntrancePattern(renderer, builders, entrance);
 
     amigaRendererClearClipRect(renderer);
     drawAsset(renderer, 408, 0, 108, 0, 0);
@@ -181,9 +199,16 @@ static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
 }
 
 static void drawRevealedGameLine(AmigaRenderer* renderer,
+                                 const downwell::BuilderPatternPack& builders,
+                                 const downwell::PackedBuilderPattern& pattern,
                                  unsigned ringOrigin,
                                  unsigned worldY) {
     const int y = downwellDisplayHeight - 1;
+    const unsigned patternY = worldY % (pattern.rowCount * 16u);
+    const UWORD row = (UWORD)(patternY >> 4);
+    const unsigned line = patternY & 15u;
+    ULONG width = 0;
+    unsigned column;
     amigaRendererSetGameOrigin(renderer, ringOrigin);
     amigaRendererClearGameRows(renderer, y, 1, 0);
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
@@ -195,10 +220,21 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
                           downwellPlayfieldX + downwellPlayfieldWidth - 2,
                           y, 2, 1, 1);
 
-    /* A sparse marker makes the one-line update path visible in the scaffold. */
-    if ((worldY & 63u) < 4u)
-        amigaRendererFillRect(renderer, downwellPlayfieldX + 32,
-                              y, downwellPlayfieldWidth - 64, 1, 1);
+    if (builders.rowWidth(pattern, row, width)) {
+        for (column = 0; column < width; ++column) {
+            char symbol = 0;
+            if (!builders.cell(pattern, (UWORD)column, row, symbol))
+                break;
+            if (isTerrainSymbol(symbol))
+                amigaRendererFillRect(renderer,
+                    downwellPlayfieldX + 8 + column * 16,
+                    y, 16, 1, 1);
+            if (symbol == '_' && line < 2u)
+                amigaRendererFillRect(renderer,
+                    downwellPlayfieldX + 8 + column * 16,
+                    y, 16, 1, 1);
+        }
+    }
     amigaRendererClearClipRect(renderer);
 }
 
@@ -255,19 +291,6 @@ static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
     return list.finish();
 }
 
-static bool validateNativeData(void) {
-    const downwell::RoomPack rooms(
-        amiga_room_pack,
-        (unsigned long)(amiga_room_pack_end - amiga_room_pack));
-    const downwell::ObjectPack objects(
-        amiga_object_pack,
-        (unsigned long)(amiga_object_pack_end - amiga_object_pack));
-    const downwell::BuilderPatternPack builders(
-        amiga_builder_pack,
-        (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
-    return rooms.valid() && objects.valid() && builders.valid();
-}
-
 static void offsetHardwareSprite(UWORD* sprite, int deltaX, int deltaY) {
     UBYTE* control = (UBYTE*)sprite;
     int startX = ((int)control[1] << 1) | (control[3] & 1);
@@ -291,7 +314,7 @@ int main(void) {
     unsigned frame = 0;
     unsigned front = 0;
     unsigned ringOrigin = initialRingOrigin;
-    unsigned worldBottom = downwellDisplayHeight - 1;
+    unsigned worldBottom;
     int playerOffsetX = 0;
     UWORD savedDmacon;
     UWORD savedIntena;
@@ -301,11 +324,24 @@ int main(void) {
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
     if (!GfxBase)
         return 1;
-    if (!validateNativeData()) {
+    const downwell::RoomPack rooms(
+        amiga_room_pack,
+        (unsigned long)(amiga_room_pack_end - amiga_room_pack));
+    const downwell::ObjectPack objects(
+        amiga_object_pack,
+        (unsigned long)(amiga_object_pack_end - amiga_object_pack));
+    const downwell::BuilderPatternPack builders(
+        amiga_builder_pack,
+        (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
+    downwell::PackedBuilderPattern entrance;
+    if (!rooms.valid() || !objects.valid() || !builders.valid() ||
+        !builders.findPattern(downwell::BuilderPatternFamily::areaOneStart,
+                              0, entrance)) {
         CloseLibrary((struct Library*)GfxBase);
         GfxBase = 0;
         return 1;
     }
+    worldBottom = entrance.rowCount * 16u - 1u;
 
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes)) {
@@ -321,7 +357,7 @@ int main(void) {
 
     amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
-    buildReferencePicture(&renderer, 0);
+    buildReferencePicture(&renderer, builders, entrance);
     if (!amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 31, 0,
             downwellPlayfieldX + 80, 200,
@@ -415,7 +451,8 @@ int main(void) {
             const unsigned back = front ^ 1u;
             ringOrigin = (ringOrigin + 1u) % downwellGameRingHeight;
             ++worldBottom;
-            drawRevealedGameLine(&renderer, ringOrigin, worldBottom);
+            drawRevealedGameLine(&renderer, builders, entrance,
+                                 ringOrigin, worldBottom);
             if (!buildCopper(copperLists[back], memory.game(), memory.hud(),
                              memory.playerSprite((frame >> 4) & 1u),
                              memory.nullSprite(), ringOrigin))

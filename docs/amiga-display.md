@@ -89,8 +89,10 @@ The scaffold exercises this contract continuously: every other PAL frame it
 draws one hidden bottom row, advances the ring origin by one, rebuilds the
 inactive copper list with the new top and wrap pointers, and publishes that
 list for the following vertical blank. It never copies or scrolls the raster
-contents. Gameplay will replace the scaffold's sparse row marker with recovered
-16-pixel terrain bands while retaining the same publication path.
+contents. The row producer decodes the selected entrance fragment directly from
+the recovered builder-pattern pack and emits its terrain symbols one scanline
+at a time. Later gameplay state will choose and sequence fragments while
+retaining the same publication path.
 
 The first hardware milestone is a four-plane copper display which proves the
 crop, palettes, priorities, null sprites, and central aperture before it tries
