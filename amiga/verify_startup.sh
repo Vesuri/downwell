@@ -18,13 +18,17 @@ READY_DESCRIPTION="${READY_DESCRIPTION:-splash and hardware-sprite menu loop}"
 [ -f out/Downwell.exe ] || { echo "normal build not found"; exit 1; }
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM"; exit 1; }
 
+# Claiming the debugger port also stops the prior project emulator.  Do that
+# before touching its mounted host directories, for the same reason as the
+# normal run script.
+fsuae_claim_port
+
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
 printf 'cd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f out/Downwell.exe "$DH1/Downwell"
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log"
 
-fsuae_claim_port
 cleanup() {
   fsuae_stop
 }

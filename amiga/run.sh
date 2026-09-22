@@ -13,6 +13,13 @@ EXE="${DOWNWELL_EXE:-out/Downwell.exe}"
 RUN=.run
 DH0="$RUN/dh0"
 DH1="$RUN/dh1"
+
+# The previous emulator still has these host directories mounted.  Stop it
+# before replacing either the startup sequence or the executable, otherwise
+# it can observe the new file while cp is still writing it (or leave the user
+# looking at the old AmigaDOS prompt).
+fsuae_stop_previous
+
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
 printf 'cd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f "$EXE" "$DH1/Downwell"
@@ -26,7 +33,6 @@ SHOTS="${FSEMU_SCREENSHOTS_DIR:-$HOME/Pictures/Screenshots}"
 mkdir -p "$SHOTS"
 export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
-fsuae_stop_previous
 fsuae_track_self
 exec "$FSUAE" \
   --amiga_model="${AMIGA_MODEL:-A500}" \
