@@ -24,14 +24,16 @@ enum {
     displayVStart = downwellDisplayVStart,
     displayVStop = displayVStart + downwellDisplayHeight,
     fetchWords = downwellDmaWidth / 16,
-    fetchStart = 0x28,
+    fetchStart = 0x20,
     fetchStop = fetchStart + 8 * (fetchWords - 1)
 };
 
-_Static_assert(displayHStop == 0x1e1, "384-pixel display window");
+_Static_assert(displayHStop == 0x1d1, "384-pixel display window");
 _Static_assert(displayVStop == 0x12e, "284-line display window");
 _Static_assert(fetchWords == 24, "384-pixel DMA fetch");
-_Static_assert(fetchStop == 0xe0, "24-word lores fetch stride");
+_Static_assert(fetchStop == 0xd8, "24-word lores fetch at hardware limit");
+_Static_assert(fetchStart == (displayHStart >> 1) - 8,
+               "lores fetch/display alignment");
 
 static volatile UWORD* const custom = (volatile UWORD*)0xdff000;
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;

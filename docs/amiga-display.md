@@ -16,6 +16,12 @@ The display setup must derive and assert its DIW and DDF values in one place.
 The intended OCS/ECS 16-bit fetch is 24 words per line; it must not inherit an
 AGA fetch mode from the operating system.
 
+The 24-word fetch is positioned at DDFSTRT=$20 and DDFSTOP=$D8, the documented
+rightmost hardware limit. Its matching 384-pixel window is HSTART=$51 through
+HSTOP=$1D1. A fetch at $28..$E0 is not equivalent: the hardware clips it at
+$D8, consumes only 46 bytes, and produces a two-byte scanline skew against a
+48-byte plane.
+
 ## Dual playfield ownership
 
 Four lores bitplanes are split 2+2:
