@@ -15,6 +15,7 @@
 #include "AmigaPortRuntime.h"
 #include "AmigaRenderer.h"
 #include "AmigaSceneRuntime.h"
+#include "AmigaStyleRenderer.h"
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
 #include "framework/AmigaMemory.h"
@@ -567,70 +568,6 @@ static void drawMenu(AmigaRenderer* renderer,
     amigaRendererClearClipRect(renderer);
 }
 
-static void drawStyleSelect(AmigaRenderer* renderer,
-                            const AmigaSceneRuntime& scenes) {
-    const int centerY = downwellDisplayHeight / 2 + scenes.styleYOffset();
-    const int smoothX = scenes.styleSmoothX();
-    int style;
-    int row;
-    amigaRendererClear(renderer, 0);
-    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
-                            downwellPlayfieldWidth, downwellDisplayHeight);
-    if (!scenes.styleSelected()) {
-        for (style = 0; style < 5; ++style) {
-            const int drawX = 80 + style * 48 - smoothX;
-            const int distance = drawX - 80;
-            const int drawY = centerY - 14 - distance * distance / 200;
-            drawGameAsset(renderer, style == 0 ? 27 : 43,
-                          style == scenes.styleCursor()
-                              ? (UWORD)scenes.styleRunFrame() : 0,
-                          downwellPlayfieldX + drawX, drawY, 0);
-        }
-        for (row = 0; row <= 36; ++row) {
-            drawGameAsset(renderer, 51, 13, downwellPlayfieldX,
-                          scenes.styleTileY() + row * 16, 0);
-            drawGameAsset(renderer, 51, 7,
-                          downwellPlayfieldX + downwellPlayfieldWidth,
-                          scenes.styleTileY() + row * 16, 0);
-        }
-        if (scenes.styleCursor() < 4)
-            drawGameAsset(renderer, 44, 0, downwellPlayfieldX + 96,
-                          centerY - 10, 0);
-        if (scenes.styleCursor() > 0)
-            drawGameAsset(renderer, 44, 0, downwellPlayfieldX + 64,
-                          centerY - 10, 1);
-        drawGameText(renderer, 65000, downwellPlayfieldX + 80,
-                     centerY - 70);
-        drawGameText(renderer, scenes.styleCursor() == 0 ? 65001 : 65003,
-                     downwellPlayfieldX + 80, centerY + 10);
-        if (scenes.styleCursor() == 0)
-            amigaRendererDrawAssetPen(
-                renderer, activeGamePack, activeGamePackEnd,
-                65002, 0, downwellPlayfieldX + 80, centerY + 32,
-                0, 1);
-    } else {
-        drawGameAsset(renderer, 27, (UWORD)scenes.styleRunFrame(),
-                      downwellPlayfieldX + 80,
-                      centerY - 14 + scenes.stylePlayerDescent(), 0);
-    }
-    {
-        const int enterTop = scenes.styleDitherY() - 400;
-        amigaRendererFillRect(renderer, downwellPlayfieldX, enterTop,
-                              downwellPlayfieldWidth, 800, 0);
-        drawGameAsset(renderer, 65004, 0,
-                      downwellPlayfieldX, enterTop, 0);
-    }
-    if (scenes.styleSelected()) {
-        const int verticalEdge = scenes.styleVerticalDitherY();
-        amigaRendererFillRect(renderer, downwellPlayfieldX,
-                              verticalEdge - 720,
-                              downwellPlayfieldWidth, 800, 0);
-        drawGameAsset(renderer, 65005, 0,
-                      downwellPlayfieldX, verticalEdge, 0);
-    }
-    amigaRendererClearClipRect(renderer);
-}
-
 static void drawMainWorldLine(
     AmigaRenderer* renderer,
     const downwell::RoomPack& rooms,
@@ -882,6 +819,28 @@ static bool buildMenuEntryCopper(CopperList& list,
     return list.finish();
 }
 
+static bool buildStyleCopper(CopperList& list, const UBYTE* frame,
+                             const Sprite& nullSprite,
+                             const Palette& palette) {
+    list.reset();
+    list.move(diwstrt, (UWORD)((displayVStart << 8) |
+                              (amigaMenuDisplayHStart & 0xff)));
+    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
+                              (amigaMenuDisplayHStop & 0xff)));
+    list.move(ddfstrt, amigaMenuFetchStart);
+    list.move(ddfstop, amigaMenuFetchStop);
+    list.move(bplcon0, 0x2001);
+    list.move(bplcon1, 0);
+    list.move(bpl1mod, 0);
+    list.move(bpl2mod, 0);
+    list.pointer(bpl1pth, frame);
+    list.pointer(bpl2pth, frame + amigaStylePlaneBytes);
+    for (unsigned channel = 0; channel < 8; ++channel)
+        list.showSprite((UWORD)channel, nullSprite);
+    list.setPalette(palette);
+    return list.finish();
+}
+
 static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                             unsigned index) {
     return index < AmigaPortRuntime::bulletCapacity
@@ -943,6 +902,7 @@ int main(void) {
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
                          menuTitleSpritesBytes,
+                         amigaStyleFrameBytes, amigaStyleBorderBytes,
                          gamePackBytes)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
@@ -1036,6 +996,13 @@ int main(void) {
                               memory.menuForeground(),
                               memory.menuBackground(),
                               memory.menuEntry())) {
+        platform.restore();
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        memory.release();
+        return 1;
+    }
+    if (!amigaBuildStyleBorder(activeGamePack, activeGamePackEnd,
+                               memory.styleBorder())) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1218,9 +1185,8 @@ int main(void) {
                          !scenes.menuPlayerNapping()))
                         drawMenu(&renderer, menuDrawList, scenes);
                 }
-                else if (presentedScene == AmigaScene::styleSelect)
-                    drawStyleSelect(&renderer, scenes);
-                else if (presentationChanged)
+                else if (presentedScene != AmigaScene::styleSelect &&
+                         presentationChanged)
                     buildReferencePicture(
                         &renderer, rooms, mainRoom, builders,
                         fragments, amigaInitialTerrainFragmentCount,
@@ -1322,6 +1288,20 @@ int main(void) {
                         downwellMenuEntryScrollReady();
                     }
 #endif
+                    continue;
+                }
+                if (presentedScene == AmigaScene::styleSelect) {
+                    if (!amigaRenderStyleFrame(
+                            activeGamePack, activeGamePackEnd,
+                            memory.styleBorder(), scenes,
+                            memory.styleFrame(back)) ||
+                        !buildStyleCopper(
+                            copperLists[back], memory.styleFrame(back),
+                            nullSprite, palette))
+                        break;
+                    platform.publish(copperLists[back]);
+                    front = back;
+                    presentedMenuHardware = false;
                     continue;
                 }
                 if (presentationChanged) {
