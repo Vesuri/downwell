@@ -38,12 +38,25 @@ SELECTIONS = {
         44: None,    # sprSelectArrow
         51: None,    # sprTile1
         76: None,    # sprTileSurface
+        127: None,   # sprTouchWide (generated wide trigger presentation)
         133: None,   # sprGemSmall
         134: None,   # sprGemLarge
+        139: None,   # sprModBtry
+        153: None,   # sprBat
         163: None,   # sprEnmSnake
+        164: None,   # sprSnakeAir
+        166: None,   # sprFrogIdle
+        168: None,   # sprFrogAir
+        170: None,   # sprFrogPrepare
         177: None,   # sprEnmSnail
+        186: None,   # sprGroundedTurtle
+        187: None,   # sprGroundedTurtleFall
+        188: None,   # sprGroundedTurtleWalk
+        278: None,   # sprCrawler
         369: None,   # bgNightsky
         459: [0],    # sprBulScatter1 (usual gunboot projectile)
+        550: None,   # sprScattered (generated plants)
+        568: None,   # sprDungTorch
         569: None,   # sprGemChunk
         631: None,   # sprTree
         635: None,   # sprGrass

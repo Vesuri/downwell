@@ -181,7 +181,7 @@ $(AREA_ONE_TRACE_TARGET): $(AREA_ONE_TRACE_SOURCES)
 trace-area-one: generate-room-pack generate-object-pack generate-builder-pattern-pack $(AREA_ONE_TRACE_TARGET)
 	./$(AREA_ONE_TRACE_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
-test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(TEST_TARGETS)
+test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack generate-amiga-game $(TEST_TARGETS)
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)
 	./$(ALARM_TEST_TARGET)
@@ -201,7 +201,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./$(AMIGA_PLAYER_TEST_TARGET)
 	./$(AMIGA_PORT_TEST_TARGET)
 	./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
-	./$(AMIGA_RENDERER_TEST_TARGET)
+	./$(AMIGA_RENDERER_TEST_TARGET) generated/amiga-game.dwap
 
 extract:
 	tools/extract.sh
