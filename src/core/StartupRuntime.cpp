@@ -1852,7 +1852,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 2486: // gml_Object_objGrass_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            random_.irandom(3); // Sprite choice; all four sprites have 4 frames.
+            instance->spriteId = 635 + static_cast<std::int32_t>(
+                random_.irandom(3));
             instance->imageSpeed =
                 static_cast<float>(0.15 + random_.random(0.1));
             instance->imageIndex = static_cast<float>(random_.irandom(3));
@@ -2057,7 +2058,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(30); // Startup-state digest schema.
+    digest.addU32(31); // Startup-state digest schema.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2200,6 +2201,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(instance.rotation);
         digest.addF32(instance.imageSpeed);
         digest.addF32(instance.imageIndex);
+        digest.addI32(instance.spriteId);
         digest.addI32(instance.creationCodeId);
         digest.addI32(instance.preCreateCodeId);
         digest.addU32(instance.layerId);

@@ -19,6 +19,7 @@ struct InstanceRecord {
     float rotation = 0.0F;
     float imageSpeed = 1.0F;
     float imageIndex = 0.0F;
+    std::int32_t spriteId = -1;
     std::int32_t creationCodeId = -1;
     std::int32_t preCreateCodeId = -1;
     std::uint32_t layerId = 0;

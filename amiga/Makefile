@@ -33,7 +33,7 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
-	obj/AmigaTerrain.o \
+	obj/AmigaTerrain.o obj/AmigaMenu.o \
 	obj/AmigaRenderer.o obj/AmigaBlitter.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
 	obj/GCCRuntime.o obj/AmigaPlatform.o \
@@ -88,6 +88,12 @@ obj/AmigaSceneRuntime.o: $(AMIGA_SRC)/AmigaSceneRuntime.cpp \
 
 obj/AmigaTerrain.o: $(AMIGA_SRC)/AmigaTerrain.cpp \
 		$(AMIGA_SRC)/AmigaTerrain.h $(AMIGA_SRC)/AmigaPortRuntime.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaMenu.o: $(AMIGA_SRC)/AmigaMenu.cpp $(AMIGA_SRC)/AmigaMenu.h \
+		$(REPO)/src/core/RoomPack.h $(REPO)/src/core/ObjectPack.h \
+		$(REPO)/src/core/GameMakerRandom.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

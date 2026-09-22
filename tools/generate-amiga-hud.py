@@ -60,6 +60,9 @@ SELECTIONS = {
         569: None,   # sprGemChunk
         631: None,   # sprTree
         635: None,   # sprGrass
+        636: None,   # sprGrass2
+        637: None,   # sprGrass3
+        638: None,   # sprGrass4
         640: None,   # sprBench
         642: None,   # sprWell2
         646: None,   # sprTrees

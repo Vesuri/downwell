@@ -8,6 +8,7 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaMenu.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
 #include "AmigaRenderer.h"
@@ -512,58 +513,10 @@ static void drawSplash(AmigaRenderer* renderer, int stage) {
     amigaRendererClearClipRect(renderer);
 }
 
-struct MenuDrawItem {
-    int x;
-    int y;
-    int objectId;
-    int spriteId;
-    int depth;
-};
-
-struct MenuDrawList {
-    MenuDrawItem items[256];
-    unsigned count;
-};
-
-static MenuDrawList menuDrawList;
-
-static bool buildMenuDrawList(const downwell::RoomPack& rooms,
-                              const downwell::ObjectPack& objects,
-                              MenuDrawList& list) {
-    downwell::PackedRoom room;
-    unsigned index;
-    list.count = 0;
-    if (!rooms.findRoom(20, room))
-        return false;
-    for (index = 0; index < room.instanceCount && list.count < 256; ++index) {
-        downwell::PackedRoomInstance instance;
-        downwell::PackedObject object;
-        if (!rooms.roomInstance(room, index, instance) ||
-            !objects.findObject(instance.objectId, object) ||
-            !object.visible() || object.spriteId < 0 ||
-            instance.objectId == 35)
-            continue;
-        MenuDrawItem item = {
-            instance.x,
-            instance.y,
-            instance.objectId,
-            instance.objectId == 60 ? 76 : object.spriteId,
-            object.depth
-        };
-        unsigned destination = list.count;
-        while (destination > 0 &&
-               list.items[destination - 1].depth < item.depth) {
-            list.items[destination] = list.items[destination - 1];
-            --destination;
-        }
-        list.items[destination] = item;
-        ++list.count;
-    }
-    return true;
-}
+static AmigaMenuDrawList menuDrawList;
 
 static void drawMenu(AmigaRenderer* renderer,
-                     const MenuDrawList& list,
+                     const AmigaMenuDrawList& list,
                      const AmigaSceneRuntime& scenes) {
     unsigned index;
     const int viewX = scenes.menuCameraX() - 80;
@@ -573,7 +526,7 @@ static void drawMenu(AmigaRenderer* renderer,
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
                             downwellPlayfieldWidth, downwellDisplayHeight);
     for (index = 0; index < list.count; ++index) {
-        const MenuDrawItem& item = list.items[index];
+        const AmigaMenuDrawItem& item = list.items[index];
         int roomX = item.x;
         int roomY = item.y;
         if (item.objectId == 312) {
@@ -584,7 +537,7 @@ static void drawMenu(AmigaRenderer* renderer,
             amigaRendererFillRect(renderer,
                 downwellPlayfieldX + roomX - 24 - viewX,
                 roomY + 64 - viewY, 160, 1000, 0);
-        drawGameAsset(renderer, (UWORD)item.spriteId, 0,
+        drawGameAsset(renderer, (UWORD)item.spriteId, (UWORD)item.frame,
                       downwellPlayfieldX + roomX - viewX,
                       roomY - viewY, 0);
     }
@@ -918,7 +871,7 @@ int main(void) {
         !verificationReplay.valid() ||
 #endif
         !rooms.findRoom(11, mainRoom) ||
-        !buildMenuDrawList(rooms, objects, menuDrawList) ||
+        !amigaBuildMenuDrawList(rooms, objects, menuDrawList) ||
         !amigaBuildInitialAreaOneTerrain(
             builders, fragments, amigaInitialTerrainFragmentCount,
             generatedEnemies, AmigaPortRuntime::enemyCapacity,

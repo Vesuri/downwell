@@ -270,7 +270,9 @@ void Game::renderMenu(Renderer& renderer) const {
         }
         std::int32_t spriteId = isPlayer
                                     ? startup_.menuPlayerSpriteId()
-                                    : object.spriteId;
+                                    : (instance.spriteId >= 0
+                                           ? instance.spriteId
+                                           : object.spriteId);
         if (instance.objectId == 60) // objWall_n Create selects wallTile
             spriteId = 76; // global.levelTile[0] / sprTileSurface
         const float runtimeImageIndex = isPlayer
