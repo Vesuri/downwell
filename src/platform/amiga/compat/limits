@@ -1,0 +1,13 @@
+#ifndef DOWNWELL_AMIGA_COMPAT_LIMITS
+#define DOWNWELL_AMIGA_COMPAT_LIMITS
+
+namespace std {
+template <typename T> class numeric_limits;
+
+template <> class numeric_limits<float> {
+public:
+    static constexpr bool is_iec559 = true;
+};
+}
+
+#endif

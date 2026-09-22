@@ -1,0 +1,14 @@
+#ifndef DOWNWELL_AMIGA_COMPAT_CSTRING
+#define DOWNWELL_AMIGA_COMPAT_CSTRING
+
+extern "C" {
+void* memcpy(void* destination, const void* source, __SIZE_TYPE__ length);
+void* memset(void* destination, int value, __SIZE_TYPE__ length);
+}
+
+namespace std {
+using ::memcpy;
+using ::memset;
+}
+
+#endif

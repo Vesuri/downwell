@@ -22,10 +22,12 @@ two bytes at each row's far edge, and `$30..$d8` fetches the intervening 22
 words. The backing geometry remains 384 pixels wide for direct host-to-Amiga
 coordinate mapping.
 
-The current executable displays recovered area-one wall art on a double-
-buffered PF1, the recovered 4:3 HUD on the single-buffered PF2, and the player
-on hardware sprite channel 0. The player alternates between recovered idle and
-air frames to make paired copper-list and sprite-pointer swaps visible.
+The current executable displays recovered area-one wall art on a 320-line
+circular PF1, the recovered 4:3 HUD on the fixed PF2, and the player on hardware
+sprite channel 0. It embeds and validates the recovered room, object/event, and
+builder-pattern packs with the same endian-safe readers as the SDL reference.
+The player alternates between recovered idle and air frames to make paired
+copper-list and sprite-pointer swaps visible.
 
 Its small `AmigaHardware` and `CopperList` classes are adapted from the proven
 sibling-port framework. Its machine lifecycle follows Rescue on Fractalus:

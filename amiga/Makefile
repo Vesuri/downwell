@@ -13,14 +13,18 @@ CFLAGS := -g -O2 -m68020 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DDOWNWELL_PLATFORM_AMIGA
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
-	-fno-use-cxa-atexit
+	-fno-use-cxa-atexit -I$(AMIGA_SRC)/compat -I$(REPO)/src
 ASFLAGS := -mcpu=68020 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
 AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
+ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
+OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
+BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaRenderer.o obj/AmigaHardware.o \
-	obj/CopperList.o obj/AmigaAssets.o \
+	obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o obj/BuilderPatternPack.o \
+	obj/AmigaAssets.o \
 	obj/gcc8_c_support.o obj/gcc8_a_support.o
 
 .PHONY: all check clean audit
@@ -57,6 +61,19 @@ obj/CopperList.o: $(AMIGA_SRC)/framework/CopperList.cpp \
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
+obj/RoomPack.o: $(REPO)/src/core/RoomPack.cpp $(REPO)/src/core/RoomPack.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/ObjectPack.o: $(REPO)/src/core/ObjectPack.cpp $(REPO)/src/core/ObjectPack.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/BuilderPatternPack.o: $(REPO)/src/core/BuilderPatternPack.cpp \
+		$(REPO)/src/core/BuilderPatternPack.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
 obj/AmigaRenderer.o: $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -67,7 +84,17 @@ $(AMIGA_HUD):
 $(AMIGA_GAME):
 	$(MAKE) -C $(REPO) generate-amiga-game
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME)
+$(ROOM_PACK):
+	$(MAKE) -C $(REPO) generate-room-pack
+
+$(OBJECT_PACK):
+	$(MAKE) -C $(REPO) generate-object-pack
+
+$(BUILDER_PACK):
+	$(MAKE) -C $(REPO) generate-builder-pattern-pack
+
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) \
+		$(ROOM_PACK) $(OBJECT_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 

@@ -12,3 +12,24 @@ amiga_game_pack:
 	.incbin "../generated/amiga-game.dwap"
 	.globl amiga_game_pack_end
 amiga_game_pack_end:
+
+	.balign 4
+	.globl amiga_room_pack
+amiga_room_pack:
+	.incbin "../generated/downwell-rooms.dwrm"
+	.globl amiga_room_pack_end
+amiga_room_pack_end:
+
+	.balign 4
+	.globl amiga_object_pack
+amiga_object_pack:
+	.incbin "../generated/downwell-objects.dwob"
+	.globl amiga_object_pack_end
+amiga_object_pack_end:
+
+	.balign 4
+	.globl amiga_builder_pack
+amiga_builder_pack:
+	.incbin "../generated/downwell-builder-patterns.dwbp"
+	.globl amiga_builder_pack_end
+amiga_builder_pack_end:

@@ -1,0 +1,9 @@
+#ifndef DOWNWELL_AMIGA_COMPAT_CSTDDEF
+#define DOWNWELL_AMIGA_COMPAT_CSTDDEF
+
+namespace std {
+typedef __SIZE_TYPE__ size_t;
+typedef __PTRDIFF_TYPE__ ptrdiff_t;
+}
+
+#endif

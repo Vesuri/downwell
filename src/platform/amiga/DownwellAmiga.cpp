@@ -10,6 +10,9 @@
 #include "AmigaRenderer.h"
 #include "framework/AmigaHardware.h"
 #include "framework/CopperList.h"
+#include "core/BuilderPatternPack.h"
+#include "core/ObjectPack.h"
+#include "core/RoomPack.h"
 
 struct ExecBase* SysBase = 0;
 struct GfxBase* GfxBase = 0;
@@ -22,6 +25,12 @@ extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
 extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_game_pack_end[];
+extern const UBYTE amiga_room_pack[];
+extern const UBYTE amiga_room_pack_end[];
+extern const UBYTE amiga_object_pack[];
+extern const UBYTE amiga_object_pack_end[];
+extern const UBYTE amiga_builder_pack[];
+extern const UBYTE amiga_builder_pack_end[];
 }
 
 enum {
@@ -219,6 +228,19 @@ static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
     return list.finish();
 }
 
+static bool validateNativeData(void) {
+    const downwell::RoomPack rooms(
+        amiga_room_pack,
+        (unsigned long)(amiga_room_pack_end - amiga_room_pack));
+    const downwell::ObjectPack objects(
+        amiga_object_pack,
+        (unsigned long)(amiga_object_pack_end - amiga_object_pack));
+    const downwell::BuilderPatternPack builders(
+        amiga_builder_pack,
+        (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
+    return rooms.valid() && objects.valid() && builders.valid();
+}
+
 int main(void) {
     struct View* savedView;
     UBYTE* game;
@@ -237,6 +259,11 @@ int main(void) {
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
     if (!GfxBase)
         return 1;
+    if (!validateNativeData()) {
+        CloseLibrary((struct Library*)GfxBase);
+        GfxBase = 0;
+        return 1;
+    }
 
     game = (UBYTE*)AllocMem(downwellGameRingBytes, MEMF_CHIP | MEMF_CLEAR);
     hud = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
