@@ -423,7 +423,7 @@ static UWORD mainWallFrame(const downwell::RoomPack& rooms,
 static void drawMainRoomWalls(AmigaRenderer* renderer,
                               const downwell::RoomPack& rooms,
                               const downwell::PackedRoom& room,
-                              int viewY) {
+                              int viewX, int viewY) {
     unsigned index;
     for (index = 0; index < room.instanceCount; ++index) {
         downwell::PackedRoomInstance instance;
@@ -433,7 +433,7 @@ static void drawMainRoomWalls(AmigaRenderer* renderer,
             continue;
         drawGameAsset(renderer, 51,
                       mainWallFrame(rooms, room, instance.x, instance.y),
-                      downwellPlayfieldX + instance.x - mainViewX,
+                      downwellPlayfieldX + instance.x - viewX,
                       instance.y - viewY, 0);
     }
 }
@@ -450,7 +450,7 @@ static void buildReferencePicture(
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
                             downwellPlayfieldWidth, downwellDisplayHeight);
     if (rooms.findRoom(11, room))
-        drawMainRoomWalls(renderer, rooms, room, viewY);
+        drawMainRoomWalls(renderer, rooms, room, mainViewX, viewY);
 
     amigaRendererClearClipRect(renderer);
     drawAsset(renderer, 408, 0, 108, 0, 0);
@@ -668,7 +668,7 @@ static void drawMainWorldLine(
     const NativeFragment* fragments,
     unsigned fragmentCount,
     const AmigaPortRuntime* runtime,
-    int worldY, int screenY) {
+    int viewX, int worldY, int screenY) {
     unsigned index;
     const int centerY = ((worldY + 8) / 16) * 16;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, screenY,
@@ -681,7 +681,7 @@ static void drawMainWorldLine(
             continue;
         drawGameAsset(renderer, 51,
                       mainWallFrame(rooms, room, instance.x, instance.y),
-                      downwellPlayfieldX + instance.x - mainViewX,
+                      downwellPlayfieldX + instance.x - viewX,
                       screenY + instance.y - worldY, 0);
     }
 
@@ -707,10 +707,10 @@ static void drawMainWorldLine(
                                        : (fragment.reversed ? 160 : 320);
                 const int secondX = fragment.reversed ? 320 : 160;
                 drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + firstX - mainViewX,
+                              downwellPlayfieldX + firstX - viewX,
                               screenY + centerY - worldY, 0);
                 drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + secondX - mainViewX,
+                              downwellPlayfieldX + secondX - viewX,
                               screenY + centerY - worldY, 0);
             }
             if (centerY > finalRowY)
@@ -727,10 +727,10 @@ static void drawMainWorldLine(
                                        : (fragment.reversed ? 160 : 320);
                 const int secondX = fragment.reversed ? 320 : 160;
                 drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + firstX - mainViewX,
+                              downwellPlayfieldX + firstX - viewX,
                               screenY + centerY - worldY, 0);
                 drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + secondX - mainViewX,
+                              downwellPlayfieldX + secondX - viewX,
                               screenY + centerY - worldY, 0);
             }
             if (builders.rowWidth(fragment.pattern, row, width)) {
@@ -750,7 +750,7 @@ static void drawMainWorldLine(
                     if (isTerrainSymbol(symbol))
                         drawGameAsset(
                             renderer, 51, terrainFrame(symbol),
-                            downwellPlayfieldX + worldX - mainViewX,
+                            downwellPlayfieldX + worldX - viewX,
                             screenY + centerY - worldY, 0);
                 }
             }
@@ -768,12 +768,13 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
                                  unsigned fragmentCount,
                                  const AmigaPortRuntime* runtime,
                                  unsigned ringOrigin,
-                                 int worldY,
+                                 int viewX, int worldY,
                                  int y) {
     amigaRendererSetGameOrigin(renderer, ringOrigin);
     amigaRendererClearGameRows(renderer, y, 1, 0);
     drawMainWorldLine(renderer, rooms, room, builders,
-                      fragments, fragmentCount, runtime, worldY, y);
+                      fragments, fragmentCount, runtime,
+                      viewX, worldY, y);
 }
 
 static bool buildCopper(CopperList& list,
@@ -836,6 +837,7 @@ int main(void) {
     AmigaMemory memory;
     AmigaRenderer renderer;
     unsigned front = 0;
+    int worldViewX = mainViewX;
     int worldViewY = mainInitialViewY;
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
@@ -1061,6 +1063,7 @@ int main(void) {
     while ((*ciaaPra & 0x40u) != 0) {
         UBYTE packedInput;
         int scrollDelta = 0;
+        bool cameraXChanged = false;
         unsigned destroyedBlockCount = 0;
         int destroyedBlockX[AmigaPortRuntime::bulletCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::bulletCapacity] = {0};
@@ -1113,6 +1116,7 @@ int main(void) {
 #endif
             const AmigaPortFrame result = port.step(packedInput);
             scrollDelta = result.scrollDelta;
+            cameraXChanged = result.cameraXChanged;
             destroyedBlockCount = result.destroyedBlockCount;
             for (unsigned block = 0; block < destroyedBlockCount; ++block) {
                 destroyedBlockX[block] = result.blockX[block];
@@ -1148,11 +1152,22 @@ int main(void) {
                         fragments, nativeFragmentCount,
                         &port,
                         (unsigned)origin,
+                        worldViewX,
                         direction > 0
                             ? worldViewY + downwellDisplayHeight - 1
                             : worldViewY,
                         direction > 0 ? downwellDisplayHeight - 1 : 0);
                 }
+            }
+            if (cameraXChanged) {
+                worldViewX = mainViewX + port.cameraOffsetX();
+                for (int screenY = 0;
+                     screenY < downwellDisplayHeight; ++screenY)
+                    drawRevealedGameLine(
+                        &renderer, rooms, mainRoom, builders,
+                        fragments, nativeFragmentCount, &port,
+                        port.ringOrigin(), worldViewX,
+                        worldViewY + screenY, screenY);
             }
             if (destroyedBlockCount != 0) {
                 for (unsigned block = 0;
@@ -1166,7 +1181,8 @@ int main(void) {
                         drawRevealedGameLine(
                             &renderer, rooms, mainRoom, builders,
                             fragments, nativeFragmentCount,
-                            &port, port.ringOrigin(), line, screenY);
+                            &port, port.ringOrigin(), worldViewX,
+                            line, screenY);
                     }
                     (void)destroyedBlockX[block];
                 }
@@ -1175,7 +1191,8 @@ int main(void) {
                     activeGamePack, activeGamePackEnd,
                     (UWORD)port.player().spriteId(),
                     (UWORD)port.player().spriteFrame(),
-                    downwellPlayfieldX + 80 + port.player().offsetX(),
+                    downwellPlayfieldX + 80 + port.player().offsetX() -
+                        port.cameraOffsetX(),
 #ifdef DOWNWELL_REPLAY_VERIFY
                     gameplayPlayerGroundY + port.player().offsetY(),
 #else
@@ -1194,7 +1211,8 @@ int main(void) {
                 if (state.active)
                     buildBulletSprite(
                         sprite,
-                        downwellPlayfieldX + 80 + state.x,
+                        downwellPlayfieldX + 80 + state.x -
+                            port.cameraOffsetX(),
                         gameplayPlayerStartY + state.y -
                             port.cameraOffsetY());
                 else
@@ -1216,7 +1234,8 @@ int main(void) {
                         activeGamePack, activeGamePackEnd,
                         (UWORD)enemy.spriteId,
                         (UWORD)((port.tick() >> 2) & 1u),
-                        downwellPlayfieldX + 80 + enemy.x,
+                        downwellPlayfieldX + 80 + enemy.x -
+                            port.cameraOffsetX(),
                         screenY, enemy.facing < 0,
                         memory.enemySprite(back), enemySpriteHeight))
                     frameReady = false;
@@ -1237,7 +1256,8 @@ int main(void) {
                             activeGamePack, activeGamePackEnd,
                             (UWORD)(gem.large ? 134 : 133),
                             (UWORD)((gem.age / 2u) & 3u),
-                            downwellPlayfieldX + 80 + gem.x,
+                            downwellPlayfieldX + 80 + gem.x -
+                                port.cameraOffsetX(),
                             screenY, 0,
                             memory.enemySprite(back), enemySpriteHeight))
                         frameReady = false;

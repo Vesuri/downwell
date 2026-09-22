@@ -10,6 +10,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
     : player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
+      cameraPixelX_(0),
       enemyCount_(0), enemiesDefeated_(0), health_(4), invulnerability_(0),
       currency_(0),
       solidResolver_(0),
@@ -276,8 +277,14 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }
 
     int scrollDelta = 0;
+    int cameraXDelta = 0;
     if (followCamera_) {
+        const int oldCameraPixelX = cameraPixelX_;
         const int oldCameraPixelY = cameraPixelY_;
+        const int playerWorldX = 240 + player_.offsetX();
+        cameraPixelX_ = playerWorldX < 160 ? -160
+                        : playerWorldX > 320 ? 160 : 0;
+        cameraXDelta = cameraPixelX_ - oldCameraPixelX;
         const long target = player_.offsetYFixed() + 24L * 256L;
         cameraY_ += (target - cameraY_) / 5L;
         cameraPixelY_ = cameraY_ >= 0
@@ -428,6 +435,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     frame.bulletChanged = bulletChanged;
     frame.scrolled = scrollDelta != 0;
     frame.scrollDelta = scrollDelta;
+    frame.cameraXChanged = cameraXDelta != 0;
+    frame.cameraXDelta = cameraXDelta;
     frame.destroyedBlockCount = destroyedBlockCount;
     for (unsigned index = 0; index < destroyedBlockCount; ++index) {
         frame.blockX[index] = destroyedBlockX[index];

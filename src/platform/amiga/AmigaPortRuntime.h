@@ -20,6 +20,8 @@ struct AmigaPortFrame {
     bool bulletChanged;
     bool scrolled;
     int scrollDelta;
+    bool cameraXChanged;
+    int cameraXDelta;
     unsigned destroyedBlockCount;
     int blockX[amigaPortBulletCapacity];
     int blockY[amigaPortBulletCapacity];
@@ -106,6 +108,7 @@ public:
     int bulletX() const;
     int bulletY() const;
     int cameraOffsetY() const { return cameraPixelY_; }
+    int cameraOffsetX() const { return cameraPixelX_; }
     bool breakableActiveAt(int x, int y) const;
     unsigned blocksDestroyed() const { return blocksDestroyed_; }
     std::uint64_t checkpoint() const { return checkpoint_; }
@@ -125,6 +128,7 @@ private:
     bool followCamera_;
     long cameraY_;
     int cameraPixelY_;
+    int cameraPixelX_;
     BulletState bullets_[bulletCapacity];
     EnemyState enemies_[enemyCapacity];
     GemState gems_[gemCapacity];

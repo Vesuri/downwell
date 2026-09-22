@@ -14,6 +14,10 @@ void require(bool condition, const char* message) {
     }
 }
 
+bool noSolid(void*, int, int) {
+    return false;
+}
+
 } // namespace
 
 int main() {
@@ -106,6 +110,19 @@ int main() {
     require(contact.health() == 3 && !contactFrame.healthChanged &&
                 contact.invulnerability() == 89,
             "invulnerability suppresses repeated overlap damage");
+
+    AmigaPortRuntime sideCamera(300, true, 0, true);
+    sideCamera.configureSolidResolver(noSolid, 0);
+    downwell::Input walkRight;
+    walkRight.right = true;
+    AmigaPortFrame sideFrame{};
+    for (unsigned frame = 0;
+         frame < 120 && sideCamera.cameraOffsetX() == 0; ++frame)
+        sideFrame = sideCamera.step(downwell::packReplayInput(walkRight));
+    require(sideCamera.player().offsetX() > 80 &&
+                sideCamera.cameraOffsetX() == 160 &&
+                sideFrame.cameraXChanged && sideFrame.cameraXDelta == 160,
+            "crossing the recovered shaft edge snaps to the right-room camera");
 
     AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
     int accumulatedScroll = 0;
