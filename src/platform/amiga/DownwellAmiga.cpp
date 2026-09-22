@@ -64,6 +64,16 @@ enum {
     gameplayPlayerGroundY = 200
 };
 
+struct NativeFragment {
+    downwell::PackedBuilderPattern pattern;
+    int y;
+    bool reversed;
+    bool sideRoom;
+    bool appendPillars;
+};
+
+enum { nativeFragmentCount = 5, nativeBreakableCapacity = 96 };
+
 static_assert(displayHStart == 0x71, "cropped display starts at logical x=16");
 static_assert(displayHStop == 0x1d1, "352-pixel cropped display window");
 static_assert(displayVStop == 0x12e, "284-line display window");
@@ -223,11 +233,11 @@ static void buildEntranceLandingProfile(
     }
 }
 
-static unsigned buildEntranceBreakables(
+static unsigned appendFragmentBreakables(
     const downwell::BuilderPatternPack& builders,
     const downwell::PackedBuilderPattern& pattern,
-    bool reversed, int* x, int* y, unsigned capacity) {
-    unsigned count = 0;
+    int patternY, bool reversed, int* x, int* y,
+    unsigned count, unsigned capacity) {
     UWORD row;
     for (row = 0; row < pattern.rowCount && count < capacity; ++row) {
         ULONG width = 0;
@@ -243,7 +253,7 @@ static unsigned buildEntranceBreakables(
                 continue;
             x[count] = (reversed ? 320 - ordinal * 16
                                  : 160 + ordinal * 16) - 240;
-            y[count] = mainBuilderStartY + (int)row * 16 - 176;
+            y[count] = patternY + (int)row * 16 - 176;
             ++count;
         }
     }
@@ -519,7 +529,8 @@ static void drawMainWorldLine(
     const downwell::RoomPack& rooms,
     const downwell::PackedRoom& room,
     const downwell::BuilderPatternPack& builders,
-    const downwell::PackedBuilderPattern& pattern,
+    const NativeFragment* fragments,
+    unsigned fragmentCount,
     const AmigaPortRuntime* runtime,
     int worldY, int screenY) {
     unsigned index;
@@ -545,34 +556,70 @@ static void drawMainWorldLine(
                       downwellPlayfieldX + downwellPlayfieldWidth,
                       screenY + centerY - worldY, 0);
     }
-    if (centerY >= mainBuilderStartY &&
-        centerY < mainBuilderStartY + (int)pattern.rowCount * 16) {
-        const UWORD row = (UWORD)((centerY - mainBuilderStartY) / 16);
-        ULONG width = 0;
-        unsigned column;
-        if (row + 1 < pattern.rowCount) {
-            drawGameAsset(renderer, 51, 0, downwellPlayfieldX,
-                          screenY + centerY - worldY, 0);
-            drawGameAsset(renderer, 51, 0,
-                          downwellPlayfieldX + downwellPlayfieldWidth,
-                          screenY + centerY - worldY, 0);
+    for (index = 0; index < fragmentCount; ++index) {
+        const NativeFragment& fragment = fragments[index];
+        const int finalRowY = fragment.y +
+            ((int)fragment.pattern.rowCount - 1) * 16;
+        const int finalY = finalRowY +
+            (fragment.appendPillars ? 3 * 16 : 16);
+        if (centerY < fragment.y || centerY >= finalY)
+            continue;
+        if (centerY >= finalRowY) {
+            if (fragment.appendPillars) {
+                const int firstX = fragment.sideRoom
+                                       ? (fragment.reversed ? 0 : 480)
+                                       : (fragment.reversed ? 160 : 320);
+                const int secondX = fragment.reversed ? 320 : 160;
+                drawGameAsset(renderer, 51, 0,
+                              downwellPlayfieldX + firstX - mainViewX,
+                              screenY + centerY - worldY, 0);
+                drawGameAsset(renderer, 51, 0,
+                              downwellPlayfieldX + secondX - mainViewX,
+                              screenY + centerY - worldY, 0);
+            }
+            if (centerY > finalRowY)
+                break;
         }
-        if (builders.rowWidth(pattern, row, width)) {
-            for (column = 0; column < width; ++column) {
-                char symbol = 0;
-                const int worldX = 320 - ((int)column + 1) * 16;
-                if (!builders.cell(pattern, (UWORD)column, row, symbol))
-                    break;
-                if (symbol == 'B' && runtime != 0 &&
-                    !runtime->breakableActiveAt(
-                        worldX - 240, centerY - 176))
-                    continue;
-                if (isTerrainSymbol(symbol))
-                    drawGameAsset(renderer, 51, terrainFrame(symbol),
-                                  downwellPlayfieldX + worldX - mainViewX,
-                                  screenY + centerY - worldY, 0);
+        {
+            const UWORD row =
+                (UWORD)((centerY - fragment.y) / 16);
+            ULONG width = 0;
+            unsigned column;
+            if (row + 1 < fragment.pattern.rowCount) {
+                const int firstX = fragment.sideRoom
+                                       ? (fragment.reversed ? 0 : 480)
+                                       : (fragment.reversed ? 160 : 320);
+                const int secondX = fragment.reversed ? 320 : 160;
+                drawGameAsset(renderer, 51, 0,
+                              downwellPlayfieldX + firstX - mainViewX,
+                              screenY + centerY - worldY, 0);
+                drawGameAsset(renderer, 51, 0,
+                              downwellPlayfieldX + secondX - mainViewX,
+                              screenY + centerY - worldY, 0);
+            }
+            if (builders.rowWidth(fragment.pattern, row, width)) {
+                for (column = 0; column < width; ++column) {
+                    char symbol = 0;
+                    const int ordinal = (int)column + 1;
+                    const int worldX = fragment.reversed
+                                           ? 320 - ordinal * 16
+                                           : 160 + ordinal * 16;
+                    if (!builders.cell(fragment.pattern, (UWORD)column,
+                                       row, symbol))
+                        break;
+                    if (symbol == 'B' && runtime != 0 &&
+                        !runtime->breakableActiveAt(
+                            worldX - 240, centerY - 176))
+                        continue;
+                    if (isTerrainSymbol(symbol))
+                        drawGameAsset(
+                            renderer, 51, terrainFrame(symbol),
+                            downwellPlayfieldX + worldX - mainViewX,
+                            screenY + centerY - worldY, 0);
+                }
             }
         }
+        break;
     }
     amigaRendererClearClipRect(renderer);
 }
@@ -581,15 +628,16 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
                                  const downwell::RoomPack& rooms,
                                  const downwell::PackedRoom& room,
                                  const downwell::BuilderPatternPack& builders,
-                                 const downwell::PackedBuilderPattern& pattern,
+                                 const NativeFragment* fragments,
+                                 unsigned fragmentCount,
                                  const AmigaPortRuntime* runtime,
                                  unsigned ringOrigin,
                                  int worldY,
                                  int y) {
     amigaRendererSetGameOrigin(renderer, ringOrigin);
     amigaRendererClearGameRows(renderer, y, 1, 0);
-    drawMainWorldLine(renderer, rooms, room, builders, pattern, runtime,
-                      worldY, y);
+    drawMainWorldLine(renderer, rooms, room, builders,
+                      fragments, fragmentCount, runtime, worldY, y);
 }
 
 static bool buildCopper(CopperList& list,
@@ -683,6 +731,10 @@ int main(void) {
         downwell::portReplayBytes, downwell::portReplaySize);
 #endif
     downwell::PackedBuilderPattern entrance;
+    downwell::PackedBuilderPattern main32;
+    downwell::PackedBuilderPattern main30;
+    downwell::PackedBuilderPattern main27;
+    downwell::PackedBuilderPattern right3;
     downwell::PackedRoom mainRoom;
     if (!rooms.valid() || !objects.valid() || !builders.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -691,16 +743,37 @@ int main(void) {
         !rooms.findRoom(11, mainRoom) ||
         !buildMenuDrawList(rooms, objects, menuDrawList) ||
         !builders.findPattern(downwell::BuilderPatternFamily::areaOneStart,
-                              3, entrance)) {
+                              3, entrance) ||
+        !builders.findPattern(downwell::BuilderPatternFamily::areaOneMain,
+                              32, main32) ||
+        !builders.findPattern(downwell::BuilderPatternFamily::areaOneMain,
+                              30, main30) ||
+        !builders.findPattern(downwell::BuilderPatternFamily::areaOneMain,
+                              27, main27) ||
+        !builders.findPattern(downwell::BuilderPatternFamily::areaOneRight,
+                              3, right3)) {
         return 1;
     }
+    const NativeFragment fragments[nativeFragmentCount] = {
+        {entrance, 1168, true, false, false},
+        {main32, 1248, true, false, true},
+        {main30, 1472, true, false, true},
+        {main27, 1776, true, false, true},
+        {right3, 1968, false, true, true}
+    };
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
         int landingProfile[AmigaPlayer::landingProfileSize];
-        int breakableX[16];
-        int breakableY[16];
-        const unsigned breakableCount = buildEntranceBreakables(
-            builders, entrance, true, breakableX, breakableY, 16);
+        int breakableX[nativeBreakableCapacity];
+        int breakableY[nativeBreakableCapacity];
+        unsigned breakableCount = 0;
+        for (unsigned fragment = 0;
+             fragment < nativeFragmentCount; ++fragment)
+            breakableCount = appendFragmentBreakables(
+                builders, fragments[fragment].pattern,
+                fragments[fragment].y, fragments[fragment].reversed,
+                breakableX, breakableY, breakableCount,
+                nativeBreakableCapacity);
         port.configureBreakables(breakableX, breakableY, breakableCount);
         buildEntranceLandingProfile(
             builders, entrance, true, &port, landingProfile);
@@ -914,7 +987,8 @@ int main(void) {
                     if (origin >= downwellGameRingHeight)
                         origin -= downwellGameRingHeight;
                     drawRevealedGameLine(
-                        &renderer, rooms, mainRoom, builders, entrance,
+                        &renderer, rooms, mainRoom, builders,
+                        fragments, nativeFragmentCount,
                         &port,
                         (unsigned)origin,
                         direction > 0
@@ -938,7 +1012,8 @@ int main(void) {
                         if (screenY < 0 || screenY >= downwellDisplayHeight)
                             continue;
                         drawRevealedGameLine(
-                            &renderer, rooms, mainRoom, builders, entrance,
+                            &renderer, rooms, mainRoom, builders,
+                            fragments, nativeFragmentCount,
                             &port, port.ringOrigin(), line, screenY);
                     }
                     (void)destroyedBlockX[block];
