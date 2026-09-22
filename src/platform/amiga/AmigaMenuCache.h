@@ -7,6 +7,7 @@ struct AmigaMenuDrawList;
 
 bool amigaRenderMenuCache(const AmigaMenuDrawList& list,
                           const UBYTE* pack, const UBYTE* packEnd,
-                          UBYTE* foreground, UBYTE* background);
+                          UBYTE* foreground, UBYTE* background,
+                          UBYTE* entry);
 
 #endif

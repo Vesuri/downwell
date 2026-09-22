@@ -502,6 +502,9 @@ int amigaRendererBuildHardwareSpritePart(
     int startX;
     int startY;
     int stopY;
+    int logicalTop;
+    int sourceTop;
+    int visibleHeight;
     int y;
     int x;
     if (!record)
@@ -548,9 +551,26 @@ int amigaRendererBuildHardwareSpritePart(
         destination[3] = 0;
         return 2;
     }
+    logicalTop = anchorY - originY;
+    sourceTop = 0;
+    visibleHeight = height;
+    if (logicalTop < 0) {
+        sourceTop = -logicalTop;
+        visibleHeight -= sourceTop;
+        logicalTop = 0;
+    }
+    if (logicalTop + visibleHeight > downwellDisplayHeight)
+        visibleHeight = downwellDisplayHeight - logicalTop;
+    if (visibleHeight <= 0) {
+        destination[0] = 0;
+        destination[1] = 0;
+        destination[2] = 0;
+        destination[3] = 0;
+        return 2;
+    }
     startX = downwellDisplayHStart + logicalStartX;
-    startY = downwellDisplayVStart + anchorY - originY;
-    stopY = startY + height;
+    startY = downwellDisplayVStart + logicalTop;
+    stopY = startY + visibleHeight;
     control[0] = (UBYTE)startY;
     control[1] = (UBYTE)(startX >> 1);
     control[2] = (UBYTE)stopY;
@@ -558,9 +578,9 @@ int amigaRendererBuildHardwareSpritePart(
                          (stopY > 255 ? 2 : 0) |
                          (startY > 255 ? 4 : 0));
 
-    for (y = 0; y < height; ++y) {
+    for (y = 0; y < visibleHeight; ++y) {
         const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
-        const UBYTE* row = data + y * planeBytes;
+        const UBYTE* row = data + (sourceTop + y) * planeBytes;
         UWORD plane0 = 0;
         UWORD plane1 = 0;
         for (x = 0; x < 16; ++x) {
@@ -580,8 +600,8 @@ int amigaRendererBuildHardwareSpritePart(
         destination[2 + y * 2] = plane0;
         destination[3 + y * 2] = plane1;
     }
-    destination[2 + height * 2] = 0;
-    destination[3 + height * 2] = 0;
+    destination[2 + visibleHeight * 2] = 0;
+    destination[3 + visibleHeight * 2] = 0;
     return 1;
 }
 

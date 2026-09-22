@@ -156,6 +156,17 @@ int main(int argc, char** argv) {
                 reinterpret_cast<UBYTE*>(titleLeft)[1] + 48,
             "seven-part title spans consecutive hardware-sprite slices");
 
+    UWORD clippedTitle[2 + 2 * 32 + 2] = {};
+    require(amigaRendererBuildHardwareSpritePart(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                654, 9, 0, downwellPlayfieldX + 80, 8, 0,
+                clippedTitle, 32) == 1 &&
+            reinterpret_cast<UBYTE*>(clippedTitle)[0] ==
+                downwellDisplayVStart &&
+            reinterpret_cast<UBYTE*>(clippedTitle)[2] ==
+                downwellDisplayVStart + 24,
+            "hardware-sprite strips clip cleanly through the display top");
+
     std::cout << "Amiga renderer tests passed\n";
     return 0;
 }

@@ -55,21 +55,28 @@ bool drawMask(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
 
 bool amigaRenderMenuCache(const AmigaMenuDrawList& list,
                           const UBYTE* pack, const UBYTE* packEnd,
-                          UBYTE* foreground, UBYTE* background) {
+                          UBYTE* foreground, UBYTE* background,
+                          UBYTE* entry) {
     Bitmap foregroundBitmap(foreground, amigaMenuCacheWidth,
                             amigaMenuCacheHeight, 1, false);
     Bitmap backgroundBitmap(background, amigaMenuCacheWidth,
                             amigaMenuCacheHeight, 1, false);
+    Bitmap entryBitmap(entry, amigaMenuEntryWidth,
+                       amigaMenuEntryHeight, 1, false);
     for (unsigned i = 0; i < list.count; ++i) {
         const AmigaMenuDrawItem& item = list.items[i];
         if (item.objectId == 312) {
             if (!drawMask(backgroundBitmap, pack, packEnd,
                           (UWORD)item.spriteId, (UWORD)item.frame, 120, 129))
                 return false;
-        } else if (!drawMask(foregroundBitmap, pack, packEnd,
-                             (UWORD)item.spriteId, (UWORD)item.frame,
-                             item.x, item.y - amigaMenuCacheWorldY)) {
-            return false;
+        } else {
+            if (!drawMask(foregroundBitmap, pack, packEnd,
+                          (UWORD)item.spriteId, (UWORD)item.frame,
+                          item.x, item.y - amigaMenuCacheWorldY) ||
+                !drawMask(entryBitmap, pack, packEnd,
+                          (UWORD)item.spriteId, (UWORD)item.frame,
+                          item.x - amigaMenuEntryWorldX, item.y))
+                return false;
         }
     }
     AmigaHardware::blitterDrain();

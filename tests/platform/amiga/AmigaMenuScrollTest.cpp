@@ -18,6 +18,10 @@ int main() {
             "eleven-word intro fetch uses ten DDF intervals");
     require(amigaMenuModulo == 42,
             "intro modulo skips the unused cached row bytes");
+    require(amigaMenuEntryWidth == 176 &&
+                amigaMenuEntryBytesPerRow == 22 &&
+                amigaMenuEntryPlaneBytes == 25344,
+            "entry cache is one exact eleven-word fetch wide");
 
     AmigaMenuScrollState state = amigaMenuScrollState(0, 284);
     require(state.foregroundOffset == 0 &&
@@ -39,6 +43,11 @@ int main() {
             "cached planes preserve independent parallax pointers");
     require(state.scrollControl == 0,
             "word-aligned parallax offsets need no fine scroll");
+
+    require(amigaMenuEntryOffset(306) == 306 * 22 &&
+                amigaMenuEntryOffset(858) == 858 * 22 &&
+                amigaMenuEntryOffset(2000) == (1152 - 284) * 22,
+            "entry pointer follows and clamps the recovered vertical camera");
 
     std::cout << "Amiga menu hardware-scroll tests passed\n";
     return 0;

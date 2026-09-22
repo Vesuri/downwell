@@ -150,6 +150,11 @@ downwellMenuTitleSpriteReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
+extern "C" __attribute__((noinline, used)) void
+downwellMenuEntryScrollReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
 extern "C" __attribute__((noinline, used)) void downwellSceneGameplayReady(void) {
     __asm__ volatile("" ::: "memory");
 }
@@ -846,6 +851,37 @@ static bool buildMenuCopper(CopperList& list,
     return list.finish();
 }
 
+static bool buildMenuEntryCopper(CopperList& list,
+                                 const UBYTE* entry,
+                                 const UWORD* titleSprites,
+                                 unsigned titlePartCount,
+                                 const Sprite& nullSprite,
+                                 const Palette& palette,
+                                 int viewY) {
+    list.reset();
+    list.move(diwstrt, (UWORD)((displayVStart << 8) |
+                              (amigaMenuDisplayHStart & 0xff)));
+    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
+                              (amigaMenuDisplayHStop & 0xff)));
+    list.move(ddfstrt, amigaMenuFetchStart);
+    list.move(ddfstop, amigaMenuFetchStop);
+    list.move(bplcon0, 0x1001);
+    list.move(bplcon1, 0);
+    list.move(bpl1mod, 0);
+    list.move(bpl2mod, 0);
+    list.pointer(bpl1pth, entry + amigaMenuEntryOffset(viewY));
+    list.showSprite(0, nullSprite);
+    for (unsigned channel = 1; channel < 8; ++channel) {
+        const UWORD* sprite = channel <= titlePartCount
+            ? titleSprites + (channel - 1) *
+                (menuTitleSpriteBytes / sizeof(UWORD))
+            : nullSprite.data();
+        list.pointer((UWORD)(spr1pth + (channel << 2)), sprite);
+    }
+    list.setPalette(palette);
+    return list.finish();
+}
+
 static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                             unsigned index) {
     return index < AmigaPortRuntime::bulletCapacity
@@ -877,6 +913,7 @@ int main(void) {
     bool sceneGameplayLandedReported = false;
     bool sceneGameplayActiveReported = false;
     bool sceneMenuTitleReported = false;
+    bool sceneMenuEntryReported = false;
     int sceneGameplayLandedCameraY = 0;
 #endif
     worldViewY += port.cameraOffsetY();
@@ -901,7 +938,7 @@ int main(void) {
     const ULONG gamePackBytes =
         (ULONG)(amiga_game_pack_end - amiga_game_pack);
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
-                         menuPlaneBytes,
+                         menuPlaneBytes, amigaMenuEntryPlaneBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
@@ -997,7 +1034,8 @@ int main(void) {
     if (!amigaRenderMenuCache(menuDrawList, activeGamePack,
                               activeGamePackEnd,
                               memory.menuForeground(),
-                              memory.menuBackground())) {
+                              memory.menuBackground(),
+                              memory.menuEntry())) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1163,8 +1201,9 @@ int main(void) {
                     scenes.splashStage() != presentedSplash;
                 const unsigned back = front ^ 1u;
                 const bool menuHardware =
-                    scenes.scene() == AmigaScene::menu &&
-                    !scenes.menuEnterSequenceActive();
+                    scenes.scene() == AmigaScene::menu;
+                const bool menuEntry = menuHardware &&
+                    scenes.menuEnterSequenceActive();
                 const bool menuModeChanged =
                     menuHardware != presentedMenuHardware;
                 presentedScene = scenes.scene();
@@ -1207,7 +1246,7 @@ int main(void) {
                     } else {
                         playerSprites[back].hide();
                     }
-                    if (menuFrameReady && menuHardware &&
+                    if (menuFrameReady &&
                         scenes.menuTitleFrame() != 0) {
                         titlePartCount =
                             amigaRendererHardwareSpritePartCount(
@@ -1237,7 +1276,13 @@ int main(void) {
                         }
                     }
                     if (menuFrameReady) {
-                        if (menuHardware) {
+                        if (menuEntry) {
+                            menuFrameReady = buildMenuEntryCopper(
+                                copperLists[back], memory.menuEntry(),
+                                titleSprites, titlePartCount,
+                                nullSprite, palette,
+                                scenes.menuCameraY() - 142);
+                        } else if (menuHardware) {
                             const AmigaMenuScrollState scroll =
                                 amigaMenuScrollState(
                                     scenes.menuCameraX() - 80,
@@ -1270,6 +1315,11 @@ int main(void) {
                         titlePartCount == menuTitleSpriteParts) {
                         sceneMenuTitleReported = true;
                         downwellMenuTitleSpriteReady();
+                    }
+                    if (!sceneMenuEntryReported && menuEntry &&
+                        scenes.menuCameraY() >= 900) {
+                        sceneMenuEntryReported = true;
+                        downwellMenuEntryScrollReady();
                     }
 #endif
                     continue;

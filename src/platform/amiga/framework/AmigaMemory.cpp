@@ -6,7 +6,8 @@
 AmigaMemory::AmigaMemory()
     : game_(0), hud_(0), menu_(0), copper_(0), nullSprite_(0), bulletSprite_(0),
       menuSprites_(0), assets_(0),
-      gameBytes_(0), hudBytes_(0), menuPlaneBytes_(0), copperBytes_(0),
+      gameBytes_(0), hudBytes_(0), menuPlaneBytes_(0), menuEntryBytes_(0),
+      copperBytes_(0),
       playerSpriteBytes_(0), bulletSpriteBytes_(0), enemySpriteBytes_(0),
       menuSpriteBytes_(0), assetBytes_(0)
 {
@@ -22,7 +23,7 @@ AmigaMemory::~AmigaMemory()
 }
 
 bool AmigaMemory::allocate(ULONG gameBytes, ULONG hudBytes,
-                           ULONG menuPlaneBytes,
+                           ULONG menuPlaneBytes, ULONG menuEntryBytes,
                            ULONG copperBytes, ULONG playerSpriteBytes,
                            ULONG bulletSpriteBytes, ULONG enemySpriteBytes,
                            ULONG menuSpriteBytes,
@@ -32,6 +33,7 @@ bool AmigaMemory::allocate(ULONG gameBytes, ULONG hudBytes,
     gameBytes_ = gameBytes;
     hudBytes_ = hudBytes;
     menuPlaneBytes_ = menuPlaneBytes;
+    menuEntryBytes_ = menuEntryBytes;
     copperBytes_ = copperBytes;
     playerSpriteBytes_ = playerSpriteBytes;
     bulletSpriteBytes_ = bulletSpriteBytes;
@@ -40,7 +42,8 @@ bool AmigaMemory::allocate(ULONG gameBytes, ULONG hudBytes,
     assetBytes_ = assetBytes;
     game_ = (UBYTE*)AllocMem(gameBytes_, MEMF_CHIP | MEMF_CLEAR);
     hud_ = (UBYTE*)AllocMem(hudBytes_, MEMF_CHIP | MEMF_CLEAR);
-    menu_ = (UBYTE*)AllocMem(menuPlaneBytes_ * 2, MEMF_CHIP | MEMF_CLEAR);
+    menu_ = (UBYTE*)AllocMem(menuPlaneBytes_ * 2 + menuEntryBytes_,
+                             MEMF_CHIP | MEMF_CLEAR);
     copper_ = (UWORD*)AllocMem(copperBytes_, MEMF_CHIP | MEMF_CLEAR);
     nullSprite_ = (UWORD*)AllocMem(8, MEMF_CHIP | MEMF_CLEAR);
     playerSprite_[0] =
@@ -77,7 +80,7 @@ void AmigaMemory::release()
     if (playerSprite_[0]) FreeMem(playerSprite_[0], playerSpriteBytes_);
     if (nullSprite_) FreeMem(nullSprite_, 8);
     if (copper_) FreeMem(copper_, copperBytes_);
-    if (menu_) FreeMem(menu_, menuPlaneBytes_ * 2);
+    if (menu_) FreeMem(menu_, menuPlaneBytes_ * 2 + menuEntryBytes_);
     if (hud_) FreeMem(hud_, hudBytes_);
     if (game_) FreeMem(game_, gameBytes_);
     game_ = 0;

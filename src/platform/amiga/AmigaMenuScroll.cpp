@@ -35,3 +35,10 @@ AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY) {
         (foregroundX & 15) | ((backgroundX & 15) << 4));
     return state;
 }
+
+std::uint32_t amigaMenuEntryOffset(int viewY) {
+    const int top = clamp(viewY, 0,
+                          amigaMenuEntryHeight - 284);
+    return static_cast<std::uint32_t>(top) *
+           amigaMenuEntryBytesPerRow;
+}

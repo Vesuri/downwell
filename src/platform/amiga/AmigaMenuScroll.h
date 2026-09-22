@@ -15,7 +15,13 @@ enum {
     amigaMenuDisplayHStop = 0x171,
     amigaMenuFetchStart = 0x60,
     amigaMenuFetchStop = 0xb0,
-    amigaMenuModulo = amigaMenuCacheBytesPerRow - amigaMenuFetchBytes
+    amigaMenuModulo = amigaMenuCacheBytesPerRow - amigaMenuFetchBytes,
+    amigaMenuEntryWidth = amigaMenuFetchWords * 16,
+    amigaMenuEntryHeight = 1152,
+    amigaMenuEntryBytesPerRow = amigaMenuEntryWidth / 8,
+    amigaMenuEntryPlaneBytes = amigaMenuEntryBytesPerRow *
+                               amigaMenuEntryHeight,
+    amigaMenuEntryWorldX = 248
 };
 
 struct AmigaMenuScrollState {
@@ -25,5 +31,6 @@ struct AmigaMenuScrollState {
 };
 
 AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY);
+std::uint32_t amigaMenuEntryOffset(int viewY);
 
 #endif
