@@ -122,6 +122,10 @@ int main(int argc, char** argv) {
                 gamePack.data(), gamePack.data() + gamePack.size(),
                 186, 0) == 2,
             "wide turtle artwork requests two hardware sprites");
+    require(amigaRendererHardwareSpritePartCount(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                654, 9) == 7,
+            "Downwell title artwork requests its seven opaque slices");
     UWORD turtleLeft[2 + 2 * 32 + 2] = {};
     UWORD turtleRight[2 + 2 * 32 + 2] = {};
     require(amigaRendererBuildHardwareSpritePart(
@@ -137,6 +141,20 @@ int main(int argc, char** argv) {
             reinterpret_cast<UBYTE*>(turtleRight)[1] ==
                 reinterpret_cast<UBYTE*>(turtleLeft)[1] + 8,
             "wide turtle halves occupy adjacent sixteen-pixel slices");
+
+    UWORD titleLeft[2 + 2 * 32 + 2] = {};
+    UWORD titleRight[2 + 2 * 32 + 2] = {};
+    require(amigaRendererBuildHardwareSpritePart(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                654, 9, 0, downwellPlayfieldX + 80, 40, 0,
+                titleLeft, 32) == 1 &&
+            amigaRendererBuildHardwareSpritePart(
+                gamePack.data(), gamePack.data() + gamePack.size(),
+                654, 9, 6, downwellPlayfieldX + 80, 40, 0,
+                titleRight, 32) == 1 &&
+            reinterpret_cast<UBYTE*>(titleRight)[1] ==
+                reinterpret_cast<UBYTE*>(titleLeft)[1] + 48,
+            "seven-part title spans consecutive hardware-sprite slices");
 
     std::cout << "Amiga renderer tests passed\n";
     return 0;

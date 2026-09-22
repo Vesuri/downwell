@@ -473,7 +473,7 @@ unsigned amigaRendererHardwareSpritePartCount(
     if (!record || !hardwareSpriteOpaqueBounds(
             record, pack, packEnd, &left, &right))
         return 0;
-    return right - left + 1 > 16 ? 2u : 1u;
+    return (unsigned)(right - left + 16) / 16u;
 }
 
 int amigaRendererBuildHardwareSpritePart(
@@ -522,7 +522,7 @@ int amigaRendererBuildHardwareSpritePart(
         return 0;
     displayedLeft = flipX ? width - 1 - opaqueRight : opaqueLeft;
     displayedRight = flipX ? width - 1 - opaqueLeft : opaqueRight;
-    partCount = displayedRight - displayedLeft + 1 > 16 ? 2u : 1u;
+    partCount = (unsigned)(displayedRight - displayedLeft + 16) / 16u;
     if (part >= partCount)
         return 0;
     if (partCount == 1) {
