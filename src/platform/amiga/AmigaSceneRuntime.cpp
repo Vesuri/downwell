@@ -15,11 +15,14 @@ AmigaSceneRuntime::AmigaSceneRuntime()
     : scene_(AmigaScene::splash), tick_(0), priorLeft_(false),
       priorRight_(false), priorFire_(false), splashStage_(1),
       splashTimer_(10), menuTicks_(0), menuNapping_(true),
-      menuGrounded_(true), menuTeleport_(false), menuTitleDelay_(-1),
+      menuGrounded_(true), menuFallTicks_(0), menuTeleport_(false),
+      menuTitleDelay_(-1),
       menuTitleImage_(0), menuTitleReadyTimer_(-1),
       menuTitleReady_(false), menuSequenceDelay_(-1),
       menuEnterActive_(false), menuEnterBlackDelay_(-1),
-      menuFacing_(1), menuTitleFrame_(0), menuX_(112 * fixedOne),
+      menuFacing_(1), menuSprite_(12), menuImage_(0),
+      menuImageSpeed_(0x3e19999aUL), menuTitleFrame_(0),
+      menuX_(112 * fixedOne),
       menuY_(menuGroundY), menuSpeedX_(0), menuSpeedY_(0),
       menuCameraX_(112 * fixedOne), menuCameraY_(512 * fixedOne),
       menuCameraLockerY_(448 * fixedOne), menuEnterSpeedY_(0),
@@ -41,6 +44,98 @@ int AmigaSceneRuntime::roundedFinePixel(long value)
 {
     return value >= 0 ? static_cast<int>((value + 32768) >> 16)
                       : -static_cast<int>((-value + 32768) >> 16);
+}
+
+unsigned AmigaSceneRuntime::menuPlayerFrame() const
+{
+    unsigned frame = positiveFloatFloor(menuImage_);
+    unsigned count = 1;
+    if (menuSprite_ == 12 || menuSprite_ == 27)
+        count = 8;
+    else if (menuSprite_ == 31)
+        count = 4;
+    else if (menuSprite_ == 37)
+        count = 5;
+    return frame % count;
+}
+
+static std::uint32_t shiftRightJam(std::uint32_t value, unsigned distance)
+{
+    if (distance == 0)
+        return value;
+    if (distance >= 32)
+        return value != 0;
+    const std::uint32_t discarded = value << (32 - distance);
+    return (value >> distance) | (discarded != 0);
+}
+
+std::uint32_t AmigaSceneRuntime::addPositiveFloat(std::uint32_t left,
+                                                   std::uint32_t right)
+{
+    if (left == 0)
+        return right;
+    if (right == 0)
+        return left;
+    unsigned leftExponent = (left >> 23) & 0xffU;
+    unsigned rightExponent = (right >> 23) & 0xffU;
+    std::uint32_t leftSignificand =
+        ((left & 0x7fffffUL) | 0x800000UL) << 3;
+    std::uint32_t rightSignificand =
+        ((right & 0x7fffffUL) | 0x800000UL) << 3;
+    if (leftExponent < rightExponent) {
+        const unsigned exponent = leftExponent;
+        const std::uint32_t significand = leftSignificand;
+        leftExponent = rightExponent;
+        leftSignificand = rightSignificand;
+        rightExponent = exponent;
+        rightSignificand = significand;
+    }
+    rightSignificand = shiftRightJam(
+        rightSignificand, leftExponent - rightExponent);
+    std::uint32_t result = leftSignificand + rightSignificand;
+    if ((result & 0x08000000UL) != 0) {
+        result = shiftRightJam(result, 1);
+        ++leftExponent;
+    }
+    const unsigned roundBits = result & 7U;
+    result >>= 3;
+    if (roundBits > 4U || (roundBits == 4U && (result & 1U) != 0))
+        ++result;
+    if ((result & 0x01000000UL) != 0) {
+        result >>= 1;
+        ++leftExponent;
+    }
+    return (leftExponent << 23) | (result & 0x7fffffUL);
+}
+
+unsigned AmigaSceneRuntime::positiveFloatFloor(std::uint32_t value)
+{
+    const unsigned exponent = (value >> 23) & 0xffU;
+    if (exponent < 127)
+        return 0;
+    const unsigned shift = exponent - 127;
+    const std::uint32_t significand =
+        (value & 0x7fffffUL) | 0x800000UL;
+    if (shift >= 23)
+        return significand << (shift - 23);
+    return significand >> (23 - shift);
+}
+
+std::uint32_t AmigaSceneRuntime::subtractEight(std::uint32_t value)
+{
+    unsigned exponent = (value >> 23) & 0xffU;
+    std::uint32_t significand =
+        (value & 0x7fffffUL) | 0x800000UL;
+    if (exponent != 130 || significand < 0x800000UL)
+        return value;
+    significand -= 0x800000UL;
+    if (significand == 0)
+        return 0;
+    while ((significand & 0x800000UL) == 0) {
+        significand <<= 1;
+        --exponent;
+    }
+    return (exponent << 23) | (significand & 0x7fffffUL);
 }
 
 int AmigaSceneRuntime::splashDuration(int stage)
@@ -82,11 +177,20 @@ void AmigaSceneRuntime::stepSplash(bool firePressed)
 void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
 {
     ++menuTicks_;
+    const bool teleportWasActive = menuTeleport_;
     const bool controlsLocked = menuTicks_ <= 30 || menuTeleport_;
     if (menuNapping_) {
         if (!controlsLocked &&
-            (input.left || input.right || input.fire || input.pause))
+            (input.left || input.right || input.fire || input.pause)) {
             menuNapping_ = false;
+            menuY_ = menuGroundY;
+            menuSprite_ = 31;
+            menuImage_ = 0;
+            menuImageSpeed_ = 0x3dcccccdUL;
+            menuGrounded_ = true;
+            menuFallTicks_ = 0;
+            menuSpeedY_ = 0;
+        }
     } else if (!menuTeleport_) {
         if (!controlsLocked && input.left != input.right) {
             menuSpeedX_ += input.left ? -51 : 51;
@@ -108,9 +212,11 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
         if (menuGrounded_ && menuX_ >= menuWellLeft && menuX_ <= menuWellRight)
             menuGrounded_ = false;
         if (menuGrounded_) {
+            menuFallTicks_ = 0;
             menuY_ = menuGroundY;
             menuSpeedY_ = 0;
         } else {
+            ++menuFallTicks_;
             menuSpeedY_ += 51;
             if (menuSpeedY_ > 7 * fixedOne) menuSpeedY_ = 7 * fixedOne;
             menuY_ += menuSpeedY_;
@@ -126,7 +232,32 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
                 menuSpeedY_ = 0;
             }
         }
+
     }
+
+    if (!menuNapping_) {
+        if (!menuGrounded_) {
+            menuSprite_ = 37;
+            menuImageSpeed_ = 0;
+            if (teleportWasActive || menuFallTicks_ < 5)
+                menuImage_ = 0x40000000UL;
+            else if (menuFallTicks_ < 10)
+                menuImage_ = 0x40400000UL;
+            else
+                menuImage_ = 0x40800000UL;
+        } else {
+            menuSprite_ = menuSpeedX_ == 0 ? 31 : 27;
+            menuImageSpeed_ = menuSpeedX_ == 0
+                                  ? 0x3dcccccdUL
+                                  : 0x3e99999aUL;
+        }
+    }
+
+    if (menuImageSpeed_ != 0)
+        menuImage_ = addPositiveFloat(menuImage_, menuImageSpeed_);
+    if (!menuNapping_ && menuGrounded_ && menuSprite_ == 27 &&
+        positiveFloatFloor(menuImage_) >= 8)
+        menuImage_ = subtractEight(menuImage_);
 
     const bool inCameraLocker =
         menuX_ >= 238 * fixedOne && menuX_ <= 418 * fixedOne &&

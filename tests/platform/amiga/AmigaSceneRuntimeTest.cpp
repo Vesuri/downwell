@@ -64,6 +64,27 @@ void compareMenu(const AmigaSceneRuntime& amiga,
             "menu sleeping state follows decoded runtime");
     require(amiga.menuPlayerVisible() == reference.menuPlayerVisible(),
             "menu visibility follows decoded runtime");
+    require(amiga.menuPlayerSprite() == reference.menuPlayerSpriteId(),
+            "menu player sprite follows decoded runtime");
+    unsigned referenceFrames = 1;
+    if (reference.menuPlayerSpriteId() == 12 ||
+        reference.menuPlayerSpriteId() == 27)
+        referenceFrames = 8;
+    else if (reference.menuPlayerSpriteId() == 31)
+        referenceFrames = 4;
+    else if (reference.menuPlayerSpriteId() == 37)
+        referenceFrames = 5;
+    const unsigned referenceFrame =
+        static_cast<unsigned>(reference.menuPlayerImageIndex()) %
+        referenceFrames;
+    if (amiga.menuPlayerFrame() != referenceFrame) {
+        std::cerr << "FAILED: menu player frame follows decoded runtime "
+                  << "(Amiga " << amiga.menuPlayerFrame()
+                  << ", reference " << referenceFrame
+                  << ", reference index " << reference.menuPlayerImageIndex()
+                  << ", parity frame " << parityFrame << ")\n";
+        std::exit(1);
+    }
     require(amiga.menuTeleportActive() == reference.menuTeleportActive(),
             "menu teleport follows decoded runtime");
     require(amiga.menuEnterSequenceActive() == reference.enterSequenceActive(),

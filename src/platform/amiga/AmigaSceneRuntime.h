@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_SCENE_RUNTIME_H
 
 #include "core/Input.h"
+#include <cstdint>
 
 enum class AmigaScene {
     splash,
@@ -23,6 +24,8 @@ public:
     int menuPlayerX() const { return roundedPixel(menuX_); }
     int menuPlayerY() const { return roundedPixel(menuY_); }
     int menuPlayerFacing() const { return menuFacing_; }
+    int menuPlayerSprite() const { return menuSprite_; }
+    unsigned menuPlayerFrame() const;
     int menuCameraX() const { return roundedPixel(menuCameraX_); }
     int menuCameraY() const { return roundedPixel(menuCameraY_); }
     int menuTitleFrame() const { return menuTitleFrame_; }
@@ -46,6 +49,10 @@ public:
 private:
     static int roundedPixel(long value);
     static int roundedFinePixel(long value);
+    static std::uint32_t addPositiveFloat(std::uint32_t left,
+                                          std::uint32_t right);
+    static unsigned positiveFloatFloor(std::uint32_t value);
+    static std::uint32_t subtractEight(std::uint32_t value);
     static int splashDuration(int stage);
     void enterMenu();
     void enterStyleSelect();
@@ -66,6 +73,7 @@ private:
     unsigned menuTicks_;
     bool menuNapping_;
     bool menuGrounded_;
+    unsigned menuFallTicks_;
     bool menuTeleport_;
     int menuTitleDelay_;
     long menuTitleImage_;
@@ -75,6 +83,9 @@ private:
     bool menuEnterActive_;
     int menuEnterBlackDelay_;
     int menuFacing_;
+    int menuSprite_;
+    std::uint32_t menuImage_;
+    std::uint32_t menuImageSpeed_;
     int menuTitleFrame_;
     long menuX_;
     long menuY_;

@@ -576,19 +576,8 @@ static void drawMenu(AmigaRenderer* renderer,
     drawGameAsset(renderer, 654, (UWORD)scenes.menuTitleFrame(),
                   downwellPlayfieldX + 328 - viewX, 432 - viewY, 0);
     if (scenes.menuPlayerVisible()) {
-        UWORD sprite = 31;
-        UWORD frame = (UWORD)((scenes.tick() / 10U) & 3U);
-        if (scenes.menuPlayerNapping()) {
-            sprite = 12;
-            frame = 0;
-        } else if (scenes.menuPlayerY() > 512) {
-            sprite = 37;
-            frame = 4;
-        } else if ((scenes.tick() & 7U) != 0) {
-            sprite = 27;
-            frame = (UWORD)((scenes.tick() / 3U) & 7U);
-        }
-        drawGameAsset(renderer, sprite, frame,
+        drawGameAsset(renderer, (UWORD)scenes.menuPlayerSprite(),
+                      (UWORD)scenes.menuPlayerFrame(),
                       downwellPlayfieldX + scenes.menuPlayerX() - viewX,
                       scenes.menuPlayerY() - viewY,
                       scenes.menuPlayerFacing() < 0);
