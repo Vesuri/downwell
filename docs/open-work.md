@@ -112,3 +112,7 @@
 - [x] Define the host/Amiga replay-input seam before gameplay code moves.
 - [x] Cross-compile the shared state-digest primitive and pin the initial Amiga
   port checkpoint against the host result.
+- [x] Move the native player with allocation-free fixed-point state and map
+  grounded fire to jump plus a later airborne press to gunboot recoil.
+- [x] Emit the first native gunboot bullet on a dedicated hardware sprite and
+  update the 4:3 side-panel ammo display when a charge is consumed.

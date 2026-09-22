@@ -9,7 +9,8 @@ public:
     ~AmigaMemory();
 
     bool allocate(ULONG gameBytes, ULONG hudBytes,
-                  ULONG copperBytes, ULONG spriteBytes);
+                  ULONG copperBytes, ULONG playerSpriteBytes,
+                  ULONG bulletSpriteBytes);
     void release();
 
     UBYTE* game() const { return game_; }
@@ -19,6 +20,7 @@ public:
     UWORD* playerSprite(unsigned index) const {
         return index < 2 ? playerSprite_[index] : 0;
     }
+    UWORD* bulletSprite() const { return bulletSprite_; }
 
 private:
     AmigaMemory(const AmigaMemory&);
@@ -29,10 +31,12 @@ private:
     UWORD* copper_;
     UWORD* nullSprite_;
     UWORD* playerSprite_[2];
+    UWORD* bulletSprite_;
     ULONG gameBytes_;
     ULONG hudBytes_;
     ULONG copperBytes_;
-    ULONG spriteBytes_;
+    ULONG playerSpriteBytes_;
+    ULONG bulletSpriteBytes_;
 };
 
 #endif

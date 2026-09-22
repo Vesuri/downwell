@@ -13,10 +13,11 @@ sections and can therefore reside in Fast RAM when available.
 | PF2 384x284 fixed HUD raster, two planes | 27,264 | whole run |
 | Two 128-word copper lists | 512 | whole run |
 | Two 32-line player sprite buffers | 272 | whole run |
+| One 8-line gunboot bullet sprite buffer | 40 | whole run |
 | Armed null sprite | 8 | whole run |
-| **Total** | **58,776** | |
+| **Total** | **58,816** | |
 
-`AmigaMemory` owns these six allocations as one unit. A partial allocation is
+`AmigaMemory` owns these seven allocations as one unit. A partial allocation is
 rolled back immediately, and all early-exit paths release the same ownership
 object before the graphics library is closed. Gameplay data must not migrate
 into Chip RAM merely because the renderer consumes it.

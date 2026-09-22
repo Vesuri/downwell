@@ -32,7 +32,10 @@ small allocation-free 8.8 fixed-point player state: left/right accelerate and
 decelerate, the fire button jumps from the grounded state, releasing it shortens
 the jump, and later airborne press edges consume gunboot charge and add recoil.
 Landing restores all eight charges. This is the first target-specialized
-replacement for the host reference's floating-point GameMaker values.
+replacement for the host reference's floating-point GameMaker values. An
+airborne press emits a bounded downward bullet on hardware sprite channel 1
+and redraws the side-panel ammo digit; channel 0 remains dedicated to the
+player.
 
 Its small `AmigaHardware` and `CopperList` classes are adapted from the proven
 sibling-port framework. Its machine lifecycle follows Rescue on Fractalus:

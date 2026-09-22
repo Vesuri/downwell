@@ -42,6 +42,8 @@ enum {
     copperWords = 128,
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
+    bulletSpriteHeight = 8,
+    bulletSpriteBytes = (bulletSpriteHeight + 2) * 4,
     fetchCropBytes = 2,
     fetchWords = 22,
     fetchWidth = fetchWords * 16,
@@ -139,6 +141,12 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
         drawAsset(renderer, 413, digit + 10,
                   x + offsets[index][0], y + offsets[index][1], 0);
     drawAsset(renderer, 413, digit, x, y, 0);
+}
+
+static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo) {
+    amigaRendererClearClipRect(renderer);
+    amigaRendererFillRect(renderer, 282, 232, 20, 20, 0);
+    drawAmmoDigit(renderer, 290, 239, ammo);
 }
 
 static bool isTerrainSymbol(char symbol) {
@@ -241,6 +249,7 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
 
 static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
                         const UWORD* playerSprite,
+                        const UWORD* bulletSprite,
                         const UWORD* nullSprite,
                         unsigned ringOrigin) {
     unsigned channel;
@@ -259,7 +268,8 @@ static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
                  hud + downwellPlaneBytes + fetchCropBytes);
 
     list.pointer(AmigaHardware::spr0pth, playerSprite);
-    for (channel = 1; channel < 8; ++channel)
+    list.pointer(AmigaHardware::spr0pth + 4, bulletSprite);
+    for (channel = 2; channel < 8; ++channel)
         list.pointer((UWORD)(AmigaHardware::spr0pth + channel * 4), nullSprite);
 
     list.move(AmigaHardware::color00 + 0 * 2, 0x000);
@@ -292,6 +302,31 @@ static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
     return list.finish();
 }
 
+static void hideHardwareSprite(UWORD* sprite) {
+    sprite[0] = 0;
+    sprite[1] = 0;
+}
+
+static void buildBulletSprite(UWORD* sprite, int x, int y) {
+    UBYTE* control = (UBYTE*)sprite;
+    const int startX = downwellDisplayHStart + x;
+    const int startY = downwellDisplayVStart + y;
+    const int stopY = startY + bulletSpriteHeight;
+    unsigned line;
+    control[0] = (UBYTE)startY;
+    control[1] = (UBYTE)(startX >> 1);
+    control[2] = (UBYTE)stopY;
+    control[3] = (UBYTE)((startX & 1) |
+                         (stopY > 255 ? 2 : 0) |
+                         (startY > 255 ? 4 : 0));
+    for (line = 0; line < bulletSpriteHeight; ++line) {
+        sprite[2 + line * 2] = line < 2 ? 0xc000 : 0;
+        sprite[3 + line * 2] = 0xc000;
+    }
+    sprite[2 + bulletSpriteHeight * 2] = 0;
+    sprite[3 + bulletSpriteHeight * 2] = 0;
+}
+
 static void offsetHardwareSprite(UWORD* sprite, int deltaX, int deltaY) {
     UBYTE* control = (UBYTE*)sprite;
     int startX = ((int)control[1] << 1) | (control[3] & 1);
@@ -317,6 +352,9 @@ int main(void) {
     unsigned ringOrigin = initialRingOrigin;
     unsigned worldBottom;
     AmigaPlayer player;
+    bool bulletActive = false;
+    int bulletX = 0;
+    int bulletY = 0;
     UWORD savedDmacon;
     UWORD savedIntena;
     const UWORD* osCopper;
@@ -345,7 +383,8 @@ int main(void) {
     worldBottom = entrance.rowCount * 16u - 1u;
 
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
-                         copperWords * 2 * sizeof(UWORD), playerSpriteBytes)) {
+                         copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
+                         bulletSpriteBytes)) {
         CloseLibrary((struct Library*)GfxBase);
         GfxBase = 0;
         return 1;
@@ -372,11 +411,14 @@ int main(void) {
         GfxBase = 0;
         return 1;
     }
+    hideHardwareSprite(memory.bulletSprite());
     if (!buildCopper(copperLists[0], memory.game(), memory.hud(),
-                     memory.playerSprite(0), memory.nullSprite(),
+                     memory.playerSprite(0), memory.bulletSprite(),
+                     memory.nullSprite(),
                      initialRingOrigin) ||
         !buildCopper(copperLists[1], memory.game(), memory.hud(),
-                     memory.playerSprite(1), memory.nullSprite(),
+                     memory.playerSprite(1), memory.bulletSprite(),
+                     memory.nullSprite(),
                      initialRingOrigin)) {
         memory.release();
         CloseLibrary((struct Library*)GfxBase);
@@ -433,10 +475,21 @@ int main(void) {
         waitVblank();
         ++frame;
         {
+            if (bulletActive) {
+                bulletY += 6;
+                if (bulletY >= downwellDisplayHeight) {
+                    bulletActive = false;
+                    hideHardwareSprite(memory.bulletSprite());
+                } else {
+                    buildBulletSprite(memory.bulletSprite(), bulletX, bulletY);
+                }
+            }
             const downwell::Input liveInput = AmigaInput::sample();
             packedInput = downwell::packReplayInput(liveInput);
             const downwell::Input input =
                 downwell::unpackReplayInput(packedInput);
+            const unsigned priorShots = player.shots();
+            const int priorAmmo = player.ammo();
             const AmigaPlayerMotion motion = player.step(input);
             if (motion.deltaX || motion.deltaY) {
                 offsetHardwareSprite(memory.playerSprite(0),
@@ -444,6 +497,14 @@ int main(void) {
                 offsetHardwareSprite(memory.playerSprite(1),
                                      motion.deltaX, motion.deltaY);
             }
+            if (player.shots() != priorShots) {
+                bulletActive = true;
+                bulletX = downwellPlayfieldX + 80 + player.offsetX() - 1;
+                bulletY = 200 + player.offsetY() + 8;
+                buildBulletSprite(memory.bulletSprite(), bulletX, bulletY);
+            }
+            if (player.ammo() != priorAmmo)
+                redrawAmmo(&renderer, (unsigned)player.ammo());
         }
         if ((frame & 1u) == 0) {
             const unsigned back = front ^ 1u;
@@ -452,7 +513,8 @@ int main(void) {
             drawRevealedGameLine(&renderer, builders, entrance,
                                  ringOrigin, worldBottom);
             if (!buildCopper(copperLists[back], memory.game(), memory.hud(),
-                             memory.playerSprite((frame >> 4) & 1u),
+                             memory.playerSprite(player.grounded() ? 0u : 1u),
+                             memory.bulletSprite(),
                              memory.nullSprite(), ringOrigin))
                 break;
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
