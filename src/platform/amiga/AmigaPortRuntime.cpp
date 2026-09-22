@@ -11,6 +11,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       enemyCount_(0), enemiesDefeated_(0), health_(4), invulnerability_(0),
+      currency_(0),
       solidResolver_(0),
       solidResolverContext_(0),
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
@@ -36,6 +37,72 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].active = false;
         enemies_[index].awake = false;
     }
+    for (index = 0; index < gemCapacity; ++index) {
+        gems_[index].x = 0;
+        gems_[index].y = 0;
+        gems_[index].amount = 0;
+        gems_[index].age = 0;
+        gems_[index].preciseX = 0;
+        gems_[index].preciseY = 0;
+        gems_[index].speedX = 0;
+        gems_[index].speedY = 0;
+        gems_[index].large = false;
+        gems_[index].active = false;
+    }
+}
+
+unsigned AmigaPortRuntime::integerSquareRoot(unsigned value)
+{
+    unsigned result = 0;
+    unsigned bit = 1u << 30;
+    while (bit > value)
+        bit >>= 2;
+    while (bit != 0) {
+        if (value >= result + bit) {
+            value -= result + bit;
+            result = (result >> 1) + bit;
+        } else {
+            result >>= 1;
+        }
+        bit >>= 2;
+    }
+    return result;
+}
+
+void AmigaPortRuntime::spawnReward(const EnemyState& enemy)
+{
+    int remaining = enemy.reward;
+    for (unsigned index = 0; index < gemCapacity && remaining > 0; ++index) {
+        GemState& gem = gems_[index];
+        if (gem.active)
+            continue;
+        gem.large = remaining >= 10;
+        gem.amount = gem.large ? 10 : 2;
+        gem.age = 0;
+        gem.x = enemy.x;
+        gem.y = enemy.y;
+        gem.preciseX = (long)enemy.x * 256L;
+        gem.preciseY = (long)enemy.y * 256L;
+        gem.speedX = 0;
+        gem.speedY = 0;
+        gem.active = true;
+        remaining -= gem.amount;
+    }
+}
+
+unsigned AmigaPortRuntime::gemCount() const
+{
+    unsigned count = 0;
+    for (unsigned index = 0; index < gemCapacity; ++index)
+        if (gems_[index].active)
+            ++count;
+    return count;
+}
+
+const AmigaPortRuntime::GemState&
+AmigaPortRuntime::gemAt(unsigned index) const
+{
+    return gems_[index < gemCapacity ? index : 0];
 }
 
 bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
@@ -134,6 +201,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
     const int oldAmmo = player_.ammo();
     const int oldHealth = health_;
+    const unsigned oldCurrency = currency_;
     const unsigned oldShots = player_.shots();
     bool bulletChanged = false;
     unsigned destroyedBlockCount = 0;
@@ -161,6 +229,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 if (enemy.objectId != 112) {
                     enemy.health -= 10;
                     if (enemy.health <= 0) {
+                        spawnReward(enemy);
                         enemy.active = false;
                         ++enemiesDefeated_;
                     }
@@ -297,6 +366,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             continue;
         if (enemy.objectId == 111 && enemy.y > player_.offsetY() + 2) {
             enemy.health = 0;
+            spawnReward(enemy);
             enemy.active = false;
             ++enemiesDefeated_;
             player_.stompBounce();
@@ -306,6 +376,39 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             --health_;
             invulnerability_ = 90;
             player_.contactKnockback(enemy.x);
+        }
+    }
+
+    for (unsigned gemIndex = 0; gemIndex < gemCapacity; ++gemIndex) {
+        GemState& gem = gems_[gemIndex];
+        if (!gem.active)
+            continue;
+        ++gem.age;
+        const int dx = player_.offsetX() - gem.x;
+        const int dy = player_.offsetY() - gem.y;
+        const unsigned distance = integerSquareRoot(
+            (unsigned)(dx * dx + dy * dy));
+        long speed = 4L * 256L + ((long)gem.age - 15L) * 32L;
+        if (speed > 9L * 256L)
+            speed = 9L * 256L;
+        if (speed < 0)
+            speed = 0;
+        if (distance != 0) {
+            gem.speedX = (long)dx * speed / (long)distance;
+            gem.speedY = (long)dy * speed / (long)distance;
+        }
+        gem.preciseX += gem.speedX;
+        gem.preciseY += gem.speedY;
+        gem.x = (int)(gem.preciseX / 256L);
+        gem.y = (int)(gem.preciseY / 256L);
+        const int collectX = player_.offsetX() - gem.x;
+        const int collectY = player_.offsetY() - gem.y;
+        if (gem.age >= 10 && collectX >= -6 && collectX <= 6 &&
+            collectY >= -8 && collectY <= 8) {
+            currency_ += (unsigned)gem.amount;
+            gem.active = false;
+        } else if (gem.age >= 310) {
+            gem.active = false;
         }
     }
 
@@ -321,6 +424,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     frame.playerMotion = motion;
     frame.ammoChanged = player_.ammo() != oldAmmo;
     frame.healthChanged = health_ != oldHealth;
+    frame.currencyChanged = currency_ != oldCurrency;
     frame.bulletChanged = bulletChanged;
     frame.scrolled = scrollDelta != 0;
     frame.scrollDelta = scrollDelta;

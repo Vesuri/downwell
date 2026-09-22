@@ -219,6 +219,26 @@ static void redrawHealth(AmigaRenderer* renderer, unsigned health) {
     drawHealthNumber(renderer, 52, 15, health, 4);
 }
 
+static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
+    unsigned divisor = 1;
+    unsigned digits = 1;
+    unsigned index;
+    while (currency / divisor >= 10 && digits < 5) {
+        divisor *= 10;
+        ++digits;
+    }
+    amigaRendererClearClipRect(renderer);
+    amigaRendererFillRect(renderer, 316, 4, 64, 30, 0);
+    drawAsset(renderer, 376, 0, 362, 18, 0);
+    for (index = 0; index < digits; ++index) {
+        const unsigned digit = (currency / divisor) % 10;
+        drawCurrencyDigit(renderer,
+                          354 - (int)(digits - index - 1) * 8,
+                          18, digit);
+        divisor /= 10;
+    }
+}
+
 static bool isTerrainSymbol(char symbol) {
     return symbol == '1' || symbol == '2' || symbol == '3' ||
            symbol == 'B' || symbol == '-' || symbol == '|';
@@ -1063,6 +1083,8 @@ int main(void) {
                 redrawAmmo(&renderer, (unsigned)port.player().ammo());
             if (result.healthChanged)
                 redrawHealth(&renderer, (unsigned)port.health());
+            if (result.currencyChanged)
+                redrawCurrency(&renderer, port.currency());
         }
         {
             const unsigned back = front ^ 1u;
@@ -1141,6 +1163,7 @@ int main(void) {
             }
 #ifndef DOWNWELL_REPLAY_VERIFY
             enemySprites[back].hide();
+            bool actorDrawn = false;
             for (unsigned enemyIndex = 0;
                  enemyIndex < port.enemyCount(); ++enemyIndex) {
                 const AmigaPortRuntime::EnemyState& enemy =
@@ -1158,7 +1181,29 @@ int main(void) {
                         screenY, enemy.facing < 0,
                         memory.enemySprite(back), enemySpriteHeight))
                     frameReady = false;
+                actorDrawn = true;
                 break;
+            }
+            if (!actorDrawn) {
+                for (unsigned gemIndex = 0;
+                     gemIndex < AmigaPortRuntime::gemCapacity; ++gemIndex) {
+                    const AmigaPortRuntime::GemState& gem =
+                        port.gemAt(gemIndex);
+                    const int screenY = gameplayPlayerStartY + gem.y -
+                        port.cameraOffsetY();
+                    if (!gem.active || screenY < 16 ||
+                        screenY >= downwellDisplayHeight)
+                        continue;
+                    if (!amigaRendererBuildHardwareSprite(
+                            activeGamePack, activeGamePackEnd,
+                            (UWORD)(gem.large ? 134 : 133),
+                            (UWORD)((gem.age / 2u) & 3u),
+                            downwellPlayfieldX + 80 + gem.x,
+                            screenY, 0,
+                            memory.enemySprite(back), enemySpriteHeight))
+                        frameReady = false;
+                    break;
+                }
             }
 #endif
             if (frameReady &&

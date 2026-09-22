@@ -6,12 +6,17 @@
 
 #include <cstdint>
 
-enum { amigaPortBulletCapacity = 6, amigaPortEnemyCapacity = 3 };
+enum {
+    amigaPortBulletCapacity = 6,
+    amigaPortEnemyCapacity = 3,
+    amigaPortGemCapacity = 12
+};
 
 struct AmigaPortFrame {
     AmigaPlayerMotion playerMotion;
     bool ammoChanged;
     bool healthChanged;
+    bool currencyChanged;
     bool bulletChanged;
     bool scrolled;
     int scrollDelta;
@@ -25,6 +30,7 @@ public:
     static constexpr unsigned ringHeight = 320;
     static constexpr unsigned bulletCapacity = amigaPortBulletCapacity;
     static constexpr unsigned enemyCapacity = amigaPortEnemyCapacity;
+    static constexpr unsigned gemCapacity = amigaPortGemCapacity;
     static constexpr int bulletBottom = 284;
     typedef bool (*SolidResolver)(void* context, int x, int y);
 
@@ -47,6 +53,18 @@ public:
         long speedY;
         bool active;
         bool awake;
+    };
+    struct GemState {
+        int x;
+        int y;
+        int amount;
+        unsigned age;
+        long preciseX;
+        long preciseY;
+        long speedX;
+        long speedY;
+        bool large;
+        bool active;
     };
 
     explicit AmigaPortRuntime(unsigned initialRingOrigin,
@@ -78,6 +96,9 @@ public:
     const EnemyState& enemyAt(unsigned index) const;
     unsigned enemyCount() const { return enemyCount_; }
     unsigned enemiesDefeated() const { return enemiesDefeated_; }
+    unsigned gemCount() const;
+    const GemState& gemAt(unsigned index) const;
+    unsigned currency() const { return currency_; }
     int health() const { return health_; }
     unsigned invulnerability() const { return invulnerability_; }
     bool bulletActive() const { return bulletCount() != 0; }
@@ -105,10 +126,12 @@ private:
     int cameraPixelY_;
     BulletState bullets_[bulletCapacity];
     EnemyState enemies_[enemyCapacity];
+    GemState gems_[gemCapacity];
     unsigned enemyCount_;
     unsigned enemiesDefeated_;
     int health_;
     unsigned invulnerability_;
+    unsigned currency_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;
     Breakable breakables_[breakableCapacity];
@@ -116,6 +139,9 @@ private:
     unsigned blocksDestroyed_;
     std::uint64_t checkpoint_;
     downwell::StateDigest trajectory_;
+
+    void spawnReward(const EnemyState& enemy);
+    static unsigned integerSquareRoot(unsigned value);
 };
 
 #endif

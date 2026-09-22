@@ -82,8 +82,17 @@ int main() {
     require(stomp.enemiesDefeated() == 1 &&
                 !stomp.enemyAt(0).active &&
                 !stomp.player().grounded() &&
-                stomp.player().ammo() == 8,
+                stomp.player().ammo() == 8 && stomp.gemCount() == 3,
             "descending contact stomps a snake, bounces and refills gunboots");
+    require(stomp.gemAt(0).amount == 2 && !stomp.gemAt(0).large &&
+                stomp.gemAt(1).amount == 2 &&
+                stomp.gemAt(2).amount == 2,
+            "six-value snake reward splits into three recovered small gems");
+    for (unsigned frame = 0;
+         frame < 120 && stomp.currency() == 0; ++frame)
+        stomp.step(0);
+    require(stomp.currency() == 6 && stomp.gemCount() == 0,
+            "attracted stomp reward reaches the player and enters currency");
 
     AmigaPortRuntime contact(300);
     require(contact.configureEnemy(0, 117, 177, 0, 0,

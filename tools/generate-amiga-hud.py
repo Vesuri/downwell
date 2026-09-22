@@ -38,6 +38,8 @@ SELECTIONS = {
         44: None,    # sprSelectArrow
         51: None,    # sprTile1
         76: None,    # sprTileSurface
+        133: None,   # sprGemSmall
+        134: None,   # sprGemLarge
         163: None,   # sprEnmSnake
         177: None,   # sprEnmSnail
         369: None,   # bgNightsky
