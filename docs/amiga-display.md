@@ -63,3 +63,22 @@ core rendering boundary.
 The first hardware milestone is a four-plane copper display which proves the
 crop, palettes, priorities, null sprites, and central aperture before it tries
 to render recovered assets.
+
+## Recovered HUD asset format
+
+`tools/generate-amiga-hud.py` converts the exact HUD resources used by the
+landscape path into `generated/amiga-hud.dwap`. The generated payload remains
+uncommitted copyrighted material. Each frame record retains its stable sprite
+and frame IDs, origin, logical dimensions, word-aligned DMA width, payload
+offset, and size.
+
+Rows are stored as two interleaved planes. The four pens deliberately
+distinguish transparency from black:
+
+- 0: transparent
+- 1: white
+- 2: red
+- 3: opaque black
+
+That distinction lets the PF2 border and gauges occlude PF1 where the recovered
+art contains black while leaving genuinely transparent atlas pixels open.
