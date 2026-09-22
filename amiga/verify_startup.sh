@@ -60,10 +60,10 @@ env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
   "$GDB" -q -batch -x "$GDB_SCRIPT" out/Downwell.elf \
   > "$RUN/gdb-startup.log" 2>&1
 
-grep -q '^DOWNWELL_STARTUP_READY$' "$RUN/gdb-startup.log" || {
-  echo "normal build did not reach its first rendered splash"
+grep -q '^DOWNWELL_FRAME_LOOP_READY$' "$RUN/gdb-startup.log" || {
+  echo "normal build did not remain in its live frame loop"
   tail -80 "$RUN/gdb-startup.log"
   exit 1
 }
 
-echo "normal A500 startup passed"
+echo "normal A500 startup and sustained frame loop passed"

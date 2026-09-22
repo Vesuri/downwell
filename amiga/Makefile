@@ -190,7 +190,9 @@ audit:
 		echo "*** instruction newer than 68000 in native executable"; exit 1; \
 	else echo "68000 instruction audit: clean"; fi
 
+# Keep .run: it owns the live FS-UAE pid used by run.sh to replace the
+# previous project emulator safely.  Removing it leaves a stale window.
 clean:
-	$(RM) -r obj out .run
+	$(RM) -r obj out
 
 -include $(OBJECTS:.o=.d)

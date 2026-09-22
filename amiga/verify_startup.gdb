@@ -1,7 +1,7 @@
 set pagination off
 target remote 127.0.0.1:2345
-break downwellStartupReady
+break downwellFrameLoopReady
 continue
-printf "DOWNWELL_STARTUP_READY\n"
+printf "DOWNWELL_FRAME_LOOP_READY\n"
 detach
 quit

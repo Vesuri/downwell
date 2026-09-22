@@ -144,6 +144,10 @@ __attribute__((noinline, used)) void downwellReplayComplete(void) {
 extern "C" __attribute__((noinline, used)) void downwellStartupReady(void) {
     __asm__ volatile("" ::: "memory");
 }
+
+extern "C" __attribute__((noinline, used)) void downwellFrameLoopReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
 #endif
 
 static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
@@ -862,6 +866,7 @@ int main(void) {
     AmigaSceneRuntime scenes;
     AmigaScene presentedScene = scenes.scene();
     int presentedSplash = scenes.splashStage();
+    unsigned liveFrameCount = 0;
     worldViewY += port.cameraOffsetY();
 #endif
 
@@ -1104,6 +1109,10 @@ int main(void) {
         int destroyedBlockX[AmigaPortRuntime::bulletCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::bulletCapacity] = {0};
         platform.waitVblank();
+#ifndef DOWNWELL_REPLAY_VERIFY
+        if (++liveFrameCount == 64)
+            downwellFrameLoopReady();
+#endif
         {
 #ifdef DOWNWELL_REPLAY_VERIFY
             downwell::Input replayInput;

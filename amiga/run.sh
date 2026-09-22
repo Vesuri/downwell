@@ -16,7 +16,15 @@ DH1="$RUN/dh1"
 mkdir -p "$DH0/s" "$DH1" "$RUN/state"
 printf 'cd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f "$EXE" "$DH1/Downwell"
+echo "running $EXE"
 rm -f "$RUN"/state/*.uss
+
+# This fsemu-core FS-UAE takes a capture with HOST-KEY + S (hold F12,
+# press S).  It reads the destination from the environment even though it
+# also parses the command-line option.
+SHOTS="${FSEMU_SCREENSHOTS_DIR:-$HOME/Pictures/Screenshots}"
+mkdir -p "$SHOTS"
+export FSEMU_SCREENSHOTS_DIR="$SHOTS"
 
 fsuae_stop_previous
 fsuae_track_self
@@ -28,4 +36,5 @@ exec "$FSUAE" \
   --joystick_port_0=none --joystick_port_1=none \
   --automatic_input_grab=0 --fullscreen=0 \
   --window_width=760 --window_height=568 --ntsc_mode=0 \
-  --state_dir="$RUN/state"
+  --state_dir="$RUN/state" \
+  --screenshots_output_dir="$SHOTS"
