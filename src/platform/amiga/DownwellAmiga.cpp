@@ -359,6 +359,8 @@ struct MenuDrawList {
     unsigned count;
 };
 
+static MenuDrawList menuDrawList;
+
 static bool buildMenuDrawList(const downwell::RoomPack& rooms,
                               const downwell::ObjectPack& objects,
                               MenuDrawList& list) {
@@ -651,7 +653,6 @@ int main(void) {
     AmigaPlatform platform;
     AmigaMemory memory;
     AmigaRenderer renderer;
-    MenuDrawList menuDrawList;
     unsigned front = 0;
     int worldViewY = mainInitialViewY;
 #ifdef DOWNWELL_REPLAY_VERIFY
