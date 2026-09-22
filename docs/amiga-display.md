@@ -38,10 +38,10 @@ Four lores bitplanes are split 2+2:
 | PF1 | BPL1, BPL3 | COLOR00..03 | Game well |
 | PF2 | BPL2, BPL4 | COLOR08..11 | HUD and side panels |
 
-Each 384x284 bitplane occupies its own contiguous 13,632-byte region. Every
-hardware pointer therefore advances directly from one 48-byte row to the next,
-so BPL1MOD and BPL2MOD are both zero. The two regions for each playfield remain
-in one allocation for simple ownership and cleanup.
+PF2's 384x284 bitplanes each occupy a contiguous 13,632-byte region. PF1 uses
+two 384x320 circular bitplanes. The 22-word crop advances 44 bytes per fetched
+line, so BPL1MOD and BPL2MOD are both four and each hardware pointer lands on
+the same two-byte inset of the next 48-byte backing row.
 
 PF2 has priority over PF1. Pen zero remains transparent on both layers, with
 COLOR00 black, so the two layers can use white and red independently without
@@ -70,13 +70,20 @@ Every unused channel points at an armed-safe null sprite on every frame. Sprite
 priority is programmed explicitly together with PF2-over-PF1 priority; it must
 not depend on an operating-system value left in BPLCON2.
 
-## Buffering
+## Vertical ring and buffering
 
-PF1 is double buffered because the scrolling game changes continuously. PF2 is
-single buffered initially because most of the HUD is static; dynamic counters
-and gauges update only their small dirty regions. If tearing measurements show
-that this is insufficient, PF2 can be double buffered without changing the
-core rendering boundary.
+PF1 is a single 320-line circular raster. The camera's integer vertical offset
+selects its first physical row by changing the BPL1/BPL3 pointers. If the
+284-line visible span crosses the end of the allocation, the copper waits until
+just after the final data fetch of the preceding scanline and repoints only
+BPL1/BPL3 to the ring base. A line-255 wait barrier is emitted when the split
+crosses the copper's eight-bit vertical comparator.
+
+Scrolling must never repaint the complete viewport. Before advancing the
+published origin, the renderer clears and draws only the rows or complete
+16-pixel block bands about to become visible at the bottom. The 36 hidden ring
+rows provide the update lead. PF2 remains a fixed, single-buffered HUD raster;
+dynamic counters and gauges update only their small dirty regions.
 
 The first hardware milestone is a four-plane copper display which proves the
 crop, palettes, priorities, null sprites, and central aperture before it tries

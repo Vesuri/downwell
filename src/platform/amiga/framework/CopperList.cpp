@@ -29,6 +29,18 @@ bool CopperList::pointer(UWORD reg, const void* value)
            move((UWORD)(reg + 2), (UWORD)address);
 }
 
+bool CopperList::wait(UWORD vertical, UWORD horizontal)
+{
+    if (!valid_ || count_ + 2 > capacity_) {
+        valid_ = false;
+        return false;
+    }
+    words_[count_++] = (UWORD)(((vertical & 0xff) << 8) |
+                               (horizontal & 0xfe) | 1);
+    words_[count_++] = 0xfffe;
+    return true;
+}
+
 bool CopperList::finish()
 {
     if (!valid_ || count_ + 2 > capacity_) {

@@ -37,7 +37,8 @@ enum {
     displayVStop = displayVStart + downwellDisplayHeight,
     fetchStart = 0x30,
     fetchStop = fetchStart + 8 * (fetchWords - 1),
-    fetchModulo = downwellBytesPerPlaneLine - fetchWords * 2
+    fetchModulo = downwellBytesPerPlaneLine - fetchWords * 2,
+    initialRingOrigin = 300
 };
 
 static_assert(displayHStart == 0x71, "cropped display starts at logical x=16");
@@ -167,17 +168,20 @@ static void buildReferencePicture(AmigaRenderer* renderer, unsigned phase) {
 
 static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
                         const UWORD* playerSprite,
-                        const UWORD* nullSprite) {
+                        const UWORD* nullSprite,
+                        unsigned ringOrigin) {
     unsigned channel;
+    const unsigned firstSpan = downwellGameRingHeight - ringOrigin;
+    UBYTE* gameStart = game + ringOrigin * downwellBytesPerPlaneLine;
 
     list.reset();
     list.move(AmigaHardware::bplcon0, 0x4401);
     list.move(AmigaHardware::bpl1mod, fetchModulo);
     list.move(AmigaHardware::bpl2mod, fetchModulo);
-    list.pointer(AmigaHardware::bpl1pth, game + fetchCropBytes);
+    list.pointer(AmigaHardware::bpl1pth, gameStart + fetchCropBytes);
     list.pointer(AmigaHardware::bpl1pth + 4, hud + fetchCropBytes);
     list.pointer(AmigaHardware::bpl1pth + 8,
-                 game + downwellPlaneBytes + fetchCropBytes);
+                 gameStart + downwellGameRingPlaneBytes + fetchCropBytes);
     list.pointer(AmigaHardware::bpl1pth + 12,
                  hud + downwellPlaneBytes + fetchCropBytes);
 
@@ -196,12 +200,28 @@ static bool buildCopper(CopperList& list, UBYTE* game, UBYTE* hud,
     list.move(AmigaHardware::color00 + 18 * 2, 0xf00);
     list.move(AmigaHardware::color00 + 19 * 2, 0x000);
 
+    if (firstSpan < downwellDisplayHeight) {
+        const unsigned resetAfterLine =
+            displayVStart + firstSpan - 1;
+        /*
+         * Repoint after the final fetch from the ring tail and before the next
+         * line's DDFSTRT. Copper vertical comparison wraps at line 255, so an
+         * explicit line-255 barrier is required for splits below that point.
+         */
+        if (resetAfterLine > 255)
+            list.wait(255, 0xdf);
+        list.wait((UWORD)resetAfterLine, 0xdf);
+        list.pointer(AmigaHardware::bpl1pth, game + fetchCropBytes);
+        list.pointer(AmigaHardware::bpl1pth + 8,
+                     game + downwellGameRingPlaneBytes + fetchCropBytes);
+    }
+
     return list.finish();
 }
 
 int main(void) {
     struct View* savedView;
-    UBYTE* game[2];
+    UBYTE* game;
     UBYTE* hud;
     UWORD* copper;
     UWORD* nullSprite;
@@ -218,8 +238,7 @@ int main(void) {
     if (!GfxBase)
         return 1;
 
-    game[0] = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
-    game[1] = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
+    game = (UBYTE*)AllocMem(downwellGameRingBytes, MEMF_CHIP | MEMF_CLEAR);
     hud = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
     copper = (UWORD*)AllocMem(copperWords * 2 * sizeof(UWORD),
                              MEMF_CHIP | MEMF_CLEAR);
@@ -228,15 +247,14 @@ int main(void) {
                                       MEMF_CHIP | MEMF_CLEAR);
     playerSprite[1] = (UWORD*)AllocMem(playerSpriteBytes,
                                       MEMF_CHIP | MEMF_CLEAR);
-    if (!game[0] || !game[1] || !hud || !copper || !nullSprite ||
+    if (!game || !hud || !copper || !nullSprite ||
         !playerSprite[0] || !playerSprite[1]) {
         if (playerSprite[1]) FreeMem(playerSprite[1], playerSpriteBytes);
         if (playerSprite[0]) FreeMem(playerSprite[0], playerSpriteBytes);
         if (nullSprite) FreeMem(nullSprite, 8);
         if (copper) FreeMem(copper, copperWords * 2 * sizeof(UWORD));
         if (hud) FreeMem(hud, downwellLayerBytes);
-        if (game[1]) FreeMem(game[1], downwellLayerBytes);
-        if (game[0]) FreeMem(game[0], downwellLayerBytes);
+        if (game) FreeMem(game, downwellGameRingBytes);
         CloseLibrary((struct Library*)GfxBase);
         return 1;
     }
@@ -246,10 +264,9 @@ int main(void) {
         CopperList(copper + copperWords, copperWords)
     };
 
-    amigaRendererInit(&renderer, game[0], hud);
+    amigaRendererInit(&renderer, game, hud);
+    amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
     buildReferencePicture(&renderer, 0);
-    amigaRendererInit(&renderer, game[1], hud);
-    buildReferencePicture(&renderer, 1);
     if (!amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 31, 0,
             downwellPlayfieldX + 80, 200,
@@ -263,22 +280,20 @@ int main(void) {
         FreeMem(nullSprite, 8);
         FreeMem(copper, copperWords * 2 * sizeof(UWORD));
         FreeMem(hud, downwellLayerBytes);
-        FreeMem(game[1], downwellLayerBytes);
-        FreeMem(game[0], downwellLayerBytes);
+        FreeMem(game, downwellGameRingBytes);
         CloseLibrary((struct Library*)GfxBase);
         return 1;
     }
-    if (!buildCopper(copperLists[0], game[0], hud,
-                     playerSprite[0], nullSprite) ||
-        !buildCopper(copperLists[1], game[1], hud,
-                     playerSprite[1], nullSprite)) {
+    if (!buildCopper(copperLists[0], game, hud,
+                     playerSprite[0], nullSprite, initialRingOrigin) ||
+        !buildCopper(copperLists[1], game, hud,
+                     playerSprite[1], nullSprite, initialRingOrigin)) {
         FreeMem(playerSprite[1], playerSpriteBytes);
         FreeMem(playerSprite[0], playerSpriteBytes);
         FreeMem(nullSprite, 8);
         FreeMem(copper, copperWords * 2 * sizeof(UWORD));
         FreeMem(hud, downwellLayerBytes);
-        FreeMem(game[1], downwellLayerBytes);
-        FreeMem(game[0], downwellLayerBytes);
+        FreeMem(game, downwellGameRingBytes);
         CloseLibrary((struct Library*)GfxBase);
         return 1;
     }
@@ -371,8 +386,7 @@ int main(void) {
     FreeMem(nullSprite, 8);
     FreeMem(copper, copperWords * 2 * sizeof(UWORD));
     FreeMem(hud, downwellLayerBytes);
-    FreeMem(game[1], downwellLayerBytes);
-    FreeMem(game[0], downwellLayerBytes);
+    FreeMem(game, downwellGameRingBytes);
     CloseLibrary((struct Library*)GfxBase);
     GfxBase = 0;
     return 0;

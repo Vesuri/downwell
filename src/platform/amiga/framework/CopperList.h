@@ -10,6 +10,7 @@ public:
     void reset();
     bool move(UWORD reg, UWORD value);
     bool pointer(UWORD reg, const void* value);
+    bool wait(UWORD vertical, UWORD horizontal);
     bool finish();
     UWORD* data() const { return words_; }
     unsigned size() const { return count_; }

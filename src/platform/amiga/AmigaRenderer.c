@@ -11,18 +11,25 @@ static ULONG readLong(const UBYTE* data) {
 static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {
     UBYTE* row;
     UBYTE mask;
+    ULONG planeBytes = downwellPlaneBytes;
+    int targetY = y;
     if (x < renderer->clipX || y < renderer->clipY ||
         x >= renderer->clipX + renderer->clipWidth ||
         y >= renderer->clipY + renderer->clipHeight ||
         x < 0 || x >= downwellVisibleWidth ||
         y < 0 || y >= downwellDisplayHeight)
         return;
-    row = renderer->target + y * downwellBytesPerPlaneLine;
+    if (renderer->target == renderer->game) {
+        targetY = (int)((renderer->gameOrigin + (unsigned)y) %
+                        downwellGameRingHeight);
+        planeBytes = downwellGameRingPlaneBytes;
+    }
+    row = renderer->target + targetY * downwellBytesPerPlaneLine;
     mask = (UBYTE)(0x80u >> (x & 7));
     row[x >> 3] &= (UBYTE)~mask;
-    row[downwellPlaneBytes + (x >> 3)] &= (UBYTE)~mask;
+    row[planeBytes + (x >> 3)] &= (UBYTE)~mask;
     if (pen & 1u) row[x >> 3] |= mask;
-    if (pen & 2u) row[downwellPlaneBytes + (x >> 3)] |= mask;
+    if (pen & 2u) row[planeBytes + (x >> 3)] |= mask;
 }
 
 static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
@@ -46,25 +53,28 @@ static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
 void amigaRendererInit(AmigaRenderer* renderer, UBYTE* game, UBYTE* hud) {
     renderer->game = game;
     renderer->hud = hud;
+    renderer->gameOrigin = 0;
     amigaRendererClearClipRect(renderer);
 }
 
+void amigaRendererSetGameOrigin(AmigaRenderer* renderer, unsigned origin) {
+    renderer->gameOrigin = origin % downwellGameRingHeight;
+}
+
 void amigaRendererClear(AmigaRenderer* renderer, unsigned pen) {
+    ULONG index;
     UBYTE* savedTarget = renderer->target;
     int savedX = renderer->clipX;
     int savedY = renderer->clipY;
     int savedWidth = renderer->clipWidth;
     int savedHeight = renderer->clipHeight;
-    renderer->clipX = 0;
-    renderer->clipY = 0;
-    renderer->clipWidth = downwellVisibleWidth;
-    renderer->clipHeight = downwellDisplayHeight;
-    renderer->target = renderer->game;
-    amigaRendererFillRect(renderer, 0, 0, downwellVisibleWidth,
-                          downwellDisplayHeight, pen);
-    renderer->target = renderer->hud;
-    amigaRendererFillRect(renderer, 0, 0, downwellVisibleWidth,
-                          downwellDisplayHeight, 0);
+    for (index = 0; index < downwellGameRingPlaneBytes; ++index) {
+        renderer->game[index] = (pen & 1u) ? 0xff : 0;
+        renderer->game[downwellGameRingPlaneBytes + index] =
+            (pen & 2u) ? 0xff : 0;
+    }
+    for (index = 0; index < downwellLayerBytes; ++index)
+        renderer->hud[index] = 0;
     renderer->target = savedTarget;
     renderer->clipX = savedX;
     renderer->clipY = savedY;
