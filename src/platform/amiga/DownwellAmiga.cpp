@@ -56,6 +56,9 @@ enum {
     fetchStop = fetchStart + 8 * (fetchWords - 1),
     fetchModulo = downwellBytesPerPlaneLine - fetchWords * 2,
     initialRingOrigin = 300,
+    mainViewX = 160,
+    mainInitialViewY = 34,
+    mainBuilderStartY = 1168,
     gameplayPlayerStartY = 142,
     gameplayPlayerGroundY = 200
 };
@@ -171,41 +174,61 @@ static bool isTerrainSymbol(char symbol) {
            symbol == 'B' || symbol == '-' || symbol == '|';
 }
 
-static void drawEntrancePattern(AmigaRenderer* renderer,
-                                const downwell::BuilderPatternPack& builders,
-                                const downwell::PackedBuilderPattern& pattern) {
-    const int baseY = downwellDisplayHeight - pattern.rowCount * 16;
-    unsigned row;
-    for (row = 0; row < pattern.rowCount; ++row) {
-        ULONG width = 0;
-        unsigned column;
-        if (!builders.rowWidth(pattern, (UWORD)row, width))
-            return;
-        for (column = 0; column < width; ++column) {
-            char symbol = 0;
-            if (!builders.cell(pattern, (UWORD)column, (UWORD)row, symbol))
-                return;
-            if (isTerrainSymbol(symbol))
-                drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + 8 + column * 16,
-                              baseY + row * 16, 0);
-            if (symbol == 'd')
-                drawGameAsset(renderer, 166, 0,
-                              downwellPlayfieldX + 8 + column * 16,
-                              baseY + row * 16, 0);
-        }
+static bool roomHasMainWall(const downwell::RoomPack& rooms,
+                            const downwell::PackedRoom& room,
+                            int x, int y) {
+    unsigned index;
+    for (index = 0; index < room.instanceCount; ++index) {
+        downwell::PackedRoomInstance instance;
+        if (rooms.roomInstance(room, index, instance) &&
+            instance.objectId == 60 && instance.x == x && instance.y == y)
+            return true;
+    }
+    return false;
+}
+
+static UWORD mainWallFrame(const downwell::RoomPack& rooms,
+                           const downwell::PackedRoom& room,
+                           int x, int y) {
+    UWORD frame = 0;
+    if (roomHasMainWall(rooms, room, x, y - 16)) frame |= 1;
+    if (roomHasMainWall(rooms, room, x + 16, y)) frame |= 2;
+    if (roomHasMainWall(rooms, room, x, y + 16)) frame |= 4;
+    if (roomHasMainWall(rooms, room, x - 16, y)) frame |= 8;
+    return frame;
+}
+
+static void drawMainRoomWalls(AmigaRenderer* renderer,
+                              const downwell::RoomPack& rooms,
+                              const downwell::PackedRoom& room,
+                              int viewY) {
+    unsigned index;
+    for (index = 0; index < room.instanceCount; ++index) {
+        downwell::PackedRoomInstance instance;
+        if (!rooms.roomInstance(room, index, instance) ||
+            instance.objectId != 60 || instance.y + 8 < viewY ||
+            instance.y - 8 >= viewY + downwellDisplayHeight)
+            continue;
+        drawGameAsset(renderer, 51,
+                      mainWallFrame(rooms, room, instance.x, instance.y),
+                      downwellPlayfieldX + instance.x - mainViewX,
+                      instance.y - viewY, 0);
     }
 }
 
 static void buildReferencePicture(
     AmigaRenderer* renderer,
+    const downwell::RoomPack& rooms,
     const downwell::BuilderPatternPack& builders,
-    const downwell::PackedBuilderPattern& entrance) {
+    const downwell::PackedBuilderPattern& entrance,
+    int viewY) {
+    downwell::PackedRoom room;
 
     amigaRendererClear(renderer, 0);
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
                             downwellPlayfieldWidth, downwellDisplayHeight);
-    drawEntrancePattern(renderer, builders, entrance);
+    if (rooms.findRoom(11, room))
+        drawMainRoomWalls(renderer, rooms, room, viewY);
 
     amigaRendererClearClipRect(renderer);
     drawAsset(renderer, 408, 0, 108, 0, 0);
@@ -222,6 +245,8 @@ static void buildReferencePicture(
     drawAsset(renderer, 376, 0, 362, 18, 0);
     drawCurrencyDigit(renderer, 354, 18, 0);
     drawAmmoDigit(renderer, 290, 239, 8);
+    (void)builders;
+    (void)entrance;
 }
 
 static void drawSplash(AmigaRenderer* renderer, int stage) {
@@ -406,44 +431,76 @@ static void drawStyleSelect(AmigaRenderer* renderer,
     amigaRendererClearClipRect(renderer);
 }
 
+static void drawMainWorldLine(
+    AmigaRenderer* renderer,
+    const downwell::RoomPack& rooms,
+    const downwell::PackedRoom& room,
+    const downwell::BuilderPatternPack& builders,
+    const downwell::PackedBuilderPattern& pattern,
+    int worldY, int screenY) {
+    unsigned index;
+    const int centerY = ((worldY + 8) / 16) * 16;
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, screenY,
+                            downwellPlayfieldWidth, 1);
+    for (index = 0; index < room.instanceCount; ++index) {
+        downwell::PackedRoomInstance instance;
+        if (!rooms.roomInstance(room, index, instance) ||
+            instance.objectId != 60 || worldY < instance.y - 8 ||
+            worldY > instance.y + 7)
+            continue;
+        drawGameAsset(renderer, 51,
+                      mainWallFrame(rooms, room, instance.x, instance.y),
+                      downwellPlayfieldX + instance.x - mainViewX,
+                      screenY + instance.y - worldY, 0);
+    }
+
+    if (centerY >= 704 && centerY < mainBuilderStartY) {
+        drawGameAsset(renderer, 51, 0, downwellPlayfieldX,
+                      screenY + centerY - worldY, 0);
+        drawGameAsset(renderer, 51, 0,
+                      downwellPlayfieldX + downwellPlayfieldWidth,
+                      screenY + centerY - worldY, 0);
+    }
+    if (centerY >= mainBuilderStartY &&
+        centerY < mainBuilderStartY + (int)pattern.rowCount * 16) {
+        const UWORD row = (UWORD)((centerY - mainBuilderStartY) / 16);
+        ULONG width = 0;
+        unsigned column;
+        if (row + 1 < pattern.rowCount) {
+            drawGameAsset(renderer, 51, 0, downwellPlayfieldX,
+                          screenY + centerY - worldY, 0);
+            drawGameAsset(renderer, 51, 0,
+                          downwellPlayfieldX + downwellPlayfieldWidth,
+                          screenY + centerY - worldY, 0);
+        }
+        if (builders.rowWidth(pattern, row, width)) {
+            for (column = 0; column < width; ++column) {
+                char symbol = 0;
+                const int worldX = 320 - ((int)column + 1) * 16;
+                if (!builders.cell(pattern, (UWORD)column, row, symbol))
+                    break;
+                if (isTerrainSymbol(symbol))
+                    drawGameAsset(renderer, 51, 0,
+                                  downwellPlayfieldX + worldX - mainViewX,
+                                  screenY + centerY - worldY, 0);
+            }
+        }
+    }
+    amigaRendererClearClipRect(renderer);
+}
+
 static void drawRevealedGameLine(AmigaRenderer* renderer,
+                                 const downwell::RoomPack& rooms,
+                                 const downwell::PackedRoom& room,
                                  const downwell::BuilderPatternPack& builders,
                                  const downwell::PackedBuilderPattern& pattern,
                                  unsigned ringOrigin,
                                  unsigned worldY) {
     const int y = downwellDisplayHeight - 1;
-    const unsigned patternY = worldY % (pattern.rowCount * 16u);
-    const UWORD row = (UWORD)(patternY >> 4);
-    const unsigned line = patternY & 15u;
-    ULONG width = 0;
-    unsigned column;
     amigaRendererSetGameOrigin(renderer, ringOrigin);
     amigaRendererClearGameRows(renderer, y, 1, 0);
-    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
-                            downwellPlayfieldWidth, downwellDisplayHeight);
-
-    /* The side walls are permanent world geometry, revealed a line at a time. */
-    amigaRendererFillRect(renderer, downwellPlayfieldX, y, 2, 1, 1);
-    amigaRendererFillRect(renderer,
-                          downwellPlayfieldX + downwellPlayfieldWidth - 2,
-                          y, 2, 1, 1);
-
-    if (builders.rowWidth(pattern, row, width)) {
-        for (column = 0; column < width; ++column) {
-            char symbol = 0;
-            if (!builders.cell(pattern, (UWORD)column, row, symbol))
-                break;
-            if (isTerrainSymbol(symbol))
-                amigaRendererFillRect(renderer,
-                    downwellPlayfieldX + 8 + column * 16,
-                    y, 16, 1, 1);
-            if (symbol == '_' && line < 2u)
-                amigaRendererFillRect(renderer,
-                    downwellPlayfieldX + 8 + column * 16,
-                    y, 16, 1, 1);
-        }
-    }
-    amigaRendererClearClipRect(renderer);
+    drawMainWorldLine(renderer, rooms, room, builders, pattern,
+                      (int)worldY, y);
 }
 
 static bool buildCopper(CopperList& list,
@@ -551,15 +608,17 @@ int main(void) {
         downwell::portReplayBytes, downwell::portReplaySize);
 #endif
     downwell::PackedBuilderPattern entrance;
+    downwell::PackedRoom mainRoom;
     if (!rooms.valid() || !objects.valid() || !builders.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
         !verificationReplay.valid() ||
 #endif
+        !rooms.findRoom(11, mainRoom) ||
         !builders.findPattern(downwell::BuilderPatternFamily::areaOneStart,
-                              0, entrance)) {
+                              3, entrance)) {
         return 1;
     }
-    worldBottom = entrance.rowCount * 16u - 1u;
+    worldBottom = mainInitialViewY + downwellDisplayHeight - 1u;
 
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
@@ -584,7 +643,8 @@ int main(void) {
     amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
 #ifdef DOWNWELL_REPLAY_VERIFY
-    buildReferencePicture(&renderer, builders, entrance);
+    buildReferencePicture(&renderer, rooms, builders, entrance,
+                          mainInitialViewY);
 #else
     drawSplash(&renderer, scenes.splashStage());
 #endif
@@ -671,7 +731,8 @@ int main(void) {
                 else if (presentedScene == AmigaScene::styleSelect)
                     drawStyleSelect(&renderer, scenes);
                 else if (presentationChanged)
-                    buildReferencePicture(&renderer, builders, entrance);
+                    buildReferencePicture(&renderer, rooms, builders, entrance,
+                                          mainInitialViewY);
                 if (presentationChanged) {
                     if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
                                      presentedScene == AmigaScene::gameplay
@@ -708,7 +769,8 @@ int main(void) {
         if ((port.tick() & 1u) == 0) {
             const unsigned back = front ^ 1u;
             ++worldBottom;
-            drawRevealedGameLine(&renderer, builders, entrance,
+            drawRevealedGameLine(&renderer, rooms, mainRoom,
+                                 builders, entrance,
                                  port.ringOrigin(), worldBottom);
             if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
                              playerSprites[port.player().grounded() ? 0u : 1u],
