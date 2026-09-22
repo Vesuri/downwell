@@ -9,7 +9,8 @@ class AmigaPortRuntime;
 
 enum {
     amigaInitialTerrainFragmentCount = 19,
-    amigaTerrainBreakableCapacity = 128
+    amigaTerrainBreakableCapacity = 128,
+    amigaTerrainDecorationCapacity = 128
 };
 
 struct AmigaTerrainFragment {
@@ -34,6 +35,15 @@ struct AmigaTerrainEnemy {
     int alarm1;
 };
 
+struct AmigaTerrainDecoration {
+    int objectId;
+    int spriteId;
+    int x;
+    int y;
+    int frame;
+    bool flipX;
+};
+
 struct AmigaTerrainCollisionContext {
     const downwell::RoomPack* rooms;
     const downwell::PackedRoom* room;
@@ -52,6 +62,15 @@ bool amigaBuildInitialAreaOneTerrain(
     AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
     unsigned& enemyCount,
     downwell::GameMakerRandom* randomAfter = 0);
+bool amigaBuildInitialAreaOneTerrain(
+    const downwell::BuilderPatternPack& builders,
+    AmigaTerrainFragment* fragments, unsigned capacity,
+    AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
+    unsigned& enemyCount,
+    downwell::GameMakerRandom* randomAfter,
+    AmigaTerrainDecoration* decorations,
+    unsigned decorationCapacity,
+    unsigned* decorationCount);
 
 int amigaEnemyHealth(int objectId);
 int amigaEnemyReward(int objectId);

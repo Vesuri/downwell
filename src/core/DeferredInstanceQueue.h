@@ -30,6 +30,7 @@ struct DeferredCreateInstance {
     std::int32_t y;
     float scaleX = 1.0F;
     float scaleY = 1.0F;
+    std::int32_t integerScaleX = 1;
     float imageSpeed = 1.0F;
     float imageIndex = 0.0F;
     std::int32_t integerImageIndex = 0;

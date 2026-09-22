@@ -305,7 +305,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     downwell::PackedRoom terrainRoom;
     AmigaTerrainFragment terrain[amigaInitialTerrainFragmentCount];
     AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
+    AmigaTerrainDecoration
+        generatedDecorations[amigaTerrainDecorationCapacity];
     unsigned generatedEnemyCount = 0;
+    unsigned generatedDecorationCount = 0;
     downwell::GameMakerRandom gameplayRandom(2);
     int breakableX[amigaTerrainBreakableCapacity];
     int breakableY[amigaTerrainBreakableCapacity];
@@ -313,8 +316,33 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 amigaBuildInitialAreaOneTerrain(
                     patterns, terrain, amigaInitialTerrainFragmentCount,
                     generatedEnemies, AmigaPortRuntime::enemyCapacity,
-                    generatedEnemyCount, &gameplayRandom),
+                    generatedEnemyCount, &gameplayRandom,
+                    generatedDecorations, amigaTerrainDecorationCapacity,
+                    &generatedDecorationCount),
             "native gameplay terrain is recovered for parity");
+    bool sawPlant = false;
+    bool sawSpecial = false;
+    for (unsigned index = 0; index < generatedDecorationCount; ++index) {
+        const AmigaTerrainDecoration& decoration =
+            generatedDecorations[index];
+        if (decoration.objectId == 289) {
+            sawPlant = true;
+            require(decoration.spriteId == 550 &&
+                        decoration.frame >= 0 && decoration.frame <= 16,
+                    "native plants retain recovered sprite frames");
+        } else {
+            sawSpecial = true;
+            require(decoration.objectId == 293 ||
+                        decoration.objectId == 296 ||
+                        decoration.objectId == 109 ||
+                        decoration.objectId == 306,
+                    "native decoration list contains SDL-visible objects");
+        }
+    }
+    require(generatedDecorationCount > 0 &&
+                generatedDecorationCount <= amigaTerrainDecorationCapacity &&
+                sawPlant && sawSpecial,
+            "complete recovered decoration population fits native storage");
     const unsigned breakableCount = amigaCollectTerrainBreakables(
         patterns, terrain, amigaInitialTerrainFragmentCount,
         breakableX, breakableY, amigaTerrainBreakableCapacity);

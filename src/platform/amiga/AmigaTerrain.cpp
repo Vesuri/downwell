@@ -26,10 +26,22 @@ bool amigaBuildInitialAreaOneTerrain(
 namespace {
 struct BuildContext {
     AmigaTerrainEnemy* enemies;
-    unsigned capacity;
-    unsigned count;
+    unsigned enemyCapacity;
+    unsigned enemyCount;
+    AmigaTerrainDecoration* decorations;
+    unsigned decorationCapacity;
+    unsigned decorationCount;
     bool overflowed;
 };
+
+int decorationSprite(int objectId) {
+    if (objectId == 289) return 550;
+    if (objectId == 293) return 569;
+    if (objectId == 296) return 568;
+    if (objectId == 109) return 139;
+    if (objectId == 306) return 127;
+    return -1;
+}
 
 bool collectGeneratedObject(
     void* opaque, const downwell::DeferredCreateInstance& command) {
@@ -37,24 +49,39 @@ bool collectGeneratedObject(
     const bool enemy = command.objectId == 111 || command.objectId == 112 ||
                        command.objectId == 113 || command.objectId == 116 ||
                        command.objectId == 117 || command.objectId == 119;
-    if (!enemy || context.enemies == 0)
-        return true;
-    if (context.count >= context.capacity) {
-        context.overflowed = true;
-        return false;
+    if (enemy && context.enemies != 0) {
+        if (context.enemyCount >= context.enemyCapacity) {
+            context.overflowed = true;
+            return false;
+        }
+        AmigaTerrainEnemy& output = context.enemies[context.enemyCount++];
+        output.objectId = command.objectId;
+        output.x = command.x - 240;
+        output.y = command.y - 176;
+        output.speedX = command.integerVelocityX;
+        output.speedY = command.integerVelocityY;
+        output.direction = command.integerDirection;
+        output.moveSpeed = command.integerMoveSpeed;
+        output.motionState = command.motionState;
+        output.auxiliaryState = command.auxiliaryState;
+        output.alarm0 = command.alarms.get(0);
+        output.alarm1 = command.alarms.get(1);
     }
-    AmigaTerrainEnemy& output = context.enemies[context.count++];
-    output.objectId = command.objectId;
-    output.x = command.x - 240;
-    output.y = command.y - 176;
-    output.speedX = command.integerVelocityX;
-    output.speedY = command.integerVelocityY;
-    output.direction = command.integerDirection;
-    output.moveSpeed = command.integerMoveSpeed;
-    output.motionState = command.motionState;
-    output.auxiliaryState = command.auxiliaryState;
-    output.alarm0 = command.alarms.get(0);
-    output.alarm1 = command.alarms.get(1);
+    const int spriteId = decorationSprite(command.objectId);
+    if (spriteId >= 0 && context.decorations != 0) {
+        if (context.decorationCount >= context.decorationCapacity) {
+            context.overflowed = true;
+            return false;
+        }
+        AmigaTerrainDecoration& output =
+            context.decorations[context.decorationCount++];
+        output.objectId = command.objectId;
+        output.spriteId = spriteId;
+        output.x = command.x;
+        output.y = command.y;
+        output.frame = command.integerImageIndex;
+        output.flipX = command.integerScaleX < 0;
+    }
     return true;
 }
 }
@@ -82,7 +109,21 @@ bool amigaBuildInitialAreaOneTerrain(
     AmigaTerrainFragment* fragments, unsigned capacity,
     AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
     unsigned& enemyCount, downwell::GameMakerRandom* randomAfter) {
+    return amigaBuildInitialAreaOneTerrain(
+        builders, fragments, capacity, enemies, enemyCapacity, enemyCount,
+        randomAfter, 0, 0, 0);
+}
+
+bool amigaBuildInitialAreaOneTerrain(
+    const downwell::BuilderPatternPack& builders,
+    AmigaTerrainFragment* fragments, unsigned capacity,
+    AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
+    unsigned& enemyCount, downwell::GameMakerRandom* randomAfter,
+    AmigaTerrainDecoration* decorations, unsigned decorationCapacity,
+    unsigned* decorationCount) {
     enemyCount = 0;
+    if (decorationCount != 0)
+        *decorationCount = 0;
     if (fragments == 0 || capacity < amigaInitialTerrainFragmentCount)
         return false;
     enum {
@@ -99,7 +140,11 @@ bool amigaBuildInitialAreaOneTerrain(
     downwell::AreaOneBuilder builder;
     builder.restoreInitialCheckpoint(builderX, builderY, -30,
                                      firstRightRoom, secondRightRoom);
-    BuildContext context = {enemies, enemyCapacity, 0, false};
+    BuildContext context = {
+        enemies, enemyCapacity, 0,
+        decorations, decorationCapacity, 0,
+        false
+    };
     unsigned fragmentCount = 0;
     for (unsigned step = 0; step < 64 && !builder.endReached(); ++step) {
         downwell::AreaOneBuilderStep result;
@@ -117,7 +162,9 @@ bool amigaBuildInitialAreaOneTerrain(
             pattern, result.patternY, result.reversed, result.sideRoom,
             result.appendPillars};
     }
-    enemyCount = context.count;
+    enemyCount = context.enemyCount;
+    if (decorationCount != 0)
+        *decorationCount = context.decorationCount;
     const bool valid = !context.overflowed && builder.endReached() &&
         fragmentCount == amigaInitialTerrainFragmentCount &&
         random.drawCount() == 4770;

@@ -118,7 +118,8 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     if (objectId == 289) {
         command.imageSpeed = 0.0F;
-        command.scaleX = random.irandomSmall(1) == 0 ? 1.0F : -1.0F;
+        command.integerScaleX = random.irandomSmall(1) == 0 ? 1 : -1;
+        command.scaleX = command.integerScaleX < 0 ? -1.0F : 1.0F;
         command.integerImageIndex = random.irandomSmall(15);
 #ifndef DOWNWELL_FREESTANDING
         command.imageIndex = static_cast<float>(command.integerImageIndex);
