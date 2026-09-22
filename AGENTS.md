@@ -1,8 +1,8 @@
 # Downwell port working agreement
 
 This repository is a behavior-first port of the Windows Steam release of
-Downwell to an SDL host reference implementation and then to native Amiga
-68020 code.
+Downwell to an SDL host reference implementation and then to native Amiga 500
+68000 code.
 
 ## Source of truth
 
@@ -24,7 +24,7 @@ Downwell to an SDL host reference implementation and then to native Amiga
   Validate uncertain behavior against the Windows build and VM bytecode.
 - Prefer deterministic input/RNG replays and state checks over visual judgment.
 - Establish a portable C/C++ implementation and evidence before adding a
-  68020 assembly twin. Keep the portable implementation as its oracle.
+  68000 assembly twin. Keep the portable implementation as its oracle.
 
 ## Generated and copyrighted material
 
@@ -38,4 +38,3 @@ Downwell to an SDL host reference implementation and then to native Amiga
 - Host: `make`, then `make run`.
 - Amiga environment: `. amiga/env.sh`.
 - Amiga scaffold/tool check: `make amiga` or `cd amiga && . ./env.sh && make`.
-

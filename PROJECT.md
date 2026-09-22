@@ -3,7 +3,7 @@
 ## Goal
 
 Reproduce the behavior of the Windows Steam build of *Downwell* on an Amiga
-with a 68020-class CPU. Preserve behavior first, then replace generic GameMaker
+500 with a 68000 CPU. Preserve behavior first, then replace generic GameMaker
 semantics with simpler native structures whose equivalence is testable.
 
 ## Architecture
@@ -19,7 +19,7 @@ portable deterministic core + SDL2 backend
         ↓
 native Amiga backend and data conversion
         ↓
-measured 68020 assembly twins
+measured 68000 assembly twins
 ```
 
 The IR has two complementary views:
@@ -67,8 +67,7 @@ truth.
 6. Amiga display/input/audio bring-up on the shared C++ framework.
 7. Behavior-complete native Amiga C/C++ implementation.
 8. Asset and memory-layout conversion.
-9. Profile-driven 68020 assembly optimization.
+9. Profile-driven 68000 assembly optimization.
 10. Packaging, compatibility testing, and release documentation.
 
 See [docs/open-work.md](docs/open-work.md) for the current queue.
-

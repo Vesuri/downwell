@@ -39,7 +39,8 @@ private:
     void addByte(std::uint8_t value) {
         value_ ^= value;
         /* FNV prime = 2^40 + 435, expanded for freestanding 32-bit targets. */
-        const std::uint64_t prior = value_;
+        /* Volatile keeps GCC from folding this back into __muldi3 on 68000. */
+        const volatile std::uint64_t prior = value_;
         value_ = (prior << 40) + (prior << 8) + (prior << 7) +
                  (prior << 5) + (prior << 4) + (prior << 1) + prior;
     }

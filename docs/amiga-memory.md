@@ -25,6 +25,13 @@ The current executable embeds approximately 330 KiB of recovered room,
 object/event, and builder-pattern data. These packs are validated before
 takeover and read in place; no endian-converted duplicate is allocated.
 
+The CPU baseline is now a plain 68000 and the emulator defaults to an A500.
+For the moment it uses 512 KiB of Chip RAM plus an 8 MiB Fast RAM expansion so
+CPU work is not confused with ordinary-memory reduction. The table above shows
+that the current DMA allocations fit comfortably in 512 KiB of Chip RAM; the
+embedded packs and eventual runtime state determine the separate Fast/Slow RAM
+requirement that still needs measuring and reducing.
+
 Future sprite, sound, and music conversion must add explicit rows to this
 budget. Animation art should stay packed in ordinary memory and be expanded
 only into bounded sprite/blitter staging buffers. The PF1 ring is permanent:

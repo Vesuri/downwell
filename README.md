@@ -1,10 +1,10 @@
-# Downwell — SDL reference and Amiga 68020 port
+# Downwell — SDL reference and Amiga 500 port
 
 Behavior-first reimplementation of the Windows Steam release of *Downwell*.
 The project starts from GameMaker VM bytecode and resource data, produces an
 auditable intermediate representation, implements a portable SDL reference,
-and progressively lowers that implementation to native Amiga C/C++ and
-selected 68020 assembly.
+and progressively lowers that implementation to native 68000 Amiga C/C++ and
+selected 68000 assembly.
 
 This repository does not distribute the original game. A locally owned Steam
 build lives under `data/`, which is ignored by Git and treated as immutable.

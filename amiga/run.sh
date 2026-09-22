@@ -20,8 +20,8 @@ rm -f "$RUN"/state/*.uss
 fsuae_stop_previous
 fsuae_track_self
 exec "$FSUAE" \
-  --amiga_model="${AMIGA_MODEL:-A1200}" \
-  --chip_memory=2048 --fast_memory=8192 \
+  --amiga_model="${AMIGA_MODEL:-A500}" \
+  --chip_memory="${CHIP_MEMORY:-512}" --fast_memory="${FAST_MEMORY:-8192}" \
   --kickstart_file="$ROM" \
   --hard_drive_0="$DH0" --hard_drive_1="$DH1" \
   --joystick_port_0=none --joystick_port_1=none \
