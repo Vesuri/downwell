@@ -27,13 +27,17 @@ public:
     int menuCameraY() const { return roundedPixel(menuCameraY_); }
     int menuTitleFrame() const { return menuTitleFrame_; }
     bool menuTeleportActive() const { return menuTeleport_; }
+    bool menuEnterSequenceActive() const { return menuEnterActive_; }
+    int menuEnterSequenceY() const { return roundedPixel(menuCameraLockerY_); }
     int styleYOffset() const { return roundedPixel(styleYOffset_); }
     int styleTileY() const { return roundedPixel(styleTileY_); }
     int styleDitherY() const { return roundedPixel(styleDitherY_); }
     int styleSmoothX() const { return roundedPixel(styleSmoothX_); }
     int styleCursor() const { return styleCursor_; }
     bool styleSelected() const { return styleSelected_; }
-    int stylePlayerDescent() const { return roundedPixel(stylePlayerDescent_); }
+    int stylePlayerDescent() const {
+        return roundedFinePixel(stylePlayerDescent_);
+    }
     int styleVerticalDitherY() const {
         return roundedPixel(styleVerticalDitherY_);
     }
@@ -41,6 +45,7 @@ public:
 
 private:
     static int roundedPixel(long value);
+    static int roundedFinePixel(long value);
     static int splashDuration(int stage);
     void enterMenu();
     void enterStyleSelect();

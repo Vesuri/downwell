@@ -3,6 +3,7 @@
 namespace {
 enum {
     fixedOne = 256,
+    fineFixedOne = 65536,
     menuGroundY = 512 * fixedOne,
     menuWellLeft = 300 * fixedOne,
     menuWellRight = 356 * fixedOne,
@@ -34,6 +35,12 @@ int AmigaSceneRuntime::roundedPixel(long value)
 {
     return value >= 0 ? static_cast<int>((value + 128) >> 8)
                       : -static_cast<int>((-value + 128) >> 8);
+}
+
+int AmigaSceneRuntime::roundedFinePixel(long value)
+{
+    return value >= 0 ? static_cast<int>((value + 32768) >> 16)
+                      : -static_cast<int>((-value + 32768) >> 16);
 }
 
 int AmigaSceneRuntime::splashDuration(int stage)
@@ -107,8 +114,13 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
             menuSpeedY_ += 51;
             if (menuSpeedY_ > 7 * fixedOne) menuSpeedY_ = 7 * fixedOne;
             menuY_ += menuSpeedY_;
+            if (menuY_ > menuGroundY) {
+                if (menuX_ < menuWellLeft)
+                    menuX_ = menuWellLeft;
+                else if (menuX_ > menuWellRight)
+                    menuX_ = menuWellRight;
+            }
             if (menuY_ >= menuTeleportY) {
-                menuY_ = menuTeleportY;
                 menuTeleport_ = true;
                 menuSpeedX_ = 0;
                 menuSpeedY_ = 0;
@@ -156,6 +168,7 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
             menuTitleReady_ = true;
     }
 
+    const bool enterWasActive = menuEnterActive_;
     if (menuTeleport_ && menuTitleReady_ && !menuEnterActive_) {
         if (menuSequenceDelay_ < 0)
             menuSequenceDelay_ = 30;
@@ -164,7 +177,7 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
         else
             menuEnterActive_ = true;
     }
-    if (menuEnterActive_) {
+    if (enterWasActive) {
         if (menuCameraLockerY_ < 1000 * fixedOne) {
             menuCameraLockerY_ += menuEnterSpeedY_;
             menuEnterSpeedY_ += 64;
@@ -172,6 +185,8 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
             menuEnterBlackDelay_ = 5;
         } else if (menuEnterBlackDelay_ > 0) {
             --menuEnterBlackDelay_;
+            if (menuEnterBlackDelay_ == 0)
+                enterStyleSelect();
         } else {
             enterStyleSelect();
         }
@@ -204,7 +219,7 @@ void AmigaSceneRuntime::stepStyleSelect(const downwell::Input& input,
         styleSmoothX_ = targetX;
 
     if (styleSelected_) {
-        stylePlayerSpeedY_ += 13;
+        stylePlayerSpeedY_ += fineFixedOne / 20;
         stylePlayerDescent_ += stylePlayerSpeedY_;
         if (styleVerticalDitherY_ < 320 * fixedOne)
             styleVerticalDitherY_ += 10 * fixedOne;
