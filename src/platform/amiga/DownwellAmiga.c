@@ -5,6 +5,7 @@
 #include <graphics/gfxbase.h>
 #include <graphics/view.h>
 #include <hardware/dmabits.h>
+#include "AmigaRenderer.h"
 
 struct ExecBase* SysBase = 0;
 struct GfxBase* GfxBase = 0;
@@ -13,15 +14,6 @@ extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
 
 enum {
-    visibleWidth = 380,
-    dmaWidth = 384,
-    displayHeight = 284,
-    bytesPerPlaneLine = dmaWidth / 8,
-    bytesPerLayerLine = bytesPerPlaneLine * 2,
-    layerBytes = bytesPerLayerLine * displayHeight,
-    backingBias = 2,
-    wellX = backingBias + 110,
-    wellWidth = 160,
     copperWords = 128
 };
 
@@ -62,161 +54,94 @@ static void copperPointer(UWORD* list, unsigned* count, UWORD reg, const void* p
     copperMove(list, count, reg + 2, (UWORD)address);
 }
 
-static void setPixel(UBYTE* layer, int x, int y, unsigned pen) {
-    UBYTE* row;
-    UBYTE mask;
-    if (x < 0 || x >= dmaWidth || y < 0 || y >= displayHeight)
-        return;
-    row = layer + y * bytesPerLayerLine;
-    mask = (UBYTE)(0x80u >> (x & 7));
-    row[x >> 3] &= (UBYTE)~mask;
-    row[bytesPerPlaneLine + (x >> 3)] &= (UBYTE)~mask;
-    if (pen & 1u) row[x >> 3] |= mask;
-    if (pen & 2u) row[bytesPerPlaneLine + (x >> 3)] |= mask;
-}
-
-static UWORD readWord(const UBYTE* data) {
-    return (UWORD)(((UWORD)data[0] << 8) | data[1]);
-}
-
-static ULONG readLong(const UBYTE* data) {
-    return ((ULONG)readWord(data) << 16) | readWord(data + 2);
-}
-
-static const UBYTE* findAsset(UWORD sprite, UWORD frame) {
-    const UBYTE* record;
-    ULONG count;
-    ULONG index;
-    if (readLong(amiga_hud_pack) != 0x44574150UL ||
-        readWord(amiga_hud_pack + 4) != 1)
-        return 0;
-    count = readLong(amiga_hud_pack + 8);
-    record = amiga_hud_pack + readWord(amiga_hud_pack + 6);
-    for (index = 0; index < count; ++index, record += 24)
-        if (readWord(record) == sprite && readWord(record + 2) == frame)
-            return record;
-    return 0;
-}
-
-static void drawAsset(UBYTE* layer, UWORD sprite, UWORD frame,
+static void drawAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
                       int anchorX, int anchorY, int flipX) {
-    const UBYTE* record = findAsset(sprite, frame);
-    const UBYTE* data;
-    int originX;
-    int originY;
-    int width;
-    int height;
-    int dataWidth;
-    int planeBytes;
-    int y;
-    int x;
-    if (!record)
-        return;
-    originX = (WORD)readWord(record + 4);
-    originY = (WORD)readWord(record + 6);
-    width = readWord(record + 8);
-    height = readWord(record + 10);
-    dataWidth = readWord(record + 12);
-    planeBytes = dataWidth >> 3;
-    data = amiga_hud_pack + readLong(record + 16);
-    if (data + readLong(record + 20) > amiga_hud_pack_end)
-        return;
-
-    for (y = 0; y < height; ++y) {
-        const UBYTE* row = data + y * planeBytes * 2;
-        for (x = 0; x < width; ++x) {
-            const UBYTE mask = (UBYTE)(0x80u >> (x & 7));
-            unsigned pen = (row[x >> 3] & mask) ? 1u : 0u;
-            pen |= (row[planeBytes + (x >> 3)] & mask) ? 2u : 0u;
-            if (pen) {
-                const int drawX = flipX ? anchorX + originX - 1 - x
-                                        : anchorX - originX + x;
-                setPixel(layer, backingBias + drawX,
-                         anchorY - originY + y, pen);
-            }
-        }
-    }
+    amigaRendererDrawAsset(renderer, amiga_hud_pack, amiga_hud_pack_end,
+                           sprite, frame, anchorX, anchorY, flipX);
 }
 
-static void drawHealthNumber(UBYTE* hud, int x, int y,
+static void drawHealthNumber(AmigaRenderer* renderer, int x, int y,
                              unsigned health, unsigned maximum) {
     const int slashX = x - 4;
     const int digitY = y - 5;
     const int healthX = slashX - 9;
     const int maximumX = slashX + 9;
-    drawAsset(hud, 413, health + 20, healthX + 1, digitY, 0);
-    drawAsset(hud, 413, health + 20, healthX + 1, digitY + 1, 0);
-    drawAsset(hud, 413, health + 20, healthX, digitY + 1, 0);
-    drawAsset(hud, 413, health, healthX, digitY, 0);
-    drawAsset(hud, 414, 2, slashX + 1, digitY, 0);
-    drawAsset(hud, 414, 2, slashX + 1, digitY + 1, 0);
-    drawAsset(hud, 414, 2, slashX, digitY + 1, 0);
-    drawAsset(hud, 414, 0, slashX, digitY, 0);
-    drawAsset(hud, 413, maximum + 20, maximumX + 1, digitY, 0);
-    drawAsset(hud, 413, maximum + 20, maximumX + 1, digitY + 1, 0);
-    drawAsset(hud, 413, maximum + 20, maximumX, digitY + 1, 0);
-    drawAsset(hud, 413, maximum, maximumX, digitY, 0);
+    drawAsset(renderer, 413, health + 20, healthX + 1, digitY, 0);
+    drawAsset(renderer, 413, health + 20, healthX + 1, digitY + 1, 0);
+    drawAsset(renderer, 413, health + 20, healthX, digitY + 1, 0);
+    drawAsset(renderer, 413, health, healthX, digitY, 0);
+    drawAsset(renderer, 414, 2, slashX + 1, digitY, 0);
+    drawAsset(renderer, 414, 2, slashX + 1, digitY + 1, 0);
+    drawAsset(renderer, 414, 2, slashX, digitY + 1, 0);
+    drawAsset(renderer, 414, 0, slashX, digitY, 0);
+    drawAsset(renderer, 413, maximum + 20, maximumX + 1, digitY, 0);
+    drawAsset(renderer, 413, maximum + 20, maximumX + 1, digitY + 1, 0);
+    drawAsset(renderer, 413, maximum + 20, maximumX, digitY + 1, 0);
+    drawAsset(renderer, 413, maximum, maximumX, digitY, 0);
 }
 
-static void drawCurrencyDigit(UBYTE* hud, int x, int y, unsigned digit) {
+static void drawCurrencyDigit(AmigaRenderer* renderer, int x, int y,
+                              unsigned digit) {
     const int digitX = x - 8;
     const int digitY = y - 5;
-    drawAsset(hud, 413, digit + 10, digitX - 1, digitY, 0);
-    drawAsset(hud, 413, digit + 10, digitX, digitY - 1, 0);
-    drawAsset(hud, 413, digit + 20, digitX + 1, digitY, 0);
-    drawAsset(hud, 413, digit + 20, digitX, digitY + 1, 0);
-    drawAsset(hud, 413, digit, digitX, digitY, 0);
+    drawAsset(renderer, 413, digit + 10, digitX - 1, digitY, 0);
+    drawAsset(renderer, 413, digit + 10, digitX, digitY - 1, 0);
+    drawAsset(renderer, 413, digit + 20, digitX + 1, digitY, 0);
+    drawAsset(renderer, 413, digit + 20, digitX, digitY + 1, 0);
+    drawAsset(renderer, 413, digit, digitX, digitY, 0);
 }
 
-static void drawAmmoDigit(UBYTE* hud, int x, int y, unsigned digit) {
+static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
+                          unsigned digit) {
     static const BYTE offsets[14][2] = {
         {-1, 0}, {0, -1}, {1, 0}, {0, 1}, {-1, 1}, {0, 0}, {1, 1},
         {0, 2}, {0, 0}, {1, -1}, {2, 0}, {1, 1}, {0, 1}, {1, 0}
     };
     unsigned index;
     for (index = 0; index < 12; ++index)
-        drawAsset(hud, 413, digit + 20,
+        drawAsset(renderer, 413, digit + 20,
                   x + offsets[index][0], y + offsets[index][1], 0);
     for (; index < 14; ++index)
-        drawAsset(hud, 413, digit + 10,
+        drawAsset(renderer, 413, digit + 10,
                   x + offsets[index][0], y + offsets[index][1], 0);
-    drawAsset(hud, 413, digit, x, y, 0);
+    drawAsset(renderer, 413, digit, x, y, 0);
 }
 
-static void fillRect(UBYTE* layer, int x, int y, int width, int height,
-                     unsigned pen) {
-    int py;
-    int px;
-    for (py = y; py < y + height; ++py)
-        for (px = x; px < x + width; ++px)
-            setPixel(layer, px, py, pen);
-}
-
-static void buildDiagnosticPicture(UBYTE* game, UBYTE* hud) {
+static void buildDiagnosticPicture(AmigaRenderer* renderer) {
     int y;
     int x;
 
-    fillRect(game, wellX, 0, wellWidth, displayHeight, 1);
-    fillRect(game, wellX + 4, 4, wellWidth - 8, displayHeight - 8, 0);
-    fillRect(game, wellX + 24, 52, wellWidth - 48, 40, 2);
+    amigaRendererClear(renderer, 0);
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
+                            downwellPlayfieldWidth, downwellDisplayHeight);
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 0,
+                          downwellPlayfieldWidth, downwellDisplayHeight, 1);
+    amigaRendererFillRect(renderer, downwellPlayfieldX + 4, 4,
+                          downwellPlayfieldWidth - 8,
+                          downwellDisplayHeight - 8, 0);
+    amigaRendererFillRect(renderer, downwellPlayfieldX + 24, 52,
+                          downwellPlayfieldWidth - 48, 40, 2);
     for (y = 116; y < 244; y += 16)
-        for (x = wellX + 8; x < wellX + wellWidth - 8; x += 16)
-            fillRect(game, x, y, 8, 8, ((x + y) >> 3) & 1 ? 1 : 2);
+        for (x = downwellPlayfieldX + 8;
+             x < downwellPlayfieldX + downwellPlayfieldWidth - 8; x += 16)
+            amigaRendererFillRect(renderer, x, y, 8, 8,
+                                  ((x + y) >> 3) & 1 ? 1 : 2);
 
-    drawAsset(hud, 408, 0, 108, 0, 0);
-    drawAsset(hud, 408, 0, 272, 0, 1);
+    amigaRendererClearClipRect(renderer);
+    drawAsset(renderer, 408, 0, 108, 0, 0);
+    drawAsset(renderer, 408, 0, 272, 0, 1);
 
-    drawAsset(hud, 415, 1, 8, 6, 0);
-    fillRect(hud, backingBias + 12, 11, 80, 6, 2);
-    drawAsset(hud, 415, 0, 8, 6, 0);
-    drawHealthNumber(hud, 52, 15, 4, 4);
+    drawAsset(renderer, 415, 1, 8, 6, 0);
+    amigaRendererFillRect(renderer, 12, 11, 80, 6, 2);
+    drawAsset(renderer, 415, 0, 8, 6, 0);
+    drawHealthNumber(renderer, 52, 15, 4, 4);
 
-    drawAsset(hud, 416, 0, 284, 43, 0);
-    fillRect(hud, backingBias + 289, 49, 10, 184, 1);
-    drawAsset(hud, 416, 1, 284, 43, 0);
-    drawAsset(hud, 376, 0, 362, 18, 0);
-    drawCurrencyDigit(hud, 354, 18, 0);
-    drawAmmoDigit(hud, 290, 239, 8);
+    drawAsset(renderer, 416, 0, 284, 43, 0);
+    amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
+    drawAsset(renderer, 416, 1, 284, 43, 0);
+    drawAsset(renderer, 376, 0, 362, 18, 0);
+    drawCurrencyDigit(renderer, 354, 18, 0);
+    drawAmmoDigit(renderer, 290, 239, 8);
 }
 
 static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
@@ -225,12 +150,14 @@ static unsigned buildCopper(UWORD* list, UBYTE* game, UBYTE* hud,
     unsigned channel;
 
     copperMove(list, &count, regBplcon0, 0x4401);
-    copperMove(list, &count, regBpl1mod, bytesPerPlaneLine);
-    copperMove(list, &count, regBpl2mod, bytesPerPlaneLine);
+    copperMove(list, &count, regBpl1mod, downwellBytesPerPlaneLine);
+    copperMove(list, &count, regBpl2mod, downwellBytesPerPlaneLine);
     copperPointer(list, &count, regBpl1pth, game);
     copperPointer(list, &count, regBpl1pth + 4, hud);
-    copperPointer(list, &count, regBpl1pth + 8, game + bytesPerPlaneLine);
-    copperPointer(list, &count, regBpl1pth + 12, hud + bytesPerPlaneLine);
+    copperPointer(list, &count, regBpl1pth + 8,
+                  game + downwellBytesPerPlaneLine);
+    copperPointer(list, &count, regBpl1pth + 12,
+                  hud + downwellBytesPerPlaneLine);
 
     for (channel = 0; channel < 8; ++channel)
         copperPointer(list, &count, regSpr0pth + channel * 4, nullSprite);
@@ -265,26 +192,28 @@ int main(void) {
     UBYTE* hud;
     UWORD* copper;
     UWORD* nullSprite;
+    AmigaRenderer renderer;
 
     SysBase = *(struct ExecBase**)4UL;
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
     if (!GfxBase)
         return 1;
 
-    game = (UBYTE*)AllocMem(layerBytes, MEMF_CHIP | MEMF_CLEAR);
-    hud = (UBYTE*)AllocMem(layerBytes, MEMF_CHIP | MEMF_CLEAR);
+    game = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
+    hud = (UBYTE*)AllocMem(downwellLayerBytes, MEMF_CHIP | MEMF_CLEAR);
     copper = (UWORD*)AllocMem(copperWords * sizeof(UWORD), MEMF_CHIP | MEMF_CLEAR);
     nullSprite = (UWORD*)AllocMem(8, MEMF_CHIP | MEMF_CLEAR);
     if (!game || !hud || !copper || !nullSprite) {
         if (nullSprite) FreeMem(nullSprite, 8);
         if (copper) FreeMem(copper, copperWords * sizeof(UWORD));
-        if (hud) FreeMem(hud, layerBytes);
-        if (game) FreeMem(game, layerBytes);
+        if (hud) FreeMem(hud, downwellLayerBytes);
+        if (game) FreeMem(game, downwellLayerBytes);
         CloseLibrary((struct Library*)GfxBase);
         return 1;
     }
 
-    buildDiagnosticPicture(game, hud);
+    amigaRendererInit(&renderer, game, hud);
+    buildDiagnosticPicture(&renderer);
     buildCopper(copper, game, hud, nullSprite);
 
     savedView = GfxBase->ActiView;
@@ -310,8 +239,8 @@ int main(void) {
 
     FreeMem(nullSprite, 8);
     FreeMem(copper, copperWords * sizeof(UWORD));
-    FreeMem(hud, layerBytes);
-    FreeMem(game, layerBytes);
+    FreeMem(hud, downwellLayerBytes);
+    FreeMem(game, downwellLayerBytes);
     CloseLibrary((struct Library*)GfxBase);
     GfxBase = 0;
     return 0;

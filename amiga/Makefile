@@ -16,7 +16,8 @@ ASFLAGS := -mcpu=68020 -g --register-prefix-optional -I"$(SDKDIR)" -I"$(CURDIR)"
 LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
-OBJECTS := obj/DownwellAmiga.o obj/AmigaAssets.o obj/gcc8_c_support.o obj/gcc8_a_support.o
+OBJECTS := obj/DownwellAmiga.o obj/AmigaRenderer.o obj/AmigaAssets.o \
+	obj/gcc8_c_support.o obj/gcc8_a_support.o
 
 .PHONY: all check clean audit
 
@@ -39,6 +40,10 @@ $(OUT).elf: $(OBJECTS)
 	@$(MAKE) --no-print-directory audit
 
 obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+obj/AmigaRenderer.o: $(AMIGA_SRC)/AmigaRenderer.c $(AMIGA_SRC)/AmigaRenderer.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c -o $@ $<
 

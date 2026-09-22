@@ -12,5 +12,10 @@ framework: it establishes the exact display and lifecycle directly, then will
 adopt proven framework pieces as the renderer needs them. Provenance is tracked
 in `UPSTREAM.md`.
 
-The current executable displays a two-layer diagnostic picture and exits back
-to Workbench on a fresh left-mouse click.
+`AmigaRenderer` mirrors the important state transition in the shared renderer
+contract: setting a clip rectangle selects PF1 and limits game drawing to the
+central well; clearing the clip selects PF2 and restores the full 380x284 HUD
+canvas.  Its drawing coordinates never include the two-pixel DMA backing bias.
+
+The current executable displays a two-layer diagnostic picture through that
+boundary and exits back to Workbench on a fresh left-mouse click.
