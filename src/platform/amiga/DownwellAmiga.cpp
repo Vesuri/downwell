@@ -884,6 +884,31 @@ int main(void) {
 
     if (!platform.available())
         return 1;
+    UWORD* startupCopperWords =
+        (UWORD*)AllocMem(4 * sizeof(UWORD), MEMF_CHIP | MEMF_CLEAR);
+    if (!startupCopperWords)
+        return 1;
+    CopperList startupCopper(startupCopperWords, 4);
+    if (!startupCopper.move(color00, 0x000) ||
+        !startupCopper.finish() ||
+        !platform.takeover(startupCopper,
+                           displayHStart, displayHStop,
+                           displayVStart, displayVStop,
+                           fetchStart, fetchStop)) {
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        return 1;
+    }
+    const ULONG gamePackBytes =
+        (ULONG)(amiga_game_pack_end - amiga_game_pack);
+    if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
+                         copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
+                         bulletSpriteBytes * bulletSpriteBufferCount,
+                         enemySpriteBytes,
+                         gamePackBytes)) {
+        platform.restore();
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        return 1;
+    }
     const downwell::RoomPack rooms(
         amiga_room_pack,
         (unsigned long)(amiga_room_pack_end - amiga_room_pack));
@@ -919,6 +944,9 @@ int main(void) {
                               27, main27) ||
         !builders.findPattern(downwell::BuilderPatternFamily::areaOneRight,
                               3, right3)) {
+        platform.restore();
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        memory.release();
         return 1;
     }
     const NativeFragment fragments[nativeFragmentCount] = {
@@ -959,15 +987,6 @@ int main(void) {
                             0, 26, 20, 24);
     }
 #endif
-    const ULONG gamePackBytes =
-        (ULONG)(amiga_game_pack_end - amiga_game_pack);
-    if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
-                         copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
-                         bulletSpriteBytes * bulletSpriteBufferCount,
-                         enemySpriteBytes,
-                         gamePackBytes)) {
-        return 1;
-    }
     for (ULONG byte = 0; byte < gamePackBytes; ++byte)
         memory.assets()[byte] = amiga_game_pack[byte];
     activeGamePack = memory.assets();
@@ -989,12 +1008,7 @@ int main(void) {
 
     amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, initialRingOrigin);
-#ifdef DOWNWELL_REPLAY_VERIFY
-    buildReferencePicture(&renderer, rooms, builders, entrance,
-                          mainInitialViewY);
-#else
-    drawSplash(&renderer, scenes.splashStage());
-#endif
+    amigaRendererEnableBlitter(&renderer);
     if (!amigaRendererBuildHardwareSprite(
             activeGamePack, activeGamePackEnd, 31, 0,
             downwellPlayfieldX + 80,
@@ -1015,6 +1029,8 @@ int main(void) {
 #endif
             0,
             memory.playerSprite(1), playerSpriteHeight)) {
+        platform.restore();
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
         return 1;
     }
@@ -1065,8 +1081,16 @@ int main(void) {
 #else
                      nullSprite, bulletSprites, enemySprites[0], palette,
 #endif
-                     initialRingOrigin) ||
-        !buildCopper(copperLists[1], gameBitmap, hudBitmap,
+                     initialRingOrigin)) {
+        platform.restore();
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        memory.release();
+        return 1;
+    }
+    platform.publish(copperLists[0]);
+    platform.waitVblank();
+    FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+    if (!buildCopper(copperLists[1], gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
                      playerSprites[1],
                      bulletSprites + AmigaPortRuntime::bulletCapacity,
@@ -1077,18 +1101,16 @@ int main(void) {
                      enemySprites[1], palette,
 #endif
                      initialRingOrigin)) {
+        platform.restore();
         memory.release();
         return 1;
     }
-
-    if (!platform.takeover(copperLists[0],
-                           displayHStart, displayHStop,
-                           displayVStart, displayVStop,
-                           fetchStart, fetchStop)) {
-        memory.release();
-        return 1;
-    }
-    amigaRendererEnableBlitter(&renderer);
+#ifdef DOWNWELL_REPLAY_VERIFY
+    buildReferencePicture(&renderer, rooms, builders, entrance,
+                          mainInitialViewY);
+#else
+    drawSplash(&renderer, scenes.splashStage());
+#endif
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
     while ((*ciaaPra & 0x40u) != 0) {
         UBYTE packedInput;
