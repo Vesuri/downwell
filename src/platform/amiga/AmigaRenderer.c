@@ -444,6 +444,9 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
     int dataWidth;
     int planeBytes;
     int cropX;
+    int logicalStartX;
+    int visibleLeft;
+    int visibleRight;
     int startX;
     int startY;
     int stopY;
@@ -463,9 +466,22 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
         return 0;
 
     cropX = (width - 16) >> 1;
-    startX = downwellDisplayHStart +
-             (flipX ? anchorX + originX - width + cropX
-                    : anchorX - originX + cropX);
+    logicalStartX = flipX ? anchorX + originX - width + cropX
+                          : anchorX - originX + cropX;
+    visibleLeft = logicalStartX;
+    visibleRight = logicalStartX + 16;
+    if (visibleLeft < downwellPlayfieldX)
+        visibleLeft = downwellPlayfieldX;
+    if (visibleRight > downwellPlayfieldX + downwellPlayfieldWidth)
+        visibleRight = downwellPlayfieldX + downwellPlayfieldWidth;
+    if (visibleLeft >= visibleRight) {
+        destination[0] = 0;
+        destination[1] = 0;
+        destination[2] = 0;
+        destination[3] = 0;
+        return 2;
+    }
+    startX = downwellDisplayHStart + logicalStartX;
     startY = downwellDisplayVStart + anchorY - originY;
     stopY = startY + height;
     control[0] = (UBYTE)startY;
@@ -481,9 +497,12 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
         UWORD plane0 = 0;
         UWORD plane1 = 0;
         for (x = 0; x < 16; ++x) {
+            const int logicalX = logicalStartX + x;
             const int sourceX = flipX ? width - 1 - (cropX + x)
                                       : cropX + x;
             const UBYTE mask = (UBYTE)(0x80u >> (sourceX & 7));
+            if (logicalX < visibleLeft || logicalX >= visibleRight)
+                continue;
             if (row[sourceX >> 3] & mask)
                 plane0 |= (UWORD)(0x8000u >> x);
             if (row[sourcePlaneBytes + (sourceX >> 3)] & mask)

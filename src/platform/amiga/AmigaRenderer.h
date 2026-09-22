@@ -58,6 +58,11 @@ void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
                                UWORD sprite, UWORD frame,
                                int anchorX, int anchorY, int flipX,
                                unsigned pen);
+/*
+ * Returns zero on an invalid asset, one when at least one sprite pixel can
+ * appear inside the game playfield, and two when the valid sprite is wholly
+ * clipped.  A clipped result still writes a hidden hardware-sprite record.
+ */
 int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      UWORD sprite, UWORD frame,
                                      int anchorX, int anchorY, int flipX,
