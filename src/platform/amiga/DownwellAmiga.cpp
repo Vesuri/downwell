@@ -50,6 +50,8 @@ enum {
     bulletSpriteHeight = 8,
     bulletSpriteBytes = (bulletSpriteHeight + 2) * 4,
     bulletSpriteBufferCount = 2 * AmigaPortRuntime::bulletCapacity,
+    enemySpriteHeight = 32,
+    enemySpriteBytes = (enemySpriteHeight + 2) * 4,
     fetchCropBytes = 2,
     fetchWords = 22,
     fetchWidth = fetchWords * 16,
@@ -262,6 +264,43 @@ static int resolveTerrainLanding(void* opaque, int offsetX,
         }
     }
     return landing;
+}
+
+static bool resolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
+    const TerrainCollisionContext& context =
+        *static_cast<const TerrainCollisionContext*>(opaque);
+    const int worldX = 240 + offsetX;
+    const int worldY = 176 + offsetY;
+    for (unsigned fragmentIndex = 0;
+         fragmentIndex < context.fragmentCount; ++fragmentIndex) {
+        const NativeFragment& fragment = context.fragments[fragmentIndex];
+        for (UWORD row = 0; row < fragment.pattern.rowCount; ++row) {
+            const int tileY = fragment.y + (int)row * 16;
+            ULONG width = 0;
+            if (worldY < tileY - 8 || worldY >= tileY + 8)
+                continue;
+            if (!context.builders->rowWidth(fragment.pattern, row, width))
+                break;
+            for (unsigned column = 0; column < width; ++column) {
+                char symbol = 0;
+                const int ordinal = (int)column + 1;
+                const int tileX = fragment.reversed
+                                      ? 320 - ordinal * 16
+                                      : 160 + ordinal * 16;
+                if (!context.builders->cell(fragment.pattern, (UWORD)column,
+                                            row, symbol))
+                    break;
+                if (worldX < tileX - 8 || worldX >= tileX + 8 ||
+                    !isTerrainSymbol(symbol))
+                    continue;
+                if (symbol != 'B' || context.runtime == 0 ||
+                    context.runtime->breakableActiveAt(
+                        tileX - 240, tileY - 176))
+                    return true;
+            }
+        }
+    }
+    return false;
 }
 
 static unsigned appendFragmentBreakables(
@@ -675,7 +714,7 @@ static bool buildCopper(CopperList& list,
                         const Bitmap& game, const Bitmap& hud,
                         const Sprite& playerSprite,
                         const Sprite* bulletSprites,
-                        const Sprite& nullSprite,
+                        const Sprite& enemySprite,
                         const Palette& palette,
                         unsigned ringOrigin) {
     unsigned channel;
@@ -690,9 +729,7 @@ static bool buildCopper(CopperList& list,
     list.showSprite(0, playerSprite);
     for (channel = 0; channel < AmigaPortRuntime::bulletCapacity; ++channel)
         list.showSprite((UWORD)(channel + 1), bulletSprites[channel]);
-    for (channel = AmigaPortRuntime::bulletCapacity + 1;
-         channel < 8; ++channel)
-        list.showSprite((UWORD)channel, nullSprite);
+    list.showSprite(7, enemySprite);
 
     list.setPalette(palette);
 
@@ -812,6 +849,14 @@ int main(void) {
         terrainCollision.runtime = &port;
         port.configureLandingResolver(resolveTerrainLanding,
                                       &terrainCollision);
+        port.configureSolidResolver(resolveTerrainSolid,
+                                    &terrainCollision);
+        port.configureEnemy(0, 111, 163, -16, 1122,
+                            128, 0, 5, 6);
+        port.configureEnemy(1, 111, 163, 48, 1426,
+                            128, 0, 5, 6);
+        port.configureEnemy(2, 117, 177, 64, 1840,
+                            0, 26, 20, 24);
     }
 #endif
     const ULONG gamePackBytes =
@@ -819,6 +864,7 @@ int main(void) {
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
                          bulletSpriteBytes * bulletSpriteBufferCount,
+                         enemySpriteBytes,
                          gamePackBytes)) {
         return 1;
     }
@@ -905,24 +951,30 @@ int main(void) {
                bulletSpriteHeight)
     };
     Sprite nullSprite(memory.nullSprite(), 0);
+    Sprite enemySprites[2] = {
+        Sprite(memory.enemySprite(0), enemySpriteHeight),
+        Sprite(memory.enemySprite(1), enemySpriteHeight)
+    };
     for (unsigned bullet = 0; bullet < bulletSpriteBufferCount; ++bullet)
         bulletSprites[bullet].hide();
+    enemySprites[0].hide();
+    enemySprites[1].hide();
     if (!buildCopper(copperLists[0], gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
-                     playerSprites[0], bulletSprites, nullSprite, palette,
+                     playerSprites[0], bulletSprites, enemySprites[0], palette,
 #else
-                     nullSprite, bulletSprites, nullSprite, palette,
+                     nullSprite, bulletSprites, enemySprites[0], palette,
 #endif
                      initialRingOrigin) ||
         !buildCopper(copperLists[1], gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
                      playerSprites[1],
                      bulletSprites + AmigaPortRuntime::bulletCapacity,
-                     nullSprite, palette,
+                     enemySprites[1], palette,
 #else
                      nullSprite,
                      bulletSprites + AmigaPortRuntime::bulletCapacity,
-                     nullSprite, palette,
+                     enemySprites[1], palette,
 #endif
                      initialRingOrigin)) {
         memory.release();
@@ -981,7 +1033,7 @@ int main(void) {
                                          ? playerSprites[0] : nullSprite,
                                      bulletSprites + back *
                                          AmigaPortRuntime::bulletCapacity,
-                                     nullSprite, palette,
+                                     enemySprites[back], palette,
                                      port.ringOrigin()))
                         break;
                     platform.publish(copperLists[back]);
@@ -1076,12 +1128,34 @@ int main(void) {
                 else
                     sprite.hide();
             }
+#ifndef DOWNWELL_REPLAY_VERIFY
+            enemySprites[back].hide();
+            for (unsigned enemyIndex = 0;
+                 enemyIndex < port.enemyCount(); ++enemyIndex) {
+                const AmigaPortRuntime::EnemyState& enemy =
+                    port.enemyAt(enemyIndex);
+                const int screenY = gameplayPlayerStartY + enemy.y -
+                    port.cameraOffsetY();
+                if (!enemy.active || !enemy.awake || screenY < 16 ||
+                    screenY >= downwellDisplayHeight)
+                    continue;
+                if (!amigaRendererBuildHardwareSprite(
+                        activeGamePack, activeGamePackEnd,
+                        (UWORD)enemy.spriteId,
+                        (UWORD)((port.tick() >> 2) & 1u),
+                        downwellPlayfieldX + 80 + enemy.x,
+                        screenY, enemy.facing < 0,
+                        memory.enemySprite(back), enemySpriteHeight))
+                    frameReady = false;
+                break;
+            }
+#endif
             if (frameReady &&
                 !buildCopper(copperLists[back], gameBitmap, hudBitmap,
                              playerSprites[back],
                              bulletSprites + back *
                                  AmigaPortRuntime::bulletCapacity,
-                             nullSprite, palette,
+                             enemySprites[back], palette,
                              port.ringOrigin()))
                 frameReady = false;
             if (!frameReady)

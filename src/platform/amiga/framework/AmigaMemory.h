@@ -10,7 +10,8 @@ public:
 
     bool allocate(ULONG gameBytes, ULONG hudBytes,
                   ULONG copperBytes, ULONG playerSpriteBytes,
-                  ULONG bulletSpriteBytes, ULONG assetBytes = 0);
+                  ULONG bulletSpriteBytes, ULONG enemySpriteBytes,
+                  ULONG assetBytes = 0);
     void release();
 
     UBYTE* game() const { return game_; }
@@ -21,6 +22,9 @@ public:
         return index < 2 ? playerSprite_[index] : 0;
     }
     UWORD* bulletSprite() const { return bulletSprite_; }
+    UWORD* enemySprite(unsigned index) const {
+        return index < 2 ? enemySprite_[index] : 0;
+    }
     UBYTE* assets() const { return assets_; }
 
 private:
@@ -33,12 +37,14 @@ private:
     UWORD* nullSprite_;
     UWORD* playerSprite_[2];
     UWORD* bulletSprite_;
+    UWORD* enemySprite_[2];
     UBYTE* assets_;
     ULONG gameBytes_;
     ULONG hudBytes_;
     ULONG copperBytes_;
     ULONG playerSpriteBytes_;
     ULONG bulletSpriteBytes_;
+    ULONG enemySpriteBytes_;
     ULONG assetBytes_;
 };
 
