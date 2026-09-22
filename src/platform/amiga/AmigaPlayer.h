@@ -35,6 +35,8 @@ private:
     int ammo_;
     bool grounded_;
     bool priorFire_;
+    bool jumpShootLocked_;
+    unsigned shotDelay_;
     unsigned jumps_;
     unsigned shots_;
 };

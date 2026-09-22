@@ -24,7 +24,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     ++tick_;
     if (bulletActive_) {
-        bulletY_ += 6;
+        bulletY_ += 8;
         if (bulletY_ >= bulletBottom)
             bulletActive_ = false;
     }

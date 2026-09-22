@@ -35,6 +35,13 @@ int main() {
     player.step(input);
     require(player.shots() == 1 && player.ammo() == 7,
             "a later airborne press consumes one charge and shoots");
+    for (unsigned frame = 0; frame < 6; ++frame)
+        player.step(input);
+    require(player.shots() == 1,
+            "held gunboot fire respects the recovered seven-tick delay");
+    player.step(input);
+    require(player.shots() == 2 && player.ammo() == 6,
+            "held gunboot fire repeats when the delay expires");
 
     input.fire = false;
     for (unsigned frame = 0; frame < 240 && !player.grounded(); ++frame)
