@@ -62,8 +62,12 @@ int main() {
             "a later airborne press consumes one charge and shoots");
     require(player.spriteId() == 3,
             "airborne fire selects the recovered shooting pose");
-    for (unsigned frame = 0; frame < 6; ++frame)
+    for (unsigned frame = 0; frame < 6; ++frame) {
         player.step(input);
+        if (frame == 3)
+            require(player.spriteFrame() == 1,
+                    "shooting advances at the recovered 0.25 image speed");
+    }
     require(player.shots() == 1,
             "held gunboot fire respects the recovered seven-tick delay");
     player.step(input);
@@ -71,6 +75,10 @@ int main() {
             "held gunboot fire repeats when the delay expires");
 
     input.fire = false;
+    for (unsigned frame = 0; frame < 13; ++frame)
+        player.step(input);
+    require(player.spriteFrame() == 3,
+            "the shooting sequence stops on its recovered final frame");
     for (unsigned frame = 0; frame < 240 && !player.grounded(); ++frame)
         player.step(input);
     require(player.grounded() && player.ammo() == 8,

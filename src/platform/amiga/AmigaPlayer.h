@@ -74,6 +74,7 @@ private:
     unsigned runPhaseTenths_;
     bool idling_;
     unsigned idlePhaseTenths_;
+    unsigned shotPhaseQuarters_;
     unsigned shotDelay_;
     int facing_;
     unsigned jumps_;

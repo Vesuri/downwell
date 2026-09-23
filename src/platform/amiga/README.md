@@ -118,6 +118,9 @@ player re-enters the running state, so animation adds no playfield work and no
 fixed-point approximation drift.
 The four-frame `sprPlayerIdle` sequence similarly advances at its recovered
 0.1 frame per simulation step while the player remains stationary.
+Each gunboot discharge resets the four-frame `sprPlayerShoot` sequence, which
+then advances at 0.25 frame per simulation step and holds its final pose until
+landing.  This too only updates hardware sprite 0.
 
 `make verify-amiga-menu-wake-frame` captures the first walking garden frame as
 the two immutable 512x384 cache planes, their independent pointer/fine-scroll

@@ -27,6 +27,7 @@ AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
       jumpShootLocked_(false), airborneShot_(false),
       running_(false), runPhaseTenths_(0),
       idling_(startsGrounded), idlePhaseTenths_(0),
+      shotPhaseQuarters_(0),
       shotDelay_(startsGrounded ? 0u : 1u), facing_(1),
       jumps_(0), shots_(0)
 {
@@ -94,6 +95,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     const int oldPixelY = pixelY_;
     const bool firePressed = input.fire && !priorFire_;
     const bool fireReleased = !input.fire && priorFire_;
+    bool shotFired = false;
 
     if (shotDelay_ > 0)
         --shotDelay_;
@@ -187,6 +189,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         --ammo_;
         ++shots_;
         airborneShot_ = true;
+        shotFired = true;
         shotDelay_ = 7;
     }
 
@@ -223,6 +226,14 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     }
     idling_ = nowIdling;
 
+    if (!airborneShot_) {
+        shotPhaseQuarters_ = 0;
+    } else if (shotFired) {
+        shotPhaseQuarters_ = 0;
+    } else if (shotPhaseQuarters_ < 13) {
+        ++shotPhaseQuarters_;
+    }
+
     priorFire_ = input.fire;
     pixelX_ = fixedToPixel(x_);
     pixelY_ = fixedToPixel(y_);
@@ -240,7 +251,8 @@ unsigned AmigaPlayer::spriteFrame() const
 {
     if (grounded_)
         return running_ ? runPhaseTenths_ / 10 : idlePhaseTenths_ / 10;
-    if (airborneShot_) return 0;
+    if (airborneShot_)
+        return shotPhaseQuarters_ / 4 < 3 ? shotPhaseQuarters_ / 4 : 3;
     if (speedY_ < -2 * fixedOne) return 0;
     if (speedY_ < 0) return 1;
     if (speedY_ < fixedOne) return 2;
