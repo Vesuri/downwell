@@ -23,7 +23,7 @@ static bool beginCroppedDisplay(CopperList& list)
            list.move(ddfstop, downwellFetchStop);
 }
 
-static bool beginNarrowDisplay(CopperList& list)
+static bool beginNarrowDisplay(CopperList& list, bool staticFrame = false)
 {
     list.reset();
     return list.move(diwstrt,
@@ -32,7 +32,9 @@ static bool beginNarrowDisplay(CopperList& list)
            list.move(diwstop,
                      (UWORD)(((downwellDisplayVStopCropped & 0xff) << 8) |
                              (amigaMenuDisplayHStop & 0xff))) &&
-           list.move(ddfstrt, amigaMenuFetchStart) &&
+           // Only scrolling needs the extra word before the visible window.
+           list.move(ddfstrt, staticFrame ? amigaMenuFetchStart + 8
+                                         : amigaMenuFetchStart) &&
            list.move(ddfstop, amigaMenuFetchStop);
 }
 
@@ -49,11 +51,11 @@ static bool buildNarrow(CopperList& list, const UBYTE* frame,
                         const Sprite& nullSprite, const Palette& palette,
                         const UBYTE* ditherTile)
 {
-    if (!beginNarrowDisplay(list) ||
+    if (!beginNarrowDisplay(list, true) ||
         !list.move(bplcon0, ditherTile ? 0x3001 : 0x2001) ||
         !list.move(bplcon1, 0) ||
-        !list.move(bpl1mod, 0) ||
-        !list.move(bpl2mod, 0) ||
+        !list.move(bpl1mod, amigaSplashBytesPerRow - amigaSplashVisibleWidth / 8) ||
+        !list.move(bpl2mod, amigaSplashBytesPerRow - amigaSplashVisibleWidth / 8) ||
         !list.pointer(bpl1pth, frame) ||
         !list.pointer(bpl2pth, frame + amigaStylePlaneBytes) ||
         (ditherTile && !list.pointer(bpl3pth, ditherTile)) ||

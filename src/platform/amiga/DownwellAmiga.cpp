@@ -150,6 +150,7 @@ volatile const UBYTE* gDownwellLockedStyleFrame;
 volatile const UBYTE* gDownwellSelectedStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
+volatile const UWORD* gDownwellControlsCopper;
 volatile const UBYTE* gDownwellCreditsFrame;
 volatile const UWORD* gDownwellCreditsCopper;
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -1243,6 +1244,7 @@ int main(void) {
                         }
                         if (!sceneControlsFrameReported &&
                             presentedSplash == 4) {
+                            gDownwellControlsCopper = platform.publishedCopper();
                             sceneControlsFrameReported = true;
                             gDownwellControlsFrame = amigaSplashFrame(
                                 memory.sceneCache(), presentedSplash);

@@ -94,6 +94,12 @@ must finish their iteration without reaching the gameplay publisher.
 Removing the splash branch's terminating `continue` makes this verifier report
 600 overwritten frames; the corrected scene sequence passes.
 
+Static narrow splash/style frames use a 160-pixel fetch (`$60..$a8`), zero
+scroll delay and 2-byte modulos for their 176-pixel backing rows. The garden
+scroll retains its separate early 11-word fetch. Sharing that early fetch
+with unshifted static frames clipped the first 16 source pixels. The controls
+frame verifier checks the published fetch, window, delay and both modulos.
+
 `make verify-amiga-credits-frame` stops on splash stage 3 and captures the
 fixed 384x284 two-plane HUD backing raster. Before capturing, it audits the
 published copper program for both consecutive BPL1/BPL2 pointer pairs, the
