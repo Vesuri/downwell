@@ -42,6 +42,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       cameraPixelX_(0),
       enemyCount_(0), enemiesDefeated_(0), enemyRandom_(2),
       health_(4), invulnerability_(0),
+      dead_(false), deathFrames_(0),
       currency_(0), gemStreak_(0), gemStreakTimer_(0),
       solidResolver_(0),
       solidResolverContext_(0),
@@ -288,7 +289,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     int destroyedBlockY[bulletCapacity] = {0};
 
     ++tick_;
-    const downwell::Input input = downwell::unpackReplayInput(packedInput);
+    if (dead_)
+        ++deathFrames_;
+    downwell::Input input = downwell::unpackReplayInput(packedInput);
+    if (dead_)
+        input = downwell::Input{};
     AmigaPlayerMotion motion = player_.step(input);
     if (player_.shots() != oldShots) {
         unsigned index;
@@ -306,7 +311,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     int scrollDelta = 0;
     int cameraXDelta = 0;
-    if (followCamera_) {
+    if (followCamera_ && !dead_) {
         const int oldCameraPixelX = cameraPixelX_;
         const int oldCameraPixelY = cameraPixelY_;
         const int playerWorldX = 240 + player_.offsetX();
@@ -658,6 +663,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             --health_;
             invulnerability_ = 90;
             player_.contactKnockback(enemy.x, enemy.y);
+            if (health_ == 0) {
+                dead_ = true;
+                deathFrames_ = 0;
+            }
         }
     }
 

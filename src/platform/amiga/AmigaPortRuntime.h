@@ -128,6 +128,9 @@ public:
     unsigned gemStreakTimer() const { return gemStreakTimer_; }
     int health() const { return health_; }
     unsigned invulnerability() const { return invulnerability_; }
+    bool dead() const { return dead_; }
+    unsigned deathFrames() const { return deathFrames_; }
+    bool deathMenuReady() const { return dead_ && deathFrames_ >= 100; }
     bool bulletActive() const { return bulletCount() != 0; }
     int bulletX() const;
     int bulletY() const;
@@ -161,6 +164,8 @@ private:
     downwell::GameMakerRandom enemyRandom_;
     int health_;
     unsigned invulnerability_;
+    bool dead_;
+    unsigned deathFrames_;
     unsigned currency_;
     unsigned gemStreak_;
     unsigned gemStreakTimer_;

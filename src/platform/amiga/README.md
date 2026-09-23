@@ -103,6 +103,11 @@ the accepted-style transition.  Its pinned raster guards the descending player
 and the 80-line dither wipe before gameplay takes over, then restores the normal
 executable like the other focused frame checks.
 
+Native gameplay now clamps health at zero, switches to recovered `sprPlDead`,
+disables player input, and freezes the camera.  The runtime retains the
+recovered 90-frame death animation alarm followed by the 10-frame menu delay;
+the death-menu presentation itself is the next layer above that explicit gate.
+
 `make verify-amiga-menu-wake-frame` captures the first walking garden frame as
 the two immutable 512x384 cache planes, their independent pointer/fine-scroll
 state, and hardware sprite 0.  Its host decoder reconstructs the centered

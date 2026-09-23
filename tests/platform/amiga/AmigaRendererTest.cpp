@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
         std::istreambuf_iterator<char>()};
     require(!gamePack.empty(), "Amiga game pack can be read");
     const unsigned runtimeSprites[][2] = {
-        {3, 4}, {12, 8}, {27, 8}, {31, 4}, {37, 5},
+        {0, 2}, {3, 4}, {12, 8}, {27, 8}, {31, 4}, {37, 5},
         {127, 1}, {133, 4}, {134, 4}, {139, 2}, {153, 4},
         {163, 4}, {164, 1}, {166, 4}, {168, 2}, {170, 4},
         {177, 4}, {186, 4}, {187, 1}, {188, 6}, {278, 2},

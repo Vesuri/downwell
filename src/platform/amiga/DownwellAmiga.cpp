@@ -1726,8 +1726,8 @@ int main(void) {
             }
             if (!amigaRendererBuildHardwareSprite(
                     activeGamePack, activeGamePackEnd,
-                    (UWORD)port.player().spriteId(),
-                    (UWORD)port.player().spriteFrame(),
+                    (UWORD)(port.dead() ? 0 : port.player().spriteId()),
+                    (UWORD)(port.dead() ? 0 : port.player().spriteFrame()),
                     downwellPlayfieldX + 80 + port.player().offsetX() -
                         port.cameraOffsetX(),
 #ifdef DOWNWELL_REPLAY_VERIFY
