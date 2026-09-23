@@ -4,7 +4,7 @@ target remote 127.0.0.1:2345
 break downwellProfileReady
 continue
 set $s = gDownwellProfileTargetScene
-if gDownwellProfileFrozen != 1 || gDownwellProfileFrames[$s] != 180 || gDownwellProfileFields[$s] == 0
+if gDownwellProfileFrozen != 1 || gDownwellProfileFrames[$s] != gDownwellProfileTargetFrames || gDownwellProfileFields[$s] == 0
     printf "Invalid profiling window\n"
     quit 1
 end

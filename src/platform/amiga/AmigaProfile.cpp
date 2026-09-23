@@ -6,10 +6,13 @@ static const ULONG ticksPerField = 313UL * 256UL;
 extern "C" {
 #ifdef DOWNWELL_SKIP_TO_GAME
 volatile ULONG gDownwellProfileTargetScene = 3;
+volatile ULONG gDownwellProfileTargetFrames = 30;
 #elif defined(DOWNWELL_SKIP_INTRO)
 volatile ULONG gDownwellProfileTargetScene = 2;
+volatile ULONG gDownwellProfileTargetFrames = 180;
 #else
 volatile ULONG gDownwellProfileTargetScene = 1;
+volatile ULONG gDownwellProfileTargetFrames = 180;
 #endif
 volatile ULONG gDownwellProfileVbi;
 volatile ULONG gDownwellProfileEpoch;
@@ -102,6 +105,19 @@ void downwellProfileEnd()
     if (elapsed > gDownwellProfileFrameMax[sceneId])
         gDownwellProfileFrameMax[sceneId] = elapsed;
 #endif
+    // The first gameplay frame builds the scene; measure steady-state work
+    // separately rather than averaging this one-time setup into frame cost.
+    static bool gameplayWarmed = false;
+    if (sceneId == 3 && !gameplayWarmed) {
+        gameplayWarmed = true;
+        for (unsigned phase = 0; phase < profilePhaseCount; ++phase) {
+            gDownwellProfileTicks[3][phase] = 0;
+            gDownwellProfileCalls[3][phase] = 0;
+            gDownwellProfileMax[3][phase] = 0;
+        }
+        gDownwellProfileFrameMax[3] = 0;
+        return;
+    }
     const ULONG fields = gDownwellProfileVbi - startField;
     ++gDownwellProfileFrames[sceneId];
     gDownwellProfileFields[sceneId] += fields;
@@ -110,7 +126,7 @@ void downwellProfileEnd()
 #ifdef DOWNWELL_PROFILE_AUTORUN
     // Freeze only at a completed frame boundary, outside the measured window.
     if (sceneId == gDownwellProfileTargetScene &&
-        gDownwellProfileFrames[sceneId] == 180) {
+        gDownwellProfileFrames[sceneId] == gDownwellProfileTargetFrames) {
         gDownwellProfileFrozen = 1;
         downwellProfileReady();
         for (;;) { }

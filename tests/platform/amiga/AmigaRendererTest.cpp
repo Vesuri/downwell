@@ -167,6 +167,50 @@ int main(int argc, char** argv) {
                 downwellDisplayVStart + 24,
             "hardware-sprite strips clip cleanly through the display top");
 
+    // Remove only the prepared DMA directory entries, retaining original payload
+    // offsets, to run the old pixel converter as an independent oracle.
+    auto oraclePack = gamePack;
+    auto word = [](const UBYTE* p) { return unsigned(p[0]) * 256 + p[1]; };
+    const unsigned records = (word(gamePack.data() + 8) << 16) |
+                             word(gamePack.data() + 10);
+    unsigned kept = 0;
+    for (unsigned i = 0; i < records; ++i) {
+        const auto* record = gamePack.data() + 20 + i * 24;
+        if (word(record) >= 63000 && word(record) < 64000) continue;
+        std::memcpy(oraclePack.data() + 20 + kept++ * 24, record, 24);
+    }
+    putLong(oraclePack.data(), 8, kept);
+    unsigned comparisons = 0;
+    for (unsigned i = 0; i < records; ++i) {
+        const auto* record = gamePack.data() + 20 + i * 24;
+        const unsigned id = word(record), variant = word(record + 2);
+        if (id < 63000 || id >= 64000) continue;
+        for (int x : {100, 110, 115, 190, 263, 270, 285})
+            for (int y : {-35, -3, 0, 40, 275, 284, 310}) {
+                UWORD actual[68] = {}, expected[68] = {};
+                const int a = amigaRendererBuildHardwareSpritePart(
+                    gamePack.data(), gamePack.data() + gamePack.size(),
+                    id - 63000, variant / 8, variant % 4,
+                    x, y, (variant % 8) / 4, actual, 32);
+                const int b = amigaRendererBuildHardwareSpritePart(
+                    oraclePack.data(), oraclePack.data() + oraclePack.size(),
+                    id - 63000, variant / 8, variant % 4,
+                    190, y, (variant % 8) / 4, expected, 32);
+                // Horizontal edges must preserve the entire sprite body: the
+                // opaque HUD playfield, not a runtime pixel mask, covers it.
+                if (a == 2) {
+                    require(actual[0] == 0 && actual[1] == 0,
+                            "offscreen actor is hidden");
+                } else {
+                    std::memcpy(expected, actual, 4); // position differs
+                    require(a == b && !std::memcmp(actual, expected, sizeof(actual)),
+                            "offline DMA body matches oracle without horizontal clipping");
+                }
+                ++comparisons;
+            }
+    }
+    require(comparisons > 1000, "gameplay pack contains offline sprite variants");
+    std::cout << comparisons << " offline sprite oracle comparisons\n";
     std::cout << "Amiga renderer tests passed\n";
     return 0;
 }

@@ -18,6 +18,27 @@ build on exit. Reports remain in `amiga/.run/profile-fps.log` and
 
 ## Two distinct modes
 
+Gameplay: `SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh probes`
+(or `fps`). This measures 30 iterations after discarding the initial gameplay
+composition frame. Deterministic input alternates direction every 120 ticks
+and fires on ticks 0 and 3 modulo 16. Phase 4 means HUD updates for gameplay;
+phase 6 includes terrain generation/redrawing. The shorter window keeps slow
+gameplay captures bounded. This is not representative of every level/encounter.
+
+First gameplay sample after offline sprite conversion (30 frames, PROBES):
+simulation 1028.250 ms/frame, terrain 224.516 (max bracket 3437.227), HUD
+14.691, sprites 7.245, copper construction 2.927, publication 0.147.
+These instrumented timings exclude the one-time scene build and are not a
+shipping FPS measurement. No clock clamps were recorded.
+
+Gameplay sprite bounds, slicing, mirroring and planar-to-sprite interleaving
+are generated on the host. The copy-only payload remains in Fast RAM; per-DMA
+channel caches copy prepared words only when the variant/vertical DMA range
+changes. Position-only updates touch the header. Horizontal viewport edges
+use PF2 priority and opaque-black HUD margins, not sprite pixel clipping.
+The original pixel converter remains a host test oracle; target builds never
+fall back to runtime conversion. Tests cover 12,348 variant/position cases.
+
 `FPSCOUNT=1` counts completed loop iterations and elapsed real VERTB fields,
 plus the worst per-iteration field gap, per scene. The garden publishes one
 frame per loop. FPS is `50 * completed garden frames / elapsed PAL fields`.

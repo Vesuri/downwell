@@ -426,6 +426,44 @@ def build_pack(manifest, extracted, profile):
         }
         encoded.append((sprite, 0, dma_width, planar))
 
+    # Gameplay DMA words, including mirrored multi-channel actors, are host work.
+    if profile == "game":
+        hardware = []
+        actors = (0, 3, 12, 15, 27, 31, 37, 133, 134, 153, 163, 164,
+                  166, 168, 170, 177, 186, 187, 188, 278, 459)
+        for sprite, frame_index, dma_width, planar in encoded:
+            if sprite["id"] not in actors:
+                continue
+            width, height = sprite["width"], sprite["height"]
+            stride = dma_width // 8
+            def pixel(x, y, plane):
+                return 0 <= x < width and bool(
+                    planar[plane * stride * height + y * stride + x // 8]
+                    & (0x80 >> (x & 7)))
+            opaque = [x for x in range(width) if any(
+                pixel(x, y, 0) or pixel(x, y, 1) for y in range(height))]
+            left, right = (min(opaque), max(opaque)) if opaque else (0, 0)
+            parts = (right - left + 16) // 16
+            require(parts <= 4 and height <= 32, "gameplay sprite exceeds DMA slot")
+            for flip in (0, 1):
+                lo, hi = (width - 1 - right, width - 1 - left) if flip else (left, right)
+                for part in range(parts):
+                    crop = (max(0, min(width - 16, lo - (16 - (hi - lo + 1)) // 2))
+                            if parts == 1 else lo + part * 16)
+                    stream = bytearray()
+                    for y in range(height):
+                        for plane in (0, 1):
+                            bits = sum(int(pixel(width - 1 - crop - x if flip else crop + x,
+                                                 y, plane)) << (15 - x) for x in range(16))
+                            stream.extend(struct.pack(">H", bits))
+                    metadata = dict(sprite, id=63000 + sprite["id"], width=16,
+                                    originX=(width - sprite["originX"] if flip
+                                             else sprite["originX"]) - crop,
+                                    hardware=True, hardwareParts=parts)
+                    hardware.append((metadata, frame_index * 8 + flip * 4 + part,
+                                     16, bytes(stream)))
+        encoded.extend(hardware)
+
     # Garden hardware sprites: bounds, centering and mirroring are host work.
     # Two DMA copies let the target change only the inactive position header.
     if profile == "game":
@@ -474,13 +512,19 @@ def build_pack(manifest, extracted, profile):
     payload_offset = HEADER.size + RECORD.size * len(encoded)
     records = []
     payload = bytearray()
+    offsets = {}
+    # Gameplay DMA words are copied into channel slots, not read by DMA here.
+    # Keep them at the end so the target can leave this tail in Fast RAM.
+    for sprite, frame_index, dma_width, planar in sorted(
+            encoded, key=lambda item: bool(item[0].get("hardwareParts"))):
+        offsets[(sprite["id"], frame_index)] = payload_offset + len(payload)
+        payload.extend(planar)
     for sprite, frame_index, dma_width, planar in encoded:
         records.append(RECORD.pack(
             sprite["id"], frame_index, sprite["originX"], sprite["originY"],
             sprite["width"], sprite["height"], dma_width,
-            4 if sprite.get("hardware") else 3,
-            payload_offset + len(payload), len(planar)))
-        payload.extend(planar)
+            (4 | (sprite.get("hardwareParts", 0) << 8)) if sprite.get("hardware") else 3,
+            offsets[(sprite["id"], frame_index)], len(planar)))
 
     source_prefix = bytes.fromhex(SOURCE_SHA256)[:8]
     return b"".join((

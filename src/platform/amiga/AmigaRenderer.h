@@ -70,6 +70,7 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      unsigned destinationHeight);
 unsigned amigaRendererHardwareSpritePartCount(
     const UBYTE* pack, const UBYTE* packEnd, UWORD sprite, UWORD frame);
+ULONG amigaRendererChipPackBytes(const UBYTE* pack, const UBYTE* packEnd);
 int amigaRendererBuildHardwareSpritePart(
     const UBYTE* pack, const UBYTE* packEnd,
     UWORD sprite, UWORD frame, unsigned part,

@@ -19,6 +19,6 @@ make clean
 make -j4 "$flags" PROFILE_AUTORUN=1
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
-READY_DESCRIPTION="bounded 180-frame scene profile" bash verify_startup.sh
+READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
 sed -n '/PROFILE scene/,$p' ".run/profile-${mode}.log"

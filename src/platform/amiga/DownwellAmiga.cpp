@@ -369,18 +369,18 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo) {
      * 233-pixel bottom anchor, exactly like the desktop 4:3 HUD path.
      */
     amigaRendererFillRect(renderer, gaugeX, gaugeTop,
-                          gaugeWidth, gaugeLength, 0);
+                          gaugeWidth, gaugeLength, 3);
     if (filled > 0)
         amigaRendererFillRect(renderer, gaugeX,
                               gaugeTop + gaugeLength - filled,
                               gaugeWidth, filled, 1);
-    amigaRendererFillRect(renderer, 282, 232, 20, 20, 0);
+    amigaRendererFillRect(renderer, 282, 232, 20, 20, 3);
     drawAmmoDigit(renderer, 290, 239, ammo);
 }
 
 static void redrawHealth(AmigaRenderer* renderer, unsigned health) {
     amigaRendererClearClipRect(renderer);
-    amigaRendererFillRect(renderer, 8, 6, 92, 28, 0);
+    amigaRendererFillRect(renderer, 8, 6, 92, 28, 3);
     drawAsset(renderer, 415, 1, 8, 6, 0);
     amigaRendererFillRect(renderer, 12, 11, (int)health * 20, 6, 2);
     drawAsset(renderer, 415, 0, 8, 6, 0);
@@ -396,7 +396,7 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
         ++digits;
     }
     amigaRendererClearClipRect(renderer);
-    amigaRendererFillRect(renderer, 316, 4, 64, 30, 0);
+    amigaRendererFillRect(renderer, 316, 4, 64, 30, 3);
     drawAsset(renderer, 376, 0, 362, 18, 0);
     for (index = 0; index < digits; ++index) {
         const unsigned digit = (currency / divisor) % 10;
@@ -611,6 +611,12 @@ static void buildReferencePicture(
                   viewX, viewY);
 
     amigaRendererClearClipRect(renderer);
+    // PF2 is above all sprites; its nonzero black pen masks the HUD margins.
+    amigaRendererFillRect(renderer, 0, 0, downwellPlayfieldX,
+                          downwellDisplayHeight, 3);
+    amigaRendererFillRect(renderer, downwellPlayfieldX + downwellPlayfieldWidth,
+                          0, downwellVisibleWidth - downwellPlayfieldX - downwellPlayfieldWidth,
+                          downwellDisplayHeight, 3);
     drawAsset(renderer, 408, 0, 108, 0, 0);
     drawAsset(renderer, 408, 0, 272, 0, 1);
 
@@ -870,7 +876,7 @@ int main(void) {
         return 1;
     }
     const ULONG gamePackBytes =
-        (ULONG)(amiga_game_pack_end - amiga_game_pack);
+        amigaRendererChipPackBytes(amiga_game_pack, amiga_game_pack_end);
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          menuPlaneBytes, amigaMenuEntryPlaneBytes,
                          downwellCopperWords * copperListCount * sizeof(UWORD),
@@ -1053,7 +1059,7 @@ int main(void) {
     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
     amigaRendererEnableBlitter(&renderer);
     if (!amigaRendererBuildHardwareSprite(
-            activeGamePack, activeGamePackEnd, 31, 0,
+            amiga_game_pack, amiga_game_pack_end, 31, 0,
             downwellPlayfieldX + 80,
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
@@ -1063,7 +1069,7 @@ int main(void) {
             0,
             memory.playerSprite(0), playerSpriteHeight) ||
         !amigaRendererBuildHardwareSprite(
-            activeGamePack, activeGamePackEnd, 37, 0,
+            amiga_game_pack, amiga_game_pack_end, 37, 0,
             downwellPlayfieldX + 80,
 #ifdef DOWNWELL_REPLAY_VERIFY
             gameplayPlayerGroundY,
@@ -1218,6 +1224,11 @@ int main(void) {
                 liveInput.fire = (liveFrameCount & 1) != 0;
             else if (scenes.scene() == AmigaScene::menu)
                 liveInput.right = ++profileMenuFrames > 40;
+            else if (scenes.scene() == AmigaScene::gameplay) {
+                liveInput.right = ((port.tick() / 120) & 1) == 0;
+                liveInput.left = !liveInput.right;
+                liveInput.fire = (port.tick() % 16) == 0 || (port.tick() % 16) == 3;
+            }
 #ifdef DOWNWELL_PROFILE_NAVIGATE
             else if (scenes.scene() == AmigaScene::styleSelect &&
                      scenes.styleYOffset() == 0 && (liveFrameCount % 16) == 0) {
@@ -1422,7 +1433,7 @@ int main(void) {
                         sceneMenuWakeFrameReported = true;
                         // Test-only portable oracle; never used for presentation.
                         amigaRendererBuildHardwareSprite(
-                            activeGamePack, activeGamePackEnd,
+                            amiga_game_pack, amiga_game_pack_end,
                             (UWORD)scenes.menuPlayerSprite(),
                             (UWORD)scenes.menuPlayerFrame(),
                             downwellPlayfieldX + scenes.menuPlayerX() -
@@ -1587,7 +1598,9 @@ int main(void) {
             if (scenes.scene() != AmigaScene::gameplay)
                 continue;
 #endif
+            DW_PROFILE_PHASE(profileSimulation);
             const AmigaPortFrame result = port.step(packedInput);
+            DW_PROFILE_PHASE(profileTitle);
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
             destroyedBlockCount = result.destroyedBlockCount;
@@ -1607,6 +1620,7 @@ int main(void) {
         {
             const unsigned back = front ^ 1u;
             bool frameReady = true;
+            DW_PROFILE_PHASE(profileScroll);
             if (scrollDelta != 0) {
                 const int direction = scrollDelta > 0 ? 1 : -1;
                 const int steps = scrollDelta > 0 ? scrollDelta : -scrollDelta;
@@ -1695,10 +1709,11 @@ int main(void) {
                     (void)destroyedBlockX[block];
                 }
             }
+            DW_PROFILE_PHASE(profileSprite);
             if (!port.playerVisible()) {
                 playerSprites[back].hide();
             } else if (!amigaRendererBuildHardwareSprite(
-                           activeGamePack, activeGamePackEnd,
+                           amiga_game_pack, amiga_game_pack_end,
                            (UWORD)(port.dead()
                                        ? 0 : port.player().spriteId()),
                            (UWORD)(port.dead()
@@ -1728,7 +1743,7 @@ int main(void) {
                         actorSprites, enemySprites[back], actorCount);
                     const int spriteResult =
                         amigaRendererBuildHardwareSprite(
-                        activeGamePack, activeGamePackEnd, 459, 0,
+                        amiga_game_pack, amiga_game_pack_end, 459, 0,
                         downwellPlayfieldX + 80 + state.x -
                             port.cameraOffsetX(),
                         gameplayPlayerStartY + state.y -
@@ -1754,7 +1769,7 @@ int main(void) {
                     continue;
                 const unsigned partCount =
                     amigaRendererHardwareSpritePartCount(
-                        activeGamePack, activeGamePackEnd,
+                        amiga_game_pack, amiga_game_pack_end,
                         (UWORD)enemy.spriteId, (UWORD)enemy.imageFrame);
                 if (partCount == 0) {
                     frameReady = false;
@@ -1768,7 +1783,7 @@ int main(void) {
                         actorSprites, enemySprites[back], actorCount);
                     const int spriteResult =
                         amigaRendererBuildHardwareSpritePart(
-                            activeGamePack, activeGamePackEnd,
+                            amiga_game_pack, amiga_game_pack_end,
                             (UWORD)enemy.spriteId,
                             (UWORD)enemy.imageFrame, part,
                             downwellPlayfieldX + 80 + enemy.x -
@@ -1796,7 +1811,7 @@ int main(void) {
                     actorSprites, enemySprites[back], actorCount);
                 const int spriteResult =
                     amigaRendererBuildHardwareSprite(
-                        activeGamePack, activeGamePackEnd,
+                        amiga_game_pack, amiga_game_pack_end,
                         (UWORD)(gem.large ? 134 : 133),
                         (UWORD)((gem.age / 2u) & 3u),
                         downwellPlayfieldX + 80 + gem.x -
@@ -1812,6 +1827,7 @@ int main(void) {
                 actorSprites[actorCount++].hide();
             if (actorCount <= AmigaPortRuntime::bulletCapacity)
                 enemySprites[back].hide();
+            DW_PROFILE_PHASE(profileCopper);
             if (frameReady &&
                 !gameplayCopperLists[back].build(
                     gameBitmap, hudBitmap, playerSprites[back],
@@ -1823,7 +1839,9 @@ int main(void) {
             if (!frameReady)
                 break;
             /* AmigaPlatform makes the published list live at next VBlank. */
+            DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayCopperLists[back]);
+            DW_PROFILE_PHASE(profileOther);
             front = back;
 #ifdef DOWNWELL_SCENE_VERIFY
             if (!sceneGameplayLandedReported && port.player().grounded()) {

@@ -467,6 +467,11 @@ static int hardwareSpriteOpaqueBounds(const UBYTE* record,
 
 unsigned amigaRendererHardwareSpritePartCount(
     const UBYTE* pack, const UBYTE* packEnd, UWORD sprite, UWORD frame) {
+    const UBYTE* prepared = findAsset(pack, packEnd, 63000 + sprite, frame * 8);
+    if (prepared) return readWord(prepared + 14) >> 8;
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    return 0; // A missing offline asset is an error, never runtime conversion.
+#endif
     const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
     int left;
     int right;
@@ -474,6 +479,11 @@ unsigned amigaRendererHardwareSpritePartCount(
             record, pack, packEnd, &left, &right))
         return 0;
     return (unsigned)(right - left + 16) / 16u;
+}
+
+ULONG amigaRendererChipPackBytes(const UBYTE* pack, const UBYTE* packEnd) {
+    const UBYTE* first = findAsset(pack, packEnd, 63000, 0);
+    return first ? readLong(first + 16) : (ULONG)(packEnd - pack);
 }
 
 int amigaRendererBuildHardwareSpritePart(
@@ -507,6 +517,65 @@ int amigaRendererBuildHardwareSpritePart(
     int visibleHeight;
     int y;
     int x;
+    const UBYTE* prepared = findAsset(pack, packEnd, 63000 + sprite,
+                                     frame * 8 + (flipX ? 4 : 0) + part);
+    if (prepared) {
+        height = readWord(prepared + 10);
+        if (height > (int)destinationHeight) return 0;
+        logicalStartX = anchorX - (WORD)readWord(prepared + 4);
+        logicalTop = anchorY - (WORD)readWord(prepared + 6);
+        sourceTop = logicalTop < 0 ? -logicalTop : 0;
+        visibleHeight = height - sourceTop;
+        if (logicalTop < 0) logicalTop = 0;
+        if (logicalTop + visibleHeight > downwellDisplayHeight)
+            visibleHeight = downwellDisplayHeight - logicalTop;
+        if (logicalStartX + 16 <= downwellPlayfieldX ||
+            logicalStartX >= downwellPlayfieldX + downwellPlayfieldWidth ||
+            visibleHeight <= 0) {
+            destination[0] = destination[1] = 0;
+            return 2;
+        }
+        data = pack + readLong(prepared + 16);
+        if (data + height * 4 > packEnd || readLong(prepared + 20) < (ULONG)height * 4)
+            return 0;
+        startX = downwellDisplayHStart + logicalStartX;
+        startY = downwellDisplayVStart + logicalTop;
+        stopY = startY + visibleHeight;
+        control[0] = (UBYTE)startY;
+        control[1] = (UBYTE)(startX >> 1);
+        control[2] = (UBYTE)stopY;
+        control[3] = (UBYTE)((startX & 1) | (stopY > 255 ? 2 : 0) | (startY > 255 ? 4 : 0));
+        /* Immutable host-converted words. PF2 priority masks horizontal edges. */
+#ifdef DOWNWELL_PLATFORM_AMIGA
+        {
+            static struct {
+                UWORD* destination;
+                const UBYTE* source;
+                int height;
+            } slots[16];
+            unsigned slot;
+            const UBYTE* source = data + sourceTop * 4;
+            for (slot = 0; slot < 16; ++slot)
+                if (!slots[slot].destination || slots[slot].destination == destination)
+                    break;
+            if (slot < 16) {
+                if (slots[slot].destination == destination &&
+                    slots[slot].source == source && slots[slot].height == visibleHeight)
+                    return 1; // Only the four-byte position header changed.
+                slots[slot].destination = destination;
+                slots[slot].source = source;
+                slots[slot].height = visibleHeight;
+            }
+        }
+#endif
+        for (y = 0; y < visibleHeight * 2; ++y)
+            destination[2 + y] = readWord(data + sourceTop * 4 + y * 2);
+        destination[2 + visibleHeight * 2] = destination[3 + visibleHeight * 2] = 0;
+        return 1;
+    }
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    return 0;
+#endif
     if (!record)
         return 0;
     originX = (WORD)readWord(record + 4);

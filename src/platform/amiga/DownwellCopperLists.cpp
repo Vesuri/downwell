@@ -137,6 +137,7 @@ bool DownwellGameplayCopperList::build(
     const unsigned firstSpan = downwellGameRingHeight - ringOrigin;
     if (!beginCroppedDisplay(*this) ||
         !move(bplcon0, 0x4401) ||
+        !move(bplcon2, 0x0044) || // PF2 HUD above sprites; sprites above PF1 world
         !move(bplcon1, 0) ||
         !move(bpl1mod, downwellFetchModulo) ||
         !move(bpl2mod, downwellFetchModulo) ||
