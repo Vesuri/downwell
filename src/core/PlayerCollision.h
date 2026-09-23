@@ -2,13 +2,14 @@
 #define DOWNWELL_CORE_PLAYER_COLLISION_H
 
 #include <cmath>
+#include "GameMakerRounding.h"
 
 namespace downwell {
 
 // sprPlayerIdle's recovered mask spans x -4..+3 and y -4..+7.
-// sprThinPlatform's mask spans x -8..+7 and only y -8..-7. GameMaker rests
-// the player one pixel above that mask and detects support at yy + 1.
-inline bool resolveDownwardThinPlatform(float playerX,
+// Wall/box and thin-platform masks share the top edge at y -8 and x -8..+7.
+// This only resolves downward top contact, not the full swept collision script.
+inline bool resolveDownwardTopContact(float playerX,
                                         float currentPlayerY,
                                         float nextPlayerY,
                                         float platformX,
@@ -27,7 +28,7 @@ inline bool resolveDownwardThinPlatform(float playerX,
     const float currentBottom = currentPlayerY + 7.0F;
     // scrPlayerPlatformCollision probes round(yy) plus ceil(abs(ysp)), so even
     // subpixel downward speed keeps an already-standing player supported.
-    const float probedBottom = currentBottom +
+    const float probedBottom = static_cast<float>(roundGameMakerCoordinate(currentPlayerY)) + 7.0F +
         std::ceil(nextPlayerY - currentPlayerY);
     if (currentBottom >= platformTop || probedBottom < platformTop)
         return false;

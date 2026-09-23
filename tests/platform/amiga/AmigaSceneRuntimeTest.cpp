@@ -687,6 +687,19 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         bool reported = false;
         bool playerReported = false;
         for (unsigned tick = 0; tick < 600; ++tick) {
+            if (tick == 0) {
+                std::cout << "COMBAT START tick=" << gameplay.tick()
+                          << " native=" << 240 + gameplay.player().offsetX() << ',' << 176 + gameplay.player().offsetYFixed() / 256.0F
+                          << " SDL=" << reference.mainPlayerX() << ',' << reference.mainPlayerY()
+                          << " ground=" << gameplay.player().grounded() << ',' << reference.mainPlayerGrounded() << '\n';
+                for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                    const auto& wall = reference.instanceAt(i);
+                    if (wall.active && (wall.objectId == 60 || wall.objectId == 92 || wall.objectId == 93) &&
+                        std::fabs(wall.x - reference.mainPlayerX()) < 24 &&
+                        std::fabs(wall.y - reference.mainPlayerY()) < 32)
+                        std::cout << "NEARBY SOLID " << wall.objectId << ' ' << wall.x << ',' << wall.y << '\n';
+                }
+            }
             downwell::Input input;
             input.left = (tick / 90) % 2 == 0;
             input.right = !input.left;

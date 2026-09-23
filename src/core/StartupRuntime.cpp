@@ -462,8 +462,12 @@ bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
             for (std::size_t index = 0; index < instances_.size(); ++index) {
                 const InstanceRecord& platform = instances_.at(index);
                 float landingY = mainPlayerY_;
-                if (platform.active && platform.objectId == 93 &&
-                    resolveDownwardThinPlatform(
+                // Solid walls/boxes and one-way platforms use the same
+                // downward top-contact probe. Other axes retain solid-only
+                // collision handling below.
+                if (platform.active && (platform.objectId == 93 ||
+                        platform.objectId == 60 || platform.objectId == 92) &&
+                    resolveDownwardTopContact(
                         mainPlayerX_, mainPlayerY_, nextY,
                         static_cast<float>(platform.x),
                         static_cast<float>(platform.y), landingY)) {

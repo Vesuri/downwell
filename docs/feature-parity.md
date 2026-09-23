@@ -1,7 +1,9 @@
 # SDL / Amiga feature parity
 
-Parity with the implemented SDL reference is the current priority. This does
-not mean completeness against the Windows game. Do not count a matching
+Both ports must reproduce the original Windows game; SDL is not the oracle.
+See [the source-backed audit](original-behavior-audit.md) for current fidelity
+findings and combat results; the chronological notes below include superseded
+checkpoints. Do not count a matching
 port-runtime replay on two CPUs as proof that StartupRuntime and
 AmigaPortRuntime implement identical behavior.
 

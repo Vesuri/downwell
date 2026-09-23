@@ -567,14 +567,17 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 runtime.step(releasedMain, false);
             }
         }
+        // This is a tape-specific regression, not a Windows trajectory oracle.
+        // Corrected fractional floor contact changes the shared RNG schedule.
+        // scrRightPat1 pattern 6 contains J,v,O,_,@,{,}: seven special markers.
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 3 &&
+                    runtime.mainBuilderLastRightPattern() == 6 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
                     runtime.mainBuilderRowsGenerated() == 95,
                 "the first scheduled side room preserves deterministic selection and rows");
-        require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
+        require(runtime.mainBuilderSpecialObjectsGenerated() == 7,
                 "every special marker in deterministic right-room pattern is interpreted");
         bool foundTorch = false;
         bool foundAmbience = false;
@@ -590,9 +593,24 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             foundRoomReward = foundRoomReward || instance.objectId == 293 ||
                               instance.objectId == 109;
         }
-        require(!foundTorch && foundAmbience && foundTimeField &&
+        require(foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
                 "pattern-specific side-room utility and reward objects retain recovered IDs");
+        // Side-room generation does not itself guarantee an enemy encounter.
+        // Exercise combat explicitly instead of relying on the former route
+        // through a subpixel floor gap to happen to produce a kill.
+        for (unsigned tick = 0; tick < 1800 && runtime.mainEnemiesDefeated() == 0; ++tick) {
+            downwell::Input combat;
+            combat.left = (tick / 90) % 2 == 0;
+            combat.right = !combat.left;
+            combat.fire = tick % 10 < 5;
+            runtime.step(combat, tick % 10 == 0);
+        }
+        std::cout << "Combat coverage: kills=" << runtime.mainEnemiesDefeated()
+                  << " health=" << runtime.mainPlayerHealth()
+                  << " gems=" << runtime.mainCurrencyCount()
+                  << " total=" << runtime.mainCurrencyTotal()
+                  << " position=" << runtime.mainPlayerX() << ',' << runtime.mainPlayerY() << '\n';
         require(runtime.mainEnemiesDefeated() > 0 &&
                     runtime.mainCurrencyCount() +
                         static_cast<std::size_t>(runtime.mainCurrencyTotal()) > 0,

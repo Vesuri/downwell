@@ -43,6 +43,26 @@ comparison passes with the current in-progress collision changes present.
   do not establish animation scheduling or all hit-state presentation.
 
 The extended combat comparison remains a failing gate, not proof of fidelity.
-The current working tree also contains an uncommitted SDL downward-contact
-correction; its full-suite side-room expectation failure must be investigated
-before treating that change as verified.
+
+## Fractional downward contact
+
+Both `scrPlayerPlatformCollision` and `scrCheckCollisionWith` assembly compute
+the vertical probe as round(yy) + ceil(abs(ysp))*sign(ysp). The SDL top-contact
+helper now rounds yy, and applies to the shared top edge of walls/boxes as well
+as thin platforms. At the observed (308.8,1984.2) floor contact, the old SDL
+adaptation missed support and fired instead of jumping. Both ports now start
+the extended tape grounded at y=1984. This fixes this contact case, not the
+full two-axis/mask collision semantics listed above.
+
+The startup test's first side room is now pattern 6 rather than 3. Generation
+count 4, rows 95, one side room and zero shops remain pinned. Pattern 6 in
+scrRightPat1 contains a J torch marker in addition to v,O,_,@,{,}; tests now
+expect that torch and seven special markers. Pattern selection here is a
+regression baseline for this adapted simulation, not a Windows reference trace.
+The previous incidental kill before that checkpoint no longer occurs; an
+explicit bounded 1800-step alternating-movement/fire continuation preserves
+the mandatory kill/reward coverage (one kill, three gems, health 4 observed).
+
+The extended SDL/native combat gate still fails: first >3-pixel player-Y
+difference at tick 593, first kill mismatch at 601. Final health 3/3, kills
+2/1 and currency 22/4. Do not widen tolerances to conceal this difference.
