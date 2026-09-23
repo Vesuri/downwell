@@ -1310,6 +1310,7 @@ int main(void) {
                 const bool presentationChanged =
                     scenes.scene() != presentedScene ||
                     scenes.splashStage() != presentedSplash;
+                const AmigaScene priorPresentedScene = presentedScene;
                 const bool splashDitherChanged =
                     scenes.splashDitherFrame() != presentedSplashDither;
                 const unsigned back = front ^ 1u;
@@ -1339,6 +1340,16 @@ int main(void) {
                             break;
                         platform.publish(copperLists[back]);
                         front = back;
+                        /*
+                         * COP1LC is latched by the copper at the following
+                         * vertical blank.  Synchronize discrete splash
+                         * changes here so a quickly advanced stage cannot
+                         * remain merely queued while its alternate list is
+                         * reused.  Per-frame dither updates retain the normal
+                         * alternating-list cadence.
+                         */
+                        if (presentationChanged)
+                            platform.waitVblank();
 #ifdef DOWNWELL_SCENE_VERIFY
                         if (!sceneCreditsFrameReported &&
                             presentedSplash == 3) {
@@ -1432,6 +1443,9 @@ int main(void) {
                         break;
                     platform.publish(copperLists[back]);
                     front = back;
+                    if (presentationChanged &&
+                        priorPresentedScene == AmigaScene::splash)
+                        platform.waitVblank();
                     if (++menuSpriteFrameCount == 2)
                         downwellMenuSpriteReady();
 #ifdef DOWNWELL_SCENE_VERIFY

@@ -98,6 +98,21 @@ CREDIT_TEXT_SELECTIONS = {
     },
 }
 
+# Splash credits are centred on these recovered application-surface X
+# coordinates.  Their visible pixels must stay there, but the A500 cache
+# composer must start every masked blit on a word boundary: the OCS blitter's
+# shifted B channel otherwise carries pixels from the end of one row into the
+# beginning of the next.  Transparent left padding moves the record origin by
+# the same amount, preserving the visible placement while aligning the blit.
+CREDIT_TEXT_ANCHOR_X = {
+    65200: 190,
+    65201: 190,
+    65202: 278,
+    65203: 278,
+    65204: 102,
+    65205: 102,
+}
+
 # The recovered streak counter uses font 2 and is drawn over the playfield by
 # the fixed HUD layer.  Pre-render the bounded two-digit forms so the 68000
 # never needs a glyph compositor in the frame loop.
@@ -310,11 +325,21 @@ def build_pack(manifest, extracted, profile):
 
     for text_id, (text, color) in CREDIT_TEXT_SELECTIONS.get(profile, {}).items():
         canvas = render_bordered_text(manifest, pages, text, color)
+        origin_x = canvas.width // 2
+        left = CREDIT_TEXT_ANCHOR_X[text_id] - origin_x
+        left_padding = left & 15
+        if left_padding:
+            aligned = Image.new(
+                "RGBA", (canvas.width + left_padding, canvas.height),
+                (0, 0, 0, 0))
+            aligned.alpha_composite(canvas, (left_padding, 0))
+            canvas = aligned
+            origin_x += left_padding
         pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
         dma_width, planar = encode_planar(pens, canvas.width, canvas.height)
         sprite = {
             "id": text_id,
-            "originX": canvas.width // 2,
+            "originX": origin_x,
             "originY": 1,
             "width": canvas.width,
             "height": canvas.height,

@@ -52,6 +52,14 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
     if (top + drawHeight > destination.height)
         drawHeight = destination.height - top;
     if (drawWidth <= 0 || drawHeight <= 0) return true;
+    /*
+     * Startup screens are composed once, so their generated records are
+     * padded to make the destination word-aligned.  Do not silently fall
+     * back to a shifted masked blit here: its B-channel carry crosses rows
+     * on OCS and produces the stray pixels seen after @KISSAKOLME.
+     */
+    if ((left & 15) != 0 || sourceX != 0)
+        return false;
     Bitmap source((void*)data, width, height, 2, false, false, dataWidth);
     Bitmap mask((void*)(data + planeBytes * 2), width, height, 1,
                 false, false, dataWidth);
