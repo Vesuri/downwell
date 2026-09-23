@@ -51,6 +51,13 @@ extern const UBYTE amiga_builder_pack_end[];
 
 enum {
     copperWords = 400,
+    dynamicCopper0 = 0,
+    dynamicCopper1 = 1,
+    splashBlankCopper = 2,
+    splashLogoCopper = 3,
+    splashCreditsCopper = 4,
+    splashControlsCopper = 5,
+    copperListCount = 6,
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
     /* Channels 1..6 are shared by bullets, enemies and gems each frame. */
@@ -1032,7 +1039,8 @@ int main(void) {
         (ULONG)(amiga_game_pack_end - amiga_game_pack);
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          menuPlaneBytes, amigaMenuEntryPlaneBytes,
-                         copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
+                         copperWords * copperListCount * sizeof(UWORD),
+                         playerSpriteBytes,
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
                          sceneCacheBytes,
@@ -1149,9 +1157,13 @@ int main(void) {
         return 1;
     }
 
-    CopperList copperLists[2] = {
+    CopperList copperLists[copperListCount] = {
         CopperList(memory.copper(), copperWords),
-        CopperList(memory.copper() + copperWords, copperWords)
+        CopperList(memory.copper() + copperWords, copperWords),
+        CopperList(memory.copper() + copperWords * 2, copperWords),
+        CopperList(memory.copper() + copperWords * 3, copperWords),
+        CopperList(memory.copper() + copperWords * 4, copperWords),
+        CopperList(memory.copper() + copperWords * 5, copperWords)
     };
     Bitmap gameBitmap(memory.game(), downwellVisibleWidth,
                       downwellGameRingHeight, 2, false, false,
@@ -1234,14 +1246,21 @@ int main(void) {
     enemySprites[1].hide();
     if (
 #ifdef DOWNWELL_REPLAY_VERIFY
-        !buildCopper(copperLists[0], gameBitmap, hudBitmap,
+        !buildCopper(copperLists[dynamicCopper0], gameBitmap, hudBitmap,
                      playerSprites[0], bulletSprites, enemySprites[0], palette,
                      port.ringOrigin())
 #else
-        !buildNarrowCopper(
-            copperLists[0],
-            amigaSplashFrame(memory.sceneCache(), scenes.splashStage()),
-            nullSprite, palette)
+        !buildNarrowCopper(copperLists[splashBlankCopper],
+                           amigaSplashFrame(memory.sceneCache(), 1),
+                           nullSprite, palette) ||
+        !buildNarrowCopper(copperLists[splashLogoCopper],
+                           amigaSplashFrame(memory.sceneCache(), 2),
+                           nullSprite, palette) ||
+        !buildWideSplashCopper(copperLists[splashCreditsCopper],
+                               hudBitmap, nullSprite, palette) ||
+        !buildNarrowCopper(copperLists[splashControlsCopper],
+                           amigaSplashFrame(memory.sceneCache(), 4),
+                           nullSprite, palette)
 #endif
     ) {
         platform.restore();
@@ -1249,10 +1268,16 @@ int main(void) {
         memory.release();
         return 1;
     }
-    platform.publish(copperLists[0]);
+    platform.publish(copperLists[
+#ifdef DOWNWELL_REPLAY_VERIFY
+        dynamicCopper0
+#else
+        splashBlankCopper
+#endif
+    ]);
     platform.waitVblank();
     FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-    if (!buildCopper(copperLists[1], gameBitmap, hudBitmap,
+    if (!buildCopper(copperLists[dynamicCopper1], gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
                      playerSprites[1],
                      bulletSprites + AmigaPortRuntime::bulletCapacity,
@@ -1322,31 +1347,37 @@ int main(void) {
                 presentedSplashDither = scenes.splashDitherFrame();
                 if (presentedScene == AmigaScene::splash) {
                     if (presentationChanged || splashDitherChanged) {
-                        const bool built = presentedSplash == 3
-                            ? buildWideSplashCopper(copperLists[back],
-                                                   hudBitmap, nullSprite,
-                                                   palette)
-                            : buildNarrowCopper(
-                                  copperLists[back],
-                                  amigaSplashFrame(memory.sceneCache(),
-                                                   presentedSplash),
-                                  nullSprite, palette,
-                                  presentedSplash == 5 || presentedSplash == 6
-                                      ? amigaSplashDitherTile(
-                                            memory.sceneCache(),
-                                            presentedSplashDither)
-                                      : 0);
+                        unsigned splashCopper = back;
+                        bool built = true;
+                        if (presentationChanged && presentedSplash == 2)
+                            splashCopper = splashLogoCopper;
+                        else if (presentationChanged && presentedSplash == 3)
+                            splashCopper = splashCreditsCopper;
+                        else if (presentationChanged && presentedSplash == 4)
+                            splashCopper = splashControlsCopper;
+                        else {
+                            built = buildNarrowCopper(
+                                copperLists[back],
+                                amigaSplashFrame(memory.sceneCache(),
+                                                 presentedSplash),
+                                nullSprite, palette,
+                                presentedSplash == 5 || presentedSplash == 6
+                                    ? amigaSplashDitherTile(
+                                          memory.sceneCache(),
+                                          presentedSplashDither)
+                                    : 0);
+                            front = back;
+                        }
                         if (!built)
                             break;
-                        platform.publish(copperLists[back]);
-                        front = back;
+                        platform.publish(copperLists[splashCopper]);
                         /*
                          * COP1LC is latched by the copper at the following
                          * vertical blank.  Synchronize discrete splash
                          * changes here so a quickly advanced stage cannot
-                         * remain merely queued while its alternate list is
-                         * reused.  Per-frame dither updates retain the normal
-                         * alternating-list cadence.
+                         * remain merely queued.  The four static splash
+                         * programs are immutable; only per-frame dither
+                         * updates use the two alternating dynamic lists.
                          */
                         if (presentationChanged)
                             platform.waitVblank();
