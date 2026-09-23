@@ -98,3 +98,11 @@ the current vertical camera position, plus the seven title sprite strips.  The
 decoded `build/amiga-menu-entry-frame.png` therefore guards the handoff from
 the independently scrolled garden planes to pointer-only vertical scrolling
 without introducing a repaint path.
+
+`make verify-amiga-gameplay-frame` stops on the first published frame where
+the player has landed.  It captures both 320-line circular game planes, both
+fixed HUD planes, the live ring origin, and all eight hardware-sprite channels.
+The host decoder reconstructs the 352x284 fetched aperture in
+`build/amiga-gameplay-frame.png`; its pinned hash covers the solid landing,
+dual-playfield HUD composition, player, and gunboot shot together.  The normal
+playable executable is rebuilt after the check.

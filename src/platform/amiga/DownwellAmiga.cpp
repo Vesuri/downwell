@@ -189,6 +189,12 @@ volatile const UWORD* gDownwellMenuTitleSprites;
 volatile const UBYTE* gDownwellMenuEntryFrame;
 volatile const UWORD* gDownwellMenuEntryTitleSprites;
 volatile UWORD gDownwellMenuEntryTitlePartCount;
+volatile const UBYTE* gDownwellGameplayGame;
+volatile const UBYTE* gDownwellGameplayHud;
+volatile const UWORD* gDownwellGameplayPlayerSprite;
+volatile const UWORD* gDownwellGameplayActorSprites;
+volatile const UWORD* gDownwellGameplayOverflowSprite;
+volatile UWORD gDownwellGameplayRingOrigin;
 
 __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
     __asm__ volatile("" ::: "memory");
@@ -207,6 +213,10 @@ __attribute__((noinline, used)) void downwellMenuTitleFrameReady(void) {
 }
 
 __attribute__((noinline, used)) void downwellMenuEntryFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellGameplayFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 }
@@ -1699,6 +1709,15 @@ int main(void) {
             if (!sceneGameplayLandedReported && port.player().grounded()) {
                 sceneGameplayLandedReported = true;
                 sceneGameplayLandedCameraY = port.cameraOffsetY();
+                gDownwellGameplayGame = memory.game();
+                gDownwellGameplayHud = memory.hud();
+                gDownwellGameplayPlayerSprite = memory.playerSprite(back);
+                gDownwellGameplayActorSprites = memory.bulletSprite() +
+                    back * AmigaPortRuntime::bulletCapacity *
+                        bulletSpriteWordStride;
+                gDownwellGameplayOverflowSprite = memory.enemySprite(back);
+                gDownwellGameplayRingOrigin = (UWORD)port.ringOrigin();
+                downwellGameplayFrameReady();
                 downwellSceneGameplayLanded();
             } else if (sceneGameplayLandedReported &&
                        !sceneGameplayActiveReported &&
