@@ -154,3 +154,28 @@ combat endpoint remains health 2/3, kills 1/1, currency 6/6 and fails.
 Full host tests and bounded A500 canonical replay pass, with unchanged digest
 `bfbbd762b9b62a59` and clean 68000 audits. The focused wall fixtures, rather
 than that short replay, exercise the newly added wall-stop branch.
+
+## Player gravity precision and the disputed snake hit
+
+Tracing the later snake showed identical precise X/Y through tick 599. The
+apparent one-pixel actor difference at 600 was a consequence of its earlier
+death in SDL, not the cause: the native bullet was one pixel behind vertically.
+Its muzzle had rounded differently after cumulative player gravity error.
+
+`scrPlayerGlobalStat` initializes grav=.2 and maxgrav=7; `scrGravity_n` uses
+those values for the default non-water state. Native player velocity previously
+added 51/256 each update. It now retains signed fifth-Q8 velocity and position
+remainders, including the -4.4 jump impulse and variable-height release. Landing
+clears position residuals, while recoil, braking and knockback set the velocity
+residual consistently. A 100-step exact-rational test covers integration and
+terminal-speed clamping without using SDL as its expected-value generator.
+
+The extended tape now agrees on the snake hit and initial reward collection.
+Its first combat-state mismatch moves from tick 600 to 702 (health 3/4); a
+player-Y difference still begins at tick 666. Final health 2/3, kills 2/1,
+currency 18/6. Full combat remains a failing gate. This supersedes the earlier
+snake-motion suspicion; do not alter snake speed to compensate for muzzle drift.
+Full host tests and the bounded A500 canonical replay pass; the short replay
+digest remains `bfbbd762b9b62a59`, with clean 68000 audits. It does not cover
+the long-tape drift; the rational integration test and traced combat continuation
+provide that evidence.

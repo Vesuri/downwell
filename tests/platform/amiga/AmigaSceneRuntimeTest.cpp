@@ -710,6 +710,29 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             input.fire = tick % 10 < 5;
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && tick % 10 == 0);
+            if (std::getenv("DOWNWELL_TRACE_SNAKE") && gameplay.enemyCount() > 4 && gameplay.tick() >= 585 && gameplay.tick() <= 601) {
+                const auto& native = gameplay.enemyAt(4);
+                unsigned ordinal = 0;
+                for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                    const auto& enemy = reference.instanceAt(i);
+                    if (enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 113 &&
+                        enemy.objectId != 116 && enemy.objectId != 117 && enemy.objectId != 119) continue;
+                    if (ordinal++ != 4) continue;
+                    std::cout << "SNAKE " << gameplay.tick()
+                              << " x=" << 240 + native.preciseX / 256.0F << ',' << enemy.preciseX
+                              << " y=" << 176 + native.preciseY / 256.0F << ',' << enemy.preciseY
+                              << " vx=" << native.speedX / 256.0F << ',' << enemy.velocityX
+                              << " ground=" << native.grounded << ',' << enemy.grounded << '\n';
+                }
+                for (unsigned i = 0; i < gameplay.bulletCapacity; ++i) {
+                    const auto& bullet = gameplay.bulletAt(i);
+                    if (bullet.active) std::cout << "BULLET N " << bullet.x + 240 << ',' << bullet.y + 176 << '\n';
+                }
+                for (unsigned i = 0; i < reference.mainBulletCount(); ++i) {
+                    const auto& bullet = reference.mainBulletAt(i);
+                    std::cout << "BULLET S " << bullet.x << ',' << bullet.y << '\n';
+                }
+            }
             if (std::getenv("DOWNWELL_TRACE_PLAYER_STEPS") && gameplay.tick() >= 550 && gameplay.tick() <= 605)
                 std::cout << "PLAYER STEP " << gameplay.tick()
                           << " x=" << 240 + gameplay.player().offsetX() << ',' << reference.mainPlayerX()

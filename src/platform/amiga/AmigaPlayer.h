@@ -55,6 +55,8 @@ private:
     long y_;
     long speedX_;
     long speedY_;
+    int gravityRemainder_; // signed fifths of a Q8 velocity unit
+    int verticalPositionRemainder_; // signed fifths of a Q8 position unit
     long landingY_;
     int landingProfile_[landingProfileSize];
     LandingResolver landingResolver_;

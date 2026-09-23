@@ -33,6 +33,18 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    AmigaPlayer gravityPrecision(false, 10000);
+    // Source scrGravity_n: exactly .2 per update, capped at 7.
+    long fifthsPosition = 0;
+    long fifthsSpeed = 0;
+    for (unsigned tick = 0; tick < 100; ++tick) {
+        fifthsSpeed += 256;
+        if (fifthsSpeed > 7 * 256 * 5) fifthsSpeed = 7 * 256 * 5;
+        fifthsPosition += fifthsSpeed;
+        gravityPrecision.step(downwell::Input{});
+        require(gravityPrecision.offsetYFixed() == fifthsPosition / 5,
+                "native player preserves exact .2 gravity and position integration through terminal speed");
+    }
     AmigaPlayer emptyGun(false, 10000);
     downwell::Input trigger;
     trigger.fire = true;

@@ -20,6 +20,7 @@ enum {
 
 AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
     : x_(0), y_(0), speedX_(0), speedY_(0),
+      gravityRemainder_(0), verticalPositionRemainder_(0),
       landingY_(landingOffset * fixedOne), landingResolver_(0),
       landingResolverContext_(0), solidResolver_(0),
       solidResolverContext_(0),
@@ -76,6 +77,7 @@ unsigned AmigaPlayer::integerSquareRoot(unsigned value)
 void AmigaPlayer::stompBounce()
 {
     speedY_ = -640;
+    gravityRemainder_ = 0;
     grounded_ = false;
     ammo_ = maximumAmmo;
 }
@@ -90,6 +92,7 @@ void AmigaPlayer::contactKnockback(int enemyX, int enemyY)
                   ? 0
                   : (long)dx * (3L * fixedOne) / (long)distance;
     speedY_ = -2 * fixedOne;
+    gravityRemainder_ = 0;
     grounded_ = false;
 }
 
@@ -106,10 +109,20 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     // Gravity precedes horizontal movement/support checks in the recovered
     // player Step. Walking off an edge must start falling this same frame.
     speedY_ += gravity;
-    if (speedY_ > fallMaximum) speedY_ = fallMaximum;
+    if (++gravityRemainder_ >= 5) {
+        ++speedY_;
+        gravityRemainder_ -= 5;
+    }
+    if (speedY_ >= fallMaximum) {
+        speedY_ = fallMaximum;
+        gravityRemainder_ = 0;
+    }
     if (fireReleased) {
-        if (speedY_ < 0)
-            speedY_ /= 2;
+        if (speedY_ < 0) {
+            const long halved = (speedY_ * 5 + gravityRemainder_) / 2;
+            speedY_ = halved / 5;
+            gravityRemainder_ = (int)(halved % 5);
+        }
         jumpShootLocked_ = false;
         shotDelay_ = 0;
     }
@@ -192,6 +205,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     if (firePressed && grounded_) {
         grounded_ = false;
         speedY_ = jumpSpeed;
+        gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
         jumpShootLocked_ = true;
         ++jumps_;
     }
@@ -199,11 +213,18 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         !jumpShootLocked_ && ammo_ == 0) {
         // scrPlayerShootN's empty-charge branch still brakes a fast fall.
         // It consumes no charge and creates no bullet or shooting animation.
-        if (speedY_ > 3 * fixedOne) speedY_ = 3 * fixedOne;
+        if (speedY_ > 3 * fixedOne ||
+            (speedY_ == 3 * fixedOne && gravityRemainder_ > 0)) {
+            speedY_ = 3 * fixedOne;
+            gravityRemainder_ = 0;
+        }
         shotDelay_ = 16;
     } else if (input.fire && !grounded_ && shotDelay_ == 0 &&
                !jumpShootLocked_ && ammo_ > 0) {
-        if (speedY_ > 0) speedY_ = 0;
+        if (speedY_ > 0 || (speedY_ == 0 && gravityRemainder_ > 0)) {
+            speedY_ = 0;
+            gravityRemainder_ = 0;
+        }
         --ammo_;
         ++shots_;
         airborneShot_ = true;
@@ -212,17 +233,25 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     }
 
     if (!grounded_) {
-        y_ += speedY_;
+        const long displacement = speedY_ * 5 + gravityRemainder_ +
+                                  verticalPositionRemainder_;
+        y_ += displacement / 5;
+        verticalPositionRemainder_ = (int)(displacement % 5);
         if (y_ >= landingY_) {
             y_ = landingY_;
             speedY_ = 0;
+            gravityRemainder_ = 0;
+            verticalPositionRemainder_ = 0;
             grounded_ = true;
             ammo_ = maximumAmmo;
             airborneShot_ = false;
         }
     }
 
-    if (grounded_) speedY_ = 0;
+    if (grounded_) {
+        speedY_ = 0;
+        gravityRemainder_ = 0;
+    }
     pixelX_ = fixedToPixel(x_);
     pixelY_ = fixedToPixel(y_);
 
