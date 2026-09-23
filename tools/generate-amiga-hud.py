@@ -83,6 +83,19 @@ TEXT_SELECTIONS = {
     },
 }
 
+# Splash stage 3 is a static 4:3 composition.  Keep its six bounded strings
+# as ready-to-blit outlined assets so the 68000 never runs a glyph compositor.
+CREDIT_TEXT_SELECTIONS = {
+    "game": {
+        65200: ("a game by\nOJIRO FUMOTO", "white"),
+        65201: ("@MOPPIN_", "red"),
+        65202: ("EIRIK SUHRKE", "white"),
+        65203: ("@STROTCHY", "red"),
+        65204: ("JOONAS TURNER", "white"),
+        65205: ("@KISSAKOLME", "red"),
+    },
+}
+
 # The recovered streak counter uses font 2 and is drawn over the playfield by
 # the fixed HUD layer.  Pre-render the bounded two-digit forms so the 68000
 # never needs a glyph compositor in the frame loop.
@@ -179,6 +192,23 @@ def render_text(manifest, pages, text):
     return canvas
 
 
+def render_bordered_text(manifest, pages, text, color):
+    glyphs = render_text(manifest, pages, text)
+    alpha = glyphs.getchannel("A")
+    canvas = Image.new("RGBA", (glyphs.width + 2, glyphs.height + 2),
+                       (0, 0, 0, 0))
+    outline = Image.new("RGBA", glyphs.size, (0, 0, 0, 255))
+    outline.putalpha(alpha)
+    for position in ((0, 1), (2, 1), (1, 0), (1, 2)):
+        canvas.alpha_composite(outline, position)
+    foreground = Image.new(
+        "RGBA", glyphs.size,
+        (255, 0, 0, 255) if color == "red" else (255, 255, 255, 255))
+    foreground.putalpha(alpha)
+    canvas.alpha_composite(foreground, (1, 1))
+    return canvas
+
+
 def render_dither_strip(sprite, frame, items, pages, source_x, source_y):
     canvas = frame_canvas(sprite, frame, items, pages).crop(
         (source_x, source_y, source_x + 160, source_y + 80))
@@ -241,6 +271,19 @@ def build_pack(manifest, extracted, profile):
             "id": text_id,
             "originX": canvas.width // 2,
             "originY": 0,
+            "width": canvas.width,
+            "height": canvas.height,
+        }
+        encoded.append((sprite, 0, dma_width, planar))
+
+    for text_id, (text, color) in CREDIT_TEXT_SELECTIONS.get(profile, {}).items():
+        canvas = render_bordered_text(manifest, pages, text, color)
+        pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
+        dma_width, planar = encode_planar(pens, canvas.width, canvas.height)
+        sprite = {
+            "id": text_id,
+            "originX": canvas.width // 2,
+            "originY": 1,
             "width": canvas.width,
             "height": canvas.height,
         }

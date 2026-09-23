@@ -6,6 +6,16 @@
 #include <string>
 namespace downwell {
 namespace {
+void drawBorderText(Renderer& renderer, float x, float y, const char* text,
+                    Color foreground) {
+    const Color black{0, 0, 0, 255};
+    renderer.drawText(2, text, x + 1.0F, y, black, TextAlign::center);
+    renderer.drawText(2, text, x - 1.0F, y, black, TextAlign::center);
+    renderer.drawText(2, text, x, y + 1.0F, black, TextAlign::center);
+    renderer.drawText(2, text, x, y - 1.0F, black, TextAlign::center);
+    renderer.drawText(2, text, x, y, foreground, TextAlign::center);
+}
+
 class OffsetRenderer final : public Renderer {
 public:
     OffsetRenderer(Renderer& renderer, int x) : renderer_(renderer), x_(x) {}
@@ -61,6 +71,7 @@ void Game::render(Renderer& renderer) const {
     renderer.setClipRect(playfieldX, 0, StartupRuntime::surfaceWidth,
                          logicalHeight);
     OffsetRenderer playfield(renderer, playfieldX);
+    bool clipReleased = false;
     if (startup_.inMenu()) {
         renderMenu(playfield);
     } else if (startup_.inPlayMenu()) {
@@ -71,12 +82,29 @@ void Game::render(Renderer& renderer) const {
         const int stage = startup_.showSplash();
         if (stage == 2)
             playfield.drawSprite(696, 0, 80, 140); // sprDevolverLogo
+        if (stage == 3) {
+            renderer.clearClipRect();
+            clipReleased = true;
+            drawBorderText(renderer, playfieldX + 80.0F, 130.0F,
+                           "a game by\nOJIRO FUMOTO", {255, 255, 255, 255});
+            drawBorderText(renderer, playfieldX + 80.0F, 150.0F,
+                           "@MOPPIN_", {255, 0, 0, 255});
+            drawBorderText(renderer, playfieldX + 168.0F, 200.0F,
+                           "EIRIK SUHRKE", {255, 255, 255, 255});
+            drawBorderText(renderer, playfieldX + 168.0F, 210.0F,
+                           "@STROTCHY", {255, 0, 0, 255});
+            drawBorderText(renderer, playfieldX - 8.0F, 200.0F,
+                           "JOONAS TURNER", {255, 255, 255, 255});
+            drawBorderText(renderer, playfieldX - 8.0F, 210.0F,
+                           "@KISSAKOLME", {255, 0, 0, 255});
+        }
         if (stage == 4 || stage == 5)
             playfield.drawSprite(695, 0, 80, 140); // sprControls
         if (stage == 5 || stage == 6)
             playfield.drawSpriteTiled(733, 11, -300, 0); // sprDitherFade
     }
-    renderer.clearClipRect();
+    if (!clipReleased)
+        renderer.clearClipRect();
     if (startup_.inMainRoom())
         renderLandscapeHud(renderer);
 }

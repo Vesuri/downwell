@@ -69,16 +69,19 @@ without SDL.
 Room-entry tests also pin serialized creation order, persistence, lifecycle
 phases, and atomic failure behavior.
 
-Splash stages 2, 4, 5, and 6 now draw their recovered Devolver, controls, and
-dither sprites. Stage 3 credits require the font renderer and remain blank for
-now; fade-frame interpolation is also still pending.
+Splash stages 2 through 6 now draw their recovered Devolver logo, full 4:3
+credits composition, controls, and dither sprites. The Amiga credits are
+precomposed once into the fixed HUD planes before presentation and displayed
+with the wide fetch; they do not invoke a glyph compositor or repaint during
+their three-second hold. Fade-frame interpolation is still pending.
 
-The two nonblank native splash rasters have independent emulator-backed
+The three nonblank native splash rasters have independent emulator-backed
 regression gates. `make verify-amiga-splash-frame` pins the complete Devolver
-publisher frame and `make verify-amiga-controls-frame` pins the recovered
-controller/keyboard instructions. In this Steam data, the stage-5 dither frame
-is transparent, so its visible result is identical to stage 4 before stage 6
-clears the compact splash buffer.
+publisher frame, `make verify-amiga-credits-frame` pins the wide credits, and
+`make verify-amiga-controls-frame` pins the recovered controller/keyboard
+instructions. In this Steam data, dither frame 11 is transparent, so the first
+stage-5 frame is identical to stage 4 before the recovered frame index begins
+to change.
 
 The cross-target replay and state-comparison contract is documented in
 [docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional

@@ -15,7 +15,7 @@ enum {
 };
 
 bool amigaBuildSplashCache(const UBYTE* pack, const UBYTE* packEnd,
-                           UBYTE* cache);
+                           UBYTE* cache, UBYTE* wideCredits);
 const UBYTE* amigaSplashFrame(const UBYTE* cache, int stage);
 
 #endif

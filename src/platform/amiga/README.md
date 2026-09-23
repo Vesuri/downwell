@@ -72,6 +72,13 @@ only after a generated enemy is awake and that gameplay frame and copper list
 have been published. It also restores the normal playable executable after
 passing.
 
+`make verify-amiga-credits-frame` stops on splash stage 3 and captures the
+fixed 384x284 two-plane HUD backing raster.  Its decoder applies the real
+16-pixel hardware crop and writes `build/amiga-credits-frame.png`, pinning the
+recovered 4:3 placement of the three contributor blocks.  The frame is
+precomposed before it becomes visible and remains unchanged for the whole
+splash stage.
+
 `make verify-amiga-style-frame` stops on the first stable default-style frame,
 dumps the exact 176x284 two-plane Chip RAM image through GDB, verifies its
 pinned SHA-256, decodes the visible 160-pixel aperture to

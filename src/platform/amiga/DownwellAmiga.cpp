@@ -174,6 +174,7 @@ extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
+volatile const UBYTE* gDownwellCreditsFrame;
 
 struct DownwellMenuFrameCapture {
     ULONG foregroundOffset;
@@ -206,6 +207,10 @@ __attribute__((noinline, used)) void downwellSplashFrameReady(void) {
 }
 
 __attribute__((noinline, used)) void downwellControlsFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellCreditsFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
@@ -911,6 +916,27 @@ static bool buildNarrowCopper(CopperList& list, const UBYTE* frame,
     return list.finish();
 }
 
+static bool buildWideSplashCopper(CopperList& list, const Bitmap& frame,
+                                  const Sprite& nullSprite,
+                                  const Palette& palette) {
+    list.reset();
+    list.move(diwstrt, (UWORD)((displayVStart << 8) |
+                              (displayHStart & 0xff)));
+    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
+                              (displayHStop & 0xff)));
+    list.move(ddfstrt, fetchStart);
+    list.move(ddfstop, fetchStop);
+    list.move(bplcon0, 0x2001);
+    list.move(bplcon1, 0);
+    list.move(bpl1mod, fetchModulo);
+    list.move(bpl2mod, fetchModulo);
+    list.showBitmap(frame, 1, 2, fetchCropBytes * 8, 0, 1);
+    for (unsigned channel = 0; channel < 8; ++channel)
+        list.showSprite((UWORD)channel, nullSprite);
+    list.setPalette(palette);
+    return list.finish();
+}
+
 static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                             unsigned index) {
     return index < AmigaPortRuntime::bulletCapacity
@@ -961,6 +987,7 @@ int main(void) {
     bool sceneStyleFrameReported = false;
     bool sceneSplashFrameReported = false;
     bool sceneControlsFrameReported = false;
+    bool sceneCreditsFrameReported = false;
     int sceneGameplayLandedCameraY = 0;
 #endif
     worldViewY += port.cameraOffsetY();
@@ -1097,7 +1124,7 @@ int main(void) {
     }
 #endif
     if (!amigaBuildSplashCache(activeGamePack, activeGamePackEnd,
-                               memory.sceneCache())) {
+                               memory.sceneCache(), memory.hud())) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1274,15 +1301,26 @@ int main(void) {
                 presentedSplash = scenes.splashStage();
                 if (presentedScene == AmigaScene::splash) {
                     if (presentationChanged) {
-                        if (!buildNarrowCopper(
-                                copperLists[back],
-                                amigaSplashFrame(memory.sceneCache(),
-                                                 presentedSplash),
-                                nullSprite, palette))
+                        const bool built = presentedSplash == 3
+                            ? buildWideSplashCopper(copperLists[back],
+                                                   hudBitmap, nullSprite,
+                                                   palette)
+                            : buildNarrowCopper(
+                                  copperLists[back],
+                                  amigaSplashFrame(memory.sceneCache(),
+                                                   presentedSplash),
+                                  nullSprite, palette);
+                        if (!built)
                             break;
                         platform.publish(copperLists[back]);
                         front = back;
 #ifdef DOWNWELL_SCENE_VERIFY
+                        if (!sceneCreditsFrameReported &&
+                            presentedSplash == 3) {
+                            sceneCreditsFrameReported = true;
+                            gDownwellCreditsFrame = memory.hud();
+                            downwellCreditsFrameReady();
+                        }
                         if (!sceneSplashFrameReported &&
                             presentedSplash == 2) {
                             sceneSplashFrameReported = true;

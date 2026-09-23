@@ -49,10 +49,10 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
     int sourceX = 0, sourceY = 0, drawWidth = width, drawHeight = height;
     if (left < 0) { sourceX = -left; drawWidth += left; left = 0; }
     if (top < 0) { sourceY = -top; drawHeight += top; top = 0; }
-    if (left + drawWidth > amigaSplashVisibleWidth)
-        drawWidth = amigaSplashVisibleWidth - left;
-    if (top + drawHeight > amigaSplashHeight)
-        drawHeight = amigaSplashHeight - top;
+    if (left + drawWidth > destination.width)
+        drawWidth = destination.width - left;
+    if (top + drawHeight > destination.height)
+        drawHeight = destination.height - top;
     if (drawWidth <= 0 || drawHeight <= 0) return true;
     Bitmap source((void*)data, width, height, 2, false, false, dataWidth);
     Bitmap mask((void*)(data + planeBytes * 2), width, height, 1,
@@ -95,7 +95,7 @@ bool tileFade(UBYTE* destination, const UBYTE* pack, const UBYTE* end) {
 } // namespace
 
 bool amigaBuildSplashCache(const UBYTE* pack, const UBYTE* packEnd,
-                           UBYTE* cache) {
+                           UBYTE* cache, UBYTE* wideCredits) {
     for (int frame = 0; frame < amigaSplashFrameCount; ++frame) {
         Bitmap bitmap(cache + frame * amigaSplashFrameBytes,
                       amigaSplashWidth, amigaSplashHeight, 2, false);
@@ -107,9 +107,17 @@ bool amigaBuildSplashCache(const UBYTE* pack, const UBYTE* packEnd,
                     amigaSplashWidth, amigaSplashHeight, 2, false);
     Bitmap controlsFade(cache + controlsFadeFrame * amigaSplashFrameBytes,
                         amigaSplashWidth, amigaSplashHeight, 2, false);
+    Bitmap credits(wideCredits, 380, amigaSplashHeight, 2, false, false, 384);
+    credits.clear();
     if (!draw(devolver, pack, packEnd, 696, 0, 80, 140) ||
         !draw(controls, pack, packEnd, 695, 0, 80, 140) ||
-        !draw(controlsFade, pack, packEnd, 695, 0, 80, 140))
+        !draw(controlsFade, pack, packEnd, 695, 0, 80, 140) ||
+        !draw(credits, pack, packEnd, 65200, 0, 190, 130) ||
+        !draw(credits, pack, packEnd, 65201, 0, 190, 150) ||
+        !draw(credits, pack, packEnd, 65202, 0, 278, 200) ||
+        !draw(credits, pack, packEnd, 65203, 0, 278, 210) ||
+        !draw(credits, pack, packEnd, 65204, 0, 102, 200) ||
+        !draw(credits, pack, packEnd, 65205, 0, 102, 210))
         return false;
     AmigaHardware::blitterDrain();
     return tileFade(cache + controlsFadeFrame * amigaSplashFrameBytes,
