@@ -127,6 +127,11 @@ single-frame airborne poses, two-frame crawler and frog-air poses, four-frame
 idle/flying/crawling poses, and the turtle's six-frame walk. Frog air frames
 remain selected directly from vertical direction, matching its GML Step event.
 
+When the grounded player stops, the native fixed-point controller performs the
+recovered five-pixel forward support probe. Missing support selects the
+five-frame `sprPlayerBalancing` hardware-sprite cycle at 0.25 frame per step;
+support or movement returns to the ordinary idle/run states.
+
 `make verify-amiga-menu-wake-frame` captures the first walking garden frame as
 the two immutable 512x384 cache planes, their independent pointer/fine-scroll
 state, and hardware sprite 0.  Its host decoder reconstructs the centered

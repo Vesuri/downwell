@@ -27,6 +27,7 @@ AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
       jumpShootLocked_(false), airborneShot_(false),
       running_(false), runPhaseTenths_(0),
       idling_(startsGrounded), idlePhaseTenths_(0),
+      balancing_(false), balancePhaseQuarters_(0),
       shotPhaseQuarters_(0),
       shotDelay_(startsGrounded ? 0u : 1u), facing_(1),
       jumps_(0), shots_(0)
@@ -204,6 +205,30 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         }
     }
 
+    pixelX_ = fixedToPixel(x_);
+    pixelY_ = fixedToPixel(y_);
+
+    bool nowBalancing = grounded_ && speedX_ == 0 &&
+        !input.left && !input.right && solidResolver_ != 0;
+    if (nowBalancing) {
+        const int probeX = pixelX_ + 5 * facing_;
+        for (int probeY = pixelY_; probeY <= pixelY_ + 16; ++probeY) {
+            if (solidResolver_(solidResolverContext_, probeX, probeY)) {
+                nowBalancing = false;
+                break;
+            }
+        }
+    }
+    if (nowBalancing) {
+        if (!balancing_)
+            balancePhaseQuarters_ = (idlePhaseTenths_ / 10) * 4;
+        else
+            balancePhaseQuarters_ = (balancePhaseQuarters_ + 1) % 20;
+    } else {
+        balancePhaseQuarters_ = 0;
+    }
+    balancing_ = nowBalancing;
+
     const bool nowRunning = grounded_ && speedX_ != 0;
     if (nowRunning) {
         if (!running_)
@@ -215,7 +240,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     }
     running_ = nowRunning;
 
-    const bool nowIdling = grounded_ && speedX_ == 0;
+    const bool nowIdling = grounded_ && speedX_ == 0 && !balancing_;
     if (nowIdling) {
         if (!idling_)
             idlePhaseTenths_ = 0;
@@ -235,22 +260,22 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     }
 
     priorFire_ = input.fire;
-    pixelX_ = fixedToPixel(x_);
-    pixelY_ = fixedToPixel(y_);
     AmigaPlayerMotion motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
     return motion;
 }
 
 int AmigaPlayer::spriteId() const
 {
-    if (grounded_) return running_ ? 27 : 31;
+    if (grounded_) return running_ ? 27 : balancing_ ? 15 : 31;
     return airborneShot_ ? 3 : 37;
 }
 
 unsigned AmigaPlayer::spriteFrame() const
 {
     if (grounded_)
-        return running_ ? runPhaseTenths_ / 10 : idlePhaseTenths_ / 10;
+        return running_ ? runPhaseTenths_ / 10
+                        : balancing_ ? balancePhaseQuarters_ / 4
+                                     : idlePhaseTenths_ / 10;
     if (airborneShot_)
         return shotPhaseQuarters_ / 4 < 3 ? shotPhaseQuarters_ / 4 : 3;
     if (speedY_ < -2 * fixedOne) return 0;

@@ -21,6 +21,15 @@ bool resolveSolid(void* opaque, int x, int y) {
     return fixture.wall && x >= 24 && x <= 39 && y >= -8 && y <= 15;
 }
 
+struct EdgeFixture {
+    int rightEdge;
+};
+
+bool resolveLedge(void* opaque, int x, int y) {
+    const EdgeFixture& fixture = *static_cast<EdgeFixture*>(opaque);
+    return x < fixture.rightEdge && y >= 8 && y <= 16;
+}
+
 } // namespace
 
 int main() {
@@ -112,6 +121,22 @@ int main() {
         player.step(input);
     require(player.spriteId() == 31 && player.spriteFrame() == 0,
             "friction returns the stationary player to the idle pose");
+
+    EdgeFixture edge = {5};
+    AmigaPlayer balancing;
+    balancing.configureSolidResolver(resolveLedge, &edge, -236, 236);
+    input = downwell::Input{};
+    balancing.step(input);
+    require(balancing.spriteId() == 15 && balancing.spriteFrame() == 0,
+            "stationary player facing beyond support uses the ledge pose");
+    for (unsigned frame = 0; frame < 4; ++frame)
+        balancing.step(input);
+    require(balancing.spriteFrame() == 1,
+            "the five-frame ledge pose advances at recovered 0.25 speed");
+    edge.rightEdge = 6;
+    balancing.step(input);
+    require(balancing.spriteId() == 31 && balancing.spriteFrame() == 0,
+            "support beneath the forward probe restores the idle pose");
 
     SolidFixture fixture = {true};
     AmigaPlayer colliding;

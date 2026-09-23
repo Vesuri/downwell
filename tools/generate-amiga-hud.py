@@ -32,6 +32,7 @@ SELECTIONS = {
         0: None,     # sprPlDead
         3: None,     # sprPlayerShoot
         12: None,    # sprPlayerLegswing
+        15: None,    # sprPlayerBalancing
         27: None,    # sprPlayerRunExg
         31: None,    # sprPlayerIdle
         37: None,    # sprPlayerAir
