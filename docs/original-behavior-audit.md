@@ -132,3 +132,25 @@ Full host tests, the live scene/latch comparison, and the bounded A500 canonical
 replay pass. The target digest remains `bfbbd762b9b62a59`; that short tape does
 not exercise frog landing. Native unit tests provide the landing-edge coverage.
 Both 68000 audits are clean and the playable SDL build was rebuilt.
+
+## Default bullets and ordinary walls
+
+`bulletStandard_Step_0` calls `scrBulCheckSolid` before applying velocity.
+The latter's assembly queries a segment against resource 59 (solid walls),
+but bypasses this branch when the same segment intersects resource 83
+(enemies). A normal non-wave bullet is destroyed by an ordinary solid wall;
+breakable walls instead receive damage. Native code previously handled only
+enemies and its explicit breakable list, allowing shots through ordinary walls.
+It now checks the remaining vertical segment against its solid resolver.
+Focused tests assert ordinary-wall absorption without a breakable record and
+preservation of the existing enemy-line precedence.
+
+This is not a complete translation of the original bullet system. Source
+collision masks, overlapping wall/box selection, bullet direction randomization,
+hit effects and the separate enemy collision event remain incomplete. SDL's
+pixel-by-pixel first-hit ordering also differs from the source's enemy-line
+guard and must not be used to override that evidence. The current extended
+combat endpoint remains health 2/3, kills 1/1, currency 6/6 and fails.
+Full host tests and bounded A500 canonical replay pass, with unchanged digest
+`bfbbd762b9b62a59` and clean 68000 audits. The focused wall fixtures, rather
+than that short replay, exercise the newly added wall-stop branch.

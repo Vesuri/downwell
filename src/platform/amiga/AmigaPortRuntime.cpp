@@ -488,7 +488,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }
 
     /*
-     * objBullet_n receives its Step later in the same GameMaker phase in
+     * The adapted default bullet receives its Step later in the phase in
      * which objPlayer_n creates it. Existing and newly-created shots therefore
      * advance together after player movement and firing.
      */
@@ -546,6 +546,17 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                         ++destroyedBlockCount;
                     }
                     ++blocksDestroyed_;
+                }
+            }
+            // scrBulCheckSolid also destroys an ordinary, non-wave bullet
+            // on an unbreakable solid wall. Keep its enemy-line precedence:
+            // an enemy hit above has already consumed the shot.
+            if (bullet.active && solidResolver_ != 0) {
+                for (int y = priorBulletY; y <= bullet.y; ++y) {
+                    if (solidResolver_(solidResolverContext_, bullet.x, y)) {
+                        bullet.active = false;
+                        break;
+                    }
                 }
             }
             if (bullet.y >= cameraPixelY_ + bulletBottom)

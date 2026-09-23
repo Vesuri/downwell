@@ -208,6 +208,21 @@ int main() {
             "shot originates at pre-movement rounded instance coordinates before its own Step");
 
     AmigaPortRuntime destructible(300);
+    AmigaPortRuntime wallShot(300, false, 1000);
+    wallShot.configureSolidResolver(flatGround, nullptr);
+    wallShot.step(4);
+    require(wallShot.player().shots() == 1 && !wallShot.bulletActive() &&
+                wallShot.blocksDestroyed() == 0,
+            "ordinary solid walls absorb the default bullet without a breakable record");
+
+    AmigaPortRuntime wallEnemyShot(300, false, 1000);
+    wallEnemyShot.configureSolidResolver(flatGround, nullptr);
+    wallEnemyShot.configureEnemy(0, 111, 163, -1, 12, 0, 0, 5, 6,
+                                 0, 0, -1, -1, 0, 0, true, false, true);
+    wallEnemyShot.step(4);
+    require(wallEnemyShot.enemiesDefeated() == 1,
+            "source enemy-line intersection retains precedence over the solid wall check");
+
     const int blockX[] = {-1};
     const int blockY[] = {32};
     destructible.configureBreakables(blockX, blockY, 1);
