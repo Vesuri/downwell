@@ -40,6 +40,7 @@ struct AmigaMenuScrollState {
     std::uint32_t foregroundOffset;
     std::uint32_t backgroundOffset;
     std::uint16_t scrollControl;
+    unsigned backgroundVisibleLines;
 };
 
 AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY);

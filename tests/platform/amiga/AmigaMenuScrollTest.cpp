@@ -67,6 +67,11 @@ int main() {
     }
     require(amigaMenuEntryScrollState(248, 858).backgroundOffset == 78 * 64 + 4,
             "background keeps scrolling during deep entry");
+    require(amigaMenuEntryScrollState(248, 306).backgroundVisibleLines == 270 &&
+                amigaMenuEntryScrollState(248, 575).backgroundVisibleLines == 1 &&
+                amigaMenuEntryScrollState(248, 576).backgroundVisibleLines == 0 &&
+                amigaMenuEntryScrollState(248, 858).backgroundVisibleLines == 0,
+            "opaque well shaft covers sky before the next scene");
     std::cout << "Amiga menu hardware-scroll tests passed\n";
     return 0;
 }

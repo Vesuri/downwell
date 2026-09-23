@@ -26,6 +26,7 @@ public:
     unsigned moveOffset(UWORD reg) const;
     bool patchMove(unsigned offset, UWORD value);
     bool patchPointer(unsigned offset, const void* value);
+    bool patchWait(unsigned offset, UWORD vertical, UWORD horizontal);
     UWORD* data() const { return words_; }
     unsigned size() const { return count_; }
     bool valid() const { return valid_; }

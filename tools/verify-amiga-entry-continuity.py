@@ -24,7 +24,7 @@ for row in range(284):
     for col in range(160):
         foreground = pixel(entry, 24, x + col, y + row)
         assert foreground == pixel(garden, 64, 240 + x + col, y - 284 + row), (col, row)
-        sky = pixel(background, 64, bx + col, by + row)
+        sky = pixel(background, 64, bx + col, by + row) if row < max(0, 576 - y) else 0
         background_lit += sky
         pixels.append((255, 255, 255) if foreground or sky else (0, 0, 0))
 assert background_lit > 0, "handoff lost the sky"

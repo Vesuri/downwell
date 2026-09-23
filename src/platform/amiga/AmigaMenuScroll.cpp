@@ -29,6 +29,7 @@ AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY) {
     const int backgroundX = clamp(viewX / 6, 0, maximumX);
     const int top = clamp(viewY, amigaMenuCacheWorldY, maximumY);
     AmigaMenuScrollState state;
+    state.backgroundVisibleLines = 284;
     state.foregroundOffset = planeOffset(foregroundX, top);
     state.backgroundOffset = backgroundOffset(backgroundX, viewY);
     /*
@@ -52,6 +53,8 @@ std::uint32_t amigaMenuEntryOffset(int viewY) {
 
 AmigaMenuScrollState amigaMenuEntryScrollState(int viewX, int viewY) {
     AmigaMenuScrollState state = amigaMenuScrollState(viewX, viewY);
+    // rmMenu objWell at (272,512): Draw paints black from y+64 down.
+    state.backgroundVisibleLines = (unsigned)clamp(576 - viewY, 0, 284);
     const int x = clamp(viewX - amigaMenuEntryWorldX, 0,
                         amigaMenuEntryWidth - amigaMenuFetchWords * 16);
     state.foregroundOffset = amigaMenuEntryOffset(viewY) + (x >> 4) * 2;

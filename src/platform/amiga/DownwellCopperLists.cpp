@@ -154,6 +154,20 @@ bool DownwellMenuCopperList::buildScroll(
     foregroundOffset_ = moveOffset(bpl1pth);
     backgroundOffset_ = moveOffset(bpl2pth);
     playerOffset_ = moveOffset(spr1pth);
+    // Keep a fixed two-part split layout across PAL line 255. Pen 2 is
+    // background-only; pen 3 remains white so foreground pixels survive.
+    const unsigned cut = downwellDisplayVStartCropped +
+                         scroll.backgroundVisibleLines - 1;
+    skyWaitOffset_ = size();
+    // $c0 is past this narrow DIW but leaves room for the color move
+    // before the separate $ffdf rollover barrier on line 255.
+    if (!wait((UWORD)(cut < 255 ? cut : 255), 0xc0)) return false;
+    skyColorOffset_ = size();
+    if (!move(color02, cut <= 255 ? 0 : 0xfff) || !wait(255, 0xdf))
+        return false;
+    skyLateWaitOffset_ = size();
+    if (!wait((UWORD)(cut > 255 ? cut : 256), 0xdf) || !move(color02, 0))
+        return false;
     return finish();
 }
 
@@ -161,7 +175,12 @@ bool DownwellMenuCopperList::updateScroll(
     const UBYTE* foreground, const UBYTE* background,
     const UWORD* player, const AmigaMenuScrollState& scroll, bool entry)
 {
+    const unsigned cut = downwellDisplayVStartCropped +
+                         scroll.backgroundVisibleLines - 1;
     return patchMove(scrollOffset_, scroll.scrollControl) &&
+           patchWait(skyWaitOffset_, (UWORD)(cut < 255 ? cut : 255), 0xc0) &&
+           patchMove(skyColorOffset_, cut <= 255 ? 0 : 0xfff) &&
+           patchWait(skyLateWaitOffset_, (UWORD)(cut > 255 ? cut : 256), 0xdf) &&
            patchMove(foregroundModuloOffset_,
                      entry ? amigaMenuEntryBytesPerRow - amigaMenuFetchBytes
                            : amigaMenuModulo) &&

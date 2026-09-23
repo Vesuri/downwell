@@ -188,8 +188,8 @@ against the previous pixel-builder representation. This is the garden path;
 gameplay's generic sprite builder remains a separate migration task.
 
 Garden copper programs are built once per buffer/mode. Following the reference
-ports' indexed-update pattern, the active frame patches only eight value words
-(two plane pointers, BPLCON1, sprite pointer, foreground modulo), including entry.
+ports' indexed-update pattern, the active frame patches only changing pointer,
+scroll, modulo and shaft-cover words, including entry.
 Palette and register-address words are retained. Scene-verification builds
 compare every patched program with a freshly emitted oracle; normal builds do
 not perform that comparison. The wake sprite is also checked against the old
@@ -209,6 +209,15 @@ The aligned origin preserves the settled camera x=248 without a sideways jump.
 scroll state; its host verifier compares every visible foreground pixel across
 the handoff and confirms visible sky pixels. It also produces
 `build/amiga-menu-entry-frame.png`. Neither layer is repainted while descending.
+
+The recovered `objWell` Draw bytecode paints an opaque black shaft from
+world (248,576) to (408,1512). During the centered descent, a copper color-2
+split follows that top edge: background-only pixels below it become black,
+while color 3 stays white to preserve the foreground. The sky's slow parallax
+does not accelerate; the shaft covers it before style selection. The split
+has fixed slots on both sides of PAL line 255, patched without rebuilding the
+program. `amiga/verify_menu_sky.gdb` stops when coverage is complete and checks
+the patched program against the freshly emitted test-only oracle.
 
 `make verify-amiga-gameplay-frame` stops on the first published frame where
 the player has landed.  It captures both 320-line circular game planes, both

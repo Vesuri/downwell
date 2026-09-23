@@ -145,6 +145,10 @@ downwellMenuEntryScrollReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
+extern "C" __attribute__((noinline, used)) void downwellMenuSkyCovered(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
 extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
 volatile const UBYTE* gDownwellLockedStyleFrame;
@@ -1365,6 +1369,10 @@ int main(void) {
 #endif
                     DW_PROFILE_PHASE(profilePublish);
                     platform.publish(menuCopperLists[back]);
+#ifdef DOWNWELL_SCENE_VERIFY
+                    if (menuEntry && menuScroll.backgroundVisibleLines == 0)
+                        downwellMenuSkyCovered();
+#endif
                     DW_PROFILE_PHASE(profileOther);
                     front = back;
                     if (presentationChanged &&

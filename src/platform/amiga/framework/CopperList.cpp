@@ -113,3 +113,11 @@ bool CopperList::patchPointer(unsigned offset, const void* value)
     return patchMove(offset, (UWORD)(address >> 16)) &&
            patchMove(offset + 2, (UWORD)address);
 }
+
+bool CopperList::patchWait(unsigned offset, UWORD vertical, UWORD horizontal)
+{
+    if (offset + 1 >= count_ || (offset & 1)) return false;
+    words_[offset] = (UWORD)(((vertical & 0xff) << 8) |
+                             (horizontal & 0xfe) | 1);
+    return true;
+}

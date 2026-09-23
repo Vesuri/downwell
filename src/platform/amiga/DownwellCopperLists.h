@@ -58,6 +58,7 @@ public:
 private:
     unsigned scrollOffset_, foregroundOffset_, backgroundOffset_, playerOffset_;
     unsigned foregroundModuloOffset_;
+    unsigned skyWaitOffset_, skyColorOffset_, skyLateWaitOffset_;
 };
 
 class DownwellSplashCopperList : public CopperList {
