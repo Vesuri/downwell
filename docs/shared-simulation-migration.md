@@ -47,3 +47,30 @@ status does not imply that this migration or original-game fidelity is complete.
 First-slice validation: full host suite and bounded A500 replay pass with
 unchanged native digest `bfbbd762b9b62a59`; both 68000 audits are clean.
 SDL was rebuilt. The known ceiling and extended-combat failures remain open.
+
+## Player-state extraction
+
+`src/core/PlayerMotion.{h,cpp}` now owns the previously native player state and
+update routine. The Amiga player header is only a compatibility alias; there is
+no platform-specific player implementation file. Both the host test build and
+the actual 68000 build compile the core implementation. Its behavioral tests
+have moved to `tests/core/PlayerMotionTest.cpp` and include the core directly.
+
+This relocation intentionally changes no simulation behavior. SDL's
+`StartupRuntime::updateMainPlayer` has **not yet** been replaced. In particular,
+the extracted implementation lacks upward ceiling collision handling that the
+SDL path currently provides. Wiring SDL to it without resolving that omission
+would remove implemented behavior, not establish fidelity. The original
+`scrCheckCollisionWith` uses rounded predictive probes and a diagonal fallback;
+`scrWallCol` also handles breaking boxes above the player. Simply transferring
+the SDL axis loop would not completely reproduce those source rules either.
+
+Next migration gate: implement and test the shared source-backed collision
+contract, then route SDL player motion, jump/shoot state, stomp and contact
+responses through `PlayerMotion`, removing its old authoritative state updates.
+Rendering mirrors may remain temporarily, but must not become a second writer.
+
+Extraction validation: full host suite passes, including the relocated core
+test; bounded cross-target replay retains `64 bfbbd762 b9b62a59`. The 68000
+instruction and 64-bit-helper audits pass. This verifies the relocation, not
+completion of SDL integration or original-game fidelity.

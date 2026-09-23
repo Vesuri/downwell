@@ -1,4 +1,4 @@
-#include "AmigaPlayer.h"
+#include "PlayerMotion.h"
 #include "core/PlayerControls.h"
 
 namespace {
@@ -11,7 +11,7 @@ enum {
 };
 }
 
-AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
+PlayerMotion::PlayerMotion(bool startsGrounded, int landingOffset)
     : x_(0), y_(0), speedX_(0), speedY_(0),
       gravityRemainder_(0), verticalPositionRemainder_(0),
       landingY_(landingOffset * fixedOne), landingResolver_(0),
@@ -34,7 +34,7 @@ AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
         landingProfile_[index] = landingOffset;
 }
 
-void AmigaPlayer::configureLandingProfile(const int* offsets, unsigned count)
+void PlayerMotion::configureLandingProfile(const int* offsets, unsigned count)
 {
     unsigned index;
     if (offsets == 0 || count != landingProfileSize)
@@ -44,12 +44,12 @@ void AmigaPlayer::configureLandingProfile(const int* offsets, unsigned count)
     usesLandingProfile_ = true;
 }
 
-int AmigaPlayer::fixedToPixel(long value)
+int PlayerMotion::fixedToPixel(long value)
 {
     return value >= 0 ? (int)(value >> 8) : -(int)((-value) >> 8);
 }
 
-unsigned AmigaPlayer::integerSquareRoot(unsigned value)
+unsigned PlayerMotion::integerSquareRoot(unsigned value)
 {
     unsigned result = 0;
     unsigned bit = 1u << 30;
@@ -67,7 +67,7 @@ unsigned AmigaPlayer::integerSquareRoot(unsigned value)
     return result;
 }
 
-void AmigaPlayer::stompBounce()
+void PlayerMotion::stompBounce()
 {
     speedY_ = -640;
     gravityRemainder_ = 0;
@@ -75,7 +75,7 @@ void AmigaPlayer::stompBounce()
     ammo_ = maximumAmmo;
 }
 
-void AmigaPlayer::contactKnockback(int enemyX, int enemyY)
+void PlayerMotion::contactKnockback(int enemyX, int enemyY)
 {
     const int dx = pixelX_ - enemyX;
     const int dy = pixelY_ - enemyY;
@@ -89,7 +89,7 @@ void AmigaPlayer::contactKnockback(int enemyX, int enemyY)
     grounded_ = false;
 }
 
-AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
+PlayerMotionDelta PlayerMotion::step(const downwell::Input& input)
 {
     const int oldPixelX = pixelX_;
     const int oldPixelY = pixelY_;
@@ -276,17 +276,17 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     }
 
     priorFire_ = input.fire;
-    AmigaPlayerMotion motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
+    PlayerMotionDelta motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
     return motion;
 }
 
-int AmigaPlayer::spriteId() const
+int PlayerMotion::spriteId() const
 {
     if (grounded_) return running_ ? 27 : balancing_ ? 15 : 31;
     return airborneShot_ ? 3 : 37;
 }
 
-unsigned AmigaPlayer::spriteFrame() const
+unsigned PlayerMotion::spriteFrame() const
 {
     if (grounded_)
         return running_ ? runPhaseTenths_ / 10

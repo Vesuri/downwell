@@ -1,4 +1,4 @@
-#include "platform/amiga/AmigaPlayer.h"
+#include "core/PlayerMotion.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -33,7 +33,7 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
-    AmigaPlayer gravityPrecision(false, 10000);
+    PlayerMotion gravityPrecision(false, 10000);
     // Source scrGravity_n: exactly .2 per update, capped at 7.
     long fifthsPosition = 0;
     long fifthsSpeed = 0;
@@ -43,9 +43,9 @@ int main() {
         fifthsPosition += fifthsSpeed;
         gravityPrecision.step(downwell::Input{});
         require(gravityPrecision.offsetYFixed() == fifthsPosition / 5,
-                "native player preserves exact .2 gravity and position integration through terminal speed");
+                "shared player preserves exact .2 gravity and position integration through terminal speed");
     }
-    AmigaPlayer emptyGun(false, 10000);
+    PlayerMotion emptyGun(false, 10000);
     downwell::Input trigger;
     trigger.fire = true;
     for (unsigned shot = 0; shot < 8; ++shot) {
@@ -74,7 +74,7 @@ int main() {
     // Source-backed default-style rules, independent of SDL comparison.
     // scrPlayerInit: maxsp=2, airMaxsp=2.5, decclsp=.4, airdeccl=.1.
     // scrPlMovement: reversal boost=2 grounded / 1 airborne; both keys stop.
-    AmigaPlayer groundControls;
+    PlayerMotion groundControls;
     downwell::Input right;
     right.right = true;
     for (unsigned frame = 0; frame < 12; ++frame) groundControls.step(right);
@@ -96,7 +96,7 @@ int main() {
             groundControls.offsetX() == beforeBoth,
             "simultaneous directions stop immediately rather than applying friction");
 
-    AmigaPlayer edgeFall;
+    PlayerMotion edgeFall;
     edgeFall.configureLandingResolver([](void*, int x, int) { return x < 1 ? 0 : 100; }, nullptr);
     downwell::Input walkOff;
     walkOff.right = true;
@@ -105,7 +105,7 @@ int main() {
     require(!edgeFall.grounded() && edgeFall.offsetYFixed() > 0,
             "walking off support applies gravity on the first airborne frame");
 
-    AmigaPlayer player;
+    PlayerMotion player;
     downwell::Input input;
     require(player.grounded() && player.ammo() == 8,
             "player starts grounded with a full gunboot charge");
@@ -166,7 +166,7 @@ int main() {
             "landing restores the full gunboot charge");
 
     input.right = true;
-    const AmigaPlayerMotion firstMove = player.step(input);
+    const PlayerMotionDelta firstMove = player.step(input);
     require(player.spriteId() == 27 && player.spriteFrame() == 0,
             "ground movement selects and resets the recovered run cycle");
     player.step(input);
@@ -177,7 +177,7 @@ int main() {
     player.step(input);
     require(player.spriteFrame() == 1,
             "the recovered 0.3 image speed advances after four intervals");
-    AmigaPlayerMotion laterMove = firstMove;
+    PlayerMotionDelta laterMove = firstMove;
     for (unsigned frame = 0; frame < 8; ++frame)
         laterMove = player.step(input);
     require(player.offsetX() > 0 && laterMove.deltaX >= firstMove.deltaX,
@@ -186,7 +186,7 @@ int main() {
     input.left = true;
     player.step(input);
     require(player.facing() == -1,
-            "leftward input flips the native player presentation");
+            "leftward input flips the shared player presentation");
 
     input.left = false;
     for (unsigned frame = 0; frame < 40 && player.speedXFixed() != 0; ++frame)
@@ -195,7 +195,7 @@ int main() {
             "friction returns the stationary player to the idle pose");
 
     EdgeFixture edge = {5};
-    AmigaPlayer balancing;
+    PlayerMotion balancing;
     balancing.configureSolidResolver(resolveLedge, &edge, -236, 236);
     input = downwell::Input{};
     balancing.step(input);
@@ -211,7 +211,7 @@ int main() {
             "support beneath the forward probe restores the idle pose");
 
     SolidFixture fixture = {true};
-    AmigaPlayer colliding;
+    PlayerMotion colliding;
     colliding.configureSolidResolver(resolveSolid, &fixture, -236, 236);
     input = downwell::Input{};
     input.right = true;
@@ -225,28 +225,28 @@ int main() {
     require(colliding.offsetX() > 60 && colliding.offsetX() <= 236,
             "decoded terrain replaces the old center-shaft movement clamp");
 
-    AmigaPlayer falling(false, 58);
+    PlayerMotion falling(false, 58);
     downwell::Input neutral;
     for (unsigned frame = 0; frame < 120 && !falling.grounded(); ++frame)
         falling.step(neutral);
     require(falling.grounded() && falling.offsetY() == 58,
             "gameplay spawn falls to the configured first platform");
 
-    AmigaPlayer overlapping;
+    PlayerMotion overlapping;
     overlapping.contactKnockback(0, 0);
     require(overlapping.speedXFixed() == 0 && !overlapping.grounded(),
             "exact enemy overlap has no invented horizontal knockback");
-    AmigaPlayer diagonal;
+    PlayerMotion diagonal;
     diagonal.contactKnockback(6, 8);
     require(diagonal.speedXFixed() == -460,
             "diagonal contact normalizes recovered horizontal knockback");
 
-    int landingProfile[AmigaPlayer::landingProfileSize];
-    for (unsigned index = 0; index < AmigaPlayer::landingProfileSize; ++index)
+    int landingProfile[PlayerMotion::landingProfileSize];
+    for (unsigned index = 0; index < PlayerMotion::landingProfileSize; ++index)
         landingProfile[index] = index < 60 ? 42 : 74;
-    AmigaPlayer profiled(false, 200);
+    PlayerMotion profiled(false, 200);
     profiled.configureLandingProfile(
-        landingProfile, AmigaPlayer::landingProfileSize);
+        landingProfile, PlayerMotion::landingProfileSize);
     input = downwell::Input{};
     input.left = true;
     for (unsigned frame = 0; frame < 120 && !profiled.grounded(); ++frame)
@@ -254,10 +254,10 @@ int main() {
     require(profiled.grounded() && profiled.offsetY() == 42,
             "horizontal position selects the recovered landing profile");
 
-    for (unsigned index = 0; index < AmigaPlayer::landingProfileSize; ++index)
+    for (unsigned index = 0; index < PlayerMotion::landingProfileSize; ++index)
         landingProfile[index] = index < 60 ? 42 : 74;
     profiled.configureLandingProfile(
-        landingProfile, AmigaPlayer::landingProfileSize);
+        landingProfile, PlayerMotion::landingProfileSize);
     input = downwell::Input{};
     input.right = true;
     for (unsigned frame = 0; frame < 120 && profiled.offsetY() != 74;
@@ -266,6 +266,6 @@ int main() {
     require(profiled.grounded() && profiled.offsetY() == 74,
             "walking beyond a platform edge starts a fall to lower terrain");
 
-    std::cout << "Amiga player tests passed\n";
+    std::cout << "Shared player tests passed\n";
     return 0;
 }
