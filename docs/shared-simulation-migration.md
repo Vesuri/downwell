@@ -65,7 +65,7 @@ would remove implemented behavior, not establish fidelity. The original
 `scrWallCol` also handles breaking boxes above the player. Simply transferring
 the SDL axis loop would not completely reproduce those source rules either.
 
-Next migration gate: implement and test the shared source-backed collision
+Next migration gate: finish integrating the shared source-backed collision
 contract, then route SDL player motion, jump/shoot state, stomp and contact
 responses through `PlayerMotion`, removing its old authoritative state updates.
 Rendering mirrors may remain temporarily, but must not become a second writer.
@@ -74,3 +74,37 @@ Extraction validation: full host suite passes, including the relocated core
 test; bounded cross-target replay retains `64 bfbbd762 b9b62a59`. The 68000
 instruction and 64-bit-helper audits pass. This verifies the relocation, not
 completion of SDL integration or original-game fidelity.
+
+## Shared ceiling collision
+
+`SolidCollision.h` transcribes `scrCheckCollisionWith` VM blocks 1..40:
+rounded predictive probes, integer contact walks and the diagonal fallback
+(including its reset of both displacements at the vertical limit). Tests cover
+those branches, ties-to-even with negative coordinates, fractions and zero
+velocity. The fixed arithmetic uses fifths of Q8, preserving the player's
+gravity residual without floating-point or 64-bit target operations.
+
+Both current runtimes now call the same vertical branch for upward contacts.
+The complete two-axis routine is tested but is not yet the runtime collision
+path: the current callers still integrate horizontal movement separately.
+Calling the whole routine with a synthetic zero horizontal velocity was tested
+and rejected: its rounded horizontal probe could snap fractional X into a wall.
+The vertical-only adapter explicitly preserves X, with a regression fixture.
+
+This removes the native missing-ceiling response. The full host suite passes.
+The extended combat tape still fails, but its former first movement mismatch
+at tick 666 is gone. The first combat mismatch remains at tick 702 (health 3/4),
+and the first reported movement mismatch is now 704 after that knockback.
+Final health is 3/3, kills 2/1, currency 18/6. These are diagnostic results,
+not new expected values or relaxed acceptance criteria.
+
+Still required: box-above destruction and its downward impulse, shared mask
+semantics, full source event order, and replacing the SDL player state/update
+with `PlayerMotion`. Neither the existing side-contact loop nor the floor
+resolver should be mistaken for the complete original collision script.
+
+Target verification: the bounded 64-frame cross-CPU replay passes with
+unchanged digest `bfbbd762b9b62a59`, and both 68000 audits are clean. This replay
+checks target execution stability, not the newly added ceiling case; the
+source-branch fixtures and the longer host combat trace exercise that case.
+The normal Amiga executable and playable SDL binary were rebuilt.

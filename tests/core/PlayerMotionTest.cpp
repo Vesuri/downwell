@@ -33,6 +33,21 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    PlayerMotion ceilingPlayer(true);
+    ceilingPlayer.configureSolidResolver([](void*, int, int y) {
+        return y <= -12;
+    }, nullptr, -60, 60);
+    downwell::Input jumpAtCeiling;
+    jumpAtCeiling.fire = true;
+    ceilingPlayer.step(jumpAtCeiling);
+    ceilingPlayer.step(jumpAtCeiling);
+    require(ceilingPlayer.offsetYFixed() == -7 * 256 &&
+            !ceilingPlayer.grounded(),
+            "shared upward contact stops below the ceiling without becoming grounded");
+    ceilingPlayer.step(jumpAtCeiling);
+    require(ceilingPlayer.offsetYFixed() > -7 * 256,
+            "gravity resumes downward motion on the frame after ceiling contact");
+
     PlayerMotion gravityPrecision(false, 10000);
     // Source scrGravity_n: exactly .2 per update, capped at 7.
     long fifthsPosition = 0;

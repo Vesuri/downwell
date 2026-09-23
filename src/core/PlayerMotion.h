@@ -6,7 +6,7 @@
 // Portable default-style player state/update, extracted from the native port.
 // Terrain is queried through callbacks; rendering and hardware are not owned
 // here. This is an adaptation, not a complete implementation of scrWallCol:
-// ceiling contacts and original mask/event ordering remain migration work.
+// box-above responses and original mask/event ordering remain migration work.
 
 struct PlayerMotionDelta {
     int deltaX;

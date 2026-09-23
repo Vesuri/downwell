@@ -1,5 +1,6 @@
 #include "PlayerMotion.h"
 #include "core/PlayerControls.h"
+#include "core/SolidCollision.h"
 
 namespace {
 enum {
@@ -202,6 +203,28 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input)
     }
 
     if (!grounded_) {
+        if (solidResolver_ != 0 && speedY_ < 0) {
+            long collisionX = x_ * 5;
+            long collisionY = y_ * 5 + verticalPositionRemainder_;
+            const int hit = downwell::resolveVerticalSolidCollision<downwell::FixedCollisionMath>(
+                collisionX, collisionY, speedY_ * 5 + gravityRemainder_,
+                [this](long px, long py) {
+                    // Keep the existing solid adapter's pixel quantization;
+                    // rounding X here alone would disagree with side contacts.
+                    const int x = (int)(px / 1280);
+                    const int y = (int)(py / 1280);
+                    return solidResolver_(solidResolverContext_, x - 4, y - 4) ||
+                           solidResolver_(solidResolverContext_, x + 3, y - 4) ||
+                           solidResolver_(solidResolverContext_, x - 4, y + 7) ||
+                           solidResolver_(solidResolverContext_, x + 3, y + 7);
+                });
+            if (hit < 0) {
+                y_ = collisionY / 5;
+                verticalPositionRemainder_ = (int)(collisionY % 5);
+                speedY_ = 0;
+                gravityRemainder_ = 0;
+            }
+        }
         const long displacement = speedY_ * 5 + gravityRemainder_ +
                                   verticalPositionRemainder_;
         y_ += displacement / 5;

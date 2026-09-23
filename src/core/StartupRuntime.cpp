@@ -7,12 +7,24 @@
 #include "ObjectPack.h"
 #include "PackedRoomLoader.h"
 #include "PlayerCollision.h"
+#include "SolidCollision.h"
 #include "RoomLoader.h"
 #include "StateDigest.h"
 #include <algorithm>
 #include <cmath>
 
 namespace downwell {
+
+namespace {
+struct FloatCollisionMath {
+    using Number = float;
+    static Number unit() { return 1.0F; }
+    static Number round(Number value) {
+        return static_cast<float>(roundGameMakerCoordinate(value));
+    }
+    static Number ceilAbs(Number value) { return std::ceil(std::abs(value)); }
+};
+}
 
 StartupRuntime::StartupRuntime(PlatformProfile profile,
                                const RoomPack* roomPack,
@@ -452,6 +464,14 @@ bool StartupRuntime::mainSolidAt(float x, float y) const {
 }
 
 bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
+    if (!horizontal && amount < 0.0F) {
+        const int hit = resolveVerticalSolidCollision<FloatCollisionMath>(
+            mainPlayerX_, mainPlayerY_, amount,
+            [this](float x, float y) { return mainPlayerCollides(x, y); });
+        if (hit < 0) return false;
+        mainPlayerY_ += amount;
+        return true;
+    }
     float remaining = amount;
     while (std::abs(remaining) > 0.0001F) {
         const float move = remaining > 0.0F
