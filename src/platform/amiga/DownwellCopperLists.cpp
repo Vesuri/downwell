@@ -134,7 +134,6 @@ bool DownwellGameplayCopperList::build(
     unsigned actorCount, const Sprite& overflowSprite,
     const Palette& palette, unsigned ringOrigin)
 {
-    const unsigned firstSpan = downwellGameRingHeight - ringOrigin;
     if (!beginCroppedDisplay(*this) ||
         !move(bplcon0, 0x4401) ||
         !move(bplcon2, 0x0044) || // PF2 HUD above sprites; sprites above PF1 world
@@ -154,15 +153,32 @@ bool DownwellGameplayCopperList::build(
     if (!showSprite(7, overflowSprite) || !setPalette(palette))
         return false;
 
-    if (firstSpan < downwellDisplayHeight) {
-        const unsigned resetAfterLine =
-            downwellDisplayVStartCropped + firstSpan - 1;
-        if (resetAfterLine > 255 && !wait(255, 0xdf)) return false;
-        if (!wait((UWORD)resetAfterLine, 0xdf) ||
-            !showBitmap(game, 1, 2, downwellFetchCropBytes * 8, 0, 2))
-            return false;
+    planeOffset_ = moveOffset(bpl1pth);
+    wrapWaitOffset_ = size();
+    // Fixed shape, including the PAL line-255 bridge, permits word patches.
+    if (!wait(255, 0xdf) || !wait(301, 0xdf) ||
+        !showBitmap(game, 1, 2, downwellFetchCropBytes * 8, 0, 2) || !finish())
+        return false;
+    return update(game, ringOrigin);
+}
+
+bool DownwellGameplayCopperList::update(const Bitmap& game, unsigned ringOrigin)
+{
+    if (gameData_ != game.data) {
+        const UBYTE* base = (const UBYTE*)game.data + downwellFetchCropBytes;
+        if (!patchPointer(wrapWaitOffset_ + 4, base) ||
+            !patchPointer(wrapWaitOffset_ + 8, base + downwellGameRingPlaneBytes)) return false;
+        gameData_ = game.data;
     }
-    return finish();
+    unsigned span = downwellGameRingHeight - ringOrigin;
+    if (span > downwellDisplayHeight) span = downwellDisplayHeight;
+    const unsigned line = downwellDisplayVStartCropped + span - 1;
+    const UBYTE* data = (const UBYTE*)game.data + downwellFetchCropBytes +
+                        ringOrigin * downwellBytesPerPlaneLine;
+    return patchPointer(planeOffset_, data) &&
+           patchPointer(planeOffset_ + 4, data + downwellGameRingPlaneBytes) &&
+           patchWait(wrapWaitOffset_, line < 255 ? line : 255, 0xdf) &&
+           patchWait(wrapWaitOffset_ + 2, line, 0xdf);
 }
 
 DownwellMenuCopperList::DownwellMenuCopperList(

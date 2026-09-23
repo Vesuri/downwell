@@ -515,6 +515,23 @@ void AmigaHardware::blitterFill(uint16_t* data, uint16_t width, uint16_t height,
     AmigaHardware::setInterrupts(INTF_BLIT, false);
 }
 
+void AmigaHardware::blitterSolidRect(uint16_t* destination, uint16_t widthWords,
+    uint16_t height, int16_t modulo, uint16_t firstMask, uint16_t lastMask, bool set)
+{
+    blitterDrain();
+    // A is a constant rectangle mask; C preserves pixels outside edge masks.
+    *bltcon0Pointer = (uint16_t)(BC0F_SRCC | BC0F_DEST | (set ? 0xfa : 0x0a));
+    *bltcon1Pointer = 0;
+    *bltafwmPointer = firstMask;
+    *bltalwmPointer = lastMask;
+    *bltadatPointer = 0xffff;
+    *bltcmodPointer = modulo;
+    *bltdmodPointer = modulo;
+    *bltcptPointer = destination;
+    *bltdptPointer = destination;
+    *bltsizePointer = (uint16_t)((height << 6) | widthWords);
+}
+
 void AmigaHardware::processBlitterQueue()
 {
     if (isBlitterBusy() || !hasQueuedBlits) {

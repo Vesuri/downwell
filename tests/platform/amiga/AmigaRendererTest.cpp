@@ -16,6 +16,7 @@ int amigaBlitterDrawPlanarMasked(const UBYTE*, const UBYTE*, UWORD, UWORD,
 int amigaBlitterClearPlanar(UBYTE*, UWORD, UWORD) {
     return 0;
 }
+int amigaBlitterSolidRect(UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD) { return 0; }
 
 namespace {
 
@@ -96,7 +97,7 @@ int main(int argc, char** argv) {
     require(result == 2 && sprite[0] == 0 && sprite[1] == 0,
             "fully clipped hardware sprite produces a hidden record");
 
-    require(argc == 2, "Amiga game pack path is supplied");
+    require(argc == 3, "Amiga game and HUD pack paths are supplied");
     std::ifstream input(argv[1], std::ios::binary);
     const std::vector<UBYTE> gamePack{
         std::istreambuf_iterator<char>(input),
@@ -176,7 +177,7 @@ int main(int argc, char** argv) {
     unsigned kept = 0;
     for (unsigned i = 0; i < records; ++i) {
         const auto* record = gamePack.data() + 20 + i * 24;
-        if (word(record) >= 63000 && word(record) < 64000) continue;
+        if (word(record) >= 62000 && word(record) < 64000) continue;
         std::memcpy(oraclePack.data() + 20 + kept++ * 24, record, 24);
     }
     putLong(oraclePack.data(), 8, kept);
@@ -211,6 +212,48 @@ int main(int argc, char** argv) {
     }
     require(comparisons > 1000, "gameplay pack contains offline sprite variants");
     std::cout << comparisons << " offline sprite oracle comparisons\n";
+    std::vector<UBYTE> actualGame(downwellGameRingBytes), expectedGame(downwellGameRingBytes);
+    std::vector<UBYTE> actualHud(downwellLayerBytes), expectedHud(downwellLayerBytes);
+    AmigaRenderer actualRenderer, expectedRenderer;
+    amigaRendererInit(&actualRenderer, actualGame.data(), actualHud.data());
+    amigaRendererInit(&expectedRenderer, expectedGame.data(), expectedHud.data());
+    amigaRendererSetGameOrigin(&actualRenderer, 311);
+    amigaRendererSetGameOrigin(&expectedRenderer, 311);
+    amigaRendererSetClipRect(&actualRenderer, 110, 0, 160, 284);
+    amigaRendererSetClipRect(&expectedRenderer, 110, 0, 160, 284);
+    for (unsigned i = 0; i < records; ++i) {
+        const auto* record = gamePack.data() + 20 + i * 24;
+        const unsigned id = word(record), frame = word(record + 2);
+        if (id < 62000 || id >= 63000) continue;
+        for (int x : {110, 117, 190, 263}) for (int y : {2, 90, 278}) {
+            std::fill(actualGame.begin(), actualGame.end(), 0x55);
+            std::fill(expectedGame.begin(), expectedGame.end(), 0x55);
+            amigaRendererDrawAsset(&actualRenderer, gamePack.data(), gamePack.data() + gamePack.size(),
+                id - 62000, frame, x, y, 1);
+            amigaRendererDrawAsset(&expectedRenderer, oraclePack.data(), oraclePack.data() + oraclePack.size(),
+                id - 62000, frame, x, y, 1);
+            require(actualGame == expectedGame, "offline mirrored scenery matches scalar clipped/ring oracle");
+        }
+    }
+    std::ifstream hudInput(argv[2], std::ios::binary);
+    const std::vector<UBYTE> hudPack{std::istreambuf_iterator<char>(hudInput), {}};
+    require(!hudPack.empty(), "HUD pack can be read");
+    amigaRendererClearClipRect(&actualRenderer);
+    amigaRendererClearClipRect(&expectedRenderer);
+    const int offsets[][2] = {{-1,0},{0,-1},{1,0},{0,1},{-1,1},{0,0},
+        {1,1},{0,2},{0,0},{1,-1},{2,0},{1,1},{0,1},{1,0}};
+    for (unsigned digit = 0; digit < 10; ++digit) {
+        std::fill(actualHud.begin(), actualHud.end(), 0x55);
+        std::fill(expectedHud.begin(), expectedHud.end(), 0x55);
+        amigaRendererDrawAsset(&actualRenderer, hudPack.data(), hudPack.data() + hudPack.size(),
+            65010, digit, 290, 239, 0);
+        for (unsigned layer = 0; layer < 14; ++layer)
+            amigaRendererDrawAsset(&expectedRenderer, hudPack.data(), hudPack.data() + hudPack.size(),
+                413, digit + (layer < 12 ? 20 : 10), 290 + offsets[layer][0], 239 + offsets[layer][1], 0);
+        amigaRendererDrawAsset(&expectedRenderer, hudPack.data(), hudPack.data() + hudPack.size(),
+            413, digit, 290, 239, 0);
+        require(actualHud == expectedHud, "offline ammo digits match all fifteen original layers");
+    }
     std::cout << "Amiga renderer tests passed\n";
     return 0;
 }

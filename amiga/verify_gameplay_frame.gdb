@@ -2,6 +2,10 @@ set pagination off
 target remote 127.0.0.1:2345
 break downwellGameplayFrameReady
 continue
+if gDownwellTerrainRasterFailures != 0 || gDownwellTerrainRasterChecks == 0
+    printf "Terrain raster differs from fresh composition\n"
+    quit 1
+end
 if gDownwellGameBufferFailures != 0
     printf "Display ring differs from static backing\n"
     quit 1

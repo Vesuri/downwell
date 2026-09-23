@@ -8,13 +8,22 @@ extern int amigaBlitterDrawPlanarMasked(
     UWORD sourceX, UWORD sourceY, UWORD width, UWORD height);
 extern int amigaBlitterClearPlanar(UBYTE* destination,
                                    UWORD height, UWORD planes);
+extern int amigaBlitterSolidRect(UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD);
 
 static UWORD readWord(const UBYTE* data) {
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    return *(const UWORD*)data; // DWAP fields/rows are word-aligned, native big endian.
+#else
     return (UWORD)(((UWORD)data[0] << 8) | data[1]);
+#endif
 }
 
 static ULONG readLong(const UBYTE* data) {
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    return *(const ULONG*)data;
+#else
     return ((ULONG)readWord(data) << 16) | readWord(data + 2);
+#endif
 }
 
 static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {
@@ -185,6 +194,12 @@ static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
     ULONG count;
     ULONG first = 0;
     ULONG last;
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    static struct { const UBYTE* pack; const UBYTE* end; ULONG key; const UBYTE* record; } cache[64];
+    const unsigned slot = (sprite ^ (frame * 17u)) & 63u;
+    if (cache[slot].pack == pack && cache[slot].end == packEnd && cache[slot].key == wanted)
+        return cache[slot].record;
+#endif
     if (packEnd - pack < 20 || readLong(pack) != 0x44574150UL ||
         readWord(pack + 4) != 2)
         return 0;
@@ -201,8 +216,15 @@ static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
             first = middle + 1;
         else if (key > wanted)
             last = middle;
-        else
+        else {
+#ifdef DOWNWELL_PLATFORM_AMIGA
+            cache[slot].pack = pack;
+            cache[slot].end = packEnd;
+            cache[slot].key = wanted;
+            cache[slot].record = record;
+#endif
             return record;
+        }
     }
     return 0;
 }
@@ -253,6 +275,25 @@ void amigaRendererClearGameRows(AmigaRenderer* renderer,
     int y;
     const UBYTE low = (pen & 1u) ? 0xff : 0;
     const UBYTE high = (pen & 2u) ? 0xff : 0;
+    if (firstY < 0) { height += firstY; firstY = 0; }
+    if (firstY + height > downwellDisplayHeight)
+        height = downwellDisplayHeight - firstY;
+    if (height <= 0) return;
+    if (renderer->blitterEnabled && pen == 0) {
+        unsigned row = (renderer->gameOrigin + (unsigned)firstY) % downwellGameRingHeight;
+        unsigned count = (unsigned)height;
+        unsigned first = count;
+        unsigned plane;
+        if (first > downwellGameRingHeight - row) first = downwellGameRingHeight - row;
+        for (plane = 0; plane < 2; ++plane) {
+            UBYTE* base = renderer->game + plane * downwellGameRingPlaneBytes;
+            if (!amigaBlitterClearPlanar(base + row * downwellBytesPerPlaneLine, first, 1))
+                break;
+            if (first < count && !amigaBlitterClearPlanar(base, count - first, 1))
+                break;
+        }
+        if (plane == 2) return;
+    }
     for (y = firstY; y < firstY + height; ++y) {
         unsigned physicalY;
         ULONG offset;
@@ -307,37 +348,42 @@ void amigaRendererFillRect(AmigaRenderer* renderer,
     if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
     if (left >= right || top >= bottom)
         return;
+    if (renderer->blitterEnabled && renderer->target == renderer->hud &&
+        amigaBlitterSolidRect(renderer->hud, downwellDisplayHeight,
+                             left, top, right - left, bottom - top, pen)) return;
     destinationPlaneBytes = renderer->target == renderer->game
                                 ? downwellGameRingPlaneBytes
                                 : downwellPlaneBytes;
+    {
+    const int firstByte = left >> 3;
+    const int lastByte = (right - 1) >> 3;
+    const UBYTE firstMask = (UBYTE)(0xffu >> (left & 7));
+    const UBYTE lastMask = (UBYTE)(0xffu << (7 - ((right - 1) & 7)));
+    const UBYTE low = (pen & 1) ? 0xff : 0;
+    const UBYTE high = (pen & 2) ? 0xff : 0;
     for (py = top; py < bottom; ++py) {
         unsigned targetY = (unsigned)py;
         ULONG rowOffset;
         int destinationByte;
-        const int firstByte = left >> 3;
-        const int lastByte = (right - 1) >> 3;
         if (renderer->target == renderer->game)
             targetY = (renderer->gameOrigin + targetY) %
                       downwellGameRingHeight;
         rowOffset = targetY * downwellBytesPerPlaneLine;
         for (destinationByte = firstByte;
              destinationByte <= lastByte; ++destinationByte) {
-            const int destinationX = destinationByte << 3;
-            int firstBit = left - destinationX;
-            int lastBit = right - destinationX;
-            UBYTE mask;
+            UBYTE mask = 0xff;
             UBYTE* target0;
             UBYTE* target1;
-            if (firstBit < 0) firstBit = 0;
-            if (lastBit > 8) lastBit = 8;
-            mask = spanMask(firstBit, lastBit);
+            if (destinationByte == firstByte) mask &= firstMask;
+            if (destinationByte == lastByte) mask &= lastMask;
             target0 = renderer->target + rowOffset + destinationByte;
             target1 = target0 + destinationPlaneBytes;
             *target0 = (UBYTE)((*target0 & (UBYTE)~mask) |
-                               ((pen & 1u) ? mask : 0));
+                               (low & mask));
             *target1 = (UBYTE)((*target1 & (UBYTE)~mask) |
-                               ((pen & 2u) ? mask : 0));
+                               (high & mask));
         }
+    }
     }
 }
 
@@ -345,7 +391,9 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,
                             int anchorX, int anchorY, int flipX) {
-    const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
+    const UBYTE* record = flipX ? findAsset(pack, packEnd, 62000 + sprite, frame) : 0;
+    if (record) flipX = 0;
+    else record = findAsset(pack, packEnd, sprite, frame);
     const UBYTE* data;
     int originX;
     int originY;
@@ -491,7 +539,7 @@ int amigaRendererBuildHardwareSpritePart(
     UWORD sprite, UWORD frame, unsigned part,
     int anchorX, int anchorY, int flipX,
     UWORD* destination, unsigned destinationHeight) {
-    const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
+    const UBYTE* record;
     const UBYTE* data;
     UBYTE* control = (UBYTE*)destination;
     int originX;
@@ -576,6 +624,7 @@ int amigaRendererBuildHardwareSpritePart(
 #ifdef DOWNWELL_PLATFORM_AMIGA
     return 0;
 #endif
+    record = findAsset(pack, packEnd, sprite, frame);
     if (!record)
         return 0;
     originX = (WORD)readWord(record + 4);

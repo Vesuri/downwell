@@ -1,5 +1,59 @@
 # Amiga performance instrumentation
 
+## Gameplay result: 600 frames without a missed PAL field
+
+The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in
+600 PAL fields: 50.00 FPS, maximum gap one field**. This includes the
+160-pixel side-room camera change. It is evidence for this deterministic
+window, not a guarantee for every encounter or later level.
+
+Configuration: A500/68000, PAL, 512 KB Chip RAM and 8 MB Fast RAM; `-O3 -flto`;
+`FPSCOUNT=1 PROFILE_AUTORUN=1`; 45-second host timeout. Sprite priority,
+22-word data fetch and the copper-reset circular scroll remain unchanged.
+No game-speed compensation is applied on PAL.
+
+The major changes are:
+
+- Spatial terrain/landing and breakable indices replace repeated serialized
+  resource searches. Host tests compare these with the original queries.
+- Gameplay checksums remain in host/replay/scene-verification builds, but are
+  not recalculated every frame in the playable build.
+- HUD digits and mirrored scenery are composed offline. HUD assets are moved
+  to retired intro Chip RAM, so the framework blitter can actually draw them.
+- The static level raster is composed once at level entry. New rows transfer
+  into the private terrain ring; unchanged rows survive camera reversals.
+  Destroyed blocks invalidate the affected cached rows, including hidden rows.
+- Side-room views are prepared incrementally in retired garden memory on
+  frames without a new terrain strip. On a camera change that ring becomes
+  the inactive display ring. Its restoration-copy DMA overlaps sprite setup.
+- Copper programs retain their layout and patch only pointers/wrap waits.
+  The two display rings synchronize only dirty, word-aligned gameplay spans.
+
+Memory trade-off: the Fast-RAM raster reserves 1,081,344 bytes plus 24,576
+dirty flags (about 1.06 MiB combined). The terrain/landing index uses 192 KiB;
+the breakable index uses 32 KiB. Staging reuses 30,720 bytes of retired garden
+Chip RAM; no new Chip allocation was added. This does **not** claim stock
+A500 memory compatibility. Level-entry composition is excluded from the
+steady-state frame window.
+
+`make verify-amiga-gameplay-cache` checks 600 simulation ticks, compares
+cached transfers with fresh terrain composition (146 comparisons in the
+recorded run), checks staged view pixels and compares display rings with the
+static backing. The 68000 MOVEM row-copy twin is included in these checks.
+Host renderer tests independently compare mirrored scenery and all ten
+precomposed ammo digits against their original drawing operations, in addition
+to the 12,348 offline hardware-sprite comparisons.
+The normal-intro grounded and active gameplay captures retain identical
+decoded display pixels to the pre-optimization captures. Their raw capture
+hashes change because the retained hidden ring rows change. Cross-target
+replay also passes (`64 95d0aaea 1be7256f`).
+
+The progression was 0.78 FPS initially, 31 FPS after indexing, approximately
+40 FPS after retained-row fixes, then 49.92 FPS with one missed side-room
+deadline. Overlapping that restoration DMA with sprite setup removed the
+remaining miss. Longer/different deterministic scenarios should be added
+before treating this as a general worst-case frame-budget guarantee.
+
 Run from the repository root:
 
 ```
@@ -19,11 +73,12 @@ build on exit. Reports remain in `amiga/.run/profile-fps.log` and
 ## Two distinct modes
 
 Gameplay: `SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh probes`
-(or `fps`). This measures 30 iterations after discarding the initial gameplay
+(or `fps`). This measures 600 iterations after discarding the initial gameplay
 composition frame. Deterministic input alternates direction every 120 ticks
 and fires on ticks 0 and 3 modulo 16. Phase 4 means HUD updates for gameplay;
-phase 6 includes terrain generation/redrawing. The shorter window keeps slow
-gameplay captures bounded. This is not representative of every level/encounter.
+phase 6 includes terrain row transfers/staging. Missed deadlines report their
+frame number, field count, scroll delta and horizontal camera change.
+This is not representative of every level/encounter.
 
 First gameplay sample after offline sprite conversion (30 frames, PROBES):
 simulation 1028.250 ms/frame, terrain 224.516 (max bracket 3437.227), HUD
@@ -39,7 +94,7 @@ use PF2 priority and opaque-black HUD margins, not sprite pixel clipping.
 The original pixel converter remains a host test oracle; target builds never
 fall back to runtime conversion. Tests cover 12,348 variant/position cases.
 
-## Retained gameplay terrain and measured bottleneck
+## Historical baseline: retained gameplay terrain and measured bottleneck
 
 Gameplay now retains one private 384x320, two-plane terrain ring (30,720
 bytes). Two equally sized display rings reuse 61,440 bytes of the finished

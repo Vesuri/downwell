@@ -42,6 +42,10 @@ public:
                const Sprite* actorSprites, unsigned actorCount,
                const Sprite& overflowSprite,
                const Palette& palette, unsigned ringOrigin);
+    bool update(const Bitmap& game, unsigned ringOrigin);
+private:
+    unsigned planeOffset_, wrapWaitOffset_;
+    const void* gameData_ = nullptr;
 };
 
 class DownwellMenuCopperList : public CopperList {

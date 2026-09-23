@@ -291,6 +291,13 @@ def build_pack(manifest, extracted, profile):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
+            if profile == "game" and sprite_id in (127, 139, 550, 568, 569):
+                mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
+                stride, data = encode_planar(pixels, mirrored.width, mirrored.height)
+                metadata = dict(sprite, id=62000 + sprite_id,
+                                originX=sprite["width"] - sprite["originX"])
+                encoded.append((metadata, frame_index, stride, data))
             if profile == "game" and sprite_id in (27, 43, 44):
                 # Style bobs contain large transparent margins. Trim offline
                 # while retaining exactly the same world-space anchor.
@@ -343,6 +350,28 @@ def build_pack(manifest, extracted, profile):
                     f"aligned title round trip failed for frame {frame_index}")
                 encoded.append((aligned_sprite, frame_index,
                                 aligned_dma_width, aligned_planar))
+
+    if profile == "hud":
+        digits = {frame: (sprite, decode_planar(data, sprite["width"], sprite["height"], stride))
+                  for sprite, frame, stride, data in encoded if sprite["id"] == 413}
+        offsets = ((-1, 0), (0, -1), (1, 0), (0, 1), (-1, 1), (0, 0),
+                   (1, 1), (0, 2), (0, 0), (1, -1), (2, 0), (1, 1), (0, 1), (1, 0))
+        for digit in range(10):
+            pens = [0] * (32 * 24)
+            layers = [(digit + (20 if i < 12 else 10), x, y)
+                      for i, (x, y) in enumerate(offsets)] + [(digit, 0, 0)]
+            for frame, dx, dy in layers:
+                source, pixels = digits[frame]
+                for y in range(source["height"]):
+                    for x in range(source["width"]):
+                        pen = pixels[y * source["width"] + x]
+                        px, py = 8 + dx + x - source["originX"], 8 + dy + y - source["originY"]
+                        if pen:
+                            require(0 <= px < 32 and 0 <= py < 24, "ammo digit bounds")
+                            pens[py * 32 + px] = pen
+            stride, data = encode_planar(pens, 32, 24)
+            encoded.append((dict(id=65010, width=32, height=24, originX=8, originY=8),
+                            digit, stride, data))
 
     style_text = {}
     for text_id, text in TEXT_SELECTIONS.get(profile, {}).items():

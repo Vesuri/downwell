@@ -25,6 +25,21 @@ Bitmap::~Bitmap()
     }
 }
 
+void Bitmap::solidRect(uint16_t x, uint16_t y, uint16_t rectWidth, uint16_t rectHeight, uint16_t color)
+{
+    if (!rectWidth || !rectHeight || !blittable) return;
+    const unsigned words = ((x + rectWidth + 15) >> 4) - (x >> 4);
+    const uint16_t first = (uint16_t)(0xffffu >> (x & 15));
+    const unsigned end = (x + rectWidth) & 15;
+    const uint16_t last = end ? (uint16_t)(0xffffu << (16 - end)) : 0xffff;
+    for (unsigned plane = 0; plane < bitplanes; ++plane) {
+        auto* target = (uint8_t*)data + y * rowSizeInBytes + (x >> 4) * 2 +
+            plane * (interleaved ? widthInBytes : bitplaneSizeInBytes);
+        AmigaHardware::blitterSolidRect((uint16_t*)target, words, rectHeight,
+            rowSizeInBytes - words * 2, first, last, (color & (1u << plane)) != 0);
+    }
+}
+
 uint16_t Bitmap::widthInWords() const
 {
     return widthInBytes >> 1;
@@ -277,6 +292,13 @@ void Bitmap::copy(const Bitmap& source, uint16_t destX, uint16_t destY, uint16_t
     if (blittable && source.blittable) {
         if (interleaved) {
             AmigaHardware::blitterCopy(sourceData, destData, widthWords, bitplanes * height, sourceRowModulo << 1, destRowModulo << 1, shift, firstWordMask, lastWordMask, mask);
+        } else if (!source.interleaved && shift >= 0 && sourceY == 0 && destY == 0 &&
+                   height == source.height && height == this->height &&
+                   bitplanes == source.bitplanes && (unsigned)height * bitplanes <= 1024) {
+            // Whole planar planes are consecutive rows too: one DMA command
+            // can traverse them without a CPU/queue gap between planes.
+            AmigaHardware::blitterCopy(sourceData, destData, widthWords, bitplanes * height,
+                sourceRowModulo << 1, destRowModulo << 1, shift, firstWordMask, lastWordMask, mask);
         } else {
             uint16_t bitplanes = this->bitplanes < source.bitplanes ? this->bitplanes : source.bitplanes;
             for (uint16_t i = 0; i < bitplanes; i++) {

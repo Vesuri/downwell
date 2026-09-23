@@ -23,7 +23,7 @@ ifeq ($(PROFILE_AUTORUN)$(PROBES)$(FPSCOUNT),100)
 $(error PROFILE_AUTORUN requires PROBES=1 or FPSCOUNT=1)
 endif
 
-CFLAGS := -g -O2 -m68000 -msoft-float -nostdlib -MP -MMD \
+CFLAGS := -g -O3 -flto -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA
 ifeq ($(REPLAY_VERIFY),1)
