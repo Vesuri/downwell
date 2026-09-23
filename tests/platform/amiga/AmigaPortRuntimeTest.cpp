@@ -247,12 +247,17 @@ int main() {
     AmigaPortFrame contactFrame = contact.step(0);
     require(contact.health() == 3 && contactFrame.healthChanged &&
                 contact.invulnerability() == 90 &&
-                contact.player().speedXFixed() == 0,
+                contact.player().speedXFixed() == 0 &&
+                contact.playerVisible(),
             "side contact removes one health and starts invulnerability");
     contactFrame = contact.step(0);
     require(contact.health() == 3 && !contactFrame.healthChanged &&
-                contact.invulnerability() == 89,
-            "invulnerability suppresses repeated overlap damage");
+                contact.invulnerability() == 89 &&
+                !contact.playerVisible(),
+            "first damaged Step suppresses repeated damage and hides player");
+    contactFrame = contact.step(0);
+    require(contact.invulnerability() == 88 && contact.playerVisible(),
+            "recovered dFlash alternates player visibility every damaged Step");
 
     while (!contact.dead() && contact.tick() < 400)
         contact.step(0);

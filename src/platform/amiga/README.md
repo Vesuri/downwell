@@ -107,6 +107,9 @@ Native gameplay now clamps health at zero, switches to recovered `sprPlDead`,
 disables player input, and freezes the camera.  The runtime retains the
 recovered 90-frame death animation alarm followed by the 10-frame menu delay;
 the death-menu presentation itself is the next layer above that explicit gate.
+The preceding invulnerability interval follows `dFlash` by alternating the
+player hardware sprite between visible and hidden records, without redrawing
+either playfield.
 
 `make verify-amiga-menu-wake-frame` captures the first walking garden frame as
 the two immutable 512x384 cache planes, their independent pointer/fine-scroll

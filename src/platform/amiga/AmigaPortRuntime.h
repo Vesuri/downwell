@@ -131,6 +131,7 @@ public:
     bool dead() const { return dead_; }
     unsigned deathFrames() const { return deathFrames_; }
     bool deathMenuReady() const { return dead_ && deathFrames_ >= 100; }
+    bool playerVisible() const { return (invulnerability_ & 1u) == 0; }
     bool bulletActive() const { return bulletCount() != 0; }
     int bulletX() const;
     int bulletY() const;

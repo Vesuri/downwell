@@ -1724,20 +1724,26 @@ int main(void) {
                     (void)destroyedBlockX[block];
                 }
             }
-            if (!amigaRendererBuildHardwareSprite(
-                    activeGamePack, activeGamePackEnd,
-                    (UWORD)(port.dead() ? 0 : port.player().spriteId()),
-                    (UWORD)(port.dead() ? 0 : port.player().spriteFrame()),
-                    downwellPlayfieldX + 80 + port.player().offsetX() -
-                        port.cameraOffsetX(),
+            if (!port.playerVisible()) {
+                playerSprites[back].hide();
+            } else if (!amigaRendererBuildHardwareSprite(
+                           activeGamePack, activeGamePackEnd,
+                           (UWORD)(port.dead()
+                                       ? 0 : port.player().spriteId()),
+                           (UWORD)(port.dead()
+                                       ? 0 : port.player().spriteFrame()),
+                           downwellPlayfieldX + 80 +
+                               port.player().offsetX() -
+                               port.cameraOffsetX(),
 #ifdef DOWNWELL_REPLAY_VERIFY
-                    gameplayPlayerGroundY + port.player().offsetY(),
+                           gameplayPlayerGroundY + port.player().offsetY(),
 #else
-                    gameplayPlayerStartY + port.player().offsetY() -
-                        port.cameraOffsetY(),
+                           gameplayPlayerStartY +
+                               port.player().offsetY() -
+                               port.cameraOffsetY(),
 #endif
-                    port.player().facing() < 0,
-                    memory.playerSprite(back), playerSpriteHeight))
+                           port.player().facing() < 0,
+                           memory.playerSprite(back), playerSpriteHeight))
                 frameReady = false;
             unsigned actorCount = 0;
             Sprite* actorSprites = bulletSprites +

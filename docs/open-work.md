@@ -93,6 +93,8 @@
   during the menu-well camera transition.
 - [x] Enter the recovered zero-health death state, disable player control,
   freeze the gameplay camera, and expose the 90+10-frame death-menu gate.
+- [x] Reproduce the damaged player's alternating `dFlash` solely by hiding
+  and showing its hardware sprite during the invulnerability alarm.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.
