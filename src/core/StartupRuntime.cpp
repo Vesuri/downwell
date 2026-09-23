@@ -717,8 +717,13 @@ void StartupRuntime::updateMainEnemies() {
         } else if (enemy.objectId == 113) {
             enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.15F);
             const float nextY = enemy.preciseY + enemy.velocityY;
+            // The recovered Step rechecks support at yy+1. A landed frog
+            // must not become airborne simply because its next subpixel
+            // fall has not yet reached the tile's first occupied pixel.
+            const bool supported = enemy.grounded &&
+                mainSolidAt(enemy.preciseX, enemy.preciseY + 9.0F);
             if (enemy.velocityY > 0.0F &&
-                mainSolidAt(enemy.preciseX, nextY + 8.0F)) {
+                (supported || mainSolidAt(enemy.preciseX, nextY + 8.0F))) {
                 while (!mainSolidAt(enemy.preciseX,
                                     enemy.preciseY + 9.0F))
                     enemy.preciseY += 1.0F;

@@ -385,3 +385,19 @@ This is still integer-only and does not change the hardware sprite asset path.
 Host tests and the bounded 600-tick target cache check pass (101 composition
 checks, zero reported mismatches). Final live-tape frog/turtle frame indices
 still differ, so exact rates alone do not prove animation-state parity.
+
+### Frog landing-pose parity
+
+`DOWNWELL_TRACE_ANIMATION=1` reports the first active sprite/frame mismatch per
+enemy type, alongside grounded flags and precise Y. It exposed SDL's frog
+losing support at tick 299: native stayed grounded at y=2127.08, while SDL
+briefly fell again at y=2127.3. The reference adaptation now rechecks its
+existing support at yy+1 instead of requiring the next fractional fall to
+reach a solid pixel again, consistent with the recovered frog Step support
+check. This also removes repeated airborne-pose resets after landing.
+
+On the current live tape every paired active frog now has exact assertions
+for grounded state, sprite ID and integer animation frame, with required
+coverage of both airborne and landed states. The earlier snake mismatch at
+tick 138 remains (native airborne, SDL grounded); this does not establish
+all-enemy animation parity or frog hit-stun/long-jump coverage.

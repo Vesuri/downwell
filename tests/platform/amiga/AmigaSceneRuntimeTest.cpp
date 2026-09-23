@@ -16,6 +16,7 @@
 namespace {
 int parityFrame = 0;
 bool sawExtendedEnemyAnimation = false;
+bool sawPairedFrogAir = false, sawPairedFrogGround = false;
 
 void require(bool condition, const char* message) {
     if (!condition) {
@@ -240,8 +241,28 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             sawExtendedEnemyAnimation = true;
         if (comparedOrdinal < amiga.enemyCount()) {
             const auto& native = amiga.enemyAt(comparedOrdinal);
+            if (std::getenv("DOWNWELL_TRACE_ANIMATION")) {
+                static bool reported[120] = {};
+                if (!reported[enemy.objectId] && enemy.active && native.active &&
+                    (native.spriteId != enemy.spriteId ||
+                     native.imageFrame != static_cast<unsigned>(enemy.imageIndex))) {
+                    reported[enemy.objectId] = true;
+                    std::cout << "ANIMATION tick=" << amiga.tick() << " object=" << enemy.objectId
+                              << " native=" << native.spriteId << ':' << native.imageFrame
+                              << " SDL=" << enemy.spriteId << ':' << enemy.imageIndex
+                              << " grounded=" << native.grounded << ',' << enemy.grounded
+                              << " y=" << 176 + native.preciseY / 256.0F << ',' << enemy.preciseY << '\n';
+                }
+            }
             require(native.objectId == enemy.objectId,
                     "paired actor identity matches throughout live comparison");
+            if (enemy.objectId == 113 && enemy.active && native.active) {
+                require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
+                            native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
+                        "frog support, sprite and animation frame match on the live tape");
+                sawPairedFrogGround = sawPairedFrogGround || enemy.grounded;
+                sawPairedFrogAir = sawPairedFrogAir || !enemy.grounded;
+            }
             requireNear(240 + native.preciseX / 256.0F, enemy.preciseX, 1.0F,
                         "paired actor horizontal trajectory agrees across targets");
             requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F,
@@ -653,6 +674,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     require(retiredCompared >= 2, "comparison exercises two out-of-view enemy retirements");
     require(sawExtendedEnemyAnimation,
             "SDL live tape actually displays enemy frames beyond the old two-frame cap");
+    require(sawPairedFrogAir && sawPairedFrogGround,
+            "frog presentation comparison covers both flight and landing");
     require(enemyOrdinal == gameplay.enemyCount(),
             "live generation creates exactly the SDL enemy prefix, not a forecast population");
     require(live.builder.fragmentCount() > 0 &&
