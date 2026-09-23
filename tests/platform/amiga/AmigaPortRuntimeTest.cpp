@@ -298,12 +298,33 @@ int main() {
                 frog.enemyAt(0).imageFrame == 0,
             "frog alarm launches its recovered directional jump");
 
+    AmigaPortRuntime fallingFrog(300);
+    fallingFrog.configureSolidResolver(noSolid, nullptr);
+    require(fallingFrog.configureEnemy(0, 113, 171, 40, 1,
+                0, 0, 35, 20, 0, 0, -1, -1), "configure free-falling frog");
+    for (long tick = 1; tick <= 40; ++tick) {
+        fallingFrog.step(0);
+        const auto& state = fallingFrog.enemyAt(0);
+        require(state.speedY == tick * 192 / 5 && state.gravityRemainder == tick * 2 % 5,
+                "frog gravity retains exact fifth-unit velocity remainder");
+        const double expectedY = 1.0 + 0.15 * tick * (tick + 1) / 2.0;
+        require(std::fabs(state.preciseY / 256.0 - expectedY) < tick / 256.0,
+                "frog ballistic position stays within one Q8 unit per integration step");
+    }
+
+    for (unsigned tick = 0; tick < 20; ++tick) fallingFrog.step(0);
+    require(fallingFrog.enemyAt(0).speedY == 7 * 256 &&
+                fallingFrog.enemyAt(0).gravityRemainder == 0,
+            "terminal velocity clears gravity remainder rather than accumulating hidden speed");
+
     AmigaPortRuntime unsupportedFrog(300);
     unsupportedFrog.configureSolidResolver(flatGround, nullptr);
     require(unsupportedFrog.configureEnemy(0, 113, 171, 40, 1,
                 0, 0, 35, 20, 0, 0, -1, 60), "configure frog on removable support");
     unsupportedFrog.step(0);
-    require(unsupportedFrog.enemyAt(0).grounded, "frog initially lands on support");
+    require(unsupportedFrog.enemyAt(0).grounded &&
+                unsupportedFrog.enemyAt(0).gravityRemainder == 0,
+            "frog landing clears the gravity remainder");
     const long supportedY = unsupportedFrog.enemyAt(0).preciseY;
     unsupportedFrog.configureSolidResolver(noSolid, nullptr);
     unsupportedFrog.step(0);

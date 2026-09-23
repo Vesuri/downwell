@@ -68,6 +68,7 @@ public:
         long preciseY;
         long speedX;
         long speedY;
+        unsigned char gravityRemainder; // Frog: fifths of one Q8 velocity unit.
         int motionState;
         int auxiliaryState;
         int alarm0;

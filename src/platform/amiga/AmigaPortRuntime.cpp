@@ -108,6 +108,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].preciseY = 0;
         enemies_[index].speedX = 0;
         enemies_[index].speedY = 0;
+        enemies_[index].gravityRemainder = 0;
         enemies_[index].motionState = 0;
         enemies_[index].auxiliaryState = 0;
         enemies_[index].alarm0 = -1;
@@ -220,6 +221,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
     enemy.speedY = speedY;
+    enemy.gravityRemainder = 0;
     enemy.motionState = motionState;
     enemy.auxiliaryState = auxiliaryState;
     enemy.alarm0 = alarm0;
@@ -369,6 +371,7 @@ void AmigaPortRuntime::advanceEnemyAlarms()
             if (alarm0Fired) {
                 if (enemy.grounded) {
                     enemy.speedY = -4 * 256;
+                    enemy.gravityRemainder = 0;
                     enemy.speedX = enemy.motionState * 256;
                     enemy.grounded = false;
                 }
@@ -644,9 +647,18 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     (int)downwell::floorQ8Coordinate(enemy.preciseY) + foot + 1))
                 enemy.grounded = false;
             if (!enemy.grounded) {
+                // 0.15 * 256 = 38 + 2/5. Carry the remainder instead of
+                // permanently losing 0.4 Q8 units on every airborne frame.
+                enemy.gravityRemainder += 2;
                 enemy.speedY += 38;
-                if (enemy.speedY > 7 * 256)
+                if (enemy.gravityRemainder >= 5) {
+                    ++enemy.speedY;
+                    enemy.gravityRemainder -= 5;
+                }
+                if (enemy.speedY >= 7 * 256) {
                     enemy.speedY = 7 * 256;
+                    enemy.gravityRemainder = 0;
+                }
                 const int nextX = (int)downwell::floorQ8Coordinate(enemy.preciseX + enemy.speedX);
                 const int edge = nextX +
                     (enemy.speedX < 0 ? -halfWidth : halfWidth);
@@ -665,11 +677,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     }
                     enemy.speedY = 0;
                     enemy.grounded = true;
+                    enemy.gravityRemainder = 0;
                 } else {
                     enemy.preciseY += enemy.speedY;
                 }
             } else {
                 enemy.speedY = 0;
+                enemy.gravityRemainder = 0;
             }
         } else if (enemy.objectId == 117) {
             if (enemy.motionState == 0) {

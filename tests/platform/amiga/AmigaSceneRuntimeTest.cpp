@@ -228,19 +228,23 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             referenceSeen = count;
         }
     }
-    // First generated snake traverses fractional positions over adjoining
-    // tiles. This caught SDL's subpixel cracks and native stale-X probes.
-    if (amiga.enemyCount() && amiga.enemyAt(0).objectId == 111) {
-        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
-            const auto& enemy = reference.instanceAt(i);
-            if (enemy.objectId != 111) continue;
-            const auto& native = amiga.enemyAt(0);
+    // Compare every paired actor, not just the first snake. A newborn can
+    // temporarily be absent on one side due to the separately tracked camera
+    // threshold drift; never substitute a different actor for that ordinal.
+    unsigned comparedOrdinal = 0;
+    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+        const auto& enemy = reference.instanceAt(i);
+        if (!amigaEnemyHealth(enemy.objectId)) continue;
+        if (comparedOrdinal < amiga.enemyCount()) {
+            const auto& native = amiga.enemyAt(comparedOrdinal);
+            require(native.objectId == enemy.objectId,
+                    "paired actor identity matches throughout live comparison");
             requireNear(240 + native.preciseX / 256.0F, enemy.preciseX, 1.0F,
-                        "first snake horizontal trajectory agrees across targets");
+                        "paired actor horizontal trajectory agrees across targets");
             requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F,
-                        "first snake vertical trajectory agrees within Q8 gravity error");
-            break;
+                        "paired actor vertical trajectory agrees within Q8 integration error");
         }
+        ++comparedOrdinal;
     }
     if (std::getenv("DOWNWELL_TRACE_ACTORS")) {
         static bool reported = false;

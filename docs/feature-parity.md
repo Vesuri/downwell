@@ -340,3 +340,20 @@ existing player/camera drift. The first >1-pixel actor diagnostic is now the
 frog at tick 272: y=1954.86 versus 1955.9, with native gravity 38/256 rather
 than exactly 0.15. Neither the later birth timing nor complete frog collision
 semantics is claimed solved.
+
+### Frog gravity remainder and broader position assertions
+
+Frog gravity now retains fifths of a Q8 velocity unit: 0.15 pixels/frame² is
+38 + 2/5 in Q8, not a constant 38. A one-byte remainder is cleared on
+configuration, jumping, landing and terminal-speed clamping. The implementation
+uses integer arithmetic only. A 40-frame ballistic test checks velocity and
+position against exact 0.15 integration; separate tests check landing and
+terminal-speed resets.
+
+Every paired actor in the live SDL/native tape now has mandatory X/Y assertions
+within one pixel at each sampled comparison. There are no >1-pixel diagnostic
+differences on this tape. It still does not assert all animation frames or
+complete lifecycle state, and a temporarily missing newborn is not position
+compared. The last two births remain one frame late (340 versus 339), so full
+actor parity is not proven. Host tests and the bounded 600-tick Amiga terrain
+cache verification pass with the integer remainder enabled.
