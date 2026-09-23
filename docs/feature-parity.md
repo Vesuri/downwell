@@ -296,3 +296,27 @@ This corrects instance-coordinate quantization, not the incomplete collision
 adaptation. The live trace still differs: first sampled >1-pixel mismatch is
 now tick 172, native (222,1297.99) moving left versus SDL (223.5,1298.2)
 moving right. Full actor-motion parity remains open.
+
+### Fractional solid probes and first-snake regression
+
+SDL's point-probe adaptation compared fractional coordinates directly with
+inclusive integer tile bounds. Between adjacent tile centres 0 and 16, x=7.5
+incorrectly missed both tiles. The query now floors to a pixel before testing
+the recovered 16-pixel extent. Native snake/turtle probes likewise floor their
+precise Q8 positions rather than truncating signed relative coordinates or
+using rounded display positions. Vertical collision uses the X after horizontal
+movement, retains the fractional Y when advancing to contact, and records
+landing immediately, matching the reference adaptation's ordering.
+
+The first snake now agrees within one pixel throughout the sampled live tape,
+including retirement; these X/Y comparisons are assertions, not optional logs.
+The Q8 floor helper is exhaustively compared with `std::floor` across
+[-1024,1024]. The first optional diagnostic difference moves to the frog at
+tick 242 (native y=1860.16 versus SDL y=1859.15). Other enemies and full
+mask-based `place_meeting` semantics remain unfinished; this is not a claim
+that point probes fully reproduce the original GameMaker collision system.
+
+Validation: full host suite passes. The bounded 68000 cache run reaches 600
+simulation ticks with five generated fragments and three enemies, 101
+fresh-composition comparisons and zero reported cache/buffer mismatches.
+No overflow BOB comparisons occurred in that run; it does not cover that path.

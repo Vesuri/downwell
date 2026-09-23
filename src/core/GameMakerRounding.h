@@ -3,6 +3,12 @@
 
 namespace downwell {
 
+// Pixel lookup is floor, not C++ signed division's truncation toward zero.
+inline long floorQ8Coordinate(long value) {
+    const long whole = value / 256;
+    return whole - (value % 256 < 0 ? 1 : 0);
+}
+
 // GML round: nearest integer, exact halves to even. Coordinates must be
 // finite and fit a signed long. Explicit arithmetic avoids dependence on
 // the host floating-point rounding mode and needs no target FPU/libm.

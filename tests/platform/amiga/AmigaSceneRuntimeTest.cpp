@@ -210,6 +210,20 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             "reference remains in gameplay during comparison");
     require(amiga.generationSucceeded(),
             "live terrain generation succeeds throughout the comparison tape");
+    // First generated snake traverses fractional positions over adjoining
+    // tiles. This caught SDL's subpixel cracks and native stale-X probes.
+    if (amiga.enemyCount() && amiga.enemyAt(0).objectId == 111) {
+        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+            const auto& enemy = reference.instanceAt(i);
+            if (enemy.objectId != 111) continue;
+            const auto& native = amiga.enemyAt(0);
+            requireNear(240 + native.preciseX / 256.0F, enemy.preciseX, 1.0F,
+                        "first snake horizontal trajectory agrees across targets");
+            requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F,
+                        "first snake vertical trajectory agrees within Q8 gravity error");
+            break;
+        }
+    }
     if (std::getenv("DOWNWELL_TRACE_ACTORS")) {
         static bool reported = false;
         unsigned ordinal = 0;

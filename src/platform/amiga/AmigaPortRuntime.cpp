@@ -554,38 +554,40 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             const int halfWidth = enemy.objectId == 112 ? 8 : 6;
             const int foot = enemy.objectId == 112 ? 8 : 5;
             const int direction = enemy.speedX < 0 ? -1 : 1;
+            const int probeX = (int)downwell::floorQ8Coordinate(enemy.preciseX);
+            const int probeY = (int)downwell::floorQ8Coordinate(enemy.preciseY);
             const bool grounded = solidResolver_(
-                solidResolverContext_, enemy.x, enemy.y + foot + 1);
+                solidResolverContext_, probeX, probeY + foot + 1);
             enemy.grounded = grounded;
             if (grounded) {
                 enemy.speedY = 0;
                 if (!solidResolver_(solidResolverContext_,
-                                    enemy.x + direction * (halfWidth + 1),
-                                    enemy.y + foot + 1))
+                                    probeX + direction * (halfWidth + 1),
+                                    probeY + foot + 1))
                     enemy.speedX = -enemy.speedX;
             } else {
                 enemy.speedY += 51;
                 if (enemy.speedY > 7 * 256)
                     enemy.speedY = 7 * 256;
             }
-            const int nextX = (int)((enemy.preciseX + enemy.speedX) / 256L);
+            const int nextX = (int)downwell::floorQ8Coordinate(enemy.preciseX + enemy.speedX);
             const int edge = nextX +
                 (enemy.speedX < 0 ? -halfWidth : halfWidth);
-            if (solidResolver_(solidResolverContext_, edge, enemy.y))
+            if (solidResolver_(solidResolverContext_, edge, probeY))
                 enemy.speedX = -enemy.speedX;
             else
                 enemy.preciseX += enemy.speedX;
             if (!grounded) {
-                const int nextY =
-                    (int)((enemy.preciseY + enemy.speedY) / 256L);
+                const int nextY = (int)downwell::floorQ8Coordinate(enemy.preciseY + enemy.speedY);
+                const int movedX = (int)downwell::floorQ8Coordinate(enemy.preciseX);
                 if (enemy.speedY > 0 && solidResolver_(
-                        solidResolverContext_, enemy.x, nextY + foot)) {
-                    while (!solidResolver_(solidResolverContext_, enemy.x,
-                                           enemy.y + foot + 1)) {
-                        ++enemy.y;
-                        enemy.preciseY = (long)enemy.y * 256L;
+                        solidResolverContext_, movedX, nextY + foot)) {
+                    while (!solidResolver_(solidResolverContext_, movedX,
+                                (int)downwell::floorQ8Coordinate(enemy.preciseY) + foot + 1)) {
+                        enemy.preciseY += 256L;
                     }
                     enemy.speedY = 0;
+                    enemy.grounded = true;
                 } else {
                     enemy.preciseY += enemy.speedY;
                 }

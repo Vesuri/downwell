@@ -433,6 +433,11 @@ bool StartupRuntime::mainPlayerCollides(float x, float y) const {
 }
 
 bool StartupRuntime::mainSolidAt(float x, float y) const {
+    // A solid tile covers all sixteen pixel cells. Testing fractional
+    // coordinates against inclusive integer bounds left subpixel cracks
+    // between adjacent tiles (e.g. x=7.5 between centres 0 and 16).
+    x = std::floor(x);
+    y = std::floor(y);
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& wall = instances_.at(index);
         if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))

@@ -5,6 +5,7 @@
 #include "core/GameMakerRounding.h"
 
 #include <cstdlib>
+#include <cmath>
 #include <iostream>
 
 namespace {
@@ -67,6 +68,8 @@ int main() {
                 "GML exact half coordinates round to even on both sides of zero");
     }
     for (long q = -1024 * 256; q <= 1024 * 256; ++q) {
+        require(downwell::floorQ8Coordinate(q) == (long)std::floor(q / 256.0),
+                "collision pixel lookup floors negative and positive fractions");
         const long rounded = downwell::roundGameMakerQ8(q);
         require(rounded == downwell::roundGameMakerCoordinate(q / 256.0),
                 "fixed-point coordinate rounding matches portable oracle");
