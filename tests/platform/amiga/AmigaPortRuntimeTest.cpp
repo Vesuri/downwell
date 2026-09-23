@@ -129,6 +129,29 @@ int main() {
                 !destructible.breakableActiveAt(-1, 32) &&
                 !destructible.bulletActive(),
             "gunboot bullets destroy configured recovered blocks");
+    const int newBlockX[] = {32, 48}, newBlockY[] = {64, 64};
+    require(destructible.appendBreakables(newBlockX, newBlockY, 2) &&
+                destructible.blocksDestroyed() == 1 &&
+                !destructible.breakableActiveAt(-1, 32) &&
+                destructible.breakableActiveAt(32, 64) &&
+                destructible.breakableActiveAt(48, 64),
+            "new terrain appends without resurrecting destroyed blocks or resetting statistics");
+    require(!destructible.appendBreakables(newBlockX, newBlockY, 128) &&
+                !destructible.appendBreakables(nullptr, newBlockY, 1) &&
+                destructible.appendBreakables(nullptr, nullptr, 0) &&
+                destructible.blocksDestroyed() == 1 && destructible.breakableActiveAt(32, 64),
+            "append overflow and missing arrays fail without mutation; empty batch is valid");
+    AmigaPortRuntime indexedBlocks(300);
+    AmigaPortRuntime initiallyEmpty(300);
+    require(initiallyEmpty.appendBreakables(newBlockX, newBlockY, 2) &&
+                initiallyEmpty.breakableActiveAt(32, 64) && initiallyEmpty.breakableActiveAt(48, 64),
+            "first live batch can append to an empty runtime without prior configuration");
+    const int firstX[] = {0}, firstY[] = {32};
+    indexedBlocks.configureBreakables(firstX, firstY, 1);
+    require(indexedBlocks.appendBreakables(newBlockX, newBlockY, 2) &&
+                indexedBlocks.breakableActiveAt(0, 32) && indexedBlocks.breakableActiveAt(32, 64) &&
+                indexedBlocks.breakableActiveAt(48, 64) && !indexedBlocks.breakableActiveAt(16, 64),
+            "aligned batches extend the indexed collision path without losing prior blocks");
 
     AmigaPortRuntime combat(300);
     require(combat.configureEnemy(0, 111, 163, -1, 12,

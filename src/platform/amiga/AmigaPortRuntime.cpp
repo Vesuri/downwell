@@ -284,28 +284,36 @@ int AmigaPortRuntime::bulletY() const
 void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
                                             unsigned count)
 {
-    unsigned index;
     if (x == 0 || y == 0)
         return;
     if (count > breakableCapacity)
         count = breakableCapacity;
-    breakableCount_ = count;
+    breakableCount_ = 0;
     breakableIndexReady_ = true;
     for (unsigned cell = 0; cell < sizeof(breakableIndex_); ++cell) breakableIndex_[cell] = 0;
     blocksDestroyed_ = 0;
-    for (index = 0; index < count; ++index) {
-        breakables_[index].x = x[index];
-        breakables_[index].y = y[index];
+    appendBreakables(x, y, count);
+}
+
+bool AmigaPortRuntime::appendBreakables(const int* x, const int* y, unsigned count)
+{
+    if (count > breakableCapacity - breakableCount_ || (count && (!x || !y)))
+        return false;
+    for (unsigned source = 0; source < count; ++source) {
+        const unsigned index = breakableCount_++;
+        breakables_[index].x = x[source];
+        breakables_[index].y = y[source];
         breakables_[index].active = true;
-        if ((x[index] & 15) || (y[index] & 15) || x[index] < -512 ||
-            x[index] >= 512 || y[index] < 0 || y[index] >= 8192) {
+        if ((x[source] & 15) || (y[source] & 15) || x[source] < -512 ||
+            x[source] >= 512 || y[source] < 0 || y[source] >= 8192) {
             breakableIndexReady_ = false;
-        } else {
-            auto& cell = breakableIndex_[(y[index] >> 4) * 64 + ((x[index] + 512) >> 4)];
+        } else if (breakableIndexReady_) {
+            auto& cell = breakableIndex_[(y[source] >> 4) * 64 + ((x[source] + 512) >> 4)];
             if (cell) breakableIndexReady_ = false;
             cell = index + 1;
         }
     }
+    return true;
 }
 
 bool AmigaPortRuntime::breakableActiveAt(int x, int y) const

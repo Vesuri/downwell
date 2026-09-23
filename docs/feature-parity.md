@@ -140,3 +140,26 @@ Verification of the adapter refactor: full host suite passed; the bounded A500
 gameplay-cache run passed 600 ticks and 146 fresh-composition comparisons.
 These checks preserve the existing forecast renderer, not yet SDL/live-world
 parity. The ordinary `SKIP_TO_GAME=1` executable is restored after verification.
+
+The native builder now exposes every actual Create event to a caller-owned
+observer. `amigaAddTerrainObject` can incrementally add those events to a
+collision index, updating only the affected upward landing links. This is
+important beyond timing: pattern symbols `2` and `3` are probabilistic in
+`AreaOneBuilder::emitPattern`, while the old full-forecast collision path
+treats both as unconditional terrain. Live integration must use the emitted
+objects for collision **and rendering**, not just a growing pattern prefix.
+The native generation test checks every collision cell and next-landing link
+after each event against an independent full-grid reconstruction from emitted
+objects, including RNG-interleaved generation. Invisible events change nothing.
+
+`AmigaPortRuntime::appendBreakables` preserves prior block activity and
+destruction counts, supports the indexed path, and rejects oversized batches
+before mutation. It avoids resetting all breakables whenever a section arrives.
+These incremental APIs are integration foundations, not yet the playable
+runtime's live terrain source. The old forecast path remains until its renderer
+and event-order dependencies are migrated together.
+
+Incremental-collision verification: full host suite passed, including every
+cell/link after each generated section; cross-target replay retained
+`64 95d0aaea 1be7256f`. This replay confirms no regression in its existing
+64-tick scope, not full live-generation parity.

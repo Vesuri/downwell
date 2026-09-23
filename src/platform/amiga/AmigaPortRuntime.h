@@ -103,6 +103,9 @@ public:
         player_.configureLandingResolver(resolver, context);
     }
     void configureBreakables(const int* x, const int* y, unsigned count);
+    // Append a newly generated batch without reviving destroyed earlier blocks.
+    // Reject capacity failure before changing any state.
+    bool appendBreakables(const int* x, const int* y, unsigned count);
     void configureSolidResolver(SolidResolver resolver, void* context) {
         solidResolver_ = resolver;
         solidResolverContext_ = context;

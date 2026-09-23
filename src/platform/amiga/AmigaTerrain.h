@@ -57,6 +57,11 @@ public:
         AmigaTerrainEnemy* enemies = nullptr, unsigned enemyCapacity = 0,
         AmigaTerrainDecoration* decorations = nullptr,
         unsigned decorationCapacity = 0);
+    void setCreateObserver(downwell::AreaOneBuilder::EmitFunction observer,
+                           void* context) {
+        observer_ = observer;
+        observerContext_ = context;
+    }
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
     bool stepVisible(const downwell::BuilderPatternPack& patterns,
                      downwell::GameMakerRandom& random, int viewBottomCeiling,
@@ -81,6 +86,8 @@ private:
     unsigned enemyCount_ = 0;
     unsigned decorationCount_ = 0;
     bool failed_ = false;
+    downwell::AreaOneBuilder::EmitFunction observer_ = nullptr;
+    void* observerContext_ = nullptr;
 };
 
 struct AmigaTerrainCollisionContext {
@@ -100,6 +107,10 @@ struct AmigaTerrainIndex {
 };
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index);
+// Add an actual recovered Create event, not a probabilistic pattern symbol.
+// Requires an initialized index. Only links above the new landing are patched.
+bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
+                           bool initialRoomWall = false);
 bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y);
 
 bool amigaBuildInitialAreaOneTerrain(

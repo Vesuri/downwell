@@ -38,6 +38,10 @@ int decorationSprite(int objectId) {
 bool AmigaAreaOneTerrainBuilder::collect(
     void* opaque, const downwell::DeferredCreateInstance& command) {
     auto& context = *static_cast<AmigaAreaOneTerrainBuilder*>(opaque);
+    if (context.observer_ && !context.observer_(context.observerContext_, command)) {
+        context.failed_ = true;
+        return false;
+    }
     const bool enemy = command.objectId == 111 || command.objectId == 112 ||
                        command.objectId == 113 || command.objectId == 116 ||
                        command.objectId == 117 || command.objectId == 119;
@@ -299,6 +303,25 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
 
 bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y) {
     return (indexCell(index, x, y) & roomWallCell) != 0;
+}
+
+bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
+                           bool initialRoomWall) {
+    const unsigned flags = objectId == 60
+        ? solidCell | landingCell | (initialRoomWall ? roomWallCell : 0)
+        : objectId == 92 ? breakableCell : objectId == 93 ? landingCell : 0;
+    if (!flags) return true;
+    if (!indexAdd(index, x, y, flags)) return false;
+    const int column = (x - AmigaTerrainIndex::minX) / 16;
+    const int landingRow = y / 16;
+    // An existing closer landing terminates the update. No clearing, full-map
+    // scan or allocation is required when a new section becomes live.
+    for (int row = landingRow; row >= 0; --row) {
+        auto& next = index.nextLanding[row * AmigaTerrainIndex::columns + column];
+        if (next && next <= landingRow + 1) break;
+        next = landingRow + 1;
+    }
+    return true;
 }
 
 int amigaResolveTerrainLanding(void* opaque, int offsetX,
