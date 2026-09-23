@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaPortRuntime.h"
+#include "platform/amiga/AmigaActorChannels.h"
 #include "core/PortReplay.h"
 #include "core/Replay.h"
 
@@ -33,6 +34,26 @@ bool crawlerCorner(void*, int x, int y) {
 } // namespace
 
 int main() {
+    for (unsigned limit = 0; limit <= 8; ++limit) {
+        for (unsigned pattern = 0; pattern < 256; ++pattern) {
+            AmigaActorChannels channels(limit);
+            unsigned expected = 0;
+            bool fellBack = false;
+            for (unsigned actor = 0; actor < 8; ++actor) {
+                const unsigned parts = 1 + ((pattern >> actor) & 1);
+                const int first = channels.take(parts);
+                if (expected + parts > limit) fellBack = true;
+                if (fellBack)
+                    require(first == -1, "behind a BOB, smaller actors cannot jump above it in DMA");
+                else {
+                    require(first == static_cast<int>(expected),
+                            "front-to-back actors get increasing DMA priority indices");
+                    expected += parts;
+                }
+                require(channels.used() == expected, "multipart actor allocation is atomic");
+            }
+        }
+    }
     static_assert(AmigaPortRuntime::bulletCapacity == 16,
                   "bullet simulation capacity matches SDL, not DMA channels");
     static_assert(AmigaPortRuntime::gemCapacity == 64,

@@ -304,6 +304,7 @@ def build_pack(manifest, extracted, profile):
                                     originX=sprite["width"] - sprite["originX"] if flip_x else sprite["originX"])
                     encoded.append((metadata, 256 + frame_index, stride, data))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
+                    0, 3, 12, 15, 27, 31, 37,
                     153, 163, 164, 166, 168, 170, 177, 186, 187, 188, 278):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
@@ -477,6 +478,9 @@ def build_pack(manifest, extracted, profile):
             if sprite["id"] not in actors:
                 continue
             width, height = sprite["width"], sprite["height"]
+            require(width <= 64 and height <= 64 and
+                    0 <= sprite["originX"] <= width and 0 <= sprite["originY"] <= height,
+                    "gameplay actor exceeds conservative visibility bounds")
             stride = dma_width // 8
             def pixel(x, y, plane):
                 return 0 <= x < width and bool(
@@ -555,12 +559,22 @@ def build_pack(manifest, extracted, profile):
     records = []
     payload = bytearray()
     offsets = {}
+    immutable_payloads = {}
     # Gameplay DMA words are copied into channel slots, not read by DMA here.
     # Keep them at the end so the target can leave this tail in Fast RAM.
     for sprite, frame_index, dma_width, planar in sorted(
             encoded, key=lambda item: bool(item[0].get("hardwareParts"))):
-        offsets[(sprite["id"], frame_index)] = payload_offset + len(payload)
-        payload.extend(planar)
+        # Planar art/masks are immutable. Identical frames and symmetric
+        # variants can share bytes without changing any resource/frame ID.
+        # Garden DMA records contain writable position headers: never alias
+        # those, or one animation buffer could modify the displayed sprite.
+        offset = None if sprite.get("hardware") else immutable_payloads.get(planar)
+        if offset is None:
+            offset = payload_offset + len(payload)
+            payload.extend(planar)
+            if not sprite.get("hardware"):
+                immutable_payloads[planar] = offset
+        offsets[(sprite["id"], frame_index)] = offset
     for sprite, frame_index, dma_width, planar in encoded:
         records.append(RECORD.pack(
             sprite["id"], frame_index, sprite["originX"], sprite["originY"],

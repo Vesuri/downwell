@@ -27,8 +27,9 @@ game has them: establish which portions SDL actually implements first.
 Simulation capacities are shared in `src/core/GameplayLimits.h`. The six regular
 actor DMA buffers plus channel 7 remain a separate rendering limit. A multi-part
 enemy either fits completely in the remaining channels or becomes one masked
-planar BOB; it is never cut in half by channel exhaustion. Player channel 0 is
-retained. Hardware sprites still rely on playfield priority at horizontal edges.
+planar BOB; it is never cut in half by channel exhaustion. All eight channels
+are assigned in reverse SDL painter order (gems, bullets, player, enemies).
+Hardware sprites still rely on playfield priority at horizontal edges.
 
 Overflow BOBs use offline planar assets (including mirrored enemy variants),
 the existing Bitmap/blitter path, and the inactive scrolling display buffer.
@@ -67,3 +68,23 @@ and DMA variants. No target-side pixel flip or conversion is introduced.
 Tests compare every flipped frame against a reflected original raster, test
 the direction reversal, and compare all prepared DMA bodies with the pixel
 oracle (13,132 comparisons including the new variants).
+
+## Actor overlap order
+
+SDL's `Game::renderMain` paints enemies, player, bullets and gems in that order.
+The previous fixed channel-zero player overrode bullets/gems; allocating later
+enemies to hardware after an earlier BOB also reversed painter order.
+`AmigaActorChannels` now allocates the frontmost actors to the lowest DMA
+channels. Once an entire actor cannot fit, it and every actor behind it use
+BOBs in original back-to-front order. No channel is reused by a smaller actor
+behind the first BOB. Player BOBs also use offline mirrored planar variants.
+The channel planner is tested for 256 one-/two-part actor sequences at every
+channel budget from zero to eight.
+
+The target forced-BOB test passed 100 scalar-versus-blitter comparisons with
+the player included. Startup now also has a 512 KiB Chip allocation check;
+see `amiga-memory.md` for the reproduced shortage and offline deduplication fix.
+Final normal-build timing for the ordered renderer: 600 frames / 603 PAL
+fields (49.75 FPS), with a three-field frame at 528 and a two-field frame at
+574. These misses remain open; the former 50 FPS result is not applicable to
+this build. The playable SKIP_TO_GAME build is restored after profiling.

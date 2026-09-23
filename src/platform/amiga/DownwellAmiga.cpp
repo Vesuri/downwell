@@ -8,6 +8,7 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaActorChannels.h"
 #include "AmigaProfile.h"
 #include "DownwellCopperLists.h"
 #include "AmigaMenu.h"
@@ -164,6 +165,13 @@ volatile ULONG gDownwellStyleReferenceFrames;
 volatile ULONG gDownwellGameBufferFailures;
 volatile ULONG gDownwellGameplayBobChecks;
 volatile ULONG gDownwellGameplayBobFailures;
+volatile ULONG gDownwellActorFailureSprite;
+volatile ULONG gDownwellActorFailureFrame;
+volatile ULONG gDownwellStartupFailure;
+volatile ULONG gDownwellStartupChipFree;
+volatile ULONG gDownwellStartupChipLargest;
+volatile ULONG gDownwellStartupAssetBytes;
+volatile ULONG gDownwellStartupChipRemaining;
 volatile ULONG gDownwellTerrainRasterFailures;
 volatile ULONG gDownwellTerrainRasterChecks;
 volatile const UBYTE* gDownwellSplashFrame;
@@ -919,6 +927,33 @@ struct GameplayBob {
     int x, y, flip;
 };
 
+extern "C" __attribute__((noinline, used)) void downwellStartupFailed() {
+    __asm__ volatile("" ::: "memory");
+}
+
+extern "C" __attribute__((noinline)) void downwellGameplayRenderFailure() {
+    __asm__ volatile("" ::: "memory");
+}
+
+static bool appendGameplayActor(GameplayBob* actors, unsigned& count,
+                                 UWORD sprite, UWORD frame, int x, int y, int flip) {
+    // Offline gameplay actors have <=64-pixel canvases and origins inside
+    // them. Avoid Chip-directory reads for actors far outside the viewport.
+    if (x < downwellPlayfieldX - 64 || x > downwellPlayfieldX + downwellPlayfieldWidth + 64 ||
+        y < -64 || y > downwellDisplayHeight + 64) return true;
+    int left, top, width, height;
+    if (!amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
+            sprite, frame, x, y, flip, &left, &top, &width, &height)) {
+        gDownwellActorFailureSprite = sprite;
+        gDownwellActorFailureFrame = frame;
+        return false;
+    }
+    if (left < downwellPlayfieldX + downwellPlayfieldWidth &&
+        left + width > downwellPlayfieldX && top < downwellDisplayHeight && top + height > 0)
+        actors[count++] = {sprite, frame, x, y, flip};
+    return true;
+}
+
 #ifdef DOWNWELL_BOB_VERIFY
 extern "C" __attribute__((noinline)) void downwellGameplayBobsReady() {
     __asm__ volatile("" ::: "memory");
@@ -1043,12 +1078,18 @@ int main(void) {
     worldViewY += port.cameraOffsetY();
 #endif
 
-    if (!platform.available())
+    if (!platform.available()) {
+        gDownwellStartupFailure = 1;
+        downwellStartupFailed();
         return 1;
+    }
     UWORD* startupCopperWords =
         (UWORD*)AllocMem(4 * sizeof(UWORD), MEMF_CHIP | MEMF_CLEAR);
-    if (!startupCopperWords)
+    if (!startupCopperWords) {
+        gDownwellStartupFailure = 2;
+        downwellStartupFailed();
         return 1;
+    }
     CopperList startupCopper(startupCopperWords, 4);
     if (!startupCopper.move(color00, 0x000) ||
         !startupCopper.finish() ||
@@ -1059,10 +1100,15 @@ int main(void) {
                            downwellDisplayVStopCropped,
                            downwellFetchStart, downwellFetchStop)) {
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        gDownwellStartupFailure = 3;
+        downwellStartupFailed();
         return 1;
     }
     const ULONG gamePackBytes =
         amigaRendererChipPackBytes(amiga_game_pack, amiga_game_pack_end);
+    gDownwellStartupChipFree = AvailMem(MEMF_CHIP);
+    gDownwellStartupChipLargest = AvailMem(MEMF_CHIP | MEMF_LARGEST);
+    gDownwellStartupAssetBytes = gamePackBytes;
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          menuPlaneBytes, amigaMenuEntryPlaneBytes,
                          downwellCopperWords * copperListCount * sizeof(UWORD),
@@ -1073,8 +1119,11 @@ int main(void) {
                          gamePackBytes)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        gDownwellStartupFailure = 4;
+        downwellStartupFailed();
         return 1;
     }
+    gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
     const downwell::RoomPack rooms(
         amiga_room_pack,
         (unsigned long)(amiga_room_pack_end - amiga_room_pack));
@@ -1111,6 +1160,8 @@ int main(void) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
+        gDownwellStartupFailure = 5;
+        downwellStartupFailed();
         return 1;
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -1130,6 +1181,8 @@ int main(void) {
         if (!amigaBuildTerrainIndex(terrainCollision, terrainIndex)) {
             platform.restore();
             FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+            gDownwellStartupFailure = 6;
+            downwellStartupFailed();
             return 1;
         }
         terrainCollision.index = &terrainIndex;
@@ -1155,6 +1208,8 @@ int main(void) {
                 platform.restore();
                 FreeMem(startupCopperWords, 4 * sizeof(UWORD));
                 memory.release();
+                gDownwellStartupFailure = 7;
+                downwellStartupFailed();
                 return 1;
             }
         }
@@ -1178,6 +1233,8 @@ int main(void) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
+        gDownwellStartupFailure = 8;
+        downwellStartupFailed();
         return 1;
     }
 #endif
@@ -1186,6 +1243,8 @@ int main(void) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
+        gDownwellStartupFailure = 9;
+        downwellStartupFailed();
         return 1;
     }
 
@@ -1195,6 +1254,8 @@ int main(void) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
+        gDownwellStartupFailure = 10;
+        downwellStartupFailed();
         return 1;
     }
 #endif
@@ -1283,6 +1344,8 @@ int main(void) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
+        gDownwellStartupFailure = 11;
+        downwellStartupFailed();
         return 1;
     }
     Sprite playerSprites[2] = {
@@ -1345,6 +1408,8 @@ int main(void) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
+        gDownwellStartupFailure = 12;
+        downwellStartupFailed();
         return 1;
     }
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -1369,6 +1434,8 @@ int main(void) {
         port.ringOrigin())) {
         platform.restore();
         memory.release();
+        gDownwellStartupFailure = 13;
+        downwellStartupFailed();
         return 1;
     }
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -2039,150 +2106,89 @@ int main(void) {
                 }
             }
             DW_PROFILE_PHASE(profileSprite);
-            if (!port.playerVisible()) {
-                playerSprites[back].hide();
-            } else if (!amigaRendererBuildHardwareSprite(
-                           amiga_game_pack, amiga_game_pack_end,
-                           (UWORD)(port.dead()
-                                       ? 0 : port.player().spriteId()),
-                           (UWORD)(port.dead()
-                                       ? 0 : port.player().spriteFrame()),
-                           downwellPlayfieldX + 80 +
-                               port.player().offsetX() -
-                               port.cameraOffsetX(),
-#ifdef DOWNWELL_REPLAY_VERIFY
-                           gameplayPlayerGroundY + port.player().offsetY(),
-#else
-                           gameplayPlayerStartY +
-                               port.player().offsetY() -
-                               port.cameraOffsetY(),
-#endif
-                           port.player().facing() < 0,
-                           memory.playerSprite(back), playerSpriteHeight))
-                frameReady = false;
-            unsigned actorCount = 0;
-#ifdef DOWNWELL_BOB_VERIFY
-            const unsigned actorLimit = 0;
-#else
-            const unsigned actorLimit = gameplayRegularSpriteCount + 1;
-#endif
-            static GameplayBob bobs[AmigaPortRuntime::bulletCapacity +
+            // SDL painter order: generated enemies, player, bullets, gems.
+            static GameplayBob actors[1 + AmigaPortRuntime::bulletCapacity +
                 AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity];
-            unsigned bobCount = 0;
-            Sprite* actorSprites = bulletSprites +
-                back * gameplayRegularSpriteCount;
-            for (unsigned bullet = 0;
-                 bullet < AmigaPortRuntime::bulletCapacity; ++bullet) {
-                const AmigaPortRuntime::BulletState& state =
-                    port.bulletAt(bullet);
-                if (state.active && actorCount >= actorLimit) {
-                    bobs[bobCount++] = {459, 0,
-                        downwellPlayfieldX + 80 + state.x - port.cameraOffsetX(),
-                        gameplayPlayerStartY + state.y - port.cameraOffsetY(), 0};
-                } else if (state.active) {
-                    Sprite& sprite = actorSpriteAt(
-                        actorSprites, enemySprites[back], actorCount);
-                    const int spriteResult =
-                        amigaRendererBuildHardwareSprite(
-                        amiga_game_pack, amiga_game_pack_end, 459, 0,
-                        downwellPlayfieldX + 80 + state.x -
-                            port.cameraOffsetX(),
-                        gameplayPlayerStartY + state.y -
-                            port.cameraOffsetY(),
-                        0, sprite.data(), bulletSpriteHeight);
-                    if (spriteResult == 0)
-                        frameReady = false;
-                    else if (spriteResult == 1)
-                        ++actorCount;
-                }
+            unsigned actorCount = 0;
+#ifndef DOWNWELL_REPLAY_VERIFY
+            for (unsigned index = 0; index < port.enemyCount(); ++index) {
+                const auto& enemy = port.enemyAt(index);
+                if (!enemy.active || !enemy.awake) continue;
+                if (!appendGameplayActor(actors, actorCount,
+                        (UWORD)enemy.spriteId, (UWORD)enemy.drawFrame(),
+                        downwellPlayfieldX + 80 + enemy.x - port.cameraOffsetX(),
+                        gameplayPlayerStartY + enemy.y - port.cameraOffsetY(),
+                        enemy.facing < 0)) frameReady = false;
+            }
+#endif
+            if (port.playerVisible() && !appendGameplayActor(actors, actorCount,
+                    (UWORD)(port.dead() ? 0 : port.player().spriteId()),
+                    (UWORD)(port.dead() ? 0 : port.player().spriteFrame()),
+                    downwellPlayfieldX + 80 + port.player().offsetX() - port.cameraOffsetX(),
+#ifdef DOWNWELL_REPLAY_VERIFY
+                    gameplayPlayerGroundY + port.player().offsetY(),
+#else
+                    gameplayPlayerStartY + port.player().offsetY() - port.cameraOffsetY(),
+#endif
+                    port.player().facing() < 0)) frameReady = false;
+            for (unsigned index = 0; index < AmigaPortRuntime::bulletCapacity; ++index) {
+                const auto& bullet = port.bulletAt(index);
+                if (bullet.active && !appendGameplayActor(actors, actorCount, 459, 0,
+                        downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
+                        gameplayPlayerStartY + bullet.y - port.cameraOffsetY(), 0))
+                    frameReady = false;
             }
 #ifndef DOWNWELL_REPLAY_VERIFY
-            for (unsigned enemyIndex = 0;
-                 enemyIndex < port.enemyCount();
-                 ++enemyIndex) {
-                const AmigaPortRuntime::EnemyState& enemy =
-                    port.enemyAt(enemyIndex);
-                const int screenY = gameplayPlayerStartY + enemy.y -
-                    port.cameraOffsetY();
-                if (!enemy.active || !enemy.awake || screenY < -32 ||
-                    screenY >= downwellDisplayHeight + 32)
-                    continue;
-                const unsigned partCount =
-                    amigaRendererHardwareSpritePartCount(
-                        amiga_game_pack, amiga_game_pack_end,
-                        (UWORD)enemy.spriteId, (UWORD)enemy.drawFrame());
-                if (partCount == 0) {
-                    frameReady = false;
-                    continue;
-                }
-                if (actorCount + partCount > actorLimit) {
-                    bobs[bobCount++] = {(UWORD)enemy.spriteId, (UWORD)enemy.drawFrame(),
-                        downwellPlayfieldX + 80 + enemy.x - port.cameraOffsetX(),
-                        screenY, enemy.facing < 0};
-                    continue;
-                }
-                for (unsigned part = 0;
-                     part < partCount &&
-                     actorCount <= gameplayRegularSpriteCount;
-                     ++part) {
-                    Sprite& sprite = actorSpriteAt(
-                        actorSprites, enemySprites[back], actorCount);
-                    const int spriteResult =
-                        amigaRendererBuildHardwareSpritePart(
-                            amiga_game_pack, amiga_game_pack_end,
-                            (UWORD)enemy.spriteId,
-                            (UWORD)enemy.drawFrame(), part,
-                            downwellPlayfieldX + 80 + enemy.x -
-                                port.cameraOffsetX(),
-                            screenY, enemy.facing < 0,
-                            sprite.data(), enemySpriteHeight);
-                    if (spriteResult == 0)
-                        frameReady = false;
-                    else if (spriteResult == 1)
-                        ++actorCount;
-                }
-            }
-            for (unsigned gemIndex = 0;
-                 gemIndex < AmigaPortRuntime::gemCapacity;
-                 ++gemIndex) {
-                const AmigaPortRuntime::GemState& gem =
-                    port.gemAt(gemIndex);
-                const int screenY = gameplayPlayerStartY + gem.y -
-                    port.cameraOffsetY();
-                if (!gem.active || screenY < -32 ||
-                    screenY >= downwellDisplayHeight + 32)
-                    continue;
-                if (actorCount >= actorLimit) {
-                    bobs[bobCount++] = {(UWORD)(gem.large ? 134 : 133),
-                        (UWORD)((gem.age / 2u) & 3u),
+            for (unsigned index = 0; index < AmigaPortRuntime::gemCapacity; ++index) {
+                const auto& gem = port.gemAt(index);
+                if (gem.active && !appendGameplayActor(actors, actorCount,
+                        (UWORD)(gem.large ? 134 : 133), (UWORD)((gem.age / 2u) & 3u),
                         downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
-                        screenY, 0};
-                    continue;
-                }
-                Sprite& sprite = actorSpriteAt(
-                    actorSprites, enemySprites[back], actorCount);
-                const int spriteResult =
-                    amigaRendererBuildHardwareSprite(
-                        amiga_game_pack, amiga_game_pack_end,
-                        (UWORD)(gem.large ? 134 : 133),
-                        (UWORD)((gem.age / 2u) & 3u),
-                        downwellPlayfieldX + 80 + gem.x -
-                            port.cameraOffsetX(),
-                        screenY, 0, sprite.data(), enemySpriteHeight);
-                if (spriteResult == 0)
+                        gameplayPlayerStartY + gem.y - port.cameraOffsetY(), 0))
                     frameReady = false;
-                else if (spriteResult == 1)
-                    ++actorCount;
             }
 #endif
-            while (actorCount < gameplayRegularSpriteCount)
-                actorSprites[actorCount++].hide();
-            if (actorCount <= gameplayRegularSpriteCount)
-                enemySprites[back].hide();
+            Sprite* regularSprites = bulletSprites + back * gameplayRegularSpriteCount;
+#ifdef DOWNWELL_BOB_VERIFY
+            AmigaActorChannels channels(0);
+#else
+            AmigaActorChannels channels;
+#endif
+            unsigned bobCount = actorCount;
+            // Assign frontmost actors first. Any remaining prefix is painted
+            // back-to-front into PF1, below every allocated hardware sprite.
+            while (bobCount > 0) {
+                const GameplayBob& actor = actors[bobCount - 1];
+                const unsigned parts = amigaRendererHardwareSpritePartCount(
+                    amiga_game_pack, amiga_game_pack_end, actor.sprite, actor.frame);
+                if (parts == 0) {
+                    gDownwellActorFailureSprite = actor.sprite;
+                    gDownwellActorFailureFrame = actor.frame;
+                    frameReady = false;
+                    break;
+                }
+                const int first = channels.take(parts);
+                if (first < 0) break;
+                for (unsigned part = 0; part < parts; ++part) {
+                    const unsigned channel = first + part;
+                    Sprite& sprite = channel == 0 ? playerSprites[back]
+                        : actorSpriteAt(regularSprites, enemySprites[back], channel - 1);
+                    if (!amigaRendererBuildHardwareSpritePart(
+                            amiga_game_pack, amiga_game_pack_end, actor.sprite, actor.frame, part,
+                            actor.x, actor.y, actor.flip, sprite.data(), enemySpriteHeight))
+                        frameReady = false;
+                }
+                --bobCount;
+            }
+            for (unsigned channel = channels.used(); channel < 8; ++channel) {
+                Sprite& sprite = channel == 0 ? playerSprites[back]
+                    : actorSpriteAt(regularSprites, enemySprites[back], channel - 1);
+                sprite.hide();
+            }
             DW_PROFILE_PHASE(profileCopper);
             syncGameRows(gameDisplay[back], gameBitmap, back);
             if (bobCount)
-                drawGameplayBobs(renderer, gameDisplay[back], port.ringOrigin(), bobs, bobCount);
+                drawGameplayBobs(renderer, gameDisplay[back], port.ringOrigin(), actors, bobCount);
             if (frameReady &&
                 !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], port.ringOrigin()) :
                   gameplayCopperLists[back].build(
@@ -2192,8 +2198,10 @@ int main(void) {
                     gameplayRegularSpriteCount,
                     enemySprites[back], palette, port.ringOrigin())))
                 frameReady = false;
-            if (!frameReady)
+            if (!frameReady) {
+                downwellGameplayRenderFailure();
                 break;
+            }
             gameListReady[back] = true;
             /* AmigaPlatform makes the published list live at next VBlank. */
             DW_PROFILE_PHASE(profilePublish);

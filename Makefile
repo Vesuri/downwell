@@ -323,6 +323,10 @@ verify-cross-replay: $(PORT_REPLAY_REFERENCE_TARGET)
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 .PHONY: verify-amiga-gameplay-cache
+.PHONY: verify-amiga-memory
+verify-amiga-memory:
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SKIP_TO_GAME=1'
+	bash -c '. amiga/env.sh && GDB_SOURCE=verify_memory.gdb READY_MARKER=DOWNWELL_MEMORY_READY READY_DESCRIPTION="startup Chip RAM budget" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-30} amiga/verify_startup.sh'
 .PHONY: verify-amiga-gameplay-bobs
 verify-amiga-gameplay-bobs:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SKIP_TO_GAME=1 SCENE_VERIFY=1 BOB_VERIFY=1'

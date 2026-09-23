@@ -1,7 +1,7 @@
 set pagination off
 set confirm off
 target remote 127.0.0.1:2345
-# BOB_VERIFY=1 exercises overflow even in sparse scenes; player stays in sprite 0.
+# BOB_VERIFY=1 exercises overflow for every actor, including the player.
 break downwellGameplayBobsReady
 continue
 if gDownwellGameplayBobChecks < 100 || gDownwellGameplayBobFailures != 0 || gDownwellGameBufferFailures != 0 || gDownwellTerrainRasterFailures != 0
