@@ -118,3 +118,25 @@ single-step behavior after camera jumps, full ordered Create-event payloads
 and complete RNG state against direct generation. An interleaved RNG test
 also confirms that gameplay random draws change later generated content:
 the current full-level forecast cannot be treated as the live world.
+
+`AmigaAreaOneTerrainBuilder` now provides the native incremental adapter with
+caller-owned buffers and an externally supplied RNG. Its existing full-level
+forecast caller uses the same adapter, preserving the pinned 4,770-draw
+forecast. A new native test compares every emitted fragment, enemy Create
+state (including grounded/active flags and alarms), decoration and full RNG
+state against individual shared-builder events, both with and without
+intervening random draws. Buffer overflow latches failure until an explicit
+reset so a partially emitted event cannot be replayed accidentally.
+
+This is not yet live-game integration: the playable runtime still forecasts
+the level. Remaining integration must update collision availability and the
+terrain raster cache as fragments arrive, and invoke generation between the
+existing-enemy alarm phase and the post-scheduler bullet/enemy updates. Newly
+created enemies must not have alarms aged on their creation tick. The source
+reference's `stepInternal` runs the event scheduler, flushes deferred creates,
+then runs bullets, enemies, interactions, currency and lifecycle in that order.
+
+Verification of the adapter refactor: full host suite passed; the bounded A500
+gameplay-cache run passed 600 ticks and 146 fresh-composition comparisons.
+These checks preserve the existing forecast renderer, not yet SDL/live-world
+parity. The ordinary `SKIP_TO_GAME=1` executable is restored after verification.

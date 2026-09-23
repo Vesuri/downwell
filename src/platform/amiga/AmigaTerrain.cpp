@@ -25,16 +25,6 @@ bool amigaBuildInitialAreaOneTerrain(
 }
 
 namespace {
-struct BuildContext {
-    AmigaTerrainEnemy* enemies;
-    unsigned enemyCapacity;
-    unsigned enemyCount;
-    AmigaTerrainDecoration* decorations;
-    unsigned decorationCapacity;
-    unsigned decorationCount;
-    bool overflowed;
-};
-
 int decorationSprite(int objectId) {
     if (objectId == 289) return 550;
     if (objectId == 293) return 569;
@@ -43,19 +33,20 @@ int decorationSprite(int objectId) {
     if (objectId == 306) return 127;
     return -1;
 }
+}
 
-bool collectGeneratedObject(
+bool AmigaAreaOneTerrainBuilder::collect(
     void* opaque, const downwell::DeferredCreateInstance& command) {
-    BuildContext& context = *static_cast<BuildContext*>(opaque);
+    auto& context = *static_cast<AmigaAreaOneTerrainBuilder*>(opaque);
     const bool enemy = command.objectId == 111 || command.objectId == 112 ||
                        command.objectId == 113 || command.objectId == 116 ||
                        command.objectId == 117 || command.objectId == 119;
-    if (enemy && context.enemies != 0) {
-        if (context.enemyCount >= context.enemyCapacity) {
-            context.overflowed = true;
+    if (enemy && context.enemies_ != 0) {
+        if (context.enemyCount_ >= context.enemyCapacity_) {
+            context.failed_ = true;
             return false;
         }
-        AmigaTerrainEnemy& output = context.enemies[context.enemyCount++];
+        AmigaTerrainEnemy& output = context.enemies_[context.enemyCount_++];
         output.objectId = command.objectId;
         output.x = command.x - 240;
         output.y = command.y - 176;
@@ -67,15 +58,17 @@ bool collectGeneratedObject(
         output.auxiliaryState = command.auxiliaryState;
         output.alarm0 = command.alarms.get(0);
         output.alarm1 = command.alarms.get(1);
+        output.grounded = command.grounded;
+        output.active = command.active;
     }
     const int spriteId = decorationSprite(command.objectId);
-    if (spriteId >= 0 && context.decorations != 0) {
-        if (context.decorationCount >= context.decorationCapacity) {
-            context.overflowed = true;
+    if (spriteId >= 0 && context.decorations_ != 0) {
+        if (context.decorationCount_ >= context.decorationCapacity_) {
+            context.failed_ = true;
             return false;
         }
         AmigaTerrainDecoration& output =
-            context.decorations[context.decorationCount++];
+            context.decorations_[context.decorationCount_++];
         output.objectId = command.objectId;
         output.spriteId = spriteId;
         output.x = command.x;
@@ -85,6 +78,47 @@ bool collectGeneratedObject(
     }
     return true;
 }
+
+AmigaAreaOneTerrainBuilder::AmigaAreaOneTerrainBuilder(
+    AmigaTerrainFragment* fragments, unsigned fragmentCapacity,
+    AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
+    AmigaTerrainDecoration* decorations, unsigned decorationCapacity)
+    : fragments_(fragments), fragmentCapacity_(fragmentCapacity),
+      enemies_(enemies), enemyCapacity_(enemyCapacity),
+      decorations_(decorations), decorationCapacity_(decorationCapacity) {}
+
+void AmigaAreaOneTerrainBuilder::resetInitialCheckpoint(
+    downwell::GameMakerRandom& random) {
+    // Captured at the initial main-room entry, before any builder Step event.
+    random.setSeed(2);
+    for (unsigned draw = 0; draw < 470; ++draw) random.nextU32();
+    builder_.restoreInitialCheckpoint(240, 704, -30, 3, 7);
+    fragmentCount_ = enemyCount_ = decorationCount_ = 0;
+    failed_ = false;
+}
+
+bool AmigaAreaOneTerrainBuilder::stepVisible(
+    const downwell::BuilderPatternPack& patterns,
+    downwell::GameMakerRandom& random, int viewBottomCeiling,
+    downwell::AreaOneBuilderStep& result) {
+    result = downwell::AreaOneBuilderStep{};
+    if (failed_) return false;
+    if (!builder_.stepVisible(patterns, random, viewBottomCeiling,
+                              collect, this, result)) {
+        failed_ = true;
+        return false;
+    }
+    if (!result.patternGenerated) return true;
+    downwell::PackedBuilderPattern pattern;
+    if (!fragments_ || fragmentCount_ >= fragmentCapacity_ ||
+        !patterns.findPattern(result.family, result.patternIndex, pattern)) {
+        failed_ = true;
+        return false;
+    }
+    fragments_[fragmentCount_++] = AmigaTerrainFragment{
+        pattern, result.patternY, result.reversed, result.sideRoom,
+        result.appendPillars};
+    return true;
 }
 
 int amigaEnemyHealth(int objectId) {
@@ -127,47 +161,22 @@ bool amigaBuildInitialAreaOneTerrain(
         *decorationCount = 0;
     if (fragments == 0 || capacity < amigaInitialTerrainFragmentCount)
         return false;
-    enum {
-        recoveredSeed = 2,
-        entranceRandomDraws = 470,
-        builderX = 240,
-        builderY = 704,
-        firstRightRoom = 3,
-        secondRightRoom = 7
-    };
-    downwell::GameMakerRandom random(recoveredSeed);
-    for (unsigned draw = 0; draw < entranceRandomDraws; ++draw)
-        random.nextU32();
-    downwell::AreaOneBuilder builder;
-    builder.restoreInitialCheckpoint(builderX, builderY, -30,
-                                     firstRightRoom, secondRightRoom);
-    BuildContext context = {
-        enemies, enemyCapacity, 0,
-        decorations, decorationCapacity, 0,
-        false
-    };
-    unsigned fragmentCount = 0;
+    downwell::GameMakerRandom random;
+    AmigaAreaOneTerrainBuilder builder(fragments, capacity, enemies,
+        enemyCapacity, decorations, decorationCapacity);
+    builder.resetInitialCheckpoint(random);
     for (unsigned step = 0; step < 64 && !builder.endReached(); ++step) {
         downwell::AreaOneBuilderStep result;
-        if (!builder.step(builders, random, collectGeneratedObject,
-                          &context, result))
+        // Forecast only: force one event at a time without live enemy events.
+        if (!builder.stepVisible(builders, random, builder.frontierY() - 127,
+                                 result))
             return false;
-        if (!result.patternGenerated)
-            continue;
-        if (fragmentCount >= capacity)
-            return false;
-        downwell::PackedBuilderPattern pattern;
-        if (!builders.findPattern(result.family, result.patternIndex, pattern))
-            return false;
-        fragments[fragmentCount++] = AmigaTerrainFragment{
-            pattern, result.patternY, result.reversed, result.sideRoom,
-            result.appendPillars};
     }
-    enemyCount = context.enemyCount;
+    enemyCount = builder.enemyCount();
     if (decorationCount != 0)
-        *decorationCount = context.decorationCount;
-    const bool valid = !context.overflowed && builder.endReached() &&
-        fragmentCount == amigaInitialTerrainFragmentCount &&
+        *decorationCount = builder.decorationCount();
+    const bool valid = !builder.failed() && builder.endReached() &&
+        builder.fragmentCount() == amigaInitialTerrainFragmentCount &&
         random.drawCount() == 4770;
     if (valid && randomAfter != 0)
         *randomAfter = random;

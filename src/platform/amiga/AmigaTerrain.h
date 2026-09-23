@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_TERRAIN_H
 
 #include "core/BuilderPatternPack.h"
+#include "core/AreaOneBuilder.h"
 #include "core/GameMakerRandom.h"
 #include "core/RoomPack.h"
 
@@ -33,6 +34,8 @@ struct AmigaTerrainEnemy {
     int auxiliaryState;
     int alarm0;
     int alarm1;
+    bool grounded;
+    bool active;
 };
 
 struct AmigaTerrainDecoration {
@@ -42,6 +45,42 @@ struct AmigaTerrainDecoration {
     int y;
     int frame;
     bool flipX;
+};
+
+// Allocation-free live generator. Storage is owned by the caller; the random
+// stream is supplied on every tick so enemy events and generation share it.
+// A failed emission latches failure: partial Create events must not be retried.
+class AmigaAreaOneTerrainBuilder {
+public:
+    AmigaAreaOneTerrainBuilder(
+        AmigaTerrainFragment* fragments, unsigned fragmentCapacity,
+        AmigaTerrainEnemy* enemies = nullptr, unsigned enemyCapacity = 0,
+        AmigaTerrainDecoration* decorations = nullptr,
+        unsigned decorationCapacity = 0);
+    void resetInitialCheckpoint(downwell::GameMakerRandom& random);
+    bool stepVisible(const downwell::BuilderPatternPack& patterns,
+                     downwell::GameMakerRandom& random, int viewBottomCeiling,
+                     downwell::AreaOneBuilderStep& result);
+    unsigned fragmentCount() const { return fragmentCount_; }
+    unsigned enemyCount() const { return enemyCount_; }
+    unsigned decorationCount() const { return decorationCount_; }
+    int frontierY() const { return builder_.y(); }
+    bool endReached() const { return builder_.endReached(); }
+    bool failed() const { return failed_; }
+
+private:
+    static bool collect(void*, const downwell::DeferredCreateInstance&);
+    downwell::AreaOneBuilder builder_;
+    AmigaTerrainFragment* fragments_;
+    unsigned fragmentCapacity_;
+    AmigaTerrainEnemy* enemies_;
+    unsigned enemyCapacity_;
+    AmigaTerrainDecoration* decorations_;
+    unsigned decorationCapacity_;
+    unsigned fragmentCount_ = 0;
+    unsigned enemyCount_ = 0;
+    unsigned decorationCount_ = 0;
+    bool failed_ = false;
 };
 
 struct AmigaTerrainCollisionContext {
