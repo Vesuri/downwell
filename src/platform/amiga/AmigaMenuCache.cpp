@@ -145,13 +145,13 @@ bool amigaRenderMenuTitle(UWORD frame,
      * by the original menu path and therefore means clear the title area.
      */
     foregroundBitmap.clear(264, 129, 128, 32);
-    entryBitmap.clear(16, 413, 128, 32);
+    entryBitmap.clear(264 - amigaMenuEntryWorldX, 413, 128, 32);
     if (frame != 0 &&
         (!drawMonochrome(foregroundBitmap, pack, packEnd,
                          alignedMenuTitleSprite, frame,
                          328, 145) ||
-         !drawMonochrome(entryBitmap, pack, packEnd, 654, frame,
-                         80, 429)))
+         !drawMonochrome(entryBitmap, pack, packEnd, alignedMenuTitleSprite, frame,
+                         328 - amigaMenuEntryWorldX, 429)))
         return false;
     AmigaHardware::blitterDrain();
     return true;

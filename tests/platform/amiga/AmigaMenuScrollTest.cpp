@@ -22,10 +22,10 @@ int main() {
             "extra scrolling word is fetched left of the 160-pixel window");
     require(amigaMenuModulo == 42,
             "intro modulo skips the unused cached row bytes");
-    require(amigaMenuEntryWidth == 176 &&
-                amigaMenuEntryBytesPerRow == 22 &&
-                amigaMenuEntryPlaneBytes == 25344,
-            "entry cache is one exact eleven-word fetch wide");
+    require(amigaMenuEntryWidth == 192 &&
+                amigaMenuEntryBytesPerRow == 24 &&
+                amigaMenuEntryPlaneBytes == 27648,
+            "entry cache retains horizontal alignment slack");
 
     AmigaMenuScrollState state = amigaMenuScrollState(0, 284);
     require(state.foregroundOffset == 0 &&
@@ -50,11 +50,23 @@ int main() {
     require(state.scrollControl == 0xff,
             "word-aligned parallax offsets use the full delay");
 
-    require(amigaMenuEntryOffset(306) == 306 * 22 &&
-                amigaMenuEntryOffset(858) == 858 * 22 &&
-                amigaMenuEntryOffset(2000) == (1152 - 284) * 22,
+    require(amigaMenuEntryOffset(306) == 306 * 24 &&
+                amigaMenuEntryOffset(858) == 858 * 24 &&
+                amigaMenuEntryOffset(2000) == (1152 - 284) * 24,
             "entry pointer follows and clamps the recovered vertical camera");
 
+    for (int x = 240; x <= 256; ++x) {
+        const auto garden = amigaMenuScrollState(x, 306);
+        const auto entry = amigaMenuEntryScrollState(x, 306);
+        require(garden.scrollControl == entry.scrollControl &&
+                    garden.backgroundOffset == entry.backgroundOffset,
+                "entry retains fine scroll and background without a jump");
+        const int sourceX = amigaMenuEntryWorldX +
+            (entry.foregroundOffset % 24) * 8 + (15 - (entry.scrollControl & 15));
+        require(sourceX == x, "entry cache maps to the same world x");
+    }
+    require(amigaMenuEntryScrollState(248, 858).backgroundOffset == 78 * 64 + 4,
+            "background keeps scrolling during deep entry");
     std::cout << "Amiga menu hardware-scroll tests passed\n";
     return 0;
 }

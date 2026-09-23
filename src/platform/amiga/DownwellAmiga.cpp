@@ -1327,33 +1327,24 @@ int main(void) {
                     }
                     if (menuFrameReady) {
                         DW_PROFILE_PHASE(profileCopper);
-                        if (menuEntry) {
-                            if (menuCopperMode[back] != 1)
-                                menuFrameReady =
-                                menuCopperLists[back].buildEntry(
-                                memory.menuEntry(),
-                                nullSprite, palette,
-                                scenes.menuCameraY() - 142);
-                            else
-                                menuFrameReady = menuCopperLists[back].updateEntry(
-                                    memory.menuEntry(), scenes.menuCameraY() - 142);
-                        } else {
-                            DW_PROFILE_PHASE(profileScroll);
-                            menuScroll = amigaMenuScrollState(
-                                scenes.menuCameraX() - 80,
-                                scenes.menuCameraY() - 142);
-                            DW_PROFILE_PHASE(profileCopper);
-                            if (menuCopperMode[back] != 0)
-                                menuFrameReady =
-                                menuCopperLists[back].buildScroll(
-                                memory.menuForeground(), memory.menuBackground(), nullSprite,
-                                nullSprite, palette, menuScroll);
-                            menuFrameReady = menuFrameReady &&
-                                menuCopperLists[back].updateScroll(
-                                    memory.menuForeground(), memory.menuBackground(),
-                                    menuPlayerData, menuScroll);
-                        }
-                        menuCopperMode[back] = menuEntry ? 1 : 0;
+                        DW_PROFILE_PHASE(profileScroll);
+                        menuScroll = menuEntry
+                            ? amigaMenuEntryScrollState(scenes.menuCameraX() - 80,
+                                                        scenes.menuCameraY() - 142)
+                            : amigaMenuScrollState(scenes.menuCameraX() - 80,
+                                                   scenes.menuCameraY() - 142);
+                        const UBYTE* foreground = menuEntry
+                            ? memory.menuEntry() : memory.menuForeground();
+                        DW_PROFILE_PHASE(profileCopper);
+                        if (menuCopperMode[back] != 0)
+                            menuFrameReady = menuCopperLists[back].buildScroll(
+                                foreground, memory.menuBackground(), nullSprite,
+                                nullSprite, palette, menuScroll, menuEntry);
+                        menuFrameReady = menuFrameReady &&
+                            menuCopperLists[back].updateScroll(
+                                foreground, memory.menuBackground(),
+                                menuPlayerData, menuScroll, menuEntry);
+                        menuCopperMode[back] = 0;
                     }
                     if (!menuFrameReady)
                         break;
@@ -1362,12 +1353,10 @@ int main(void) {
                     UWORD oracleWords[downwellCopperWords];
                     DownwellMenuCopperList oracle(oracleWords, downwellCopperWords);
                     Sprite oraclePlayer(menuPlayerData, playerSpriteHeight);
-                    const bool oracleReady = menuEntry
-                        ? oracle.buildEntry(memory.menuEntry(), nullSprite, palette,
-                                            scenes.menuCameraY() - 142)
-                        : oracle.buildScroll(memory.menuForeground(),
+                    const bool oracleReady = oracle.buildScroll(
+                                             menuEntry ? memory.menuEntry() : memory.menuForeground(),
                                              memory.menuBackground(), oraclePlayer,
-                                             nullSprite, palette, menuScroll);
+                                             nullSprite, palette, menuScroll, menuEntry);
                     if (!oracleReady || oracle.size() != menuCopperLists[back].size())
                         ++gDownwellMenuCopperPatchFailures;
                     else for (unsigned word = 0; word < oracle.size(); ++word)
@@ -1433,9 +1422,12 @@ int main(void) {
                     }
                     if (!sceneMenuEntryReported && menuEntry) {
                         sceneMenuEntryReported = true;
-                        gDownwellMenuEntryFrame = memory.menuEntry() +
-                            amigaMenuEntryOffset(
-                                scenes.menuCameraY() - 142);
+                        gDownwellMenuEntryFrame = memory.menuEntry();
+                        gDownwellMenuFrameCapture.foregroundOffset = menuScroll.foregroundOffset;
+                        gDownwellMenuFrameCapture.backgroundOffset = menuScroll.backgroundOffset;
+                        gDownwellMenuFrameCapture.scrollControl = menuScroll.scrollControl;
+                        gDownwellMenuFrameCapture.titlePartCount = 0;
+                        gDownwellMenuBackground = memory.menuBackground();
                         gDownwellMenuEntryTitlePartCount = 0;
                         downwellMenuEntryFrameReady();
                         downwellMenuEntryScrollReady();

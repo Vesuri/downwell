@@ -188,8 +188,8 @@ against the previous pixel-builder representation. This is the garden path;
 gameplay's generic sprite builder remains a separate migration task.
 
 Garden copper programs are built once per buffer/mode. Following the reference
-ports' indexed-update pattern, the active frame patches only seven value words
-(two plane pointers, BPLCON1, sprite pointer); vertical entry patches two.
+ports' indexed-update pattern, the active frame patches only eight value words
+(two plane pointers, BPLCON1, sprite pointer, foreground modulo), including entry.
 Palette and register-address words are retained. Scene-verification builds
 compare every patched program with a freshly emitted oracle; normal builds do
 not perform that comparison. The wake sprite is also checked against the old
@@ -198,17 +198,17 @@ The wake capture hash was re-established against an isolated build of commit
 9da283c: its capture and the optimized capture are byte-identical; the earlier
 stored hash was stale.
 
-`make verify-amiga-menu-title-frame` extends the same reconstruction with all
-seven hardware-sprite strips of the fully revealed Downwell logo.  Its pinned
-capture proves the logo is present and centered while the goal-stopped player
-is correctly absent, before the vertical well-entry renderer takes over.
+`make verify-amiga-menu-title-frame` captures the revealed Downwell logo in
+the foreground cache, with the goal-stopped player correctly absent.
 
-`make verify-amiga-menu-entry-frame` captures the first frame after that
-renderer takes over: one immutable 176-pixel shaft plane addressed directly at
-the current vertical camera position, plus the seven title sprite strips.  The
-decoded `build/amiga-menu-entry-frame.png` therefore guards the handoff from
-the independently scrolled garden planes to pointer-only vertical scrolling
-without introducing a repaint path.
+Well entry keeps the same two-plane garden copper program, horizontal fine
+scroll and parallax background. Only the foreground backing changes to the
+pre-rendered 192x1152 shaft cache at world x=240, with a 2-byte fetch modulo.
+The aligned origin preserves the settled camera x=248 without a sideways jump.
+`make verify-amiga-menu-entry-frame` captures both caches, the background and
+scroll state; its host verifier compares every visible foreground pixel across
+the handoff and confirms visible sky pixels. It also produces
+`build/amiga-menu-entry-frame.png`. Neither layer is repainted while descending.
 
 `make verify-amiga-gameplay-frame` stops on the first published frame where
 the player has landed.  It captures both 320-line circular game planes, both

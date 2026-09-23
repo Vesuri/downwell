@@ -82,7 +82,7 @@ AMIGA_CONTROLS_FRAME_SHA256 := ee3f455e6c9192d08f64ea26cf6b56338badf0dadeee56acf
 AMIGA_CREDITS_FRAME_SHA256 := 9e7137cae00e1925f0a61c045f23ed1571358e9e02451b2acf9db036453d3af1
 AMIGA_MENU_WAKE_FRAME_SHA256 := 5f84cd99630daab845d51ecda5709970caa5bb265364bee92b0be7cd229c45fa
 AMIGA_MENU_TITLE_FRAME_SHA256 := d9fcc0c40f37e61e239593aa8520a47415c054439283d7992264c40b63b39f2a
-AMIGA_MENU_ENTRY_FRAME_SHA256 := 8f9825392f36db030ae25be3cd3c0043f9013455cef47cec7aafee08d311a359
+AMIGA_MENU_ENTRY_FRAME_SHA256 := f734aa6e16f4014ddbba20d84a4ba871aa8eaa339f4bdf383bb0a25f33e20d2b
 AMIGA_GAMEPLAY_FRAME_SHA256 := c9e898e343f26402c28d12b7924020c2eeb69f3c461c99b81f4cd3fc434fb52e
 AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256 := cf37e9344e018aa57e38c8b899a5ab667f86f86e3bdd1b4c5f21b81e13659bd1
 AREA_ONE_TRACE_TARGET := build/trace-area-one
@@ -324,7 +324,7 @@ verify-amiga-menu-entry-frame:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_menu_entry_frame.gdb READY_MARKER=DOWNWELL_MENU_ENTRY_FRAME_READY READY_DESCRIPTION="first hardware-scrolled well-entry frame" amiga/verify_startup.sh'
 	printf '%s  %s\n' '$(AMIGA_MENU_ENTRY_FRAME_SHA256)' 'amiga/.run/menu-entry-frame.bin' | shasum -a 256 -c -
-	python3 tools/decode-amiga-menu-entry-frame.py amiga/.run/menu-entry-frame.bin build/amiga-menu-entry-frame.png
+	python3 tools/verify-amiga-entry-continuity.py
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 verify-amiga-gameplay-frame:

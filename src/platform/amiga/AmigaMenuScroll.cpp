@@ -49,3 +49,12 @@ std::uint32_t amigaMenuEntryOffset(int viewY) {
     return static_cast<std::uint32_t>(top) *
            amigaMenuEntryBytesPerRow;
 }
+
+AmigaMenuScrollState amigaMenuEntryScrollState(int viewX, int viewY) {
+    AmigaMenuScrollState state = amigaMenuScrollState(viewX, viewY);
+    const int x = clamp(viewX - amigaMenuEntryWorldX, 0,
+                        amigaMenuEntryWidth - amigaMenuFetchWords * 16);
+    state.foregroundOffset = amigaMenuEntryOffset(viewY) + (x >> 4) * 2;
+    state.scrollControl = (state.scrollControl & 0xf0) | (15 - (x & 15));
+    return state;
+}

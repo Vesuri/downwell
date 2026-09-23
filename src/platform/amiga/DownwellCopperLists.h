@@ -51,14 +51,13 @@ public:
     bool buildScroll(const UBYTE* foreground, const UBYTE* background,
                      const Sprite& playerSprite, const Sprite& nullSprite,
                      const Palette& palette,
-                     const AmigaMenuScrollState& scroll);
-    bool buildEntry(const UBYTE* entry, const Sprite& nullSprite,
-                    const Palette& palette, int viewY);
+                     const AmigaMenuScrollState& scroll, bool entry = false);
     bool updateScroll(const UBYTE* foreground, const UBYTE* background,
-                      const UWORD* player, const AmigaMenuScrollState& scroll);
-    bool updateEntry(const UBYTE* entry, int viewY);
+                      const UWORD* player, const AmigaMenuScrollState& scroll,
+                      bool entry = false);
 private:
     unsigned scrollOffset_, foregroundOffset_, backgroundOffset_, playerOffset_;
+    unsigned foregroundModuloOffset_;
 };
 
 class DownwellSplashCopperList : public CopperList {
