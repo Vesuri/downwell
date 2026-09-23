@@ -174,6 +174,7 @@ downwellMenuEntryScrollReady(void) {
 
 extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
+volatile const UBYTE* gDownwellLockedStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
 volatile const UBYTE* gDownwellCreditsFrame;
@@ -201,6 +202,10 @@ volatile const UWORD* gDownwellGameplayOverflowSprite;
 volatile UWORD gDownwellGameplayRingOrigin;
 
 __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellLockedStyleFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
@@ -257,14 +262,21 @@ downwellSceneGameplayActive(void) {
 #ifdef DOWNWELL_SCENE_VERIFY
 static downwell::Input sceneVerificationInput(
     const AmigaSceneRuntime& scenes, bool styleFrameReported,
+    bool lockedStyleFrameReported,
     bool gameplayLanded, const AmigaPortRuntime& port) {
     downwell::Input input;
     if (scenes.scene() == AmigaScene::menu)
         input.right = true;
     else if (scenes.scene() == AmigaScene::styleSelect &&
              scenes.styleYOffset() == 0 && styleFrameReported &&
-             !scenes.styleSelected())
-        input.fire = true;
+             !scenes.styleSelected()) {
+        if (!lockedStyleFrameReported)
+            input.right = scenes.styleCursor() == 0;
+        else if (scenes.styleCursor() != 0)
+            input.left = true;
+        else
+            input.fire = true;
+    }
     else if (scenes.scene() == AmigaScene::gameplay && gameplayLanded) {
         const unsigned movementPhase = (port.tick() / 120u) & 1u;
         input.right = movementPhase == 0;
@@ -1006,6 +1018,7 @@ int main(void) {
     bool sceneMenuEntryReported = false;
     bool sceneMenuWakeFrameReported = false;
     bool sceneStyleFrameReported = false;
+    bool sceneLockedStyleFrameReported = false;
     bool sceneSplashFrameReported = false;
     bool sceneControlsFrameReported = false;
     bool sceneCreditsFrameReported = false;
@@ -1304,6 +1317,7 @@ int main(void) {
 #ifdef DOWNWELL_SCENE_VERIFY
             const downwell::Input liveInput = sceneVerificationInput(
                 scenes, sceneStyleFrameReported,
+                sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
 #else
             const downwell::Input liveInput = AmigaInput::sample();
@@ -1544,6 +1558,17 @@ int main(void) {
                             memory.sceneCache() +
                                 back * amigaStyleFrameBytes;
                         downwellStyleFrameReady();
+                    }
+                    if (!sceneLockedStyleFrameReported &&
+                        sceneStyleFrameReported &&
+                        scenes.styleYOffset() == 0 &&
+                        scenes.styleCursor() == 1 &&
+                        !scenes.styleSelected()) {
+                        sceneLockedStyleFrameReported = true;
+                        gDownwellLockedStyleFrame =
+                            memory.sceneCache() +
+                                back * amigaStyleFrameBytes;
+                        downwellLockedStyleFrameReady();
                     }
 #endif
                     continue;

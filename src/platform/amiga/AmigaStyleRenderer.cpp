@@ -133,8 +133,9 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
             const int drawX = 80 + style * 48 - smoothX;
             const int distance = drawX - 80;
             const int drawY = centerY - 14 - distance * distance / 200;
-            if (!draw(output, pack, packEnd, style == 0 ? 27 : 43,
-                      style == scenes.styleCursor()
+            const bool unlocked = style == 0;
+            if (!draw(output, pack, packEnd, unlocked ? 27 : 43,
+                      unlocked && style == scenes.styleCursor()
                           ? (UWORD)scenes.styleRunFrame() : 0,
                       drawX, drawY))
                 return false;

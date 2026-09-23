@@ -92,6 +92,12 @@ pinned SHA-256, decodes the visible 160-pixel aperture to
 style clipping, alignment, palette use, and text composition inspectable
 without relying on a host-window screenshot.
 
+`make verify-amiga-locked-style-frame` then moves the carousel to the locked
+second style and pins that complete raster independently.  The deterministic
+scene traversal now visits this state before returning to the default style;
+this guards the single-frame `sprLocked` resource, both selection arrows, the
+`LOCKED!` label, and the smoothed carousel offset.
+
 `make verify-amiga-menu-wake-frame` captures the first walking garden frame as
 the two immutable 512x384 cache planes, their independent pointer/fine-scroll
 state, and hardware sprite 0.  Its host decoder reconstructs the centered
