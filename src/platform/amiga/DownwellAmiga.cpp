@@ -1617,6 +1617,10 @@ int main(void) {
                         generatedDecorations, liveBuilder.decorationCount(),
                         &port, worldViewX, worldViewY);
                     if (presentedScene == AmigaScene::gameplay) {
+                        // Capture the entry frame's input, not the later first
+                        // simulation frame: a release between them must unlock.
+                        if (port.tick() == 0)
+                            port.initializeEntryInput((packedInput & 4) != 0);
                         drawFutureGameBlock(
                             &renderer, rooms, mainRoom, builders,
                             fragments, liveBuilder.fragmentCount(),

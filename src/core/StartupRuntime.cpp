@@ -1,5 +1,4 @@
 #include "StartupRuntime.h"
-#include "PlayerControls.h"
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
@@ -14,17 +13,6 @@
 #include <cmath>
 
 namespace downwell {
-
-namespace {
-struct FloatCollisionMath {
-    using Number = float;
-    static Number unit() { return 1.0F; }
-    static Number round(Number value) {
-        return static_cast<float>(roundGameMakerCoordinate(value));
-    }
-    static Number ceilAbs(Number value) { return std::ceil(std::abs(value)); }
-};
-}
 
 StartupRuntime::StartupRuntime(PlatformProfile profile,
                                const RoomPack* roomPack,
@@ -109,6 +97,9 @@ void StartupRuntime::reset(PlatformProfile profile) {
     playMenuPlayerSpeedY_ = 0.0F;
     playMenuVerticalDitherY_ = -320.0F;
     mainPlayerInitialized_ = false;
+    mainPlayerMotion_ = PlayerMotion(false);
+    mainPlayerOriginX_ = 240;
+    mainPlayerOriginY_ = 176;
     mainPlayerX_ = 240.0F;
     mainPlayerY_ = 176.0F;
     mainPlayerSpeedX_ = 0.0F;
@@ -423,29 +414,6 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
     instance.imageSpeed = menuPlayerImageSpeed_;
 }
 
-bool StartupRuntime::mainPlayerCollides(float x, float y) const {
-    // objPlayer_n keeps sprPlayerIdle as its collision mask: an 8x12 box at
-    // offsets (-4,-4)..(+3,+7). objWall_n and objBox_n use the recovered
-    // 16x16 mask centered on each room position.
-    const float playerLeft = x - 4.0F;
-    const float playerRight = x + 3.0F;
-    const float playerTop = y - 4.0F;
-    const float playerBottom = y + 7.0F;
-    for (std::size_t index = 0; index < instances_.size(); ++index) {
-        const InstanceRecord& wall = instances_.at(index);
-        if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
-            continue;
-        const float wallLeft = wall.x - 8.0F;
-        const float wallRight = wall.x + 7.0F;
-        const float wallTop = wall.y - 8.0F;
-        const float wallBottom = wall.y + 7.0F;
-        if (playerRight >= wallLeft && playerLeft <= wallRight &&
-            playerBottom >= wallTop && playerTop <= wallBottom)
-            return true;
-    }
-    return false;
-}
-
 bool StartupRuntime::mainSolidAt(float x, float y) const {
     // A solid tile covers all sixteen pixel cells. Testing fractional
     // coordinates against inclusive integer bounds left subpixel cracks
@@ -461,49 +429,6 @@ bool StartupRuntime::mainSolidAt(float x, float y) const {
             return true;
     }
     return false;
-}
-
-bool StartupRuntime::moveMainPlayerAxis(float amount, bool horizontal) {
-    if (!horizontal && amount < 0.0F) {
-        const int hit = resolveVerticalSolidCollision<FloatCollisionMath>(
-            mainPlayerX_, mainPlayerY_, amount,
-            [this](float x, float y) { return mainPlayerCollides(x, y); });
-        if (hit < 0) return false;
-        mainPlayerY_ += amount;
-        return true;
-    }
-    float remaining = amount;
-    while (std::abs(remaining) > 0.0001F) {
-        const float move = remaining > 0.0F
-                               ? std::min(1.0F, remaining)
-                               : std::max(-1.0F, remaining);
-        const float nextX = mainPlayerX_ + (horizontal ? move : 0.0F);
-        const float nextY = mainPlayerY_ + (horizontal ? 0.0F : move);
-        if (!horizontal && move > 0.0F) {
-            for (std::size_t index = 0; index < instances_.size(); ++index) {
-                const InstanceRecord& platform = instances_.at(index);
-                float landingY = mainPlayerY_;
-                // Solid walls/boxes and one-way platforms use the same
-                // downward top-contact probe. Other axes retain solid-only
-                // collision handling below.
-                if (platform.active && (platform.objectId == 93 ||
-                        platform.objectId == 60 || platform.objectId == 92) &&
-                    resolveDownwardTopContact(
-                        mainPlayerX_, mainPlayerY_, nextY,
-                        static_cast<float>(platform.x),
-                        static_cast<float>(platform.y), landingY)) {
-                    mainPlayerY_ = landingY;
-                    return false;
-                }
-            }
-        }
-        if (mainPlayerCollides(nextX, nextY))
-            return false;
-        mainPlayerX_ = nextX;
-        mainPlayerY_ = nextY;
-        remaining -= move;
-    }
-    return true;
 }
 
 InstanceRecord* StartupRuntime::mainBulletCollision(float x, float y) {
@@ -536,14 +461,7 @@ InstanceRecord* StartupRuntime::mainBulletEnemyCollision(float x, float y) {
     return nullptr;
 }
 
-void StartupRuntime::fireMainGun(InstanceRecord& instance) {
-    if (mainAmmo_ <= 0) {
-        if (mainPlayerSpeedY_ > 3.0F)
-            mainPlayerSpeedY_ = 3.0F;
-        mainShotDelayed_ = true;
-        instance.alarms.set(2, 16);
-        return;
-    }
+void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
     if (mainBulletCount_ < mainBulletCapacity) {
         mainBullets_[mainBulletCount_++] = {
             static_cast<float>(instance.x + mainShootLeg_),
@@ -551,14 +469,24 @@ void StartupRuntime::fireMainGun(InstanceRecord& instance) {
         };
     }
     mainShootLeg_ *= -1;
-    if (mainPlayerSpeedY_ > 0.0F)
-        mainPlayerSpeedY_ = 0.0F; // Default machine-gun recoil is zero.
-    --mainAmmo_;
-    ++mainShotsFired_;
     ++soundPlayRequests_;
-    mainAirborneShot_ = true;
-    mainShotDelayed_ = true;
-    instance.alarms.set(2, 7);
+}
+
+void StartupRuntime::syncMainPlayerState() {
+    mainPlayerX_ = mainPlayerOriginX_ + mainPlayerMotion_.offsetXFixed() / 256.0F;
+    mainPlayerY_ = mainPlayerOriginY_ + mainPlayerMotion_.offsetYFixed() / 256.0F;
+    mainPlayerSpeedX_ = mainPlayerMotion_.speedXFixed() / 256.0F;
+    mainPlayerSpeedY_ = mainPlayerMotion_.speedYFixed() / 256.0F;
+    mainPlayerGrounded_ = mainPlayerMotion_.grounded();
+    mainPlayerFacing_ = mainPlayerMotion_.facing();
+    mainPlayerSpriteId_ = mainPlayerMotion_.spriteId();
+    mainPlayerImageIndex_ = static_cast<float>(mainPlayerMotion_.spriteFrame());
+    mainJumpShootLocked_ = mainPlayerMotion_.jumpShootLocked();
+    mainShotDelayed_ = mainPlayerMotion_.shotDelayed();
+    mainAirborneShot_ = mainPlayerMotion_.airborneShot();
+    mainAmmo_ = mainPlayerMotion_.ammo();
+    mainJumps_ = mainPlayerMotion_.jumps();
+    mainShotsFired_ = mainPlayerMotion_.shots();
 }
 
 void StartupRuntime::updateMainBullets() {
@@ -863,21 +791,18 @@ void StartupRuntime::updateMainEnemyInteractions() {
             enemy.health = 0;
             enemy.active = false;
             ++mainEnemiesDefeated_;
-            mainPlayerGrounded_ = false;
-            mainPlayerSpeedY_ = -2.5F;
-            mainAmmo_ = 8;
+            mainPlayerMotion_.stompBounce();
+            syncMainPlayerState();
             ++soundPlayRequests_;
             continue;
         }
         if (mainPlayerInvulnerability_ == 0 && mainPlayerHealth_ > 0) {
             --mainPlayerHealth_;
             mainPlayerInvulnerability_ = 90;
-            const float dx = mainPlayerX_ - enemy.preciseX;
-            const float dy = mainPlayerY_ - enemy.preciseY;
-            const float distance = std::sqrt(dx * dx + dy * dy);
-            mainPlayerSpeedX_ = distance > 0.001F ? dx / distance * 3.0F : 0.0F;
-            mainPlayerSpeedY_ = -2.0F;
-            mainPlayerGrounded_ = false;
+            mainPlayerMotion_.contactKnockback(
+                static_cast<int>(roundGameMakerCoordinate(enemy.preciseX)) - mainPlayerOriginX_,
+                static_cast<int>(roundGameMakerCoordinate(enemy.preciseY)) - mainPlayerOriginY_);
+            syncMainPlayerState();
             ++soundPlayRequests_;
         }
     }
@@ -1306,80 +1231,62 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         }
     }
 
-    const bool wasGrounded = mainPlayerGrounded_;
-    mainPlayerSpeedY_ = std::min(7.0F, mainPlayerSpeedY_ + 0.2F);
-    if (inputFireReleased_) {
-        if (mainPlayerSpeedY_ < 0.0F)
-            mainPlayerSpeedY_ *= 0.5F;
-        mainJumpShootLocked_ = false;
-        mainShotDelayed_ = false; // pBulDelayKill is set for the default gun.
-    }
-    applyPlayerHorizontalInput<FloatPlayerMath>(mainPlayerSpeedX_, mainPlayerFacing_,
-        wasGrounded, inputLeft_, inputRight_, controlsLocked_);
-
-    if (!controlsLocked_ && inputFirePressed_ && mainPlayerGrounded_) {
-        // The shared up/fire button calls scrJump while grounded. It does not
-        // emit a bullet until the button is released and pressed in the air.
-        mainPlayerSpeedY_ = -4.4F;
-        mainPlayerGrounded_ = false;
-        mainJumpShootLocked_ = true;
-        ++mainJumps_;
-        ++soundPlayRequests_;
-    }
-
-    if (inputFire_ && !mainPlayerGrounded_ && !mainShotDelayed_ &&
-        !mainJumpShootLocked_)
-        fireMainGun(instance);
-
-    if (!moveMainPlayerAxis(mainPlayerSpeedX_, true))
-        mainPlayerSpeedX_ = 0.0F;
-    mainPlayerGrounded_ = false;
-    if (!moveMainPlayerAxis(mainPlayerSpeedY_, false)) {
-        mainPlayerGrounded_ = mainPlayerSpeedY_ > 0.0F;
-        mainPlayerSpeedY_ = 0.0F;
-        if (!mainPlayerGrounded_) {
-            mainPlayerSpeedY_ = ceilingResponse<FloatCollisionMath>(
-                mainPlayerX_, mainPlayerY_, [this](float x, float y) {
-                    for (std::size_t i = 0; i < instances_.size(); ++i) {
-                        InstanceRecord& box = instances_.at(i);
-                        if (box.active && box.objectId == 92 && playerMaskMeetsBox(
-                                x, y, static_cast<float>(box.x),
-                                static_cast<float>(box.y), 1.0F)) {
-                            box.active = false;
-                            ++mainBlocksDestroyed_;
-                            ++soundPlayRequests_;
-                            return true;
-                        }
-                    }
-                    return false;
-                });
-            mainPlayerY_ += mainPlayerSpeedY_;
+    const bool wasGrounded = mainPlayerMotion_.grounded();
+    const unsigned priorShots = mainPlayerMotion_.shots();
+    const unsigned priorJumps = mainPlayerMotion_.jumps();
+    const int priorAmmo = mainPlayerMotion_.ammo();
+    // Rebind adapters per update so copying a runtime cannot leave callbacks
+    // pointing into the original instance store.
+    mainPlayerMotion_.configureSolidResolver([](void* context, int x, int y) {
+        const auto& runtime = *static_cast<StartupRuntime*>(context);
+        return runtime.mainSolidAt(x + runtime.mainPlayerOriginX_,
+                                   y + runtime.mainPlayerOriginY_);
+    }, this, 4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
+    mainPlayerMotion_.configureLandingResolver([](void* context, int x, int minimumY) {
+        const auto& runtime = *static_cast<StartupRuntime*>(context);
+        const int worldX = x + runtime.mainPlayerOriginX_;
+        int nearest = 100000;
+        for (std::size_t i = 0; i < runtime.instances_.size(); ++i) {
+            const auto& tile = runtime.instances_.at(i);
+            if (!tile.active || (tile.objectId != 60 && tile.objectId != 92 &&
+                                 tile.objectId != 93)) continue;
+            const int landing = tile.y - 16 - runtime.mainPlayerOriginY_;
+            if (landing >= minimumY && landing < nearest &&
+                worldX + 3 >= tile.x - 8 && worldX - 4 <= tile.x + 7)
+                nearest = landing;
         }
-    }
+        return nearest;
+    }, this);
+    mainPlayerMotion_.configureBreakBoxResolver([](void* context, long x, long y) {
+        auto& runtime = *static_cast<StartupRuntime*>(context);
+        for (std::size_t i = 0; i < runtime.instances_.size(); ++i) {
+            auto& box = runtime.instances_.at(i);
+            if (box.active && box.objectId == 92 && playerMaskMeetsBox(
+                    x, y, (long)(box.x - runtime.mainPlayerOriginX_) * 1280,
+                    (long)(box.y - runtime.mainPlayerOriginY_) * 1280, 1280L)) {
+                box.active = false;
+                ++runtime.mainBlocksDestroyed_;
+                ++runtime.soundPlayRequests_;
+                return true;
+            }
+        }
+        return false;
+    }, this);
+    Input input;
+    input.left = inputLeft_;
+    input.right = inputRight_;
+    input.fire = inputFire_;
+    mainPlayerMotion_.step(input, controlsLocked_);
+    mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
+        4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
+    mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);
+    mainPlayerMotion_.configureBreakBoxResolver(nullptr, nullptr);
+    syncMainPlayerState();
+    if (mainJumps_ != priorJumps) ++soundPlayRequests_;
+    if (mainShotsFired_ != priorShots) emitMainBullet(instance);
     if (!wasGrounded && mainPlayerGrounded_) {
         ++mainLandings_;
-        if (mainAmmo_ < 8) {
-            // scrWallCol calls scrRecharge on the airborne-to-grounded edge.
-            mainAmmo_ = 8;
-            ++soundPlayRequests_;
-        }
-    }
-
-    mainPlayerSpriteId_ = mainPlayerGrounded_ ? 31
-                                              : (mainAirborneShot_ ? 3 : 37);
-    if (mainPlayerGrounded_) {
-        mainPlayerImageIndex_ = 0.0F;
-        mainAirborneShot_ = false;
-    } else if (mainAirborneShot_) {
-        mainPlayerImageIndex_ = 0.0F;
-    } else if (mainPlayerSpeedY_ < 0.0F) {
-        mainPlayerImageIndex_ = std::abs(mainPlayerSpeedY_) >= 2.0F ? 0.0F : 1.0F;
-    } else if (mainPlayerSpeedY_ < 1.0F) {
-        mainPlayerImageIndex_ = 2.0F;
-    } else if (mainPlayerSpeedY_ < 2.0F) {
-        mainPlayerImageIndex_ = 3.0F;
-    } else {
-        mainPlayerImageIndex_ = 4.0F;
+        if (priorAmmo < mainAmmo_) ++soundPlayRequests_;
     }
     instance.x = static_cast<std::int32_t>(roundGameMakerCoordinate(mainPlayerX_));
     instance.y = static_cast<std::int32_t>(roundGameMakerCoordinate(mainPlayerY_));
@@ -1545,18 +1452,11 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 menuCameraY_ = menuPlayerY_;
             } else if (instance->roomId == mainRoomId) {
                 mainPlayerInitialized_ = true;
-                mainPlayerX_ = static_cast<float>(instance->x);
-                mainPlayerY_ = static_cast<float>(instance->y);
-                mainPlayerSpeedX_ = 0.0F;
-                mainPlayerSpeedY_ = 0.0F;
-                mainPlayerGrounded_ = false;
-                mainPlayerFacing_ = 1;
-                mainPlayerSpriteId_ = 37;
-                mainPlayerImageIndex_ = 2.0F;
-                mainJumpShootLocked_ = inputFire_;
-                mainShotDelayed_ = true;
-                mainAirborneShot_ = false;
-                mainAmmo_ = 8;
+                mainPlayerOriginX_ = instance->x;
+                mainPlayerOriginY_ = instance->y;
+                mainPlayerMotion_ = PlayerMotion(false);
+                mainPlayerMotion_.initializeEntryInput(inputFire_);
+                syncMainPlayerState();
                 mainPlayerHealth_ = 4;
                 mainPlayerInvulnerability_ = 0;
                 mainShootLeg_ = -1;
@@ -1574,7 +1474,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainGameGemTotal_ = 0;
                 mainGemStreak_ = 0;
                 mainGemStreakTimer_ = 0;
-                instance->alarms.set(2, 30);
+                // The shared player now owns the default gun's countdown.
             }
             // scrPlayerInit's full state comes later. These are the two
             // instance_create calls made directly by the recovered event.
@@ -1594,7 +1494,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 845: // gml_Object_objPlayer_n_Alarm_2
         ++implementedCodeCalls_;
-        mainShotDelayed_ = false;
+        // Countdown is owned by PlayerMotion, not a second host alarm.
         return;
     case 1002: // gml_Object_objBuilder_Create_0
         ++implementedCodeCalls_;
@@ -2197,6 +2097,11 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addF32(playMenuPlayerSpeedY_);
     digest.addF32(playMenuVerticalDitherY_);
     digest.addBool(mainPlayerInitialized_);
+    if (mainPlayerInitialized_) {
+        mainPlayerMotion_.appendStateDigest(digest);
+        digest.addI32(mainPlayerOriginX_);
+        digest.addI32(mainPlayerOriginY_);
+    }
     digest.addF32(mainPlayerX_);
     digest.addF32(mainPlayerY_);
     digest.addF32(mainPlayerSpeedX_);

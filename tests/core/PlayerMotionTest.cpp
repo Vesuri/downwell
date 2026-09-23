@@ -1,4 +1,5 @@
 #include "core/PlayerMotion.h"
+#include "core/StateDigest.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -33,6 +34,39 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    PlayerMotion entry(false, 10000);
+    entry.initializeEntryInput(false);
+    PlayerMotion shortDelay(false, 10000);
+    downwell::StateDigest entryDigest, shortDigest;
+    entry.appendStateDigest(entryDigest);
+    shortDelay.appendStateDigest(shortDigest);
+    require(entry.shotDelayed() && shortDelay.shotDelayed() &&
+            entry.offsetYFixed() == shortDelay.offsetYFixed() &&
+            entryDigest.value() != shortDigest.value(),
+            "authoritative digest distinguishes different countdowns behind identical display mirrors");
+    downwell::Input heldFire;
+    heldFire.fire = true;
+    for (unsigned i = 0; i < 29; ++i) entry.step(heldFire);
+    require(entry.shots() == 0 && entry.shotDelayed(),
+            "scrPlayerInit's thirty-frame gun delay is shared state");
+    entry.step(heldFire);
+    require(entry.shots() == 1, "the shared entry delay expires after thirty updates");
+    PlayerMotion heldEntry(false, 10000);
+    heldEntry.initializeEntryInput(true);
+    for (unsigned i = 0; i < 35; ++i) heldEntry.step(heldFire);
+    require(heldEntry.shots() == 0 && heldEntry.jumpShootLocked(),
+            "carrying held fire into a room cannot immediately shoot");
+    heldEntry.step(downwell::Input{});
+    heldEntry.step(heldFire);
+    require(heldEntry.shots() == 1 && !heldEntry.jumpShootLocked(),
+            "release unlocks shared entry gun state");
+    PlayerMotion locked;
+    downwell::Input lockedInput = heldFire;
+    lockedInput.right = true;
+    locked.step(lockedInput, true);
+    require(locked.offsetXFixed() == 0 && locked.jumps() == 0,
+            "source noControl suppresses horizontal control and jumping");
+
     PlayerMotion ceilingPlayer(true);
     ceilingPlayer.configureSolidResolver([](void*, int, int y) {
         return y <= -12;

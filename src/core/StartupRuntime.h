@@ -7,6 +7,7 @@
 #include "GameMakerRandom.h"
 #include "GameplayLimits.h"
 #include "Input.h"
+#include "PlayerMotion.h"
 #include <array>
 #include <cstdint>
 
@@ -216,10 +217,9 @@ private:
     void updateMainCamera(InstanceRecord& instance);
     void updateMainBuilder(InstanceRecord& instance);
     void syncMainBuilderState();
-    bool mainPlayerCollides(float x, float y) const;
+    void syncMainPlayerState();
     bool mainSolidAt(float x, float y) const;
-    bool moveMainPlayerAxis(float amount, bool horizontal);
-    void fireMainGun(InstanceRecord& instance);
+    void emitMainBullet(const InstanceRecord& instance);
     void updateMainBullets();
     void spawnMainCurrency(float x, float y, std::int32_t amount,
                            bool attracted = false);
@@ -320,6 +320,11 @@ private:
     float playMenuPlayerSpeedY_ = 0.0F;
     float playMenuVerticalDitherY_ = -320.0F;
     bool mainPlayerInitialized_ = false;
+    PlayerMotion mainPlayerMotion_{false};
+    int mainPlayerOriginX_ = 240;
+    int mainPlayerOriginY_ = 176;
+    // Presentation/diagnostic mirrors; only syncMainPlayerState writes these
+    // during simulation. PlayerMotion owns the actual player state.
     float mainPlayerX_ = 240.0F;
     float mainPlayerY_ = 176.0F;
     float mainPlayerSpeedX_ = 0.0F;

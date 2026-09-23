@@ -359,9 +359,12 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "rmMain camera follows the fall with recovered smoothing and bias");
         for (int tick = 0; tick < 20; ++tick)
             runtime.step(fallRight, false);
-        require(runtime.mainPlayerX() > 292.7F &&
-                    runtime.mainPlayerX() < 292.9F,
-                "the recovered masks stop the player at the shaft wall");
+        // The shared Q8 acceleration accumulates a different subpixel
+        // remainder from the removed float implementation (292.8). Assert
+        // the last clear mask pixel, not that obsolete remainder. The current
+        // axis adapter permits subpixel motion within this pixel.
+        require(static_cast<int>(runtime.mainPlayerX()) == 292,
+                "the shared player mask remains at the shaft wall's last clear pixel");
         downwell::Input fireMain;
         fireMain.fire = true;
         runtime.step(fireMain, true);
@@ -593,16 +596,17 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             }
         }
         // This is a tape-specific regression, not a Windows trajectory oracle.
-        // Corrected fractional floor contact changes the shared RNG schedule.
-        // scrRightPat1 pattern 6 contains J,v,O,_,@,{,}: seven special markers.
+        // Shared fixed-point motion changes the route feeding enemy/RNG timing.
+        // The migrated tape selects scrRightPat1 pattern 3, containing exactly
+        // v,O,_,@,{,}: six special markers, with unchanged generated row count.
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 6 &&
+                    runtime.mainBuilderLastRightPattern() == 3 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
                     runtime.mainBuilderRowsGenerated() == 95,
                 "the first scheduled side room preserves deterministic selection and rows");
-        require(runtime.mainBuilderSpecialObjectsGenerated() == 7,
+        require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
                 "every special marker in deterministic right-room pattern is interpreted");
         bool foundTorch = false;
         bool foundAmbience = false;
@@ -618,9 +622,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             foundRoomReward = foundRoomReward || instance.objectId == 293 ||
                               instance.objectId == 109;
         }
-        require(foundTorch && foundAmbience && foundTimeField &&
+        require(!foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
-                "pattern-specific side-room utility and reward objects retain recovered IDs");
+                "pattern 3 emits its utility/reward IDs but no I/J torch marker");
         // Side-room generation does not itself guarantee an enemy encounter.
         // Exercise combat explicitly instead of relying on the former route
         // through a subpixel floor gap to happen to produce a kill.

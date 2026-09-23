@@ -108,6 +108,10 @@ int main(int argc, char** argv) {
     require(direct.endReached() && incremental.endReached() &&
                 directCommands.size() == incrementalCommands.size(),
             "both schedules finish the complete level");
+    bool emittedTorch = false;
+    for (const auto& command : directCommands)
+        emittedTorch = emittedTorch || command.objectId == 296;
+    require(emittedTorch, "standalone builder tape retains I/J torch emission coverage");
     for (std::size_t i = 0; i < directCommands.size(); ++i)
         require(sameCommand(directCommands[i], incrementalCommands[i]),
                 "ordered emissions preserve every Create-event field including alarms");

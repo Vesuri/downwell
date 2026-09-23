@@ -112,6 +112,7 @@ public:
                               int landingOffset = 0,
                               bool followCamera = false);
     AmigaPortFrame step(std::uint8_t packedInput);
+    void initializeEntryInput(bool fireHeld) { player_.initializeEntryInput(fireHeld); }
     void configureLandingProfile(const int* offsets, unsigned count) {
         player_.configureLandingProfile(offsets, count);
     }

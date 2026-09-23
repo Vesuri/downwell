@@ -3,6 +3,8 @@
 
 #include "core/Input.h"
 
+namespace downwell { class StateDigest; }
+
 // Portable default-style player state/update, extracted from the native port.
 // Terrain is queried through callbacks; rendering and hardware are not owned
 // here. This is an adaptation, not a complete implementation of scrWallCol:
@@ -29,7 +31,12 @@ public:
 
     explicit PlayerMotion(bool startsGrounded = true,
                          int landingOffset = 0);
-    PlayerMotionDelta step(const downwell::Input& input);
+    PlayerMotionDelta step(const downwell::Input& input, bool controlsLocked = false);
+    void initializeEntryInput(bool fireHeld) {
+        priorFire_ = fireHeld;
+        jumpShootLocked_ = fireHeld;
+        shotDelay_ = 30; // scrPlayerInit alarm[2]
+    }
     void configureLandingProfile(const int* offsets, unsigned count);
     void configureLandingResolver(LandingResolver resolver, void* context) {
         landingResolver_ = resolver;
@@ -48,6 +55,10 @@ public:
     long offsetXFixed() const { return x_; }
     long offsetYFixed() const { return y_; }
     long speedXFixed() const { return speedX_; }
+    long speedYFixed() const { return speedY_; }
+    bool jumpShootLocked() const { return jumpShootLocked_; }
+    bool shotDelayed() const { return shotDelay_ != 0; }
+    bool airborneShot() const { return airborneShot_; }
     int ammo() const { return ammo_; }
     bool grounded() const { return grounded_; }
     int facing() const { return facing_; }
@@ -57,6 +68,7 @@ public:
     unsigned shots() const { return shots_; }
     void stompBounce();
     void contactKnockback(int enemyX, int enemyY);
+    void appendStateDigest(downwell::StateDigest& digest) const;
 
 private:
     static int fixedToPixel(long value);

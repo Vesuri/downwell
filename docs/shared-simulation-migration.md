@@ -5,12 +5,16 @@ The destination is one portable, 68000-compatible gameplay implementation in
 behavioral authority. Agreement between two independent adaptations is not a
 substitute for this architecture or original-game validation.
 
-Current debt: `StartupRuntime` and `AmigaPlayer`/`AmigaPortRuntime` still own
-separate gameplay state and update sequences. The native classes contain domain
-logic that does not belong under `src/platform`. Rendering/storage optimizations
-do not justify separate rules for movement, enemies, collision or combat.
+Current status: main-room player movement, gun/jump state, animation state and
+knockback now use `PlayerMotion` in both runtimes. World storage/adapters, enemy,
+bullet, reward, camera and menu simulation still need consolidation. Native
+world classes contain domain logic that does not belong under `src/platform`.
+Rendering/storage optimizations do not justify separate gameplay rules.
 
 ## First migration slice
+
+The sections below record the migration chronologically; later sections
+supersede the earlier descriptions of what remained unimplemented.
 
 `PlayerControls.h` owns the default non-water horizontal input rules and their
 constants. Both existing runtimes call it; their former rule branches have
@@ -143,3 +147,57 @@ Validation: full host suite passes; bounded cross-target replay still returns
 `64 bfbbd762 b9b62a59`, with clean 68000 instruction/helper audits. Both playable
 binaries were rebuilt. The extended combat failure remains unchanged at tick
 702; this box fixture does not resolve enemy/contact-state divergence.
+
+## SDL now executes PlayerMotion
+
+`StartupRuntime::updateMainPlayer` now calls the same `PlayerMotion::step` that
+Amiga calls. SDL's independent gravity, horizontal/vertical movement, jump,
+gun delay/recoil and animation-selection branches were removed. Stomps and
+contact knockback also update the shared player. Legacy SDL-facing fields are
+presentation/diagnostic mirrors populated by `syncMainPlayerState`, not a
+second simulation. Bullet creation and sound requests consume state transitions.
+
+SDL world adapters scan its existing instance store for solids, support and
+boxes. They are rebound on every update and cleared afterwards, so copying a
+runtime does not retain callbacks into the old instance store. The Amiga keeps
+its indexed terrain queries and hardware rendering backend. Both paths now use
+the same Q8 state; SDL no longer uses the transitional float control adapter.
+
+Source `scrPlayerInit` gun delay (30 updates), held-entry fire lock and
+`global.noControl` are explicit shared initialization/control inputs. The live
+Amiga entry now initializes these too; synthetic grounded replay fixtures keep
+their explicitly configured state. Entry lock/delay/control tests cover this.
+
+Regression changes are not new original-game oracles: the former SDL wall
+position 292.8 becomes 292.9375 with Q8 acceleration; both use clear mask pixel
+292. The wall assertion now checks that pixel rather than a float remainder.
+The longer tape selects right-room pattern 3 instead of 6, with the same row
+count and six rather than seven special markers. The recovered pattern 3 has
+no I/J torch, so its utility-object assertion reflects that; the independent
+builder tape retains an explicit torch-emission check. The generator itself
+was not modified. These checkpoints test the migrated simulation, not exact
+Windows RNG consumption for that route.
+
+The scene test now requires exact Q8 horizontal agreement throughout its main
+comparison tape and exact vertical agreement through entry, landing and the
+initial jump/shoot sequence, replacing former pixel tolerances. Later world
+adapter/camera tolerances remain explicit. Extended combat still first differs
+at health tick 702: enemy motion/contact decisions have not yet been unified.
+
+Known approximations in the shared player are not promoted to source truth:
+Q8 horizontal constants, the existing axis/support adapters instead of full
+two-axis VM collision order, integer knockback distance, and simplified box
+retirement remain fidelity work. Sharing these rules makes corrections apply
+to both backends; it does not by itself prove the rules correct.
+
+SDL replay hashing now includes the authoritative player's timers, sub-Q8
+residuals, animation phases and input locks, not merely its float mirrors. A
+unit fixture distinguishes two delayed guns with identical display fields but
+different countdowns; callback addresses are deliberately excluded.
+
+Migration validation: full host suite passes, with no change to the startup
+replay pin. Bounded 68000 cross-CPU replay retains `64 bfbbd762 b9b62a59`; the
+600-tick A500 terrain-cache oracle also passes with the live entry path. Both
+68000 audits are clean. SDL was rebuilt and the normal Amiga build restored
+after the skip-to-game verification. Extended combat remains a failing gate,
+not a suppressed or relaxed test.

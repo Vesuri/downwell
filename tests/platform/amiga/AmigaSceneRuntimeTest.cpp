@@ -205,7 +205,7 @@ void compareStyle(const AmigaSceneRuntime& amiga,
 
 void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             const downwell::StartupRuntime& reference,
-                            float playerYTolerance = 4.0F,
+                            float playerYTolerance = 0.0F,
                             float cameraYTolerance = 2.0F,
                             bool allowGroundingPhase = false) {
     require(reference.inMainRoom(),
@@ -298,10 +298,10 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             ++ordinal;
         }
     }
-    requireNear(static_cast<float>(240 + amiga.player().offsetX()),
-                reference.mainPlayerX(), 1.0F,
-                "gameplay player X follows decoded runtime");
-    requireNear(static_cast<float>(176 + amiga.player().offsetY()),
+    requireNear(240.0F + amiga.player().offsetXFixed() / 256.0F,
+                reference.mainPlayerX(), 0.0F,
+                "both backends execute identical fixed-point horizontal player state");
+    requireNear(176.0F + amiga.player().offsetYFixed() / 256.0F,
                 reference.mainPlayerY(), playerYTolerance,
                 "gameplay player Y follows decoded runtime");
     requireNear(static_cast<float>(160 + amiga.cameraOffsetX()),
@@ -563,6 +563,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "generated native enemy is configured from recovered data");
     }
     AmigaPortRuntime gameplay(300, false, 1201 - 176, true);
+    gameplay.initializeEntryInput(false);
     int builderOrder = -1, cameraOrder = -1;
     for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
         downwell::PackedObjectEvent event;

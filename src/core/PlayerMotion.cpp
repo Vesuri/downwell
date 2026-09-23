@@ -1,6 +1,7 @@
 #include "PlayerMotion.h"
 #include "core/PlayerControls.h"
 #include "core/SolidCollision.h"
+#include "core/StateDigest.h"
 
 namespace {
 enum {
@@ -90,7 +91,7 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
     grounded_ = false;
 }
 
-PlayerMotionDelta PlayerMotion::step(const downwell::Input& input)
+PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controlsLocked)
 {
     const int oldPixelX = pixelX_;
     const int oldPixelY = pixelY_;
@@ -122,7 +123,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input)
     }
 
     downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
-        speedX_, facing_, grounded_, input.left, input.right);
+        speedX_, facing_, grounded_, input.left, input.right, controlsLocked);
     if (solidResolver_ != 0) {
         long remaining = speedX_;
         while (remaining != 0) {
@@ -172,7 +173,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input)
             grounded_ = false;
     }
 
-    if (firePressed && grounded_) {
+    if (!controlsLocked && firePressed && grounded_) {
         grounded_ = false;
         speedY_ = jumpSpeed;
         gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
@@ -306,6 +307,30 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input)
     priorFire_ = input.fire;
     PlayerMotionDelta motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
     return motion;
+}
+
+void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
+{
+    // Serialize authoritative state, not float presentation mirrors or
+    // callback addresses. Timer/fraction differences affect future behavior.
+    digest.addI32(x_); digest.addI32(y_);
+    digest.addI32(speedX_); digest.addI32(speedY_);
+    digest.addI32(gravityRemainder_);
+    digest.addI32(verticalPositionRemainder_);
+    digest.addI32(landingY_);
+    digest.addI32(horizontalLeftLimit_); digest.addI32(horizontalRightLimit_);
+    digest.addBool(usesLandingProfile_);
+    if (usesLandingProfile_)
+        for (unsigned i = 0; i < landingProfileSize; ++i) digest.addI32(landingProfile_[i]);
+    digest.addI32(pixelX_); digest.addI32(pixelY_);
+    digest.addI32(ammo_); digest.addBool(grounded_);
+    digest.addBool(priorFire_); digest.addBool(jumpShootLocked_);
+    digest.addBool(airborneShot_); digest.addBool(running_);
+    digest.addU32(runPhaseTenths_); digest.addBool(idling_);
+    digest.addU32(idlePhaseTenths_); digest.addBool(balancing_);
+    digest.addU32(balancePhaseQuarters_); digest.addU32(shotPhaseQuarters_);
+    digest.addU32(shotDelay_); digest.addI32(facing_);
+    digest.addU32(jumps_); digest.addU32(shots_);
 }
 
 int PlayerMotion::spriteId() const
