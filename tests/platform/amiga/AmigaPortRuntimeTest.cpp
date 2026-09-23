@@ -33,6 +33,22 @@ bool crawlerCorner(void*, int x, int y) {
 } // namespace
 
 int main() {
+    static_assert(AmigaPortRuntime::bulletCapacity == 16,
+                  "bullet simulation capacity matches SDL, not DMA channels");
+    static_assert(AmigaPortRuntime::gemCapacity == 64,
+                  "gem simulation capacity matches SDL");
+    AmigaPortRuntime crowdedRewards(300);
+    require(crowdedRewards.configureEnemy(0, 111, 163, 0, 5,
+                                          0, 0, 5, 140),
+            "configure reward exceeding the former twelve-gem limit");
+    crowdedRewards.step(0);
+    require(crowdedRewards.gemCount() == 14,
+            "all physical reward gems survive beyond hardware sprite limits");
+    unsigned rewardTotal = 0;
+    for (unsigned i = 0; i < AmigaPortRuntime::gemCapacity; ++i)
+        if (crowdedRewards.gemAt(i).active)
+            rewardTotal += crowdedRewards.gemAt(i).amount;
+    require(rewardTotal == 140, "crowded rewards do not silently lose currency");
     AmigaPortRuntime runtime(300);
     const AmigaPortFrame jump = runtime.step(4);
     require(!jump.scrolled && !runtime.player().grounded() &&

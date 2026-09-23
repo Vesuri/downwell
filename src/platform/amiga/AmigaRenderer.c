@@ -387,6 +387,20 @@ void amigaRendererFillRect(AmigaRenderer* renderer,
     }
 }
 
+int amigaRendererAssetBounds(const UBYTE* pack, const UBYTE* packEnd,
+                             UWORD sprite, UWORD frame, int anchorX,
+                             int anchorY, int flipX, int* x, int* y,
+                             int* width, int* height) {
+    const UBYTE* record = findAsset(pack, packEnd, sprite, frame);
+    if (!record) return 0;
+    *width = readWord(record + 8);
+    *height = readWord(record + 10);
+    *x = flipX ? anchorX + (WORD)readWord(record + 4) - *width
+               : anchorX - (WORD)readWord(record + 4);
+    *y = anchorY - (WORD)readWord(record + 6);
+    return 1;
+}
+
 void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,

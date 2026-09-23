@@ -60,7 +60,8 @@ enum {
     /* Channels 1..6 are shared by bullets, enemies and gems each frame. */
     bulletSpriteHeight = 32,
     bulletSpriteBytes = (bulletSpriteHeight + 2) * 4,
-    bulletSpriteBufferCount = 2 * AmigaPortRuntime::bulletCapacity,
+    gameplayRegularSpriteCount = 6,
+    bulletSpriteBufferCount = 2 * gameplayRegularSpriteCount,
     enemySpriteHeight = 32,
     enemySpriteBytes = (enemySpriteHeight + 2) * 4,
     menuPlaneBytes = amigaMenuCacheBytesPerRow * amigaMenuCacheHeight,
@@ -161,6 +162,8 @@ volatile const UWORD* gDownwellStyleCopper;
 volatile ULONG gDownwellStyleReferenceFailures;
 volatile ULONG gDownwellStyleReferenceFrames;
 volatile ULONG gDownwellGameBufferFailures;
+volatile ULONG gDownwellGameplayBobChecks;
+volatile ULONG gDownwellGameplayBobFailures;
 volatile ULONG gDownwellTerrainRasterFailures;
 volatile ULONG gDownwellTerrainRasterChecks;
 volatile const UBYTE* gDownwellSplashFrame;
@@ -907,8 +910,69 @@ static void drawFutureGameBlock(
 
 static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                             unsigned index) {
-    return index < AmigaPortRuntime::bulletCapacity
+    return index < gameplayRegularSpriteCount
                ? regular[index] : overflow;
+}
+
+struct GameplayBob {
+    UWORD sprite, frame;
+    int x, y, flip;
+};
+
+#ifdef DOWNWELL_BOB_VERIFY
+extern "C" __attribute__((noinline)) void downwellGameplayBobsReady() {
+    __asm__ volatile("" ::: "memory");
+}
+#endif
+
+// Overflow actors are ordinary masked planar blits into the inactive display,
+// never into the pristine terrain backing. Only their touched rows are restored
+// before this display buffer is reused.
+static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
+                             unsigned origin, const GameplayBob* bobs,
+                             unsigned count) {
+    renderer.game = (UBYTE*)display.data;
+    renderer.target = renderer.game;
+    amigaRendererSetGameOrigin(&renderer, origin);
+    amigaRendererSetClipRect(&renderer, downwellPlayfieldX, 0,
+                             downwellPlayfieldWidth, downwellDisplayHeight);
+#ifdef DOWNWELL_SCENE_VERIFY
+    static UBYTE expected[downwellGameRingBytes];
+    for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
+        expected[byte] = renderer.game[byte];
+    AmigaRenderer oracle = renderer;
+    oracle.game = oracle.target = expected;
+    oracle.blitterEnabled = 0;
+#endif
+    for (unsigned i = 0; i < count; ++i) {
+        const GameplayBob& bob = bobs[i];
+        int x, y, width, height;
+        if (!amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
+                bob.sprite, bob.frame, bob.x, bob.y, bob.flip,
+                &x, &y, &width, &height)) continue;
+        if (x >= downwellPlayfieldX + downwellPlayfieldWidth ||
+            x + width <= downwellPlayfieldX || y >= downwellDisplayHeight ||
+            y + height <= 0) continue;
+        amigaRendererDrawAsset(&renderer, activeGamePack, activeGamePackEnd,
+                               bob.sprite, bob.frame, bob.x, bob.y, bob.flip);
+#ifdef DOWNWELL_SCENE_VERIFY
+        amigaRendererDrawAsset(&oracle, activeGamePack, activeGamePackEnd,
+                               bob.sprite, bob.frame, bob.x, bob.y, bob.flip);
+        ++gDownwellGameplayBobChecks;
+#endif
+        int bottom = y + height;
+        if (y < 0) y = 0;
+        if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+        dirtyGameRows(origin, y, bottom - y);
+    }
+    AmigaHardware::blitterDrain();
+#ifdef DOWNWELL_SCENE_VERIFY
+    for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
+        if (expected[byte] != renderer.game[byte]) ++gDownwellGameplayBobFailures;
+#ifdef DOWNWELL_BOB_VERIFY
+    if (gDownwellGameplayBobChecks >= 100) downwellGameplayBobsReady();
+#endif
+#endif
 }
 
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -916,12 +980,15 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
                                 unsigned ringOrigin) {
     gDownwellGameplayGame = (const UBYTE*)display.data;
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
-        if (gDownwellGameplayGame[byte] != memory.game()[byte])
+        // Dirty rows include deliberately drawn BOBs, unlike pristine backing.
+        if (!(gameDirtyRows[(byte % downwellGameRingPlaneBytes) /
+                           downwellBytesPerPlaneLine] & (1u << buffer)) &&
+            gDownwellGameplayGame[byte] != memory.game()[byte])
             ++gDownwellGameBufferFailures;
     gDownwellGameplayHud = memory.hud();
     gDownwellGameplayPlayerSprite = memory.playerSprite(buffer);
     gDownwellGameplayActorSprites = memory.bulletSprite() +
-        buffer * AmigaPortRuntime::bulletCapacity *
+        buffer * gameplayRegularSpriteCount *
             (bulletSpriteBytes / sizeof(UWORD));
     gDownwellGameplayOverflowSprite = memory.enemySprite(buffer);
     gDownwellGameplayRingOrigin = (UWORD)ringOrigin;
@@ -1263,7 +1330,7 @@ int main(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
         !gameplayCopperLists[dynamicCopper0].build(
             gameBitmap, hudBitmap, playerSprites[0], bulletSprites,
-            AmigaPortRuntime::bulletCapacity, enemySprites[0], palette,
+            gameplayRegularSpriteCount, enemySprites[0], palette,
             port.ringOrigin())
 #else
         !splashBlankList.buildNarrow(
@@ -1297,8 +1364,8 @@ int main(void) {
 #else
         nullSprite,
 #endif
-        bulletSprites + AmigaPortRuntime::bulletCapacity,
-        AmigaPortRuntime::bulletCapacity, enemySprites[1], palette,
+        bulletSprites + gameplayRegularSpriteCount,
+        gameplayRegularSpriteCount, enemySprites[1], palette,
         port.ringOrigin())) {
         platform.restore();
         memory.release();
@@ -1736,8 +1803,8 @@ int main(void) {
                             presentedScene == AmigaScene::gameplay
                                 ? playerSprites[back] : nullSprite,
                             bulletSprites + back *
-                                AmigaPortRuntime::bulletCapacity,
-                            AmigaPortRuntime::bulletCapacity,
+                                gameplayRegularSpriteCount,
+                            gameplayRegularSpriteCount,
                             enemySprites[back], palette,
                             port.ringOrigin()))
                         break;
@@ -1994,13 +2061,25 @@ int main(void) {
                            memory.playerSprite(back), playerSpriteHeight))
                 frameReady = false;
             unsigned actorCount = 0;
+#ifdef DOWNWELL_BOB_VERIFY
+            const unsigned actorLimit = 0;
+#else
+            const unsigned actorLimit = gameplayRegularSpriteCount + 1;
+#endif
+            static GameplayBob bobs[AmigaPortRuntime::bulletCapacity +
+                AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity];
+            unsigned bobCount = 0;
             Sprite* actorSprites = bulletSprites +
-                back * AmigaPortRuntime::bulletCapacity;
+                back * gameplayRegularSpriteCount;
             for (unsigned bullet = 0;
                  bullet < AmigaPortRuntime::bulletCapacity; ++bullet) {
                 const AmigaPortRuntime::BulletState& state =
                     port.bulletAt(bullet);
-                if (state.active) {
+                if (state.active && actorCount >= actorLimit) {
+                    bobs[bobCount++] = {459, 0,
+                        downwellPlayfieldX + 80 + state.x - port.cameraOffsetX(),
+                        gameplayPlayerStartY + state.y - port.cameraOffsetY(), 0};
+                } else if (state.active) {
                     Sprite& sprite = actorSpriteAt(
                         actorSprites, enemySprites[back], actorCount);
                     const int spriteResult =
@@ -2019,15 +2098,14 @@ int main(void) {
             }
 #ifndef DOWNWELL_REPLAY_VERIFY
             for (unsigned enemyIndex = 0;
-                 enemyIndex < port.enemyCount() &&
-                 actorCount <= AmigaPortRuntime::bulletCapacity;
+                 enemyIndex < port.enemyCount();
                  ++enemyIndex) {
                 const AmigaPortRuntime::EnemyState& enemy =
                     port.enemyAt(enemyIndex);
                 const int screenY = gameplayPlayerStartY + enemy.y -
                     port.cameraOffsetY();
-                if (!enemy.active || !enemy.awake || screenY < 16 ||
-                    screenY >= downwellDisplayHeight)
+                if (!enemy.active || !enemy.awake || screenY < -32 ||
+                    screenY >= downwellDisplayHeight + 32)
                     continue;
                 const unsigned partCount =
                     amigaRendererHardwareSpritePartCount(
@@ -2037,9 +2115,15 @@ int main(void) {
                     frameReady = false;
                     continue;
                 }
+                if (actorCount + partCount > actorLimit) {
+                    bobs[bobCount++] = {(UWORD)enemy.spriteId, (UWORD)enemy.imageFrame,
+                        downwellPlayfieldX + 80 + enemy.x - port.cameraOffsetX(),
+                        screenY, enemy.facing < 0};
+                    continue;
+                }
                 for (unsigned part = 0;
                      part < partCount &&
-                     actorCount <= AmigaPortRuntime::bulletCapacity;
+                     actorCount <= gameplayRegularSpriteCount;
                      ++part) {
                     Sprite& sprite = actorSpriteAt(
                         actorSprites, enemySprites[back], actorCount);
@@ -2059,16 +2143,22 @@ int main(void) {
                 }
             }
             for (unsigned gemIndex = 0;
-                 gemIndex < AmigaPortRuntime::gemCapacity &&
-                 actorCount <= AmigaPortRuntime::bulletCapacity;
+                 gemIndex < AmigaPortRuntime::gemCapacity;
                  ++gemIndex) {
                 const AmigaPortRuntime::GemState& gem =
                     port.gemAt(gemIndex);
                 const int screenY = gameplayPlayerStartY + gem.y -
                     port.cameraOffsetY();
-                if (!gem.active || screenY < 16 ||
-                    screenY >= downwellDisplayHeight)
+                if (!gem.active || screenY < -32 ||
+                    screenY >= downwellDisplayHeight + 32)
                     continue;
+                if (actorCount >= actorLimit) {
+                    bobs[bobCount++] = {(UWORD)(gem.large ? 134 : 133),
+                        (UWORD)((gem.age / 2u) & 3u),
+                        downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
+                        screenY, 0};
+                    continue;
+                }
                 Sprite& sprite = actorSpriteAt(
                     actorSprites, enemySprites[back], actorCount);
                 const int spriteResult =
@@ -2085,19 +2175,21 @@ int main(void) {
                     ++actorCount;
             }
 #endif
-            while (actorCount < AmigaPortRuntime::bulletCapacity)
+            while (actorCount < gameplayRegularSpriteCount)
                 actorSprites[actorCount++].hide();
-            if (actorCount <= AmigaPortRuntime::bulletCapacity)
+            if (actorCount <= gameplayRegularSpriteCount)
                 enemySprites[back].hide();
             DW_PROFILE_PHASE(profileCopper);
             syncGameRows(gameDisplay[back], gameBitmap, back);
+            if (bobCount)
+                drawGameplayBobs(renderer, gameDisplay[back], port.ringOrigin(), bobs, bobCount);
             if (frameReady &&
                 !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], port.ringOrigin()) :
                   gameplayCopperLists[back].build(
                     gameDisplay[back], hudBitmap, playerSprites[back],
                     bulletSprites + back *
-                        AmigaPortRuntime::bulletCapacity,
-                    AmigaPortRuntime::bulletCapacity,
+                        gameplayRegularSpriteCount,
+                    gameplayRegularSpriteCount,
                     enemySprites[back], palette, port.ringOrigin())))
                 frameReady = false;
             if (!frameReady)

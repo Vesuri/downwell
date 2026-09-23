@@ -10,6 +10,7 @@ REPO     := ..
 AMIGA_SRC := $(REPO)/src/platform/amiga
 REPLAY_VERIFY ?= 0
 SCENE_VERIFY ?= 0
+BOB_VERIFY ?= 0
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 PROBES ?= 0
@@ -32,6 +33,9 @@ endif
 ifeq ($(SCENE_VERIFY),1)
 CFLAGS += -DDOWNWELL_SCENE_VERIFY
 endif
+ifeq ($(BOB_VERIFY),1)
+CFLAGS += -DDOWNWELL_BOB_VERIFY -DDOWNWELL_SCENE_VERIFY
+endif
 ifeq ($(SKIP_INTRO),1)
 CFLAGS += -DDOWNWELL_SKIP_INTRO
 endif
@@ -51,7 +55,7 @@ ifeq ($(PROFILE_NAVIGATE),1)
 CFLAGS += -DDOWNWELL_PROFILE_NAVIGATE
 endif
 ifneq ($(filter 1,$(PROBES) $(FPSCOUNT)),)
-ifneq ($(filter 1,$(SCENE_VERIFY) $(REPLAY_VERIFY)),)
+ifneq ($(filter 1,$(SCENE_VERIFY) $(REPLAY_VERIFY) $(BOB_VERIFY)),)
 $(error Profiling must not be combined with verification instrumentation)
 endif
 endif

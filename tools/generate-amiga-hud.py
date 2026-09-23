@@ -291,7 +291,8 @@ def build_pack(manifest, extracted, profile):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
-            if profile == "game" and sprite_id in (127, 139, 550, 568, 569):
+            if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
+                    153, 163, 164, 166, 168, 170, 177, 186, 187, 188, 278):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
                 stride, data = encode_planar(pixels, mirrored.width, mirrored.height)

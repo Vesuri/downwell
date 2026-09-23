@@ -53,6 +53,10 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,
                             int anchorX, int anchorY, int flipX);
+int amigaRendererAssetBounds(const UBYTE* pack, const UBYTE* packEnd,
+                             UWORD sprite, UWORD frame, int anchorX,
+                             int anchorY, int flipX, int* x, int* y,
+                             int* width, int* height);
 void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
                                const UBYTE* pack, const UBYTE* packEnd,
                                UWORD sprite, UWORD frame,

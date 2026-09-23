@@ -5,6 +5,7 @@
 #include "InstanceStore.h"
 #include "DeferredInstanceQueue.h"
 #include "GameMakerRandom.h"
+#include "GameplayLimits.h"
 #include "Input.h"
 #include <array>
 #include <cstdint>
@@ -40,8 +41,8 @@ public:
     };
 
     static constexpr std::size_t instanceCapacity = 2048;
-    static constexpr std::size_t mainBulletCapacity = 16;
-    static constexpr std::size_t mainCurrencyCapacity = 64;
+    static constexpr std::size_t mainBulletCapacity = gameplayBulletCapacity;
+    static constexpr std::size_t mainCurrencyCapacity = gameplayGemCapacity;
     static constexpr int entryRoomId = 7;
     static constexpr int playMenuRoomId = 8;
     static constexpr int mainRoomId = 11;

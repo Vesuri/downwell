@@ -233,6 +233,21 @@ int main(int argc, char** argv) {
             amigaRendererDrawAsset(&expectedRenderer, oraclePack.data(), oraclePack.data() + oraclePack.size(),
                 id - 62000, frame, x, y, 1);
             require(actualGame == expectedGame, "offline mirrored scenery matches scalar clipped/ring oracle");
+            int left, top, width, height;
+            require(amigaRendererAssetBounds(gamePack.data(), gamePack.data() + gamePack.size(),
+                id - 62000, frame, x, y, 1, &left, &top, &width, &height),
+                "overflow actor bounds exist");
+            // Every changed row must be covered by the restoration interval,
+            // including assets straddling the circular-buffer boundary.
+            for (unsigned row = 0; row < downwellGameRingHeight; ++row) {
+                const unsigned screenY = (row + downwellGameRingHeight - 311) % downwellGameRingHeight;
+                if ((int)screenY >= top && (int)screenY < top + height) continue;
+                for (unsigned plane = 0; plane < 2; ++plane)
+                    for (unsigned byte = 0; byte < downwellBytesPerPlaneLine; ++byte)
+                        require(actualGame[plane * downwellGameRingPlaneBytes +
+                            row * downwellBytesPerPlaneLine + byte] == 0x55,
+                            "overflow restoration bounds cover every modified row");
+            }
         }
     }
     std::ifstream hudInput(argv[2], std::ios::binary);

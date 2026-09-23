@@ -4,13 +4,14 @@
 #include "AmigaPlayer.h"
 #include "core/GameMakerRandom.h"
 #include "core/StateDigest.h"
+#include "core/GameplayLimits.h"
 
 #include <cstdint>
 
 enum {
-    amigaPortBulletCapacity = 6,
+    amigaPortBulletCapacity = downwell::gameplayBulletCapacity,
     amigaPortEnemyCapacity = 64,
-    amigaPortGemCapacity = 12
+    amigaPortGemCapacity = downwell::gameplayGemCapacity
 };
 
 struct AmigaPortFrame {

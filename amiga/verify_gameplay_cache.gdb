@@ -3,10 +3,11 @@ set confirm off
 target remote 127.0.0.1:2345
 break downwellGameplayLongRunReady
 continue
-if gDownwellTerrainRasterFailures != 0 || gDownwellTerrainRasterChecks < 50 || gDownwellGameBufferFailures != 0
+if gDownwellTerrainRasterFailures != 0 || gDownwellTerrainRasterChecks < 50 || gDownwellGameBufferFailures != 0 || gDownwellGameplayBobFailures != 0
     printf "Gameplay cache verification failed: raster=%lu checks=%lu buffers=%lu\n", gDownwellTerrainRasterFailures, gDownwellTerrainRasterChecks, gDownwellGameBufferFailures
     quit 1
 end
+printf "Overflow actors: %lu scalar-oracle comparisons, %lu mismatched bytes\n", gDownwellGameplayBobChecks, gDownwellGameplayBobFailures
 printf "Gameplay cache verified through 600 simulation ticks: %lu fresh-composition comparisons\n", gDownwellTerrainRasterChecks
 printf "DOWNWELL_GAMEPLAY_CACHE_READY\n"
 shell touch .run/gdb-ready.marker
