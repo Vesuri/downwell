@@ -20,6 +20,7 @@ public:
     bool ready() const { return renderer_ != nullptr; }
     Input pollInput();
     void present();
+    bool saveScreenshot(const std::string& directory = {});
     void waitForNextTick();
     bool loadSpriteAssets(const SpritePack& pack, const std::string& directory);
     bool loadFontAssets(const FontPack& pack);
@@ -45,6 +46,7 @@ private:
     const FontPack* fontPack_ = nullptr;
     std::array<SDL_Texture*, 8> texturePages_{};
     std::uint64_t nextTick_ = 0;
+    bool screenshotRequested_ = false;
 };
 
 } // namespace downwell

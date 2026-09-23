@@ -6,6 +6,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <chrono>
+#include <ctime>
+#include <filesystem>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cerrno>
 
 namespace downwell {
 
@@ -77,6 +84,9 @@ Input PlatformSDL::pollInput() {
     Input input;
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_KEYDOWN && !event.key.repeat &&
+            event.key.keysym.sym == SDLK_F12)
+            screenshotRequested_ = true;
         if (event.type == SDL_QUIT)
             input.quit = true;
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
@@ -261,7 +271,73 @@ void PlatformSDL::drawText(std::int32_t fontId,
 }
 
 void PlatformSDL::present() {
+    // Read before Present: the renderer backbuffer is undefined afterwards.
+    if (screenshotRequested_) {
+        screenshotRequested_ = false;
+        saveScreenshot();
+    }
     SDL_RenderPresent(renderer_);
+}
+
+bool PlatformSDL::saveScreenshot(const std::string& directory) {
+    namespace fs = std::filesystem;
+    fs::path folder(directory);
+    if (folder.empty()) {
+        const char* home = std::getenv("HOME");
+        if (!home || !*home) {
+            SDL_Log("Screenshot failed: HOME is unavailable");
+            return false;
+        }
+        folder = fs::path(home) / "Pictures" / "Screenshots";
+    }
+    std::error_code error;
+    fs::create_directories(folder, error);
+    if (error) {
+        SDL_Log("Screenshot directory: %s", error.message().c_str());
+        return false;
+    }
+    int width = 0, height = 0;
+    if (SDL_GetRendererOutputSize(renderer_, &width, &height) != 0)
+        return false;
+    SDL_Surface* pixels = SDL_CreateRGBSurfaceWithFormat(
+        0, width, height, 32, SDL_PIXELFORMAT_RGBA32);
+    if (!pixels) return false;
+    if (SDL_RenderReadPixels(renderer_, nullptr, pixels->format->format,
+                             pixels->pixels, pixels->pitch) != 0) {
+        SDL_Log("Screenshot readback: %s", SDL_GetError());
+        SDL_FreeSurface(pixels);
+        return false;
+    }
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t time = std::chrono::system_clock::to_time_t(now);
+    std::tm local{};
+    localtime_r(&time, &local);
+    char timestamp[40];
+    std::strftime(timestamp, sizeof(timestamp), "Downwell_%Y-%m-%d_%H-%M-%S", &local);
+    fs::path path;
+    int descriptor = -1;
+    // Exclusive creation prevents overwriting another capture, even across processes.
+    for (unsigned suffix = 0; suffix < 10000; ++suffix) {
+        path = folder / (std::string(timestamp) + "_" + std::to_string(suffix) + ".png");
+        descriptor = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0644);
+        if (descriptor >= 0 || errno != EEXIST) break;
+    }
+    bool success = false;
+    if (descriptor >= 0) {
+        FILE* file = fdopen(descriptor, "wb");
+        if (file) {
+            SDL_RWops* output = SDL_RWFromFP(file, SDL_TRUE);
+            if (output) success = IMG_SavePNG_RW(pixels, output, 1) == 0;
+            else std::fclose(file);
+        } else {
+            ::close(descriptor);
+        }
+        if (!success) fs::remove(path, error);
+    }
+    SDL_FreeSurface(pixels);
+    if (success) SDL_Log("Screenshot saved: %s", path.c_str());
+    else SDL_Log("Screenshot save failed: %s", path.c_str());
+    return success;
 }
 
 void PlatformSDL::waitForNextTick() {

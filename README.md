@@ -11,6 +11,12 @@ build lives under `data/`, which is ignored by Git and treated as immutable.
 
 ## Startup shortcut
 
+In the SDL window, press **F12** (Fn+F12 if required by the keyboard) to save
+the current rendered framebuffer as a PNG in `~/Pictures/Screenshots/`.
+Captures use the actual renderer resolution, including HiDPI scaling and
+letterboxing, without the window border. Timestamped names never overwrite
+existing captures. The save path or an error is printed to the console.
+
 To build directly into STYLE SELECT for testing, skipping logos, credits,
 controls and the garden:
 
