@@ -73,7 +73,10 @@ Splash stages 2 through 6 now draw their recovered Devolver logo, full 4:3
 credits composition, controls, and dither sprites. The Amiga credits are
 precomposed once into the fixed HUD planes before presentation and displayed
 with the wide fetch; they do not invoke a glyph compositor or repaint during
-their three-second hold. Fade-frame interpolation is still pending.
+their three-second hold. The controls transition uses the recovered fractional
+dither-frame sequence as a third hardware bitplane: the copper repeats one
+8-line mask tile over the narrow display, so animation only swaps copper lists
+and never repaints the controls raster.
 
 The three nonblank native splash rasters have independent emulator-backed
 regression gates. `make verify-amiga-splash-frame` pins the complete Devolver

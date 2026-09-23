@@ -101,7 +101,8 @@ void Game::render(Renderer& renderer) const {
         if (stage == 4 || stage == 5)
             playfield.drawSprite(695, 0, 80, 140); // sprControls
         if (stage == 5 || stage == 6)
-            playfield.drawSpriteTiled(733, 11, -300, 0); // sprDitherFade
+            playfield.drawSpriteTiled(733, startup_.splashDitherFrame(),
+                                      -300, 0); // sprDitherFade
     }
     if (!clipReleased)
         renderer.clearClipRect();

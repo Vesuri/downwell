@@ -19,6 +19,9 @@ public:
     AmigaScene scene() const { return scene_; }
     unsigned tick() const { return tick_; }
     int splashStage() const { return splashStage_; }
+    unsigned splashDitherFrame() const {
+        return (unsigned)(splashDitherTenths_ / 10);
+    }
     bool menuPlayerNapping() const { return menuNapping_; }
     bool menuPlayerVisible() const { return !menuTeleport_; }
     int menuPlayerX() const { return roundedPixel(menuX_); }
@@ -70,6 +73,7 @@ private:
     bool priorFire_;
     int splashStage_;
     int splashTimer_;
+    int splashDitherTenths_;
 
     unsigned menuTicks_;
     bool menuNapping_;

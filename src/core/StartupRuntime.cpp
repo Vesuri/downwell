@@ -33,6 +33,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     initTimes_ = 0;
     achievementLoginCalls_ = 0;
     splashSpeed_ = 180;
+    splashDitherTenths_ = 110;
     roomDestinationSet_ = false;
     roomLoadSucceeded_ = true;
     implementedCodeCalls_ = 0;
@@ -215,6 +216,13 @@ void StartupRuntime::stepInternal(bool advancePressed,
     inputRight_ = right;
     inputFire_ = fire;
     anyInput_ = anyInput;
+
+    if (showSplash_ == 3 || showSplash_ == 4)
+        splashDitherTenths_ = 110;
+    else if (showSplash_ == 5 && splashDitherTenths_ >= 10)
+        splashDitherTenths_ -= 3;
+    else if (showSplash_ == 6 && splashDitherTenths_ <= 110)
+        splashDitherTenths_ += 3;
 
     const auto alarmEvents = [this](const InstanceRecord& instance) {
         if (objectPack_ == nullptr)

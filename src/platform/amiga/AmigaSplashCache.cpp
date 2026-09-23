@@ -7,9 +7,7 @@ namespace {
 enum {
     blankFrame,
     devolverFrame,
-    controlsFrame,
-    controlsFadeFrame,
-    fadeFrame
+    controlsFrame
 };
 
 UWORD word(const UBYTE* p) { return (UWORD)(((UWORD)p[0] << 8) | p[1]); }
@@ -64,29 +62,26 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
     return true;
 }
 
-bool tileFade(UBYTE* destination, const UBYTE* pack, const UBYTE* end) {
-    const UBYTE* record = find(pack, end, 733, 11);
-    if (!record || word(record + 8) != 8 || word(record + 10) != 8 ||
-        word(record + 12) != 16)
-        return false;
-    const UBYTE* data = pack + longword(record + 16);
-    const ULONG dataBytes = longword(record + 20);
-    if (data < pack || data + dataBytes > end || dataBytes < 48)
-        return false;
-    const ULONG sourcePlaneBytes = 16;
-    const UBYTE* sourceMask = data + sourcePlaneBytes * 2;
-    for (int y = 0; y < amigaSplashHeight; ++y) {
-        const unsigned sourceOffset = (unsigned)(y & 7) * 2;
-        const UBYTE mask = sourceMask[sourceOffset];
-        const UBYTE low = data[sourceOffset];
-        const UBYTE high = data[sourcePlaneBytes + sourceOffset];
-        const ULONG destinationOffset =
-            (ULONG)y * amigaSplashBytesPerRow;
-        for (int x = 0; x < amigaSplashVisibleWidth / 8; ++x) {
-            UBYTE* plane0 = destination + destinationOffset + x;
-            UBYTE* plane1 = plane0 + amigaSplashPlaneBytes;
-            *plane0 = (UBYTE)((*plane0 & (UBYTE)~mask) | (low & mask));
-            *plane1 = (UBYTE)((*plane1 & (UBYTE)~mask) | (high & mask));
+bool buildDitherTiles(UBYTE* destination, const UBYTE* pack,
+                      const UBYTE* end) {
+    for (unsigned frame = 0; frame < amigaSplashDitherFrameCount; ++frame) {
+        const UBYTE* record = find(pack, end, 733, (UWORD)frame);
+        if (!record || word(record + 8) != 8 || word(record + 10) != 8 ||
+            word(record + 12) != 16)
+            return false;
+        const UBYTE* data = pack + longword(record + 16);
+        const ULONG dataBytes = longword(record + 20);
+        if (data < pack || data + dataBytes > end || dataBytes < 48)
+            return false;
+        const UBYTE* sourceMask = data + 32;
+        UBYTE* tile = destination + frame * amigaSplashDitherTileBytes;
+        for (unsigned y = 0; y < amigaSplashDitherTileHeight; ++y) {
+            const UBYTE mask = sourceMask[y * 2];
+            UBYTE* row = tile + y * amigaSplashBytesPerRow;
+            for (unsigned x = 0; x < amigaSplashVisibleWidth / 8; ++x)
+                row[x] = mask;
+            row[20] = 0;
+            row[21] = 0;
         }
     }
     return true;
@@ -105,13 +100,10 @@ bool amigaBuildSplashCache(const UBYTE* pack, const UBYTE* packEnd,
                     amigaSplashWidth, amigaSplashHeight, 2, false);
     Bitmap controls(cache + controlsFrame * amigaSplashFrameBytes,
                     amigaSplashWidth, amigaSplashHeight, 2, false);
-    Bitmap controlsFade(cache + controlsFadeFrame * amigaSplashFrameBytes,
-                        amigaSplashWidth, amigaSplashHeight, 2, false);
     Bitmap credits(wideCredits, 380, amigaSplashHeight, 2, false, false, 384);
     credits.clear();
     if (!draw(devolver, pack, packEnd, 696, 0, 80, 140) ||
         !draw(controls, pack, packEnd, 695, 0, 80, 140) ||
-        !draw(controlsFade, pack, packEnd, 695, 0, 80, 140) ||
         !draw(credits, pack, packEnd, 65200, 0, 190, 130) ||
         !draw(credits, pack, packEnd, 65201, 0, 190, 150) ||
         !draw(credits, pack, packEnd, 65202, 0, 278, 200) ||
@@ -120,17 +112,21 @@ bool amigaBuildSplashCache(const UBYTE* pack, const UBYTE* packEnd,
         !draw(credits, pack, packEnd, 65205, 0, 102, 210))
         return false;
     AmigaHardware::blitterDrain();
-    return tileFade(cache + controlsFadeFrame * amigaSplashFrameBytes,
-                    pack, packEnd) &&
-           tileFade(cache + fadeFrame * amigaSplashFrameBytes,
-                    pack, packEnd);
+    return buildDitherTiles(
+        cache + amigaSplashFrameBytes * amigaSplashFrameCount,
+        pack, packEnd);
 }
 
 const UBYTE* amigaSplashFrame(const UBYTE* cache, int stage) {
     unsigned frame = blankFrame;
     if (stage == 2) frame = devolverFrame;
-    else if (stage == 4) frame = controlsFrame;
-    else if (stage == 5) frame = controlsFadeFrame;
-    else if (stage == 6) frame = fadeFrame;
+    else if (stage == 4 || stage == 5) frame = controlsFrame;
     return cache + frame * amigaSplashFrameBytes;
+}
+
+const UBYTE* amigaSplashDitherTile(const UBYTE* cache, unsigned frame) {
+    if (frame >= amigaSplashDitherFrameCount)
+        frame = amigaSplashDitherFrameCount - 1;
+    return cache + amigaSplashFrameBytes * amigaSplashFrameCount +
+           frame * amigaSplashDitherTileBytes;
 }

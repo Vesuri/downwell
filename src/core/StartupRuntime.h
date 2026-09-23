@@ -64,6 +64,9 @@ public:
     int roomId() const { return roomId_; }
     int roomDestination() const { return roomDestination_; }
     int showSplash() const { return showSplash_; }
+    unsigned splashDitherFrame() const {
+        return static_cast<unsigned>(splashDitherTenths_ / 10);
+    }
     int alarm0() const;
     int initTimes() const { return initTimes_; }
     int achievementLoginCalls() const { return achievementLoginCalls_; }
@@ -253,6 +256,7 @@ private:
     int initTimes_ = 0;
     int achievementLoginCalls_ = 0;
     int splashSpeed_ = 180;
+    int splashDitherTenths_ = 110;
     bool roomDestinationSet_ = false;
     bool roomLoadSucceeded_ = true;
     std::uint32_t implementedCodeCalls_ = 0;

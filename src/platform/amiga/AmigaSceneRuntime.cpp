@@ -14,7 +14,8 @@ enum {
 AmigaSceneRuntime::AmigaSceneRuntime()
     : scene_(AmigaScene::splash), tick_(0), priorLeft_(false),
       priorRight_(false), priorFire_(false), splashStage_(1),
-      splashTimer_(10), menuTicks_(0), menuNapping_(true),
+      splashTimer_(10), splashDitherTenths_(110),
+      menuTicks_(0), menuNapping_(true),
       menuGrounded_(true), menuFallTicks_(0), menuTeleport_(false),
       menuTitleDelay_(-1),
       menuTitleImage_(0), menuTitleRevealTicks_(0),
@@ -168,6 +169,12 @@ void AmigaSceneRuntime::enterStyleSelect()
 
 void AmigaSceneRuntime::stepSplash(bool firePressed)
 {
+    if (splashStage_ == 3 || splashStage_ == 4)
+        splashDitherTenths_ = 110;
+    else if (splashStage_ == 5 && splashDitherTenths_ >= 10)
+        splashDitherTenths_ -= 3;
+    else if (splashStage_ == 6 && splashDitherTenths_ <= 110)
+        splashDitherTenths_ += 3;
     if (firePressed)
         splashTimer_ = 0;
     else if (splashTimer_ > 0)

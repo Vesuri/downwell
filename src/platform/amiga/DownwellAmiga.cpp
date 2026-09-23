@@ -50,7 +50,7 @@ extern const UBYTE amiga_builder_pack_end[];
 }
 
 enum {
-    copperWords = 160,
+    copperWords = 400,
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
     /* Channels 1..6 are shared by bullets, enemies and gems each frame. */
@@ -133,6 +133,8 @@ static_assert(
         2u * (sizeof(downwellPaletteData) / sizeof(downwellPaletteData[0])) +
         4u + 8u + 2u,
     "copper storage must cover registers, planes, sprites, palette and split");
+static_assert(copperWords >= 340,
+              "copper storage must cover narrow dither tile repetition");
 
 #ifdef DOWNWELL_REPLAY_VERIFY
 extern "C" {
@@ -896,7 +898,8 @@ static bool buildMenuEntryCopper(CopperList& list,
 
 static bool buildNarrowCopper(CopperList& list, const UBYTE* frame,
                               const Sprite& nullSprite,
-                              const Palette& palette) {
+                              const Palette& palette,
+                              const UBYTE* ditherTile = 0) {
     list.reset();
     list.move(diwstrt, (UWORD)((displayVStart << 8) |
                               (amigaMenuDisplayHStart & 0xff)));
@@ -904,15 +907,32 @@ static bool buildNarrowCopper(CopperList& list, const UBYTE* frame,
                               (amigaMenuDisplayHStop & 0xff)));
     list.move(ddfstrt, amigaMenuFetchStart);
     list.move(ddfstop, amigaMenuFetchStop);
-    list.move(bplcon0, 0x2001);
+    list.move(bplcon0, ditherTile ? 0x3001 : 0x2001);
     list.move(bplcon1, 0);
     list.move(bpl1mod, 0);
     list.move(bpl2mod, 0);
     list.pointer(bpl1pth, frame);
     list.pointer(bpl2pth, frame + amigaStylePlaneBytes);
+    if (ditherTile)
+        list.pointer(bpl3pth, ditherTile);
     for (unsigned channel = 0; channel < 8; ++channel)
         list.showSprite((UWORD)channel, nullSprite);
     list.setPalette(palette);
+    if (ditherTile) {
+        bool crossedLine255 = false;
+        for (unsigned line = amigaSplashDitherTileHeight;
+             line < amigaSplashHeight;
+             line += amigaSplashDitherTileHeight) {
+            const unsigned resetAfterLine = displayVStart + line - 1;
+            if (resetAfterLine > 255 && !crossedLine255) {
+                if (!list.wait(255, 0xdf)) return false;
+                crossedLine255 = true;
+            }
+            if (!list.wait((UWORD)resetAfterLine, 0xdf) ||
+                !list.pointer(bpl3pth, ditherTile))
+                return false;
+        }
+    }
     return list.finish();
 }
 
@@ -976,6 +996,7 @@ int main(void) {
     AmigaSceneRuntime scenes;
     AmigaScene presentedScene = scenes.scene();
     int presentedSplash = scenes.splashStage();
+    unsigned presentedSplashDither = scenes.splashDitherFrame();
     unsigned liveFrameCount = 0;
     unsigned menuSpriteFrameCount = 0;
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -1293,14 +1314,17 @@ int main(void) {
                 const bool presentationChanged =
                     scenes.scene() != presentedScene ||
                     scenes.splashStage() != presentedSplash;
+                const bool splashDitherChanged =
+                    scenes.splashDitherFrame() != presentedSplashDither;
                 const unsigned back = front ^ 1u;
                 const bool menuEntry =
                     scenes.scene() == AmigaScene::menu &&
                     scenes.menuEnterSequenceActive();
                 presentedScene = scenes.scene();
                 presentedSplash = scenes.splashStage();
+                presentedSplashDither = scenes.splashDitherFrame();
                 if (presentedScene == AmigaScene::splash) {
-                    if (presentationChanged) {
+                    if (presentationChanged || splashDitherChanged) {
                         const bool built = presentedSplash == 3
                             ? buildWideSplashCopper(copperLists[back],
                                                    hudBitmap, nullSprite,
@@ -1309,7 +1333,12 @@ int main(void) {
                                   copperLists[back],
                                   amigaSplashFrame(memory.sceneCache(),
                                                    presentedSplash),
-                                  nullSprite, palette);
+                                  nullSprite, palette,
+                                  presentedSplash == 5 || presentedSplash == 6
+                                      ? amigaSplashDitherTile(
+                                            memory.sceneCache(),
+                                            presentedSplashDither)
+                                      : 0);
                         if (!built)
                             break;
                         platform.publish(copperLists[back]);

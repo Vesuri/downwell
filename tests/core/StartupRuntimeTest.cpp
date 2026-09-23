@@ -75,9 +75,16 @@ void testRecoveredDesktopTiming() {
     stepMany(runtime, 240);
     require(runtime.showSplash() == 5 && runtime.alarm0() == 60,
             "later splash stages use short delay");
-    stepMany(runtime, 60);
+    require(runtime.splashDitherFrame() == 11,
+            "controls fade begins on the transparent dither frame");
+    stepMany(runtime, 1);
+    require(runtime.splashDitherFrame() == 10,
+            "controls fade follows the recovered 0.3-frame decrement");
+    stepMany(runtime, 59);
     require(runtime.showSplash() == 6 && runtime.roomId() == 7,
             "stage six remains in rmInit");
+    require(runtime.splashDitherFrame() == 0,
+            "fade-out reaches the opaque dither endpoint");
     stepMany(runtime, 60);
     require(runtime.showSplash() == 0 && runtime.roomId() == 20,
             "stage seven transitions to rmMenu");

@@ -79,6 +79,12 @@ recovered 4:3 placement of the three contributor blocks.  The frame is
 precomposed before it becomes visible and remains unchanged for the whole
 splash stage.
 
+Splash stages 5 and 6 retain GameMaker's 0.3-frame dither progression without
+touching the displayed raster.  Twelve 176-byte mask tiles are prepared before
+takeover; a third bitplane and copper pointer resets repeat the selected
+8-line tile down the 284-line narrow display.  The controls and blank base
+planes remain immutable throughout both fades.
+
 `make verify-amiga-style-frame` stops on the first stable default-style frame,
 dumps the exact 176x284 two-plane Chip RAM image through GDB, verifies its
 pinned SHA-256, decodes the visible 160-pixel aperture to

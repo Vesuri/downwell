@@ -480,6 +480,18 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
 }
 
 int main(int argc, char** argv) {
+    {
+        AmigaSceneRuntime fade;
+        for (int stage = 2; stage <= 5; ++stage)
+            pressFire(fade);
+        for (int tick = 0; tick < 59; ++tick)
+            fade.step(downwell::Input{});
+        require(fade.splashStage() == 6 && fade.splashDitherFrame() == 0,
+                "native splash reaches the opaque dither endpoint");
+        fade.step(downwell::Input{});
+        require(fade.splashDitherFrame() == 1,
+                "native splash reverses the recovered dither sequence");
+    }
     AmigaSceneRuntime runtime;
     require(runtime.scene() == AmigaScene::splash &&
             runtime.splashStage() == 1, "startup begins at splash stage one");

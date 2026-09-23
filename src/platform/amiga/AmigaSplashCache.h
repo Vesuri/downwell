@@ -10,12 +10,21 @@ enum {
     amigaSplashBytesPerRow = amigaSplashWidth / 8,
     amigaSplashPlaneBytes = amigaSplashBytesPerRow * amigaSplashHeight,
     amigaSplashFrameBytes = amigaSplashPlaneBytes * 2,
-    amigaSplashFrameCount = 5,
-    amigaSplashCacheBytes = amigaSplashFrameBytes * amigaSplashFrameCount
+    amigaSplashFrameCount = 3,
+    amigaSplashDitherFrameCount = 12,
+    amigaSplashDitherTileHeight = 8,
+    amigaSplashDitherTileBytes =
+        amigaSplashBytesPerRow * amigaSplashDitherTileHeight,
+    amigaSplashDitherBytes =
+        amigaSplashDitherTileBytes * amigaSplashDitherFrameCount,
+    amigaSplashCacheBytes =
+        amigaSplashFrameBytes * amigaSplashFrameCount +
+        amigaSplashDitherBytes
 };
 
 bool amigaBuildSplashCache(const UBYTE* pack, const UBYTE* packEnd,
                            UBYTE* cache, UBYTE* wideCredits);
 const UBYTE* amigaSplashFrame(const UBYTE* cache, int stage);
+const UBYTE* amigaSplashDitherTile(const UBYTE* cache, unsigned frame);
 
 #endif
