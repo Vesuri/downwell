@@ -186,6 +186,9 @@ volatile const UBYTE* gDownwellMenuForeground;
 volatile const UBYTE* gDownwellMenuBackground;
 volatile const UWORD* gDownwellMenuPlayerSprite;
 volatile const UWORD* gDownwellMenuTitleSprites;
+volatile const UBYTE* gDownwellMenuEntryFrame;
+volatile const UWORD* gDownwellMenuEntryTitleSprites;
+volatile UWORD gDownwellMenuEntryTitlePartCount;
 
 __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
     __asm__ volatile("" ::: "memory");
@@ -200,6 +203,10 @@ __attribute__((noinline, used)) void downwellMenuWakeFrameReady(void) {
 }
 
 __attribute__((noinline, used)) void downwellMenuTitleFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellMenuEntryFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 }
@@ -1385,9 +1392,15 @@ int main(void) {
                         downwellMenuTitleFrameReady();
                         downwellMenuTitleSpriteReady();
                     }
-                    if (!sceneMenuEntryReported && menuEntry &&
-                        scenes.menuCameraY() >= 900) {
+                    if (!sceneMenuEntryReported && menuEntry) {
                         sceneMenuEntryReported = true;
+                        gDownwellMenuEntryFrame = memory.menuEntry() +
+                            amigaMenuEntryOffset(
+                                scenes.menuCameraY() - 142);
+                        gDownwellMenuEntryTitleSprites = titleSprites;
+                        gDownwellMenuEntryTitlePartCount =
+                            (UWORD)titlePartCount;
+                        downwellMenuEntryFrameReady();
                         downwellMenuEntryScrollReady();
                     }
 #endif

@@ -91,3 +91,10 @@ solid white silhouette.
 seven hardware-sprite strips of the fully revealed Downwell logo.  Its pinned
 capture proves the logo is present and centered while the goal-stopped player
 is correctly absent, before the vertical well-entry renderer takes over.
+
+`make verify-amiga-menu-entry-frame` captures the first frame after that
+renderer takes over: one immutable 176-pixel shaft plane addressed directly at
+the current vertical camera position, plus the seven title sprite strips.  The
+decoded `build/amiga-menu-entry-frame.png` therefore guards the handoff from
+the independently scrolled garden planes to pointer-only vertical scrolling
+without introducing a repaint path.
