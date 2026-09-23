@@ -929,7 +929,6 @@ struct GameplayBob {
 extern "C" __attribute__((noinline, used)) void downwellStartupFailed() {
     __asm__ volatile("" ::: "memory");
 }
-
 extern "C" __attribute__((noinline)) void downwellGameplayRenderFailure() {
     __asm__ volatile("" ::: "memory");
 }
@@ -1080,14 +1079,14 @@ int main(void) {
     if (!platform.available()) {
         gDownwellStartupFailure = 1;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     UWORD* startupCopperWords =
         (UWORD*)AllocMem(4 * sizeof(UWORD), MEMF_CHIP | MEMF_CLEAR);
     if (!startupCopperWords) {
         gDownwellStartupFailure = 2;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     CopperList startupCopper(startupCopperWords, 4);
     if (!startupCopper.move(color00, 0x000) ||
@@ -1101,7 +1100,7 @@ int main(void) {
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         gDownwellStartupFailure = 3;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     const ULONG gamePackBytes =
         amigaRendererChipPackBytes(amiga_game_pack, amiga_game_pack_end);
@@ -1120,7 +1119,7 @@ int main(void) {
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         gDownwellStartupFailure = 4;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
     const downwell::RoomPack rooms(
@@ -1163,7 +1162,7 @@ int main(void) {
         memory.release();
         gDownwellStartupFailure = 5;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
@@ -1182,7 +1181,7 @@ int main(void) {
                 FreeMem(startupCopperWords, 4 * sizeof(UWORD));
                 gDownwellStartupFailure = 6;
                 downwellStartupFailed();
-                return 1;
+                return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
             }
         }
         terrainCollision.index = &terrainIndex;
@@ -1216,7 +1215,7 @@ int main(void) {
         memory.release();
         gDownwellStartupFailure = 8;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 #endif
     if (!amigaBuildSplashCache(activeGamePack, activeGamePackEnd,
@@ -1226,7 +1225,7 @@ int main(void) {
         memory.release();
         gDownwellStartupFailure = 9;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 
 #if defined(DOWNWELL_SKIP_INTRO) && !defined(DOWNWELL_SKIP_TO_GAME)
@@ -1237,7 +1236,7 @@ int main(void) {
         memory.release();
         gDownwellStartupFailure = 10;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 #endif
     /*
@@ -1327,7 +1326,7 @@ int main(void) {
         memory.release();
         gDownwellStartupFailure = 11;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     Sprite playerSprites[2] = {
         Sprite(memory.playerSprite(0), playerSpriteHeight),
@@ -1391,7 +1390,7 @@ int main(void) {
         memory.release();
         gDownwellStartupFailure = 12;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 #ifdef DOWNWELL_REPLAY_VERIFY
     platform.publish(gameplayCopperLists[dynamicCopper0]);
@@ -1417,7 +1416,7 @@ int main(void) {
         memory.release();
         gDownwellStartupFailure = 13;
         downwellStartupFailed();
-        return 1;
+        return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 #ifdef DOWNWELL_REPLAY_VERIFY
     buildReferencePicture(
@@ -1428,8 +1427,13 @@ int main(void) {
 #else
     downwellStartupReady();
 #endif
+    int exitCode = 20; // Internal loop breaks are failures, not normal quits.
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
-    while ((*ciaaPra & 0x40u) != 0) {
+    for (;;) {
+        if ((*ciaaPra & 0x40u) == 0) {
+            exitCode = 0;
+            break;
+        }
         DW_PROFILE_FRAME((unsigned)scenes.scene());
         UBYTE packedInput;
         int scrollDelta = 0;
@@ -1456,8 +1460,10 @@ int main(void) {
         {
 #ifdef DOWNWELL_REPLAY_VERIFY
             downwell::Input replayInput;
-            if (!verificationReplay.frame(port.tick(), replayInput))
+            if (!verificationReplay.frame(port.tick(), replayInput)) {
+                exitCode = 0;
                 break;
+            }
             packedInput = downwell::packReplayInput(replayInput);
 #else
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -2285,5 +2291,5 @@ int main(void) {
 
     platform.restore();
     memory.release();
-    return 0;
+    return exitCode;
 }
