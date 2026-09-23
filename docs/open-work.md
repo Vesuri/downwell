@@ -95,6 +95,8 @@
   freeze the gameplay camera, and expose the 90+10-frame death-menu gate.
 - [x] Reproduce the damaged player's alternating `dFlash` solely by hiding
   and showing its hardware sprite during the invulnerability alarm.
+- [x] Animate the grounded standard-style player with the recovered eight-frame
+  run sprite, exact 0.3-frame cadence, and run-entry reset.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.

@@ -70,6 +70,8 @@ private:
     bool priorFire_;
     bool jumpShootLocked_;
     bool airborneShot_;
+    bool running_;
+    unsigned runPhaseTenths_;
     unsigned shotDelay_;
     int facing_;
     unsigned jumps_;

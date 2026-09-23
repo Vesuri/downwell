@@ -68,8 +68,18 @@ int main() {
 
     input.right = true;
     const AmigaPlayerMotion firstMove = player.step(input);
+    require(player.spriteId() == 27 && player.spriteFrame() == 0,
+            "ground movement selects and resets the recovered run cycle");
+    player.step(input);
+    player.step(input);
+    player.step(input);
+    require(player.spriteFrame() == 0,
+            "the recovered 0.3 image speed holds run frame zero");
+    player.step(input);
+    require(player.spriteFrame() == 1,
+            "the recovered 0.3 image speed advances after four intervals");
     AmigaPlayerMotion laterMove = firstMove;
-    for (unsigned frame = 0; frame < 12; ++frame)
+    for (unsigned frame = 0; frame < 8; ++frame)
         laterMove = player.step(input);
     require(player.offsetX() > 0 && laterMove.deltaX >= firstMove.deltaX,
             "horizontal input accelerates the fixed-point player");
@@ -78,6 +88,12 @@ int main() {
     player.step(input);
     require(player.facing() == -1,
             "leftward input flips the native player presentation");
+
+    input.left = false;
+    for (unsigned frame = 0; frame < 40 && player.speedXFixed() != 0; ++frame)
+        player.step(input);
+    require(player.spriteId() == 31 && player.spriteFrame() == 0,
+            "friction returns the stationary player to the idle pose");
 
     SolidFixture fixture = {true};
     AmigaPlayer colliding;

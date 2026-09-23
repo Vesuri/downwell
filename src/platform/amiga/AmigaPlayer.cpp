@@ -25,6 +25,7 @@ AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
       pixelX_(0), pixelY_(0), ammo_(maximumAmmo),
       grounded_(startsGrounded), priorFire_(false),
       jumpShootLocked_(false), airborneShot_(false),
+      running_(false), runPhaseTenths_(0),
       shotDelay_(startsGrounded ? 0u : 1u), facing_(1),
       jumps_(0), shots_(0)
 {
@@ -199,6 +200,17 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         }
     }
 
+    const bool nowRunning = grounded_ && speedX_ != 0;
+    if (nowRunning) {
+        if (!running_)
+            runPhaseTenths_ = 0;
+        else
+            runPhaseTenths_ = (runPhaseTenths_ + 3) % 80;
+    } else {
+        runPhaseTenths_ = 0;
+    }
+    running_ = nowRunning;
+
     priorFire_ = input.fire;
     pixelX_ = fixedToPixel(x_);
     pixelY_ = fixedToPixel(y_);
@@ -208,13 +220,14 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
 
 int AmigaPlayer::spriteId() const
 {
-    if (grounded_) return 31;
+    if (grounded_) return running_ ? 27 : 31;
     return airborneShot_ ? 3 : 37;
 }
 
 unsigned AmigaPlayer::spriteFrame() const
 {
-    if (grounded_ || airborneShot_) return 0;
+    if (grounded_) return running_ ? runPhaseTenths_ / 10 : 0;
+    if (airborneShot_) return 0;
     if (speedY_ < -2 * fixedOne) return 0;
     if (speedY_ < 0) return 1;
     if (speedY_ < fixedOne) return 2;

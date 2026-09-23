@@ -111,6 +111,12 @@ The preceding invulnerability interval follows `dFlash` by alternating the
 player hardware sprite between visible and hidden records, without redrawing
 either playfield.
 
+Ground movement switches hardware sprite 0 from `sprPlayerIdle` to the
+eight-frame `sprPlayerRunExg` sequence.  Its integer phase advances by the
+recovered 0.3 frame per simulation step and resets to frame zero whenever the
+player re-enters the running state, so animation adds no playfield work and no
+fixed-point approximation drift.
+
 `make verify-amiga-menu-wake-frame` captures the first walking garden frame as
 the two immutable 512x384 cache planes, their independent pointer/fine-scroll
 state, and hardware sprite 0.  Its host decoder reconstructs the centered
