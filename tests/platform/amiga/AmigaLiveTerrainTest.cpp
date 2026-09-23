@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaTerrain.h"
+#include "platform/amiga/AmigaPortRuntime.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -22,6 +23,64 @@ struct LiveCollision {
         auto& self = *static_cast<LiveCollision*>(opaque);
         ++self.creates;
         return amigaAddTerrainObject(self.index, command.objectId, command.x, command.y);
+    }
+};
+
+// Exercise the complete native simulation/generator/collision wiring without
+// relying on the executable's still-forecast-based renderer.
+struct LiveSimulation {
+    AmigaTerrainFragment fragments[19];
+    AmigaTerrainEnemy enemies[64];
+    AmigaTerrainDecoration decorations[128];
+    AmigaTerrainIndex index;
+    AmigaAreaOneTerrainBuilder builder{fragments, 19, enemies, 64, decorations, 128};
+    AmigaTerrainCollisionContext collision;
+    AmigaPortRuntime* runtime = nullptr;
+    const downwell::BuilderPatternPack& patterns;
+    unsigned generationTicks = 0;
+
+    explicit LiveSimulation(const downwell::BuilderPatternPack& pack)
+        : collision{nullptr, nullptr, &pack, nullptr, 0, nullptr}, patterns(pack) {}
+
+    static bool create(void* opaque, const downwell::DeferredCreateInstance& command) {
+        auto& world = *static_cast<LiveSimulation*>(opaque);
+        if (!amigaAddTerrainObject(world.index, command.objectId, command.x, command.y))
+            return false;
+        if (command.objectId == 92) {
+            const int x = command.x - 240, y = command.y - 176;
+            if (!world.runtime->appendBreakables(&x, &y, 1)) return false;
+        }
+        if (amigaEnemyHealth(command.objectId))
+            return world.runtime->configureEnemy(world.runtime->enemyCount(), command.objectId,
+                0, command.x - 240, command.y - 176,
+                command.integerVelocityX, command.integerVelocityY,
+                amigaEnemyHealth(command.objectId), amigaEnemyReward(command.objectId),
+                command.motionState, command.auxiliaryState,
+                command.alarms.get(0), command.alarms.get(1),
+                command.integerDirection, command.integerMoveSpeed,
+                command.active, command.grounded, true);
+        return true;
+    }
+    static bool generate(void* opaque, AmigaPortRuntime& runtime,
+                         downwell::GameMakerRandom& random, int bottom) {
+        auto& world = *static_cast<LiveSimulation*>(opaque);
+        require(world.runtime == &runtime, "generation receives bound runtime");
+        ++world.generationTicks;
+        downwell::AreaOneBuilderStep result;
+        return world.builder.stepVisible(world.patterns, random, bottom, result);
+    }
+    void bind(AmigaPortRuntime& port) {
+        runtime = &port;
+        require(amigaBuildTerrainIndex(collision, index), "live simulation starts with empty generated terrain");
+        collision.index = &index;
+        collision.runtime = &port;
+        downwell::GameMakerRandom random;
+        builder.resetInitialCheckpoint(random);
+        builder.setCreateObserver(create, this);
+        port.configureEnemyRandom(random);
+        port.configureGenerationStep(generate, this);
+        port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
+        port.configureSolidResolver(amigaResolveTerrainSolid, &collision);
     }
 };
 void compareRandom(const downwell::GameMakerRandom& a,
@@ -153,6 +212,18 @@ int main(int argc, char** argv) {
     require(patterns.valid(), "builder pack validates");
     checkSchedule(patterns, false);
     checkSchedule(patterns, true);
+    LiveSimulation live(patterns);
+    AmigaPortRuntime runtime(300, false, 4096 - 176, true);
+    live.bind(runtime);
+    for (unsigned tick = 0; tick < 300; ++tick) {
+        runtime.step(0);
+        require(runtime.generationSucceeded() && runtime.enemyCount() == live.builder.enemyCount(),
+                "native runtime creates only the enemies emitted by its live generator");
+    }
+    require(live.generationTicks == 300 && live.builder.fragmentCount() > 0 &&
+                live.builder.fragmentCount() < 19 && runtime.enemyCount() > 0 &&
+                runtime.player().grounded(),
+            "live simulation generates only the visible prefix and lands on generated terrain");
     LiveCollision boundary;
     AmigaTerrainCollisionContext empty{nullptr, nullptr, &patterns, nullptr, 0, nullptr};
     require(amigaBuildTerrainIndex(empty, boundary.index), "boundary map initializes");

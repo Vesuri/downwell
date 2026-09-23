@@ -203,7 +203,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
                                       int motionState, int auxiliaryState,
                                       int alarm0, int alarm1,
                                       int direction, int moveSpeed,
-                                      bool active)
+                                      bool active, bool grounded, bool awake)
 {
     if (index >= enemyCapacity)
         return false;
@@ -233,8 +233,8 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
                        : 0u;
     enemy.imageFrame = 0;
     enemy.active = active;
-    enemy.awake = false;
-    enemy.grounded = false;
+    enemy.awake = awake;
+    enemy.grounded = grounded;
     enemy.activationPending = !active;
     if (enemyCount_ <= index)
         enemyCount_ = index + 1;
@@ -337,6 +337,69 @@ int AmigaPortRuntime::indexedBreakable(int x, int y) const {
     return (int)breakableIndex_[(y >> 4) * 64 + (x >> 4)] - 1;
 }
 
+void AmigaPortRuntime::advanceEnemyAlarms()
+{
+    DW_PROFILE_PHASE(profileEnemyAlarms);
+    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+        EnemyState& enemy = enemies_[enemyIndex];
+        if (!enemy.active)
+            continue;
+        bool alarm0Fired = false, alarm1Fired = false;
+        if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
+            alarm0Fired = true;
+        if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
+            alarm1Fired = true;
+
+        if (enemy.objectId == 112 && alarm1Fired) {
+            enemy.auxiliaryState = -enemy.auxiliaryState;
+            enemy.alarm1 = 120 + (int)enemyRandom_.irandomSmall(180);
+        } else if (enemy.objectId == 113) {
+            if (alarm1Fired) {
+                if (enemy.grounded) {
+                    enemy.auxiliaryState = 1;
+                    enemy.speedX =
+                        player_.offsetX() < enemy.x ? -256 : 256;
+                    enemy.motionState = enemy.speedX < 0 ? -2 : 2;
+                    enemy.alarm0 = 60;
+                } else {
+                    enemy.alarm1 = 60;
+                }
+            }
+            if (alarm0Fired) {
+                if (enemy.grounded) {
+                    enemy.speedY = -4 * 256;
+                    enemy.speedX = enemy.motionState * 256;
+                    enemy.grounded = false;
+                }
+                enemy.auxiliaryState = 0;
+                enemy.alarm1 = 60;
+            }
+        } else if (enemy.objectId == 119 && alarm0Fired) {
+            if (enemy.grounded) {
+                const int crawl = enemy.motionState > 0 ? 1 : -1;
+                int nextX = enemy.x;
+                int nextY = enemy.y;
+                if (solidResolver_ != 0 && solidResolver_(
+                        solidResolverContext_, enemy.x + crawl, enemy.y)) {
+                    enemy.speedX = 0;
+                    enemy.speedY = -crawl * 256;
+                    nextY -= crawl;
+                } else {
+                    enemy.speedX = crawl * 256;
+                    enemy.speedY = 0;
+                    nextX += crawl;
+                }
+                if (solidResolver_ == 0 || !solidResolver_(
+                        solidResolverContext_, nextX, nextY)) {
+                    enemy.preciseX = (long)nextX * 256L;
+                    enemy.preciseY = (long)nextY * 256L;
+                }
+            }
+            enemy.alarm0 = 2;
+        }
+    }
+}
+
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
     DW_PROFILE_PHASE(profilePlayer);
@@ -371,6 +434,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
+    // Alarms follow Begin Step movement, before builder Step/Create events.
+    advanceEnemyAlarms();
+    DW_PROFILE_PHASE(profilePlayer);
     int scrollDelta = 0;
     int cameraXDelta = 0;
     if (followCamera_ && !dead_) {
@@ -395,6 +461,15 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         origin %= (int)ringHeight;
         if (origin < 0) origin += (int)ringHeight;
         ringOrigin_ = (unsigned)origin;
+    }
+
+    if (generationStep_ && generationSucceeded_) {
+        // Camera centre is 176 + cameraY_/256; view bottom is 142 below it.
+        const long bottom = cameraY_ + 318L * 256L;
+        const int bottomCeiling = bottom >= 0 ? (int)((bottom + 255) / 256)
+                                              : -(int)((-bottom) / 256);
+        generationSucceeded_ = generationStep_(generationContext_, *this,
+                                               enemyRandom_, bottomCeiling);
     }
 
     /*
@@ -463,72 +538,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
-    DW_PROFILE_PHASE(profileEnemyAlarms);
-    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
-        EnemyState& enemy = enemies_[enemyIndex];
-        if (!enemy.active)
-            continue;
-        bool alarm0Fired = false, alarm1Fired = false;
-        enemy.imagePhase += enemy.imageSpeed;
-        if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
-            alarm0Fired = true;
-        if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
-            alarm1Fired = true;
-
-        if (enemy.objectId == 112 && alarm1Fired) {
-            enemy.auxiliaryState = -enemy.auxiliaryState;
-            enemy.alarm1 = 120 + (int)enemyRandom_.irandomSmall(180);
-        } else if (enemy.objectId == 113) {
-            if (alarm1Fired) {
-                if (enemy.grounded) {
-                    enemy.auxiliaryState = 1;
-                    enemy.speedX =
-                        player_.offsetX() < enemy.x ? -256 : 256;
-                    enemy.motionState = enemy.speedX < 0 ? -2 : 2;
-                    enemy.alarm0 = 60;
-                } else {
-                    enemy.alarm1 = 60;
-                }
-            }
-            if (alarm0Fired) {
-                if (enemy.grounded) {
-                    enemy.speedY = -4 * 256;
-                    enemy.speedX = enemy.motionState * 256;
-                    enemy.grounded = false;
-                }
-                enemy.auxiliaryState = 0;
-                enemy.alarm1 = 60;
-            }
-        } else if (enemy.objectId == 119 && alarm0Fired) {
-            if (enemy.grounded) {
-                const int crawl = enemy.motionState > 0 ? 1 : -1;
-                int nextX = enemy.x;
-                int nextY = enemy.y;
-                if (solidResolver_ != 0 && solidResolver_(
-                        solidResolverContext_, enemy.x + crawl, enemy.y)) {
-                    enemy.speedX = 0;
-                    enemy.speedY = -crawl * 256;
-                    nextY -= crawl;
-                } else {
-                    enemy.speedX = crawl * 256;
-                    enemy.speedY = 0;
-                    nextX += crawl;
-                }
-                if (solidResolver_ == 0 || !solidResolver_(
-                        solidResolverContext_, nextX, nextY)) {
-                    enemy.preciseX = (long)nextX * 256L;
-                    enemy.preciseY = (long)nextY * 256L;
-                }
-            }
-            enemy.alarm0 = 2;
-        }
-    }
 
     DW_PROFILE_PHASE(profileEnemyMotion);
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
             continue;
+        enemy.imagePhase += enemy.imageSpeed;
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
         if (!enemy.awake || solidResolver_ == 0)

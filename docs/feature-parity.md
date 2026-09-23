@@ -163,3 +163,28 @@ Incremental-collision verification: full host suite passed, including every
 cell/link after each generated section; cross-target replay retained
 `64 95d0aaea 1be7256f`. This replay confirms no regression in its existing
 64-tick scope, not full live-generation parity.
+
+Native frame ordering now advances existing enemy alarms after player movement
+but before the builder-generation hook and bullets. The hook receives the
+actual enemy RNG stream and the fractional-camera viewport bottom rounded up
+for the strict visibility gate. Creation can supply recovered grounded/awake
+flags; new enemies move and animate that tick but their alarms first age on
+the following tick. Generation failure is latched instead of retrying a partial
+event. Regression tests assert this ordering and shared RNG consumption.
+
+The host native-terrain test now connects the actual `AmigaPortRuntime` to the
+incremental builder, emitted-object collision and appended breakables for 300
+ticks. It lands on generated terrain and has only the generated enemy prefix,
+not the prebuilt full-level population. This integrated simulation fixture is
+not yet the playable executable: its cached raster renderer still needs to
+consume actual emitted tiles before switching that executable to live terrain.
+
+Frame-order validation: host suite and the integrated 300-tick fixture pass;
+cross-target replay retains `64 95d0aaea 1be7256f`. The untraced A500 cache
+check passed 600 ticks / 146 comparisons on the unchanged binary after an
+earlier run and repeat timed out with a `B-Trap F346` at `0x23ff54` (inside
+that build's asset range). A startup-only check passed with 26,584 Chip bytes
+remaining; a per-tick debugger trace also completed with a null generation
+callback throughout. The intermittent target failure is **unresolved**, not
+a proven callback or allocation failure; later successful runs do not erase
+it. Keep this separate from the already-fixed startup memory shortage.

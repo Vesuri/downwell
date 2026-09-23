@@ -31,9 +31,52 @@ bool crawlerCorner(void*, int x, int y) {
     return y >= 7 || x >= 2;
 }
 
+struct GenerationOrderProbe {
+    unsigned calls = 0;
+    downwell::GameMakerRandom expected{2};
+    static bool step(void* opaque, AmigaPortRuntime& runtime,
+                     downwell::GameMakerRandom& random, int bottom) {
+        auto& probe = *static_cast<GenerationOrderProbe*>(opaque);
+        ++probe.calls;
+        require(bottom >= 318, "generation receives world-space viewport bottom");
+        if (probe.calls == 1) {
+            probe.expected.irandomSmall(180); // Existing turtle alarm fires first.
+            require(random.drawCount() == probe.expected.drawCount(),
+                    "existing enemy alarm RNG precedes generation");
+            require(random.nextU32() == probe.expected.nextU32(),
+                    "generation shares the actual enemy RNG stream");
+            require(runtime.configureEnemy(1, 112, 169, 80, 0, 256, 0,
+                        5, 14, 0, 1, -1, 1, 0, 0, true, true, true),
+                    "generation creates a live grounded turtle");
+            require(runtime.enemyAt(1).grounded && runtime.enemyAt(1).awake,
+                    "Create flags survive native configuration");
+            return true;
+        }
+        return false;
+    }
+};
+
 } // namespace
 
 int main() {
+    AmigaPortRuntime eventOrder(300, true, 0, true);
+    eventOrder.configureSolidResolver(noSolid, nullptr);
+    require(eventOrder.configureEnemy(0, 112, 169, 40, 0, 64, 0,
+                5, 14, 0, 1, -1, 1), "configure existing alarm source");
+    GenerationOrderProbe generation;
+    eventOrder.configureGenerationStep(GenerationOrderProbe::step, &generation);
+    eventOrder.step(0);
+    require(eventOrder.generationSucceeded() && generation.calls == 1 &&
+                eventOrder.enemyAt(0).alarm1 >= 120 &&
+                eventOrder.enemyAt(1).alarm1 == 1 && eventOrder.enemyAt(1).x == 81 &&
+                eventOrder.enemyAt(1).imagePhase == 38,
+            "new enemy moves and animates immediately without aging its Create alarm");
+    eventOrder.step(0);
+    require(!eventOrder.generationSucceeded() && generation.calls == 2 &&
+                eventOrder.enemyAt(1).alarm1 >= 120,
+            "new alarm first fires on the following tick; generation failure is visible");
+    eventOrder.step(0);
+    require(generation.calls == 2, "failed generation cannot replay a partial event");
     AmigaPortRuntime lifecycle(300);
     require(lifecycle.configureEnemy(0, 111, 163, 0, -303, 0, 0, 5, 6),
             "configure enemy beyond upper cleanup boundary");

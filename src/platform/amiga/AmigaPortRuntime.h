@@ -39,6 +39,17 @@ public:
     /* Player-relative Y at the recovered 284-pixel view bottom plus 32. */
     static constexpr int bulletBottom = 174;
     typedef bool (*SolidResolver)(void* context, int x, int y);
+    // Called once after existing alarms and camera Step, before bullets and
+    // enemy motion. Receives the shared RNG and ceil(world-space view bottom).
+    // A false return latches generationSucceeded() until explicitly rebound.
+    using GenerationStep = bool (*)(void*, AmigaPortRuntime&,
+                                    downwell::GameMakerRandom&, int);
+    void configureGenerationStep(GenerationStep step, void* context) {
+        generationStep_ = step;
+        generationContext_ = context;
+        generationSucceeded_ = true;
+    }
+    bool generationSucceeded() const { return generationSucceeded_; }
 
     struct BulletState {
         int x;
@@ -117,7 +128,8 @@ public:
                         int motionState = 0, int auxiliaryState = 0,
                         int alarm0 = -1, int alarm1 = -1,
                         int direction = 0, int moveSpeed = 0,
-                        bool active = true);
+                        bool active = true, bool grounded = false,
+                        bool awake = false);
     void configureEnemyRandom(const downwell::GameMakerRandom& random) {
         enemyRandom_ = random;
     }
@@ -152,6 +164,10 @@ public:
     std::uint64_t trajectoryDigest() const { return trajectory_.value(); }
 
 private:
+    void advanceEnemyAlarms();
+    GenerationStep generationStep_ = nullptr;
+    void* generationContext_ = nullptr;
+    bool generationSucceeded_ = true;
     struct Breakable {
         int x;
         int y;
