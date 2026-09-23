@@ -121,3 +121,25 @@ cache settled headings/description; reduce full-frame background restoration
 and redraw to the changing regions or a hardware-scrolled border layer.
 Re-measure navigation with FPSCOUNT after each change. The idle 50 FPS
 sample does not establish sufficient headroom for those moving states.
+
+## Style optimizations and hardware scrolling
+
+The same 180-frame left/right test after the optimizations reports
+**180 PAL fields, 50.00 FPS, maximum gap one field** (previously 281 fields,
+32.03 FPS). This result includes entry and navigation, with the ordinary
+A500/512 KB Chip/8 MB Fast profiling configuration; it is not a guarantee
+for unrelated scenes or all hardware configurations.
+
+Changes: offline-mirrored left arrow; offline-trimmed bobs with unchanged
+anchors; prepared Bitmap descriptors; offline static text panels; per-buffer
+dirty rectangles and actor-state caching. Most importantly, PF2 now scrolls
+the immutable border by DMA pointers, while PF1 retains the static content.
+The temporary fifth plane supplies an opaque-black high bit to front-priority
+PF1 during transitions, so both playfields are hidden without repainting.
+Only four planes remain enabled once the reveal clears.
+
+The diagnostic full-redraw oracle checked 105 consecutive frames with zero
+mismatches. The original and trimmed asset pixels/anchors, mirrored arrow,
+captured headings, and fifth-plane mask palette/priority were also checked.
+All emulator runs were limited to 45 seconds and cleaned up. The playable
+`SKIP_INTRO=1` build was restored after profiling.

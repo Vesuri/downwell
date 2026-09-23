@@ -5,6 +5,17 @@
 
 class AmigaSceneRuntime;
 
+struct AmigaStyleFrameState {
+    bool initialized = false;
+    int centerY = 0;
+    int textPanel = -1;
+    bool hardwareBorder = false;
+    unsigned dirtyCount = 0;
+    int smoothX = 0, cursor = -1;
+    unsigned runFrame = 0;
+    struct Rect { UWORD x, y, width, height; } dirty[8];
+};
+
 enum {
     amigaStyleWidth = 176,
     amigaStyleVisibleWidth = 160,
@@ -28,6 +39,10 @@ const UBYTE* amigaStyleMask(const UBYTE* cache, const AmigaSceneRuntime& scenes)
 bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
                            const UBYTE* border,
                            const AmigaSceneRuntime& scenes,
-                           UBYTE* destination);
+                           UBYTE* destination, AmigaStyleFrameState& state
+#ifdef DOWNWELL_SCENE_VERIFY
+                           , bool reference = false
+#endif
+                           );
 
 #endif

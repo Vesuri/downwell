@@ -62,9 +62,9 @@ def main():
         for reg, value in struct.iter_unpack(">HH", copper):
             if reg == 0xffff: break
             registers[reg] = value
-        assert registers[0x100] == 0x3401  # three planes, dual playfield
-        assert registers[0x104] & 0x40    # PF2 in front
-        assert registers[0x192] == 0     # COLOR09: opaque black
+        assert registers[0x100] == 0x5401  # BPL5 is the temporary mask
+        assert not registers[0x104] & 0x40  # PF1 in front
+        assert all(registers[0x180 + color * 2] == 0 for color in range(4, 8))
         assert registers[0x108] == registers[0x10a] == 2
         print("Amiga DMA mask and dual-playfield Copper configuration match")
 

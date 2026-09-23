@@ -76,10 +76,10 @@ class DownwellStyleCopperList : public CopperList {
 public:
     DownwellStyleCopperList(UWORD* words, unsigned capacityWords);
     bool build(const UBYTE* frame, const UBYTE* mask,
-               const Sprite& nullSprite, const Palette& palette);
-    bool update(const UBYTE* frame, const UBYTE* mask);
+               const Sprite& nullSprite, const Palette& palette, const UBYTE* border = 0);
+    bool update(const UBYTE* frame, const UBYTE* mask, const UBYTE* border = 0);
 private:
-    unsigned frame0Offset_, frame1Offset_, maskOffset_;
+    unsigned frame0Offset_, frame1Offset_, maskOffset_, border0Offset_, border1Offset_, modeOffset_;
 };
 
 #endif

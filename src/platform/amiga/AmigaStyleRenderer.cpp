@@ -6,6 +6,7 @@
 extern "C" {
 #include <string.h>
 }
+inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
 
 namespace {
 
@@ -30,9 +31,43 @@ const UBYTE* find(const UBYTE* pack, const UBYTE* end,
     return 0;
 }
 
+struct PreparedStyleArt {
+    int originX, originY;
+    Bitmap source, mask;
+    PreparedStyleArt(const UBYTE* pack, const UBYTE* record)
+        : originX((WORD)word(record + 4)), originY((WORD)word(record + 6)),
+          source((void*)(pack + longword(record + 16)), word(record + 8),
+                 word(record + 10), 2, false, false, word(record + 12)),
+          mask((UBYTE*)source.data + source.bitplaneSizeInBytes * 2,
+               source.width, source.height, 1, false, false, source.dataWidth) {}
+};
+alignas(PreparedStyleArt) UBYTE styleArtStorage[11 * sizeof(PreparedStyleArt)];
+AmigaStyleFrameState* activeStyleState;
+
+bool drawPrepared(Bitmap& destination, unsigned index, int x, int y) {
+    PreparedStyleArt& art = *reinterpret_cast<PreparedStyleArt*>(styleArtStorage + index * sizeof(PreparedStyleArt));
+    int left = x - art.originX, top = y - art.originY;
+    int sx = 0, sy = 0, width = art.source.width, height = art.source.height;
+    if (left < 0) { sx = -left; width += left; left = 0; }
+    if (top < 0) { sy = -top; height += top; top = 0; }
+    if (left + width > amigaStyleVisibleWidth) width = amigaStyleVisibleWidth - left;
+    if (top + height > destination.height) height = destination.height - top;
+    if (width > 0 && height > 0) {
+        destination.copyWithMask(art.source, art.mask, left, top, sx, sy, sx, sy, width, height);
+        if (activeStyleState && activeStyleState->dirtyCount < 8) {
+            AmigaStyleFrameState::Rect& rect = activeStyleState->dirty[activeStyleState->dirtyCount++];
+            rect.x = left; rect.y = top; rect.width = width; rect.height = height;
+        }
+    }
+    return true;
+}
+
 bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
           UWORD sprite, UWORD frame, int anchorX, int anchorY,
-          bool flipX = false, int forcedPen = -1) {
+          int forcedPen = -1) {
+    if (sprite == 65500 && frame < 8) return drawPrepared(destination, frame, anchorX, anchorY);
+    if (sprite >= 65501 && sprite <= 65503)
+        return drawPrepared(destination, 8 + sprite - 65501, anchorX, anchorY);
     const UBYTE* record = find(pack, end, sprite, frame);
     if (!record) return false;
     const int originX = (WORD)word(record + 4);
@@ -53,7 +88,7 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
         drawHeight = destination.height - top;
     if (drawWidth <= 0 || drawHeight <= 0) return true;
 
-    if (!flipX) {
+    {
         Bitmap source((void*)data, width, height, 2, false, false, dataWidth);
         Bitmap mask((void*)(data + planeBytes * 2), width, height, 1,
                     false, false, dataWidth);
@@ -74,32 +109,18 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
         return true;
     }
 
-    DW_PROFILE_PHASE(profileStyleMirror);
-    UBYTE* output = (UBYTE*)destination.data;
-    const ULONG outputPlaneBytes = destination.bitplaneSizeInBytes;
-    for (int y = 0; y < drawHeight; ++y) {
-        const UBYTE* row = data + (sourceY + y) * (dataWidth >> 3);
-        for (int x = 0; x < drawWidth; ++x) {
-            const int sourcePixel = width - 1 - (sourceX + x);
-            const UBYTE sourceMask = (UBYTE)(0x80u >> (sourcePixel & 7));
-            unsigned pen = row[sourcePixel >> 3] & sourceMask ? 1u : 0u;
-            pen |= row[planeBytes + (sourcePixel >> 3)] & sourceMask ? 2u : 0u;
-            if (!pen) continue;
-            const ULONG offset = (ULONG)(top + y) * amigaStyleBytesPerRow +
-                                 (ULONG)(left + x) / 8;
-            const UBYTE targetMask = (UBYTE)(0x80u >> ((left + x) & 7));
-            if (pen & 1) output[offset] |= targetMask;
-            if (pen & 2) output[outputPlaneBytes + offset] |= targetMask;
-        }
-    }
-    DW_PROFILE_PHASE(profileStyleActors);
-    return true;
 }
 
 } // namespace
 
 bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
                            UBYTE* border) {
+    for (unsigned i = 0; i < 11; ++i) {
+        const UBYTE* record = find(pack, packEnd, i < 8 ? 65500 : 65501 + i - 8, i < 8 ? i : 0);
+        if (!record || longword(record + 16) > (ULONG)(packEnd - pack) ||
+            longword(record + 20) > (ULONG)(packEnd - pack) - longword(record + 16)) return false;
+        new (styleArtStorage + i * sizeof(PreparedStyleArt)) PreparedStyleArt(pack, record);
+    }
     Bitmap bitmap(border, amigaStyleWidth, amigaStyleBorderHeight, 2, false);
     bitmap.clear();
     for (int row = 0; row <= amigaStyleBorderHeight / 16 + 1; ++row) {
@@ -146,47 +167,95 @@ const UBYTE* amigaStyleMask(const UBYTE* cache, const AmigaSceneRuntime& scenes)
 bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
                            const UBYTE* border,
                            const AmigaSceneRuntime& scenes,
-                           UBYTE* destination) {
+                           UBYTE* destination, AmigaStyleFrameState& state
+#ifdef DOWNWELL_SCENE_VERIFY
+                           , bool reference
+#endif
+                           ) {
+#ifndef DOWNWELL_SCENE_VERIFY
+    const bool reference = false;
+#endif
     Bitmap output(destination, amigaStyleWidth, amigaStyleHeight, 2, false);
     Bitmap borderBitmap((void*)border, amigaStyleWidth,
                         amigaStyleBorderHeight, 2, false);
     const int borderY = -scenes.styleTileY();
     const int centerY = amigaStyleHeight / 2 + scenes.styleYOffset();
     const int smoothX = scenes.styleSmoothX();
+    const int textPanel = scenes.styleCursor() == 0 ? 0 : 1;
+    const bool hardwareBorder = !reference;
+    const bool full = reference || !state.initialized || state.centerY != centerY || scenes.styleSelected() || state.hardwareBorder != hardwareBorder;
+    const bool actorsChanged = full || state.smoothX != smoothX ||
+        state.cursor != scenes.styleCursor() ||
+        (scenes.styleCursor() == 0 && state.runFrame != scenes.styleRunFrame());
     DW_PROFILE_PHASE(profileStyleCopy);
-    output.copy(borderBitmap, 0, 0, 0, (UWORD)borderY,
-                amigaStyleWidth, amigaStyleHeight);
+    if (full) {
+        if (hardwareBorder) output.clear();
+        else output.copy(borderBitmap, 0, 0, 0, (UWORD)borderY,
+                         amigaStyleWidth, amigaStyleHeight);
+    } else if (hardwareBorder && actorsChanged) {
+        // Restore only pixels occupied in THIS back buffer. Border pixels
+        // are not stored here: PF1 supplies them through its DMA pointers.
+        for (unsigned i = 0; i < state.dirtyCount; ++i) {
+            const AmigaStyleFrameState::Rect& rect = state.dirty[i];
+            output.clear(rect.x, rect.y, rect.width, rect.height);
+        }
+    }
+    if (actorsChanged || !hardwareBorder) state.dirtyCount = 0;
+    if (!scenes.styleSelected() && !reference) {
+        const UBYTE* record = find(pack, packEnd, 65410 + textPanel, 0);
+        if (!record) return false;
+        Bitmap panel((void*)(pack + longword(record + 16)), 160, 128, 2, false);
+        int top = centerY - 80;
+        int sourceY = top < 0 ? -top : 0;
+        int height = (full || state.textPanel != textPanel ? 128 : 88) - sourceY;
+        if (top < 0) top = 0;
+        if (hardwareBorder && !full) {
+            sourceY = 90; top = centerY + 10;
+            height = state.textPanel != textPanel ? 38 : 0;
+        }
+        if (top + height > amigaStyleHeight) height = amigaStyleHeight - top;
+        if (height > 0)
+            output.copy(panel, 0, top, 0, sourceY, 160, height);
+        // Only the side strips scroll. The panel restore leaves the settled
+        // lower text intact and removes all previous actors/arrows in this
+        // back buffer, including partially clipped icons at either edge.
+        if (!hardwareBorder) {
+            output.copy(borderBitmap, 0, 0, 0, borderY, 16, amigaStyleHeight);
+            output.copy(borderBitmap, 144, 0, 144, borderY, 16, amigaStyleHeight);
+        }
+    }
 
+    activeStyleState = hardwareBorder ? &state : 0;
     DW_PROFILE_PHASE(profileStyleActors);
-    if (!scenes.styleSelected()) {
+    if (!scenes.styleSelected() && (!hardwareBorder || actorsChanged)) {
         for (int style = 0; style < 5; ++style) {
             const int drawX = 80 + style * 48 - smoothX;
+            if (drawX <= -16 || drawX >= 176) continue;
             const int distance = drawX - 80;
             const int drawY = centerY - 14 - distance * distance / 200;
             const bool unlocked = style == 0;
-            if (!draw(output, pack, packEnd, unlocked ? 27 : 43,
+            if (!draw(output, pack, packEnd, unlocked ? (reference ? 27 : 65500) : (reference ? 43 : 65501),
                       unlocked && style == scenes.styleCursor()
                           ? (UWORD)scenes.styleRunFrame() : 0,
                       drawX, drawY))
                 return false;
         }
         if (scenes.styleCursor() < 4 &&
-            !draw(output, pack, packEnd, 44, 0, 96, centerY - 10))
+            !draw(output, pack, packEnd, reference ? 44 : 65502, 0, 96, centerY - 10))
             return false;
         if (scenes.styleCursor() > 0 &&
-            !draw(output, pack, packEnd, 44, 0, 64, centerY - 10, true))
+            !draw(output, pack, packEnd, reference ? 65401 : 65503, 0, 64, centerY - 10))
             return false;
         DW_PROFILE_PHASE(profileStyleText);
-        if (!draw(output, pack, packEnd, 65000, 0, 80, centerY - 70) ||
-            !draw(output, pack, packEnd,
-                  scenes.styleCursor() == 0 ? 65001 : 65003,
-                  0, 80, centerY + 10))
-            return false;
-        if (scenes.styleCursor() == 0 &&
-            !draw(output, pack, packEnd, 65002, 0,
-                  80, centerY + 32, false, 1))
-            return false;
-    } else if (!draw(output, pack, packEnd, 27,
+#ifdef DOWNWELL_SCENE_VERIFY
+        if (reference) {
+            if (!draw(output, pack, packEnd, 65000, 0, 80, centerY - 70) ||
+                !draw(output, pack, packEnd, textPanel ? 65003 : 65001, 0, 80, centerY + 10) ||
+                (!textPanel && !draw(output, pack, packEnd, 65002, 0, 80, centerY + 32, 1)))
+                return false;
+        }
+#endif
+    } else if (scenes.styleSelected() && !draw(output, pack, packEnd, reference ? 27 : 65500,
                      (UWORD)scenes.styleRunFrame(), 80,
                      centerY - 14 + scenes.stylePlayerDescent())) {
         return false;
@@ -194,5 +263,13 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
 
     DW_PROFILE_PHASE(profileStyleDrain);
     AmigaHardware::blitterDrain();
+    activeStyleState = 0;
+    state.initialized = true;
+    state.centerY = centerY;
+    state.textPanel = textPanel;
+    state.hardwareBorder = hardwareBorder;
+    state.smoothX = smoothX;
+    state.cursor = scenes.styleCursor();
+    state.runFrame = scenes.styleRunFrame();
     return true;
 }

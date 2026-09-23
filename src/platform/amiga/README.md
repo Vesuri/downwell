@@ -236,15 +236,23 @@ the same complete ring/HUD/sprite reconstruction to produce
 scrolling, hidden-row refills, actor allocation, and enemy activation have all
 become live.
 
-Style-select transitions use a three-plane dual-playfield display: BPL1/3
-hold the two-bit content, and BPL2 is an opaque-black PF2 cover (COLOR09=0,
-PF2 priority). The asset converter extracts opacity from the original
+Style selection uses two playfields throughout: BPL1/3 retain content in
+PF1, while BPL2/4 scroll the immutable border via pointers in PF2. PF1 has
+priority. During entry/exit, BPL5 supplies the gradient as PF1's high bit;
+palette entries 4–7 are black, so the cover hides both content and borders.
+BPL5 is disabled when the entry mask clears, leaving four active planes.
+The asset converter extracts opacity from the original
 transition sprites; alpha-1 white pixels are holes, not white ink. Two
 immutable 176x648 one-plane masks hold the entry and exit gradients with
 solid/transparent padding (28,512 bytes total). Each frame patches only
-the content and mask pointers in the inactive dedicated style Copper list.
-There is no per-frame mask drawing or framebuffer AND pass; the underlying
-style content still uses its existing blitter redraw path.
+the content, border and mask pointers in the inactive dedicated style Copper
+list, plus the bitplane-count word. There is no mask repaint or framebuffer
+AND pass. Two host-generated text panels provide the static content; settled
+text is only changed on a usual/locked transition. Each back buffer tracks
+its carousel state and previous bob rectangles. Only changed carousel states
+are restored/redrawn, and the scrolling borders never need repainting.
+The left arrow is mirrored offline; all style bobs are trimmed offline with
+their anchors preserved and have prepared Bitmap/mask descriptors.
 
 `python3 tools/verify-amiga-style-mask.py` checks both packed gradients
 against source alpha. A `SCENE_VERIFY=1 SKIP_INTRO=1` Amiga build can capture
@@ -252,7 +260,7 @@ the reveal with `VERIFY_TIMEOUT_SECONDS=45 GDB_SOURCE=verify_style_reveal.gdb
 READY_MARKER=DOWNWELL_STYLE_REVEAL_READY bash amiga/verify_startup.sh`.
 Then `python3 tools/verify-amiga-style-mask.py --capture` checks the live
 DMA mask and Copper configuration. Style-frame decoding accepts `--mask`
-to composite a captured PF2 mask; selected-style verification captures both.
+to composite a captured BPL5 mask; selected-style verification captures both.
 
 Style art uses the imported `Bitmap::copyWithMask` path. Its portable
 hardware backend routes the cookie-cut mask to channel A (the channel that
@@ -267,4 +275,10 @@ For a bounded drawing regression, use the scene-verification build with
 VERIFY_TIMEOUT_SECONDS=45 bash amiga/verify_startup.sh`, then run
 `python3 tools/verify-amiga-style-drawing.py`. It compares captured arrow
 pixels, the adjacent blank word, and normal/locked headings against packed
-assets rather than merely accepting a new screenshot hash.
+assets rather than merely accepting a new screenshot hash. Verification-only
+code also composites the two real playfields and compares every style frame
+against a full redraw with the original untrimmed assets. The standard run
+checks 105 frames, including entry, both cursor directions and selection.
+Capture files contain the reconstructed two-bit composite, with the fifth
+mask plane captured separately. The locked-frame baseline changed because
+the left arrow now uses proper masked compositing instead of CPU OR writes.

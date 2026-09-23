@@ -155,6 +155,8 @@ volatile const UBYTE* gDownwellLockedStyleFrame;
 volatile const UBYTE* gDownwellSelectedStyleFrame;
 volatile const UBYTE* gDownwellStyleMask;
 volatile const UWORD* gDownwellStyleCopper;
+volatile ULONG gDownwellStyleReferenceFailures;
+volatile ULONG gDownwellStyleReferenceFrames;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
 volatile const UWORD* gDownwellControlsCopper;
@@ -1024,6 +1026,7 @@ int main(void) {
         DownwellStyleCopperList(dynamicCopperWords[1], downwellCopperWords)
     };
     bool styleListBuilt[2] = {false, false};
+    AmigaStyleFrameState styleFrameState[2];
     DownwellSplashCopperList splashBlankList(
         memory.copper() + downwellCopperWords * 2, downwellCopperWords);
     DownwellSplashCopperList splashLogoList(
@@ -1477,14 +1480,37 @@ int main(void) {
                                 amigaStyleFrameBytes * 2,
                             scenes,
                             memory.sceneCache() +
-                                back * amigaStyleFrameBytes))
+                                back * amigaStyleFrameBytes, styleFrameState[back]))
                         break;
                     const UBYTE* styleFrame = memory.sceneCache() + back * amigaStyleFrameBytes;
+#ifdef DOWNWELL_SCENE_VERIFY
+                    AmigaStyleFrameState referenceState;
+                    if (!amigaRenderStyleFrame(activeGamePack, activeGamePackEnd,
+                            memory.sceneCache() + amigaStyleFrameBytes * 2,
+                            scenes, memory.hud(), referenceState, true)) break;
+                    ++gDownwellStyleReferenceFrames;
+                    UBYTE* styleComposite = memory.hud() + amigaStyleFrameBytes;
+                    const UBYTE* referenceBorder = memory.sceneCache() + amigaStyleFrameBytes * 2 - scenes.styleTileY() * amigaStyleBytesPerRow;
+                    for (unsigned byte = 0; byte < amigaStylePlaneBytes; ++byte) {
+                        const UBYTE occupied = styleFrame[byte] | styleFrame[byte + amigaStylePlaneBytes];
+                        styleComposite[byte] = styleFrame[byte] | (referenceBorder[byte] & ~occupied);
+                        styleComposite[byte + amigaStylePlaneBytes] = styleFrame[byte + amigaStylePlaneBytes] |
+                            (referenceBorder[byte + amigaStyleBorderPlaneBytes] & ~occupied);
+                    }
+                    for (unsigned byte = 0; byte < amigaStyleFrameBytes; ++byte) {
+                        if (styleComposite[byte] != memory.hud()[byte]) {
+                            ++gDownwellStyleReferenceFailures;
+                            break;
+                        }
+                    }
+#endif
                     DW_PROFILE_PHASE(profileCopper);
-                    const UBYTE* styleMask = amigaStyleMask(memory.sceneCache(), scenes);
+                    const UBYTE* styleMask = scenes.styleDitherY() < 684 || scenes.styleSelected()
+                        ? amigaStyleMask(memory.sceneCache(), scenes) : 0;
+                    const UBYTE* styleBorder = memory.sceneCache() + amigaStyleFrameBytes * 2 - scenes.styleTileY() * amigaStyleBytesPerRow;
                     if (!(styleListBuilt[back]
-                            ? styleLists[back].update(styleFrame, styleMask)
-                            : styleLists[back].build(styleFrame, styleMask, nullSprite, palette)))
+                            ? styleLists[back].update(styleFrame, styleMask, styleBorder)
+                            : styleLists[back].build(styleFrame, styleMask, nullSprite, palette, styleBorder)))
                         break;
                     styleListBuilt[back] = true;
                     DW_PROFILE_PHASE(profilePublish);
@@ -1495,7 +1521,7 @@ int main(void) {
                     gDownwellStyleMask = styleMask;
                     gDownwellStyleCopper = styleLists[back].data();
                     if (scenes.styleDitherY() == 528 && !scenes.styleSelected()) {
-                        gDownwellStyleFrame = styleFrame;
+                        gDownwellStyleFrame = styleComposite;
                         downwellStyleRevealFrameReady();
                     }
                     if (!sceneStyleFrameReported &&
@@ -1503,8 +1529,7 @@ int main(void) {
                         !scenes.styleSelected()) {
                         sceneStyleFrameReported = true;
                         gDownwellStyleFrame =
-                            memory.sceneCache() +
-                                back * amigaStyleFrameBytes;
+                            styleComposite;
                         downwellStyleFrameReady();
                     }
                     if (!sceneLockedStyleFrameReported &&
@@ -1514,8 +1539,7 @@ int main(void) {
                         !scenes.styleSelected()) {
                         sceneLockedStyleFrameReported = true;
                         gDownwellLockedStyleFrame =
-                            memory.sceneCache() +
-                                back * amigaStyleFrameBytes;
+                            styleComposite;
                         downwellLockedStyleFrameReady();
                     }
                     if (!sceneSelectedStyleFrameReported &&
@@ -1523,8 +1547,7 @@ int main(void) {
                         scenes.styleVerticalDitherY() == 0) {
                         sceneSelectedStyleFrameReported = true;
                         gDownwellSelectedStyleFrame =
-                            memory.sceneCache() +
-                                back * amigaStyleFrameBytes;
+                            styleComposite;
                         downwellSelectedStyleFrameReady();
                     }
 #endif

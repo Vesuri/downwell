@@ -291,6 +291,36 @@ def build_pack(manifest, extracted, profile):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
+            if profile == "game" and sprite_id in (27, 43, 44):
+                # Style bobs contain large transparent margins. Trim offline
+                # while retaining exactly the same world-space anchor.
+                bounds = canvas.getbbox()
+                require(bounds is not None, "empty style bob")
+                cropped = canvas.crop(bounds)
+                pens = [pixel_to_pen(pixel) for pixel in cropped.get_flattened_data()]
+                cropped_width, cropped_data = encode_planar(pens, cropped.width, cropped.height)
+                cropped_sprite = dict(sprite, id={27: 65500, 43: 65501, 44: 65502}[sprite_id],
+                                      width=cropped.width, height=cropped.height,
+                                      originX=sprite["originX"] - bounds[0],
+                                      originY=sprite["originY"] - bounds[1])
+                encoded.append((cropped_sprite, frame_index, cropped_width, cropped_data))
+            if profile == "game" and sprite_id == 44:
+                mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                mirrored_pens = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
+                mirrored_width, mirrored_data = encode_planar(
+                    mirrored_pens, mirrored.width, mirrored.height)
+                mirrored_sprite = dict(sprite, id=65401,
+                                       originX=sprite["width"] - sprite["originX"])
+                encoded.append((mirrored_sprite, frame_index, mirrored_width, mirrored_data))
+                bounds = mirrored.getbbox()
+                cropped = mirrored.crop(bounds)
+                pens = [pixel_to_pen(pixel) for pixel in cropped.get_flattened_data()]
+                cropped_width, cropped_data = encode_planar(pens, cropped.width, cropped.height)
+                cropped_sprite = dict(mirrored_sprite, id=65503,
+                                      width=cropped.width, height=cropped.height,
+                                      originX=mirrored_sprite["originX"] - bounds[0],
+                                      originY=mirrored_sprite["originY"] - bounds[1])
+                encoded.append((cropped_sprite, frame_index, cropped_width, cropped_data))
             if profile == "game" and sprite_id == 654:
                 aligned = Image.new(
                     "RGBA", (sprite["width"] + MENU_TITLE_LEFT_PADDING,
@@ -314,6 +344,7 @@ def build_pack(manifest, extracted, profile):
                 encoded.append((aligned_sprite, frame_index,
                                 aligned_dma_width, aligned_planar))
 
+    style_text = {}
     for text_id, text in TEXT_SELECTIONS.get(profile, {}).items():
         canvas = render_text(manifest, pages, text)
         if text_id in (65000, 65001, 65003):
@@ -325,6 +356,7 @@ def build_pack(manifest, extracted, profile):
             canvas = Image.new("RGBA", (foreground.width, foreground.height + 1))
             canvas.alpha_composite(shadow, (0, 1))
             canvas.alpha_composite(foreground, (0, 0))
+        style_text[text_id] = canvas
         pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
         dma_width, planar = encode_planar(pens, canvas.width, canvas.height)
         sprite = {
@@ -335,6 +367,24 @@ def build_pack(manifest, extracted, profile):
             "height": canvas.height,
         }
         encoded.append((sprite, 0, dma_width, planar))
+
+    if profile == "game":
+        # Static style text panels, relative to centerY-80. They also serve
+        # as clean backing pixels when restoring the moving carousel band.
+        for locked in (0, 1):
+            panel = Image.new("RGBA", (160, 128), (0, 0, 0, 0))
+            for ident, y in ((65000, 10), (65003 if locked else 65001, 90)):
+                text = style_text[ident]
+                panel.alpha_composite(text, (80 - text.width // 2, y))
+            if not locked:
+                text = style_text[65002]
+                white = Image.new("RGBA", text.size, (255, 255, 255, 255))
+                white.putalpha(text.getchannel("A"))
+                panel.alpha_composite(white, (80 - text.width // 2, 112))
+            pens = [pixel_to_pen(pixel) for pixel in panel.get_flattened_data()]
+            dma_width, planar = encode_planar(pens, 160, 128)
+            encoded.append((dict(id=65410 + locked, originX=0, originY=0,
+                                 width=160, height=128), 0, dma_width, planar))
 
     for text_id, (text, color) in CREDIT_TEXT_SELECTIONS.get(profile, {}).items():
         canvas = render_bordered_text(manifest, pages, text, color)
