@@ -2,6 +2,7 @@
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
+#include "BatMotion.h"
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
 #include "PackedRoomLoader.h"
@@ -702,26 +703,23 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.frogLanded = false;
             }
         } else if (enemy.objectId == 116) {
-            constexpr float pi = 3.14159265358979323846F;
-            const float target = std::atan2(-(mainPlayerY_ - enemy.preciseY),
-                                            mainPlayerX_ - enemy.preciseX) *
-                                 180.0F / pi +
-                static_cast<float>(random_.random(40.0) - 20.0);
-            float difference = enemy.direction - target;
-            while (difference > 180.0F) difference -= 360.0F;
-            while (difference < -180.0F) difference += 360.0F;
-            if (std::abs(difference) < 20.0F)
-                enemy.moveSpeed = std::min(1.25F, enemy.moveSpeed + 0.05F);
-            else
-                enemy.moveSpeed = std::max(1.0F, enemy.moveSpeed - 0.025F);
-            enemy.direction += difference > 0.0F ? -10.0F : 10.0F;
-            const float radians = enemy.direction * pi / 180.0F;
-            enemy.velocityX = std::cos(radians) * enemy.moveSpeed;
-            enemy.velocityY = -std::sin(radians) * enemy.moveSpeed;
-            const float nextX = enemy.preciseX + enemy.velocityX;
-            const float nextY = enemy.preciseY + enemy.velocityY;
-            if (!mainSolidAt(nextX, enemy.preciseY)) enemy.preciseX = nextX;
-            if (!mainSolidAt(enemy.preciseX, nextY)) enemy.preciseY = nextY;
+            BatMotion bat{
+                static_cast<long>(std::round(enemy.preciseX * 256.0F)),
+                static_cast<long>(std::round(enemy.preciseY * 256.0F)), 0, 0,
+                static_cast<int>(enemy.direction),
+                static_cast<int>(std::round(enemy.moveSpeed * 40.0F))
+            };
+            stepBatMotion(bat,
+                mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
+                mainPlayerOriginY_ * 256L + mainPlayerMotion_.frameStartYFixed(),
+                random_.nextU32(),
+                [this](int x, int y) { return mainSolidAt(x, y); });
+            enemy.preciseX = bat.x / 256.0F;
+            enemy.preciseY = bat.y / 256.0F;
+            enemy.velocityX = bat.speedX / 256.0F;
+            enemy.velocityY = bat.speedY / 256.0F;
+            enemy.direction = static_cast<float>(bat.direction);
+            enemy.moveSpeed = bat.speedFortieths / 40.0F;
             enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
         } else if (enemy.objectId == 117) {
             if (enemy.motionState == 0) {

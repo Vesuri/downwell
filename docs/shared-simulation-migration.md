@@ -201,3 +201,54 @@ replay pin. Bounded 68000 cross-CPU replay retains `64 bfbbd762 b9b62a59`; the
 68000 audits are clean. SDL was rebuilt and the normal Amiga build restored
 after the skip-to-game verification. Extended combat remains a failing gate,
 not a suppressed or relaxed test.
+
+## Shared active-bat motion
+
+`BatMotion.h` replaces both native ten-degree-bin/cross-product steering and
+SDL floating-point steering. Both adapters execute the same fixed-point update
+for active, non-stunned bats. Source references are `enmBat_Create_0`,
+`enmBat_Step_0` (including the VM's ordered movesp branches and strict signed
+turn tests), and `scrPlMovement`'s publication of global.eplx/eply before player
+position integration. `PlayerMotion` retains that frame-start snapshot for
+both backends; the former paths targeted the post-movement player instead.
+
+The shared routine consumes exactly one RNG word per active update and retains
+fractional random_range jitter in Q16 degrees. Speed is represented in exact
+fortieths: +.05 inside the cone, -.025 outside, and a separate -.2 when above
+1.25. Thus 1.225 accelerating to 1.275 becomes 1.075, not a clamp to 1.25. Zero
+angular difference does not turn. Native Q8 storage round-trips all these speed
+steps; both adapters preserve Q8 positions and velocities.
+
+"Exact fortieths" describes the rational constants, not GameMaker's binary
+floating-point accumulation. Speed comparisons near 1 and 1.25 still require
+original-runtime validation for floating-point boundary effects, just as Q8
+velocity integration is not an exact double-precision trajectory oracle.
+
+CORDIC computes point_direction without soft-float, and a mathematical Q15
+quarter-sine table supplies integer-degree lengthdir components. Host tests
+compare all quadrants and several radii against atan2, with maximum observed
+angle error 0.00174774 degrees (required bound .004), plus every table angle
+against sin within half a Q15 unit. This is bounded numeric approximation, not
+bit-identical GameMaker double math; a decision extremely close to a threshold
+can still differ. A 1000-update fixture checks translation invariance between
+the backends' coordinate systems. Live scene comparisons also check exact bat
+position, direction and velocity whenever the paired bat is active.
+
+The prior first combat mismatch at tick 702 moves to 712. At 712 the bat's
+precise coordinates agree (298.418,2326.55), but player damage differs. Native
+contact currently uses a truncated player pixel and rounded enemy pixel;
+SDL uses precise positions. Its generic contact rectangle is not yet the
+original sprite-mask collision event. Source typStompable also compares to the
+pre-movement global.ply. This is the next shared-contact migration, not a
+reason to silently widen collision tolerances. Extended combat remains failed.
+
+Other open bat fidelity work: initial hanging/activation and hit-stun branches,
+full sprite-mask scrCheckCollisionWith (current adapters still query points),
+and original time-stop/water/upgrade behavior. Sharing steering is not proof
+of complete bat or game fidelity.
+
+Validation: full host suite (including angle/speed/translation fixtures),
+bounded 64-frame cross-target replay and 600-tick A500 terrain-cache oracle
+pass. The canonical replay digest remains `bfbbd762b9b62a59`; that short tape
+is not a standalone proof of bat accuracy. Target instruction and 64-bit
+helper audits pass. Normal SDL/Amiga builds are restored after verification.

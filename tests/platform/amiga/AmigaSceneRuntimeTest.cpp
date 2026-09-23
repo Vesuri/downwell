@@ -254,6 +254,14 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             }
             require(native.objectId == enemy.objectId,
                     "paired actor identity matches throughout live comparison");
+            if (enemy.objectId == 116 && enemy.active && native.active) {
+                require(240.0F + native.preciseX / 256.0F == enemy.preciseX &&
+                        176.0F + native.preciseY / 256.0F == enemy.preciseY &&
+                        native.direction == static_cast<int>(enemy.direction) &&
+                        native.speedX / 256.0F == enemy.velocityX &&
+                        native.speedY / 256.0F == enemy.velocityY,
+                        "active bat adapters preserve exact shared state on the comparison tape");
+            }
             if (enemy.active && native.active)
                 require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
                             native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
@@ -764,7 +772,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     const auto& enemy = gameplay.enemyAt(i);
                     std::cout << "COMBAT NATIVE ENEMY " << i << ' ' << enemy.objectId
                               << " active=" << enemy.active << " hp=" << enemy.health
-                              << " position=" << 240 + enemy.x << ',' << 176 + enemy.y << '\n';
+                              << " position=" << 240 + enemy.x << ',' << 176 + enemy.y
+                              << " precise=" << 240 + enemy.preciseX / 256.0F << ','
+                              << 176 + enemy.preciseY / 256.0F << '\n';
                 }
                 for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
                     const auto& enemy = reference.instanceAt(i);
@@ -772,7 +782,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                         enemy.objectId == 116 || enemy.objectId == 117 || enemy.objectId == 119)
                         std::cout << "COMBAT SDL ENEMY " << enemy.objectId
                                   << " active=" << enemy.active << " hp=" << enemy.health
-                                  << " position=" << enemy.x << ',' << enemy.y << '\n';
+                                  << " position=" << enemy.x << ',' << enemy.y
+                                  << " precise=" << enemy.preciseX << ',' << enemy.preciseY << '\n';
                 }
             }
         }

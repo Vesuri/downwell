@@ -87,10 +87,13 @@ int main() {
     long fifthsPosition = 0;
     long fifthsSpeed = 0;
     for (unsigned tick = 0; tick < 100; ++tick) {
+        const long frameStartY = gravityPrecision.offsetYFixed();
         fifthsSpeed += 256;
         if (fifthsSpeed > 7 * 256 * 5) fifthsSpeed = 7 * 256 * 5;
         fifthsPosition += fifthsSpeed;
         gravityPrecision.step(downwell::Input{});
+        require(gravityPrecision.frameStartYFixed() == frameStartY,
+                "enemy targeting retains scrPlMovement's pre-integration player position");
         require(gravityPrecision.offsetYFixed() == fifthsPosition / 5,
                 "shared player preserves exact .2 gravity and position integration through terminal speed");
     }

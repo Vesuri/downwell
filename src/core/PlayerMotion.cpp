@@ -93,6 +93,8 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
 
 PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controlsLocked)
 {
+    frameStartX_ = x_;
+    frameStartY_ = y_;
     const int oldPixelX = pixelX_;
     const int oldPixelY = pixelY_;
     const bool firePressed = input.fire && !priorFire_;
@@ -314,6 +316,7 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
     // Serialize authoritative state, not float presentation mirrors or
     // callback addresses. Timer/fraction differences affect future behavior.
     digest.addI32(x_); digest.addI32(y_);
+    digest.addI32(frameStartX_); digest.addI32(frameStartY_);
     digest.addI32(speedX_); digest.addI32(speedY_);
     digest.addI32(gravityRemainder_);
     digest.addI32(verticalPositionRemainder_);

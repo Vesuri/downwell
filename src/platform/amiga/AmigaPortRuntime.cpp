@@ -4,42 +4,11 @@
 #include "core/PortCheckpoint.h"
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
+#include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
 
 namespace {
-
-const short headingX[36] = {
-     256,  252,  241,  222,  196,  165,  128,   88,   44,
-       0,  -44,  -88, -128, -165, -196, -222, -241, -252,
-    -256, -252, -241, -222, -196, -165, -128,  -88,  -44,
-       0,   44,   88,  128,  165,  196,  222,  241,  252
-};
-
-const short headingY[36] = {
-       0,   44,   88,  128,  165,  196,  222,  241,  252,
-     256,  252,  241,  222,  196,  165,  128,   88,   44,
-       0,  -44,  -88, -128, -165, -196, -222, -241, -252,
-    -256, -252, -241, -222, -196, -165, -128,  -88,  -44
-};
-
-int positiveDirection(int direction)
-{
-    if (direction >= 0 && direction < 360) return direction;
-    if (direction >= -360 && direction < 0) return direction + 360;
-    if (direction >= 360 && direction < 720) return direction - 360;
-    direction %= 360;
-    return direction < 0 ? direction + 360 : direction;
-}
-
-struct HeadingIndices { unsigned char values[360] = {}; };
-constexpr HeadingIndices makeHeadingIndices() {
-    HeadingIndices result;
-    for (unsigned angle = 0; angle < 360; ++angle)
-        result.values[angle] = ((angle + 5) / 10) % 36;
-    return result;
-}
-constexpr auto headingIndices = makeHeadingIndices();
 
 int absoluteInt(int value)
 {
@@ -656,43 +625,19 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 }
             }
         } else if (enemy.objectId == 116) {
-            const int dx = player_.offsetX() - enemy.x;
-            const int dy = enemy.y - player_.offsetY();
-            const int distance = absoluteInt(dx) + absoluteInt(dy);
-            const int headingIndex = headingIndices.values[positiveDirection(enemy.direction)];
-            const int currentX = headingX[headingIndex];
-            const int currentY = headingY[headingIndex];
-            const int jitter =
-                (int)enemyRandom_.randomIntegerSmall(40) - 20;
-            long cross = (long)currentX * dy - (long)currentY * dx;
-            cross += (long)jitter * distance * 4L;
-            const long dot = (long)currentX * dx + (long)currentY * dy;
-            if (dot > 0 && (cross < 0 ? -cross : cross) <
-                               (long)distance * 88L) {
-                enemy.moveSpeed += 13;
-                if (enemy.moveSpeed > 320)
-                    enemy.moveSpeed = 320;
-            } else {
-                enemy.moveSpeed -= 6;
-                if (enemy.moveSpeed < 256)
-                    enemy.moveSpeed = 256;
-            }
-            enemy.direction = positiveDirection(
-                enemy.direction + (cross > 0 ? 10 : -10));
-            const int nextHeading = headingIndices.values[enemy.direction];
-            enemy.speedX =
-                (long)headingX[nextHeading] * enemy.moveSpeed / 256L;
-            enemy.speedY =
-                -(long)headingY[nextHeading] * enemy.moveSpeed / 256L;
-            const long nextPreciseX = enemy.preciseX + enemy.speedX;
-            const long nextPreciseY = enemy.preciseY + enemy.speedY;
-            if (!solidResolver_(solidResolverContext_,
-                                (int)(nextPreciseX / 256L), enemy.y))
-                enemy.preciseX = nextPreciseX;
-            if (!solidResolver_(solidResolverContext_,
-                                (int)(enemy.preciseX / 256L),
-                                (int)(nextPreciseY / 256L)))
-                enemy.preciseY = nextPreciseY;
+            downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, 0, 0,
+                enemy.direction, (enemy.moveSpeed * 40 + 128) / 256};
+            downwell::stepBatMotion(bat, player_.frameStartXFixed(),
+                player_.frameStartYFixed(), enemyRandom_.nextU32(),
+                [this](int x, int y) {
+                    return solidResolver_(solidResolverContext_, x, y);
+                });
+            enemy.preciseX = bat.x;
+            enemy.preciseY = bat.y;
+            enemy.speedX = bat.speedX;
+            enemy.speedY = bat.speedY;
+            enemy.direction = bat.direction;
+            enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         } else if (enemy.objectId == 113) {
             enum { halfWidth = 7, foot = 8 };
             // Ground support is queried every Step in the recovered frog

@@ -54,6 +54,9 @@ public:
     int offsetY() const { return pixelY_; }
     long offsetXFixed() const { return x_; }
     long offsetYFixed() const { return y_; }
+    // scrPlMovement publishes global.eplx/eply before position integration.
+    long frameStartXFixed() const { return frameStartX_; }
+    long frameStartYFixed() const { return frameStartY_; }
     long speedXFixed() const { return speedX_; }
     long speedYFixed() const { return speedY_; }
     bool jumpShootLocked() const { return jumpShootLocked_; }
@@ -76,6 +79,8 @@ private:
 
     long x_;
     long y_;
+    long frameStartX_ = 0;
+    long frameStartY_ = 0;
     long speedX_;
     long speedY_;
     int gravityRemainder_; // signed fifths of a Q8 velocity unit
