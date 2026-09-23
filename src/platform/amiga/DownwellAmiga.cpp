@@ -151,6 +151,10 @@ volatile const UBYTE* gDownwellSelectedStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
 volatile const UBYTE* gDownwellCreditsFrame;
+#ifdef DOWNWELL_SCENE_VERIFY
+volatile ULONG gDownwellSplashCheckedFrames[7];
+volatile ULONG gDownwellSplashPublicationFailures;
+#endif
 
 struct DownwellMenuFrameCapture {
     ULONG foregroundOffset;
@@ -808,6 +812,7 @@ int main(void) {
     unsigned menuSpriteFrameCount = 0;
     int renderedMenuTitleFrame = -1;
 #ifdef DOWNWELL_SCENE_VERIFY
+    const UWORD* expectedSplashCopper = 0;
     bool sceneGameplayLandedReported = false;
     bool sceneGameplayActiveReported = false;
     bool sceneMenuTitleReported = false;
@@ -1101,6 +1106,9 @@ int main(void) {
     platform.publish(gameplayCopperLists[dynamicCopper0]);
 #else
     platform.publish(splashBlankList);
+#ifdef DOWNWELL_SCENE_VERIFY
+    expectedSplashCopper = splashBlankList.data();
+#endif
 #endif
     platform.waitVblank();
     FreeMem(startupCopperWords, 4 * sizeof(UWORD));
@@ -1136,6 +1144,15 @@ int main(void) {
         int destroyedBlockX[AmigaPortRuntime::bulletCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::bulletCapacity] = {0};
         platform.waitVblank();
+#ifdef DOWNWELL_SCENE_VERIFY
+        // Check AFTER the preceding iteration completed, not at its first
+        // publish: a later scene branch must not replace the splash program.
+        if (presentedScene == AmigaScene::splash) {
+            ++gDownwellSplashCheckedFrames[presentedSplash];
+            if (platform.publishedCopper() != expectedSplashCopper)
+                ++gDownwellSplashPublicationFailures;
+        }
+#endif
 #ifndef DOWNWELL_REPLAY_VERIFY
         if (++liveFrameCount == 64)
             downwellFrameLoopReady();
@@ -1199,16 +1216,15 @@ int main(void) {
                         if (!built)
                             break;
                         platform.publish(*splashProgram);
+#ifdef DOWNWELL_SCENE_VERIFY
+                        expectedSplashCopper = splashProgram->data();
+#endif
                         /*
-                         * The VBlank handler makes the queued program live
-                         * and only then advances the frame counter. Hold each
-                         * discrete stage here until that handoff is complete.
+                         * Let hardware restart the selected program at VBlank
+                         * before reporting the discrete stage to capture tools.
                          */
                         if (presentationChanged)
                             platform.waitVblank();
-                        if (presentationChanged &&
-                            !platform.isLive(*splashProgram))
-                            break;
 #ifdef DOWNWELL_SCENE_VERIFY
                         if (!sceneCreditsFrameReported &&
                             presentedSplash == 3) {
@@ -1232,6 +1248,9 @@ int main(void) {
                         }
 #endif
                     }
+                    // Splash owns this frame. Falling through would publish
+                    // the gameplay list over it on every stage transition.
+                    continue;
                 }
                 else if (presentedScene == AmigaScene::menu) {
                     if (presentationChanged &&

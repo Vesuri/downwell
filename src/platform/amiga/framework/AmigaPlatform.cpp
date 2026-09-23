@@ -13,14 +13,12 @@ extern struct ExecBase* SysBase;
 extern struct GfxBase* GfxBase;
 
 volatile UWORD AmigaPlatform::vblankCount_ = 0;
-const UWORD* volatile AmigaPlatform::pendingCopper_ = 0;
-const UWORD* volatile AmigaPlatform::liveCopper_ = 0;
 
 static_assert(__builtin_offsetof(struct ExecBase, IntVects) == 84,
               "ExecBase IntVects layout must match the VERTB takeover");
 
 AmigaPlatform::AmigaPlatform()
-    : savedView_(0), osCopper_(0), savedDmacon_(0), savedIntena_(0),
+    : publishedCopper_(0), savedView_(0), osCopper_(0), savedDmacon_(0), savedIntena_(0),
       active_(false)
 {
     GfxBase = (struct GfxBase*)OpenLibrary((CONST_STRPTR)"graphics.library", 33);
@@ -43,18 +41,6 @@ bool AmigaPlatform::available() const
 ULONG AmigaPlatform::vblankHandler()
 {
     AmigaHardware::clearInterruptRequests(INTF_VERTB);
-    /*
-     * Make the published list live before advancing the frame counter.  The
-     * main thread's waitVblank() therefore cannot return until COP1LC and the
-     * copper PC both refer to the new program. This is the same published /
-     * live distinction used by Rescue on Fractalus for double-buffered lists.
-     */
-    const UWORD* copper = pendingCopper_;
-    if (copper) {
-        pendingCopper_ = 0;
-        AmigaHardware::setCopperList(copper, true);
-        liveCopper_ = copper;
-    }
     ++vblankCount_;
     return 0;
 }
@@ -97,9 +83,7 @@ bool AmigaPlatform::takeover(const CopperList& firstCopper,
     Enable();
 
     vblankCount_ = 0;
-    pendingCopper_ = 0;
-    liveCopper_ = firstCopper.data();
-    AmigaHardware::setCopperList(firstCopper);
+    publish(firstCopper);
     AmigaHardware::setInterrupts(INTF_INTEN | INTF_VERTB, true);
     AmigaHardware::setDMAChannels(DMAF_MASTER | DMAF_COPPER |
                                   DMAF_RASTER | DMAF_SPRITE |
@@ -111,12 +95,8 @@ bool AmigaPlatform::takeover(const CopperList& firstCopper,
 
 void AmigaPlatform::publish(const CopperList& copper)
 {
-    pendingCopper_ = copper.data();
-}
-
-bool AmigaPlatform::isLive(const CopperList& copper) const
-{
-    return liveCopper_ == copper.data();
+    AmigaHardware::setCopperList(copper, false);
+    publishedCopper_ = copper.data();
 }
 
 void AmigaPlatform::waitVblank() const
@@ -129,8 +109,7 @@ void AmigaPlatform::restore()
 {
     if (!active_) return;
 
-    pendingCopper_ = 0;
-    liveCopper_ = 0;
+    publishedCopper_ = 0;
     AmigaHardware::setInterrupts(INTF_VERTB, false);
     AmigaHardware::clearInterruptRequests(INTF_VERTB);
     AmigaHardware::setDMAChannels(DMAF_RASTER | DMAF_SPRITE | DMAF_COPPER,

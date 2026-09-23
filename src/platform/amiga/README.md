@@ -51,10 +51,11 @@ Its machine lifecycle is owned by the shared-style `AmigaPlatform` class and
 follows Rescue on Fractalus: allocation and the two
 `WaitTOF()` calls which retire the Workbench display happen before takeover;
 the live program owns the raw VERTB vector, forbids multitasking, and waits on
-its own interrupt counter. Copper swaps are queued by the main loop; the raw
-VBlank handler installs COP1LC, strobes COPJMP1, and only then advances the
-counter that releases the main thread. This keeps published and live lists
-distinct and makes every swap occur at a known beam-safe point. Teardown stops
+its own interrupt counter. The platform publishes completed copper programs
+through `AmigaHardware::setCopperList(list, false)`; hardware restarts them at
+the next VBlank. The interrupt handler only acknowledges VERTB and advances
+the counter. Each scene finishes its frame before another scene can publish.
+Teardown stops
 the display, restores `graphics.library`'s startup copper and the saved
 interrupt/DMA state, permits multitasking, and only then restores the View.
 It exits back to Workbench on a fresh left-mouse click.
@@ -76,6 +77,17 @@ then walks into more than 256 pixels of circular-buffer scrolling. It stops
 only after a generated enemy is awake and that gameplay frame and copper list
 have been published. It also restores the normal playable executable after
 passing.
+
+The scene verifier checks the selected copper program after every complete
+splash iteration: all 180 logo frames, 180 credits frames, 240 controls frames,
+and both 60-frame fades. This catches a later branch overwriting a splash
+publication, which a capture taken immediately after the first publish misses.
+The original failure was a fall-through from the splash branch into the
+gameplay transition publisher: it replaced the intended list with one pointing
+at the HUD/credits raster for the entire stage. Splash, menu, and style branches
+must finish their iteration without reaching the gameplay publisher.
+Removing the splash branch's terminating `continue` makes this verifier report
+600 overwritten frames; the corrected scene sequence passes.
 
 `make verify-amiga-credits-frame` stops on splash stage 3 and captures the
 fixed 384x284 two-plane HUD backing raster.  Its decoder applies the real
