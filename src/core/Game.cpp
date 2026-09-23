@@ -54,7 +54,11 @@ Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
            const BuilderPatternPack* builderPatternPack)
     : startup_(PlatformProfile::desktop, roomPack, objectPack,
                StartupRuntime::defaultRandomSeed, builderPatternPack),
-      objectPack_(objectPack) {}
+      objectPack_(objectPack) {
+#ifdef DOWNWELL_SKIP_INTRO
+    startup_.skipIntroForTesting();
+#endif
+}
 
 void Game::update(const Input& input) {
     finished_ = finished_ || input.quit;

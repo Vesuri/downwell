@@ -10,6 +10,7 @@ REPO     := ..
 AMIGA_SRC := $(REPO)/src/platform/amiga
 REPLAY_VERIFY ?= 0
 SCENE_VERIFY ?= 0
+SKIP_INTRO ?= 0
 PROBES ?= 0
 FPSCOUNT ?= 0
 PROFILE_AUTORUN ?= 0
@@ -28,6 +29,9 @@ CFLAGS += -DDOWNWELL_REPLAY_VERIFY
 endif
 ifeq ($(SCENE_VERIFY),1)
 CFLAGS += -DDOWNWELL_SCENE_VERIFY
+endif
+ifeq ($(SKIP_INTRO),1)
+CFLAGS += -DDOWNWELL_SKIP_INTRO
 endif
 ifeq ($(PROBES),1)
 CFLAGS += -DDOWNWELL_PROBES
@@ -71,6 +75,14 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 .PHONY: all check clean audit
 
 all: check $(OUT).exe
+
+.PHONY: FORCE_STARTUP_OPTIONS
+obj/startup-options: FORCE_STARTUP_OPTIONS
+	@mkdir -p obj
+	@printf '%s\n' '$(SKIP_INTRO)' > $@.tmp
+	@cmp -s $@.tmp $@ || cp $@.tmp $@
+
+$(OBJECTS): obj/startup-options
 
 check:
 	@set -e; for tool in $(CC) $(AS) $(OBJDUMP) elf2hunk; do \

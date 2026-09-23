@@ -9,6 +9,25 @@ selected 68000 assembly.
 This repository does not distribute the original game. A locally owned Steam
 build lives under `data/`, which is ignored by Git and treated as immutable.
 
+## Startup shortcut
+
+To build directly into STYLE SELECT for testing, skipping logos, credits,
+controls and the garden:
+
+```sh
+make SKIP_INTRO=1                 # SDL
+make run SKIP_INTRO=1             # build and run SDL
+make amiga SKIP_INTRO=1           # Amiga
+# Or, from amiga/: . ./env.sh && make SKIP_INTRO=1
+```
+
+The default is `SKIP_INTRO=0`. Switching the value rebuilds the target's objects
+automatically. This sets `DOWNWELL_SKIP_INTRO`; it skips presentation, not the
+asset/controller initialization required by later scenes. Style selection keeps
+its normal entrance animation and confirmation behavior. Use normal startup
+for garden profiling and intro replay checks. The headless regression check is
+`make build/skip-intro-test && build/skip-intro-test`.
+
 ## Repository layout
 
 ```text

@@ -979,6 +979,15 @@ int main(void) {
         return 1;
     }
 
+#ifdef DOWNWELL_SKIP_INTRO
+    if (!amigaBuildStyleBorder(activeGamePack, activeGamePackEnd,
+                              memory.sceneCache() + amigaStyleFrameBytes * 2)) {
+        platform.restore();
+        FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+        memory.release();
+        return 1;
+    }
+#endif
     /*
      * The scene-specific wrappers below deliberately share two alternating
      * Chip RAM programs. Only the wrapper for the active scene writes a slot;

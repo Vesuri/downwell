@@ -2,11 +2,16 @@
 # only src/platform/sdl and main.cpp include SDL headers.
 
 CXX := clang++
+SKIP_INTRO ?= 0
+export SKIP_INTRO
 
 SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
 SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image)
 
 CPPFLAGS := -Isrc $(SDL_CFLAGS)
+ifeq ($(SKIP_INTRO),1)
+CPPFLAGS += -DDOWNWELL_SKIP_INTRO
+endif
 CXXFLAGS := -std=c++17 -g -O0 -Wall -Wextra -Wpedantic -MMD -MP
 LDFLAGS  := $(SDL_LDFLAGS)
 
@@ -92,6 +97,18 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 .PHONY: all run test trace-area-one extract verify-extraction generate-room-pack verify-room-pack generate-object-pack verify-object-pack generate-sprite-pack verify-sprite-pack generate-font-pack verify-font-pack generate-builder-pattern-pack verify-builder-pattern-pack generate-amiga-hud verify-amiga-hud generate-amiga-game verify-amiga-game verify-native-data verify-amiga-startup verify-amiga-menu-title verify-amiga-menu-entry verify-amiga-menu-wake-frame verify-amiga-menu-title-frame verify-amiga-menu-entry-frame verify-amiga-gameplay-frame verify-amiga-gameplay-active-frame verify-amiga-splash-frame verify-amiga-controls-frame verify-amiga-credits-frame verify-amiga-style-frame verify-amiga-locked-style-frame verify-amiga-selected-style-frame verify-amiga-scenes verify-cross-replay amiga clean
 
 all: $(TARGET)
+
+build/skip-intro-test: tests/core/SkipIntroTest.cpp $(filter-out tests/core/GameRenderTest.cpp,$(GAME_RENDER_TEST_SOURCES)) src/platform/amiga/AmigaSceneRuntime.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -o $@ $^
+
+.PHONY: FORCE_STARTUP_OPTIONS
+build/startup-options: FORCE_STARTUP_OPTIONS
+	@mkdir -p build
+	@printf '%s\n' '$(SKIP_INTRO)' > $@.tmp
+	@cmp -s $@.tmp $@ || cp $@.tmp $@
+
+$(OBJECTS): build/startup-options
 
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)

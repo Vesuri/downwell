@@ -34,6 +34,10 @@ AmigaSceneRuntime::AmigaSceneRuntime()
       stylePlayerDescent_(0), stylePlayerSpeedY_(0),
       styleVerticalDitherY_(-320 * fixedOne)
 {
+#ifdef DOWNWELL_SKIP_INTRO
+    splashStage_ = 0;
+    enterStyleSelect();
+#endif
 }
 
 int AmigaSceneRuntime::roundedPixel(long value)

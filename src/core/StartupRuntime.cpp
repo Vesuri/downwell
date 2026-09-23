@@ -178,6 +178,15 @@ void StartupRuntime::reset(PlatformProfile profile) {
     }
 }
 
+void StartupRuntime::skipIntroForTesting() {
+    // Run normal room Create initialization, including the garden RNG draws,
+    // but never present or step the skipped scenes.
+    showSplash_ = 0;
+    gotoRoom(menuRoomId);
+    if (roomLoadSucceeded_)
+        gotoRoom(playMenuRoomId);
+}
+
 void StartupRuntime::controllerCreate(PlatformProfile profile) {
     // objControlerN_Create_0 sets initTimes to zero, then scrInitialize()
     // increments it and establishes the platform profile.
