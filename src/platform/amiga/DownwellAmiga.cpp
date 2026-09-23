@@ -185,6 +185,7 @@ volatile DownwellMenuFrameCapture gDownwellMenuFrameCapture;
 volatile const UBYTE* gDownwellMenuForeground;
 volatile const UBYTE* gDownwellMenuBackground;
 volatile const UWORD* gDownwellMenuPlayerSprite;
+volatile const UWORD* gDownwellMenuTitleSprites;
 
 __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
     __asm__ volatile("" ::: "memory");
@@ -195,6 +196,10 @@ __attribute__((noinline, used)) void downwellSplashFrameReady(void) {
 }
 
 __attribute__((noinline, used)) void downwellMenuWakeFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellMenuTitleFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 }
@@ -1364,6 +1369,20 @@ int main(void) {
                         scenes.menuTitleFrame() == 9 &&
                         titlePartCount == menuTitleSpriteParts) {
                         sceneMenuTitleReported = true;
+                        gDownwellMenuFrameCapture.foregroundOffset =
+                            menuScroll.foregroundOffset;
+                        gDownwellMenuFrameCapture.backgroundOffset =
+                            menuScroll.backgroundOffset;
+                        gDownwellMenuFrameCapture.scrollControl =
+                            menuScroll.scrollControl;
+                        gDownwellMenuFrameCapture.titlePartCount =
+                            (UWORD)titlePartCount;
+                        gDownwellMenuForeground = memory.menuForeground();
+                        gDownwellMenuBackground = memory.menuBackground();
+                        gDownwellMenuPlayerSprite =
+                            memory.playerSprite(back);
+                        gDownwellMenuTitleSprites = titleSprites;
+                        downwellMenuTitleFrameReady();
                         downwellMenuTitleSpriteReady();
                     }
                     if (!sceneMenuEntryReported && menuEntry &&

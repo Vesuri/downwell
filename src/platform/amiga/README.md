@@ -86,3 +86,8 @@ state, and hardware sprite 0.  Its host decoder reconstructs the centered
 capture hash.  This also guards the monochrome cache rule: recovered white art
 is retained while opaque source black clears the layer instead of becoming a
 solid white silhouette.
+
+`make verify-amiga-menu-title-frame` extends the same reconstruction with all
+seven hardware-sprite strips of the fully revealed Downwell logo.  Its pinned
+capture proves the logo is present and centered while the goal-stopped player
+is correctly absent, before the vertical well-entry renderer takes over.

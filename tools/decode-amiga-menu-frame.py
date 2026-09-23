@@ -14,7 +14,7 @@ BYTES_PER_ROW = CACHE_WIDTH // 8
 PLANE_BYTES = BYTES_PER_ROW * CACHE_HEIGHT
 DISPLAY_WIDTH = 160
 DISPLAY_HEIGHT = 284
-CAPTURE_BYTES = 12 + PLANE_BYTES * 2 + 136
+SPRITE_BYTES = 136
 DISPLAY_HARDWARE_X = 0x61
 DISPLAY_HARDWARE_Y = 0x12
 PLAYFIELD_X = 110
@@ -50,17 +50,18 @@ def main():
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
     payload = args.input.read_bytes()
-    if len(payload) != CAPTURE_BYTES:
-        raise SystemExit(
-            f"expected {CAPTURE_BYTES} capture bytes, got {len(payload)}")
-
     foreground_offset, background_offset, scroll, title_parts = \
         struct.unpack_from(">IIHH", payload)
-    if title_parts != 0:
-        raise SystemExit("wake capture unexpectedly contains title sprites")
+    expected_bytes = 12 + PLANE_BYTES * 2 + \
+        SPRITE_BYTES * (1 + title_parts)
+    if len(payload) != expected_bytes:
+        raise SystemExit(
+            f"expected {expected_bytes} capture bytes for {title_parts} "
+            f"title sprites, got {len(payload)}")
     foreground = payload[12:12 + PLANE_BYTES]
     background = payload[12 + PLANE_BYTES:12 + PLANE_BYTES * 2]
-    player = payload[12 + PLANE_BYTES * 2:]
+    sprite_data = payload[12 + PLANE_BYTES * 2:]
+    player = sprite_data[:SPRITE_BYTES]
 
     foreground_y, foreground_byte = divmod(foreground_offset, BYTES_PER_ROW)
     background_y, background_byte = divmod(background_offset, BYTES_PER_ROW)
@@ -82,6 +83,9 @@ def main():
             pixels[y * DISPLAY_WIDTH + x] = \
                 1 if foreground_pen or background_pen else 0
     draw_sprite(pixels, player)
+    for part in range(title_parts):
+        start = SPRITE_BYTES * (part + 1)
+        draw_sprite(pixels, sprite_data[start:start + SPRITE_BYTES])
 
     image = Image.new("P", (DISPLAY_WIDTH, DISPLAY_HEIGHT))
     image.putpalette([component for color in PALETTE for component in color] +
