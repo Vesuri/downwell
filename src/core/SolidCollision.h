@@ -8,6 +8,25 @@ struct SolidCollisionResult {
     int y;
 };
 
+// scrWallCol blocks 32..35: after an upward contact, instance_place(xx,
+// yy-16,objBox_n) marks one box's wallHp zero and changes ysp from zero to 1.
+// The callback selects/mutates the world instance; this shared rule owns the
+// query offset and response, including the same-frame downward displacement.
+template<class Math, class BreakBox>
+typename Math::Number ceilingResponse(typename Math::Number x,
+    typename Math::Number y, BreakBox breakBox) {
+    return breakBox(x, y - 16 * Math::unit()) ? Math::unit() : 0;
+}
+
+// sprPlayerIdle at the instance_place query position against a 16x16 box.
+template<class N>
+bool playerMaskMeetsBox(N x, N y, N boxX, N boxY, N unit) {
+    return x + 3 * unit >= boxX - 8 * unit &&
+           x - 4 * unit <= boxX + 7 * unit &&
+           y + 7 * unit >= boxY - 8 * unit &&
+           y - 4 * unit <= boxY + 7 * unit;
+}
+
 // VM blocks 12..23, also usable while a caller still resolves X separately.
 // Do not call the full two-axis script with an artificial zero X velocity:
 // its rounded X probe can move a fractional X into an adjacent wall.

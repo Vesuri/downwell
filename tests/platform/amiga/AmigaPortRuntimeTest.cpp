@@ -208,6 +208,28 @@ int main() {
             "shot originates at pre-movement rounded instance coordinates before its own Step");
 
     AmigaPortRuntime destructible(300);
+    AmigaPortRuntime headBox(0);
+    const int headX[] = {0}, headY[] = {-24};
+    headBox.configureBreakables(headX, headY, 1);
+    headBox.configureSolidResolver([](void* opaque, int x, int y) {
+        const auto& runtime = *static_cast<AmigaPortRuntime*>(opaque);
+        return runtime.breakableActiveAt(0, -24) &&
+            x >= -8 && x <= 7 && y >= -32 && y <= -17;
+    }, &headBox);
+    headBox.step(4);
+    headBox.step(4);
+    const AmigaPortFrame headFrame = headBox.step(4);
+    require(headBox.blocksDestroyed() == 1 &&
+            !headBox.breakableActiveAt(0, -24) &&
+            headFrame.destroyedBlockCount == 1 &&
+            headFrame.blockX[0] == 0 && headFrame.blockY[0] == -24 &&
+            headBox.player().offsetYFixed() == -11 * 256 &&
+            !headBox.player().grounded() && headBox.player().shots() == 0,
+            "head contact breaks the box, moves down immediately, and invalidates terrain once");
+    require(headBox.step(4).destroyedBlockCount == 0 &&
+            headBox.blocksDestroyed() == 1,
+            "a destroyed ceiling box cannot issue repeated cache invalidations");
+
     AmigaPortRuntime wallShot(300, false, 1000);
     wallShot.configureSolidResolver(flatGround, nullptr);
     wallShot.step(4);

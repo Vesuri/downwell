@@ -10,6 +10,7 @@
 
 enum {
     amigaPortBulletCapacity = downwell::gameplayBulletCapacity,
+    amigaPortDestroyedCapacity = amigaPortBulletCapacity + 1,
     amigaPortEnemyCapacity = 64,
     amigaPortGemCapacity = downwell::gameplayGemCapacity
 };
@@ -26,14 +27,15 @@ struct AmigaPortFrame {
     bool cameraXChanged;
     int cameraXDelta;
     unsigned destroyedBlockCount;
-    int blockX[amigaPortBulletCapacity];
-    int blockY[amigaPortBulletCapacity];
+    int blockX[amigaPortDestroyedCapacity];
+    int blockY[amigaPortDestroyedCapacity];
 };
 
 class AmigaPortRuntime {
 public:
     static constexpr unsigned ringHeight = 320;
     static constexpr unsigned bulletCapacity = amigaPortBulletCapacity;
+    static constexpr unsigned destroyedCapacity = amigaPortDestroyedCapacity;
     static constexpr unsigned enemyCapacity = amigaPortEnemyCapacity;
     static constexpr unsigned gemCapacity = amigaPortGemCapacity;
     /* Player-relative Y at the recovered 284-pixel view bottom plus 32. */

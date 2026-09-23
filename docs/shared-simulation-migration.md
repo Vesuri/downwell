@@ -108,3 +108,38 @@ unchanged digest `bfbbd762b9b62a59`, and both 68000 audits are clean. This repla
 checks target execution stability, not the newly added ceiling case; the
 source-branch fixtures and the longer host combat trace exercise that case.
 The normal Amiga executable and playable SDL binary were rebuilt.
+
+## Shared box-above response
+
+The ceiling response now follows `scrWallCol` assembly blocks 32..35 in both
+runtimes: query the player mask at `(xx, yy-16)` against object 92, select the
+first overlapping box, and use downward velocity 1 (otherwise zero) before
+same-frame vertical integration. `ceilingResponse` and `playerMaskMeetsBox`
+own those rules; world adapters own the instance mutation.
+
+The Amiga adapter emits the head-broken box through the existing destroyed
+terrain list, so the backing terrain and visible buffers receive the existing
+cache invalidation. That list now holds bullet capacity plus one, accounting
+for a head collision and bullet hits in one frame. The player callback is
+bound only during the update and cleared afterwards: no stack callback context
+survives the frame or a later runtime copy/reset.
+
+Controlled host fixtures exercise the SDL live room and the portable native
+runtime: a box 24 pixels above the starting player is broken on the third
+held-jump update; the player ends 11 pixels above the start, moving downward
+without becoming grounded. Native tests also check the exact cache-update
+coordinates and absence of repeated invalidation. Shared tests check the
+yy-16 probe, ordinary ceiling response and inclusive mask edge overlap.
+
+Limitations retained explicitly: adapters currently retire the box immediately,
+as the existing bullet adapters do. The original marks wallHp zero and processes
+destruction in the box's ordinary Step, with sound, smoke/flash/debris, optional
+embedded currency and upgrade-dependent chain reactions. That complete event
+and its ordering still need a shared world implementation; this change does
+not claim those effects are present. Original collision-mask selection and
+the full two-axis script also remain ahead of final player-state consolidation.
+
+Validation: full host suite passes; bounded cross-target replay still returns
+`64 bfbbd762 b9b62a59`, with clean 68000 instruction/helper audits. Both playable
+binaries were rebuilt. The extended combat failure remains unchanged at tick
+702; this box fixture does not resolve enemy/contact-state divergence.

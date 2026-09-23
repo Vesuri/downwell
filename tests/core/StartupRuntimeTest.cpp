@@ -544,6 +544,31 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
 
         const float groundedY = runtime.mainPlayerY();
+        {
+            // A controlled ceiling fixture on a copy of the live room; never
+            // mutate exported resources or the original test trajectory.
+            auto headBoxRuntime = runtime;
+            downwell::InstanceRecord* ceilingBox = nullptr;
+            for (std::size_t i = 0; i < headBoxRuntime.activeInstanceCount(); ++i) {
+                auto& candidate = const_cast<downwell::InstanceRecord&>(headBoxRuntime.instanceAt(i));
+                if (candidate.objectId == 60) { ceilingBox = &candidate; break; }
+            }
+            require(ceilingBox != nullptr, "head-box fixture has a terrain instance");
+            ceilingBox->objectId = 92;
+            ceilingBox->active = true;
+            ceilingBox->x = static_cast<int>(headBoxRuntime.mainPlayerX());
+            ceilingBox->y = static_cast<int>(groundedY) - 24;
+            const auto before = headBoxRuntime.mainBlocksDestroyed();
+            headBoxRuntime.step(fireMain, true);
+            headBoxRuntime.step(fireMain, false);
+            headBoxRuntime.step(fireMain, false);
+            require(!ceilingBox->active &&
+                        headBoxRuntime.mainBlocksDestroyed() == before + 1 &&
+                        headBoxRuntime.mainPlayerSpeedY() == 1.0F &&
+                        headBoxRuntime.mainPlayerY() == groundedY - 11.0F &&
+                        !headBoxRuntime.mainPlayerGrounded(),
+                    "SDL head contact breaks one box and applies the source same-frame downward impulse");
+        }
         const std::uint32_t shotsBeforeJump = runtime.mainShotsFired();
         runtime.step(fireMain, true);
         require(runtime.mainJumps() == 1 && !runtime.mainPlayerGrounded() &&

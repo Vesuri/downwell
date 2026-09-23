@@ -1337,6 +1337,24 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!moveMainPlayerAxis(mainPlayerSpeedY_, false)) {
         mainPlayerGrounded_ = mainPlayerSpeedY_ > 0.0F;
         mainPlayerSpeedY_ = 0.0F;
+        if (!mainPlayerGrounded_) {
+            mainPlayerSpeedY_ = ceilingResponse<FloatCollisionMath>(
+                mainPlayerX_, mainPlayerY_, [this](float x, float y) {
+                    for (std::size_t i = 0; i < instances_.size(); ++i) {
+                        InstanceRecord& box = instances_.at(i);
+                        if (box.active && box.objectId == 92 && playerMaskMeetsBox(
+                                x, y, static_cast<float>(box.x),
+                                static_cast<float>(box.y), 1.0F)) {
+                            box.active = false;
+                            ++mainBlocksDestroyed_;
+                            ++soundPlayRequests_;
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+            mainPlayerY_ += mainPlayerSpeedY_;
+        }
     }
     if (!wasGrounded && mainPlayerGrounded_) {
         ++mainLandings_;

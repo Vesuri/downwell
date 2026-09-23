@@ -6,7 +6,7 @@
 // Portable default-style player state/update, extracted from the native port.
 // Terrain is queried through callbacks; rendering and hardware are not owned
 // here. This is an adaptation, not a complete implementation of scrWallCol:
-// box-above responses and original mask/event ordering remain migration work.
+// full original mask/event ordering remains migration work.
 
 struct PlayerMotionDelta {
     int deltaX;
@@ -17,6 +17,12 @@ class PlayerMotion {
 public:
     typedef int (*LandingResolver)(void* context, int x, int minimumY);
     typedef bool (*SolidResolver)(void* context, int x, int y);
+    // Coordinates use fifths of Q8, matching FixedCollisionMath.
+    typedef bool (*BreakBoxResolver)(void* context, long x, long y);
+    void configureBreakBoxResolver(BreakBoxResolver resolver, void* context) {
+        breakBoxResolver_ = resolver;
+        breakBoxContext_ = context;
+    }
 
     static constexpr int landingProfileLeft = -60;
     static constexpr unsigned landingProfileSize = 121;
@@ -67,6 +73,8 @@ private:
     LandingResolver landingResolver_;
     void* landingResolverContext_;
     SolidResolver solidResolver_;
+    BreakBoxResolver breakBoxResolver_ = nullptr;
+    void* breakBoxContext_ = nullptr;
     void* solidResolverContext_;
     int horizontalLeftLimit_;
     int horizontalRightLimit_;

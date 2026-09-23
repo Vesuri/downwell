@@ -5,6 +5,7 @@
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
 #include "core/Replay.h"
+#include "core/SolidCollision.h"
 
 namespace {
 
@@ -407,8 +408,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     const unsigned oldShots = player_.shots();
     bool bulletChanged = false;
     unsigned destroyedBlockCount = 0;
-    int destroyedBlockX[bulletCapacity] = {0};
-    int destroyedBlockY[bulletCapacity] = {0};
+    int destroyedBlockX[destroyedCapacity] = {0};
+    int destroyedBlockY[destroyedCapacity] = {0};
 
     ++tick_;
     if (dead_)
@@ -432,7 +433,32 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
     const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int muzzleY = (int)downwell::roundGameMakerQ8(player_.offsetYFixed()) + 4;
+    struct HeadBreakContext {
+        AmigaPortRuntime* runtime;
+        int index;
+    } headBreak = {this, -1};
+    player_.configureBreakBoxResolver([](void* opaque, long x, long y) {
+        auto& context = *static_cast<HeadBreakContext*>(opaque);
+        auto& runtime = *context.runtime;
+        for (unsigned i = 0; i < runtime.breakableCount_; ++i) {
+            Breakable& box = runtime.breakables_[i];
+            if (box.active && downwell::playerMaskMeetsBox(
+                    x, y, (long)box.x * 1280, (long)box.y * 1280, 1280L)) {
+                box.active = false;
+                ++runtime.blocksDestroyed_;
+                context.index = (int)i;
+                return true;
+            }
+        }
+        return false;
+    }, &headBreak);
     AmigaPlayerMotion motion = player_.step(input);
+    player_.configureBreakBoxResolver(nullptr, nullptr);
+    if (headBreak.index >= 0) {
+        const Breakable& box = breakables_[headBreak.index];
+        destroyedBlockX[destroyedBlockCount] = box.x;
+        destroyedBlockY[destroyedBlockCount++] = box.y;
+    }
     if (player_.shots() != oldShots) {
         unsigned index;
         for (index = 0; index < bulletCapacity; ++index) {
@@ -540,7 +566,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     bullet.y >= block.y - 8) {
                     block.active = false;
                     bullet.active = false;
-                    if (destroyedBlockCount < bulletCapacity) {
+                    if (destroyedBlockCount < destroyedCapacity) {
                         destroyedBlockX[destroyedBlockCount] = block.x;
                         destroyedBlockY[destroyedBlockCount] = block.y;
                         ++destroyedBlockCount;

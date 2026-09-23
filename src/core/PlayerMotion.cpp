@@ -221,7 +221,12 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input)
             if (hit < 0) {
                 y_ = collisionY / 5;
                 verticalPositionRemainder_ = (int)(collisionY % 5);
-                speedY_ = 0;
+                const long response = downwell::ceilingResponse<downwell::FixedCollisionMath>(
+                    collisionX, collisionY, [this](long x, long y) {
+                        return breakBoxResolver_ != nullptr &&
+                            breakBoxResolver_(breakBoxContext_, x, y);
+                    });
+                speedY_ = response / 5;
                 gravityRemainder_ = 0;
             }
         }

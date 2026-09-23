@@ -12,6 +12,19 @@ void require(bool condition, const char* message) {
 int main() {
     using Math = downwell::FixedCollisionMath;
     constexpr long unit = 1280;
+    unsigned boxQueries = 0;
+    require(downwell::ceilingResponse<Math>(2 * unit, 10 * unit,
+                [&boxQueries](long x, long y) {
+                    ++boxQueries;
+                    return x == 2 * unit && y == -6 * unit;
+                }) == unit && boxQueries == 1,
+            "original ceiling response probes yy-16 once and returns downward speed one");
+    require(downwell::ceilingResponse<Math>(0L, 0L,
+                [](long, long) { return false; }) == 0,
+            "an ordinary ceiling stops ascent without the box impulse");
+    require(downwell::playerMaskMeetsBox(11L, 0L, 0L, 0L, 1L) &&
+            !downwell::playerMaskMeetsBox(12L, 0L, 0L, 0L, 1L),
+            "instance_place uses the player mask, not a single point in the box");
     require(Math::round(10 * unit + unit / 2) == 10 * unit &&
             Math::round(11 * unit + unit / 2) == 12 * unit &&
             Math::round(-11 * unit - unit / 2) == -12 * unit &&

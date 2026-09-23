@@ -1439,8 +1439,8 @@ int main(void) {
         int scrollDelta = 0;
         bool cameraXChanged = false;
         unsigned destroyedBlockCount = 0;
-        int destroyedBlockX[AmigaPortRuntime::bulletCapacity] = {0};
-        int destroyedBlockY[AmigaPortRuntime::bulletCapacity] = {0};
+        int destroyedBlockX[AmigaPortRuntime::destroyedCapacity] = {0};
+        int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
         DW_PROFILE_PHASE(profileWait);
         platform.waitVblank();
         DW_PROFILE_PHASE(profileInput);
