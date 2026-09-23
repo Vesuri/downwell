@@ -20,7 +20,8 @@ EXPECTED="$("$REFERENCE")"
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
 printf 'cd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f out/Downwell.exe "$DH1/Downwell"
-rm -f "$RUN"/state/*.uss "$RUN/gdb-out.log" "$RUN/fsuae-replay.log"
+rm -f "$RUN"/state/*.uss "$RUN/gdb-out.log" "$RUN/fsuae-replay.log" \
+  "$RUN/gdb-ready.marker"
 
 fsuae_claim_port
 cleanup() {
@@ -59,7 +60,26 @@ lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 || {
 env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
   "$GDB" -q -batch \
   -ex "target remote 127.0.0.1:$DEBUG_PORT" \
-  -x replay_verify.gdb out/Downwell.elf > "$RUN/gdb-out.log" 2>&1
+  -x replay_verify.gdb out/Downwell.elf > "$RUN/gdb-out.log" 2>&1 &
+GDB_PID=$!
+
+for _ in $(seq 1 36000); do
+  if [ -f "$RUN/gdb-ready.marker" ]; then
+    fsuae_stop
+    break
+  fi
+  if ! kill -0 "$GDB_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 0.1
+done
+if kill -0 "$GDB_PID" 2>/dev/null; then
+  kill "$GDB_PID" 2>/dev/null || true
+  wait "$GDB_PID" 2>/dev/null || true
+  echo "debugger did not complete replay within one hour"
+  exit 1
+fi
+wait "$GDB_PID" 2>/dev/null || true
 
 ACTUAL="$(sed -n 's/^DOWNWELL_REPLAY_RESULT //p' "$RUN/gdb-out.log" | tail -1)"
 if [ -z "$ACTUAL" ]; then

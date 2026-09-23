@@ -27,7 +27,8 @@ mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
 printf 'cd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f out/Downwell.exe "$DH1/Downwell"
 find "$RUN/state" -name '*.uss' -delete
-rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log"
+rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \
+  "$RUN/gdb-ready.marker"
 
 cleanup() {
   fsuae_stop
@@ -65,7 +66,29 @@ lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 || {
 GDB_SCRIPT="$(fsuae_gdb_script "$GDB_SOURCE")"
 env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
   "$GDB" -q -batch -x "$GDB_SCRIPT" out/Downwell.elf \
-  > "$RUN/gdb-startup.log" 2>&1
+  > "$RUN/gdb-startup.log" 2>&1 &
+GDB_PID=$!
+
+# FS-UAE's remote stub does not answer GDB's detach packet reliably. Let the
+# breakpoint script publish its result first, then close the emulator side of
+# the connection so GDB can terminate instead of leaving the verifier hung.
+for _ in $(seq 1 36000); do
+  if [ -f "$RUN/gdb-ready.marker" ]; then
+    fsuae_stop
+    break
+  fi
+  if ! kill -0 "$GDB_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 0.1
+done
+if kill -0 "$GDB_PID" 2>/dev/null; then
+  kill "$GDB_PID" 2>/dev/null || true
+  wait "$GDB_PID" 2>/dev/null || true
+  echo "debugger did not reach ${READY_DESCRIPTION} within one hour"
+  exit 1
+fi
+wait "$GDB_PID" 2>/dev/null || true
 
 grep -q "^${READY_MARKER}$" "$RUN/gdb-startup.log" || {
   echo "normal build did not reach ${READY_DESCRIPTION}"
