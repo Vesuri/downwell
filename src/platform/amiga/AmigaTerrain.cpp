@@ -211,6 +211,87 @@ unsigned amigaCollectTerrainBreakables(
     return count;
 }
 
+namespace {
+enum { solidCell = 1, landingCell = 2, breakableCell = 4, roomWallCell = 8 };
+bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags) {
+    const int column = (x - AmigaTerrainIndex::minX) / 16;
+    if ((x & 15) || (y & 15) || column < 0 || column >= AmigaTerrainIndex::columns ||
+        y < 0 || y / 16 >= AmigaTerrainIndex::rows) return false;
+    index.cells[(y / 16) * AmigaTerrainIndex::columns + column] |= flags;
+    return true;
+}
+unsigned indexCell(const AmigaTerrainIndex& index, int x, int y) {
+    const int shiftedX = x + 8 - AmigaTerrainIndex::minX;
+    const int shiftedY = y + 8;
+    if (shiftedX < 0 || shiftedY < 0 || shiftedX >= AmigaTerrainIndex::columns * 16 ||
+        shiftedY >= AmigaTerrainIndex::rows * 16) return 0;
+    return index.cells[(shiftedY >> 4) * AmigaTerrainIndex::columns + (shiftedX >> 4)];
+}
+bool indexActive(const AmigaTerrainCollisionContext& context, unsigned cell,
+                 unsigned flag, int x, int y) {
+    if (cell & flag) return true;
+    return (cell & breakableCell) && (!context.runtime ||
+        context.runtime->breakableActiveAt(((x + 8 - AmigaTerrainIndex::minX) >> 4) * 16 +
+                AmigaTerrainIndex::minX - 240, ((y + 8) >> 4) * 16 - 176));
+}
+}
+
+bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
+                           AmigaTerrainIndex& index) {
+    for (unsigned i = 0; i < sizeof(index.cells); ++i) index.cells[i] = 0;
+    if (context.rooms && context.room) {
+        for (unsigned i = 0; i < context.room->instanceCount; ++i) {
+            downwell::PackedRoomInstance instance;
+            if (!context.rooms->roomInstance(*context.room, i, instance)) return false;
+            if ((instance.objectId == 60 || instance.objectId == 92) &&
+                !indexAdd(index, instance.x, instance.y, solidCell |
+                    (instance.objectId == 60 ? roomWallCell : 0))) return false;
+        }
+    }
+    for (unsigned f = 0; f < context.fragmentCount; ++f) {
+        const auto& fragment = context.fragments[f];
+        const int firstX = fragment.sideRoom ? (fragment.reversed ? 0 : 480)
+                                             : (fragment.reversed ? 160 : 320);
+        const int secondX = fragment.reversed ? 320 : 160;
+        for (unsigned row = 0; row < fragment.pattern.rowCount; ++row) {
+            const int y = fragment.y + row * 16;
+            if (row + 1 < fragment.pattern.rowCount &&
+                (!indexAdd(index, firstX, y, solidCell) ||
+                 !indexAdd(index, secondX, y, solidCell))) return false;
+            std::uint32_t width;
+            if (!context.builders->rowWidth(fragment.pattern, row, width)) return false;
+            for (unsigned col = 0; col < width; ++col) {
+                char symbol;
+                if (!context.builders->cell(fragment.pattern, col, row, symbol)) return false;
+                const unsigned flags = symbol == 'B' ? breakableCell :
+                    (isSolidTerrainSymbol(symbol) ? solidCell : 0) |
+                    (amigaIsLandingTerrainSymbol(symbol) ? landingCell : 0);
+                const int x = fragment.reversed ? 320 - (col + 1) * 16 : 160 + (col + 1) * 16;
+                if (flags && !indexAdd(index, x, y, flags)) return false;
+            }
+        }
+        if (fragment.appendPillars)
+            for (unsigned row = 0; row < 3; ++row) {
+                const int y = fragment.y + (fragment.pattern.rowCount - 1 + row) * 16;
+                if (!indexAdd(index, firstX, y, solidCell) ||
+                    !indexAdd(index, secondX, y, solidCell)) return false;
+            }
+    }
+    for (unsigned column = 0; column < AmigaTerrainIndex::columns; ++column) {
+        unsigned next = 0;
+        for (int row = AmigaTerrainIndex::rows - 1; row >= 0; --row) {
+            const unsigned cell = row * AmigaTerrainIndex::columns + column;
+            if (index.cells[cell] & (landingCell | breakableCell)) next = row + 1;
+            index.nextLanding[cell] = next;
+        }
+    }
+    return true;
+}
+
+bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y) {
+    return (indexCell(index, x, y) & roomWallCell) != 0;
+}
+
 int amigaResolveTerrainLanding(void* opaque, int offsetX,
                                int minimumOffsetY) {
     DW_PROFILE_SCOPE(profileTerrainCollision);
@@ -218,6 +299,30 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
         *static_cast<const AmigaTerrainCollisionContext*>(opaque);
     const int worldX = 240 + offsetX;
     int landing = 4096 - 176;
+    if (context.index) {
+        int row = (minimumOffsetY + 192 + 15) / 16;
+        if (row < 0) row = 0;
+        const int firstColumn = (worldX - 4 + 8 - AmigaTerrainIndex::minX) >> 4;
+        const int lastColumn = (worldX + 3 + 8 - AmigaTerrainIndex::minX) >> 4;
+        for (int column = firstColumn; column <= lastColumn; ++column) {
+            if (column < 0 || column >= AmigaTerrainIndex::columns) continue;
+            int candidate = row;
+            while (candidate * 16 - 192 < landing) {
+                candidate = context.index->nextLanding[candidate * AmigaTerrainIndex::columns + column] - 1;
+                if (candidate < 0 || candidate * 16 - 192 >= landing) break;
+                const int y = candidate * 16;
+                const unsigned cell = context.index->cells[candidate * AmigaTerrainIndex::columns + column];
+                if ((cell & landingCell) || ((cell & breakableCell) &&
+                    (!context.runtime || context.runtime->breakableActiveAt(
+                        column * 16 + AmigaTerrainIndex::minX - 240, y - 176)))) {
+                    landing = y - 192;
+                    break;
+                }
+                ++candidate;
+            }
+        }
+        return landing;
+    }
     for (unsigned fragmentIndex = 0;
          fragmentIndex < context.fragmentCount; ++fragmentIndex) {
         const AmigaTerrainFragment& fragment =
@@ -267,6 +372,9 @@ bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
         *static_cast<const AmigaTerrainCollisionContext*>(opaque);
     const int worldX = 240 + offsetX;
     const int worldY = 176 + offsetY;
+    if (context.index)
+        return indexActive(context, indexCell(*context.index, worldX, worldY),
+                           solidCell, worldX, worldY);
     if (context.rooms != 0 && context.room != 0) {
         for (unsigned index = 0; index < context.room->instanceCount; ++index) {
             downwell::PackedRoomInstance instance;

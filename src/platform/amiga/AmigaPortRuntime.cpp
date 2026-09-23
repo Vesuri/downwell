@@ -1,4 +1,5 @@
 #include "AmigaPortRuntime.h"
+#include "AmigaProfile.h"
 
 #include "core/PortCheckpoint.h"
 #include "core/Replay.h"
@@ -21,9 +22,21 @@ const short headingY[36] = {
 
 int positiveDirection(int direction)
 {
+    if (direction >= 0 && direction < 360) return direction;
+    if (direction >= -360 && direction < 0) return direction + 360;
+    if (direction >= 360 && direction < 720) return direction - 360;
     direction %= 360;
     return direction < 0 ? direction + 360 : direction;
 }
+
+struct HeadingIndices { unsigned char values[360] = {}; };
+constexpr HeadingIndices makeHeadingIndices() {
+    HeadingIndices result;
+    for (unsigned angle = 0; angle < 360; ++angle)
+        result.values[angle] = ((angle + 5) / 10) % 36;
+    return result;
+}
+constexpr auto headingIndices = makeHeadingIndices();
 
 int absoluteInt(int value)
 {
@@ -277,16 +290,31 @@ void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
     if (count > breakableCapacity)
         count = breakableCapacity;
     breakableCount_ = count;
+    breakableIndexReady_ = true;
+    for (unsigned cell = 0; cell < sizeof(breakableIndex_); ++cell) breakableIndex_[cell] = 0;
     blocksDestroyed_ = 0;
     for (index = 0; index < count; ++index) {
         breakables_[index].x = x[index];
         breakables_[index].y = y[index];
         breakables_[index].active = true;
+        if ((x[index] & 15) || (y[index] & 15) || x[index] < -512 ||
+            x[index] >= 512 || y[index] < 0 || y[index] >= 8192) {
+            breakableIndexReady_ = false;
+        } else {
+            auto& cell = breakableIndex_[(y[index] >> 4) * 64 + ((x[index] + 512) >> 4)];
+            if (cell) breakableIndexReady_ = false;
+            cell = index + 1;
+        }
     }
 }
 
 bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
 {
+    if (breakableIndexReady_) {
+        const int index = indexedBreakable(x, y);
+        return index >= 0 && breakables_[index].x == x && breakables_[index].y == y &&
+               breakables_[index].active;
+    }
     unsigned index;
     for (index = 0; index < breakableCount_; ++index)
         if (breakables_[index].x == x && breakables_[index].y == y)
@@ -294,8 +322,16 @@ bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
     return false;
 }
 
+int AmigaPortRuntime::indexedBreakable(int x, int y) const {
+    x += 512 + 8;
+    y += 8;
+    if (x < 0 || x >= 1024 || y < 0 || y >= 8192) return -1;
+    return (int)breakableIndex_[(y >> 4) * 64 + (x >> 4)] - 1;
+}
+
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
+    DW_PROFILE_PHASE(profilePlayer);
     const int oldAmmo = player_.ammo();
     const int oldHealth = health_;
     const unsigned oldCurrency = currency_;
@@ -360,6 +396,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
      */
     {
         unsigned bulletIndex;
+        DW_PROFILE_PHASE(profileBullets);
         for (bulletIndex = 0; bulletIndex < bulletCapacity; ++bulletIndex) {
             BulletState& bullet = bullets_[bulletIndex];
             if (!bullet.active)
@@ -385,8 +422,18 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 }
                 bullet.active = false;
             }
-            for (blockIndex = 0;
-                 blockIndex < breakableCount_ && bullet.active;
+            unsigned firstBlock = 0, endBlock = breakableCount_;
+            if (breakableIndexReady_) {
+                int candidate = indexedBreakable(bullet.x, priorBulletY);
+                int next = indexedBreakable(bullet.x, bullet.y);
+                if (candidate >= 0 && !breakables_[candidate].active) candidate = -1;
+                if (next >= 0 && !breakables_[next].active) next = -1;
+                if (candidate < 0 || (next >= 0 && next < candidate)) candidate = next;
+                firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
+                endBlock = candidate < 0 ? 0 : firstBlock + 1;
+            }
+            for (blockIndex = firstBlock;
+                 blockIndex < endBlock && bullet.active;
                  ++blockIndex) {
                 Breakable& block = breakables_[blockIndex];
                 if (block.active && bullet.x >= block.x - 8 &&
@@ -408,23 +455,23 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
-    bool alarm0Fired[enemyCapacity] = {false};
-    bool alarm1Fired[enemyCapacity] = {false};
+    DW_PROFILE_PHASE(profileEnemyAlarms);
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
             continue;
+        bool alarm0Fired = false, alarm1Fired = false;
         enemy.imagePhase += enemy.imageSpeed;
         if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
-            alarm0Fired[enemyIndex] = true;
+            alarm0Fired = true;
         if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
-            alarm1Fired[enemyIndex] = true;
+            alarm1Fired = true;
 
-        if (enemy.objectId == 112 && alarm1Fired[enemyIndex]) {
+        if (enemy.objectId == 112 && alarm1Fired) {
             enemy.auxiliaryState = -enemy.auxiliaryState;
             enemy.alarm1 = 120 + (int)enemyRandom_.irandomSmall(180);
         } else if (enemy.objectId == 113) {
-            if (alarm1Fired[enemyIndex]) {
+            if (alarm1Fired) {
                 if (enemy.grounded) {
                     enemy.auxiliaryState = 1;
                     enemy.speedX =
@@ -435,7 +482,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     enemy.alarm1 = 60;
                 }
             }
-            if (alarm0Fired[enemyIndex]) {
+            if (alarm0Fired) {
                 if (enemy.grounded) {
                     enemy.speedY = -4 * 256;
                     enemy.speedX = enemy.motionState * 256;
@@ -444,7 +491,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 enemy.auxiliaryState = 0;
                 enemy.alarm1 = 60;
             }
-        } else if (enemy.objectId == 119 && alarm0Fired[enemyIndex]) {
+        } else if (enemy.objectId == 119 && alarm0Fired) {
             if (enemy.grounded) {
                 const int crawl = enemy.motionState > 0 ? 1 : -1;
                 int nextX = enemy.x;
@@ -469,6 +516,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
+    DW_PROFILE_PHASE(profileEnemyMotion);
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
@@ -521,8 +569,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             const int dx = player_.offsetX() - enemy.x;
             const int dy = enemy.y - player_.offsetY();
             const int distance = absoluteInt(dx) + absoluteInt(dy);
-            const int headingIndex =
-                ((positiveDirection(enemy.direction) + 5) / 10) % 36;
+            const int headingIndex = headingIndices.values[positiveDirection(enemy.direction)];
             const int currentX = headingX[headingIndex];
             const int currentY = headingY[headingIndex];
             const int jitter =
@@ -542,8 +589,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             }
             enemy.direction = positiveDirection(
                 enemy.direction + (cross > 0 ? 10 : -10));
-            const int nextHeading =
-                ((enemy.direction + 5) / 10) % 36;
+            const int nextHeading = headingIndices.values[enemy.direction];
             enemy.speedX =
                 (long)headingX[nextHeading] * enemy.moveSpeed / 256L;
             enemy.speedY =
@@ -665,6 +711,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         enemy.imageFrame = enemy.imagePhase >> 8;
     }
 
+    DW_PROFILE_PHASE(profileEnemyContact);
     if (invulnerability_ > 0)
         --invulnerability_;
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
@@ -703,6 +750,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     else
         gemStreak_ = 0;
 
+    DW_PROFILE_PHASE(profileGems);
     for (unsigned gemIndex = 0; gemIndex < gemCapacity; ++gemIndex) {
         GemState& gem = gems_[gemIndex];
         if (!gem.active)
@@ -780,6 +828,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
+#if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
     checkpoint_ = downwell::portCheckpointDigest(
         tick_, packedInput, player_.offsetX(), player_.offsetY(),
@@ -787,6 +836,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         player_.shots(), ringOrigin_, firstBulletActive,
         bulletX(), bulletY());
     trajectory_.addU64(checkpoint_);
+#endif
 
     AmigaPortFrame frame = {};
     frame.playerMotion = motion;
@@ -804,5 +854,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         frame.blockX[index] = destroyedBlockX[index];
         frame.blockY[index] = destroyedBlockY[index];
     }
+    DW_PROFILE_PHASE(profileSimulation);
     return frame;
 }

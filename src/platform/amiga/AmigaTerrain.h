@@ -51,7 +51,17 @@ struct AmigaTerrainCollisionContext {
     const AmigaTerrainFragment* fragments;
     unsigned fragmentCount;
     const AmigaPortRuntime* runtime;
+    const struct AmigaTerrainIndex* index = nullptr;
 };
+
+struct AmigaTerrainIndex {
+    enum { columns = 128, rows = 512, minX = -512 };
+    unsigned char cells[columns * rows];
+    std::uint16_t nextLanding[columns * rows]; // row+1; zero means no candidate
+};
+bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
+                           AmigaTerrainIndex& index);
+bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y);
 
 bool amigaBuildInitialAreaOneTerrain(
     const downwell::BuilderPatternPack& builders,

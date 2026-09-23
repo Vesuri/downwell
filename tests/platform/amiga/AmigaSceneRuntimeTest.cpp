@@ -367,6 +367,21 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         amigaInitialTerrainFragmentCount, &gameplay
     };
     gameplay.configureBreakables(breakableX, breakableY, breakableCount);
+    static AmigaTerrainIndex index;
+    require(amigaBuildTerrainIndex(terrainContext, index), "terrain fits spatial index");
+    auto indexedContext = terrainContext;
+    indexedContext.index = &index;
+    for (int y = -16; y < 4200; y += 7)
+        for (int x = -24; x < 520; x += 7)
+            require(amigaResolveTerrainSolid(&terrainContext, x - 240, y - 176) ==
+                    amigaResolveTerrainSolid(&indexedContext, x - 240, y - 176),
+                    "indexed solid queries match serialized oracle");
+    for (int y = -16; y < 4200; y += 31)
+        for (int x = -24; x < 520; x += 11)
+            require(amigaResolveTerrainLanding(&terrainContext, x - 240, y - 176) ==
+                    amigaResolveTerrainLanding(&indexedContext, x - 240, y - 176),
+                    "indexed landing queries match serialized oracle");
+    terrainContext.index = &index;
     gameplay.configureLandingResolver(amigaResolveTerrainLanding,
                                       &terrainContext);
     gameplay.configureSolidResolver(amigaResolveTerrainSolid,
