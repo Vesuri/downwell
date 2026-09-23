@@ -24,6 +24,72 @@ void require(bool condition, const char* message) {
     }
 }
 
+struct LiveSceneWorld {
+    AmigaTerrainFragment fragments[19];
+    AmigaTerrainIndex index;
+    AmigaAreaOneTerrainBuilder builder{fragments, 19};
+    AmigaTerrainCollisionContext collision;
+    const downwell::BuilderPatternPack& patterns;
+    const downwell::ObjectPack& objects;
+    AmigaPortRuntime* runtime = nullptr;
+
+    LiveSceneWorld(const downwell::BuilderPatternPack& pack,
+                   const downwell::ObjectPack& definitions)
+        : collision{nullptr, nullptr, &pack, nullptr, 0, nullptr},
+          patterns(pack), objects(definitions) {}
+
+    static bool create(void* opaque, const downwell::DeferredCreateInstance& command) {
+        auto& world = *static_cast<LiveSceneWorld*>(opaque);
+        if (!amigaAddTerrainObject(world.index, command.objectId, command.x, command.y)) return false;
+        if (command.objectId == 92) {
+            const int x = command.x - 240, y = command.y - 176;
+            return world.runtime->appendBreakables(&x, &y, 1);
+        }
+        if (amigaEnemyHealth(command.objectId)) {
+            downwell::PackedObject object;
+            return world.objects.findObject(command.objectId, object) &&
+                world.runtime->configureEnemy(world.runtime->enemyCount(), command.objectId,
+                    object.spriteId, command.x - 240, command.y - 176,
+                    command.integerVelocityX, command.integerVelocityY,
+                    amigaEnemyHealth(command.objectId), amigaEnemyReward(command.objectId),
+                    command.motionState, command.auxiliaryState,
+                    command.alarms.get(0), command.alarms.get(1),
+                    command.integerDirection, command.integerMoveSpeed,
+                    command.active, command.grounded, true);
+        }
+        return true;
+    }
+    static bool generate(void* opaque, AmigaPortRuntime&,
+                         downwell::GameMakerRandom& random, int bottom) {
+        auto& world = *static_cast<LiveSceneWorld*>(opaque);
+        downwell::AreaOneBuilderStep result;
+        return world.builder.stepVisible(world.patterns, random, bottom, result);
+    }
+    void bind(AmigaPortRuntime& port, const downwell::RoomPack& rooms,
+              const downwell::PackedRoom& room) {
+        runtime = &port;
+        require(amigaBuildTerrainIndex(collision, index), "live scene index initializes empty");
+        for (unsigned i = 0; i < room.instanceCount; ++i) {
+            downwell::PackedRoomInstance instance;
+            require(rooms.roomInstance(room, i, instance), "live room instance decodes");
+            if (instance.objectId == 60)
+                require(amigaAddTerrainObject(index, 60, instance.x, instance.y, true),
+                        "initial room walls enter the live index");
+        }
+        collision.index = &index;
+        collision.runtime = &port;
+        const int emptyBlock = 0;
+        port.configureBreakables(&emptyBlock, &emptyBlock, 0);
+        downwell::GameMakerRandom random;
+        builder.resetInitialCheckpoint(random);
+        builder.setCreateObserver(create, this);
+        port.configureEnemyRandom(random);
+        port.configureGenerationStep(generate, this);
+        port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
+        port.configureSolidResolver(amigaResolveTerrainSolid, &collision);
+    }
+};
+
 void pressFire(AmigaSceneRuntime& runtime) {
     downwell::Input fire;
     fire.fire = true;
@@ -142,6 +208,28 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             bool allowGroundingPhase = false) {
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
+    require(amiga.generationSucceeded(),
+            "live terrain generation succeeds throughout the comparison tape");
+    if (std::getenv("DOWNWELL_TRACE_ACTORS")) {
+        static bool reported = false;
+        unsigned ordinal = 0;
+        for (unsigned i = 0; !reported && i < reference.activeInstanceCount(); ++i) {
+            const auto& e = reference.instanceAt(i);
+            if (!amigaEnemyHealth(e.objectId)) continue;
+            if (ordinal < amiga.enemyCount()) {
+                const auto& a = amiga.enemyAt(ordinal);
+                const float x = 240 + a.preciseX / 256.0F, y = 176 + a.preciseY / 256.0F;
+                if (std::fabs(x - e.preciseX) > 1.0F || std::fabs(y - e.preciseY) > 1.0F) {
+                    std::cout << "FIRST ACTOR DIFFERENCE tick=" << amiga.tick() << " ordinal=" << ordinal
+                        << " native=" << x << ',' << y << " velocity=" << a.speedX << ',' << a.speedY
+                        << " ground=" << a.grounded << " SDL=" << e.preciseX << ',' << e.preciseY
+                        << " velocity=" << e.velocityX << ',' << e.velocityY << " ground=" << e.grounded << '\n';
+                    reported = true;
+                }
+            }
+            ++ordinal;
+        }
+    }
     requireNear(static_cast<float>(240 + amiga.player().offsetX()),
                 reference.mainPlayerX(), 1.0F,
                 "gameplay player X follows decoded runtime");
@@ -315,7 +403,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     require(amiga.scene() == AmigaScene::gameplay && reference.inMainRoom(),
             "both runtimes enter gameplay on the same frame");
 
-    AmigaPortRuntime gameplay(300, false, 1201 - 176, true);
+    AmigaPortRuntime forecast(300, false, 1201 - 176, true);
     downwell::PackedRoom terrainRoom;
     AmigaTerrainFragment terrain[amigaInitialTerrainFragmentCount];
     AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
@@ -333,7 +421,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     generatedEnemyCount, &gameplayRandom,
                     generatedDecorations, amigaTerrainDecorationCapacity,
                     &generatedDecorationCount),
-            "native gameplay terrain is recovered for parity");
+            "native forecast terrain is recovered for parity");
     bool sawPlant = false;
     bool sawSpecial = false;
     for (unsigned index = 0; index < generatedDecorationCount; ++index) {
@@ -364,9 +452,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "all recovered area-one breakables fit native storage");
     AmigaTerrainCollisionContext terrainContext = {
         &rooms, &terrainRoom, &patterns, terrain,
-        amigaInitialTerrainFragmentCount, &gameplay
+        amigaInitialTerrainFragmentCount, &forecast
     };
-    gameplay.configureBreakables(breakableX, breakableY, breakableCount);
+    forecast.configureBreakables(breakableX, breakableY, breakableCount);
     static AmigaTerrainIndex index;
     require(amigaBuildTerrainIndex(terrainContext, index), "terrain fits spatial index");
     auto indexedContext = terrainContext;
@@ -382,11 +470,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     amigaResolveTerrainLanding(&indexedContext, x - 240, y - 176),
                     "indexed landing queries match serialized oracle");
     terrainContext.index = &index;
-    gameplay.configureLandingResolver(amigaResolveTerrainLanding,
+    forecast.configureLandingResolver(amigaResolveTerrainLanding,
                                       &terrainContext);
-    gameplay.configureSolidResolver(amigaResolveTerrainSolid,
+    forecast.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainContext);
-    gameplay.configureEnemyRandom(gameplayRandom);
+    forecast.configureEnemyRandom(gameplayRandom);
     require(generatedEnemyCount > 3 &&
                 generatedEnemyCount <= AmigaPortRuntime::enemyCapacity,
             "complete recovered enemy population fits native storage");
@@ -395,7 +483,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         downwell::PackedObject definition;
         const AmigaTerrainEnemy& enemy = generatedEnemies[enemyIndex];
         require(objects.findObject(enemy.objectId, definition) &&
-                    gameplay.configureEnemy(
+                    forecast.configureEnemy(
                         enemyIndex, enemy.objectId, definition.spriteId,
                         enemy.x, enemy.y, enemy.speedX, enemy.speedY,
                         amigaEnemyHealth(enemy.objectId),
@@ -406,6 +494,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                         enemy.objectId != 116),
                 "generated native enemy is configured from recovered data");
     }
+    AmigaPortRuntime gameplay(300, false, 1201 - 176, true);
+    LiveSceneWorld live(patterns, objects);
+    live.bind(gameplay, rooms, terrainRoom);
     compareInitialGameplay(gameplay, reference);
     for (int tick = 0; tick < 220; ++tick) {
         parityFrame = 534 + tick;
@@ -508,6 +599,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         }
     }
     require(retiredCompared >= 2, "comparison exercises two out-of-view enemy retirements");
+    require(enemyOrdinal == gameplay.enemyCount(),
+            "live generation creates exactly the SDL enemy prefix, not a forecast population");
+    require(live.builder.fragmentCount() > 0 &&
+                live.builder.fragmentCount() < amigaInitialTerrainFragmentCount,
+            "comparison exercises incremental terrain rather than a complete forecast");
     if (std::getenv("DOWNWELL_COMPARE_ACTORS")) {
         for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {
             const auto& e = gameplay.enemyAt(i);

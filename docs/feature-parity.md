@@ -254,3 +254,27 @@ The full host suite and cross-target replay also pass. The normal live
 `SKIP_TO_GAME=1` executable passed the bounded startup check with resident
 assets 267,528 bytes and 26,584 Chip bytes remaining; it is the restored build.
 This does not yet prove actor-by-actor SDL parity or the new path's 20 ms budget.
+
+### Live scene-comparison fixture
+
+The SDL/native scene input tape now binds the native incremental generator,
+shared gameplay RNG and exact emitted collision objects, matching the executable
+instead of installing the complete forecast before simulation. The separate
+forecast/spatial-index oracle remains covered. The tape checks generation
+success, an incomplete generated terrain prefix, exact enemy population/order,
+player movement and gunboot/landing behavior, and out-of-view retirement.
+
+`DOWNWELL_TRACE_ACTORS=1` reports the first sampled position difference larger
+than one pixel; it is a diagnostic, not an actor-parity assertion. Currently it
+reports tick 171: the first snake is at (221.5, 1298.99), moving left, versus
+SDL (223, 1298.2), moving right. Source snake Step uses `place_meeting` with its
+mask and rounds final positions; the two hand-written point-probe adaptations
+still need reconciliation against that source. Passing this fixture does not
+prove all actor motion or animation matches.
+
+The reported executable exit was not reproduced by a fresh bounded check:
+the normal `SKIP_TO_GAME=1` build passed allocation with 26,584 Chip bytes
+remaining and reached 64 frame-loop iterations without a reported failure.
+This is limited startup evidence, not a claim that the reported exit is fixed.
+Startup and internal loop failures now return AmigaDOS status 20, while an
+explicit normal quit returns 0; no error text is printed.
