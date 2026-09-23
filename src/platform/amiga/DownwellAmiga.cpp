@@ -172,8 +172,13 @@ downwellMenuEntryScrollReady(void) {
 
 extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
+volatile const UBYTE* gDownwellSplashFrame;
 
 __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellSplashFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 }
@@ -918,6 +923,7 @@ int main(void) {
     bool sceneMenuTitleReported = false;
     bool sceneMenuEntryReported = false;
     bool sceneStyleFrameReported = false;
+    bool sceneSplashFrameReported = false;
     int sceneGameplayLandedCameraY = 0;
 #endif
     worldViewY += port.cameraOffsetY();
@@ -1235,6 +1241,15 @@ int main(void) {
                             break;
                         platform.publish(copperLists[back]);
                         front = back;
+#ifdef DOWNWELL_SCENE_VERIFY
+                        if (!sceneSplashFrameReported &&
+                            presentedSplash == 2) {
+                            sceneSplashFrameReported = true;
+                            gDownwellSplashFrame = amigaSplashFrame(
+                                memory.sceneCache(), presentedSplash);
+                            downwellSplashFrameReady();
+                        }
+#endif
                     }
                 }
                 else if (presentedScene == AmigaScene::menu) {

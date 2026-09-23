@@ -16,7 +16,7 @@ PALETTE = ((0, 0, 0), (255, 255, 255), (255, 0, 0), (0, 0, 0))
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Decode an A500 Downwell style-select planar frame")
+        description="Decode an A500 Downwell narrow two-plane frame")
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
