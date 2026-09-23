@@ -5,6 +5,8 @@
 #include "framework/Bitmap.h"
 
 namespace {
+const UWORD alignedMenuTitleSprite = 65400;
+
 UWORD word(const UBYTE* p) { return (UWORD)(((UWORD)p[0] << 8) | p[1]); }
 ULONG longword(const UBYTE* p) { return ((ULONG)word(p) << 16) | word(p + 2); }
 
@@ -114,7 +116,8 @@ bool amigaRenderMenuTitle(UWORD frame,
     foregroundBitmap.clear(264, 129, 128, 32);
     entryBitmap.clear(16, 413, 128, 32);
     if (frame != 0 &&
-        (!drawMonochrome(foregroundBitmap, pack, packEnd, 654, frame,
+        (!drawMonochrome(foregroundBitmap, pack, packEnd,
+                         alignedMenuTitleSprite, frame,
                          328, 145) ||
          !drawMonochrome(entryBitmap, pack, packEnd, 654, frame,
                          80, 429)))

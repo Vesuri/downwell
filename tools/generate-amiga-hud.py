@@ -114,6 +114,14 @@ DITHER_STRIPS = {
     },
 }
 
+# sprTitleFade is centred at an eight-pixel destination offset in the wide
+# garden cache.  Give that use a host-generated, word-aligned form so the
+# 68000 never asks the blitter's shifted B channel to carry a mask between
+# rows.  The original resource remains available for the already aligned
+# narrow well-entry cache.
+MENU_TITLE_ALIGNED_ID = 65400
+MENU_TITLE_LEFT_PADDING = 8
+
 
 def require(condition, message):
     if not condition:
@@ -264,6 +272,28 @@ def build_pack(manifest, extracted, profile):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
+            if profile == "game" and sprite_id == 654:
+                aligned = Image.new(
+                    "RGBA", (sprite["width"] + MENU_TITLE_LEFT_PADDING,
+                             sprite["height"]), (0, 0, 0, 0))
+                aligned.alpha_composite(canvas, (MENU_TITLE_LEFT_PADDING, 0))
+                aligned_pens = [pixel_to_pen(pixel)
+                                for pixel in aligned.get_flattened_data()]
+                aligned_dma_width, aligned_planar = encode_planar(
+                    aligned_pens, aligned.width, aligned.height)
+                aligned_sprite = {
+                    "id": MENU_TITLE_ALIGNED_ID,
+                    "originX": sprite["originX"] + MENU_TITLE_LEFT_PADDING,
+                    "originY": sprite["originY"],
+                    "width": aligned.width,
+                    "height": aligned.height,
+                }
+                require(decode_planar(
+                    aligned_planar, aligned.width, aligned.height,
+                    aligned_dma_width) == aligned_pens,
+                    f"aligned title round trip failed for frame {frame_index}")
+                encoded.append((aligned_sprite, frame_index,
+                                aligned_dma_width, aligned_planar))
 
     for text_id, text in TEXT_SELECTIONS.get(profile, {}).items():
         canvas = render_text(manifest, pages, text)
