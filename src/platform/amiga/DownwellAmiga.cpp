@@ -90,13 +90,49 @@ static AmigaTerrainCollisionContext terrainCollision;
 static AmigaTerrainIndex terrainIndex;
 static AmigaTerrainTiles terrainTiles;
 
+struct LiveGenerationContext {
+    AmigaAreaOneTerrainBuilder* builder;
+    const downwell::BuilderPatternPack* patterns;
+    const downwell::ObjectPack* objects;
+    AmigaPortRuntime* runtime;
+    int dirtyFirst = 8192;
+    int dirtyEnd = 0;
+};
+extern "C" {
+volatile ULONG gDownwellLiveFragments = 0;
+volatile ULONG gDownwellLiveEnemies = 0;
+volatile ULONG gDownwellLiveRandomDraws = 0;
+volatile ULONG gDownwellLiveGenerationFailed = 0;
+}
+static bool generateLiveTerrain(void*, AmigaPortRuntime&,
+    downwell::GameMakerRandom&, int);
+
 static bool appendGeneratedTerrain(void* opaque,
     const downwell::DeferredCreateInstance& command) {
+    auto& live = *static_cast<LiveGenerationContext*>(opaque);
     if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
         !terrainTiles.append(command)) return false;
+    if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||
+        command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
+        command.objectId == 109 || command.objectId == 306) {
+        if (command.y - 24 < live.dirtyFirst) live.dirtyFirst = command.y - 24;
+        if (command.y + 24 > live.dirtyEnd) live.dirtyEnd = command.y + 24;
+    }
     if (command.objectId == 92) {
         const int x = command.x - 240, y = command.y - 176;
-        return static_cast<AmigaPortRuntime*>(opaque)->appendBreakables(&x, &y, 1);
+        return live.runtime->appendBreakables(&x, &y, 1);
+    }
+    if (amigaEnemyHealth(command.objectId)) {
+        downwell::PackedObject object;
+        return live.objects->findObject(command.objectId, object) &&
+            live.runtime->configureEnemy(live.runtime->enemyCount(), command.objectId,
+                object.spriteId, command.x - 240, command.y - 176,
+                command.integerVelocityX, command.integerVelocityY,
+                amigaEnemyHealth(command.objectId), amigaEnemyReward(command.objectId),
+                command.motionState, command.auxiliaryState,
+                command.alarms.get(0), command.alarms.get(1),
+                command.integerDirection, command.integerMoveSpeed,
+                command.active, command.grounded, true);
     }
     return true;
 }
@@ -496,6 +532,25 @@ enum { terrainRasterRows = 8192, terrainRasterWords = 11, terrainRasterX = 96 };
 static UWORD terrainRaster[3][terrainRasterRows][2][terrainRasterWords];
 static bool terrainRasterDirty[3][terrainRasterRows];
 static bool terrainRasterReady;
+
+static bool generateLiveTerrain(void* opaque, AmigaPortRuntime& runtime,
+    downwell::GameMakerRandom& random, int bottom) {
+    auto& live = *static_cast<LiveGenerationContext*>(opaque);
+    live.dirtyFirst = terrainRasterRows;
+    live.dirtyEnd = 0;
+    downwell::AreaOneBuilderStep result;
+    const bool ok = live.builder->stepVisible(*live.patterns, random, bottom, result);
+    gDownwellLiveFragments = live.builder->fragmentCount();
+    gDownwellLiveEnemies = runtime.enemyCount();
+    gDownwellLiveRandomDraws = static_cast<ULONG>(random.drawCount());
+    if (!ok) gDownwellLiveGenerationFailed = 1;
+    if (live.dirtyFirst < 0) live.dirtyFirst = 0;
+    if (live.dirtyEnd > terrainRasterRows) live.dirtyEnd = terrainRasterRows;
+    for (unsigned column = 0; column < 3; ++column)
+        for (int y = live.dirtyFirst; y < live.dirtyEnd; ++y)
+            terrainRasterDirty[column][y] = true;
+    return ok;
+}
 typedef ULONG RasterLong __attribute__((may_alias));
 
 static void copyTerrainRows68000(const UWORD* sourceWords, UBYTE* plane0,
@@ -1082,11 +1137,12 @@ int main(void) {
         downwell::portReplayBytes, downwell::portReplaySize);
 #endif
     static AmigaTerrainFragment fragments[amigaInitialTerrainFragmentCount];
-    static AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
     static AmigaTerrainDecoration
         generatedDecorations[amigaTerrainDecorationCapacity];
-    unsigned generatedEnemyCount = 0;
-    unsigned generatedDecorationCount = 0;
+    AmigaAreaOneTerrainBuilder liveBuilder(fragments,
+        amigaInitialTerrainFragmentCount, nullptr, 0,
+        generatedDecorations, amigaTerrainDecorationCapacity);
+    LiveGenerationContext liveGeneration{&liveBuilder, &builders, &objects, &port};
     downwell::GameMakerRandom enemyRandom(2);
     downwell::PackedRoom mainRoom;
     const AmigaTerrainCollisionContext emptyTerrain{0, 0, &builders, 0, 0, 0};
@@ -1101,19 +1157,7 @@ int main(void) {
         !verificationReplay.valid() ||
 #endif
         !rooms.findRoom(11, mainRoom) ||
-        !amigaBuildMenuDrawList(rooms, objects, menuDrawList) ||
-        !amigaBuildInitialAreaOneTerrain(
-            builders, fragments, amigaInitialTerrainFragmentCount,
-            generatedEnemies, AmigaPortRuntime::enemyCapacity,
-            generatedEnemyCount, &enemyRandom,
-            generatedDecorations, amigaTerrainDecorationCapacity,
-            &generatedDecorationCount,
-#ifndef DOWNWELL_REPLAY_VERIFY
-            appendGeneratedTerrain, &port
-#else
-            nullptr, nullptr
-#endif
-            )) {
+        !amigaBuildMenuDrawList(rooms, objects, menuDrawList)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1127,7 +1171,7 @@ int main(void) {
         terrainCollision.rooms = &rooms;
         terrainCollision.room = &mainRoom;
         terrainCollision.fragments = fragments;
-        terrainCollision.fragmentCount = amigaInitialTerrainFragmentCount;
+        terrainCollision.fragmentCount = 0;
         terrainCollision.runtime = &port;
         for (unsigned i = 0; i < mainRoom.instanceCount; ++i) {
             downwell::PackedRoomInstance instance;
@@ -1146,29 +1190,10 @@ int main(void) {
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision);
+        liveBuilder.resetInitialCheckpoint(enemyRandom);
+        liveBuilder.setCreateObserver(appendGeneratedTerrain, &liveGeneration);
         port.configureEnemyRandom(enemyRandom);
-        for (unsigned enemyIndex = 0;
-             enemyIndex < generatedEnemyCount; ++enemyIndex) {
-            const AmigaTerrainEnemy& enemy = generatedEnemies[enemyIndex];
-            downwell::PackedObject definition;
-            if (!objects.findObject(enemy.objectId, definition) ||
-                !port.configureEnemy(
-                    enemyIndex, enemy.objectId, definition.spriteId,
-                    enemy.x, enemy.y, enemy.speedX, enemy.speedY,
-                    amigaEnemyHealth(enemy.objectId),
-                    amigaEnemyReward(enemy.objectId),
-                    enemy.motionState, enemy.auxiliaryState,
-                    enemy.alarm0, enemy.alarm1,
-                    enemy.direction, enemy.moveSpeed,
-                    enemy.objectId != 116)) {
-                platform.restore();
-                FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-                memory.release();
-                gDownwellStartupFailure = 7;
-                downwellStartupFailed();
-                return 1;
-            }
-        }
+        port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
     }
 #endif
     for (ULONG byte = 0; byte < gamePackBytes; ++byte)
@@ -1397,8 +1422,8 @@ int main(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
     buildReferencePicture(
         &renderer, rooms, mainRoom, builders,
-        fragments, amigaInitialTerrainFragmentCount,
-        generatedDecorations, generatedDecorationCount,
+        fragments, liveBuilder.fragmentCount(),
+        generatedDecorations, liveBuilder.decorationCount(),
         &port, mainViewX, mainInitialViewY);
 #else
     downwellStartupReady();
@@ -1577,19 +1602,19 @@ int main(void) {
                     AmigaHardware::blitterDrain();
                     if (!terrainRasterReady)
                         prepareTerrainRaster(&renderer, rooms, mainRoom, builders,
-                            fragments, amigaInitialTerrainFragmentCount,
-                            generatedDecorations, generatedDecorationCount, &port);
+                            fragments, liveBuilder.fragmentCount(),
+                            generatedDecorations, liveBuilder.decorationCount(), &port);
                     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
                     buildReferencePicture(
                         &renderer, rooms, mainRoom, builders,
-                        fragments, amigaInitialTerrainFragmentCount,
-                        generatedDecorations, generatedDecorationCount,
+                        fragments, liveBuilder.fragmentCount(),
+                        generatedDecorations, liveBuilder.decorationCount(),
                         &port, worldViewX, worldViewY);
                     if (presentedScene == AmigaScene::gameplay) {
                         drawFutureGameBlock(
                             &renderer, rooms, mainRoom, builders,
-                            fragments, amigaInitialTerrainFragmentCount,
-                            generatedDecorations, generatedDecorationCount,
+                            fragments, liveBuilder.fragmentCount(),
+                            generatedDecorations, liveBuilder.decorationCount(),
                             &port, port.ringOrigin(), worldViewX, worldViewY);
                         cachedWorldFirst = worldViewY;
                         cachedWorldEnd = worldViewY + downwellDisplayHeight + gameplayPrefetchLines;
@@ -1853,6 +1878,7 @@ int main(void) {
 #endif
             DW_PROFILE_PHASE(profileSimulation);
             const AmigaPortFrame result = port.step(packedInput);
+            if (!port.generationSucceeded()) break;
             DW_PROFILE_PHASE(profileTitle);
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
@@ -1883,6 +1909,24 @@ int main(void) {
             terrainCopyBuffer = back;
             DW_PROFILE_PHASE(profileScroll);
             worldViewY += scrollDelta;
+            if (liveGeneration.dirtyFirst < liveGeneration.dirtyEnd) {
+                stagedViewX = -10000;
+                // Discard dirty retained rows outside the current view. Visible
+                // intersections are refreshed below, after any camera swap.
+                if (liveGeneration.dirtyFirst < worldViewY &&
+                    liveGeneration.dirtyEnd > cachedWorldFirst) {
+                    const int end = liveGeneration.dirtyEnd < worldViewY
+                        ? liveGeneration.dirtyEnd : worldViewY;
+                    if (end > cachedWorldFirst) cachedWorldFirst = end;
+                }
+                const int viewEnd = worldViewY + downwellDisplayHeight;
+                if (liveGeneration.dirtyEnd > viewEnd &&
+                    liveGeneration.dirtyFirst < cachedWorldEnd) {
+                    const int first = liveGeneration.dirtyFirst > viewEnd
+                        ? liveGeneration.dirtyFirst : viewEnd;
+                    if (first < cachedWorldEnd) cachedWorldEnd = first;
+                }
+            }
             if (cameraXChanged) {
                 worldViewX = mainViewX + port.cameraOffsetX();
                 if (stagedViewX == worldViewX && stagedFirst <= worldViewY &&
@@ -1923,8 +1967,8 @@ int main(void) {
                     }
                     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
                     drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
-                        fragments, amigaInitialTerrainFragmentCount, generatedDecorations,
-                        generatedDecorationCount, &port, worldViewX, worldViewY, 0, downwellDisplayHeight);
+                        fragments, liveBuilder.fragmentCount(), generatedDecorations,
+                        liveBuilder.decorationCount(), &port, worldViewX, worldViewY, 0, downwellDisplayHeight);
 #endif
                 } else {
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -1934,13 +1978,13 @@ int main(void) {
                 if (!terrainRasterReady)
                     amigaRendererClearGameRows(&renderer, 0, downwellDisplayHeight, 0);
                 drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
-                    fragments, amigaInitialTerrainFragmentCount,
-                    generatedDecorations, generatedDecorationCount,
+                    fragments, liveBuilder.fragmentCount(),
+                    generatedDecorations, liveBuilder.decorationCount(),
                     &port, worldViewX, worldViewY, 0, downwellDisplayHeight);
                 drawFutureGameBlock(
                     &renderer, rooms, mainRoom, builders,
-                    fragments, amigaInitialTerrainFragmentCount,
-                    generatedDecorations, generatedDecorationCount,
+                    fragments, liveBuilder.fragmentCount(),
+                    generatedDecorations, liveBuilder.decorationCount(),
                     &port, port.ringOrigin(), worldViewX, worldViewY);
                 cachedWorldFirst = worldViewY;
                 cachedWorldEnd = worldViewY + downwellDisplayHeight + gameplayPrefetchLines;
@@ -1971,9 +2015,24 @@ int main(void) {
                 if (!terrainRasterReady)
                     amigaRendererClearGameRows(&renderer, 0, missingHeight, 0);
                 drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
-                    fragments, amigaInitialTerrainFragmentCount,
-                    generatedDecorations, generatedDecorationCount,
+                    fragments, liveBuilder.fragmentCount(),
+                    generatedDecorations, liveBuilder.decorationCount(),
                     &port, worldViewX, missingFirst, 0, missingHeight);
+            }
+            if (liveGeneration.dirtyFirst < liveGeneration.dirtyEnd) {
+                int top = liveGeneration.dirtyFirst - worldViewY;
+                int bottom = liveGeneration.dirtyEnd - worldViewY;
+                if (top < 0) top = 0;
+                if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+                if (top < bottom) {
+                    if (backingCopyPending) AmigaHardware::blitterDrain();
+                    amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
+                    amigaRendererClearGameRows(&renderer, top, bottom - top, 0);
+                    drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
+                        fragments, liveBuilder.fragmentCount(), generatedDecorations,
+                        liveBuilder.decorationCount(), &port, worldViewX, worldViewY,
+                        top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true);
+                }
             }
             if (destroyedBlockCount != 0) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
@@ -2011,8 +2070,8 @@ int main(void) {
                     amigaRendererSetClipRect(&renderer, left, top, right - left, bottom - top);
                     amigaRendererFillRect(&renderer, left, top, right - left, bottom - top, 0);
                     drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
-                        fragments, amigaInitialTerrainFragmentCount,
-                        generatedDecorations, generatedDecorationCount,
+                        fragments, liveBuilder.fragmentCount(),
+                        generatedDecorations, liveBuilder.decorationCount(),
                         &port, worldViewX, worldViewY, top, bottom - top, left, right - left, true);
                 }
             }
@@ -2166,6 +2225,26 @@ int main(void) {
             front = back;
 #ifdef DOWNWELL_SCENE_VERIFY
             if (port.tick() == 600) {
+                // Deterministic coverage independent of enemy encounters and
+                // travel distance: validate every strip of all three views.
+                // Use retired staging memory, never the displayed ring.
+                AmigaHardware::blitterDrain();
+                AmigaRenderer probe = renderer;
+                probe.game = stagedBuffer;
+                probe.gameOrigin = 0;
+                for (int x = mainViewX - 160; x <= mainViewX + 160; x += 160)
+                    for (int strip = 0; strip < downwellDisplayHeight; strip += 16) {
+                        const int count = strip + 16 <= downwellDisplayHeight
+                            ? 16 : downwellDisplayHeight - strip;
+                        // First materialize any newly dirty rows; the second
+                        // read exercises the cache-transfer/fresh-render oracle.
+                        drawMainWorldSpan(&probe, rooms, mainRoom, builders,
+                            fragments, liveBuilder.fragmentCount(), generatedDecorations,
+                            liveBuilder.decorationCount(), &port, x, worldViewY + strip, 0, count);
+                        drawMainWorldSpan(&probe, rooms, mainRoom, builders,
+                            fragments, liveBuilder.fragmentCount(), generatedDecorations,
+                            liveBuilder.decorationCount(), &port, x, worldViewY + strip, 0, count);
+                    }
                 exposeGameplayFrame(memory, gameDisplay[back], back, port.ringOrigin());
                 downwellGameplayLongRunReady();
             }

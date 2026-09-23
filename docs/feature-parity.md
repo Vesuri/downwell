@@ -7,11 +7,18 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+The playable executable now generates terrain and enemies incrementally from
+the live RNG stream. The forecast/integration-foundation notes below describe
+the migration history, not the current executable. Native/SDL actor-by-actor
+comparison still needs to be rerun against this live path; the older scene
+comparison fixture still uses a forecast and is not evidence for live parity.
+Frame-rate figures from earlier forecast builds must also be remeasured.
+
 | Slice | Current evidence | Remaining parity work |
 | --- | --- | --- |
 | Publisher, credits, controls, garden, well, style select | Native implementations and decoded scene comparison tests | Full-sequence display regression after gameplay changes |
 | Player, camera, landing, jumping, gunboots | SDL/native comparison through entrance and first scrolling section | Longer combat tapes; current position comparisons allow fixed-point tolerances |
-| Area-one geometry and endings | Shared builder, complete native first-area generation, terrain oracle | Side-room reversals and offscreen destruction coverage |
+| Area-one geometry and endings | Shared live builder, emitted-object collision/rendering, terrain cache oracle | Live SDL replay comparison; side-room reversals and offscreen destruction coverage |
 | Bullets and gems | Shared 16-bullet / 64-gem limits | Dense encounter behavior and ordering comparisons |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
 | Enemies and rewards | Six native enemy types; unit tests for combat, stomps and rewards | Compare every active enemy and gem against SDL, not just player state |
@@ -220,3 +227,30 @@ retained `64 95d0aaea 1be7256f`; the normal `SKIP_TO_GAME=1` build passed the
 bounded startup memory check. The intermediate startup-check-5 failure was
 the 128-block capacity, not Chip RAM exhaustion. Earlier intermittent target
 trap evidence remains open rather than being silently reclassified.
+
+## Live generation in the executable
+
+`DownwellAmiga.cpp` now binds the native generation phase to the shared
+visibility-gated builder rather than calling the full-level forecast. Create
+events append collision, breakables and row-indexed tile graphics and configure
+new enemies with their actual initial flags. The builder receives the runtime's
+RNG after existing alarms, before bullets and enemy motion. Decorations and
+fragment counts used by the compositor come directly from the live builder.
+
+New background objects dirty their affected raster rows (including the adjacent
+wall rows), invalidate staged side views and trim stale hidden retained rows.
+Any visible intersection is refreshed; unchanged rows still use the private
+backing and double-buffered circular display rings. Only the initial room is
+precomposed at entry, not future generated sections.
+
+The bounded A500 run reached 600 ticks with 5 generated fragments, 3 created
+enemies and 2,350 RNG draws at the last builder phase, with no generation
+failure. A deterministic strip sweep over all three camera columns supplements
+the encounter-dependent cache checks: 101 cache/fresh-composition comparisons
+passed with zero mismatches. The minimum coverage gate remains in place;
+it was not reduced to accommodate the shorter travel in this run.
+
+The full host suite and cross-target replay also pass. The normal live
+`SKIP_TO_GAME=1` executable passed the bounded startup check with resident
+assets 267,528 bytes and 26,584 Chip bytes remaining; it is the restored build.
+This does not yet prove actor-by-actor SDL parity or the new path's 20 ms budget.
