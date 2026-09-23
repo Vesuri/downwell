@@ -12,6 +12,8 @@ void require(bool condition, const char* message) {
 }
 
 int main() {
+    require(amigaMenuCacheWidth > amigaMenuDisplayWidth,
+            "intro layers are wider static canvases than the display");
     require(amigaMenuDisplayHStop - amigaMenuDisplayHStart == 160,
             "intro display window is centered and 160 pixels wide");
     require(amigaMenuFetchStop - amigaMenuFetchStart == 80,
@@ -30,6 +32,8 @@ int main() {
             "aligned intro origin preserves background vertical parallax");
 
     state = amigaMenuScrollState(95, 300);
+    require(state.foregroundOffset != state.backgroundOffset,
+            "foreground and background use independent plane pointers");
     require(state.foregroundOffset == 16 * 64 + 10,
             "foreground pointer advances in sixteen-pixel words");
     require(state.backgroundOffset == 27 * 64,

@@ -4,6 +4,13 @@
 #include <cstdint>
 
 enum {
+    /*
+     * The garden intro is deliberately not a dual playfield.  These are two
+     * normal one-bit color planes: foreground on odd BPL1, background on even
+     * BPL2.  BPLCON1 delays and bitplane pointers scroll them independently
+     * inside a centered 160-pixel window, with one extra fetched word for
+     * smooth scrolling.
+     */
     amigaMenuCacheWidth = 512,
     amigaMenuCacheHeight = 384,
     amigaMenuCacheWorldY = 284,

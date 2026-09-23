@@ -559,39 +559,6 @@ static void buildReferencePicture(
 
 static AmigaMenuDrawList menuDrawList;
 
-static void drawMenu(AmigaRenderer* renderer,
-                     const AmigaMenuDrawList& list,
-                     const AmigaSceneRuntime& scenes) {
-    unsigned index;
-    const int viewX = scenes.menuCameraX() - 80;
-    const int viewY = scenes.menuCameraY() - 142;
-
-    amigaRendererClear(renderer, 0);
-    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
-                            downwellPlayfieldWidth, downwellDisplayHeight);
-    for (index = 0; index < list.count; ++index) {
-        const AmigaMenuDrawItem& item = list.items[index];
-        int roomX = item.x;
-        int roomY = item.y;
-        if (item.objectId == 312) {
-            roomX = 120 + viewX * 5 / 6;
-            roomY = (viewY + 142) * 10 / 11;
-        }
-        if (item.objectId == 315)
-            amigaRendererFillRect(renderer,
-                downwellPlayfieldX + roomX - 24 - viewX,
-                roomY + 64 - viewY, 160, 1000, 0);
-        drawGameAsset(renderer, (UWORD)item.spriteId, (UWORD)item.frame,
-                      downwellPlayfieldX + roomX - viewX,
-                      roomY - viewY, 0);
-    }
-
-    drawGameAsset(renderer, 654, (UWORD)scenes.menuTitleFrame(),
-                  downwellPlayfieldX + 328 - viewX,
-                  scenes.menuTitleY() - viewY, 0);
-    amigaRendererClearClipRect(renderer);
-}
-
 static void drawMainWorldLine(
     AmigaRenderer* renderer,
     const downwell::RoomPack& rooms,
@@ -916,7 +883,6 @@ int main(void) {
     int presentedSplash = scenes.splashStage();
     unsigned liveFrameCount = 0;
     unsigned menuSpriteFrameCount = 0;
-    bool presentedMenuHardware = false;
 #ifdef DOWNWELL_SCENE_VERIFY
     bool sceneGameplayLandedReported = false;
     bool sceneGameplayActiveReported = false;
@@ -1042,6 +1008,12 @@ int main(void) {
         memory.assets()[byte] = amiga_game_pack[byte];
     activeGamePack = memory.assets();
     activeGamePackEnd = activeGamePack + gamePackBytes;
+#ifndef DOWNWELL_REPLAY_VERIFY
+    /*
+     * Compose the garden completely while the startup display is still
+     * blank.  Once presented, these two one-bit planes are immutable: the
+     * copper scrolls them solely through pointers and BPLCON1.
+     */
     if (!amigaRenderMenuCache(menuDrawList, activeGamePack,
                               activeGamePackEnd,
                               memory.menuForeground(),
@@ -1052,6 +1024,7 @@ int main(void) {
         memory.release();
         return 1;
     }
+#endif
     if (!amigaBuildSplashCache(activeGamePack, activeGamePackEnd,
                                memory.sceneCache())) {
         platform.restore();
@@ -1223,12 +1196,9 @@ int main(void) {
                     scenes.scene() != presentedScene ||
                     scenes.splashStage() != presentedSplash;
                 const unsigned back = front ^ 1u;
-                const bool menuHardware =
-                    scenes.scene() == AmigaScene::menu;
-                const bool menuEntry = menuHardware &&
+                const bool menuEntry =
+                    scenes.scene() == AmigaScene::menu &&
                     scenes.menuEnterSequenceActive();
-                const bool menuModeChanged =
-                    menuHardware != presentedMenuHardware;
                 presentedScene = scenes.scene();
                 presentedSplash = scenes.splashStage();
                 if (presentedScene == AmigaScene::splash) {
@@ -1259,10 +1229,6 @@ int main(void) {
                             memory.sceneCache() +
                                 amigaStyleFrameBytes * 2))
                         break;
-                    if (!menuHardware &&
-                        (presentationChanged || menuModeChanged ||
-                         !scenes.menuPlayerNapping()))
-                        drawMenu(&renderer, menuDrawList, scenes);
                 }
                 else if (presentedScene != AmigaScene::styleSelect &&
                          presentationChanged) {
@@ -1336,7 +1302,7 @@ int main(void) {
                                 titleSprites, titlePartCount,
                                 nullSprite, palette,
                                 scenes.menuCameraY() - 142);
-                        } else if (menuHardware) {
+                        } else {
                             const AmigaMenuScrollState scroll =
                                 amigaMenuScrollState(
                                     scenes.menuCameraX() - 80,
@@ -1346,25 +1312,16 @@ int main(void) {
                                 memory.menuBackground(), playerSprites[back],
                                 titleSprites, titlePartCount,
                                 nullSprite, palette, scroll);
-                        } else {
-                            menuFrameReady = buildCopper(
-                                copperLists[back], gameBitmap, hudBitmap,
-                                playerSprites[back],
-                                bulletSprites + back *
-                                    AmigaPortRuntime::bulletCapacity,
-                                enemySprites[back], palette,
-                                port.ringOrigin());
                         }
                     }
                     if (!menuFrameReady)
                         break;
                     platform.publish(copperLists[back]);
                     front = back;
-                    presentedMenuHardware = menuHardware;
                     if (++menuSpriteFrameCount == 2)
                         downwellMenuSpriteReady();
 #ifdef DOWNWELL_SCENE_VERIFY
-                    if (!sceneMenuTitleReported && menuHardware &&
+                    if (!sceneMenuTitleReported &&
                         scenes.menuTitleFrame() == 9 &&
                         titlePartCount == menuTitleSpriteParts) {
                         sceneMenuTitleReported = true;
@@ -1394,7 +1351,6 @@ int main(void) {
                         break;
                     platform.publish(copperLists[back]);
                     front = back;
-                    presentedMenuHardware = false;
 #ifdef DOWNWELL_SCENE_VERIFY
                     if (!sceneStyleFrameReported &&
                         scenes.styleYOffset() == 0 &&
