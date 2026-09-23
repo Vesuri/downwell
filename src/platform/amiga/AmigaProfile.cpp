@@ -4,7 +4,9 @@
 // Revs-style emulated clock: never use host time or stop GDB inside a sample.
 static const ULONG ticksPerField = 313UL * 256UL;
 extern "C" {
-#ifdef DOWNWELL_SKIP_INTRO
+#ifdef DOWNWELL_SKIP_TO_GAME
+volatile ULONG gDownwellProfileTargetScene = 3;
+#elif defined(DOWNWELL_SKIP_INTRO)
 volatile ULONG gDownwellProfileTargetScene = 2;
 #else
 volatile ULONG gDownwellProfileTargetScene = 1;

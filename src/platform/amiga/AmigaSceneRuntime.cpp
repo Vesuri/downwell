@@ -34,7 +34,10 @@ AmigaSceneRuntime::AmigaSceneRuntime()
       stylePlayerDescent_(0), stylePlayerSpeedY_(0),
       styleVerticalDitherY_(-320 * fixedOne)
 {
-#ifdef DOWNWELL_SKIP_INTRO
+#ifdef DOWNWELL_SKIP_TO_GAME
+    splashStage_ = 0;
+    scene_ = AmigaScene::gameplay;
+#elif defined(DOWNWELL_SKIP_INTRO)
     splashStage_ = 0;
     enterStyleSelect();
 #endif

@@ -3,7 +3,8 @@
 
 CXX := clang++
 SKIP_INTRO ?= 0
-export SKIP_INTRO
+SKIP_TO_GAME ?= 0
+export SKIP_INTRO SKIP_TO_GAME
 
 SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
 SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image)
@@ -11,6 +12,9 @@ SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image)
 CPPFLAGS := -Isrc $(SDL_CFLAGS)
 ifeq ($(SKIP_INTRO),1)
 CPPFLAGS += -DDOWNWELL_SKIP_INTRO
+endif
+ifeq ($(SKIP_TO_GAME),1)
+CPPFLAGS += -DDOWNWELL_SKIP_TO_GAME
 endif
 CXXFLAGS := -std=c++17 -g -O0 -Wall -Wextra -Wpedantic -MMD -MP
 LDFLAGS  := $(SDL_LDFLAGS)
@@ -106,10 +110,14 @@ build/skip-intro-test: tests/core/SkipIntroTest.cpp $(filter-out tests/core/Game
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -o $@ $^
 
+build/skip-to-game-test: tests/core/SkipToGameTest.cpp $(filter-out tests/core/GameRenderTest.cpp,$(GAME_RENDER_TEST_SOURCES)) src/platform/amiga/AmigaSceneRuntime.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -DDOWNWELL_SKIP_TO_GAME -o $@ $^
+
 .PHONY: FORCE_STARTUP_OPTIONS
 build/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p build
-	@printf '%s\n' '$(SKIP_INTRO)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): build/startup-options

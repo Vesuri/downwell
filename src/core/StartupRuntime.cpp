@@ -187,6 +187,18 @@ void StartupRuntime::skipIntroForTesting() {
         gotoRoom(playMenuRoomId);
 }
 
+void StartupRuntime::skipToGameForTesting() {
+    skipIntroForTesting();
+    if (roomLoadSucceeded_) {
+        playStyle_ = 0;
+        playMenuSelected_ = true;
+        playMenuVerticalDitherY_ = 320.0F;
+        // Take the normal confirmation transition, including same-frame
+        // camera phases, without presenting or waiting through the menu.
+        step(Input{}, false);
+    }
+}
+
 void StartupRuntime::controllerCreate(PlatformProfile profile) {
     // objControlerN_Create_0 sets initTimes to zero, then scrInitialize()
     // increments it and establishes the platform profile.

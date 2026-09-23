@@ -11,6 +11,7 @@ AMIGA_SRC := $(REPO)/src/platform/amiga
 REPLAY_VERIFY ?= 0
 SCENE_VERIFY ?= 0
 SKIP_INTRO ?= 0
+SKIP_TO_GAME ?= 0
 PROBES ?= 0
 FPSCOUNT ?= 0
 PROFILE_AUTORUN ?= 0
@@ -33,6 +34,9 @@ CFLAGS += -DDOWNWELL_SCENE_VERIFY
 endif
 ifeq ($(SKIP_INTRO),1)
 CFLAGS += -DDOWNWELL_SKIP_INTRO
+endif
+ifeq ($(SKIP_TO_GAME),1)
+CFLAGS += -DDOWNWELL_SKIP_TO_GAME
 endif
 ifeq ($(PROBES),1)
 CFLAGS += -DDOWNWELL_PROBES
@@ -83,7 +87,7 @@ all: check $(OUT).exe
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options

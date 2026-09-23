@@ -55,7 +55,9 @@ Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
     : startup_(PlatformProfile::desktop, roomPack, objectPack,
                StartupRuntime::defaultRandomSeed, builderPatternPack),
       objectPack_(objectPack) {
-#ifdef DOWNWELL_SKIP_INTRO
+#ifdef DOWNWELL_SKIP_TO_GAME
+    startup_.skipToGameForTesting();
+#elif defined(DOWNWELL_SKIP_INTRO)
     startup_.skipIntroForTesting();
 #endif
 }

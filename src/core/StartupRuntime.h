@@ -26,6 +26,7 @@ enum class PlatformProfile {
 class StartupRuntime {
 public:
     void skipIntroForTesting();
+    void skipToGameForTesting();
     struct MainBulletState {
         float x = 0.0F;
         float y = 0.0F;

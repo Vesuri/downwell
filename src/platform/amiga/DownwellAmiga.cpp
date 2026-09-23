@@ -823,6 +823,10 @@ int main(void) {
 #ifndef DOWNWELL_REPLAY_VERIFY
     AmigaSceneRuntime scenes;
     AmigaScene presentedScene = scenes.scene();
+#ifdef DOWNWELL_SKIP_TO_GAME
+    // Force the normal main-room presentation setup on the first frame.
+    presentedScene = AmigaScene::splash;
+#endif
     int presentedSplash = scenes.splashStage();
     unsigned presentedSplashDither = scenes.splashDitherFrame();
     unsigned liveFrameCount = 0;
@@ -987,7 +991,7 @@ int main(void) {
         return 1;
     }
 
-#ifdef DOWNWELL_SKIP_INTRO
+#if defined(DOWNWELL_SKIP_INTRO) && !defined(DOWNWELL_SKIP_TO_GAME)
     if (!amigaBuildStyleBorder(activeGamePack, activeGamePackEnd,
                               memory.sceneCache() + amigaStyleFrameBytes * 2)) {
         platform.restore();

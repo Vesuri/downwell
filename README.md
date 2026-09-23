@@ -34,6 +34,19 @@ its normal entrance animation and confirmation behavior. Use normal startup
 for garden profiling and intro replay checks. The headless regression check is
 `make build/skip-intro-test && build/skip-intro-test`.
 
+To skip directly into gameplay with Usual Style, including skipping STYLE SELECT:
+
+```sh
+make run SKIP_TO_GAME=1          # SDL
+make amiga SKIP_TO_GAME=1        # Amiga
+```
+
+`SKIP_TO_GAME` defaults to `0` and takes precedence over `SKIP_INTRO` when
+both are enabled. Normal controller/room initialization is preserved; the
+player starts at the normal level entrance. Both toggles trigger automatic
+rebuilds when changed. Use `SKIP_TO_GAME=0 SKIP_INTRO=0` for the full startup.
+Headless check: `make build/skip-to-game-test && build/skip-to-game-test`.
+
 ## Repository layout
 
 ```text
