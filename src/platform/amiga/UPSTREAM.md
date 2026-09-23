@@ -8,12 +8,18 @@ non-owning `Bitmap` views, hardware sprite buffers are `Sprite` objects, the
 copper palette comes from `Palette`, and `AmigaPlatform` owns the complete
 Workbench takeover, raw VERTB timebase, COP1LC publication, and restoration.
 
-Downwell retains a fixed-capacity append-only `CopperList` specialization: the
-circular PF1 needs a variable scanline split that the template's indexed demo
-list does not model. `AmigaMemory` likewise owns one game-specific allocation
-set rather than many independent framework allocations. The 380-pixel logical
-canvas, 384-pixel backing rows, 22-word fetch, circular PF1 and fixed PF2 are
-therefore explicit adaptations rather than changes to generic framework rules.
+Downwell retains a fixed-capacity append-only `CopperList` base: the circular
+PF1 needs a variable scanline split that the template's indexed demo list does
+not model. Following Rescue's application-level pattern, dedicated
+`DownwellGameplayCopperList`, `DownwellMenuCopperList`, and
+`DownwellSplashCopperList` classes own each scene's register layout and update
+rules. Their two dynamic views intentionally share one alternating Chip RAM
+pair because the scenes are mutually exclusive; the immutable splash programs
+have independent storage. `AmigaMemory` likewise owns one game-specific
+allocation set rather than many independent framework allocations. The
+380-pixel logical canvas, 384-pixel backing rows, 22-word fetch, circular PF1
+and fixed PF2 are therefore explicit adaptations rather than changes to
+generic framework rules.
 
 The build selects the framework's portable C++ implementation (`NO_ASSEMBLER`)
 so every linked instruction remains 68000-safe. The inherited VBR helper is

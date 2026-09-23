@@ -33,6 +33,7 @@ OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
+	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
 	obj/AmigaMenuCache.o obj/AmigaSplashCache.o obj/AmigaStyleRenderer.o \
 	obj/AmigaRenderer.o obj/AmigaBlitter.o \
@@ -84,6 +85,12 @@ obj/AmigaPortRuntime.o: $(AMIGA_SRC)/AmigaPortRuntime.cpp \
 
 obj/AmigaSceneRuntime.o: $(AMIGA_SRC)/AmigaSceneRuntime.cpp \
 		$(AMIGA_SRC)/AmigaSceneRuntime.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/DownwellCopperLists.o: $(AMIGA_SRC)/DownwellCopperLists.cpp \
+		$(AMIGA_SRC)/DownwellCopperLists.h \
+		$(AMIGA_SRC)/framework/CopperList.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

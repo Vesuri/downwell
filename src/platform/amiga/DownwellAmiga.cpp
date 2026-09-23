@@ -8,6 +8,7 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "DownwellCopperLists.h"
 #include "AmigaMenu.h"
 #include "AmigaMenuCache.h"
 #include "AmigaMenuScroll.h"
@@ -50,13 +51,8 @@ extern const UBYTE amiga_builder_pack_end[];
 }
 
 enum {
-    copperWords = 400,
     dynamicCopper0 = 0,
     dynamicCopper1 = 1,
-    splashBlankCopper = 2,
-    splashLogoCopper = 3,
-    splashCreditsCopper = 4,
-    splashControlsCopper = 5,
     copperListCount = 6,
     playerSpriteHeight = 32,
     playerSpriteBytes = (playerSpriteHeight + 2) * 4,
@@ -67,16 +63,6 @@ enum {
     enemySpriteHeight = 32,
     enemySpriteBytes = (enemySpriteHeight + 2) * 4,
     menuPlaneBytes = amigaMenuCacheBytesPerRow * amigaMenuCacheHeight,
-    fetchCropBytes = 2,
-    fetchWords = 22,
-    fetchWidth = fetchWords * 16,
-    displayHStart = downwellDisplayHStart + fetchCropBytes * 8,
-    displayHStop = displayHStart + fetchWidth,
-    displayVStart = downwellDisplayVStart,
-    displayVStop = displayVStart + downwellDisplayHeight,
-    fetchStart = 0x30,
-    fetchStop = fetchStart + 8 * (fetchWords - 1),
-    fetchModulo = downwellBytesPerPlaneLine - fetchWords * 2,
     initialRingOrigin = 300,
     mainViewX = 160,
     mainInitialViewY = 34,
@@ -88,10 +74,6 @@ enum {
         downwellDisplayHeight - gameplayPrefetchLines
 };
 
-static_assert((unsigned)amigaSplashPlaneBytes ==
-                  (unsigned)amigaStylePlaneBytes,
-              "narrow screens must share one copper plane stride");
-
 enum {
     styleCacheBytes = amigaStyleFrameBytes * 2 + amigaStyleBorderBytes,
     sceneCacheBytes = amigaSplashCacheBytes > styleCacheBytes
@@ -102,15 +84,6 @@ alignas(AmigaPortRuntime)
 static UBYTE portRuntimeStorage[sizeof(AmigaPortRuntime)];
 
 static AmigaTerrainCollisionContext terrainCollision;
-
-static_assert(displayHStart == 0x71, "cropped display starts at logical x=16");
-static_assert(displayHStop == 0x1d1, "352-pixel cropped display window");
-static_assert(displayVStop == 0x12e, "284-line display window");
-static_assert(fetchWords == 22, "352-pixel DMA fetch");
-static_assert(fetchStop == 0xd8, "22-word lores fetch at hardware limit");
-static_assert(fetchModulo == 4, "skip two bytes on each side per row");
-static_assert(fetchStart == (displayHStart >> 1) - 8,
-              "lores fetch/display alignment");
 
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile unsigned long long lastPortCheckpoint;
@@ -129,13 +102,11 @@ static const uint16_t downwellPaletteData[32] = {
 };
 
 static_assert(
-    copperWords >=
+    downwellCopperWords >=
         6u + 16u + 32u +
         2u * (sizeof(downwellPaletteData) / sizeof(downwellPaletteData[0])) +
         4u + 8u + 2u,
     "copper storage must cover registers, planes, sprites, palette and split");
-static_assert(copperWords >= 340,
-              "copper storage must cover narrow dither tile repetition");
 
 #ifdef DOWNWELL_REPLAY_VERIFY
 extern "C" {
@@ -793,172 +764,6 @@ static void drawFutureGameBlock(
                       gameplayPrefetchScreenY, gameplayPrefetchLines);
 }
 
-static bool buildCopper(CopperList& list,
-                        const Bitmap& game, const Bitmap& hud,
-                        const Sprite& playerSprite,
-                        const Sprite* bulletSprites,
-                        const Sprite& enemySprite,
-                        const Palette& palette,
-                        unsigned ringOrigin) {
-    unsigned channel;
-    const unsigned firstSpan = downwellGameRingHeight - ringOrigin;
-    list.reset();
-    /*
-     * The menu intro temporarily installs a narrow, independently scrolling
-     * display.  Restore every display and fetch register here rather than
-     * relying on the values left behind by platform takeover.
-     */
-    list.move(diwstrt, (UWORD)((displayVStart << 8) |
-                              (displayHStart & 0xff)));
-    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
-                              (displayHStop & 0xff)));
-    list.move(ddfstrt, fetchStart);
-    list.move(ddfstop, fetchStop);
-    list.move(bplcon0, 0x4401);
-    list.move(bplcon1, 0);
-    list.move(bpl1mod, fetchModulo);
-    list.move(bpl2mod, fetchModulo);
-    list.showBitmap(game, 1, 2, fetchCropBytes * 8, ringOrigin, 2);
-    list.showBitmap(hud, 2, 2, fetchCropBytes * 8, 0, 2);
-
-    list.showSprite(0, playerSprite);
-    for (channel = 0; channel < AmigaPortRuntime::bulletCapacity; ++channel)
-        list.showSprite((UWORD)(channel + 1), bulletSprites[channel]);
-    list.showSprite(7, enemySprite);
-
-    list.setPalette(palette);
-
-    if (firstSpan < downwellDisplayHeight) {
-        const unsigned resetAfterLine =
-            displayVStart + firstSpan - 1;
-        /*
-         * Repoint after the final fetch from the ring tail and before the next
-         * line's DDFSTRT. Copper vertical comparison wraps at line 255, so an
-         * explicit line-255 barrier is required for splits below that point.
-         */
-        if (resetAfterLine > 255)
-            list.wait(255, 0xdf);
-        list.wait((UWORD)resetAfterLine, 0xdf);
-        list.showBitmap(game, 1, 2, fetchCropBytes * 8, 0, 2);
-    }
-
-    return list.finish();
-}
-
-static bool buildMenuCopper(CopperList& list,
-                            const UBYTE* foreground,
-                            const UBYTE* background,
-                            const Sprite& playerSprite,
-                            const Sprite& nullSprite,
-                            const Palette& palette,
-                            const AmigaMenuScrollState& scroll) {
-    list.reset();
-    list.move(diwstrt, (UWORD)((displayVStart << 8) |
-                              (amigaMenuDisplayHStart & 0xff)));
-    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
-                              (amigaMenuDisplayHStop & 0xff)));
-    list.move(ddfstrt, amigaMenuFetchStart);
-    list.move(ddfstop, amigaMenuFetchStop);
-    list.move(bplcon0, 0x2001);
-    list.move(bplcon1, scroll.scrollControl);
-    list.move(bpl1mod, amigaMenuModulo);
-    list.move(bpl2mod, amigaMenuModulo);
-    list.pointer(bpl1pth, foreground + scroll.foregroundOffset);
-    list.pointer(bpl2pth, background + scroll.backgroundOffset);
-    list.showSprite(0, playerSprite);
-    for (unsigned channel = 1; channel < 8; ++channel)
-        list.pointer((UWORD)(spr1pth + (channel << 2)), nullSprite.data());
-    list.setPalette(palette);
-    list.move(color02, 0xfff);
-    list.move(color03, 0xfff);
-    return list.finish();
-}
-
-static bool buildMenuEntryCopper(CopperList& list,
-                                 const UBYTE* entry,
-                                 const Sprite& nullSprite,
-                                 const Palette& palette,
-                                 int viewY) {
-    list.reset();
-    list.move(diwstrt, (UWORD)((displayVStart << 8) |
-                              (amigaMenuDisplayHStart & 0xff)));
-    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
-                              (amigaMenuDisplayHStop & 0xff)));
-    list.move(ddfstrt, amigaMenuFetchStart);
-    list.move(ddfstop, amigaMenuFetchStop);
-    list.move(bplcon0, 0x1001);
-    list.move(bplcon1, 0);
-    list.move(bpl1mod, 0);
-    list.move(bpl2mod, 0);
-    list.pointer(bpl1pth, entry + amigaMenuEntryOffset(viewY));
-    list.showSprite(0, nullSprite);
-    for (unsigned channel = 1; channel < 8; ++channel)
-        list.pointer((UWORD)(spr1pth + (channel << 2)), nullSprite.data());
-    list.setPalette(palette);
-    return list.finish();
-}
-
-static bool buildNarrowCopper(CopperList& list, const UBYTE* frame,
-                              const Sprite& nullSprite,
-                              const Palette& palette,
-                              const UBYTE* ditherTile = 0) {
-    list.reset();
-    list.move(diwstrt, (UWORD)((displayVStart << 8) |
-                              (amigaMenuDisplayHStart & 0xff)));
-    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
-                              (amigaMenuDisplayHStop & 0xff)));
-    list.move(ddfstrt, amigaMenuFetchStart);
-    list.move(ddfstop, amigaMenuFetchStop);
-    list.move(bplcon0, ditherTile ? 0x3001 : 0x2001);
-    list.move(bplcon1, 0);
-    list.move(bpl1mod, 0);
-    list.move(bpl2mod, 0);
-    list.pointer(bpl1pth, frame);
-    list.pointer(bpl2pth, frame + amigaStylePlaneBytes);
-    if (ditherTile)
-        list.pointer(bpl3pth, ditherTile);
-    for (unsigned channel = 0; channel < 8; ++channel)
-        list.showSprite((UWORD)channel, nullSprite);
-    list.setPalette(palette);
-    if (ditherTile) {
-        bool crossedLine255 = false;
-        for (unsigned line = amigaSplashDitherTileHeight;
-             line < amigaSplashHeight;
-             line += amigaSplashDitherTileHeight) {
-            const unsigned resetAfterLine = displayVStart + line - 1;
-            if (resetAfterLine > 255 && !crossedLine255) {
-                if (!list.wait(255, 0xdf)) return false;
-                crossedLine255 = true;
-            }
-            if (!list.wait((UWORD)resetAfterLine, 0xdf) ||
-                !list.pointer(bpl3pth, ditherTile))
-                return false;
-        }
-    }
-    return list.finish();
-}
-
-static bool buildWideSplashCopper(CopperList& list, const Bitmap& frame,
-                                  const Sprite& nullSprite,
-                                  const Palette& palette) {
-    list.reset();
-    list.move(diwstrt, (UWORD)((displayVStart << 8) |
-                              (displayHStart & 0xff)));
-    list.move(diwstop, (UWORD)(((displayVStop & 0xff) << 8) |
-                              (displayHStop & 0xff)));
-    list.move(ddfstrt, fetchStart);
-    list.move(ddfstop, fetchStop);
-    list.move(bplcon0, 0x2001);
-    list.move(bplcon1, 0);
-    list.move(bpl1mod, fetchModulo);
-    list.move(bpl2mod, fetchModulo);
-    list.showBitmap(frame, 1, 2, fetchCropBytes * 8, 0, 1);
-    for (unsigned channel = 0; channel < 8; ++channel)
-        list.showSprite((UWORD)channel, nullSprite);
-    list.setPalette(palette);
-    return list.finish();
-}
-
 static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                             unsigned index) {
     return index < AmigaPortRuntime::bulletCapacity
@@ -1029,9 +834,11 @@ int main(void) {
     if (!startupCopper.move(color00, 0x000) ||
         !startupCopper.finish() ||
         !platform.takeover(startupCopper,
-                           displayHStart, displayHStop,
-                           displayVStart, displayVStop,
-                           fetchStart, fetchStop)) {
+                           downwellDisplayHStartCropped,
+                           downwellDisplayHStopCropped,
+                           downwellDisplayVStartCropped,
+                           downwellDisplayVStopCropped,
+                           downwellFetchStart, downwellFetchStop)) {
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         return 1;
     }
@@ -1039,7 +846,7 @@ int main(void) {
         (ULONG)(amiga_game_pack_end - amiga_game_pack);
     if (!memory.allocate(downwellGameRingBytes, downwellLayerBytes,
                          menuPlaneBytes, amigaMenuEntryPlaneBytes,
-                         copperWords * copperListCount * sizeof(UWORD),
+                         downwellCopperWords * copperListCount * sizeof(UWORD),
                          playerSpriteBytes,
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
@@ -1157,14 +964,39 @@ int main(void) {
         return 1;
     }
 
-    CopperList copperLists[copperListCount] = {
-        CopperList(memory.copper(), copperWords),
-        CopperList(memory.copper() + copperWords, copperWords),
-        CopperList(memory.copper() + copperWords * 2, copperWords),
-        CopperList(memory.copper() + copperWords * 3, copperWords),
-        CopperList(memory.copper() + copperWords * 4, copperWords),
-        CopperList(memory.copper() + copperWords * 5, copperWords)
+    /*
+     * The scene-specific wrappers below deliberately share two alternating
+     * Chip RAM programs. Only the wrapper for the active scene writes a slot;
+     * this retains Rescue's dedicated-list API without reserving three pairs
+     * of mutually exclusive copper storage on a 512 KB machine.
+     */
+    UWORD* const dynamicCopperWords[2] = {
+        memory.copper(), memory.copper() + downwellCopperWords
     };
+    DownwellGameplayCopperList gameplayCopperLists[2] = {
+        DownwellGameplayCopperList(dynamicCopperWords[0],
+                                   downwellCopperWords),
+        DownwellGameplayCopperList(dynamicCopperWords[1],
+                                   downwellCopperWords)
+    };
+    DownwellMenuCopperList menuCopperLists[2] = {
+        DownwellMenuCopperList(dynamicCopperWords[0], downwellCopperWords),
+        DownwellMenuCopperList(dynamicCopperWords[1], downwellCopperWords)
+    };
+    DownwellSplashCopperList dynamicSplashLists[2] = {
+        DownwellSplashCopperList(dynamicCopperWords[0],
+                                 downwellCopperWords),
+        DownwellSplashCopperList(dynamicCopperWords[1],
+                                 downwellCopperWords)
+    };
+    DownwellSplashCopperList splashBlankList(
+        memory.copper() + downwellCopperWords * 2, downwellCopperWords);
+    DownwellSplashCopperList splashLogoList(
+        memory.copper() + downwellCopperWords * 3, downwellCopperWords);
+    DownwellSplashCopperList splashCreditsList(
+        memory.copper() + downwellCopperWords * 4, downwellCopperWords);
+    DownwellSplashCopperList splashControlsList(
+        memory.copper() + downwellCopperWords * 5, downwellCopperWords);
     Bitmap gameBitmap(memory.game(), downwellVisibleWidth,
                       downwellGameRingHeight, 2, false, false,
                       downwellDmaWidth);
@@ -1246,21 +1078,18 @@ int main(void) {
     enemySprites[1].hide();
     if (
 #ifdef DOWNWELL_REPLAY_VERIFY
-        !buildCopper(copperLists[dynamicCopper0], gameBitmap, hudBitmap,
-                     playerSprites[0], bulletSprites, enemySprites[0], palette,
-                     port.ringOrigin())
+        !gameplayCopperLists[dynamicCopper0].build(
+            gameBitmap, hudBitmap, playerSprites[0], bulletSprites,
+            AmigaPortRuntime::bulletCapacity, enemySprites[0], palette,
+            port.ringOrigin())
 #else
-        !buildNarrowCopper(copperLists[splashBlankCopper],
-                           amigaSplashFrame(memory.sceneCache(), 1),
-                           nullSprite, palette) ||
-        !buildNarrowCopper(copperLists[splashLogoCopper],
-                           amigaSplashFrame(memory.sceneCache(), 2),
-                           nullSprite, palette) ||
-        !buildWideSplashCopper(copperLists[splashCreditsCopper],
-                               hudBitmap, nullSprite, palette) ||
-        !buildNarrowCopper(copperLists[splashControlsCopper],
-                           amigaSplashFrame(memory.sceneCache(), 4),
-                           nullSprite, palette)
+        !splashBlankList.buildNarrow(
+            amigaSplashFrame(memory.sceneCache(), 1), nullSprite, palette) ||
+        !splashLogoList.buildNarrow(
+            amigaSplashFrame(memory.sceneCache(), 2), nullSprite, palette) ||
+        !splashCreditsList.buildWide(hudBitmap, nullSprite, palette) ||
+        !splashControlsList.buildNarrow(
+            amigaSplashFrame(memory.sceneCache(), 4), nullSprite, palette)
 #endif
     ) {
         platform.restore();
@@ -1268,26 +1097,23 @@ int main(void) {
         memory.release();
         return 1;
     }
-    platform.publish(copperLists[
 #ifdef DOWNWELL_REPLAY_VERIFY
-        dynamicCopper0
+    platform.publish(gameplayCopperLists[dynamicCopper0]);
 #else
-        splashBlankCopper
+    platform.publish(splashBlankList);
 #endif
-    ]);
     platform.waitVblank();
     FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-    if (!buildCopper(copperLists[dynamicCopper1], gameBitmap, hudBitmap,
+    if (!gameplayCopperLists[dynamicCopper1].build(
+        gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
-                     playerSprites[1],
-                     bulletSprites + AmigaPortRuntime::bulletCapacity,
-                     enemySprites[1], palette,
+        playerSprites[1],
 #else
-                     nullSprite,
-                     bulletSprites + AmigaPortRuntime::bulletCapacity,
-                     enemySprites[1], palette,
+        nullSprite,
 #endif
-                     port.ringOrigin())) {
+        bulletSprites + AmigaPortRuntime::bulletCapacity,
+        AmigaPortRuntime::bulletCapacity, enemySprites[1], palette,
+        port.ringOrigin())) {
         platform.restore();
         memory.release();
         return 1;
@@ -1347,17 +1173,23 @@ int main(void) {
                 presentedSplashDither = scenes.splashDitherFrame();
                 if (presentedScene == AmigaScene::splash) {
                     if (presentationChanged || splashDitherChanged) {
-                        unsigned splashCopper = back;
+                        CopperList* splashProgram =
+                            &dynamicSplashLists[back];
+                        bool staticSplashProgram = false;
                         bool built = true;
-                        if (presentationChanged && presentedSplash == 2)
-                            splashCopper = splashLogoCopper;
-                        else if (presentationChanged && presentedSplash == 3)
-                            splashCopper = splashCreditsCopper;
-                        else if (presentationChanged && presentedSplash == 4)
-                            splashCopper = splashControlsCopper;
-                        else {
-                            built = buildNarrowCopper(
-                                copperLists[back],
+                        if (presentationChanged && presentedSplash == 2) {
+                            splashProgram = &splashLogoList;
+                            staticSplashProgram = true;
+                        } else if (presentationChanged &&
+                                   presentedSplash == 3) {
+                            splashProgram = &splashCreditsList;
+                            staticSplashProgram = true;
+                        } else if (presentationChanged &&
+                                   presentedSplash == 4) {
+                            splashProgram = &splashControlsList;
+                            staticSplashProgram = true;
+                        } else {
+                            built = dynamicSplashLists[back].buildNarrow(
                                 amigaSplashFrame(memory.sceneCache(),
                                                  presentedSplash),
                                 nullSprite, palette,
@@ -1370,10 +1202,6 @@ int main(void) {
                         }
                         if (!built)
                             break;
-                        const bool staticSplashProgram =
-                            splashCopper == splashLogoCopper ||
-                            splashCopper == splashCreditsCopper ||
-                            splashCopper == splashControlsCopper;
                         /*
                          * These programs were completed before display DMA
                          * started, and this branch runs immediately after
@@ -1383,8 +1211,7 @@ int main(void) {
                          * Animated dither programs remain deferred because
                          * they are assembled during the current field.
                          */
-                        platform.publish(copperLists[splashCopper],
-                                         staticSplashProgram);
+                        platform.publish(*splashProgram, staticSplashProgram);
                         /*
                          * COP1LC is latched by the copper at the following
                          * vertical blank.  Synchronize discrete splash
@@ -1470,23 +1297,25 @@ int main(void) {
                     }
                     if (menuFrameReady) {
                         if (menuEntry) {
-                            menuFrameReady = buildMenuEntryCopper(
-                                copperLists[back], memory.menuEntry(),
+                            menuFrameReady =
+                                menuCopperLists[back].buildEntry(
+                                memory.menuEntry(),
                                 nullSprite, palette,
                                 scenes.menuCameraY() - 142);
                         } else {
                             menuScroll = amigaMenuScrollState(
                                 scenes.menuCameraX() - 80,
                                 scenes.menuCameraY() - 142);
-                            menuFrameReady = buildMenuCopper(
-                                copperLists[back], memory.menuForeground(),
+                            menuFrameReady =
+                                menuCopperLists[back].buildScroll(
+                                memory.menuForeground(),
                                 memory.menuBackground(), playerSprites[back],
                                 nullSprite, palette, menuScroll);
                         }
                     }
                     if (!menuFrameReady)
                         break;
-                    platform.publish(copperLists[back]);
+                    platform.publish(menuCopperLists[back]);
                     front = back;
                     if (presentationChanged &&
                         priorPresentedScene == AmigaScene::splash)
@@ -1550,13 +1379,12 @@ int main(void) {
                             scenes,
                             memory.sceneCache() +
                                 back * amigaStyleFrameBytes) ||
-                        !buildNarrowCopper(
-                            copperLists[back],
+                        !dynamicSplashLists[back].buildNarrow(
                             memory.sceneCache() +
                                 back * amigaStyleFrameBytes,
                             nullSprite, palette))
                         break;
-                    platform.publish(copperLists[back]);
+                    platform.publish(dynamicSplashLists[back]);
                     front = back;
 #ifdef DOWNWELL_SCENE_VERIFY
                     if (!sceneStyleFrameReported &&
@@ -1592,15 +1420,17 @@ int main(void) {
                     continue;
                 }
                 if (presentationChanged) {
-                    if (!buildCopper(copperLists[back], gameBitmap, hudBitmap,
-                                     presentedScene == AmigaScene::gameplay
-                                         ? playerSprites[0] : nullSprite,
-                                     bulletSprites + back *
-                                         AmigaPortRuntime::bulletCapacity,
-                                     enemySprites[back], palette,
-                                     port.ringOrigin()))
+                    if (!gameplayCopperLists[back].build(
+                            gameBitmap, hudBitmap,
+                            presentedScene == AmigaScene::gameplay
+                                ? playerSprites[0] : nullSprite,
+                            bulletSprites + back *
+                                AmigaPortRuntime::bulletCapacity,
+                            AmigaPortRuntime::bulletCapacity,
+                            enemySprites[back], palette,
+                            port.ringOrigin()))
                         break;
-                    platform.publish(copperLists[back]);
+                    platform.publish(gameplayCopperLists[back]);
                     front = back;
                 }
                 /*
@@ -1845,17 +1675,17 @@ int main(void) {
             if (actorCount <= AmigaPortRuntime::bulletCapacity)
                 enemySprites[back].hide();
             if (frameReady &&
-                !buildCopper(copperLists[back], gameBitmap, hudBitmap,
-                             playerSprites[back],
-                             bulletSprites + back *
-                                 AmigaPortRuntime::bulletCapacity,
-                             enemySprites[back], palette,
-                             port.ringOrigin()))
+                !gameplayCopperLists[back].build(
+                    gameBitmap, hudBitmap, playerSprites[back],
+                    bulletSprites + back *
+                        AmigaPortRuntime::bulletCapacity,
+                    AmigaPortRuntime::bulletCapacity,
+                    enemySprites[back], palette, port.ringOrigin()))
                 frameReady = false;
             if (!frameReady)
                 break;
             /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
-            platform.publish(copperLists[back]);
+            platform.publish(gameplayCopperLists[back]);
             front = back;
 #ifdef DOWNWELL_SCENE_VERIFY
             if (!sceneGameplayLandedReported && port.player().grounded()) {

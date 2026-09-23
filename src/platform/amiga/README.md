@@ -13,6 +13,9 @@ and a Rescue-style platform takeover/restore shell. Downwell keeps its own game
 runtime and memory layout; the demo-production timeline, `Part` hierarchy, and
 tracker player are applications of the framework rather than platform services.
 Provenance and the deliberate adaptations are tracked in `UPSTREAM.md`.
+As in Rescue on Fractalus, scene-specific copper-list classes own the gameplay,
+menu, and splash register programs; the main loop only builds and publishes the
+appropriate typed list.
 
 `AmigaRenderer` mirrors the important state transition in the shared renderer
 contract: setting a clip rectangle selects PF1 and limits game drawing to the
