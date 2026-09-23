@@ -78,6 +78,11 @@ only after a generated enemy is awake and that gameplay frame and copper list
 have been published. It also restores the normal playable executable after
 passing.
 
+Automated startup/scene runs have a 120-second wall-clock budget, including
+emulator startup. `VERIFY_TIMEOUT_SECONDS` can set a shorter test-specific
+budget. Timeout, interruption, and completion clean up the verifier's emulator
+and debugger; interactive runs are not time-limited.
+
 The scene verifier checks the selected copper program after every complete
 splash iteration: all 180 logo frames, 180 credits frames, 240 controls frames,
 and both 60-frame fades. This catches a later branch overwriting a splash
