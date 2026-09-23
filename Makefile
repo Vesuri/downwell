@@ -80,7 +80,7 @@ AMIGA_SELECTED_STYLE_FRAME_SHA256 := d1f5739235934c53bf38abe0dd46cf1855e1e9e8b6f
 AMIGA_SPLASH_FRAME_SHA256 := b82d3f72e70a9788a16bdeb5f681fc675d831562d407bfeac317f4508d67d9f2
 AMIGA_CONTROLS_FRAME_SHA256 := ee3f455e6c9192d08f64ea26cf6b56338badf0dadeee56acf85ae2cd2838560a
 AMIGA_CREDITS_FRAME_SHA256 := 9e7137cae00e1925f0a61c045f23ed1571358e9e02451b2acf9db036453d3af1
-AMIGA_MENU_WAKE_FRAME_SHA256 := 6c6630c652c744f6dace85395b1094f3bd990b71e11119a135950bfac11c6987
+AMIGA_MENU_WAKE_FRAME_SHA256 := 5f84cd99630daab845d51ecda5709970caa5bb265364bee92b0be7cd229c45fa
 AMIGA_MENU_TITLE_FRAME_SHA256 := d9fcc0c40f37e61e239593aa8520a47415c054439283d7992264c40b63b39f2a
 AMIGA_MENU_ENTRY_FRAME_SHA256 := 8f9825392f36db030ae25be3cd3c0043f9013455cef47cec7aafee08d311a359
 AMIGA_GAMEPLAY_FRAME_SHA256 := c9e898e343f26402c28d12b7924020c2eeb69f3c461c99b81f4cd3fc434fb52e
@@ -281,6 +281,7 @@ generate-amiga-game:
 	tools/generate-amiga-hud.py --profile game
 
 verify-amiga-game: generate-amiga-game
+	python3 tools/verify-amiga-menu-sprites.py
 	tools/generate-amiga-hud.py --profile game --check
 
 verify-native-data: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(STARTUP_TEST_TARGET)

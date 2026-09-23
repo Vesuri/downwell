@@ -3,6 +3,8 @@
 #include "AmigaMenuScroll.h"
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
+#include "framework/Sprite.h"
+#include "AmigaRenderer.h"
 
 namespace {
 const UWORD alignedMenuTitleSprite = 65400;
@@ -97,6 +99,35 @@ bool amigaRenderMenuCache(const AmigaMenuDrawList& list,
     }
     AmigaHardware::blitterDrain();
     return true;
+}
+
+UWORD* amigaMenuHardwareSprite(const UBYTE* pack, const UBYTE* end,
+                              UWORD sprite, UWORD frame, bool flip,
+                              unsigned buffer, int x, int y)
+{
+    static const UBYTE* lastPack[2] = {0, 0};
+    static const UBYTE* lastRecord[2] = {0, 0};
+    static ULONG lastKey[2] = {0, 0};
+    if (buffer > 1) return 0;
+    const UWORD variant = (UWORD)(frame * 2 + (flip ? 1 : 0));
+    const ULONG key = ((ULONG)sprite << 16) | variant;
+    if (lastPack[buffer] != pack || lastKey[buffer] != key) {
+        lastRecord[buffer] = find(pack, end, (UWORD)(64000 + sprite), variant);
+        lastPack[buffer] = pack;
+        lastKey[buffer] = key;
+    }
+    const UBYTE* record = lastRecord[buffer];
+    if (!record || buffer > 1 || word(record + 14) != 4) return 0;
+    const unsigned height = word(record + 10);
+    const unsigned bytes = 136;
+    const UBYTE* payload = pack + longword(record + 16);
+    if (longword(record + 20) != bytes * 2 || payload + bytes * 2 > end)
+        return 0;
+    UWORD* data = (UWORD*)(payload + buffer * bytes);
+    Sprite prepared(data, (UWORD)height);
+    prepared.setX((UWORD)(downwellDisplayHStart + x - (WORD)word(record + 4)));
+    prepared.setY((UWORD)(downwellDisplayVStart + y - (WORD)word(record + 6)));
+    return data;
 }
 
 bool amigaRenderMenuTitle(UWORD frame,

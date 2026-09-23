@@ -148,7 +148,26 @@ bool DownwellMenuCopperList::buildScroll(
         !move(color02, 0xfff) ||
         !move(color03, 0xfff))
         return false;
+    scrollOffset_ = moveOffset(bplcon1);
+    foregroundOffset_ = moveOffset(bpl1pth);
+    backgroundOffset_ = moveOffset(bpl2pth);
+    playerOffset_ = moveOffset(spr1pth);
     return finish();
+}
+
+bool DownwellMenuCopperList::updateScroll(
+    const UBYTE* foreground, const UBYTE* background,
+    const UWORD* player, const AmigaMenuScrollState& scroll)
+{
+    return patchMove(scrollOffset_, scroll.scrollControl) &&
+           patchPointer(foregroundOffset_, foreground + scroll.foregroundOffset) &&
+           patchPointer(backgroundOffset_, background + scroll.backgroundOffset) &&
+           patchPointer(playerOffset_, player);
+}
+
+bool DownwellMenuCopperList::updateEntry(const UBYTE* entry, int viewY)
+{
+    return patchPointer(foregroundOffset_, entry + amigaMenuEntryOffset(viewY));
 }
 
 bool DownwellMenuCopperList::buildEntry(
@@ -164,6 +183,7 @@ bool DownwellMenuCopperList::buildEntry(
         !hideSprites(*this, nullSprite) ||
         !setPalette(palette))
         return false;
+    foregroundOffset_ = moveOffset(bpl1pth);
     return finish();
 }
 

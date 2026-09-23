@@ -156,6 +156,8 @@ volatile const UWORD* gDownwellCreditsCopper;
 #ifdef DOWNWELL_SCENE_VERIFY
 volatile ULONG gDownwellSplashCheckedFrames[7];
 volatile ULONG gDownwellSplashPublicationFailures;
+volatile const UWORD* gDownwellMenuSpriteOracle;
+volatile ULONG gDownwellMenuCopperPatchFailures;
 #endif
 
 struct DownwellMenuFrameCapture {
@@ -813,6 +815,7 @@ int main(void) {
     unsigned liveFrameCount = 0;
     unsigned menuSpriteFrameCount = 0;
     int renderedMenuTitleFrame = -1;
+    int menuCopperMode[2] = {-1, -1};
 #ifdef DOWNWELL_SCENE_VERIFY
     const UWORD* expectedSplashCopper = 0;
     bool sceneGameplayLandedReported = false;
@@ -1282,6 +1285,9 @@ int main(void) {
                 }
                 if (presentedScene == AmigaScene::menu) {
                     bool menuFrameReady = true;
+                    UWORD* menuPlayerData = memory.nullSprite();
+                    if (presentationChanged)
+                        menuCopperMode[0] = menuCopperMode[1] = -1;
                     AmigaMenuScrollState menuScroll = {0, 0, 0};
                     if (renderedMenuTitleFrame != scenes.menuTitleFrame()) {
                         menuFrameReady = amigaRenderMenuTitle(
@@ -1292,39 +1298,63 @@ int main(void) {
                             renderedMenuTitleFrame = scenes.menuTitleFrame();
                     }
                     if (scenes.menuPlayerVisible()) {
-                        menuFrameReady = amigaRendererBuildHardwareSprite(
+                        menuPlayerData = amigaMenuHardwareSprite(
                             activeGamePack, activeGamePackEnd,
                             (UWORD)scenes.menuPlayerSprite(),
                             (UWORD)scenes.menuPlayerFrame(),
+                            scenes.menuPlayerFacing() < 0, back,
                             downwellPlayfieldX + scenes.menuPlayerX() -
                                 (scenes.menuCameraX() - 80),
                             scenes.menuPlayerY() -
-                                (scenes.menuCameraY() - 142),
-                            scenes.menuPlayerFacing() < 0,
-                            memory.playerSprite(back), playerSpriteHeight);
-                    } else {
-                        playerSprites[back].hide();
+                                (scenes.menuCameraY() - 142));
+                        menuFrameReady = menuFrameReady && menuPlayerData;
                     }
                     if (menuFrameReady) {
                         if (menuEntry) {
-                            menuFrameReady =
+                            if (menuCopperMode[back] != 1)
+                                menuFrameReady =
                                 menuCopperLists[back].buildEntry(
                                 memory.menuEntry(),
                                 nullSprite, palette,
                                 scenes.menuCameraY() - 142);
+                            else
+                                menuFrameReady = menuCopperLists[back].updateEntry(
+                                    memory.menuEntry(), scenes.menuCameraY() - 142);
                         } else {
                             menuScroll = amigaMenuScrollState(
                                 scenes.menuCameraX() - 80,
                                 scenes.menuCameraY() - 142);
-                            menuFrameReady =
+                            if (menuCopperMode[back] != 0)
+                                menuFrameReady =
                                 menuCopperLists[back].buildScroll(
-                                memory.menuForeground(),
-                                memory.menuBackground(), playerSprites[back],
+                                memory.menuForeground(), memory.menuBackground(), nullSprite,
                                 nullSprite, palette, menuScroll);
+                            menuFrameReady = menuFrameReady &&
+                                menuCopperLists[back].updateScroll(
+                                    memory.menuForeground(), memory.menuBackground(),
+                                    menuPlayerData, menuScroll);
                         }
+                        menuCopperMode[back] = menuEntry ? 1 : 0;
                     }
                     if (!menuFrameReady)
                         break;
+#ifdef DOWNWELL_SCENE_VERIFY
+                    // Test the patched program against a freshly emitted oracle.
+                    UWORD oracleWords[downwellCopperWords];
+                    DownwellMenuCopperList oracle(oracleWords, downwellCopperWords);
+                    Sprite oraclePlayer(menuPlayerData, playerSpriteHeight);
+                    const bool oracleReady = menuEntry
+                        ? oracle.buildEntry(memory.menuEntry(), nullSprite, palette,
+                                            scenes.menuCameraY() - 142)
+                        : oracle.buildScroll(memory.menuForeground(),
+                                             memory.menuBackground(), oraclePlayer,
+                                             nullSprite, palette, menuScroll);
+                    if (!oracleReady || oracle.size() != menuCopperLists[back].size())
+                        ++gDownwellMenuCopperPatchFailures;
+                    else for (unsigned word = 0; word < oracle.size(); ++word)
+                        if (oracleWords[word] != menuCopperLists[back].data()[word])
+                            ++gDownwellMenuCopperPatchFailures;
+#endif
                     platform.publish(menuCopperLists[back]);
                     front = back;
                     if (presentationChanged &&
@@ -1338,6 +1368,17 @@ int main(void) {
                         scenes.menuPlayerVisible() &&
                         scenes.menuPlayerSprite() == 27) {
                         sceneMenuWakeFrameReported = true;
+                        // Test-only portable oracle; never used for presentation.
+                        amigaRendererBuildHardwareSprite(
+                            activeGamePack, activeGamePackEnd,
+                            (UWORD)scenes.menuPlayerSprite(),
+                            (UWORD)scenes.menuPlayerFrame(),
+                            downwellPlayfieldX + scenes.menuPlayerX() -
+                                (scenes.menuCameraX() - 80),
+                            scenes.menuPlayerY() - (scenes.menuCameraY() - 142),
+                            scenes.menuPlayerFacing() < 0,
+                            memory.playerSprite(back), playerSpriteHeight);
+                        gDownwellMenuSpriteOracle = memory.playerSprite(back);
                         gDownwellMenuFrameCapture.foregroundOffset =
                             menuScroll.foregroundOffset;
                         gDownwellMenuFrameCapture.backgroundOffset =
@@ -1348,7 +1389,7 @@ int main(void) {
                         gDownwellMenuForeground = memory.menuForeground();
                         gDownwellMenuBackground = memory.menuBackground();
                         gDownwellMenuPlayerSprite =
-                            memory.playerSprite(back);
+                            menuPlayerData;
                         downwellMenuWakeFrameReady();
                     }
                     if (!sceneMenuTitleReported &&
@@ -1364,7 +1405,7 @@ int main(void) {
                         gDownwellMenuForeground = memory.menuForeground();
                         gDownwellMenuBackground = memory.menuBackground();
                         gDownwellMenuPlayerSprite =
-                            memory.playerSprite(back);
+                            menuPlayerData;
                         downwellMenuTitleFrameReady();
                         /* Retain the old verification breakpoint name. */
                         downwellMenuTitleSpriteReady();

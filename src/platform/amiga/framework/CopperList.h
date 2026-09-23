@@ -23,6 +23,9 @@ public:
     bool setPalette(const Palette& palette, UWORD colorIndex = 0,
                     int fromIndex = 0, int toIndex = -1);
     bool finish();
+    unsigned moveOffset(UWORD reg) const;
+    bool patchMove(unsigned offset, UWORD value);
+    bool patchPointer(unsigned offset, const void* value);
     UWORD* data() const { return words_; }
     unsigned size() const { return count_; }
     bool valid() const { return valid_; }

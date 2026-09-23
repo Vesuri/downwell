@@ -363,6 +363,46 @@ def build_pack(manifest, extracted, profile):
         }
         encoded.append((sprite, 0, dma_width, planar))
 
+    # Garden hardware sprites: bounds, centering and mirroring are host work.
+    # Two DMA copies let the target change only the inactive position header.
+    if profile == "game":
+        hardware = []
+        for sprite, frame_index, dma_width, planar in encoded:
+            if sprite["id"] not in (12, 27, 31, 37):
+                continue
+            width, height = sprite["width"], sprite["height"]
+            stride = dma_width // 8
+            plane_size = stride * height
+            def pixel(x, y, plane):
+                return bool(planar[plane * plane_size + y * stride + x // 8]
+                            & (0x80 >> (x & 7)))
+            opaque = [x for x in range(width)
+                      if any(pixel(x, y, 0) or pixel(x, y, 1)
+                             for y in range(height))]
+            left, right = (min(opaque), max(opaque)) if opaque else (0, 0)
+            require(right - left < 16, "garden actor exceeds one sprite")
+            for flip in (0, 1):
+                lo, hi = (width - 1 - right, width - 1 - left) if flip else (left, right)
+                crop = max(0, min(width - 16, lo - (16 - (hi - lo + 1)) // 2))
+                stream = bytearray(4)
+                for y in range(height):
+                    for plane in (0, 1):
+                        bits = 0
+                        for x in range(16):
+                            sx = width - 1 - (crop + x) if flip else crop + x
+                            bits |= int(pixel(sx, y, plane)) << (15 - x)
+                        stream.extend(struct.pack(">H", bits))
+                stream.extend(bytes(4))
+                # Fixed-size slots also keep capture readers within one copy.
+                stream.extend(bytes(136 - len(stream)))
+                metadata = dict(sprite, id=64000 + sprite["id"], width=16,
+                                originX=(width - sprite["originX"] if flip
+                                         else sprite["originX"]) - crop,
+                                hardware=True)
+                hardware.append((metadata, frame_index * 2 + flip, 16,
+                                 bytes(stream) * 2))
+        encoded.extend(hardware)
+
     # Keep the on-disk directory ordered so the 68000 renderer can locate a
     # frame with a short binary search instead of repeatedly walking records
     # in Chip RAM.
@@ -374,7 +414,8 @@ def build_pack(manifest, extracted, profile):
     for sprite, frame_index, dma_width, planar in encoded:
         records.append(RECORD.pack(
             sprite["id"], frame_index, sprite["originX"], sprite["originY"],
-            sprite["width"], sprite["height"], dma_width, 3,
+            sprite["width"], sprite["height"], dma_width,
+            4 if sprite.get("hardware") else 3,
             payload_offset + len(payload), len(planar)))
         payload.extend(planar)
 

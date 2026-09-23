@@ -92,3 +92,24 @@ bool CopperList::finish()
     words_[count_++] = 0xfffe;
     return true;
 }
+
+unsigned CopperList::moveOffset(UWORD reg) const
+{
+    for (unsigned i = 0; i + 1 < count_; i += 2)
+        if (words_[i] == reg) return i;
+    return count_;
+}
+
+bool CopperList::patchMove(unsigned offset, UWORD value)
+{
+    if (offset + 1 >= count_ || (offset & 1)) return false;
+    words_[offset + 1] = value;
+    return true;
+}
+
+bool CopperList::patchPointer(unsigned offset, const void* value)
+{
+    const ULONG address = (ULONG)value;
+    return patchMove(offset, (UWORD)(address >> 16)) &&
+           patchMove(offset + 2, (UWORD)address);
+}

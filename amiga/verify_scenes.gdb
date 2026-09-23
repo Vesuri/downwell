@@ -2,6 +2,10 @@ set pagination off
 target remote 127.0.0.1:2345
 break downwellSceneGameplayActive
 continue
+if gDownwellMenuCopperPatchFailures != 0
+    printf "Patched garden copper differs from freshly built oracle\n"
+    quit 1
+end
 if gDownwellSplashPublicationFailures != 0
     printf "Splash list overwritten on %lu frames\n", gDownwellSplashPublicationFailures
     quit 1

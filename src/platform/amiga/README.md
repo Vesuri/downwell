@@ -172,6 +172,27 @@ capture hash.  This also guards the monochrome cache rule: recovered white art
 is retained while opaque source black clears the layer instead of becoming a
 solid white silhouette.
 
+Garden actors (resources 12, 27, 31 and 37) are converted into hardware-sprite
+DMA streams on the host, including both facings and precomputed origins/bounds.
+DWAP records 64000+resource ID, frame*2+facing, format flag 4 contain two
+136-byte DMA slots. The pixel words and terminators are never rebuilt on target;
+the inactive slot receives only position/control header updates. A cached
+record lookup changes when the animation frame or facing changes.
+`tools/verify-amiga-menu-sprites.py` checks all 50 variants and both copies
+against the previous pixel-builder representation. This is the garden path;
+gameplay's generic sprite builder remains a separate migration task.
+
+Garden copper programs are built once per buffer/mode. Following the reference
+ports' indexed-update pattern, the active frame patches only seven value words
+(two plane pointers, BPLCON1, sprite pointer); vertical entry patches two.
+Palette and register-address words are retained. Scene-verification builds
+compare every patched program with a freshly emitted oracle; normal builds do
+not perform that comparison. The wake sprite is also checked against the old
+builder once in the verification build, never in the display path.
+The wake capture hash was re-established against an isolated build of commit
+9da283c: its capture and the optimized capture are byte-identical; the earlier
+stored hash was stale.
+
 `make verify-amiga-menu-title-frame` extends the same reconstruction with all
 seven hardware-sprite strips of the fully revealed Downwell logo.  Its pinned
 capture proves the logo is present and centered while the goal-stopped player

@@ -211,7 +211,7 @@ obj/AmigaBlitter.o: $(AMIGA_SRC)/AmigaBlitter.cpp \
 $(AMIGA_HUD):
 	$(MAKE) -C $(REPO) generate-amiga-hud
 
-$(AMIGA_GAME):
+$(AMIGA_GAME): $(REPO)/tools/generate-amiga-hud.py
 	$(MAKE) -C $(REPO) generate-amiga-game
 
 $(ROOM_PACK):
