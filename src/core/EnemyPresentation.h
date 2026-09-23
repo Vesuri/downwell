@@ -3,6 +3,15 @@
 
 namespace downwell {
 
+// Rates are exact twentieths of a frame (0.1, 0.15, 0.2, 0.25).
+// Preserve fifths of one Q8 phase unit instead of rounding each increment.
+inline void advanceEnemyImageQ8(unsigned& phase, unsigned char& remainder,
+                                 unsigned twentieths) {
+    const unsigned numerator = twentieths * 64u + remainder;
+    phase += numerator / 5u;
+    remainder = static_cast<unsigned char>(numerator % 5u);
+}
+
 // Recovered resource IDs and Step-state choices; no asset payloads.
 inline int enemyPresentationSprite(int object, bool grounded, int auxiliary) {
     switch (object) {

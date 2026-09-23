@@ -76,7 +76,8 @@ public:
         int direction;
         int moveSpeed;
         unsigned imagePhase;
-        unsigned imageSpeed;
+        unsigned imageSpeed; // twentieths of a frame
+        unsigned char imageRemainder; // fifths of one Q8 phase unit
         unsigned imageFrame;
         bool active;
         bool awake;

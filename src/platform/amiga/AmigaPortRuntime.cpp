@@ -100,6 +100,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].moveSpeed = 0;
         enemies_[index].imagePhase = 0;
         enemies_[index].imageSpeed = 0;
+        enemies_[index].imageRemainder = 0;
         enemies_[index].imageFrame = 0;
         enemies_[index].active = false;
         enemies_[index].awake = false;
@@ -212,10 +213,11 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.direction = direction;
     enemy.moveSpeed = moveSpeed;
     enemy.imagePhase = 0;
-    enemy.imageSpeed = objectId == 111 ? 64u
-                       : objectId == 112 ? 38u
-                       : objectId == 116 ? 51u
-                       : objectId == 117 || objectId == 119 ? 26u
+    enemy.imageRemainder = 0;
+    enemy.imageSpeed = objectId == 111 ? 5u
+                       : objectId == 112 ? 3u
+                       : objectId == 116 ? 4u
+                       : objectId == 117 || objectId == 119 ? 2u
                        : 0u;
     enemy.imageFrame = 0;
     enemy.active = active;
@@ -535,7 +537,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
             continue;
-        enemy.imagePhase += enemy.imageSpeed;
+        downwell::advanceEnemyImageQ8(enemy.imagePhase, enemy.imageRemainder,
+                                     enemy.imageSpeed);
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
         if (!enemy.awake || solidResolver_ == 0)
@@ -724,8 +727,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             if (enemy.spriteId == 168) {
                 enemy.imageSpeed = 0;
                 enemy.imagePhase = enemy.speedY < 0 ? 0u : 256u;
+                enemy.imageRemainder = 0;
             } else {
-                enemy.imageSpeed = 51u;
+                enemy.imageSpeed = 4u;
             }
         }
         const unsigned frameCount = downwell::enemySpriteFrameCount(enemy.spriteId);

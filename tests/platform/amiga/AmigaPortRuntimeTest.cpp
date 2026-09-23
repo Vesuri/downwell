@@ -3,6 +3,7 @@
 #include "core/PortReplay.h"
 #include "core/Replay.h"
 #include "core/GameMakerRounding.h"
+#include "core/EnemyPresentation.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -63,6 +64,16 @@ struct GenerationOrderProbe {
 } // namespace
 
 int main() {
+    for (unsigned rate : {0u, 2u, 3u, 4u, 5u}) {
+        unsigned phase = 0;
+        unsigned char remainder = 0;
+        for (unsigned tick = 1; tick <= 2000; ++tick) {
+            downwell::advanceEnemyImageQ8(phase, remainder, rate);
+            require(phase == tick * rate * 64u / 5u &&
+                        remainder == tick * rate * 64u % 5u,
+                    "enemy decimal animation rates do not accumulate Q8 drift");
+        }
+    }
     const long ties[] = {0, 2, 2, 4};
     for (int i = 0; i < 4; ++i) {
         require(downwell::roundGameMakerQ8(i * 256 + 128) == ties[i] &&
@@ -406,8 +417,8 @@ int main() {
     for (unsigned frame = 0; frame < 15; ++frame)
         animatedBat.step(0);
     require(animatedBat.enemyAt(0).spriteId == 153 &&
-                animatedBat.enemyAt(0).imageFrame == 2,
-            "four-frame bat animation is no longer truncated to two frames");
+                animatedBat.enemyAt(0).imageFrame == 3,
+            "0.2-speed bat reaches frame three after exactly fifteen updates");
 
     AmigaPortRuntime walkingTurtle(300);
     walkingTurtle.configureSolidResolver(flatGround, 0);

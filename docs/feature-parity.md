@@ -372,3 +372,16 @@ Animation phase parity is still incomplete: native Q8 animation speeds and
 ground-contact timing can produce different frames, even where positions
 agree. This change fixes resource selection and cycle truncation, not all
 animation scheduling or hit-stun presentation.
+
+### Native animation-rate precision
+
+Native animation speeds now use exact twentieths of a frame, retaining a
+fifth-Q8-unit remainder alongside the Q8 image phase. This represents 0.1,
+0.15, 0.2 and 0.25 without a permanently rounded increment. Explicit airborne
+frog poses clear the remainder when setting their fixed frame. Tests check
+2,000 updates at each supported rate and require the active bat to reach
+frame 3 on its fifteenth update (the former Q8 approximation only reached 2).
+This is still integer-only and does not change the hardware sprite asset path.
+Host tests and the bounded 600-tick target cache check pass (101 composition
+checks, zero reported mismatches). Final live-tape frog/turtle frame indices
+still differ, so exact rates alone do not prove animation-state parity.
