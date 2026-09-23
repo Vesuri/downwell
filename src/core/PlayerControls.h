@@ -1,0 +1,58 @@
+#ifndef DOWNWELL_CORE_PLAYER_CONTROLS_H
+#define DOWNWELL_CORE_PLAYER_CONTROLS_H
+
+namespace downwell {
+
+// Transitional arithmetic adapters. Rules below are shared; ultimately both
+// callers should store the same fixed-point state, removing FloatPlayerMath.
+struct FixedPlayerMath {
+    using Number = long;
+    static constexpr Number ratio(int numerator, int denominator = 1) {
+        return (numerator * 256L + denominator / 2) / denominator;
+    }
+};
+struct FloatPlayerMath {
+    using Number = float;
+    static constexpr Number ratio(int numerator, int denominator = 1) {
+        return static_cast<float>(numerator) / denominator;
+    }
+};
+
+// Default, non-water scrPlayerInit + scrPlMovement. No platform dependencies.
+template<class Math>
+void applyPlayerHorizontalInput(typename Math::Number& speed, int& facing,
+                                bool grounded, bool left, bool right,
+                                bool controlsLocked = false) {
+    if (controlsLocked) {
+        speed = 0; // recovered global.noControl branch
+        return;
+    }
+    const auto acceleration = Math::ratio(1, 5);
+    const auto turnBoost = Math::ratio(grounded ? 2 : 1);
+    const auto maximum = grounded ? Math::ratio(2) : Math::ratio(5, 2);
+    const auto friction = grounded ? Math::ratio(2, 5) : Math::ratio(1, 10);
+    const auto threshold = Math::ratio(3, 10);
+    if (left != right) {
+        if (left) {
+            speed -= acceleration;
+            if (speed > 0) speed -= turnBoost;
+        } else {
+            speed += acceleration;
+            if (speed < 0) speed += turnBoost;
+        }
+        facing = left ? -1 : 1;
+        if (speed < -maximum) speed = -maximum;
+        if (speed > maximum) speed = maximum;
+    } else if (left && right) {
+        speed = 0;
+        facing = 1; // source right branch executes last
+    } else if (speed < 0) {
+        speed += friction;
+        if (speed > -threshold) speed = 0;
+    } else if (speed > 0) {
+        speed -= friction;
+        if (speed < threshold) speed = 0;
+    }
+}
+} // namespace downwell
+#endif

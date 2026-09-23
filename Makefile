@@ -69,6 +69,7 @@ RANDOM_TEST_TARGET := build/game-maker-random-test
 RANDOM_TEST_SOURCES := tests/core/GameMakerRandomTest.cpp src/core/GameMakerRandom.cpp
 PLAYER_COLLISION_TEST_TARGET := build/player-collision-test
 PLAYER_COLLISION_TEST_SOURCES := tests/core/PlayerCollisionTest.cpp
+PLAYER_CONTROLS_TEST_TARGET := build/player-controls-test
 GAME_RENDER_TEST_TARGET := build/game-render-test
 GAME_RENDER_TEST_SOURCES := tests/core/GameRenderTest.cpp src/core/Game.cpp src/core/HudNumbers.cpp src/core/StartupRuntime.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
 HUD_NUMBER_TEST_TARGET := build/hud-number-test
@@ -197,6 +198,10 @@ $(RANDOM_TEST_TARGET): $(RANDOM_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(RANDOM_TEST_SOURCES)
 
+$(PLAYER_CONTROLS_TEST_TARGET): tests/core/PlayerControlsTest.cpp src/core/PlayerControls.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/PlayerControlsTest.cpp
+
 $(PLAYER_COLLISION_TEST_TARGET): $(PLAYER_COLLISION_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(PLAYER_COLLISION_TEST_SOURCES)
@@ -245,7 +250,7 @@ $(AREA_ONE_TRACE_TARGET): $(AREA_ONE_TRACE_SOURCES)
 trace-area-one: generate-room-pack generate-object-pack generate-builder-pattern-pack $(AREA_ONE_TRACE_TARGET)
 	./$(AREA_ONE_TRACE_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
-test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack generate-amiga-game generate-amiga-hud $(TEST_TARGETS) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET)
+test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack generate-amiga-game generate-amiga-hud $(TEST_TARGETS) $(PLAYER_CONTROLS_TEST_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET)
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)
@@ -263,6 +268,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./$(DEFERRED_INSTANCE_TEST_TARGET)
 	./$(RANDOM_TEST_TARGET)
 	./$(PLAYER_COLLISION_TEST_TARGET)
+	./$(PLAYER_CONTROLS_TEST_TARGET)
 	./$(GAME_RENDER_TEST_TARGET)
 	./$(HUD_NUMBER_TEST_TARGET)
 	./$(AMIGA_PLAYER_TEST_TARGET)

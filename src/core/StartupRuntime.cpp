@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "PlayerControls.h"
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
@@ -1286,10 +1287,6 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     }
 
     const bool wasGrounded = mainPlayerGrounded_;
-    // scrPlayerInit + scrPlMovement, default style outside water.
-    const float horizontalMaximum = wasGrounded ? 2.0F : 2.5F;
-    const float turnBoost = wasGrounded ? 2.0F : 1.0F;
-    const float friction = wasGrounded ? 0.4F : 0.1F;
     mainPlayerSpeedY_ = std::min(7.0F, mainPlayerSpeedY_ + 0.2F);
     if (inputFireReleased_) {
         if (mainPlayerSpeedY_ < 0.0F)
@@ -1297,30 +1294,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         mainJumpShootLocked_ = false;
         mainShotDelayed_ = false; // pBulDelayKill is set for the default gun.
     }
-    if (!controlsLocked_ && inputLeft_ && !inputRight_) {
-        mainPlayerSpeedX_ -= 0.2F;
-        if (mainPlayerSpeedX_ > 0.0F)
-            mainPlayerSpeedX_ -= turnBoost;
-        mainPlayerSpeedX_ = std::max(-horizontalMaximum, mainPlayerSpeedX_);
-        mainPlayerFacing_ = -1;
-    } else if (!controlsLocked_ && inputRight_ && !inputLeft_) {
-        mainPlayerSpeedX_ += 0.2F;
-        if (mainPlayerSpeedX_ < 0.0F)
-            mainPlayerSpeedX_ += turnBoost;
-        mainPlayerSpeedX_ = std::min(horizontalMaximum, mainPlayerSpeedX_);
-        mainPlayerFacing_ = 1;
-    } else if (inputLeft_ && inputRight_) {
-        mainPlayerSpeedX_ = 0.0F;
-        mainPlayerFacing_ = 1;
-    } else if (mainPlayerSpeedX_ > 0.0F) {
-        mainPlayerSpeedX_ = std::max(0.0F, mainPlayerSpeedX_ - friction);
-        if (mainPlayerSpeedX_ < 0.3F)
-            mainPlayerSpeedX_ = 0.0F;
-    } else if (mainPlayerSpeedX_ < 0.0F) {
-        mainPlayerSpeedX_ = std::min(0.0F, mainPlayerSpeedX_ + friction);
-        if (mainPlayerSpeedX_ > -0.3F)
-            mainPlayerSpeedX_ = 0.0F;
-    }
+    applyPlayerHorizontalInput<FloatPlayerMath>(mainPlayerSpeedX_, mainPlayerFacing_,
+        wasGrounded, inputLeft_, inputRight_, controlsLocked_);
 
     if (!controlsLocked_ && inputFirePressed_ && mainPlayerGrounded_) {
         // The shared up/fire button calls scrJump while grounded. It does not
