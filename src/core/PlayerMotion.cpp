@@ -79,13 +79,20 @@ void PlayerMotion::stompBounce()
 
 void PlayerMotion::contactKnockback(int enemyX, int enemyY)
 {
-    const int dx = pixelX_ - enemyX;
-    const int dy = pixelY_ - enemyY;
+    // scrTypicalDamage aims from enemy x/y to global.plx/ply, published
+    // before integration. Keep subpixel precision until normalization.
+    const long dx = frameStartX_ - (long)enemyX * fixedOne;
+    const long dy = frameStartY_ - (long)enemyY * fixedOne;
     const unsigned distance = integerSquareRoot(
         (unsigned)(dx * dx + dy * dy));
-    speedX_ = distance == 0
+    const long impulseX = distance == 0
                   ? 0
                   : (long)dx * (3L * fixedOne) / (long)distance;
+    // scrFjump only replaces xsp for a nonzero horizontal impulse, and calls
+    // scrRecharge even for damage knockback (not only enemy stomps).
+    if (impulseX != 0)
+        speedX_ = impulseX;
+    ammo_ = maximumAmmo;
     speedY_ = -2 * fixedOne;
     gravityRemainder_ = 0;
     grounded_ = false;

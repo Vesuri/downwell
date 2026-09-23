@@ -284,3 +284,22 @@ Validation for this change: the bounded 64-frame 68000 cross-target replay
 retains `bfbbd762b9b62a59`; the bounded A500 600-tick terrain-cache rendering
 oracle passes. Instruction and 64-bit helper audits remain clean. These target
 checks complement, rather than replace, the host contact and combat fixtures.
+
+## Damage launch corrections
+
+The VM for scrTypicalDamage targets global.plx/ply, not the player's already
+integrated position. Shared contactKnockback now uses that frame-start Q8
+position and the enemy's rounded instance position. Keeping distance in Q8
+also removes the former large integer-pixel normalization error: a (1,1)
+diagonal no longer produces a full three-pixel horizontal impulse.
+
+scrFjump's VM calls scrRecharge and only assigns xsp when its horizontal
+argument is nonzero. Damage launch now refills the default eight-round gun
+and preserves existing horizontal speed for a zero impulse. Tests exercise a
+moving, ammo-depleted player and check pre-movement targeting, recharge,
+vertical launch and diagonal magnitude. Both backends use this same routine.
+
+This is not full scrFjump/scrRecharge fidelity yet: spinJumping presentation,
+jetFrame reset, recharge effects/audio/shake, variable weapon capacity, and
+coincident point_direction behavior remain to be reconciled. Integer square
+root and Q8 velocity remain approximations of GameMaker double math.

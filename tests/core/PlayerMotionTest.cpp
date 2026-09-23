@@ -2,6 +2,7 @@
 #include "core/StateDigest.h"
 
 #include <cstdlib>
+#include <cmath>
 #include <iostream>
 
 namespace {
@@ -292,6 +293,35 @@ int main() {
     diagonal.contactKnockback(6, 8);
     require(diagonal.speedXFixed() == -460,
             "diagonal contact normalizes recovered horizontal knockback");
+
+    PlayerMotion damaged(false, 10000);
+    downwell::Input movingFire;
+    movingFire.right = true;
+    movingFire.fire = true;
+    damaged.step(movingFire);
+    require(damaged.ammo() < 8 && damaged.speedXFixed() > 0,
+            "damage fixture is moving with depleted ammunition");
+    const long previousSpeed = damaged.speedXFixed();
+    damaged.contactKnockback(0, 8);
+    require(damaged.speedXFixed() == previousSpeed,
+            "vertical impulse uses pre-movement x and preserves existing xsp");
+    require(damaged.ammo() == 8 && damaged.speedYFixed() == -512 && !damaged.grounded(),
+            "scrFjump recharges damage knockback and applies vertical launch");
+
+    PlayerMotion shallow;
+    shallow.contactKnockback(1, 1);
+    require(shallow.speedXFixed() >= -544 && shallow.speedXFixed() <= -543,
+            "subpixel distance avoids integer-pixel square-root overestimation");
+    for (int dx = -16; dx <= 16; ++dx) {
+        for (int dy = -16; dy <= 16; ++dy) {
+            if (dx == 0 && dy == 0) continue;
+            PlayerMotion sample;
+            sample.contactKnockback(-dx, -dy);
+            const double expected = 768.0 * dx / std::sqrt(double(dx * dx + dy * dy));
+            require(std::fabs(sample.speedXFixed() - expected) < 2.0,
+                    "contact-range normalization stays within two Q8 units of double math");
+        }
+    }
 
     int landingProfile[PlayerMotion::landingProfileSize];
     for (unsigned index = 0; index < PlayerMotion::landingProfileSize; ++index)
