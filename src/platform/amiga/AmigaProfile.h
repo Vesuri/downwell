@@ -6,7 +6,8 @@
 enum DownwellProfilePhase {
     profileOther, profileWait, profileInput, profileSimulation,
     profileTitle, profileSprite, profileScroll, profileCopper,
-    profilePublish, profilePhaseCount
+    profilePublish, profileStyleCopy, profileStyleActors, profileStyleText,
+    profileStyleDrain, profileStyleMirror, profilePhaseCount
 };
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)

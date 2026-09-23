@@ -4,6 +4,11 @@
 // Revs-style emulated clock: never use host time or stop GDB inside a sample.
 static const ULONG ticksPerField = 313UL * 256UL;
 extern "C" {
+#ifdef DOWNWELL_SKIP_INTRO
+volatile ULONG gDownwellProfileTargetScene = 2;
+#else
+volatile ULONG gDownwellProfileTargetScene = 1;
+#endif
 volatile ULONG gDownwellProfileVbi;
 volatile ULONG gDownwellProfileEpoch;
 volatile ULONG gDownwellProfileFrames[4];
@@ -102,7 +107,8 @@ void downwellProfileEnd()
         gDownwellProfileMaxGap[sceneId] = fields;
 #ifdef DOWNWELL_PROFILE_AUTORUN
     // Freeze only at a completed frame boundary, outside the measured window.
-    if (sceneId == 1 && gDownwellProfileFrames[1] == 180) {
+    if (sceneId == gDownwellProfileTargetScene &&
+        gDownwellProfileFrames[sceneId] == 180) {
         gDownwellProfileFrozen = 1;
         downwellProfileReady();
         for (;;) { }

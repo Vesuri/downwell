@@ -1,5 +1,6 @@
 #include "AmigaStyleRenderer.h"
 #include "AmigaSceneRuntime.h"
+#include "AmigaProfile.h"
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
 extern "C" {
@@ -73,6 +74,7 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
         return true;
     }
 
+    DW_PROFILE_PHASE(profileStyleMirror);
     UBYTE* output = (UBYTE*)destination.data;
     const ULONG outputPlaneBytes = destination.bitplaneSizeInBytes;
     for (int y = 0; y < drawHeight; ++y) {
@@ -90,6 +92,7 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
             if (pen & 2) output[outputPlaneBytes + offset] |= targetMask;
         }
     }
+    DW_PROFILE_PHASE(profileStyleActors);
     return true;
 }
 
@@ -150,9 +153,11 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
     const int borderY = -scenes.styleTileY();
     const int centerY = amigaStyleHeight / 2 + scenes.styleYOffset();
     const int smoothX = scenes.styleSmoothX();
+    DW_PROFILE_PHASE(profileStyleCopy);
     output.copy(borderBitmap, 0, 0, 0, (UWORD)borderY,
                 amigaStyleWidth, amigaStyleHeight);
 
+    DW_PROFILE_PHASE(profileStyleActors);
     if (!scenes.styleSelected()) {
         for (int style = 0; style < 5; ++style) {
             const int drawX = 80 + style * 48 - smoothX;
@@ -171,6 +176,7 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
         if (scenes.styleCursor() > 0 &&
             !draw(output, pack, packEnd, 44, 0, 64, centerY - 10, true))
             return false;
+        DW_PROFILE_PHASE(profileStyleText);
         if (!draw(output, pack, packEnd, 65000, 0, 80, centerY - 70) ||
             !draw(output, pack, packEnd,
                   scenes.styleCursor() == 0 ? 65001 : 65003,
@@ -186,6 +192,7 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
         return false;
     }
 
+    DW_PROFILE_PHASE(profileStyleDrain);
     AmigaHardware::blitterDrain();
     return true;
 }

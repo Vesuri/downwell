@@ -44,7 +44,9 @@ loop-boundary/profiler bookkeeping outside that boundary is not in the phase
 totals. Timing counters freeze at the completed-frame boundary, while the
 underlying VBI clock may continue; the report uses the frozen scene counters.
 
-Garden stages have detailed brackets. Other scenes currently have wait,
+Garden and style-select stages have detailed brackets. Style phases cover
+background-copy submission, actors, text, final blitter drain and the CPU
+mirroring fallback separately. Other scenes have wait,
 input/simulation and an undifferentiated remainder; startup asset loading
 before the main loop is not yet bracketed. Neither instrumentation mode is
 enabled in normal builds. Verification builds are rejected in combination
@@ -63,3 +65,59 @@ produce spikes that the maximum columns retain.
 The separate lightweight run reported 180 frames in 180 PAL fields: 50.00 FPS,
 with a maximum one-field iteration gap. This establishes the sampled garden
 window only, not the whole game's frame rate.
+
+## Style-select measurement (2026-09-23)
+
+`SKIP_INTRO=1` selects a 180-frame style-select window instead of the garden.
+`PROFILE_NAVIGATE=1` adds alternating left/right key presses every 16 frames
+after entrance easing completes; direction reverses every 80 loop frames.
+It uses normal edge-triggered input and never selects a style. For example:
+
+```
+SKIP_INTRO=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh fps
+SKIP_INTRO=1 PROFILE_NAVIGATE=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh fps
+SKIP_INTRO=1 PROFILE_NAVIGATE=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh probes
+```
+
+Measured after `bd88ef7`, using the same A500/512 KB Chip/8 MB Fast setup:
+
+| Lightweight test | Frames | PAL fields | FPS | Worst field gap |
+| --- | ---: | ---: | ---: | ---: |
+| Entrance + idle usual style | 180 | 180 | 50.00 | 1 |
+| Entrance + left/right navigation | 180 | 281 | 32.03 | 2 |
+
+The navigation run missed one refresh on 101 of 180 iterations. Detailed
+instrumentation is substantially more intrusive near the 20 ms threshold;
+its FPS must not replace the lightweight result above. The final navigation
+probe run reported these average exclusive brackets across all 180 frames:
+
+| Bracket | ms/frame |
+| --- | ---: |
+| Actors, excluding CPU mirror | 10.271 |
+| CPU-mirrored left arrow | 3.796 |
+| Text | 5.523 |
+| Final blitter drain | 1.374 |
+| Background-copy submission | 0.820 |
+| Simulation | 0.468 |
+| Copper updates | 0.378 |
+| Publication | 0.154 |
+| Input + other | 1.064 |
+
+The mirror ran 101 times: 683.232 ms total, **6.765 ms per invocation**,
+maximum bracket 7.014 ms. Its nested pixel loop still flips the 16x16 arrow
+on the 68000 and reads/writes Chip RAM. This is distinct from the right
+arrow's corrected Bitmap masked-blit path. The higher actor cost also
+includes additional visible/clipped carousel icons. The phase brackets
+include CPU setup and concurrent DMA contention, not isolated blitter times.
+In particular, most of the background copy executes after its submission
+bracket; the final drain measures only what remains queued at the end.
+
+Style selection still copies both complete 176x284 planes (12,496 bytes),
+looks up/clips/draws carousel icons and redraws headings every frame. The
+black transition mask is immutable and pointer-scrolled; it is not the
+expensive part. Recommended next changes, not implemented by this profiling
+work: host-generate the mirrored arrow and use Bitmap for both directions;
+cache settled headings/description; reduce full-frame background restoration
+and redraw to the changing regions or a hardware-scrolled border layer.
+Re-measure navigation with FPSCOUNT after each change. The idle 50 FPS
+sample does not establish sufficient headroom for those moving states.

@@ -1211,6 +1211,13 @@ int main(void) {
                 liveInput.fire = (liveFrameCount & 1) != 0;
             else if (scenes.scene() == AmigaScene::menu)
                 liveInput.right = ++profileMenuFrames > 40;
+#ifdef DOWNWELL_PROFILE_NAVIGATE
+            else if (scenes.scene() == AmigaScene::styleSelect &&
+                     scenes.styleYOffset() == 0 && (liveFrameCount % 16) == 0) {
+                liveInput.right = ((liveFrameCount / 80) & 1) != 0;
+                liveInput.left = !liveInput.right;
+            }
+#endif
 #endif
 #endif
             packedInput = downwell::packReplayInput(liveInput);
@@ -1473,14 +1480,17 @@ int main(void) {
                                 back * amigaStyleFrameBytes))
                         break;
                     const UBYTE* styleFrame = memory.sceneCache() + back * amigaStyleFrameBytes;
+                    DW_PROFILE_PHASE(profileCopper);
                     const UBYTE* styleMask = amigaStyleMask(memory.sceneCache(), scenes);
                     if (!(styleListBuilt[back]
                             ? styleLists[back].update(styleFrame, styleMask)
                             : styleLists[back].build(styleFrame, styleMask, nullSprite, palette)))
                         break;
                     styleListBuilt[back] = true;
+                    DW_PROFILE_PHASE(profilePublish);
                     platform.publish(styleLists[back]);
                     front = back;
+                    DW_PROFILE_PHASE(profileOther);
 #ifdef DOWNWELL_SCENE_VERIFY
                     gDownwellStyleMask = styleMask;
                     gDownwellStyleCopper = styleLists[back].data();
