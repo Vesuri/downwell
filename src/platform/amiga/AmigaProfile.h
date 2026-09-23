@@ -5,7 +5,10 @@ enum DownwellProfilePhase {
     profileOther, profileWait, profileInput, profileSimulation,
     profileTitle, profileSprite, profileScroll, profileCopper,
     profilePublish, profileStyleCopy, profileStyleActors, profileStyleText,
-    profileStyleDrain, profileStyleMirror, profileTerrainCollision, profileGameCopy, profilePhaseCount
+    profileStyleDrain, profileStyleMirror, profileTerrainCollision, profileGameCopy,
+    profilePlayer, profileBullets, profileEnemyAlarms, profileEnemyMotion,
+    profileEnemyContact, profileGems, profileTerrainWalls, profileTerrainTiles,
+    profileTerrainDecorations, profileTerrainAsset, profileWallFrame, profilePhaseCount
 };
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -13,6 +16,10 @@ void downwellProfileVblank();
 void downwellProfileBegin(unsigned scene);
 void downwellProfileEnd();
 void downwellProfilePhase(unsigned phase);
+extern "C" volatile long gDownwellProfileScroll;
+extern "C" volatile long gDownwellProfileCameraChange;
+extern "C" volatile long gDownwellProfileStagedHits;
+extern "C" volatile long gDownwellProfileStageShortfall;
 class DownwellProfileFrame {
 public:
     explicit DownwellProfileFrame(unsigned scene) { downwellProfileBegin(scene); }

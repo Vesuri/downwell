@@ -11,9 +11,9 @@ end
 printf "PROFILE scene=%lu PROBES (instrumented, not shipping FPS): frames=%lu fields=%lu max_gap=%lu\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s]
 printf "Phases: 0=other 1=vblank_wait 2=input 3=simulation 4=title 5=sprite 6=scroll 7=copper 8=publish 9=style_copy 10=style_actors 11=style_text 12=style_drain 13=style_mirror\n"
 printf "phase  calls  total_ms  ms/frame  max_bracket_ms\n"
-printf "Additional phases: 14=terrain_collision 15=game_dirty_copy\n"
+printf "Additional phases: 14=terrain_collision 15=game_dirty_copy 16=player 17=bullets 18=enemy_alarms 19=enemy_motion 20=enemy_contact 21=gems 22=terrain_walls 23=terrain_tiles 24=terrain_decorations 25=terrain_asset 26=wall_frame\n"
 set $i = 0
-while $i < 16
+while $i < 27
     printf "%u %lu %.3f %.3f %.3f\n", $i, gDownwellProfileCalls[$s][$i], gDownwellProfileTicks[$s][$i]*20.0/80128.0, gDownwellProfileTicks[$s][$i]*20.0/80128.0/gDownwellProfileFrames[$s], gDownwellProfileMax[$s][$i]*20.0/80128.0
     set $i = $i + 1
 end

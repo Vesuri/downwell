@@ -7,7 +7,7 @@ static const ULONG ticksPerField = 313UL * 256UL;
 extern "C" {
 #ifdef DOWNWELL_SKIP_TO_GAME
 volatile ULONG gDownwellProfileTargetScene = 3;
-volatile ULONG gDownwellProfileTargetFrames = 30;
+volatile ULONG gDownwellProfileTargetFrames = 600;
 #elif defined(DOWNWELL_SKIP_INTRO)
 volatile ULONG gDownwellProfileTargetScene = 2;
 volatile ULONG gDownwellProfileTargetFrames = 180;
@@ -20,6 +20,15 @@ volatile ULONG gDownwellProfileEpoch;
 volatile ULONG gDownwellProfileFrames[4];
 volatile ULONG gDownwellProfileFields[4];
 volatile ULONG gDownwellProfileMaxGap[4];
+volatile ULONG gDownwellProfileMissCount;
+volatile ULONG gDownwellProfileMissFrame[32];
+volatile ULONG gDownwellProfileMissFields[32];
+volatile long gDownwellProfileMissScroll[32];
+volatile long gDownwellProfileMissCamera[32];
+volatile long gDownwellProfileScroll;
+volatile long gDownwellProfileCameraChange;
+volatile long gDownwellProfileStagedHits;
+volatile long gDownwellProfileStageShortfall;
 volatile ULONG gDownwellProfileTicks[4][profilePhaseCount];
 volatile ULONG gDownwellProfileCalls[4][profilePhaseCount];
 volatile ULONG gDownwellProfileMax[4][profilePhaseCount];
@@ -121,6 +130,15 @@ void downwellProfileEnd()
     }
     const ULONG fields = gDownwellProfileVbi - startField;
     ++gDownwellProfileFrames[sceneId];
+    if (sceneId == gDownwellProfileTargetScene && fields > 1) {
+        const ULONG slot = gDownwellProfileMissCount++;
+        if (slot < 32) {
+            gDownwellProfileMissFrame[slot] = gDownwellProfileFrames[sceneId];
+            gDownwellProfileMissFields[slot] = fields;
+            gDownwellProfileMissScroll[slot] = gDownwellProfileScroll;
+            gDownwellProfileMissCamera[slot] = gDownwellProfileCameraChange;
+        }
+    }
     gDownwellProfileFields[sceneId] += fields;
     if (fields > gDownwellProfileMaxGap[sceneId])
         gDownwellProfileMaxGap[sceneId] = fields;

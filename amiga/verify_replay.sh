@@ -11,6 +11,11 @@ RUN=.run
 DH0="$RUN/dh0"
 DH1="$RUN/dh1"
 GDBHOME="$RUN/gdbhome"
+VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}"
+if ! [[ "$VERIFY_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "VERIFY_TIMEOUT_SECONDS must be a positive integer"
+  exit 1
+fi
 
 [ -x "$REFERENCE" ] || { echo "reference runner not found: $REFERENCE"; exit 1; }
 [ -f out/Downwell.exe ] || { echo "verification build not found"; exit 1; }
@@ -25,9 +30,14 @@ rm -f "$RUN"/state/*.uss "$RUN/gdb-out.log" "$RUN/fsuae-replay.log" \
 
 fsuae_claim_port
 cleanup() {
+  if [ -n "${GDB_PID:-}" ]; then
+    kill "$GDB_PID" 2>/dev/null || true
+    wait "$GDB_PID" 2>/dev/null || true
+  fi
   fsuae_stop
 }
 trap cleanup EXIT INT TERM
+VERIFY_DEADLINE=$((SECONDS + VERIFY_TIMEOUT_SECONDS))
 
 "$FSUAE" \
   --amiga_model=A500 --chip_memory=512 --fast_memory=8192 \
@@ -43,6 +53,10 @@ FSUAE_PID=$!
 fsuae_track "$FSUAE_PID"
 
 for _ in $(seq 1 120); do
+  if (( SECONDS >= VERIFY_DEADLINE )); then
+    echo "verification exceeded ${VERIFY_TIMEOUT_SECONDS}s"
+    exit 1
+  fi
   kill -0 "$FSUAE_PID" 2>/dev/null || {
     echo "FS-UAE exited before opening its debugger stub"
     exit 1
@@ -63,7 +77,7 @@ env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
   -x replay_verify.gdb out/Downwell.elf > "$RUN/gdb-out.log" 2>&1 &
 GDB_PID=$!
 
-for _ in $(seq 1 36000); do
+while (( SECONDS < VERIFY_DEADLINE )); do
   if [ -f "$RUN/gdb-ready.marker" ]; then
     fsuae_stop
     break
@@ -76,7 +90,7 @@ done
 if kill -0 "$GDB_PID" 2>/dev/null; then
   kill "$GDB_PID" 2>/dev/null || true
   wait "$GDB_PID" 2>/dev/null || true
-  echo "debugger did not complete replay within one hour"
+  echo "debugger did not complete replay within ${VERIFY_TIMEOUT_SECONDS}s"
   exit 1
 fi
 wait "$GDB_PID" 2>/dev/null || true
