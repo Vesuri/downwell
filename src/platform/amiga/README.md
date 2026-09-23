@@ -106,3 +106,12 @@ The host decoder reconstructs the 352x284 fetched aperture in
 `build/amiga-gameplay-frame.png`; its pinned hash covers the solid landing,
 dual-playfield HUD composition, player, and gunboot shot together.  The normal
 playable executable is rebuilt after the check.
+
+`make verify-amiga-gameplay-active-frame` continues the same deterministic
+run through more than 256 pixels of camera movement, alternating steering and
+edge-triggered jumps/shots so the player cannot park indefinitely on the
+entrance geometry.  It stops only when a generated enemy is awake, then uses
+the same complete ring/HUD/sprite reconstruction to produce
+`build/amiga-gameplay-active-frame.png`.  This pins a frame after circular
+scrolling, hidden-row refills, actor allocation, and enemy activation have all
+become live.

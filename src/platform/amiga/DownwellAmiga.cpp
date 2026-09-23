@@ -219,6 +219,10 @@ __attribute__((noinline, used)) void downwellMenuEntryFrameReady(void) {
 __attribute__((noinline, used)) void downwellGameplayFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
+
+__attribute__((noinline, used)) void downwellGameplayActiveFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
 }
 
 static_assert(sizeof(DownwellMenuFrameCapture) == 12,
@@ -241,7 +245,7 @@ downwellSceneGameplayActive(void) {
 #ifdef DOWNWELL_SCENE_VERIFY
 static downwell::Input sceneVerificationInput(
     const AmigaSceneRuntime& scenes, bool styleFrameReported,
-    bool gameplayLanded) {
+    bool gameplayLanded, const AmigaPortRuntime& port) {
     downwell::Input input;
     if (scenes.scene() == AmigaScene::menu)
         input.right = true;
@@ -249,8 +253,13 @@ static downwell::Input sceneVerificationInput(
              scenes.styleYOffset() == 0 && styleFrameReported &&
              !scenes.styleSelected())
         input.fire = true;
-    else if (scenes.scene() == AmigaScene::gameplay && gameplayLanded)
-        input.right = true;
+    else if (scenes.scene() == AmigaScene::gameplay && gameplayLanded) {
+        const unsigned movementPhase = (port.tick() / 120u) & 1u;
+        input.right = movementPhase == 0;
+        input.left = movementPhase != 0;
+        const unsigned firePhase = port.tick() % 16u;
+        input.fire = firePhase == 0 || firePhase == 3;
+    }
     return input;
 }
 #endif
@@ -903,6 +912,20 @@ static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                ? regular[index] : overflow;
 }
 
+#ifdef DOWNWELL_SCENE_VERIFY
+static void exposeGameplayFrame(const AmigaMemory& memory, unsigned buffer,
+                                unsigned ringOrigin) {
+    gDownwellGameplayGame = memory.game();
+    gDownwellGameplayHud = memory.hud();
+    gDownwellGameplayPlayerSprite = memory.playerSprite(buffer);
+    gDownwellGameplayActorSprites = memory.bulletSprite() +
+        buffer * AmigaPortRuntime::bulletCapacity *
+            (bulletSpriteBytes / sizeof(UWORD));
+    gDownwellGameplayOverflowSprite = memory.enemySprite(buffer);
+    gDownwellGameplayRingOrigin = (UWORD)ringOrigin;
+}
+#endif
+
 int main(void) {
     AmigaPlatform platform;
     AmigaMemory memory;
@@ -1227,7 +1250,7 @@ int main(void) {
 #ifdef DOWNWELL_SCENE_VERIFY
             const downwell::Input liveInput = sceneVerificationInput(
                 scenes, sceneStyleFrameReported,
-                sceneGameplayLandedReported);
+                sceneGameplayLandedReported, port);
 #else
             const downwell::Input liveInput = AmigaInput::sample();
 #endif
@@ -1709,14 +1732,7 @@ int main(void) {
             if (!sceneGameplayLandedReported && port.player().grounded()) {
                 sceneGameplayLandedReported = true;
                 sceneGameplayLandedCameraY = port.cameraOffsetY();
-                gDownwellGameplayGame = memory.game();
-                gDownwellGameplayHud = memory.hud();
-                gDownwellGameplayPlayerSprite = memory.playerSprite(back);
-                gDownwellGameplayActorSprites = memory.bulletSprite() +
-                    back * AmigaPortRuntime::bulletCapacity *
-                        bulletSpriteWordStride;
-                gDownwellGameplayOverflowSprite = memory.enemySprite(back);
-                gDownwellGameplayRingOrigin = (UWORD)port.ringOrigin();
+                exposeGameplayFrame(memory, back, port.ringOrigin());
                 downwellGameplayFrameReady();
                 downwellSceneGameplayLanded();
             } else if (sceneGameplayLandedReported &&
@@ -1728,6 +1744,8 @@ int main(void) {
                     awakeEnemy = awakeEnemy || port.enemyAt(enemy).awake;
                 if (awakeEnemy) {
                     sceneGameplayActiveReported = true;
+                    exposeGameplayFrame(memory, back, port.ringOrigin());
+                    downwellGameplayActiveFrameReady();
                     downwellSceneGameplayActive();
                 }
             }
