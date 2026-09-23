@@ -10,8 +10,9 @@ AmigaPortRuntime implement identical behavior.
 The playable executable now generates terrain and enemies incrementally from
 the live RNG stream. The forecast/integration-foundation notes below describe
 the migration history, not the current executable. Native/SDL actor-by-actor
-comparison still needs to be rerun against this live path; the older scene
-comparison fixture still uses a forecast and is not evidence for live parity.
+comparison now uses the live path: the initial tape asserts matching creation
+counts and active-actor presentation, plus bounded positional differences.
+The extended combat tape fails and is not evidence of completed gameplay parity.
 Frame-rate figures from earlier forecast builds must also be remeasured.
 
 | Slice | Current evidence | Remaining parity work |
@@ -21,13 +22,37 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Area-one geometry and endings | Shared live builder, emitted-object collision/rendering, terrain cache oracle | Live SDL replay comparison; side-room reversals and offscreen destruction coverage |
 | Bullets and gems | Shared 16-bullet / 64-gem limits | Dense encounter behavior and ordering comparisons |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
-| Enemies and rewards | Six native enemy types; unit tests for combat, stomps and rewards | Compare every active enemy and gem against SDL, not just player state |
+| Enemies and rewards | Initial live tape checks paired positions, creation counts and active presentation; combat unit tests | Extended combat fails; gem trajectories and broader actor states remain unverified |
 | HUD | Health, ammo, currency and streak implementations | State-driven image comparisons for damage, depletion and streak expiry |
 | Death | Native control lock and death timer | End-to-end SDL/native death-state comparison |
 
 Sound playback, complete shops/upgrades, later areas and a complete death/restart
 UI must not be described as Amiga parity omissions merely because the Windows
 game has them: establish which portions SDL actually implements first.
+
+The original Windows game remains the ultimate oracle. A disagreement between
+ports must be resolved against its VM/resource evidence or a Windows capture,
+not by automatically changing Amiga to agree with SDL.
+
+### Extended combat gate (currently failing)
+
+Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
+or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
+steps, alternates horizontal direction every 90 frames and holds fire for five
+of each ten frames. Both targets must exercise kills and currency collection.
+The verifier is separate from the currently passing entrance tape; its failure
+must not be hidden by calling the default suite full gameplay parity.
+
+Current first player discrepancy is tick 343: native jumps (second jump), SDL
+fires (second shot), with y=1979.6 versus 1984.2. First health/kill/currency
+disagreement is tick 626 (native one kill, SDL zero). At the end health is 4/3,
+kills 3/3 and currency 22/24. This is a floor-contact/action mismatch upstream
+of combat, not evidence that reward amounts themselves should be changed.
+The recovered objPlayer_n Begin Step calls scrGravity_n, scrPlMovement and
+scrWallCol; the latter uses scrPlayerPlatformCollision/scrCheckCollisionWith
+rounded/ceil swept probes. Neither current simplified player collision path
+fully models those routines. Resolve that behavior from the Windows evidence
+before choosing a port's outcome as correct.
 
 ## Crowded actor rendering
 

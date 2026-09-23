@@ -683,6 +683,48 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     require(live.builder.fragmentCount() > 0 &&
                 live.builder.fragmentCount() < amigaInitialTerrainFragmentCount,
             "comparison exercises incremental terrain rather than a complete forecast");
+    if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
+        bool reported = false;
+        bool playerReported = false;
+        for (unsigned tick = 0; tick < 600; ++tick) {
+            downwell::Input input;
+            input.left = (tick / 90) % 2 == 0;
+            input.right = !input.left;
+            input.fire = tick % 10 < 5;
+            gameplay.step(downwell::packReplayInput(input));
+            reference.step(input, input.fire && tick % 10 == 0);
+            require(gameplay.generationSucceeded(), "combat continuation retains successful live generation");
+            if (!playerReported && std::fabs(176 + gameplay.player().offsetYFixed() / 256.0F - reference.mainPlayerY()) > 3.0F) {
+                playerReported = true;
+                std::cout << "COMBAT PLAYER tick=" << gameplay.tick()
+                          << " y=" << 176 + gameplay.player().offsetYFixed() / 256.0F << ',' << reference.mainPlayerY()
+                          << " ground=" << gameplay.player().grounded() << ',' << reference.mainPlayerGrounded()
+                          << " jumps=" << gameplay.player().jumps() << ',' << reference.mainJumps()
+                          << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired()
+                          << " ammo=" << gameplay.player().ammo() << ',' << reference.mainAmmo() << '\n';
+            }
+            if (!reported && (gameplay.health() != reference.mainPlayerHealth() ||
+                    gameplay.enemiesDefeated() != reference.mainEnemiesDefeated() ||
+                    gameplay.currency() != reference.mainCurrencyTotal())) {
+                std::cout << "COMBAT DIFFERENCE tick=" << gameplay.tick()
+                          << " health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
+                          << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
+                          << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()
+                          << " player=" << 240 + gameplay.player().offsetX() << ',' << 176 + gameplay.player().offsetY()
+                          << " SDL=" << reference.mainPlayerX() << ',' << reference.mainPlayerY() << '\n';
+                reported = true;
+            }
+        }
+        std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
+                  << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
+                  << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal() << '\n';
+        require(gameplay.enemiesDefeated() > 0 && reference.mainEnemiesDefeated() > 0 &&
+                    gameplay.currency() > 0 && reference.mainCurrencyTotal() > 0,
+                "combat diagnostic actually exercises kills and reward collection on both targets");
+        if (std::getenv("DOWNWELL_VERIFY_COMBAT"))
+            require(!reported && !playerReported,
+                    "extended combat tape must match movement, health, kills and currency");
+    }
     if (std::getenv("DOWNWELL_COMPARE_ACTORS")) {
         for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {
             const auto& e = gameplay.enemyAt(i);
