@@ -221,6 +221,25 @@ int main(int argc, char** argv) {
     amigaRendererSetGameOrigin(&expectedRenderer, 311);
     amigaRendererSetClipRect(&actualRenderer, 110, 0, 160, 284);
     amigaRendererSetClipRect(&expectedRenderer, 110, 0, 160, 284);
+    for (unsigned frame = 0; frame < 4; ++frame) for (int flipX : {0, 1}) {
+        std::fill(actualGame.begin(), actualGame.end(), 0);
+        std::fill(expectedGame.begin(), expectedGame.end(), 0);
+        amigaRendererDrawAsset(&actualRenderer, gamePack.data(), gamePack.data() + gamePack.size(),
+            177, 256 + frame, 190, 100, flipX);
+        amigaRendererDrawAsset(&expectedRenderer, gamePack.data(), gamePack.data() + gamePack.size(),
+            177, frame, 190, 100, flipX);
+        for (unsigned plane = 0; plane < 2; ++plane)
+            for (unsigned y = 0; y < downwellDisplayHeight; ++y)
+                for (unsigned x = 0; x < downwellBytesPerPlaneLine; ++x) {
+                    const unsigned row = (311 + y) % downwellGameRingHeight;
+                    const unsigned mirror = (311 + 199 - y) % downwellGameRingHeight;
+                    const UBYTE expected = y < 200 ? expectedGame[
+                        plane * downwellGameRingPlaneBytes + mirror * downwellBytesPerPlaneLine + x] : 0;
+                    require(actualGame[plane * downwellGameRingPlaneBytes +
+                        row * downwellBytesPerPlaneLine + x] == expected,
+                        "offline snail Y flip preserves the source anchor and either X facing");
+                }
+    }
     for (unsigned i = 0; i < records; ++i) {
         const auto* record = gamePack.data() + 20 + i * 24;
         const unsigned id = word(record), frame = word(record + 2);

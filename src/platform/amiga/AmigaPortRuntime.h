@@ -70,6 +70,11 @@ public:
         bool awake;
         bool grounded;
         bool activationPending;
+        unsigned drawFrame() const {
+            // Source enmSnail Step: image_yscale = -sign(ysp).
+            // Frame 256+n is host-generated, for both planar and DMA assets.
+            return imageFrame + (objectId == 117 && speedY > 0 ? 256u : 0u);
+        }
     };
     struct GemState {
         int x;

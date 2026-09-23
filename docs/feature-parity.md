@@ -54,3 +54,16 @@ passed 102 scalar-versus-blitter actor comparisons with no pixel mismatch.
 The latter is a correctness test with expensive instrumentation, not an FPS
 measurement. Its earlier 600-tick form exceeded the 45-second wall-clock limit;
 the smaller test exits as soon as its draw coverage requirement is satisfied.
+
+## Wall-snail orientation
+
+The Amiga renderer now follows SDL's downward-crawling vertical flip. This is
+also explicit in recovered `gml_Object_enmSnail_Step_0.asm` block 20:
+`image_yscale = -sign(ysp)`. Sprite resource 177 remains unchanged; synthetic
+frame `256+n` contains the offline vertical flip of source frame `n`, with
+origin Y adjusted to preserve the anchor. Both horizontal facings have planar
+and DMA variants. No target-side pixel flip or conversion is introduced.
+
+Tests compare every flipped frame against a reflected original raster, test
+the direction reversal, and compare all prepared DMA bodies with the pixel
+oracle (13,132 comparisons including the new variants).

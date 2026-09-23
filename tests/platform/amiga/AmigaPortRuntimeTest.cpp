@@ -167,11 +167,15 @@ int main() {
                 snail.enemyAt(0).motionState == 1 &&
                 snail.enemyAt(0).facing == 1,
             "wall snail discovers and records its recovered wall side");
+    require(snail.enemyAt(0).drawFrame() == snail.enemyAt(0).imageFrame + 256,
+            "descending wall snail selects offline vertically flipped artwork");
     for (unsigned frame = 0;
          frame < 120 && snail.enemyAt(0).speedY > 0; ++frame)
         snail.step(0);
     require(snail.enemyAt(0).speedY < 0,
             "wall snail reverses at the end of its supporting wall");
+    require(snail.enemyAt(0).drawFrame() == snail.enemyAt(0).imageFrame,
+            "ascending wall snail restores unflipped artwork");
 
     AmigaPortRuntime detachedSnail(300);
     detachedSnail.configureSolidResolver(noSolid, 0);

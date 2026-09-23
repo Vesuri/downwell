@@ -2110,13 +2110,13 @@ int main(void) {
                 const unsigned partCount =
                     amigaRendererHardwareSpritePartCount(
                         amiga_game_pack, amiga_game_pack_end,
-                        (UWORD)enemy.spriteId, (UWORD)enemy.imageFrame);
+                        (UWORD)enemy.spriteId, (UWORD)enemy.drawFrame());
                 if (partCount == 0) {
                     frameReady = false;
                     continue;
                 }
                 if (actorCount + partCount > actorLimit) {
-                    bobs[bobCount++] = {(UWORD)enemy.spriteId, (UWORD)enemy.imageFrame,
+                    bobs[bobCount++] = {(UWORD)enemy.spriteId, (UWORD)enemy.drawFrame(),
                         downwellPlayfieldX + 80 + enemy.x - port.cameraOffsetX(),
                         screenY, enemy.facing < 0};
                     continue;
@@ -2131,7 +2131,7 @@ int main(void) {
                         amigaRendererBuildHardwareSpritePart(
                             amiga_game_pack, amiga_game_pack_end,
                             (UWORD)enemy.spriteId,
-                            (UWORD)enemy.imageFrame, part,
+                            (UWORD)enemy.drawFrame(), part,
                             downwellPlayfieldX + 80 + enemy.x -
                                 port.cameraOffsetX(),
                             screenY, enemy.facing < 0,

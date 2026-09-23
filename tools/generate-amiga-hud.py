@@ -291,6 +291,18 @@ def build_pack(manifest, extracted, profile):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
+            if profile == "game" and sprite_id == 177:
+                # enmSnail Step sets image_yscale=-sign(ysp). Keep the real
+                # resource ID; synthetic frame 256+n is the offline Y flip.
+                vertical = canvas.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                for flip_x in (False, True):
+                    variant = vertical.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else vertical
+                    pixels = [pixel_to_pen(pixel) for pixel in variant.get_flattened_data()]
+                    stride, data = encode_planar(pixels, variant.width, variant.height)
+                    metadata = dict(sprite, id=62000 + sprite_id if flip_x else sprite_id,
+                                    originY=sprite["height"] - sprite["originY"],
+                                    originX=sprite["width"] - sprite["originX"] if flip_x else sprite["originX"])
+                    encoded.append((metadata, 256 + frame_index, stride, data))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
                     153, 163, 164, 166, 168, 170, 177, 186, 187, 188, 278):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
