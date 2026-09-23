@@ -20,8 +20,13 @@ enum {
     amigaMenuFetchBytes = amigaMenuFetchWords * 2,
     amigaMenuDisplayHStart = 0xd1,
     amigaMenuDisplayHStop = 0x171,
-    amigaMenuFetchStart = 0x60,
-    amigaMenuFetchStop = 0xb0,
+    /*
+     * The unscrolled 160-pixel fetch is $60..$a8.  Smooth scrolling keeps
+     * DDFSTOP unchanged and starts one word earlier, placing the eleventh
+     * fetched word to the left of the 160-pixel DIW.
+     */
+    amigaMenuFetchStart = 0x58,
+    amigaMenuFetchStop = 0xa8,
     amigaMenuModulo = amigaMenuCacheBytesPerRow - amigaMenuFetchBytes,
     amigaMenuEntryWidth = amigaMenuFetchWords * 16,
     amigaMenuEntryHeight = 1152,

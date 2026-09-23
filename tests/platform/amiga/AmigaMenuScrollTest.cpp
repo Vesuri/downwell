@@ -16,8 +16,10 @@ int main() {
             "intro layers are wider static canvases than the display");
     require(amigaMenuDisplayHStop - amigaMenuDisplayHStart == 160,
             "intro display window is centered and 160 pixels wide");
-    require(amigaMenuFetchStop - amigaMenuFetchStart == 80,
-            "eleven-word intro fetch uses ten DDF intervals");
+    require(amigaMenuFetchStart == 0x58 &&
+                amigaMenuFetchStop == 0xa8 &&
+                amigaMenuFetchStop - amigaMenuFetchStart == 80,
+            "extra scrolling word is fetched left of the 160-pixel window");
     require(amigaMenuModulo == 42,
             "intro modulo skips the unused cached row bytes");
     require(amigaMenuEntryWidth == 176 &&
