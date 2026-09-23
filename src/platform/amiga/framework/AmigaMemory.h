@@ -12,7 +12,6 @@ public:
                   ULONG menuPlaneBytes, ULONG menuEntryBytes,
                   ULONG copperBytes, ULONG playerSpriteBytes,
                   ULONG bulletSpriteBytes, ULONG enemySpriteBytes,
-                  ULONG menuSpriteBytes,
                   ULONG sceneCacheBytes,
                   ULONG assetBytes = 0);
     void release();
@@ -31,7 +30,6 @@ public:
     UWORD* enemySprite(unsigned index) const {
         return index < 2 ? enemySprite_[index] : 0;
     }
-    UWORD* menuSprites() const { return menuSprites_; }
     UBYTE* sceneCache() const { return sceneCache_; }
     UBYTE* assets() const { return assets_; }
 
@@ -47,7 +45,6 @@ private:
     UWORD* playerSprite_[2];
     UWORD* bulletSprite_;
     UWORD* enemySprite_[2];
-    UWORD* menuSprites_;
     UBYTE* sceneCache_;
     UBYTE* assets_;
     ULONG gameBytes_;
@@ -58,7 +55,6 @@ private:
     ULONG playerSpriteBytes_;
     ULONG bulletSpriteBytes_;
     ULONG enemySpriteBytes_;
-    ULONG menuSpriteBytes_;
     ULONG sceneCacheBytes_;
     ULONG assetBytes_;
 };

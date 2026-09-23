@@ -96,3 +96,29 @@ bool amigaRenderMenuCache(const AmigaMenuDrawList& list,
     AmigaHardware::blitterDrain();
     return true;
 }
+
+bool amigaRenderMenuTitle(UWORD frame,
+                          const UBYTE* pack, const UBYTE* packEnd,
+                          UBYTE* foreground, UBYTE* entry) {
+    Bitmap foregroundBitmap(foreground, amigaMenuCacheWidth,
+                            amigaMenuCacheHeight, 1, false);
+    Bitmap entryBitmap(entry, amigaMenuEntryWidth,
+                       amigaMenuEntryHeight, 1, false);
+
+    /*
+     * sprTitleFade is scenery.  Its 128x32 frame is centred on world
+     * (328,429), so keep it in both immutable scrolling views rather than
+     * spending seven hardware sprites on it.  Frame zero was not displayed
+     * by the original menu path and therefore means clear the title area.
+     */
+    foregroundBitmap.clear(264, 129, 128, 32);
+    entryBitmap.clear(16, 413, 128, 32);
+    if (frame != 0 &&
+        (!drawMonochrome(foregroundBitmap, pack, packEnd, 654, frame,
+                         328, 145) ||
+         !drawMonochrome(entryBitmap, pack, packEnd, 654, frame,
+                         80, 429)))
+        return false;
+    AmigaHardware::blitterDrain();
+    return true;
+}

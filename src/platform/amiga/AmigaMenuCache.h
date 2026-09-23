@@ -10,4 +10,8 @@ bool amigaRenderMenuCache(const AmigaMenuDrawList& list,
                           UBYTE* foreground, UBYTE* background,
                           UBYTE* entry);
 
+bool amigaRenderMenuTitle(UWORD frame,
+                          const UBYTE* pack, const UBYTE* packEnd,
+                          UBYTE* foreground, UBYTE* entry);
+
 #endif

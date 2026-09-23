@@ -59,12 +59,6 @@ enum {
     bulletSpriteBufferCount = 2 * AmigaPortRuntime::bulletCapacity,
     enemySpriteHeight = 32,
     enemySpriteBytes = (enemySpriteHeight + 2) * 4,
-    menuTitleSpriteHeight = 32,
-    menuTitleSpriteBytes = (menuTitleSpriteHeight + 2) * 4,
-    menuTitleSpriteParts = 7,
-    menuTitleSpriteBuffers = 2,
-    menuTitleSpritesBytes = menuTitleSpriteBytes * menuTitleSpriteParts *
-                            menuTitleSpriteBuffers,
     menuPlaneBytes = amigaMenuCacheBytesPerRow * amigaMenuCacheHeight,
     fetchCropBytes = 2,
     fetchWords = 22,
@@ -191,9 +185,7 @@ volatile DownwellMenuFrameCapture gDownwellMenuFrameCapture;
 volatile const UBYTE* gDownwellMenuForeground;
 volatile const UBYTE* gDownwellMenuBackground;
 volatile const UWORD* gDownwellMenuPlayerSprite;
-volatile const UWORD* gDownwellMenuTitleSprites;
 volatile const UBYTE* gDownwellMenuEntryFrame;
-volatile const UWORD* gDownwellMenuEntryTitleSprites;
 volatile UWORD gDownwellMenuEntryTitlePartCount;
 volatile const UBYTE* gDownwellGameplayGame;
 volatile const UBYTE* gDownwellGameplayHud;
@@ -850,8 +842,6 @@ static bool buildMenuCopper(CopperList& list,
                             const UBYTE* foreground,
                             const UBYTE* background,
                             const Sprite& playerSprite,
-                            const UWORD* titleSprites,
-                            unsigned titlePartCount,
                             const Sprite& nullSprite,
                             const Palette& palette,
                             const AmigaMenuScrollState& scroll) {
@@ -869,13 +859,8 @@ static bool buildMenuCopper(CopperList& list,
     list.pointer(bpl1pth, foreground + scroll.foregroundOffset);
     list.pointer(bpl2pth, background + scroll.backgroundOffset);
     list.showSprite(0, playerSprite);
-    for (unsigned channel = 1; channel < 8; ++channel) {
-        const UWORD* sprite = channel <= titlePartCount
-            ? titleSprites + (channel - 1) *
-                (menuTitleSpriteBytes / sizeof(UWORD))
-            : nullSprite.data();
-        list.pointer((UWORD)(spr1pth + (channel << 2)), sprite);
-    }
+    for (unsigned channel = 1; channel < 8; ++channel)
+        list.pointer((UWORD)(spr1pth + (channel << 2)), nullSprite.data());
     list.setPalette(palette);
     list.move(color02, 0xfff);
     list.move(color03, 0xfff);
@@ -884,8 +869,6 @@ static bool buildMenuCopper(CopperList& list,
 
 static bool buildMenuEntryCopper(CopperList& list,
                                  const UBYTE* entry,
-                                 const UWORD* titleSprites,
-                                 unsigned titlePartCount,
                                  const Sprite& nullSprite,
                                  const Palette& palette,
                                  int viewY) {
@@ -902,13 +885,8 @@ static bool buildMenuEntryCopper(CopperList& list,
     list.move(bpl2mod, 0);
     list.pointer(bpl1pth, entry + amigaMenuEntryOffset(viewY));
     list.showSprite(0, nullSprite);
-    for (unsigned channel = 1; channel < 8; ++channel) {
-        const UWORD* sprite = channel <= titlePartCount
-            ? titleSprites + (channel - 1) *
-                (menuTitleSpriteBytes / sizeof(UWORD))
-            : nullSprite.data();
-        list.pointer((UWORD)(spr1pth + (channel << 2)), sprite);
-    }
+    for (unsigned channel = 1; channel < 8; ++channel)
+        list.pointer((UWORD)(spr1pth + (channel << 2)), nullSprite.data());
     list.setPalette(palette);
     return list.finish();
 }
@@ -1016,6 +994,7 @@ int main(void) {
     unsigned presentedSplashDither = scenes.splashDitherFrame();
     unsigned liveFrameCount = 0;
     unsigned menuSpriteFrameCount = 0;
+    int renderedMenuTitleFrame = -1;
 #ifdef DOWNWELL_SCENE_VERIFY
     bool sceneGameplayLandedReported = false;
     bool sceneGameplayActiveReported = false;
@@ -1056,7 +1035,6 @@ int main(void) {
                          copperWords * 2 * sizeof(UWORD), playerSpriteBytes,
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
-                         menuTitleSpritesBytes,
                          sceneCacheBytes,
                          gamePackBytes)) {
         platform.restore();
@@ -1250,8 +1228,6 @@ int main(void) {
         Sprite(memory.enemySprite(0), enemySpriteHeight),
         Sprite(memory.enemySprite(1), enemySpriteHeight)
     };
-    const unsigned menuTitleSpriteWordStride =
-        menuTitleSpriteBytes / sizeof(UWORD);
     for (unsigned bullet = 0; bullet < bulletSpriteBufferCount; ++bullet)
         bulletSprites[bullet].hide();
     enemySprites[0].hide();
@@ -1414,10 +1390,14 @@ int main(void) {
                 if (presentedScene == AmigaScene::menu) {
                     bool menuFrameReady = true;
                     AmigaMenuScrollState menuScroll = {0, 0, 0};
-                    unsigned titlePartCount = 0;
-                    UWORD* titleSprites = memory.menuSprites() +
-                        back * menuTitleSpriteParts *
-                            menuTitleSpriteWordStride;
+                    if (renderedMenuTitleFrame != scenes.menuTitleFrame()) {
+                        menuFrameReady = amigaRenderMenuTitle(
+                            (UWORD)scenes.menuTitleFrame(),
+                            activeGamePack, activeGamePackEnd,
+                            memory.menuForeground(), memory.menuEntry());
+                        if (menuFrameReady)
+                            renderedMenuTitleFrame = scenes.menuTitleFrame();
+                    }
                     if (scenes.menuPlayerVisible()) {
                         menuFrameReady = amigaRendererBuildHardwareSprite(
                             activeGamePack, activeGamePackEnd,
@@ -1432,40 +1412,10 @@ int main(void) {
                     } else {
                         playerSprites[back].hide();
                     }
-                    if (menuFrameReady &&
-                        scenes.menuTitleFrame() != 0) {
-                        titlePartCount =
-                            amigaRendererHardwareSpritePartCount(
-                                activeGamePack, activeGamePackEnd, 654,
-                                (UWORD)scenes.menuTitleFrame());
-                        if (titlePartCount > menuTitleSpriteParts) {
-                            menuFrameReady = false;
-                        } else {
-                            const int titleX = downwellPlayfieldX + 328 -
-                                (scenes.menuCameraX() - 80);
-                            const int titleY = scenes.menuTitleY() -
-                                (scenes.menuCameraY() - 142);
-                            for (unsigned part = 0;
-                                 part < titlePartCount; ++part) {
-                                if (!amigaRendererBuildHardwareSpritePart(
-                                        activeGamePack, activeGamePackEnd,
-                                        654,
-                                        (UWORD)scenes.menuTitleFrame(), part,
-                                        titleX, titleY, 0,
-                                        titleSprites + part *
-                                            menuTitleSpriteWordStride,
-                                        menuTitleSpriteHeight)) {
-                                    menuFrameReady = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
                     if (menuFrameReady) {
                         if (menuEntry) {
                             menuFrameReady = buildMenuEntryCopper(
                                 copperLists[back], memory.menuEntry(),
-                                titleSprites, titlePartCount,
                                 nullSprite, palette,
                                 scenes.menuCameraY() - 142);
                         } else {
@@ -1475,7 +1425,6 @@ int main(void) {
                             menuFrameReady = buildMenuCopper(
                                 copperLists[back], memory.menuForeground(),
                                 memory.menuBackground(), playerSprites[back],
-                                titleSprites, titlePartCount,
                                 nullSprite, palette, menuScroll);
                         }
                     }
@@ -1497,8 +1446,7 @@ int main(void) {
                             menuScroll.backgroundOffset;
                         gDownwellMenuFrameCapture.scrollControl =
                             menuScroll.scrollControl;
-                        gDownwellMenuFrameCapture.titlePartCount =
-                            (UWORD)titlePartCount;
+                        gDownwellMenuFrameCapture.titlePartCount = 0;
                         gDownwellMenuForeground = memory.menuForeground();
                         gDownwellMenuBackground = memory.menuBackground();
                         gDownwellMenuPlayerSprite =
@@ -1506,8 +1454,7 @@ int main(void) {
                         downwellMenuWakeFrameReady();
                     }
                     if (!sceneMenuTitleReported &&
-                        scenes.menuTitleFrame() == 9 &&
-                        titlePartCount == menuTitleSpriteParts) {
+                        scenes.menuTitleFrame() == 9) {
                         sceneMenuTitleReported = true;
                         gDownwellMenuFrameCapture.foregroundOffset =
                             menuScroll.foregroundOffset;
@@ -1515,14 +1462,13 @@ int main(void) {
                             menuScroll.backgroundOffset;
                         gDownwellMenuFrameCapture.scrollControl =
                             menuScroll.scrollControl;
-                        gDownwellMenuFrameCapture.titlePartCount =
-                            (UWORD)titlePartCount;
+                        gDownwellMenuFrameCapture.titlePartCount = 0;
                         gDownwellMenuForeground = memory.menuForeground();
                         gDownwellMenuBackground = memory.menuBackground();
                         gDownwellMenuPlayerSprite =
                             memory.playerSprite(back);
-                        gDownwellMenuTitleSprites = titleSprites;
                         downwellMenuTitleFrameReady();
+                        /* Retain the old verification breakpoint name. */
                         downwellMenuTitleSpriteReady();
                     }
                     if (!sceneMenuEntryReported && menuEntry) {
@@ -1530,9 +1476,7 @@ int main(void) {
                         gDownwellMenuEntryFrame = memory.menuEntry() +
                             amigaMenuEntryOffset(
                                 scenes.menuCameraY() - 142);
-                        gDownwellMenuEntryTitleSprites = titleSprites;
-                        gDownwellMenuEntryTitlePartCount =
-                            (UWORD)titlePartCount;
+                        gDownwellMenuEntryTitlePartCount = 0;
                         downwellMenuEntryFrameReady();
                         downwellMenuEntryScrollReady();
                     }
