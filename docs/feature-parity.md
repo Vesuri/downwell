@@ -278,3 +278,21 @@ remaining and reached 64 frame-loop iterations without a reported failure.
 This is limited startup evidence, not a claim that the reported exit is fixed.
 Startup and internal loop failures now return AmigaDOS status 20, while an
 explicit normal quit returns 0; no error text is printed.
+
+### Enemy coordinate rounding
+
+The snake, turtle, frog, bat, snail and crawler Step assembly all call `round`
+when copying their precise positions into instance x/y. Native code previously
+truncated signed Q8 values toward zero; SDL used `std::round` (halves away
+from zero). Both now use nearest, ties-to-even, consistent with the
+[GameMaker round reference](https://manual.gamemaker.io/lts/en/GameMaker_Language/GML_Reference/Maths_And_Numbers/Number_Functions/round.htm).
+The target implementation uses only integer arithmetic. Its relative origins
+(240,176) are even, preserving ties-to-even parity in world coordinates.
+
+Tests cover positive/negative half ties, every Q8 value in [-1024,1024]
+against the portable floating-point oracle, both world-origin translations,
+and actual enemy Steps with positive/negative fractional displacement.
+This corrects instance-coordinate quantization, not the incomplete collision
+adaptation. The live trace still differs: first sampled >1-pixel mismatch is
+now tick 172, native (222,1297.99) moving left versus SDL (223.5,1298.2)
+moving right. Full actor-motion parity remains open.

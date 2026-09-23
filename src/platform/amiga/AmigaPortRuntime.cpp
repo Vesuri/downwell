@@ -2,6 +2,7 @@
 #include "AmigaProfile.h"
 
 #include "core/PortCheckpoint.h"
+#include "core/GameMakerRounding.h"
 #include "core/Replay.h"
 
 namespace {
@@ -702,8 +703,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 }
             }
         }
-        enemy.x = (int)(enemy.preciseX / 256L);
-        enemy.y = (int)(enemy.preciseY / 256L);
+        // World origins (240,176) are even integers, so ties-to-even is
+        // unchanged by storing these positions relative to the origin.
+        enemy.x = (int)downwell::roundGameMakerQ8(enemy.preciseX);
+        enemy.y = (int)downwell::roundGameMakerQ8(enemy.preciseY);
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
         if (enemy.objectId == 111)

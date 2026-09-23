@@ -2,6 +2,7 @@
 #include "platform/amiga/AmigaActorChannels.h"
 #include "core/PortReplay.h"
 #include "core/Replay.h"
+#include "core/GameMakerRounding.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -59,6 +60,30 @@ struct GenerationOrderProbe {
 } // namespace
 
 int main() {
+    const long ties[] = {0, 2, 2, 4};
+    for (int i = 0; i < 4; ++i) {
+        require(downwell::roundGameMakerQ8(i * 256 + 128) == ties[i] &&
+                    downwell::roundGameMakerQ8(-i * 256 - 128) == -ties[i],
+                "GML exact half coordinates round to even on both sides of zero");
+    }
+    for (long q = -1024 * 256; q <= 1024 * 256; ++q) {
+        const long rounded = downwell::roundGameMakerQ8(q);
+        require(rounded == downwell::roundGameMakerCoordinate(q / 256.0),
+                "fixed-point coordinate rounding matches portable oracle");
+        require(downwell::roundGameMakerQ8(q + 240 * 256) - 240 == rounded &&
+                    downwell::roundGameMakerQ8(q + 176 * 256) - 176 == rounded,
+                "even world origins preserve rounded relative coordinates");
+    }
+    AmigaPortRuntime roundingActors(300, true, 0, true);
+    roundingActors.configureSolidResolver(noSolid, nullptr);
+    require(roundingActors.configureEnemy(0, 111, 163, 40, 20, 192, 0, 5, 6) &&
+                roundingActors.configureEnemy(1, 111, 163, -40, 20, -192, 0, 5, 6),
+            "configure fractional motion on both sides of the native origin");
+    roundingActors.step(0);
+    require(roundingActors.enemyAt(0).x == 41 && roundingActors.enemyAt(1).x == -41 &&
+                roundingActors.enemyAt(0).y == 20 && roundingActors.enemyAt(1).y == 20,
+            "enemy Step rounds final coordinates instead of truncating toward origin");
+
     AmigaPortRuntime eventOrder(300, true, 0, true);
     eventOrder.configureSolidResolver(noSolid, nullptr);
     require(eventOrder.configureEnemy(0, 112, 169, 40, 0, 64, 0,

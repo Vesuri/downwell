@@ -1,6 +1,7 @@
 #include "StartupRuntime.h"
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
+#include "GameMakerRounding.h"
 #include "ObjectPack.h"
 #include "PackedRoomLoader.h"
 #include "PlayerCollision.h"
@@ -781,8 +782,8 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.preciseY = nextY;
             }
         }
-        enemy.x = static_cast<std::int32_t>(std::round(enemy.preciseX));
-        enemy.y = static_cast<std::int32_t>(std::round(enemy.preciseY));
+        enemy.x = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
+        enemy.y = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
         enemy.imageIndex += enemy.imageSpeed;
         if (enemy.imageIndex >= 2.0F)
             enemy.imageIndex = std::fmod(enemy.imageIndex, 2.0F);
