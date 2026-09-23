@@ -39,6 +39,7 @@ struct InstanceRecord {
     std::int32_t auxiliaryState = 0;
     bool motionInitialized = false;
     bool grounded = false;
+    bool frogLanded = true; // enmFrog Create; cleared by an airborne Step
     AlarmBank alarms;
 };
 

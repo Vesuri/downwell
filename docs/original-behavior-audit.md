@@ -113,3 +113,22 @@ while native has not. The snake positions differ by one pixel (198/199 world
 X), relevant to a bullet at the collision boundary. The inactive native bat
 versus active SDL bat also needs investigation. Final health 2/3, kills 2/1,
 currency 6/6: matching total currency does not establish matching combat.
+
+## Frog landing timer
+
+`enmFrog_Create_0.asm` initializes landed=1. `enmFrog_Step_0.asm` blocks
+26–30 clear it while airborne, and on grounded && !landed set landed=1 and
+alarm[1]=60. Both ports now retain this separate latch; a grounded flag alone
+cannot preserve the original edge-triggered timer behavior. Native tests
+remove support, restore it, require alarm 60 on landing and 59 on the next
+grounded frame. The live comparison also checks the frog landing latch.
+The added SDL digest field changes its startup checksum to `9a7487de074ed927`.
+
+This changes the later frog's jump timing but does not close the extended
+combat gate: the first kill mismatch remains tick 600, player-Y mismatch 666,
+and final health/kills/currency remain 2/3, 1/1, 6/6. Full frog collision,
+hit-stun, water and visibility semantics remain incomplete.
+Full host tests, the live scene/latch comparison, and the bounded A500 canonical
+replay pass. The target digest remains `bfbbd762b9b62a59`; that short tape does
+not exercise frog landing. Native unit tests provide the landing-edge coverage.
+Both 68000 audits are clean and the playable SDL build was rebuilt.

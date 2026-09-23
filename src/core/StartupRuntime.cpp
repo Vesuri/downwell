@@ -745,6 +745,13 @@ void StartupRuntime::updateMainEnemies() {
             }
             if (enemy.velocityX != 0.0F)
                 enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
+            // enmFrog Step's landed latch is distinct from current support.
+            if (enemy.grounded) {
+                if (!enemy.frogLanded) enemy.alarms.set(1, 60);
+                enemy.frogLanded = true;
+            } else {
+                enemy.frogLanded = false;
+            }
         } else if (enemy.objectId == 116) {
             constexpr float pi = 3.14159265358979323846F;
             const float target = std::atan2(-(mainPlayerY_ - enemy.preciseY),
@@ -2280,6 +2287,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(instance.auxiliaryState);
         digest.addBool(instance.motionInitialized);
         digest.addBool(instance.grounded);
+        digest.addBool(instance.frogLanded);
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm)
             digest.addI32(instance.alarms.get(alarm));
     }

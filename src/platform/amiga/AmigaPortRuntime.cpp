@@ -106,6 +106,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].active = false;
         enemies_[index].awake = false;
         enemies_[index].grounded = false;
+        enemies_[index].frogLanded = true;
         enemies_[index].activationPending = false;
     }
     for (index = 0; index < gemCapacity; ++index) {
@@ -225,6 +226,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.active = active;
     enemy.awake = awake;
     enemy.grounded = grounded;
+    enemy.frogLanded = true;
     enemy.activationPending = !active;
     if (enemyCount_ <= index)
         enemyCount_ = index + 1;
@@ -701,6 +703,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             } else {
                 enemy.speedY = 0;
                 enemy.gravityRemainder = 0;
+            }
+            // enmFrog Step: restart preparation only on a landing edge.
+            if (enemy.grounded) {
+                if (!enemy.frogLanded) enemy.alarm1 = 60;
+                enemy.frogLanded = true;
+            } else {
+                enemy.frogLanded = false;
             }
         } else if (enemy.objectId == 117) {
             if (enemy.motionState == 0) {

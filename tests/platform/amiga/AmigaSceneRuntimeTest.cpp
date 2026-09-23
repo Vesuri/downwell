@@ -259,6 +259,8 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
                         "all paired active actors match support, sprite and animation frame");
             if (enemy.objectId == 113 && enemy.active && native.active) {
+                require(native.frogLanded == enemy.frogLanded,
+                        "frog landing latch matches on the live tape");
                 require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
                             native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
                         "frog support, sprite and animation frame match on the live tape");

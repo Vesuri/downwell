@@ -366,6 +366,17 @@ int main() {
                 unsupportedFrog.enemyAt(0).preciseY > supportedY &&
                 unsupportedFrog.enemyAt(0).alarm1 > 0,
             "frog falls immediately when support disappears, without waiting for jump alarm");
+    require(!unsupportedFrog.enemyAt(0).frogLanded,
+            "an airborne Step clears the original landed latch");
+    unsupportedFrog.configureSolidResolver(flatGround, nullptr);
+    unsupportedFrog.step(0);
+    require(unsupportedFrog.enemyAt(0).grounded &&
+                unsupportedFrog.enemyAt(0).frogLanded &&
+                unsupportedFrog.enemyAt(0).alarm1 == 60,
+            "landing restarts the original sixty-frame preparation alarm");
+    unsupportedFrog.step(0);
+    require(unsupportedFrog.enemyAt(0).alarm1 == 59,
+            "remaining grounded does not continually restart the alarm");
 
     AmigaPortRuntime snail(300);
     snail.configureSolidResolver(shortRightWall, 0);

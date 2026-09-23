@@ -83,6 +83,7 @@ public:
         bool active;
         bool awake;
         bool grounded;
+        bool frogLanded;
         bool activationPending;
         unsigned drawFrame() const {
             // Source enmSnail Step: image_yscale = -sign(ysp).
