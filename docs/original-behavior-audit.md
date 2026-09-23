@@ -66,3 +66,23 @@ the mandatory kill/reward coverage (one kill, three gems, health 4 observed).
 The extended SDL/native combat gate still fails: first >3-pixel player-Y
 difference at tick 593, first kill mismatch at 601. Final health 3/3, kills
 2/1 and currency 22/4. Do not widen tolerances to conceal this difference.
+
+## Empty-ammo gunboot braking
+
+The tick-593 divergence above was traced to the empty-charge branch, not a
+floor collision: SDL reduced falling speed at tick 590 while Amiga did not.
+`gml_GlobalScript_scrPlayerShootN.asm` lines 357–395 sets noAmmoYsp=3,
+clamps a faster downward ysp, sets alarm 2 to 16 and enables shotDelay.
+Amiga now implements that branch without creating a bullet or spending ammo.
+Focused tests drain all eight rounds, verify the three-pixel fall displacement,
+and verify that holding fire waits sixteen updates before braking again.
+Smoke, EMPTY text and sound remain separate presentation omissions.
+Full host tests pass. The bounded A500 canonical replay passes with unchanged
+digest `b112ca1f7174a6e1`, and both 68000 audits are clean. That short replay
+does not cover ammo depletion; the focused host test supplies that coverage.
+
+After this correction the first >3-pixel Y difference moves to tick 666.
+The kill mismatch at tick 601 remains even with player positions within a
+pixel: native (172,2096), SDL (171.1,2096.7). Final health 3/3, kills 1/1 and
+currency 12/4 still fail the extended combat gate. This supersedes the earlier
+combat endpoint, not the outstanding mask/ordering concerns.

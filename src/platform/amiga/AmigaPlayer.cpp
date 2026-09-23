@@ -196,7 +196,13 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         ++jumps_;
     }
     if (input.fire && !grounded_ && shotDelay_ == 0 &&
-        !jumpShootLocked_ && ammo_ > 0) {
+        !jumpShootLocked_ && ammo_ == 0) {
+        // scrPlayerShootN's empty-charge branch still brakes a fast fall.
+        // It consumes no charge and creates no bullet or shooting animation.
+        if (speedY_ > 3 * fixedOne) speedY_ = 3 * fixedOne;
+        shotDelay_ = 16;
+    } else if (input.fire && !grounded_ && shotDelay_ == 0 &&
+               !jumpShootLocked_ && ammo_ > 0) {
         if (speedY_ > 0) speedY_ = 0;
         --ammo_;
         ++shots_;

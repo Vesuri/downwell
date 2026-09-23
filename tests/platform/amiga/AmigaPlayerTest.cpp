@@ -33,6 +33,32 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    AmigaPlayer emptyGun(false, 10000);
+    downwell::Input trigger;
+    trigger.fire = true;
+    for (unsigned shot = 0; shot < 8; ++shot) {
+        emptyGun.step(downwell::Input{});
+        emptyGun.step(trigger);
+    }
+    require(emptyGun.ammo() == 0 && emptyGun.shots() == 8,
+            "empty-charge fixture consumes all eight rounds in midair");
+    for (unsigned frame = 0; frame < 40; ++frame) emptyGun.step(downwell::Input{});
+    long previousY = emptyGun.offsetYFixed();
+    emptyGun.step(trigger);
+    require(emptyGun.offsetYFixed() - previousY == 3 * 256 &&
+            emptyGun.ammo() == 0 && emptyGun.shots() == 8,
+            "original empty gun brakes the fall to three without producing a bullet");
+    for (unsigned frame = 1; frame < 16; ++frame) {
+        previousY = emptyGun.offsetYFixed();
+        emptyGun.step(trigger);
+        require(emptyGun.offsetYFixed() - previousY > 3 * 256,
+                "held empty gun respects the sixteen-frame delay");
+    }
+    previousY = emptyGun.offsetYFixed();
+    emptyGun.step(trigger);
+    require(emptyGun.offsetYFixed() - previousY == 3 * 256,
+            "held empty gun brakes again after the recovered delay");
+
     // Source-backed default-style rules, independent of SDL comparison.
     // scrPlayerInit: maxsp=2, airMaxsp=2.5, decclsp=.4, airdeccl=.1.
     // scrPlMovement: reversal boost=2 grounded / 1 airborne; both keys stop.

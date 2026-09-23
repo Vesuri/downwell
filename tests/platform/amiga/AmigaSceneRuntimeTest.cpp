@@ -706,6 +706,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             input.fire = tick % 10 < 5;
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && tick % 10 == 0);
+            if (std::getenv("DOWNWELL_TRACE_PLAYER_STEPS") && gameplay.tick() >= 550 && gameplay.tick() <= 605)
+                std::cout << "PLAYER STEP " << gameplay.tick()
+                          << " x=" << 240 + gameplay.player().offsetX() << ',' << reference.mainPlayerX()
+                          << " y=" << 176 + gameplay.player().offsetYFixed() / 256.0F << ',' << reference.mainPlayerY()
+                          << " ground=" << gameplay.player().grounded() << ',' << reference.mainPlayerGrounded()
+                          << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired() << '\n';
             require(gameplay.generationSucceeded(), "combat continuation retains successful live generation");
             if (!playerReported && std::fabs(176 + gameplay.player().offsetYFixed() / 256.0F - reference.mainPlayerY()) > 3.0F) {
                 playerReported = true;
