@@ -251,6 +251,16 @@ bool AreaOneBuilder::emitPattern(
     return true;
 }
 
+bool AreaOneBuilder::stepVisible(const BuilderPatternPack& patterns,
+                                 GameMakerRandom& random, int viewBottomCeiling,
+                                 EmitFunction emit, void* context,
+                                 AreaOneBuilderStep& result) {
+    result = AreaOneBuilderStep{};
+    if (endReached_ || viewBottomCeiling <= y_ - 128)
+        return true;
+    return step(patterns, random, emit, context, result);
+}
+
 bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
                           GameMakerRandom& random, EmitFunction emit,
                           void* context, AreaOneBuilderStep& result) {

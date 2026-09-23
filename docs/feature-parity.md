@@ -108,3 +108,13 @@ next simulation work must reproduce creation/alarm/RNG ordering and terrain
 availability. Do not widen position tolerances to call this parity, or replace
 SDL with the native runtime to conceal it. The static raster cache can remain
 precomputed, but it must not dictate when simulation objects become live.
+
+The shared `AreaOneBuilder::stepVisible` now owns the recovered strict
+visibility gate and executes at most one builder event per tick. SDL uses this
+entry point; the native live-builder migration remains outstanding. Integer
+callers pass `ceil(viewBottom)` to preserve fractional boundary crossings
+without target floating point. Tests cover invisible/end-of-level no-ops,
+single-step behavior after camera jumps, full ordered Create-event payloads
+and complete RNG state against direct generation. An interleaved RNG test
+also confirms that gameplay random draws change later generated content:
+the current full-level forecast cannot be treated as the live world.

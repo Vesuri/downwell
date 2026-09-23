@@ -31,6 +31,12 @@ public:
                                   int firstRightRoom, int secondRightRoom);
     bool step(const BuilderPatternPack& patterns, GameMakerRandom& random,
               EmitFunction emit, void* context, AreaOneBuilderStep& result);
+    // One objBuilder Step event, never a catch-up loop. Pass ceil(viewBottom)
+    // so the strict integer threshold preserves fractional camera positions
+    // without requiring floating point on the 68000.
+    bool stepVisible(const BuilderPatternPack& patterns, GameMakerRandom& random,
+                     int viewBottomCeiling, EmitFunction emit, void* context,
+                     AreaOneBuilderStep& result);
 
     int y() const { return y_; }
     int generationCount() const { return generationCount_; }

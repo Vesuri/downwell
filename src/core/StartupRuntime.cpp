@@ -906,14 +906,12 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     // patterns share their last row, so each call advances one 16-pixel row
     // and creates the two boundary pillars at the builder's current y.
     const float viewBottom = mainCameraViewY() + surfaceHeight;
-    if (static_cast<float>(instance.y) - viewBottom >= 128.0F)
-        return;
     if (builderPatternPack_ == nullptr)
         return;
 
     AreaOneBuilderStep result;
-    const bool generated = areaOneBuilder_.step(
-        *builderPatternPack_, random_,
+    const bool generated = areaOneBuilder_.stepVisible(
+        *builderPatternPack_, random_, static_cast<int>(std::ceil(viewBottom)),
         [](void* opaque, const DeferredCreateInstance& command) {
             StartupRuntime* runtime = static_cast<StartupRuntime*>(opaque);
             return runtime->deferredInstances_.enqueueCreate(command);
