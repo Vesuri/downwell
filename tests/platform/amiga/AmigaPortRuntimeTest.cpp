@@ -34,6 +34,23 @@ bool crawlerCorner(void*, int x, int y) {
 } // namespace
 
 int main() {
+    AmigaPortRuntime lifecycle(300);
+    require(lifecycle.configureEnemy(0, 111, 163, 0, -303, 0, 0, 5, 6),
+            "configure enemy beyond upper cleanup boundary");
+    require(lifecycle.configureEnemy(1, 111, 163, 0, -302, 0, 0, 5, 6),
+            "configure enemy exactly on upper cleanup boundary");
+    require(lifecycle.configureEnemy(2, 111, 163, 0, 4000, 0, 0, 5, 6),
+            "configure future prebuilt enemy");
+    lifecycle.step(0);
+    require(!lifecycle.enemyAt(0).active && !lifecycle.enemyAt(0).activationPending,
+            "enemy above viewTop minus 160 is retired, not queued for reactivation");
+    require(lifecycle.enemyAt(1).active,
+            "cleanup comparison is strictly less than the boundary");
+    require(lifecycle.enemyAt(2).active && !lifecycle.enemyAt(2).awake,
+            "future prebuilt enemies are not mistaken for out-of-view live instances");
+    lifecycle.step(0);
+    require(!lifecycle.enemyAt(0).active && !lifecycle.enemyAt(0).awake,
+            "retired enemy stays retired on subsequent ticks");
     for (unsigned limit = 0; limit <= 8; ++limit) {
         for (unsigned pattern = 0; pattern < 256; ++pattern) {
             AmigaActorChannels channels(limit);

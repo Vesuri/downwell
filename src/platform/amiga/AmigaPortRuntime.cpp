@@ -826,6 +826,16 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.active = true;
             enemy.activationPending = false;
         }
+        // scrOutofview (rmMain): y < viewTop-160 or y > viewTop+3000.
+        // Native coordinates are relative to player start y=176; viewTop
+        // starts at 34, hence -302 / +2858. Future prebuilt enemies are not
+        // yet live instances and must not be destroyed before activation.
+        if (enemy.active && enemy.awake &&
+            (enemy.y - cameraPixelY_ < -302 || enemy.y - cameraPixelY_ > 2858)) {
+            enemy.active = false;
+            enemy.awake = false;
+            enemy.activationPending = false;
+        }
     }
 
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)

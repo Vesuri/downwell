@@ -491,6 +491,39 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "post-landing tape scrolls at least one circular-buffer page");
     require(sawAwakeEnemy,
             "post-landing tape reaches generated native enemy simulation");
+    unsigned retiredCompared = 0, enemyOrdinal = 0;
+    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+        const auto& enemy = reference.instanceAt(i);
+        if (enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 113 &&
+            enemy.objectId != 116 && enemy.objectId != 117 && enemy.objectId != 119) continue;
+        require(enemyOrdinal < gameplay.enemyCount() &&
+                gameplay.enemyAt(enemyOrdinal).objectId == enemy.objectId,
+                "generated enemy prefix preserves creation order across targets");
+        const auto& native = gameplay.enemyAt(enemyOrdinal++);
+        if (!enemy.active && enemy.health > 0 &&
+            enemy.y < reference.mainCameraViewY() - 160) {
+            require(!native.active && !native.awake && !native.activationPending,
+                    "SDL-retired enemies no longer remain live in Amiga");
+            ++retiredCompared;
+        }
+    }
+    require(retiredCompared >= 2, "comparison exercises two out-of-view enemy retirements");
+    if (std::getenv("DOWNWELL_COMPARE_ACTORS")) {
+        for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {
+            const auto& e = gameplay.enemyAt(i);
+            std::cout << "AMIGA " << i << ' ' << e.objectId << ' ' << e.active << ' '
+                      << e.awake << ' ' << e.x + 240 << ' ' << e.y + 176 << ' '
+                      << e.health << ' ' << e.imageFrame << '\n';
+        }
+        unsigned ordinal = 0;
+        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+            const auto& e = reference.instanceAt(i);
+            if (e.objectId != 111 && e.objectId != 112 && e.objectId != 113 &&
+                e.objectId != 116 && e.objectId != 117 && e.objectId != 119) continue;
+            std::cout << "SDL " << ordinal++ << ' ' << e.objectId << ' ' << e.active << ' '
+                      << e.x << ' ' << e.y << ' ' << e.health << ' ' << e.imageIndex << '\n';
+        }
+    }
 }
 }
 

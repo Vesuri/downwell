@@ -88,3 +88,23 @@ Final normal-build timing for the ordered renderer: 600 frames / 603 PAL
 fields (49.75 FPS), with a three-field frame at 528 and a two-field frame at
 574. These misses remain open; the former 50 FPS result is not applicable to
 this build. The playable SKIP_TO_GAME build is restored after profiling.
+
+## Enemy lifecycle comparison
+
+The scene parity test now checks two actual SDL enemy retirements against the
+native runtime, in addition to strict cleanup-boundary unit tests. Native
+awake enemies retire outside `viewTop-160 .. viewTop+3000`, matching
+`gml_Script_scrOutofview` VM code. Retirement clears the activation-pending
+state so an old enemy cannot wake again. Future prebuilt, not-yet-awake enemies
+are deliberately excluded from this live-instance cleanup.
+
+`DOWNWELL_COMPARE_ACTORS=1` on the scene test emits both actor populations.
+This reveals an unresolved **creation-timing mismatch**, not merely rounding:
+after the current tape, SDL's first turtle is at (228,2521), whereas the native
+turtle is at (214,2139). SDL incrementally creates fragments when the builder
+is within 128 pixels of the viewport bottom; native terrain is prebuilt and
+enemy movement uses a different wake gate, while alarms already run. The
+next simulation work must reproduce creation/alarm/RNG ordering and terrain
+availability. Do not widen position tolerances to call this parity, or replace
+SDL with the native runtime to conceal it. The static raster cache can remain
+precomputed, but it must not dictate when simulation objects become live.
