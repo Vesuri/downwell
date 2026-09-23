@@ -328,6 +328,9 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
     }
     uint16_t maskFirstWord = maskX >> 4;
     uint16_t maskLastWord = (uint16_t)(maskFirstWord + widthWords);
+    // Include the extra fetch word when an unaligned destination spans
+    // more words than the source. It must be zero-masked before shifting.
+    sourceLastWord = (uint16_t)(sourceFirstWord + widthWords);
     widthWords++;
 
     // Calculate modulos
@@ -354,8 +357,9 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
         sourceData += sourceY * source.rowSizeInWords() + sourceFirstWord;
         maskData += maskY * mask.rowSizeInWords() + maskFirstWord;
         destData += destY * this->rowSizeInWords() + destFirstWord;
-        lastWordMask <<= ((sourceLastWord << 4) + 16 - sourceX - width);
-        firstWordMask >>= sourceLeftShift;
+        const unsigned trailing = (maskLastWord << 4) + 16 - maskX - width;
+        lastWordMask = trailing >= 16 ? 0 : (uint16_t)(0xffffu << trailing);
+        firstWordMask >>= maskLeftShift;
 
         if (maskShift < 0) {
             maskShift += 16;
@@ -365,8 +369,9 @@ void Bitmap::copyWithMask(const Bitmap& source, const Bitmap& mask, uint16_t des
         sourceData += (sourceY + height) * source.rowSizeInWords() - sourceWidthWords + sourceLastWord;
         maskData += (maskY + height) * mask.rowSizeInWords() - maskWidthWords + maskLastWord;
         destData += (destY + height) * this->rowSizeInWords() - destWidthWords + destLastWord;
-        firstWordMask <<= ((sourceLastWord << 4) + 16 - sourceX - width);
-        lastWordMask >>= sourceLeftShift;
+        const unsigned trailing = (maskLastWord << 4) + 16 - maskX - width;
+        firstWordMask = trailing >= 16 ? 0 : (uint16_t)(0xffffu << trailing);
+        lastWordMask >>= maskLeftShift;
 
         if (maskShift > 0) {
             maskShift -= 16;

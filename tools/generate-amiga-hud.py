@@ -316,6 +316,15 @@ def build_pack(manifest, extracted, profile):
 
     for text_id, text in TEXT_SELECTIONS.get(profile, {}).items():
         canvas = render_text(manifest, pages, text)
+        if text_id in (65000, 65001, 65003):
+            # Same two draws as Game::renderStyleSelect: red at y+1,
+            # followed by white at y. Keep the original anchor unchanged.
+            foreground = canvas
+            shadow = Image.new("RGBA", foreground.size, (255, 0, 0, 255))
+            shadow.putalpha(foreground.getchannel("A"))
+            canvas = Image.new("RGBA", (foreground.width, foreground.height + 1))
+            canvas.alpha_composite(shadow, (0, 1))
+            canvas.alpha_composite(foreground, (0, 0))
         pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
         dma_width, planar = encode_planar(pens, canvas.width, canvas.height)
         sprite = {

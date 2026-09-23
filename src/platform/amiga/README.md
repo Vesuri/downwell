@@ -253,3 +253,18 @@ READY_MARKER=DOWNWELL_STYLE_REVEAL_READY bash amiga/verify_startup.sh`.
 Then `python3 tools/verify-amiga-style-mask.py --capture` checks the live
 DMA mask and Copper configuration. Style-frame decoding accepts `--mask`
 to composite a captured PF2 mask; selected-style verification captures both.
+
+Style art uses the imported `Bitmap::copyWithMask` path. Its portable
+hardware backend routes the cookie-cut mask to channel A (the channel that
+receives first/last-word masks), pixels to B, and uses minterm $CA. The
+extra source word required by an unaligned destination is zero-masked;
+this prevents the 16-pixel arrow at X=88 from leaking into the next word.
+The same correction applies to immediate and queued blits. Heading assets
+include the recovered one-pixel red shadow, generated on the host.
+
+For a bounded drawing regression, use the scene-verification build with
+`GDB_SOURCE=verify_style_drawing.gdb READY_MARKER=DOWNWELL_STYLE_DRAWING_READY
+VERIFY_TIMEOUT_SECONDS=45 bash amiga/verify_startup.sh`, then run
+`python3 tools/verify-amiga-style-drawing.py`. It compares captured arrow
+pixels, the adjacent blank word, and normal/locked headings against packed
+assets rather than merely accepting a new screenshot hash.
