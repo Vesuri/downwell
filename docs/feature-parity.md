@@ -401,3 +401,14 @@ for grounded state, sprite ID and integer animation frame, with required
 coverage of both airborne and landed states. The earlier snake mismatch at
 tick 138 remains (native airborne, SDL grounded); this does not establish
 all-enemy animation parity or frog hit-stun/long-jump coverage.
+
+### Snake/turtle gravity integration
+
+Native snake/turtle gravity now retains the 1/5 Q8-unit velocity remainder
+of 0.2, and a separate remainder when integrating velocity into position.
+Keeping only velocity precision still leaves the fifth update just short of
+an integer pixel boundary, delaying landing. A 30-frame exact-rational test
+checks both speed and position; the first live-tape snake now also has exact
+grounded/sprite/frame assertions while active. Its former tick-138 mismatch
+is gone. The optional animation trace next reports a later snake at tick 343,
+after the separately documented one-frame-late birth. Full parity remains open.

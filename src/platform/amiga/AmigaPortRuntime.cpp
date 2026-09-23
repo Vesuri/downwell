@@ -92,6 +92,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
         enemies_[index].speedX = 0;
         enemies_[index].speedY = 0;
         enemies_[index].gravityRemainder = 0;
+        enemies_[index].gravityPositionRemainder = 0;
         enemies_[index].motionState = 0;
         enemies_[index].auxiliaryState = 0;
         enemies_[index].alarm0 = -1;
@@ -206,6 +207,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.speedX = speedX;
     enemy.speedY = speedY;
     enemy.gravityRemainder = 0;
+    enemy.gravityPositionRemainder = 0;
     enemy.motionState = motionState;
     enemy.auxiliaryState = auxiliaryState;
     enemy.alarm0 = alarm0;
@@ -554,14 +556,21 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.grounded = grounded;
             if (grounded) {
                 enemy.speedY = 0;
+                enemy.gravityRemainder = 0;
                 if (!solidResolver_(solidResolverContext_,
                                     probeX + direction * (halfWidth + 1),
                                     probeY + foot + 1))
                     enemy.speedX = -enemy.speedX;
             } else {
                 enemy.speedY += 51;
-                if (enemy.speedY > 7 * 256)
+                if (++enemy.gravityRemainder == 5) {
+                    ++enemy.speedY;
+                    enemy.gravityRemainder = 0;
+                }
+                if (enemy.speedY >= 7 * 256) {
                     enemy.speedY = 7 * 256;
+                    enemy.gravityRemainder = 0;
+                }
             }
             const int nextX = (int)downwell::floorQ8Coordinate(enemy.preciseX + enemy.speedX);
             const int edge = nextX +
@@ -571,7 +580,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             else
                 enemy.preciseX += enemy.speedX;
             if (!grounded) {
-                const int nextY = (int)downwell::floorQ8Coordinate(enemy.preciseY + enemy.speedY);
+                const unsigned residual = enemy.gravityPositionRemainder + enemy.gravityRemainder;
+                const long nextPreciseY = enemy.preciseY + enemy.speedY + residual / 5u;
+                const int nextY = (int)downwell::floorQ8Coordinate(nextPreciseY);
                 const int movedX = (int)downwell::floorQ8Coordinate(enemy.preciseX);
                 if (enemy.speedY > 0 && solidResolver_(
                         solidResolverContext_, movedX, nextY + foot)) {
@@ -580,9 +591,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                         enemy.preciseY += 256L;
                     }
                     enemy.speedY = 0;
+                    enemy.gravityRemainder = 0;
                     enemy.grounded = true;
                 } else {
-                    enemy.preciseY += enemy.speedY;
+                    enemy.preciseY = nextPreciseY;
+                    enemy.gravityPositionRemainder = static_cast<unsigned char>(residual % 5u);
                 }
             }
         } else if (enemy.objectId == 116) {

@@ -309,6 +309,19 @@ int main() {
                 frog.enemyAt(0).imageFrame == 0,
             "frog alarm launches its recovered directional jump");
 
+    AmigaPortRuntime fallingSnake(300);
+    fallingSnake.configureSolidResolver(noSolid, nullptr);
+    require(fallingSnake.configureEnemy(0, 111, 163, 40, 0, 0, 0, 5, 6),
+            "configure snake for exact decimal integration");
+    for (long tick = 1; tick <= 30; ++tick) {
+        fallingSnake.step(0);
+        const auto& state = fallingSnake.enemyAt(0);
+        require(state.speedY == tick * 256 / 5 &&
+                    state.preciseY == tick * (tick + 1) * 128 / 5 &&
+                    state.gravityPositionRemainder == tick * (tick + 1) * 128 % 5,
+                "0.2 gravity retains both velocity and integrated position fractions");
+    }
+
     AmigaPortRuntime fallingFrog(300);
     fallingFrog.configureSolidResolver(noSolid, nullptr);
     require(fallingFrog.configureEnemy(0, 113, 171, 40, 1,

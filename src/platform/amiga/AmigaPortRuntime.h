@@ -68,7 +68,8 @@ public:
         long preciseY;
         long speedX;
         long speedY;
-        unsigned char gravityRemainder; // Frog: fifths of one Q8 velocity unit.
+        unsigned char gravityRemainder; // fifths of one Q8 velocity unit
+        unsigned char gravityPositionRemainder; // snake/turtle integration residual
         int motionState;
         int auxiliaryState;
         int alarm0;

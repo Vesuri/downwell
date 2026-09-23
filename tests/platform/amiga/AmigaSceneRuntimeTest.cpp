@@ -256,6 +256,10 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             }
             require(native.objectId == enemy.objectId,
                     "paired actor identity matches throughout live comparison");
+            if (comparedOrdinal == 0 && enemy.objectId == 111 && enemy.active && native.active)
+                require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
+                            native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
+                        "first snake landing and presentation match exactly across targets");
             if (enemy.objectId == 113 && enemy.active && native.active) {
                 require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
                             native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
