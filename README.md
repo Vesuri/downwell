@@ -91,10 +91,12 @@ The cross-target replay and state-comparison contract is documented in
 GameMaker behavior is tracked separately in
 [docs/runtime-semantics.md](docs/runtime-semantics.md).
 
-Both the default and locked style-selection states have emulator-backed raster
-gates (`make verify-amiga-style-frame` and
-`make verify-amiga-locked-style-frame`). The full scene verifier visits the
-locked carousel entry before returning to and accepting the default style.
+The default, locked, and accepted style-selection states have emulator-backed
+raster gates (`make verify-amiga-style-frame`,
+`make verify-amiga-locked-style-frame`, and
+`make verify-amiga-selected-style-frame`). The full scene verifier visits the
+locked carousel entry before returning to and accepting the default style; the
+last gate pins the hardware-dither transition into the well.
 
 ## GameMaker extraction
 

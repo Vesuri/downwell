@@ -98,6 +98,11 @@ scene traversal now visits this state before returning to the default style;
 this guards the single-frame `sprLocked` resource, both selection arrows, the
 `LOCKED!` label, and the smoothed carousel offset.
 
+`make verify-amiga-selected-style-frame` captures the first centered frame of
+the accepted-style transition.  Its pinned raster guards the descending player
+and the 80-line dither wipe before gameplay takes over, then restores the normal
+executable like the other focused frame checks.
+
 `make verify-amiga-menu-wake-frame` captures the first walking garden frame as
 the two immutable 512x384 cache planes, their independent pointer/fine-scroll
 state, and hardware sprite 0.  Its host decoder reconstructs the centered

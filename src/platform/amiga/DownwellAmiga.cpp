@@ -175,6 +175,7 @@ downwellMenuEntryScrollReady(void) {
 extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
 volatile const UBYTE* gDownwellLockedStyleFrame;
+volatile const UBYTE* gDownwellSelectedStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
 volatile const UBYTE* gDownwellCreditsFrame;
@@ -206,6 +207,10 @@ __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
 }
 
 __attribute__((noinline, used)) void downwellLockedStyleFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellSelectedStyleFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
@@ -1019,6 +1024,7 @@ int main(void) {
     bool sceneMenuWakeFrameReported = false;
     bool sceneStyleFrameReported = false;
     bool sceneLockedStyleFrameReported = false;
+    bool sceneSelectedStyleFrameReported = false;
     bool sceneSplashFrameReported = false;
     bool sceneControlsFrameReported = false;
     bool sceneCreditsFrameReported = false;
@@ -1569,6 +1575,15 @@ int main(void) {
                             memory.sceneCache() +
                                 back * amigaStyleFrameBytes;
                         downwellLockedStyleFrameReady();
+                    }
+                    if (!sceneSelectedStyleFrameReported &&
+                        scenes.styleSelected() &&
+                        scenes.styleVerticalDitherY() == 0) {
+                        sceneSelectedStyleFrameReported = true;
+                        gDownwellSelectedStyleFrame =
+                            memory.sceneCache() +
+                                back * amigaStyleFrameBytes;
+                        downwellSelectedStyleFrameReady();
                     }
 #endif
                     continue;
