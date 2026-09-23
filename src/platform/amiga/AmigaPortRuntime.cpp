@@ -30,6 +30,24 @@ int absoluteInt(int value)
     return value < 0 ? -value : value;
 }
 
+unsigned enemySpriteFrameCount(int spriteId)
+{
+    switch (spriteId) {
+        case 153: return 4; /* sprBat */
+        case 163: return 4; /* sprSnake */
+        case 164: return 1; /* sprSnakeAir */
+        case 166: return 4; /* sprFrogIdle */
+        case 168: return 2; /* sprFrogAir */
+        case 170: return 4; /* sprFrogPrepare */
+        case 177: return 4; /* sprEnmSnail */
+        case 186: return 4; /* sprGroundedTurtle */
+        case 187: return 1; /* sprGroundedTurtleFall */
+        case 188: return 6; /* sprGroundedTurtleWalk */
+        case 278: return 2; /* sprCrawler */
+        default: return 1;
+    }
+}
+
 } // namespace
 
 AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
@@ -397,9 +415,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         if (!enemy.active)
             continue;
         enemy.imagePhase += enemy.imageSpeed;
-        while (enemy.imagePhase >= 2u * 256u)
-            enemy.imagePhase -= 2u * 256u;
-        enemy.imageFrame = enemy.imagePhase >> 8;
         if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
             alarm0Fired[enemyIndex] = true;
         if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
@@ -635,6 +650,19 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.spriteId = 177;
         if (enemy.objectId == 119)
             enemy.spriteId = 278;
+        if (enemy.objectId == 113) {
+            if (enemy.spriteId == 168) {
+                enemy.imageSpeed = 0;
+                enemy.imagePhase = enemy.speedY < 0 ? 0u : 256u;
+            } else {
+                enemy.imageSpeed = 51u;
+            }
+        }
+        const unsigned frameCount = enemySpriteFrameCount(enemy.spriteId);
+        const unsigned cycle = frameCount * 256u;
+        while (enemy.imagePhase >= cycle)
+            enemy.imagePhase -= cycle;
+        enemy.imageFrame = enemy.imagePhase >> 8;
     }
 
     if (invulnerability_ > 0)

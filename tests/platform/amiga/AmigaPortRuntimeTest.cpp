@@ -137,7 +137,8 @@ int main() {
                 frog.enemyAt(0).auxiliaryState == 0 &&
                 frog.enemyAt(0).speedY < 0 &&
                 frog.enemyAt(0).preciseX < 40L * 256L &&
-                frog.enemyAt(0).spriteId == 168,
+                frog.enemyAt(0).spriteId == 168 &&
+                frog.enemyAt(0).imageFrame == 0,
             "frog alarm launches its recovered directional jump");
 
     AmigaPortRuntime snail(300);
@@ -198,6 +199,32 @@ int main() {
                 bat.enemyAt(0).moveSpeed >= 256 &&
                 bat.enemyAt(0).moveSpeed <= 320,
             "visible bat activates and steers toward the player in fixed point");
+
+    AmigaPortRuntime animatedBat(300);
+    animatedBat.configureSolidResolver(noSolid, 0);
+    require(animatedBat.configureEnemy(0, 116, 153, 40, 0,
+                                        0, 0, 15, 12,
+                                        0, 0, -1, -1,
+                                        180, 320, true),
+            "active bat is available for recovered animation timing");
+    for (unsigned frame = 0; frame < 15; ++frame)
+        animatedBat.step(0);
+    require(animatedBat.enemyAt(0).spriteId == 153 &&
+                animatedBat.enemyAt(0).imageFrame == 2,
+            "four-frame bat animation is no longer truncated to two frames");
+
+    AmigaPortRuntime walkingTurtle(300);
+    walkingTurtle.configureSolidResolver(flatGround, 0);
+    require(walkingTurtle.configureEnemy(0, 112, 186, 40, 0,
+                                          64, 0, 5, 14,
+                                          0, 1, -1, 100,
+                                          0, 0, true),
+            "walking turtle is available for recovered animation timing");
+    for (unsigned frame = 0; frame < 34; ++frame)
+        walkingTurtle.step(0);
+    require(walkingTurtle.enemyAt(0).spriteId == 188 &&
+                walkingTurtle.enemyAt(0).imageFrame == 5,
+            "six-frame walking-turtle cycle retains its final two frames");
 
     AmigaPortRuntime distantBat(300);
     distantBat.configureSolidResolver(noSolid, 0);

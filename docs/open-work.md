@@ -101,6 +101,8 @@
   0.1-frame cadence on hardware sprite 0.
 - [x] Play and retrigger the four-frame gunboot shooting pose at its recovered
   0.25-frame cadence, stopping on the final frame.
+- [x] Preserve the recovered one-, two-, four-, and six-frame animation cycles
+  for every native area-one enemy state.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.
