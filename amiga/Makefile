@@ -10,6 +10,15 @@ REPO     := ..
 AMIGA_SRC := $(REPO)/src/platform/amiga
 REPLAY_VERIFY ?= 0
 SCENE_VERIFY ?= 0
+PROBES ?= 0
+FPSCOUNT ?= 0
+PROFILE_AUTORUN ?= 0
+ifeq ($(PROBES)$(FPSCOUNT),11)
+$(error Use PROBES or FPSCOUNT separately)
+endif
+ifeq ($(PROFILE_AUTORUN)$(PROBES)$(FPSCOUNT),100)
+$(error PROFILE_AUTORUN requires PROBES=1 or FPSCOUNT=1)
+endif
 
 CFLAGS := -g -O2 -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
@@ -19,6 +28,20 @@ CFLAGS += -DDOWNWELL_REPLAY_VERIFY
 endif
 ifeq ($(SCENE_VERIFY),1)
 CFLAGS += -DDOWNWELL_SCENE_VERIFY
+endif
+ifeq ($(PROBES),1)
+CFLAGS += -DDOWNWELL_PROBES
+endif
+ifeq ($(FPSCOUNT),1)
+CFLAGS += -DDOWNWELL_FPSCOUNT
+endif
+ifeq ($(PROFILE_AUTORUN),1)
+CFLAGS += -DDOWNWELL_PROFILE_AUTORUN
+endif
+ifneq ($(filter 1,$(PROBES) $(FPSCOUNT)),)
+ifneq ($(filter 1,$(SCENE_VERIFY) $(REPLAY_VERIFY)),)
+$(error Profiling must not be combined with verification instrumentation)
+endif
 endif
 CPPFLAGS := $(CFLAGS) -x c++ -std=gnu++17 -fno-rtti -fno-exceptions \
 	-fno-use-cxa-atexit -DDOWNWELL_FREESTANDING \
@@ -31,7 +54,7 @@ AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
-OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
+OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
@@ -71,6 +94,10 @@ obj/DownwellAmiga.o: $(AMIGA_SRC)/DownwellAmiga.cpp \
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 obj/AmigaInput.o: $(AMIGA_SRC)/AmigaInput.cpp $(AMIGA_SRC)/AmigaInput.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaProfile.o: $(AMIGA_SRC)/AmigaProfile.cpp $(AMIGA_SRC)/AmigaProfile.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

@@ -8,6 +8,7 @@
 #include "AmigaHardware.h"
 #include "AmigaPlatform.h"
 #include "CopperList.h"
+#include "../AmigaProfile.h"
 
 extern struct ExecBase* SysBase;
 extern struct GfxBase* GfxBase;
@@ -42,6 +43,9 @@ ULONG AmigaPlatform::vblankHandler()
 {
     AmigaHardware::clearInterruptRequests(INTF_VERTB);
     ++vblankCount_;
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+    downwellProfileVblank();
+#endif
     return 0;
 }
 

@@ -8,6 +8,7 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
+#include "AmigaProfile.h"
 #include "DownwellCopperLists.h"
 #include "AmigaMenu.h"
 #include "AmigaMenuCache.h"
@@ -1142,13 +1143,16 @@ int main(void) {
 #endif
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
     while ((*ciaaPra & 0x40u) != 0) {
+        DW_PROFILE_FRAME((unsigned)scenes.scene());
         UBYTE packedInput;
         int scrollDelta = 0;
         bool cameraXChanged = false;
         unsigned destroyedBlockCount = 0;
         int destroyedBlockX[AmigaPortRuntime::bulletCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::bulletCapacity] = {0};
+        DW_PROFILE_PHASE(profileWait);
         platform.waitVblank();
+        DW_PROFILE_PHASE(profileInput);
 #ifdef DOWNWELL_SCENE_VERIFY
         // Check AFTER the preceding iteration completed, not at its first
         // publish: a later scene branch must not replace the splash program.
@@ -1175,10 +1179,20 @@ int main(void) {
                 sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
 #else
-            const downwell::Input liveInput = AmigaInput::sample();
+            downwell::Input liveInput = AmigaInput::sample();
+#ifdef DOWNWELL_PROFILE_AUTORUN
+            static unsigned profileMenuFrames = 0;
+            liveInput = downwell::Input();
+            if (scenes.scene() == AmigaScene::splash)
+                liveInput.fire = (liveFrameCount & 1) != 0;
+            else if (scenes.scene() == AmigaScene::menu)
+                liveInput.right = ++profileMenuFrames > 40;
+#endif
 #endif
             packedInput = downwell::packReplayInput(liveInput);
+            DW_PROFILE_PHASE(profileSimulation);
             scenes.step(liveInput);
+            DW_PROFILE_PHASE(profileOther);
             {
                 const bool presentationChanged =
                     scenes.scene() != presentedScene ||
@@ -1289,6 +1303,7 @@ int main(void) {
                     if (presentationChanged)
                         menuCopperMode[0] = menuCopperMode[1] = -1;
                     AmigaMenuScrollState menuScroll = {0, 0, 0};
+                    DW_PROFILE_PHASE(profileTitle);
                     if (renderedMenuTitleFrame != scenes.menuTitleFrame()) {
                         menuFrameReady = amigaRenderMenuTitle(
                             (UWORD)scenes.menuTitleFrame(),
@@ -1297,6 +1312,7 @@ int main(void) {
                         if (menuFrameReady)
                             renderedMenuTitleFrame = scenes.menuTitleFrame();
                     }
+                    DW_PROFILE_PHASE(profileSprite);
                     if (scenes.menuPlayerVisible()) {
                         menuPlayerData = amigaMenuHardwareSprite(
                             activeGamePack, activeGamePackEnd,
@@ -1310,6 +1326,7 @@ int main(void) {
                         menuFrameReady = menuFrameReady && menuPlayerData;
                     }
                     if (menuFrameReady) {
+                        DW_PROFILE_PHASE(profileCopper);
                         if (menuEntry) {
                             if (menuCopperMode[back] != 1)
                                 menuFrameReady =
@@ -1321,9 +1338,11 @@ int main(void) {
                                 menuFrameReady = menuCopperLists[back].updateEntry(
                                     memory.menuEntry(), scenes.menuCameraY() - 142);
                         } else {
+                            DW_PROFILE_PHASE(profileScroll);
                             menuScroll = amigaMenuScrollState(
                                 scenes.menuCameraX() - 80,
                                 scenes.menuCameraY() - 142);
+                            DW_PROFILE_PHASE(profileCopper);
                             if (menuCopperMode[back] != 0)
                                 menuFrameReady =
                                 menuCopperLists[back].buildScroll(
@@ -1355,7 +1374,9 @@ int main(void) {
                         if (oracleWords[word] != menuCopperLists[back].data()[word])
                             ++gDownwellMenuCopperPatchFailures;
 #endif
+                    DW_PROFILE_PHASE(profilePublish);
                     platform.publish(menuCopperLists[back]);
+                    DW_PROFILE_PHASE(profileOther);
                     front = back;
                     if (presentationChanged &&
                         priorPresentedScene == AmigaScene::splash)

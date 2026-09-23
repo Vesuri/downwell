@@ -1,5 +1,10 @@
 # Amiga backend
 
+Performance measurements: see `docs/amiga-profiling.md`. From the repository
+root, run `bash amiga/profile.sh fps` for lightweight frame-rate measurement
+or `bash amiga/profile.sh probes` for per-stage milliseconds. Runs are bounded
+and automatically restore the normal executable.
+
 This directory will contain the native Amiga implementation of the platform
 boundary used by `src/core`.
 
