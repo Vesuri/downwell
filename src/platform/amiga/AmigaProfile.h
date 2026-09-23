@@ -1,13 +1,11 @@
 #ifndef DOWNWELL_AMIGA_PROFILE_H
 #define DOWNWELL_AMIGA_PROFILE_H
 
-#include <exec/types.h>
-
 enum DownwellProfilePhase {
     profileOther, profileWait, profileInput, profileSimulation,
     profileTitle, profileSprite, profileScroll, profileCopper,
     profilePublish, profileStyleCopy, profileStyleActors, profileStyleText,
-    profileStyleDrain, profileStyleMirror, profilePhaseCount
+    profileStyleDrain, profileStyleMirror, profileTerrainCollision, profileGameCopy, profilePhaseCount
 };
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -22,11 +20,21 @@ public:
 };
 #define DW_PROFILE_FRAME(scene) DownwellProfileFrame profileFrame(scene)
 #ifdef DOWNWELL_PROBES
+unsigned downwellProfileEnter(unsigned phase);
+class DownwellProfileScope {
+    unsigned previous_;
+public:
+    explicit DownwellProfileScope(unsigned phase) : previous_(downwellProfileEnter(phase)) {}
+    ~DownwellProfileScope() { downwellProfilePhase(previous_); }
+};
+#define DW_PROFILE_SCOPE(phase) DownwellProfileScope profileScope(phase)
 #define DW_PROFILE_PHASE(phase) downwellProfilePhase(phase)
 #else
+#define DW_PROFILE_SCOPE(phase) ((void)0)
 #define DW_PROFILE_PHASE(phase) ((void)0)
 #endif
 #else
+#define DW_PROFILE_SCOPE(phase) ((void)0)
 #define DW_PROFILE_FRAME(scene) ((void)0)
 #define DW_PROFILE_PHASE(phase) ((void)0)
 #endif

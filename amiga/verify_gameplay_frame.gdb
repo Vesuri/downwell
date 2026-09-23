@@ -2,6 +2,10 @@ set pagination off
 target remote 127.0.0.1:2345
 break downwellGameplayFrameReady
 continue
+if gDownwellGameBufferFailures != 0
+    printf "Display ring differs from static backing\n"
+    quit 1
+end
 dump binary memory .run/gameplay-frame.bin &gDownwellGameplayRingOrigin &gDownwellGameplayRingOrigin+1
 append binary memory .run/gameplay-frame.bin gDownwellGameplayGame gDownwellGameplayGame+30720
 append binary memory .run/gameplay-frame.bin gDownwellGameplayHud gDownwellGameplayHud+27264

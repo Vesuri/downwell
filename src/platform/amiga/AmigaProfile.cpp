@@ -1,4 +1,5 @@
 #include "AmigaProfile.h"
+#include <exec/types.h>
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
 // Revs-style emulated clock: never use host time or stop GDB inside a sample.
@@ -133,4 +134,11 @@ void downwellProfileEnd()
     }
 #endif
 }
+#ifdef DOWNWELL_PROBES
+unsigned downwellProfileEnter(unsigned phase) {
+    const unsigned previous = phaseId;
+    downwellProfilePhase(phase);
+    return previous;
+}
+#endif
 #endif

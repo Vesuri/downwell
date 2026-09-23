@@ -72,6 +72,7 @@ def main():
     offset += HUD_PLANE_BYTES
 
     pixels = [0] * (DISPLAY_WIDTH * DISPLAY_HEIGHT)
+    hud_pixels = [0] * len(pixels)
     for y in range(DISPLAY_HEIGHT):
         game_y = (ring_origin + y) % RING_HEIGHT
         for x in range(DISPLAY_WIDTH):
@@ -80,11 +81,18 @@ def main():
                 (plane_pixel(game1, dma_x, game_y) << 1)
             hud_pen = plane_pixel(hud0, dma_x, y) | \
                 (plane_pixel(hud1, dma_x, y) << 1)
-            pixels[y * DISPLAY_WIDTH + x] = hud_pen or game_pen
+            pixels[y * DISPLAY_WIDTH + x] = game_pen
+            hud_pixels[y * DISPLAY_WIDTH + x] = hud_pen
 
     for sprite_index in range(1 + ACTOR_SPRITES + 1):
         start = offset + sprite_index * SPRITE_BYTES
         draw_sprite(pixels, payload[start:start + SPRITE_BYTES])
+
+    # BPLCON2=$44: HUD PF2 is above all sprite channels, including its
+    # nontransparent black margins; sprites remain above world PF1.
+    for index, pen in enumerate(hud_pixels):
+        if pen:
+            pixels[index] = pen
 
     image = Image.new("P", (DISPLAY_WIDTH, DISPLAY_HEIGHT))
     image.putpalette([component for color in PALETTE for component in color] +

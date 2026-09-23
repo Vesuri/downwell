@@ -39,6 +39,52 @@ use PF2 priority and opaque-black HUD margins, not sprite pixel clipping.
 The original pixel converter remains a host test oracle; target builds never
 fall back to runtime conversion. Tests cover 12,348 variant/position cases.
 
+## Retained gameplay terrain and measured bottleneck
+
+Gameplay now retains one private 384x320, two-plane terrain ring (30,720
+bytes). Two equally sized display rings reuse 61,440 bytes of the finished
+intro/style cache, without increasing Chip RAM allocation. Both display rings
+track dirty physical rows independently. Blitter copies synchronize only dirty
+row runs into the inactive ring; the copper still scrolls by bitplane pointers
+and resets those pointers at ring wrap. Hardware sprites do not touch either
+terrain bitmap and therefore need no background restoration. This backing is
+also the restoration source for future software-drawn moving objects.
+
+New bottom strips are drawn into the private backing, never the visible ring.
+Upward scrolling draws a new top strip in one pass. Side-room changes rebuild
+the viewport off-screen in one pass, not 284 separate line scans. Destroyed
+blocks redraw their clipped 16x16 region, not 16 entire rows. Unchanged terrain
+is not redrawn for ordinary player/sprite motion. The initial grounded capture
+checks all display-ring bytes against the backing (including a ring wrap).
+
+The expanded 30-frame PROBES sample separates terrain collision (phase 14)
+and dirty-row copies (phase 15):
+
+| Work | Average ms/frame |
+| --- | ---: |
+| Terrain collision queries (302 calls) | 1008.434 |
+| Remaining simulation | 22.126 |
+| Terrain strip drawing | 224.669 |
+| HUD updates | 14.802 |
+| Prepared hardware sprites | 7.261 |
+| Dirty-row copies | 3.319 |
+| Copper construction | 3.120 |
+
+Separate low-overhead FPSCOUNT run: 30 frames / 1,931 PAL fields = **0.78
+FPS**, worst gap 241 fields. This confirms that the dominant costs are real,
+not just the detailed-probe overhead. Both runs used the same deterministic
+gameplay inputs and 45-second host safety limits. The wrapper restored the
+normal `SKIP_TO_GAME=1` executable afterwards.
+
+Buffering prevents visible partial updates; it does **not** solve the dominant
+CPU bottleneck. `amigaResolveTerrainSolid` walks serialized room instances for
+each query, and both collision resolvers traverse pattern rows/cells repeatedly.
+Drawing likewise searches room instances and repeatedly resolves wall neighbours.
+The next optimization should be a predecoded spatial terrain/collision index,
+checked against the current resolvers as an oracle—not further sprite masking
+or full-screen redraws. The later active-enemy capture exceeded its 45-second
+host limit; the verifier stopped the emulator rather than leaving it running.
+
 `FPSCOUNT=1` counts completed loop iterations and elapsed real VERTB fields,
 plus the worst per-iteration field gap, per scene. The garden publishes one
 frame per loop. FPS is `50 * completed garden frames / elapsed PAL fields`.
@@ -65,10 +111,11 @@ loop-boundary/profiler bookkeeping outside that boundary is not in the phase
 totals. Timing counters freeze at the completed-frame boundary, while the
 underlying VBI clock may continue; the report uses the frozen scene counters.
 
-Garden and style-select stages have detailed brackets. Style phases cover
+Garden, style-select and gameplay stages have detailed brackets. Style phases cover
 background-copy submission, actors, text, final blitter drain and the CPU
-mirroring fallback separately. Other scenes have wait,
-input/simulation and an undifferentiated remainder; startup asset loading
+mirroring fallback separately. Gameplay separates collision queries and
+backing-to-display copies; splash has wait, input/simulation and an
+undifferentiated remainder. Startup asset loading
 before the main loop is not yet bracketed. Neither instrumentation mode is
 enabled in normal builds. Verification builds are rejected in combination
 with profiling: their reference rendering must not pollute performance data.

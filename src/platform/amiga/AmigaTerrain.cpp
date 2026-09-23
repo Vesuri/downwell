@@ -1,4 +1,5 @@
 #include "AmigaTerrain.h"
+#include "AmigaProfile.h"
 
 #include "AmigaPortRuntime.h"
 #include "core/AreaOneBuilder.h"
@@ -212,6 +213,7 @@ unsigned amigaCollectTerrainBreakables(
 
 int amigaResolveTerrainLanding(void* opaque, int offsetX,
                                int minimumOffsetY) {
+    DW_PROFILE_SCOPE(profileTerrainCollision);
     const AmigaTerrainCollisionContext& context =
         *static_cast<const AmigaTerrainCollisionContext*>(opaque);
     const int worldX = 240 + offsetX;
@@ -260,6 +262,7 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
 }
 
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
+    DW_PROFILE_SCOPE(profileTerrainCollision);
     const AmigaTerrainCollisionContext& context =
         *static_cast<const AmigaTerrainCollisionContext*>(opaque);
     const int worldX = 240 + offsetX;
