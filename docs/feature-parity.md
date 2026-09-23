@@ -188,3 +188,35 @@ remaining; a per-tick debugger trace also completed with a null generation
 callback throughout. The intermittent target failure is **unresolved**, not
 a proven callback or allocation failure; later successful runs do not erase
 it. Keep this separate from the already-fixed startup memory shortage.
+
+The playable Amiga terrain compositor now consumes actual emitted terrain:
+all walls participate in four-neighbor frame selection, while a bounded
+row-linked tile list preserves block Create frames and thin-platform frame 23.
+The same emission observer populates collision and breakable state. This
+removes the unconditional rendering/collision of probabilistic `2`/`3` symbols,
+fixed frame-zero generated walls and fixed frame-16 blocks. The circular
+display rings and cached planar row transfers are unchanged. Host tests compare
+tile row order and every stored frame with the emitted Create commands,
+including an RNG-interleaved generation schedule and capacity/reset cases.
+
+Generation in the executable is still a forecast, not yet live. Its raster
+invalidation must also cover newly created walls' neighboring rows when the
+live generator is enabled; otherwise changing wall connections can leave stale
+cached images. This is now a timing/cache-invalidation migration rather than
+a second independent terrain representation.
+
+Actual emission exposed a formerly hidden storage shortage: the forecast
+contains 146 breakables, while the earlier pattern-only collector/runtime
+allowed 128; the RNG-interleaved test has 160. Native storage is now 512, with
+16-bit lookup IDs and regression coverage through ID 300. This is Fast RAM,
+not additional Chip residency. The emission path rejects overflow rather than
+silently dropping blocks. The main routine's persistent fragment array also
+moved to static storage after measuring only 376 stack bytes remaining in the
+prelude Create callback on the default 4 KiB stack.
+
+Emitted-terrain validation: full host suite passed; A500 cache verification
+passed 600 ticks with 146 fresh-composition comparisons; cross-target replay
+retained `64 95d0aaea 1be7256f`; the normal `SKIP_TO_GAME=1` build passed the
+bounded startup memory check. The intermediate startup-check-5 failure was
+the 128-block capacity, not Chip RAM exhaustion. Earlier intermittent target
+trap evidence remains open rather than being silently reclassified.

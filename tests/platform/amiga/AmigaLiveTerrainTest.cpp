@@ -18,11 +18,13 @@ bool collect(void* context, const downwell::DeferredCreateInstance& command) {
 }
 struct LiveCollision {
     AmigaTerrainIndex index;
+    AmigaTerrainTiles tiles;
     unsigned creates = 0;
     static bool create(void* opaque, const downwell::DeferredCreateInstance& command) {
         auto& self = *static_cast<LiveCollision*>(opaque);
         ++self.creates;
-        return amigaAddTerrainObject(self.index, command.objectId, command.x, command.y);
+        return amigaAddTerrainObject(self.index, command.objectId, command.x, command.y) &&
+               self.tiles.append(command);
     }
 };
 
@@ -195,6 +197,30 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
     }
     require(native.endReached() && reference.endReached() && native.fragmentCount() == 19,
             "complete native generation ends with nineteen fragments");
+    unsigned tileCount = 0;
+    unsigned blocks = 0;
+    for (const auto& command : commands) if (command.objectId == 92) ++blocks;
+    std::cout << "Generated breakables (interleaved=" << interleave << "): " << blocks << '\n';
+    for (int y = 0; y < AmigaTerrainTiles::rows * 16; y += 16) {
+        unsigned id = collision.tiles.first(y);
+        for (const auto& command : commands) {
+            if (command.y != y || (command.objectId != 92 && command.objectId != 93)) continue;
+            require(id != 0, "each emitted visible tile appears in its row list");
+            const auto& tile = collision.tiles.at(id);
+            require(tile.objectId == command.objectId && tile.x == command.x &&
+                        tile.frame == (command.objectId == 93 ? 23 : command.integerImageIndex),
+                    "tile rendering preserves object order and recovered Create frame");
+            id = tile.next;
+            ++tileCount;
+        }
+        require(id == 0, "row list has no uncreated probabilistic tiles");
+    }
+    require(tileCount == collision.tiles.size() && tileCount > 0,
+            "row lists account for every stored tile exactly once");
+    for (const auto& command : commands)
+        if (command.objectId == 60)
+            require(amigaIndexedWall(collision.index, command.x, command.y),
+                    "generated walls are available for neighbor-based tile rendering");
     native.resetInitialCheckpoint(nativeRandom);
     require(native.frontierY() == 704 && native.fragmentCount() == 0 &&
                 native.enemyCount() == 0 && native.decorationCount() == 0 &&
@@ -212,6 +238,17 @@ int main(int argc, char** argv) {
     require(patterns.valid(), "builder pack validates");
     checkSchedule(patterns, false);
     checkSchedule(patterns, true);
+    AmigaTerrainTiles boundedTiles;
+    downwell::DeferredCreateInstance tileCommand(92, 160, 704);
+    tileCommand.integerImageIndex = 22;
+    for (unsigned i = 0; i < AmigaTerrainTiles::capacity; ++i)
+        require(boundedTiles.append(tileCommand), "tile storage accepts its full capacity");
+    require(!boundedTiles.append(tileCommand) && boundedTiles.size() == AmigaTerrainTiles::capacity,
+            "tile overflow is reported without changing the list");
+    boundedTiles.clear();
+    require(boundedTiles.size() == 0 && boundedTiles.first(704) == 0 &&
+                boundedTiles.first(-16) == 0 && boundedTiles.first(8192) == 0,
+            "tile reset discards old row links and bounds queries");
     LiveSimulation live(patterns);
     AmigaPortRuntime runtime(300, false, 4096 - 176, true);
     live.bind(runtime);

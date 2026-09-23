@@ -290,7 +290,7 @@ void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
         count = breakableCapacity;
     breakableCount_ = 0;
     breakableIndexReady_ = true;
-    for (unsigned cell = 0; cell < sizeof(breakableIndex_); ++cell) breakableIndex_[cell] = 0;
+    for (auto& cell : breakableIndex_) cell = 0;
     blocksDestroyed_ = 0;
     appendBreakables(x, y, count);
 }

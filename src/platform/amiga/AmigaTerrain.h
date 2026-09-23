@@ -10,7 +10,7 @@ class AmigaPortRuntime;
 
 enum {
     amigaInitialTerrainFragmentCount = 19,
-    amigaTerrainBreakableCapacity = 128,
+    amigaTerrainBreakableCapacity = 512,
     amigaTerrainDecorationCapacity = 128
 };
 
@@ -45,6 +45,26 @@ struct AmigaTerrainDecoration {
     int y;
     int frame;
     bool flipX;
+};
+
+// Non-wall tile presentation from actual Create events. Row lists preserve
+// emission order without scanning the whole level for each newly exposed row.
+class AmigaTerrainTiles {
+public:
+    enum { capacity = 2048, rows = 512 };
+    struct Tile { std::int16_t x; std::uint16_t objectId, frame, next; };
+    void clear();
+    bool append(const downwell::DeferredCreateInstance& command);
+    unsigned first(int worldY) const {
+        return worldY >= 0 && worldY < rows * 16 && !(worldY & 15)
+                   ? heads_[worldY / 16] : 0;
+    }
+    const Tile& at(unsigned id) const { return tiles_[id - 1]; }
+    unsigned size() const { return count_; }
+private:
+    Tile tiles_[capacity];
+    std::uint16_t heads_[rows] = {}, tails_[rows] = {};
+    unsigned count_ = 0;
 };
 
 // Allocation-free live generator. Storage is owned by the caller; the random
@@ -112,6 +132,7 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
                            bool initialRoomWall = false);
 bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y);
+bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y);
 
 bool amigaBuildInitialAreaOneTerrain(
     const downwell::BuilderPatternPack& builders,
@@ -130,7 +151,9 @@ bool amigaBuildInitialAreaOneTerrain(
     downwell::GameMakerRandom* randomAfter,
     AmigaTerrainDecoration* decorations,
     unsigned decorationCapacity,
-    unsigned* decorationCount);
+    unsigned* decorationCount,
+    downwell::AreaOneBuilder::EmitFunction observer = nullptr,
+    void* observerContext = nullptr);
 
 int amigaEnemyHealth(int objectId);
 int amigaEnemyReward(int objectId);

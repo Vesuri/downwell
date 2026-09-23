@@ -5,6 +5,27 @@
 #include "core/AreaOneBuilder.h"
 #include "core/GameMakerRandom.h"
 
+void AmigaTerrainTiles::clear() {
+    for (unsigned row = 0; row < rows; ++row) heads_[row] = tails_[row] = 0;
+    count_ = 0;
+}
+
+bool AmigaTerrainTiles::append(const downwell::DeferredCreateInstance& command) {
+    if (command.objectId != 92 && command.objectId != 93) return true;
+    if (count_ == capacity || command.y < 0 || command.y >= rows * 16 ||
+        (command.y & 15) || command.x < -512 || command.x >= 1536 || (command.x & 15))
+        return false;
+    const unsigned row = command.y / 16;
+    const unsigned id = ++count_;
+    tiles_[id - 1] = Tile{static_cast<std::int16_t>(command.x),
+        static_cast<std::uint16_t>(command.objectId),
+        static_cast<std::uint16_t>(command.objectId == 93 ? 23 : command.integerImageIndex), 0};
+    if (tails_[row]) tiles_[tails_[row] - 1].next = id;
+    else heads_[row] = id;
+    tails_[row] = id;
+    return true;
+}
+
 bool amigaIsLandingTerrainSymbol(char symbol) {
     return symbol == '1' || symbol == '2' || symbol == '3' ||
            symbol == 'B' || symbol == '-' || symbol == '|';
@@ -159,7 +180,8 @@ bool amigaBuildInitialAreaOneTerrain(
     AmigaTerrainEnemy* enemies, unsigned enemyCapacity,
     unsigned& enemyCount, downwell::GameMakerRandom* randomAfter,
     AmigaTerrainDecoration* decorations, unsigned decorationCapacity,
-    unsigned* decorationCount) {
+    unsigned* decorationCount, downwell::AreaOneBuilder::EmitFunction observer,
+    void* observerContext) {
     enemyCount = 0;
     if (decorationCount != 0)
         *decorationCount = 0;
@@ -169,6 +191,7 @@ bool amigaBuildInitialAreaOneTerrain(
     AmigaAreaOneTerrainBuilder builder(fragments, capacity, enemies,
         enemyCapacity, decorations, decorationCapacity);
     builder.resetInitialCheckpoint(random);
+    builder.setCreateObserver(observer, observerContext);
     for (unsigned step = 0; step < 64 && !builder.endReached(); ++step) {
         downwell::AreaOneBuilderStep result;
         // Forecast only: force one event at a time without live enemy events.
@@ -225,7 +248,7 @@ unsigned amigaCollectTerrainBreakables(
 }
 
 namespace {
-enum { solidCell = 1, landingCell = 2, breakableCell = 4, roomWallCell = 8 };
+enum { solidCell = 1, landingCell = 2, breakableCell = 4, roomWallCell = 8, wallCell = 16 };
 bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags) {
     const int column = (x - AmigaTerrainIndex::minX) / 16;
     if ((x & 15) || (y & 15) || column < 0 || column >= AmigaTerrainIndex::columns ||
@@ -305,10 +328,14 @@ bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y) {
     return (indexCell(index, x, y) & roomWallCell) != 0;
 }
 
+bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y) {
+    return (indexCell(index, x, y) & (wallCell | roomWallCell)) != 0;
+}
+
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
                            bool initialRoomWall) {
     const unsigned flags = objectId == 60
-        ? solidCell | landingCell | (initialRoomWall ? roomWallCell : 0)
+        ? solidCell | landingCell | wallCell | (initialRoomWall ? roomWallCell : 0)
         : objectId == 92 ? breakableCell : objectId == 93 ? landingCell : 0;
     if (!flags) return true;
     if (!indexAdd(index, x, y, flags)) return false;

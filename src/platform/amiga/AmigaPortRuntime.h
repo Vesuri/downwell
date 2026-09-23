@@ -173,7 +173,7 @@ private:
         int y;
         bool active;
     };
-    static constexpr unsigned breakableCapacity = 128;
+    static constexpr unsigned breakableCapacity = 512;
 
     AmigaPlayer player_;
     unsigned tick_;
@@ -200,7 +200,7 @@ private:
     Breakable breakables_[breakableCapacity];
     unsigned breakableCount_;
     bool breakableIndexReady_ = false;
-    std::uint8_t breakableIndex_[64 * 512];
+    std::uint16_t breakableIndex_[64 * 512];
     int indexedBreakable(int x, int y) const;
     unsigned blocksDestroyed_;
     std::uint64_t checkpoint_;

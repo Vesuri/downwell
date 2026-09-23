@@ -88,6 +88,18 @@ static UBYTE portRuntimeStorage[sizeof(AmigaPortRuntime)];
 
 static AmigaTerrainCollisionContext terrainCollision;
 static AmigaTerrainIndex terrainIndex;
+static AmigaTerrainTiles terrainTiles;
+
+static bool appendGeneratedTerrain(void* opaque,
+    const downwell::DeferredCreateInstance& command) {
+    if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
+        !terrainTiles.append(command)) return false;
+    if (command.objectId == 92) {
+        const int x = command.x - 240, y = command.y - 176;
+        return static_cast<AmigaPortRuntime*>(opaque)->appendBreakables(&x, &y, 1);
+    }
+    return true;
+}
 
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile unsigned long long lastPortCheckpoint;
@@ -434,14 +446,6 @@ static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
                  downwellPlayfieldX + 81, 51);
 }
 
-static UWORD terrainFrame(char symbol) {
-    if (symbol == 'B' || symbol == '3')
-        return 16;
-    if (symbol == '-')
-        return 23;
-    return 0;
-}
-
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
                             const downwell::PackedRoom& room,
                             int x, int y) {
@@ -461,10 +465,10 @@ static UWORD mainWallFrame(const downwell::RoomPack& rooms,
     DW_PROFILE_SCOPE(profileWallFrame);
     if (terrainCollision.index) {
         const auto& index = *terrainCollision.index;
-        return (amigaIndexedRoomWall(index, x, y - 16) ? 1 : 0) |
-               (amigaIndexedRoomWall(index, x + 16, y) ? 2 : 0) |
-               (amigaIndexedRoomWall(index, x, y + 16) ? 4 : 0) |
-               (amigaIndexedRoomWall(index, x - 16, y) ? 8 : 0);
+        return (amigaIndexedWall(index, x, y - 16) ? 1 : 0) |
+               (amigaIndexedWall(index, x + 16, y) ? 2 : 0) |
+               (amigaIndexedWall(index, x, y + 16) ? 4 : 0) |
+               (amigaIndexedWall(index, x - 16, y) ? 8 : 0);
     }
     UWORD frame = 0;
     if (roomHasMainWall(rooms, room, x, y - 16)) frame |= 1;
@@ -609,14 +613,14 @@ static void syncGameRows(Bitmap& destination, const Bitmap& backing, unsigned bu
     gameRingInitialized[buffer] = true;
 }
 
-static void drawIndexedRoomWalls(AmigaRenderer* renderer,
+static void drawIndexedWalls(AmigaRenderer* renderer,
     const downwell::RoomPack& rooms, const downwell::PackedRoom& room,
     int viewX, int viewY, int clipX, int clipY, int width, int height) {
     const int firstX = viewX + clipX - downwellPlayfieldX;
     const int firstY = viewY + clipY;
     for (int y = (firstY - 8) & ~15; y < firstY + height + 8; y += 16)
         for (int x = (firstX - 8) & ~15; x < firstX + width + 8; x += 16)
-            if (amigaIndexedRoomWall(*terrainCollision.index, x, y))
+            if (amigaIndexedWall(*terrainCollision.index, x, y))
                 drawGameAsset(renderer, 51, mainWallFrame(rooms, room, x, y),
                               downwellPlayfieldX + x - viewX, y - viewY, 0);
 }
@@ -685,7 +689,7 @@ static void drawMainWorldSpan(
     {
     DW_PROFILE_SCOPE(profileTerrainWalls);
     if (terrainCollision.index)
-        drawIndexedRoomWalls(renderer, rooms, room, viewX, viewY,
+        drawIndexedWalls(renderer, rooms, room, viewX, viewY,
                              clipX, clipY, clipWidth, clipHeight);
     for (index = 0; !terrainCollision.index && index < room.instanceCount; ++index) {
         downwell::PackedRoomInstance instance;
@@ -698,80 +702,17 @@ static void drawMainWorldSpan(
                       downwellPlayfieldX + instance.x - viewX,
                       instance.y - viewY, 0);
     }
-    for (int wallY = 704; wallY < mainBuilderStartY; wallY += 16) {
-        if (wallY + 8 < firstWorldY || wallY - 8 >= finalWorldY)
-            continue;
-        drawGameAsset(renderer, 51, 0, downwellPlayfieldX,
-                      wallY - viewY, 0);
-        drawGameAsset(renderer, 51, 0,
-                      downwellPlayfieldX + downwellPlayfieldWidth,
-                      wallY - viewY, 0);
-    }
     }
     {
     DW_PROFILE_SCOPE(profileTerrainTiles);
-    for (index = 0; index < fragmentCount; ++index) {
-        const AmigaTerrainFragment& fragment = fragments[index];
-        int firstRow = (firstWorldY - fragment.y - 8 + 15) >> 4;
-        int endRow = (finalWorldY - fragment.y + 8 + 15) >> 4;
-        if (firstRow < 0) firstRow = 0;
-        if (endRow > fragment.pattern.rowCount) endRow = fragment.pattern.rowCount;
-        for (int row = firstRow; row < endRow; ++row) {
-            const int rowY = fragment.y + (int)row * 16;
-            ULONG width = 0;
-            if (rowY + 8 < firstWorldY || rowY - 8 >= finalWorldY)
-                continue;
-            if (row + 1 < fragment.pattern.rowCount) {
-                const int firstX = fragment.sideRoom
-                                       ? (fragment.reversed ? 0 : 480)
-                                       : (fragment.reversed ? 160 : 320);
-                const int secondX = fragment.reversed ? 320 : 160;
-                drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + firstX - viewX,
-                              rowY - viewY, 0);
-                drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + secondX - viewX,
-                              rowY - viewY, 0);
-            }
-            if (!builders.rowWidth(fragment.pattern, row, width))
-                break;
-            for (unsigned column = 0; column < width; ++column) {
-                char symbol = 0;
-                const int ordinal = (int)column + 1;
-                const int worldX = fragment.reversed
-                                       ? 320 - ordinal * 16
-                                       : 160 + ordinal * 16;
-                if (!builders.cell(fragment.pattern, (UWORD)column,
-                                   row, symbol))
-                    break;
-                if (symbol == 'B' && runtime != 0 &&
-                    !runtime->breakableActiveAt(
-                        worldX - 240, rowY - 176))
-                    continue;
-                if (amigaIsLandingTerrainSymbol(symbol))
-                    drawGameAsset(renderer, 51, terrainFrame(symbol),
-                                  downwellPlayfieldX + worldX - viewX,
-                                  rowY - viewY, 0);
-            }
-        }
-        if (fragment.appendPillars) {
-            const int finalRowY = fragment.y +
-                ((int)fragment.pattern.rowCount - 1) * 16;
-            const int firstX = fragment.sideRoom
-                                   ? (fragment.reversed ? 0 : 480)
-                                   : (fragment.reversed ? 160 : 320);
-            const int secondX = fragment.reversed ? 320 : 160;
-            for (int padding = 0; padding < 3; ++padding) {
-                const int rowY = finalRowY + padding * 16;
-                if (rowY + 8 < firstWorldY || rowY - 8 >= finalWorldY)
-                    continue;
-                drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + firstX - viewX,
-                              rowY - viewY, 0);
-                drawGameAsset(renderer, 51, 0,
-                              downwellPlayfieldX + secondX - viewX,
-                              rowY - viewY, 0);
-            }
+    for (int rowY = (firstWorldY - 8) & ~15; rowY < finalWorldY + 8; rowY += 16) {
+        for (unsigned id = terrainTiles.first(rowY); id; ) {
+            const auto& tile = terrainTiles.at(id);
+            id = tile.next;
+            if (tile.objectId == 92 && runtime &&
+                !runtime->breakableActiveAt(tile.x - 240, rowY - 176)) continue;
+            drawGameAsset(renderer, 51, tile.frame,
+                          downwellPlayfieldX + tile.x - viewX, rowY - viewY, 0);
         }
     }
     }
@@ -1140,7 +1081,7 @@ int main(void) {
     const downwell::ReplayReader verificationReplay(
         downwell::portReplayBytes, downwell::portReplaySize);
 #endif
-    AmigaTerrainFragment fragments[amigaInitialTerrainFragmentCount];
+    static AmigaTerrainFragment fragments[amigaInitialTerrainFragmentCount];
     static AmigaTerrainEnemy generatedEnemies[AmigaPortRuntime::enemyCapacity];
     static AmigaTerrainDecoration
         generatedDecorations[amigaTerrainDecorationCapacity];
@@ -1148,6 +1089,13 @@ int main(void) {
     unsigned generatedDecorationCount = 0;
     downwell::GameMakerRandom enemyRandom(2);
     downwell::PackedRoom mainRoom;
+    const AmigaTerrainCollisionContext emptyTerrain{0, 0, &builders, 0, 0, 0};
+    amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
+    terrainTiles.clear();
+#ifndef DOWNWELL_REPLAY_VERIFY
+    const int emptyBlock = 0;
+    port.configureBreakables(&emptyBlock, &emptyBlock, 0);
+#endif
     if (!rooms.valid() || !objects.valid() || !builders.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
         !verificationReplay.valid() ||
@@ -1159,7 +1107,13 @@ int main(void) {
             generatedEnemies, AmigaPortRuntime::enemyCapacity,
             generatedEnemyCount, &enemyRandom,
             generatedDecorations, amigaTerrainDecorationCapacity,
-            &generatedDecorationCount)) {
+            &generatedDecorationCount,
+#ifndef DOWNWELL_REPLAY_VERIFY
+            appendGeneratedTerrain, &port
+#else
+            nullptr, nullptr
+#endif
+            )) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1169,24 +1123,23 @@ int main(void) {
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
     {
-        static int breakableX[amigaTerrainBreakableCapacity];
-        static int breakableY[amigaTerrainBreakableCapacity];
-        const unsigned breakableCount = amigaCollectTerrainBreakables(
-            builders, fragments, amigaInitialTerrainFragmentCount,
-            breakableX, breakableY, amigaTerrainBreakableCapacity);
-        port.configureBreakables(breakableX, breakableY, breakableCount);
         terrainCollision.builders = &builders;
         terrainCollision.rooms = &rooms;
         terrainCollision.room = &mainRoom;
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = amigaInitialTerrainFragmentCount;
         terrainCollision.runtime = &port;
-        if (!amigaBuildTerrainIndex(terrainCollision, terrainIndex)) {
-            platform.restore();
-            FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-            gDownwellStartupFailure = 6;
-            downwellStartupFailed();
-            return 1;
+        for (unsigned i = 0; i < mainRoom.instanceCount; ++i) {
+            downwell::PackedRoomInstance instance;
+            if (!rooms.roomInstance(mainRoom, i, instance) ||
+                (instance.objectId == 60 && !amigaAddTerrainObject(
+                    terrainIndex, 60, instance.x, instance.y, true))) {
+                platform.restore();
+                FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+                gDownwellStartupFailure = 6;
+                downwellStartupFailed();
+                return 1;
+            }
         }
         terrainCollision.index = &terrainIndex;
         port.configureLandingResolver(amigaResolveTerrainLanding,

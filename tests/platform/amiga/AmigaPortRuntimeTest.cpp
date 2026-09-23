@@ -179,12 +179,19 @@ int main() {
                 destructible.breakableActiveAt(32, 64) &&
                 destructible.breakableActiveAt(48, 64),
             "new terrain appends without resurrecting destroyed blocks or resetting statistics");
-    require(!destructible.appendBreakables(newBlockX, newBlockY, 128) &&
+    require(!destructible.appendBreakables(newBlockX, newBlockY, 512) &&
                 !destructible.appendBreakables(nullptr, newBlockY, 1) &&
                 destructible.appendBreakables(nullptr, nullptr, 0) &&
                 destructible.blocksDestroyed() == 1 && destructible.breakableActiveAt(32, 64),
             "append overflow and missing arrays fail without mutation; empty batch is valid");
     AmigaPortRuntime indexedBlocks(300);
+    AmigaPortRuntime manyBlocks(300);
+    int manyX[300], manyY[300];
+    for (int i = 0; i < 300; ++i) { manyX[i] = (i % 32) * 16; manyY[i] = (i / 32) * 16; }
+    manyBlocks.configureBreakables(manyX, manyY, 300);
+    for (int i = 0; i < 300; ++i)
+        require(manyBlocks.breakableActiveAt(manyX[i], manyY[i]),
+                "indexed breakable IDs above 255 do not wrap or disappear");
     AmigaPortRuntime initiallyEmpty(300);
     require(initiallyEmpty.appendBreakables(newBlockX, newBlockY, 2) &&
                 initiallyEmpty.breakableActiveAt(32, 64) && initiallyEmpty.breakableActiveAt(48, 64),
