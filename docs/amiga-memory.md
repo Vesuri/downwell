@@ -11,16 +11,27 @@ sections and can therefore reside in Fast RAM when available.
 | --- | ---: | --- |
 | PF1 384x320 circular raster, two planes | 30,720 | whole run |
 | PF2 384x284 fixed HUD raster, two planes | 27,264 | whole run |
-| Two 128-word copper lists | 512 | whole run |
+| Menu foreground/background caches and entry shaft | 74,496 | whole run |
+| Two 160-word copper lists | 640 | whole run |
 | Two 32-line player sprite buffers | 272 | whole run |
-| One 8-line gunboot bullet sprite buffer | 40 | whole run |
+| Twelve 32-line bullet sprite buffers | 1,632 | whole run |
+| Two 32-line enemy sprite buffers | 272 | whole run |
+| Fourteen 32-line menu-title sprite buffers | 1,904 | whole run |
 | Armed null sprite | 8 | whole run |
-| **Total** | **58,816** | |
+| Shared splash/style screen cache | 62,480 | whole run |
+| Blitter-readable recovered game-art pack | 181,316 | whole run |
+| **Total** | **381,004** | |
 
-`AmigaMemory` owns these seven allocations as one unit. A partial allocation is
+`AmigaMemory` owns these allocations as one unit. A partial allocation is
 rolled back immediately, and all early-exit paths release the same ownership
 object before the graphics library is closed. Gameplay data must not migrate
 into Chip RAM merely because the renderer consumes it.
+
+The splash and style-select screens are mutually exclusive. They reuse one
+bounded cache: during startup it holds five precomposed 176x284 splash frames;
+after the splash it holds the two style-select frame buffers and its repeating
+border. Splash transitions therefore change copper bitplane pointers without
+drawing into the visible display.
 
 The current executable embeds approximately 330 KiB of recovered room,
 object/event, and builder-pattern data. These packs are validated before
@@ -33,8 +44,10 @@ that the current DMA allocations fit comfortably in 512 KiB of Chip RAM; the
 embedded packs and eventual runtime state determine the separate Fast/Slow RAM
 requirement that still needs measuring and reducing.
 
-Future sprite, sound, and music conversion must add explicit rows to this
-budget. Animation art should stay packed in ordinary memory and be expanded
-only into bounded sprite/blitter staging buffers. The PF1 ring is permanent:
-vertical scrolling changes its bitplane origin and redraws revealed rows, not
-the complete 284-line viewport and not a second full playfield.
+Future sound and music conversion must add explicit rows to this budget. The
+recovered planar art currently has to be copied to Chip RAM because it is used
+directly as a blitter source; reducing that 181,316-byte residency remains an
+important A500 memory task. Animation art should otherwise stay packed and be
+expanded only into bounded sprite/blitter staging buffers. The PF1 ring is
+permanent: vertical scrolling changes its bitplane origin and redraws revealed
+rows, not the complete 284-line viewport and not a second full playfield.

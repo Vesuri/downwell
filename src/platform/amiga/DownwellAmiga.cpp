@@ -15,6 +15,7 @@
 #include "AmigaPortRuntime.h"
 #include "AmigaRenderer.h"
 #include "AmigaSceneRuntime.h"
+#include "AmigaSplashCache.h"
 #include "AmigaStyleRenderer.h"
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
@@ -81,6 +82,16 @@ enum {
     mainBuilderStartY = 1168,
     gameplayPlayerStartY = 142,
     gameplayPlayerGroundY = 200
+};
+
+static_assert((unsigned)amigaSplashPlaneBytes ==
+                  (unsigned)amigaStylePlaneBytes,
+              "narrow screens must share one copper plane stride");
+
+enum {
+    styleCacheBytes = amigaStyleFrameBytes * 2 + amigaStyleBorderBytes,
+    sceneCacheBytes = amigaSplashCacheBytes > styleCacheBytes
+                          ? amigaSplashCacheBytes : styleCacheBytes
 };
 
 alignas(AmigaPortRuntime)
@@ -512,27 +523,6 @@ static void buildReferencePicture(
     drawAmmoDigit(renderer, 290, 239, 8);
 }
 
-static void drawSplash(AmigaRenderer* renderer, int stage) {
-    amigaRendererClear(renderer, 0);
-    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
-                            downwellPlayfieldWidth, downwellDisplayHeight);
-    if (stage == 2)
-        drawGameAsset(renderer, 696, 0,
-                      downwellPlayfieldX + 80, 140, 0);
-    if (stage == 4 || stage == 5)
-        drawGameAsset(renderer, 695, 0,
-                      downwellPlayfieldX + 80, 140, 0);
-    if (stage == 5 || stage == 6) {
-        int y;
-        int x;
-        for (y = 0; y < downwellDisplayHeight; y += 8)
-            for (x = downwellPlayfieldX;
-                 x < downwellPlayfieldX + downwellPlayfieldWidth; x += 8)
-                drawGameAsset(renderer, 733, 11, x, y, 0);
-    }
-    amigaRendererClearClipRect(renderer);
-}
-
 static AmigaMenuDrawList menuDrawList;
 
 static void drawMenu(AmigaRenderer* renderer,
@@ -819,9 +809,9 @@ static bool buildMenuEntryCopper(CopperList& list,
     return list.finish();
 }
 
-static bool buildStyleCopper(CopperList& list, const UBYTE* frame,
-                             const Sprite& nullSprite,
-                             const Palette& palette) {
+static bool buildNarrowCopper(CopperList& list, const UBYTE* frame,
+                              const Sprite& nullSprite,
+                              const Palette& palette) {
     list.reset();
     list.move(diwstrt, (UWORD)((displayVStart << 8) |
                               (amigaMenuDisplayHStart & 0xff)));
@@ -902,7 +892,7 @@ int main(void) {
                          bulletSpriteBytes * bulletSpriteBufferCount,
                          enemySpriteBytes,
                          menuTitleSpritesBytes,
-                         amigaStyleFrameBytes, amigaStyleBorderBytes,
+                         sceneCacheBytes,
                          gamePackBytes)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
@@ -1001,8 +991,8 @@ int main(void) {
         memory.release();
         return 1;
     }
-    if (!amigaBuildStyleBorder(activeGamePack, activeGamePackEnd,
-                               memory.styleBorder())) {
+    if (!amigaBuildSplashCache(activeGamePack, activeGamePackEnd,
+                               memory.sceneCache())) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1094,13 +1084,18 @@ int main(void) {
         bulletSprites[bullet].hide();
     enemySprites[0].hide();
     enemySprites[1].hide();
-    if (!buildCopper(copperLists[0], gameBitmap, hudBitmap,
+    if (
 #ifdef DOWNWELL_REPLAY_VERIFY
+        !buildCopper(copperLists[0], gameBitmap, hudBitmap,
                      playerSprites[0], bulletSprites, enemySprites[0], palette,
+                     port.ringOrigin())
 #else
-                     nullSprite, bulletSprites, enemySprites[0], palette,
+        !buildNarrowCopper(
+            copperLists[0],
+            amigaSplashFrame(memory.sceneCache(), scenes.splashStage()),
+            nullSprite, palette)
 #endif
-                     port.ringOrigin())) {
+    ) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1131,7 +1126,6 @@ int main(void) {
         generatedDecorations, generatedDecorationCount,
         &port, mainViewX, mainInitialViewY);
 #else
-    drawSplash(&renderer, scenes.splashStage());
     downwellStartupReady();
 #endif
     while ((*ciaaPra & 0x40u) == 0) platform.waitVblank();
@@ -1176,10 +1170,24 @@ int main(void) {
                 presentedScene = scenes.scene();
                 presentedSplash = scenes.splashStage();
                 if (presentedScene == AmigaScene::splash) {
-                    if (presentationChanged)
-                        drawSplash(&renderer, presentedSplash);
+                    if (presentationChanged) {
+                        if (!buildNarrowCopper(
+                                copperLists[back],
+                                amigaSplashFrame(memory.sceneCache(),
+                                                 presentedSplash),
+                                nullSprite, palette))
+                            break;
+                        platform.publish(copperLists[back]);
+                        front = back;
+                    }
                 }
                 else if (presentedScene == AmigaScene::menu) {
+                    if (presentationChanged &&
+                        !amigaBuildStyleBorder(
+                            activeGamePack, activeGamePackEnd,
+                            memory.sceneCache() +
+                                amigaStyleFrameBytes * 2))
+                        break;
                     if (!menuHardware &&
                         (presentationChanged || menuModeChanged ||
                          !scenes.menuPlayerNapping()))
@@ -1293,10 +1301,15 @@ int main(void) {
                 if (presentedScene == AmigaScene::styleSelect) {
                     if (!amigaRenderStyleFrame(
                             activeGamePack, activeGamePackEnd,
-                            memory.styleBorder(), scenes,
-                            memory.styleFrame(back)) ||
-                        !buildStyleCopper(
-                            copperLists[back], memory.styleFrame(back),
+                            memory.sceneCache() +
+                                amigaStyleFrameBytes * 2,
+                            scenes,
+                            memory.sceneCache() +
+                                back * amigaStyleFrameBytes) ||
+                        !buildNarrowCopper(
+                            copperLists[back],
+                            memory.sceneCache() +
+                                back * amigaStyleFrameBytes,
                             nullSprite, palette))
                         break;
                     platform.publish(copperLists[back]);

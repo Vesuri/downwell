@@ -34,7 +34,7 @@ BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/AmigaTerrain.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
-	obj/AmigaMenuCache.o obj/AmigaStyleRenderer.o \
+	obj/AmigaMenuCache.o obj/AmigaSplashCache.o obj/AmigaStyleRenderer.o \
 	obj/AmigaRenderer.o obj/AmigaBlitter.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
 	obj/GCCRuntime.o obj/AmigaPlatform.o \
@@ -111,6 +111,11 @@ obj/AmigaMenuCache.o: $(AMIGA_SRC)/AmigaMenuCache.cpp \
 
 obj/AmigaStyleRenderer.o: $(AMIGA_SRC)/AmigaStyleRenderer.cpp \
 		$(AMIGA_SRC)/AmigaStyleRenderer.h $(AMIGA_SRC)/AmigaSceneRuntime.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaSplashCache.o: $(AMIGA_SRC)/AmigaSplashCache.cpp \
+		$(AMIGA_SRC)/AmigaSplashCache.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
