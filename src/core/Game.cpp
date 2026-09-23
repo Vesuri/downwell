@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "EnemyPresentation.h"
 #include "HudNumbers.h"
 #include "ObjectPack.h"
 #include <array>
@@ -159,24 +160,14 @@ void Game::renderMain(Renderer& renderer) const {
         std::int32_t sprite = -1;
         if (instance.objectId == 93) sprite = 51;
         if (instance.objectId == 92) sprite = 51;
-        if (instance.objectId == 111) sprite = 163;
-        if (instance.objectId == 112) sprite = 186;
-        if (instance.objectId == 113) sprite = 166;
-        if (instance.objectId == 116) sprite = 153;
-        if (instance.objectId == 117) sprite = 177;
-        if (instance.objectId == 119) sprite = 278;
         if (instance.objectId == 289) sprite = 550;
         if (instance.objectId == 293) sprite = 569;
         if (instance.objectId == 296) sprite = 568;
         if (instance.objectId == 109) sprite = 139;
         if (instance.objectId == 306) sprite = 127;
-        if (instance.objectId == 111 && !instance.grounded) sprite = 164;
-        if (instance.objectId == 112 && !instance.grounded) sprite = 187;
-        if (instance.objectId == 112 && instance.grounded &&
-            instance.auxiliaryState != 0) sprite = 188;
-        if (instance.objectId == 113 && !instance.grounded) sprite = 168;
-        if (instance.objectId == 113 && instance.grounded &&
-            instance.auxiliaryState != 0) sprite = 170;
+        const int enemySprite = enemyPresentationSprite(instance.objectId,
+                                      instance.grounded, instance.auxiliaryState);
+        if (enemySprite >= 0) sprite = enemySprite;
         if (sprite >= 0)
             renderer.drawSpriteTransformed(
                 sprite, static_cast<std::uint32_t>(instance.imageIndex),

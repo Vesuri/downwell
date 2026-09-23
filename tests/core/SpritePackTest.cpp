@@ -1,4 +1,5 @@
 #include "core/SpritePack.h"
+#include "core/EnemyPresentation.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -37,6 +38,10 @@ void testGeneratedPack(const char* path) {
                 pack.pageItemCount() == 3161 && pack.texturePageCount() == 2,
             "generated sprite pack has audited totals");
     downwell::PackedSprite sprite;
+    for (int id : {153, 163, 164, 166, 168, 170, 177, 186, 187, 188, 278})
+        require(pack.sprite(id, sprite) &&
+                    sprite.frameCount == downwell::enemySpriteFrameCount(id),
+                "shared enemy animation lengths match serialized source resources");
     require(pack.sprite(733, sprite) && sprite.width == 8 && sprite.height == 8 &&
                 sprite.frameCount == 12,
             "sprDitherFade metadata is decoded");

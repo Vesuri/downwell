@@ -15,6 +15,7 @@
 
 namespace {
 int parityFrame = 0;
+bool sawExtendedEnemyAnimation = false;
 
 void require(bool condition, const char* message) {
     if (!condition) {
@@ -235,6 +236,8 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
     for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
         const auto& enemy = reference.instanceAt(i);
         if (!amigaEnemyHealth(enemy.objectId)) continue;
+        if (enemy.active && enemy.imageIndex >= 2.0F)
+            sawExtendedEnemyAnimation = true;
         if (comparedOrdinal < amiga.enemyCount()) {
             const auto& native = amiga.enemyAt(comparedOrdinal);
             require(native.objectId == enemy.objectId,
@@ -243,6 +246,10 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                         "paired actor horizontal trajectory agrees across targets");
             requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F,
                         "paired actor vertical trajectory agrees within Q8 integration error");
+            if (enemy.objectId == 113 && enemy.active && !enemy.grounded)
+                require(enemy.spriteId == 168 &&
+                            enemy.imageIndex == (enemy.velocityY < 0 ? 0.0F : 1.0F),
+                        "SDL airborne frog uses the recovered rise/fall pose");
         }
         ++comparedOrdinal;
     }
@@ -644,6 +651,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         }
     }
     require(retiredCompared >= 2, "comparison exercises two out-of-view enemy retirements");
+    require(sawExtendedEnemyAnimation,
+            "SDL live tape actually displays enemy frames beyond the old two-frame cap");
     require(enemyOrdinal == gameplay.enemyCount(),
             "live generation creates exactly the SDL enemy prefix, not a forecast population");
     require(live.builder.fragmentCount() > 0 &&

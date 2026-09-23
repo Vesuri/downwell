@@ -357,3 +357,18 @@ complete lifecycle state, and a temporarily missing newborn is not position
 compared. The last two births remain one frame late (340 versus 339), so full
 actor parity is not proven. Host tests and the bounded 600-tick Amiga terrain
 cache verification pass with the integer remainder enabled.
+
+### Shared enemy presentation resources
+
+SDL previously wrapped every enemy at two animation frames. Shared
+`EnemyPresentation.h` now provides the recovered sprite choices and actual
+1/2/4/6-frame cycles to the SDL simulation/drawing and native simulation.
+Sprite-pack tests compare all eleven cycle lengths with serialized metadata.
+SDL now also selects the frog's rising frame 0 / falling frame 1, stops its
+airborne animation, and restores grounded animation speed. The live tape
+asserts the airborne pose. No native cycle was shortened to match SDL's bug.
+
+Animation phase parity is still incomplete: native Q8 animation speeds and
+ground-contact timing can produce different frames, even where positions
+agree. This change fixes resource selection and cycle truncation, not all
+animation scheduling or hit-stun presentation.

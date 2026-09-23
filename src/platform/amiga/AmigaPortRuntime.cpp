@@ -3,6 +3,7 @@
 
 #include "core/PortCheckpoint.h"
 #include "core/GameMakerRounding.h"
+#include "core/EnemyPresentation.h"
 #include "core/Replay.h"
 
 namespace {
@@ -42,24 +43,6 @@ constexpr auto headingIndices = makeHeadingIndices();
 int absoluteInt(int value)
 {
     return value < 0 ? -value : value;
-}
-
-unsigned enemySpriteFrameCount(int spriteId)
-{
-    switch (spriteId) {
-        case 153: return 4; /* sprBat */
-        case 163: return 4; /* sprSnake */
-        case 164: return 1; /* sprSnakeAir */
-        case 166: return 4; /* sprFrogIdle */
-        case 168: return 2; /* sprFrogAir */
-        case 170: return 4; /* sprFrogPrepare */
-        case 177: return 4; /* sprEnmSnail */
-        case 186: return 4; /* sprGroundedTurtle */
-        case 187: return 1; /* sprGroundedTurtleFall */
-        case 188: return 6; /* sprGroundedTurtleWalk */
-        case 278: return 2; /* sprCrawler */
-        default: return 1;
-    }
 }
 
 } // namespace
@@ -735,20 +718,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         enemy.y = (int)downwell::roundGameMakerQ8(enemy.preciseY);
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
-        if (enemy.objectId == 111)
-            enemy.spriteId = enemy.grounded ? 163 : 164;
-        if (enemy.objectId == 112)
-            enemy.spriteId = !enemy.grounded ? 187
-                             : enemy.auxiliaryState != 0 ? 188 : 186;
-        if (enemy.objectId == 113)
-            enemy.spriteId = !enemy.grounded ? 168
-                             : enemy.auxiliaryState != 0 ? 170 : 166;
-        if (enemy.objectId == 116)
-            enemy.spriteId = 153;
-        if (enemy.objectId == 117)
-            enemy.spriteId = 177;
-        if (enemy.objectId == 119)
-            enemy.spriteId = 278;
+        enemy.spriteId = downwell::enemyPresentationSprite(enemy.objectId,
+                                            enemy.grounded, enemy.auxiliaryState);
         if (enemy.objectId == 113) {
             if (enemy.spriteId == 168) {
                 enemy.imageSpeed = 0;
@@ -757,7 +728,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 enemy.imageSpeed = 51u;
             }
         }
-        const unsigned frameCount = enemySpriteFrameCount(enemy.spriteId);
+        const unsigned frameCount = downwell::enemySpriteFrameCount(enemy.spriteId);
         const unsigned cycle = frameCount * 256u;
         while (enemy.imagePhase >= cycle)
             enemy.imagePhase -= cycle;

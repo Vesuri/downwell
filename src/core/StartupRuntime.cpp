@@ -1,6 +1,7 @@
 #include "StartupRuntime.h"
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
+#include "EnemyPresentation.h"
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
 #include "PackedRoomLoader.h"
@@ -677,6 +678,7 @@ void StartupRuntime::updateMainEnemies() {
             enemy.motionInitialized = true;
         }
 
+        enemy.imageIndex += enemy.imageSpeed;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const float halfWidth = enemy.objectId == 112 ? 8.0F : 6.0F;
             const float foot = enemy.objectId == 112 ? 8.0F : 5.0F;
@@ -789,9 +791,19 @@ void StartupRuntime::updateMainEnemies() {
         }
         enemy.x = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
         enemy.y = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
-        enemy.imageIndex += enemy.imageSpeed;
-        if (enemy.imageIndex >= 2.0F)
-            enemy.imageIndex = std::fmod(enemy.imageIndex, 2.0F);
+        enemy.spriteId = enemyPresentationSprite(enemy.objectId, enemy.grounded,
+                                                  enemy.auxiliaryState);
+        if (enemy.objectId == 113) {
+            if (!enemy.grounded) {
+                enemy.imageSpeed = 0.0F;
+                enemy.imageIndex = enemy.velocityY < 0.0F ? 0.0F : 1.0F;
+            } else {
+                enemy.imageSpeed = 0.2F;
+            }
+        }
+        const float frames = static_cast<float>(enemySpriteFrameCount(enemy.spriteId));
+        if (enemy.imageIndex >= frames)
+            enemy.imageIndex = std::fmod(enemy.imageIndex, frames);
     }
 }
 
