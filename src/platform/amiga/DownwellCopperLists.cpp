@@ -82,6 +82,36 @@ static bool buildNarrow(CopperList& list, const UBYTE* frame,
     return list.finish();
 }
 
+DownwellStyleCopperList::DownwellStyleCopperList(UWORD* words, unsigned capacityWords)
+    : CopperList(words, capacityWords), frame0Offset_(0), frame1Offset_(0), maskOffset_(0)
+{
+}
+
+bool DownwellStyleCopperList::build(const UBYTE* frame, const UBYTE* mask,
+                                    const Sprite& nullSprite, const Palette& palette)
+{
+    // PF1 is two-bit content (BPL1/3); PF2 is a one-bit black cover (BPL2).
+    // Nonzero PF2 wins, while zero is transparent. No framebuffer AND pass.
+    if (!beginNarrowDisplay(*this, true) || !move(bplcon0, 0x3401) ||
+        !move(bplcon1, 0) || !move(bplcon2, 0x0064) ||
+        !move(bpl1mod, amigaStyleBytesPerRow - 20) ||
+        !move(bpl2mod, amigaStyleBytesPerRow - 20)) return false;
+    frame0Offset_ = size();
+    if (!pointer(bpl1pth, frame)) return false;
+    frame1Offset_ = size();
+    if (!pointer(bpl3pth, frame + amigaStylePlaneBytes)) return false;
+    maskOffset_ = size();
+    return pointer(bpl2pth, mask) && hideSprites(*this, nullSprite) &&
+           setPalette(palette) && move(color09, 0) && finish();
+}
+
+bool DownwellStyleCopperList::update(const UBYTE* frame, const UBYTE* mask)
+{
+    return patchPointer(frame0Offset_, frame) &&
+           patchPointer(frame1Offset_, frame + amigaStylePlaneBytes) &&
+           patchPointer(maskOffset_, mask);
+}
+
 DownwellGameplayCopperList::DownwellGameplayCopperList(
     UWORD* words, unsigned capacityWords)
     : CopperList(words, capacityWords)

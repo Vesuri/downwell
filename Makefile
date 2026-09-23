@@ -81,7 +81,7 @@ PORT_REPLAY_REFERENCE_TARGET := build/port-replay-reference
 PORT_REPLAY_REFERENCE_SOURCES := tools/port-replay-reference.cpp src/platform/amiga/AmigaPortRuntime.cpp src/platform/amiga/AmigaPlayer.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp
 AMIGA_STYLE_FRAME_SHA256 := b30993c1fc9519c33c41c6197d8aaf51574ec894e260808bcd335f465ac6a017
 AMIGA_LOCKED_STYLE_FRAME_SHA256 := 864f7174880f3f458d3714dc822de14a60d877e5e5a69221e76a7dc1d9b21f83
-AMIGA_SELECTED_STYLE_FRAME_SHA256 := d1f5739235934c53bf38abe0dd46cf1855e1e9e8b6f0b3b731ecd1bce992e818
+AMIGA_SELECTED_STYLE_FRAME_SHA256 := 2bae3a77e4f22ba81e42ba3c648c917a4227b427511d458b7345b2c564363fb9
 AMIGA_SPLASH_FRAME_SHA256 := b82d3f72e70a9788a16bdeb5f681fc675d831562d407bfeac317f4508d67d9f2
 AMIGA_CONTROLS_FRAME_SHA256 := ee3f455e6c9192d08f64ea26cf6b56338badf0dadeee56acf85ae2cd2838560a
 AMIGA_CREDITS_FRAME_SHA256 := 9e7137cae00e1925f0a61c045f23ed1571358e9e02451b2acf9db036453d3af1
@@ -226,6 +226,7 @@ trace-area-one: generate-room-pack generate-object-pack generate-builder-pattern
 	./$(AREA_ONE_TRACE_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
 test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack generate-amiga-game $(TEST_TARGETS)
+	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)
 	./$(ALARM_TEST_TARGET)
@@ -380,7 +381,8 @@ verify-amiga-selected-style-frame:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_selected_style_frame.gdb READY_MARKER=DOWNWELL_SELECTED_STYLE_FRAME_READY READY_DESCRIPTION="mid-transition selected-style planar frame" amiga/verify_startup.sh'
 	printf '%s  %s\n' '$(AMIGA_SELECTED_STYLE_FRAME_SHA256)' 'amiga/.run/selected-style-frame.bin' | shasum -a 256 -c -
-	python3 tools/decode-amiga-style-frame.py amiga/.run/selected-style-frame.bin build/amiga-selected-style-frame.png
+	python3 tools/verify-amiga-style-mask.py --selected
+	python3 tools/decode-amiga-style-frame.py amiga/.run/selected-style-frame.bin build/amiga-selected-style-frame.png --mask amiga/.run/selected-style-mask.bin
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 verify-amiga-splash-frame:

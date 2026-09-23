@@ -76,7 +76,7 @@ enum {
 };
 
 enum {
-    styleCacheBytes = amigaStyleFrameBytes * 2 + amigaStyleBorderBytes,
+    styleCacheBytes = amigaStyleCacheBytes,
     sceneCacheBytes = amigaSplashCacheBytes > styleCacheBytes
                           ? amigaSplashCacheBytes : styleCacheBytes
 };
@@ -153,6 +153,8 @@ extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
 volatile const UBYTE* gDownwellLockedStyleFrame;
 volatile const UBYTE* gDownwellSelectedStyleFrame;
+volatile const UBYTE* gDownwellStyleMask;
+volatile const UWORD* gDownwellStyleCopper;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
 volatile const UWORD* gDownwellControlsCopper;
@@ -186,6 +188,10 @@ volatile const UWORD* gDownwellGameplayOverflowSprite;
 volatile UWORD gDownwellGameplayRingOrigin;
 
 __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellStyleRevealFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
@@ -1013,6 +1019,11 @@ int main(void) {
         DownwellSplashCopperList(dynamicCopperWords[1],
                                  downwellCopperWords)
     };
+    DownwellStyleCopperList styleLists[2] = {
+        DownwellStyleCopperList(dynamicCopperWords[0], downwellCopperWords),
+        DownwellStyleCopperList(dynamicCopperWords[1], downwellCopperWords)
+    };
+    bool styleListBuilt[2] = {false, false};
     DownwellSplashCopperList splashBlankList(
         memory.copper() + downwellCopperWords * 2, downwellCopperWords);
     DownwellSplashCopperList splashLogoList(
@@ -1459,15 +1470,24 @@ int main(void) {
                                 amigaStyleFrameBytes * 2,
                             scenes,
                             memory.sceneCache() +
-                                back * amigaStyleFrameBytes) ||
-                        !dynamicSplashLists[back].buildNarrow(
-                            memory.sceneCache() +
-                                back * amigaStyleFrameBytes,
-                            nullSprite, palette))
+                                back * amigaStyleFrameBytes))
                         break;
-                    platform.publish(dynamicSplashLists[back]);
+                    const UBYTE* styleFrame = memory.sceneCache() + back * amigaStyleFrameBytes;
+                    const UBYTE* styleMask = amigaStyleMask(memory.sceneCache(), scenes);
+                    if (!(styleListBuilt[back]
+                            ? styleLists[back].update(styleFrame, styleMask)
+                            : styleLists[back].build(styleFrame, styleMask, nullSprite, palette)))
+                        break;
+                    styleListBuilt[back] = true;
+                    platform.publish(styleLists[back]);
                     front = back;
 #ifdef DOWNWELL_SCENE_VERIFY
+                    gDownwellStyleMask = styleMask;
+                    gDownwellStyleCopper = styleLists[back].data();
+                    if (scenes.styleDitherY() == 528 && !scenes.styleSelected()) {
+                        gDownwellStyleFrame = styleFrame;
+                        downwellStyleRevealFrameReady();
+                    }
                     if (!sceneStyleFrameReported &&
                         scenes.styleYOffset() == 0 &&
                         !scenes.styleSelected()) {

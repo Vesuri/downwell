@@ -3,6 +3,7 @@ target remote 127.0.0.1:2345
 break downwellSelectedStyleFrameReady
 continue
 dump binary memory .run/selected-style-frame.bin gDownwellSelectedStyleFrame gDownwellSelectedStyleFrame+12496
+dump binary memory .run/selected-style-mask.bin gDownwellStyleMask gDownwellStyleMask+6248
 printf "DOWNWELL_SELECTED_STYLE_FRAME_READY\n"
 shell touch .run/gdb-ready.marker
 detach

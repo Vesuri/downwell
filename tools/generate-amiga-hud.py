@@ -121,7 +121,8 @@ TEXT_SELECTIONS["game"].update({65100 + value: str(value)
 
 # The original 320x800 style-transition sprites are almost entirely opaque
 # black.  Only the 160x80 gradient edge that crosses the logical playfield
-# needs packed pixels; the native renderer supplies the black body as a fill.
+# needs packed opacity; the native renderer pads it into an immutable PF2
+# mask with transparent/solid rows before presenting the scene.
 DITHER_STRIPS = {
     "game": {
         65004: (129, 80, 0),    # visible centre of sprEnterDither's top edge
@@ -235,12 +236,15 @@ def render_bordered_text(manifest, pages, text, color):
 
 
 def render_dither_strip(sprite, frame, items, pages, source_x, source_y):
+    # Encode opacity, not RGB: these sprites have opaque black cover pixels
+    # and white pixels with alpha=1 (effectively transparent holes).
+    # The packed white bits feed an opaque-black Amiga PF2 palette entry.
     canvas = frame_canvas(sprite, frame, items, pages).crop(
         (source_x, source_y, source_x + 160, source_y + 80))
     pixels = []
     for red, green, blue, alpha in canvas.get_flattened_data():
         pixels.append((255, 255, 255, 255)
-                      if alpha != 0 and (red, green, blue) == (255, 255, 255)
+                      if alpha >= 128
                       else (0, 0, 0, 0))
     output = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     output.putdata(pixels)

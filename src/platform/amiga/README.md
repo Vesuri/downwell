@@ -235,3 +235,21 @@ the same complete ring/HUD/sprite reconstruction to produce
 `build/amiga-gameplay-active-frame.png`.  This pins a frame after circular
 scrolling, hidden-row refills, actor allocation, and enemy activation have all
 become live.
+
+Style-select transitions use a three-plane dual-playfield display: BPL1/3
+hold the two-bit content, and BPL2 is an opaque-black PF2 cover (COLOR09=0,
+PF2 priority). The asset converter extracts opacity from the original
+transition sprites; alpha-1 white pixels are holes, not white ink. Two
+immutable 176x648 one-plane masks hold the entry and exit gradients with
+solid/transparent padding (28,512 bytes total). Each frame patches only
+the content and mask pointers in the inactive dedicated style Copper list.
+There is no per-frame mask drawing or framebuffer AND pass; the underlying
+style content still uses its existing blitter redraw path.
+
+`python3 tools/verify-amiga-style-mask.py` checks both packed gradients
+against source alpha. A `SCENE_VERIFY=1 SKIP_INTRO=1` Amiga build can capture
+the reveal with `VERIFY_TIMEOUT_SECONDS=45 GDB_SOURCE=verify_style_reveal.gdb
+READY_MARKER=DOWNWELL_STYLE_REVEAL_READY bash amiga/verify_startup.sh`.
+Then `python3 tools/verify-amiga-style-mask.py --capture` checks the live
+DMA mask and Copper configuration. Style-frame decoding accepts `--mask`
+to composite a captured PF2 mask; selected-style verification captures both.

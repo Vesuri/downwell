@@ -15,11 +15,16 @@ enum {
     amigaStyleFrameBytes = amigaStylePlaneBytes * 2,
     amigaStyleBorderPlaneBytes =
         amigaStyleBytesPerRow * amigaStyleBorderHeight,
-    amigaStyleBorderBytes = amigaStyleBorderPlaneBytes * 2
+    amigaStyleBorderBytes = amigaStyleBorderPlaneBytes * 2,
+    amigaStyleMaskHeight = amigaStyleHeight * 2 + 80,
+    amigaStyleMaskBytes = amigaStyleBytesPerRow * amigaStyleMaskHeight,
+    amigaStyleMaskOffset = amigaStyleFrameBytes * 2 + amigaStyleBorderBytes,
+    amigaStyleCacheBytes = amigaStyleMaskOffset + amigaStyleMaskBytes * 2
 };
 
 bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
                            UBYTE* border);
+const UBYTE* amigaStyleMask(const UBYTE* cache, const AmigaSceneRuntime& scenes);
 bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
                            const UBYTE* border,
                            const AmigaSceneRuntime& scenes,

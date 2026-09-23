@@ -2,6 +2,9 @@
 #include "AmigaSceneRuntime.h"
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
+extern "C" {
+#include <string.h>
+}
 
 namespace {
 
@@ -90,15 +93,6 @@ bool draw(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
     return true;
 }
 
-void clearRect(Bitmap& bitmap, int x, int y, int width, int height) {
-    if (x < 0) { width += x; x = 0; }
-    if (y < 0) { height += y; y = 0; }
-    if (x + width > amigaStyleVisibleWidth) width = amigaStyleVisibleWidth - x;
-    if (y + height > amigaStyleHeight) height = amigaStyleHeight - y;
-    if (width > 0 && height > 0)
-        bitmap.clear((UWORD)x, (UWORD)y, (UWORD)width, (UWORD)height);
-}
-
 } // namespace
 
 bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
@@ -112,7 +106,38 @@ bool amigaBuildStyleBorder(const UBYTE* pack, const UBYTE* packEnd,
             return false;
     }
     AmigaHardware::blitterDrain();
+    // Immutable PF2 opacity masks: transparent/gradient/solid for entry,
+    // solid/gradient/transparent for exit. Only DMA pointers move per frame.
+    UBYTE* masks = border + amigaStyleBorderBytes;
+    for (unsigned exit = 0; exit < 2; ++exit) {
+        const UBYTE* record = find(pack, packEnd, 65004 + exit, 0);
+        if (!record || word(record + 8) != 160 || word(record + 10) != 80)
+            return false;
+        const unsigned stride = word(record + 12) / 8;
+        const ULONG offset = longword(record + 16);
+        if (offset > (ULONG)(packEnd - pack) ||
+            stride * 80UL > (ULONG)(packEnd - pack) - offset) return false;
+        UBYTE* mask = masks + exit * amigaStyleMaskBytes;
+        memset(mask, exit ? 0xff : 0, amigaStylePlaneBytes);
+        for (unsigned y = 0; y < 80; ++y) {
+            UBYTE* row = mask + (amigaStyleHeight + y) * amigaStyleBytesPerRow;
+            memcpy(row, pack + offset + y * stride, 20);
+            memset(row + 20, 0, amigaStyleBytesPerRow - 20);
+        }
+        memset(mask + (amigaStyleHeight + 80) * amigaStyleBytesPerRow,
+               exit ? 0 : 0xff, amigaStylePlaneBytes);
+    }
     return true;
+}
+
+const UBYTE* amigaStyleMask(const UBYTE* cache, const AmigaSceneRuntime& scenes) {
+    const bool exit = scenes.styleSelected();
+    const int top = exit ? scenes.styleVerticalDitherY() : scenes.styleDitherY() - 400;
+    int row = amigaStyleHeight - top;
+    if (row < 0) row = 0;
+    if (row > amigaStyleHeight + 80) row = amigaStyleHeight + 80;
+    return cache + amigaStyleMaskOffset + (exit ? amigaStyleMaskBytes : 0) +
+           row * amigaStyleBytesPerRow;
 }
 
 bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
@@ -161,17 +186,6 @@ bool amigaRenderStyleFrame(const UBYTE* pack, const UBYTE* packEnd,
         return false;
     }
 
-    const int enterTop = scenes.styleDitherY() - 400;
-    clearRect(output, 0, enterTop, amigaStyleVisibleWidth, 800);
-    if (!draw(output, pack, packEnd, 65004, 0, 0, enterTop))
-        return false;
-    if (scenes.styleSelected()) {
-        const int verticalEdge = scenes.styleVerticalDitherY();
-        clearRect(output, 0, verticalEdge - 720,
-                  amigaStyleVisibleWidth, 800);
-        if (!draw(output, pack, packEnd, 65005, 0, 0, verticalEdge))
-            return false;
-    }
     AmigaHardware::blitterDrain();
     return true;
 }

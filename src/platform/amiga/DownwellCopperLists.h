@@ -72,4 +72,14 @@ public:
                    const Palette& palette);
 };
 
+class DownwellStyleCopperList : public CopperList {
+public:
+    DownwellStyleCopperList(UWORD* words, unsigned capacityWords);
+    bool build(const UBYTE* frame, const UBYTE* mask,
+               const Sprite& nullSprite, const Palette& palette);
+    bool update(const UBYTE* frame, const UBYTE* mask);
+private:
+    unsigned frame0Offset_, frame1Offset_, maskOffset_;
+};
+
 #endif

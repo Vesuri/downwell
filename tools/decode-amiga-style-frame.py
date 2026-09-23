@@ -19,9 +19,13 @@ def main():
         description="Decode an A500 Downwell narrow two-plane frame")
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--mask", type=Path, help="black PF2 overlay captured with the frame")
     args = parser.parse_args()
 
     data = args.input.read_bytes()
+    mask_data = args.mask.read_bytes() if args.mask else None
+    if mask_data is not None and len(mask_data) != PLANE_BYTES:
+        raise SystemExit("invalid mask size")
     if len(data) != FRAME_BYTES:
         raise SystemExit(
             f"expected {FRAME_BYTES} bytes, found {len(data)}")
@@ -34,6 +38,8 @@ def main():
             offset = row + (x >> 3)
             pen = int(bool(data[offset] & mask))
             pen |= int(bool(data[PLANE_BYTES + offset] & mask)) << 1
+            if mask_data is not None and mask_data[offset] & mask:
+                pen = 0
             pixels.append(PALETTE[pen])
 
     image = Image.new("RGB", (VISIBLE_WIDTH, HEIGHT))
