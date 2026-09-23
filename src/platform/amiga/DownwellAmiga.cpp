@@ -114,6 +114,16 @@ static_assert(
         4u + 8u + 2u,
     "copper storage must cover registers, planes, sprites, palette and split");
 
+extern "C" {
+volatile ULONG gDownwellActorFailureSprite;
+volatile ULONG gDownwellActorFailureFrame;
+volatile ULONG gDownwellStartupFailure;
+volatile ULONG gDownwellStartupChipFree;
+volatile ULONG gDownwellStartupChipLargest;
+volatile ULONG gDownwellStartupAssetBytes;
+volatile ULONG gDownwellStartupChipRemaining;
+}
+
 #ifdef DOWNWELL_REPLAY_VERIFY
 extern "C" {
 volatile ULONG gReplayComplete;
@@ -165,13 +175,6 @@ volatile ULONG gDownwellStyleReferenceFrames;
 volatile ULONG gDownwellGameBufferFailures;
 volatile ULONG gDownwellGameplayBobChecks;
 volatile ULONG gDownwellGameplayBobFailures;
-volatile ULONG gDownwellActorFailureSprite;
-volatile ULONG gDownwellActorFailureFrame;
-volatile ULONG gDownwellStartupFailure;
-volatile ULONG gDownwellStartupChipFree;
-volatile ULONG gDownwellStartupChipLargest;
-volatile ULONG gDownwellStartupAssetBytes;
-volatile ULONG gDownwellStartupChipRemaining;
 volatile ULONG gDownwellTerrainRasterFailures;
 volatile ULONG gDownwellTerrainRasterChecks;
 volatile const UBYTE* gDownwellSplashFrame;
