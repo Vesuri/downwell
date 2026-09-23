@@ -2,6 +2,7 @@
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
+#include "EnemyContact.h"
 #include "BatMotion.h"
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
@@ -780,10 +781,18 @@ void StartupRuntime::updateMainEnemyInteractions() {
         const bool contactOnly = enemy.objectId == 117 || enemy.objectId == 119;
         if (!enemy.active || enemy.health <= 0 || (!stompable && !contactOnly))
             continue;
-        if (std::abs(mainPlayerX_ - enemy.preciseX) > 10.0F ||
-            std::abs(mainPlayerY_ - enemy.preciseY) > 11.0F)
-            continue;
-        if (stompable && enemy.preciseY > mainPlayerY_ + 2.0F) {
+        const ContactActor playerContact{
+            mainPlayerMotion_.offsetXFixed(), mainPlayerMotion_.offsetYFixed(),
+            mainPlayerMotion_.facing(), 1, 31};
+        const ContactActor enemyContact{
+            static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 256.0F)),
+            static_cast<long>(std::round((enemy.preciseY - mainPlayerOriginY_) * 256.0F)),
+            enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
+            enemyContactMask(enemy.objectId, enemy.spriteId)};
+        const auto contact = classifyEnemyContact(playerContact, enemyContact,
+            enemy.objectId, mainPlayerMotion_.frameStartYFixed());
+        if (contact == EnemyContact::none) continue;
+        if (contact == EnemyContact::stomp) {
             spawnMainCurrency(enemy.preciseX, enemy.preciseY,
                               enemy.reward, true);
             enemy.health = 0;

@@ -252,3 +252,35 @@ bounded 64-frame cross-target replay and 600-tick A500 terrain-cache oracle
 pass. The canonical replay digest remains `bfbbd762b9b62a59`; that short tape
 is not a standalone proof of bat accuracy. Target instruction and 64-bit
 helper audits pass. Normal SDL/Amiga builds are restored after verification.
+
+## Shared enemy contact classification
+
+`EnemyContact.h` replaces both backends' generic contact region with the
+recovered axis-aligned player/enemy mask rectangles. A metadata verifier checks
+all eleven supported sprite rectangles against the pinned original export,
+including the source hash and extractor version. Frogs, ground turtles, snails
+and crawlers retain fixed masks instead of using animation bounds. Instance
+coordinates use ties-to-even rounding; unit flips transform pixel-cell edges
+about the sprite origin. Edge-only touching is not overlap.
+
+The shared stomp decision follows typStompable's strict comparison of enemy yy
+against the pre-movement global.ply + 2, not the newly integrated player y.
+Fixtures cover the short bat mask, asymmetric horizontal flip, fixed masks,
+fractional stomp thresholds and coordinate translation between the adapters.
+
+The 600-update combat continuation now finishes with matching health 3, kills 2
+and currency 16, with no intermediate disagreement in those counters. It is now
+enabled in the default host test target. Its existing movement check only
+rejects vertical differences greater than three pixels: this is not an exact
+whole-world state or original-runtime proof. No tolerance was widened to pass.
+
+Remaining contact fidelity work includes knockback's integer direction
+approximation, enemy activation/event ordering, and original-runtime boundary
+validation. Unit-flip rectangular masks do not cover arbitrary scaling,
+rotation or precise per-pixel masks. Sharing this classifier does not establish
+complete gameplay parity.
+
+Validation for this change: the bounded 64-frame 68000 cross-target replay
+retains `bfbbd762b9b62a59`; the bounded A500 600-tick terrain-cache rendering
+oracle passes. Instruction and 64-bit helper audits remain clean. These target
+checks complement, rather than replace, the host contact and combat fixtures.

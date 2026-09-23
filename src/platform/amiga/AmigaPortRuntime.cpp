@@ -4,6 +4,7 @@
 #include "core/PortCheckpoint.h"
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
+#include "core/EnemyContact.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
@@ -768,15 +769,17 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active || !enemy.awake || enemy.health <= 0)
             continue;
-        const int dx = player_.offsetX() - enemy.x;
-        const int dy = player_.offsetY() - enemy.y;
-        if (dx < -10 || dx > 10 || dy < -11 || dy > 11)
-            continue;
-        const bool stompable = enemy.objectId == 111 ||
-                               enemy.objectId == 112 ||
-                               enemy.objectId == 113 ||
-                               enemy.objectId == 116;
-        if (stompable && enemy.y > player_.offsetY() + 2) {
+        const downwell::ContactActor playerContact{
+            player_.offsetXFixed(), player_.offsetYFixed(), player_.facing(), 1, 31};
+        const downwell::ContactActor enemyContact{
+            enemy.preciseX, enemy.preciseY,
+            enemy.objectId == 117 ? enemy.motionState : enemy.facing,
+            enemy.objectId == 117 && enemy.speedY > 0 ? -1 : 1,
+            downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
+        const auto contact = downwell::classifyEnemyContact(
+            playerContact, enemyContact, enemy.objectId, player_.frameStartYFixed());
+        if (contact == downwell::EnemyContact::none) continue;
+        if (contact == downwell::EnemyContact::stomp) {
             enemy.health = 0;
             spawnReward(enemy, true);
             enemy.active = false;
