@@ -62,6 +62,7 @@ public:
     bool jumpShootLocked() const { return jumpShootLocked_; }
     bool shotDelayed() const { return shotDelay_ != 0; }
     bool airborneShot() const { return airborneShot_; }
+    bool spinJumping() const { return spinJumping_; }
     int ammo() const { return ammo_; }
     bool grounded() const { return grounded_; }
     int facing() const { return facing_; }
@@ -76,6 +77,7 @@ public:
 private:
     static int fixedToPixel(long value);
     static unsigned integerSquareRoot(unsigned value);
+    void beginSpin();
 
     long x_;
     long y_;
@@ -103,6 +105,8 @@ private:
     bool priorFire_;
     bool jumpShootLocked_;
     bool airborneShot_;
+    bool spinJumping_ = false;
+    unsigned spinPhaseTwentieths_ = 0;
     bool running_;
     unsigned runPhaseTenths_;
     bool idling_;

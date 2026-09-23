@@ -69,8 +69,22 @@ unsigned PlayerMotion::integerSquareRoot(unsigned value)
     return result;
 }
 
+void PlayerMotion::beginSpin()
+{
+    if (!spinJumping_) {
+        // scrFjump does not reset image_index. Preserve fractional phase
+        // from the currently selected animation when switching to spin.
+        spinPhaseTwentieths_ = grounded_
+            ? running_ ? runPhaseTenths_ * 2
+              : balancing_ ? balancePhaseQuarters_ * 5 : idlePhaseTenths_ * 2
+            : airborneShot_ ? shotPhaseQuarters_ * 5 : spriteFrame() * 20;
+    }
+    spinJumping_ = true;
+}
+
 void PlayerMotion::stompBounce()
 {
+    beginSpin();
     speedY_ = -640;
     gravityRemainder_ = 0;
     grounded_ = false;
@@ -79,6 +93,7 @@ void PlayerMotion::stompBounce()
 
 void PlayerMotion::contactKnockback(int enemyX, int enemyY)
 {
+    beginSpin();
     // scrTypicalDamage aims from enemy x/y to global.plx/ply, published
     // before integration. Keep subpixel precision until normalization.
     const long dx = frameStartX_ - (long)enemyX * fixedOne;
@@ -131,8 +146,11 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controls
         shotDelay_ = 0;
     }
 
+    const bool wasSpinning = spinJumping_;
+    const int oldFacing = facing_;
     downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
         speedX_, facing_, grounded_, input.left, input.right, controlsLocked);
+    if (spinJumping_) facing_ = oldFacing;
     if (solidResolver_ != 0) {
         long remaining = speedX_;
         while (remaining != 0) {
@@ -187,8 +205,13 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controls
         speedY_ = jumpSpeed;
         gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
         jumpShootLocked_ = true;
+        if (input.left || input.right) spinJumping_ = true;
+        spinPhaseTwentieths_ = 0; // scrJump explicitly resets image_index
         ++jumps_;
     }
+    // scrUpButtonFunctions clears spin when held fire is no longer jump-locked,
+    // even if a shot is still delayed or ammunition is empty.
+    if (input.fire && !jumpShootLocked_) spinJumping_ = false;
     if (input.fire && !grounded_ && shotDelay_ == 0 &&
         !jumpShootLocked_ && ammo_ == 0) {
         // scrPlayerShootN's empty-charge branch still brakes a fast fall.
@@ -252,10 +275,12 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controls
             grounded_ = true;
             ammo_ = maximumAmmo;
             airborneShot_ = false;
+            spinJumping_ = false;
         }
     }
 
     if (grounded_) {
+        spinJumping_ = false;
         speedY_ = 0;
         gravityRemainder_ = 0;
     }
@@ -313,6 +338,9 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controls
         ++shotPhaseQuarters_;
     }
 
+    if (spinJumping_ && wasSpinning)
+        spinPhaseTwentieths_ = (spinPhaseTwentieths_ + 6) % 160;
+    if (!spinJumping_) spinPhaseTwentieths_ = 0;
     priorFire_ = input.fire;
     PlayerMotionDelta motion = {pixelX_ - oldPixelX, pixelY_ - oldPixelY};
     return motion;
@@ -336,6 +364,7 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
     digest.addI32(ammo_); digest.addBool(grounded_);
     digest.addBool(priorFire_); digest.addBool(jumpShootLocked_);
     digest.addBool(airborneShot_); digest.addBool(running_);
+    digest.addBool(spinJumping_); digest.addU32(spinPhaseTwentieths_);
     digest.addU32(runPhaseTenths_); digest.addBool(idling_);
     digest.addU32(idlePhaseTenths_); digest.addBool(balancing_);
     digest.addU32(balancePhaseQuarters_); digest.addU32(shotPhaseQuarters_);
@@ -346,6 +375,7 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
 int PlayerMotion::spriteId() const
 {
     if (grounded_) return running_ ? 27 : balancing_ ? 15 : 31;
+    if (spinJumping_) return 1;
     return airborneShot_ ? 3 : 37;
 }
 
@@ -355,6 +385,7 @@ unsigned PlayerMotion::spriteFrame() const
         return running_ ? runPhaseTenths_ / 10
                         : balancing_ ? balancePhaseQuarters_ / 4
                                      : idlePhaseTenths_ / 10;
+    if (spinJumping_) return spinPhaseTwentieths_ / 20;
     if (airborneShot_)
         return shotPhaseQuarters_ / 4 < 3 ? shotPhaseQuarters_ / 4 : 3;
     if (speedY_ < -2 * fixedOne) return 0;

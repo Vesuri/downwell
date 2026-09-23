@@ -17,8 +17,8 @@ memory requirement.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Resident game-art pack (directory, planar art, garden sprites) | 267,528 |
-| **Total** | **476,000** |
+| Resident game-art pack (directory, planar art, garden sprites) | 274,440 |
+| **Total** | **482,912** |
 
 A temporary 16-byte startup copper list is also allocated during initialization.
 Gameplay reuses the retired splash/style cache for its two display rings and
@@ -39,7 +39,9 @@ preserving every directory entry and resource/frame ID. This saves 35,136
 bytes. Writable garden sprite DMA records are explicitly excluded from sharing;
 inactive position headers must never alias the displayed sprite.
 
-The renderer test caps resident game art at 270,000 bytes. Run
+The eight-frame spin animation adds 6,912 resident bytes, including directory
+entries and offline mirrored art. The bounded A500 allocation check passes
+with this pack; the renderer test now caps resident game art at 275,000 bytes. Run
 `make verify-amiga-memory` for a bounded target allocation/initialization
 check. Startup diagnostics expose the failed check, initial Chip free/largest
 block, requested asset bytes and remaining Chip memory after allocations.

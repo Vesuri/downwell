@@ -159,6 +159,41 @@ int main() {
             "walking off support applies gravity on the first airborne frame");
 
     PlayerMotion player;
+    PlayerMotion spin;
+    downwell::Input spinInput;
+    spinInput.right = true;
+    spinInput.fire = true;
+    spin.step(spinInput);
+    require(spin.spinJumping() && spin.spriteId() == 1 && spin.spriteFrame() == 0,
+            "directional jump selects recovered spin sprite and resets image index");
+    spinInput.right = false;
+    spinInput.left = true;
+    for (unsigned i = 0; i < 10; ++i) spin.step(spinInput);
+    require(spin.spriteFrame() == 3 && spin.facing() == 1 && spin.speedXFixed() < 0,
+            "spin advances at 0.3 while reverse input steers without flipping facing");
+    spinInput.fire = false;
+    spin.step(spinInput);
+    require(spin.spinJumping(), "release unlocks shooting but does not itself cancel spin");
+    spinInput.fire = true;
+    spin.step(spinInput);
+    require(!spin.spinJumping() && spin.spriteId() == 3,
+            "unlocked fire cancels spin and selects shooting presentation");
+    spin.stompBounce();
+    require(spin.spinJumping() && spin.spriteId() == 1,
+            "stomp forced jump takes precedence over prior airborne shooting");
+    for (unsigned i = 0; i < 100 && !spin.grounded(); ++i)
+        spin.step(downwell::Input{});
+    require(spin.grounded() && !spin.spinJumping(), "landing clears the shared spin state");
+    PlayerMotion loopingSpin(false, 10000);
+    loopingSpin.stompBounce();
+    const unsigned inheritedFrame = loopingSpin.spriteFrame();
+    unsigned seenSpinFrames = 0;
+    for (unsigned i = 0; i < 80; ++i) {
+        loopingSpin.step(downwell::Input{});
+        seenSpinFrames |= 1u << loopingSpin.spriteFrame();
+    }
+    require(seenSpinFrames == 255 && loopingSpin.spriteFrame() == inheritedFrame,
+            "spin covers all eight frames and loops three times in eighty updates");
     downwell::Input input;
     require(player.grounded() && player.ammo() == 8,
             "player starts grounded with a full gunboot charge");

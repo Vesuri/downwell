@@ -303,3 +303,35 @@ This is not full scrFjump/scrRecharge fidelity yet: spinJumping presentation,
 jetFrame reset, recharge effects/audio/shake, variable weapon capacity, and
 coincident point_direction behavior remain to be reconciled. Integer square
 root and Q8 velocity remain approximations of GameMaker double math.
+
+## Shared default-style spin state
+
+PlayerMotion now owns spinJumping for directional ground jumps, stomps and
+damage launches. VM references: scrJump sets spin for left/right input and
+resets image_index; scrFjump sets spin without resetting image_index;
+scrPlMovement suppresses ordinary facing changes while spinning and clears
+spin on landing; scrUpButtonFunctions clears it on unlocked held fire.
+playerSpriteControl selects spriteSpin, configured as resource 1 at speed .3.
+
+The eight-frame animation is shared by both renderers. Twentieth-frame phase
+retains existing .1, .25 and .3 animation fractions when a forced jump switches
+to spin; a normal jump resets phase. Input still accelerates horizontally
+while the spin-facing lock is active. Tests cover reversal, release, shooting,
+stomp and landing; the extended combat test now checks player sprite/frame
+agreement on every update as well as its prior counters and movement checks.
+
+The host asset generator supplies all eight planar frames, mirrors and prepared
+hardware-sprite streams. There is no new runtime sprite conversion. Resident
+art increases to 274,440 bytes, validated by the bounded 512 KiB Chip A500
+startup allocation check before increasing the art-only regression cap.
+
+Still incomplete: spin wall-contact poses/wall kicks, ending overrides,
+non-default styles and exact original runner image-phase timing at event
+boundaries. The normal-jump first frame follows the existing host animation
+timing convention; cross-backend agreement alone does not prove that timing.
+
+Validation: full host suite and extended combat presentation checks pass;
+the renderer compares 13,916 offline variants. Bounded 68000 replay and A500
+600-tick terrain-cache checks pass, with clean target instruction/helper
+audits. Normal SDL and Amiga builds are restored. The short replay checksum
+is unchanged; it is not a complete digest of animation state.

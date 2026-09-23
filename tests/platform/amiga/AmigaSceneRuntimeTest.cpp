@@ -749,6 +749,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << " ground=" << gameplay.player().grounded() << ',' << reference.mainPlayerGrounded()
                           << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired() << '\n';
             require(gameplay.generationSucceeded(), "combat continuation retains successful live generation");
+            require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
+                    gameplay.player().spriteFrame() ==
+                        static_cast<unsigned>(reference.mainPlayerImageIndex()),
+                    "combat player presentation agrees across adapters, including forced spins");
             if (!playerReported && std::fabs(176 + gameplay.player().offsetYFixed() / 256.0F - reference.mainPlayerY()) > 3.0F) {
                 playerReported = true;
                 std::cout << "COMBAT PLAYER tick=" << gameplay.tick()

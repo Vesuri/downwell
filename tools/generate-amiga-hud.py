@@ -30,6 +30,7 @@ SELECTIONS = {
     },
     "game": {
         0: None,     # sprPlDead
+        1: None,     # sprPlayerSpin
         3: None,     # sprPlayerShoot
         12: None,    # sprPlayerLegswing
         15: None,    # sprPlayerBalancing
@@ -304,7 +305,7 @@ def build_pack(manifest, extracted, profile):
                                     originX=sprite["width"] - sprite["originX"] if flip_x else sprite["originX"])
                     encoded.append((metadata, 256 + frame_index, stride, data))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
-                    0, 3, 12, 15, 27, 31, 37,
+                    0, 1, 3, 12, 15, 27, 31, 37,
                     153, 163, 164, 166, 168, 170, 177, 186, 187, 188, 278):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
@@ -472,7 +473,7 @@ def build_pack(manifest, extracted, profile):
     # Gameplay DMA words, including mirrored multi-channel actors, are host work.
     if profile == "game":
         hardware = []
-        actors = (0, 3, 12, 15, 27, 31, 37, 133, 134, 153, 163, 164,
+        actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 163, 164,
                   166, 168, 170, 177, 186, 187, 188, 278, 459)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:
