@@ -1275,6 +1275,10 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         return;
 
     const bool wasGrounded = mainPlayerGrounded_;
+    // scrPlayerInit + scrPlMovement, default style outside water.
+    const float horizontalMaximum = wasGrounded ? 2.0F : 2.5F;
+    const float turnBoost = wasGrounded ? 2.0F : 1.0F;
+    const float friction = wasGrounded ? 0.4F : 0.1F;
     mainPlayerSpeedY_ = std::min(7.0F, mainPlayerSpeedY_ + 0.2F);
     if (inputFireReleased_) {
         if (mainPlayerSpeedY_ < 0.0F)
@@ -1285,23 +1289,24 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!controlsLocked_ && inputLeft_ && !inputRight_) {
         mainPlayerSpeedX_ -= 0.2F;
         if (mainPlayerSpeedX_ > 0.0F)
-            mainPlayerSpeedX_ -= 1.0F;
-        mainPlayerSpeedX_ = std::max(-2.5F, mainPlayerSpeedX_);
+            mainPlayerSpeedX_ -= turnBoost;
+        mainPlayerSpeedX_ = std::max(-horizontalMaximum, mainPlayerSpeedX_);
         mainPlayerFacing_ = -1;
     } else if (!controlsLocked_ && inputRight_ && !inputLeft_) {
         mainPlayerSpeedX_ += 0.2F;
         if (mainPlayerSpeedX_ < 0.0F)
-            mainPlayerSpeedX_ += 1.0F;
-        mainPlayerSpeedX_ = std::min(2.5F, mainPlayerSpeedX_);
+            mainPlayerSpeedX_ += turnBoost;
+        mainPlayerSpeedX_ = std::min(horizontalMaximum, mainPlayerSpeedX_);
         mainPlayerFacing_ = 1;
     } else if (inputLeft_ && inputRight_) {
         mainPlayerSpeedX_ = 0.0F;
+        mainPlayerFacing_ = 1;
     } else if (mainPlayerSpeedX_ > 0.0F) {
-        mainPlayerSpeedX_ = std::max(0.0F, mainPlayerSpeedX_ - 0.1F);
+        mainPlayerSpeedX_ = std::max(0.0F, mainPlayerSpeedX_ - friction);
         if (mainPlayerSpeedX_ < 0.3F)
             mainPlayerSpeedX_ = 0.0F;
     } else if (mainPlayerSpeedX_ < 0.0F) {
-        mainPlayerSpeedX_ = std::min(0.0F, mainPlayerSpeedX_ + 0.1F);
+        mainPlayerSpeedX_ = std::min(0.0F, mainPlayerSpeedX_ + friction);
         if (mainPlayerSpeedX_ > -0.3F)
             mainPlayerSpeedX_ = 0.0F;
     }

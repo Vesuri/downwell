@@ -4,10 +4,13 @@ namespace {
 enum {
     fixedOne = 256,
     horizontalAcceleration = 51,
-    horizontalTurnBoost = fixedOne,
-    horizontalFriction = 26,
+    horizontalAirTurnBoost = fixedOne,
+    horizontalGroundTurnBoost = 2 * fixedOne,
+    horizontalAirFriction = 26,
+    horizontalGroundFriction = 102,
     horizontalStopThreshold = 77,
-    horizontalMaximum = 640,
+    horizontalAirMaximum = 640,
+    horizontalGroundMaximum = 512,
     jumpSpeed = -1126,
     gravity = 51,
     fallMaximum = 7 * fixedOne,
@@ -111,22 +114,30 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         shotDelay_ = 0;
     }
 
+    // scrPlayerInit/scrPlMovement distinguish grounded and airborne motion.
+    const long turnBoost = grounded_ ? horizontalGroundTurnBoost : horizontalAirTurnBoost;
+    const long friction = grounded_ ? horizontalGroundFriction : horizontalAirFriction;
+    const long maximum = grounded_ ? horizontalGroundMaximum : horizontalAirMaximum;
     if (input.left != input.right) {
         if (input.left) {
             speedX_ -= horizontalAcceleration;
-            if (speedX_ > 0) speedX_ -= horizontalTurnBoost;
+            if (speedX_ > 0) speedX_ -= turnBoost;
         } else {
             speedX_ += horizontalAcceleration;
-            if (speedX_ < 0) speedX_ += horizontalTurnBoost;
+            if (speedX_ < 0) speedX_ += turnBoost;
         }
         facing_ = input.left ? -1 : 1;
-        if (speedX_ < -horizontalMaximum) speedX_ = -horizontalMaximum;
-        if (speedX_ > horizontalMaximum) speedX_ = horizontalMaximum;
+        if (speedX_ < -maximum) speedX_ = -maximum;
+        if (speedX_ > maximum) speedX_ = maximum;
+    } else if (input.left && input.right) {
+        // Both source branches execute, with right last, then xsp is zeroed.
+        speedX_ = 0;
+        facing_ = 1;
     } else if (speedX_ < 0) {
-        speedX_ += horizontalFriction;
+        speedX_ += friction;
         if (speedX_ > -horizontalStopThreshold) speedX_ = 0;
     } else if (speedX_ > 0) {
-        speedX_ -= horizontalFriction;
+        speedX_ -= friction;
         if (speedX_ < horizontalStopThreshold) speedX_ = 0;
     }
     if (solidResolver_ != 0) {

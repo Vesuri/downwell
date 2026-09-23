@@ -33,6 +33,31 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    // Source-backed default-style rules, independent of SDL comparison.
+    // scrPlayerInit: maxsp=2, airMaxsp=2.5, decclsp=.4, airdeccl=.1.
+    // scrPlMovement: reversal boost=2 grounded / 1 airborne; both keys stop.
+    AmigaPlayer groundControls;
+    downwell::Input right;
+    right.right = true;
+    for (unsigned frame = 0; frame < 12; ++frame) groundControls.step(right);
+    require(groundControls.speedXFixed() == 512,
+            "original grounded horizontal speed caps at two pixels");
+    groundControls.step(downwell::Input{});
+    require(groundControls.speedXFixed() == 410,
+            "ground friction uses .4 rather than airborne .1 (Q8 approximation)");
+    downwell::Input left;
+    left.left = true;
+    groundControls.step(left);
+    require(groundControls.speedXFixed() == -153,
+            "ground reversal subtracts two pixels after acceleration");
+    downwell::Input both = right;
+    both.left = true;
+    const int beforeBoth = groundControls.offsetX();
+    groundControls.step(both);
+    require(groundControls.speedXFixed() == 0 &&
+            groundControls.offsetX() == beforeBoth,
+            "simultaneous directions stop immediately rather than applying friction");
+
     AmigaPlayer edgeFall;
     edgeFall.configureLandingResolver([](void*, int x, int) { return x < 1 ? 0 : 100; }, nullptr);
     downwell::Input walkOff;
