@@ -185,6 +185,7 @@ private:
     long cameraY_;
     int cameraPixelY_;
     int cameraPixelX_;
+    int activationY_;
     BulletState bullets_[bulletCapacity];
     EnemyState enemies_[enemyCapacity];
     GemState gems_[gemCapacity];

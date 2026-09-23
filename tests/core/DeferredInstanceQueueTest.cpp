@@ -89,7 +89,8 @@ void testApplyIsOrderedAndAtomic() {
     require(instances.at(2).scaleX == -1.0F &&
                 instances.at(2).imageSpeed == 0.0F &&
                 instances.at(2).imageIndex == 22.0F &&
-                !instances.at(2).active && instances.at(2).alarms.get(1) == 73,
+                !instances.at(2).active && instances.at(2).activationPending &&
+                instances.at(2).alarms.get(1) == 73,
             "synchronous Create results survive deferred insertion");
 
     downwell::DeferredInstanceQueue<2> invalid;

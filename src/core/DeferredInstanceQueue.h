@@ -121,6 +121,7 @@ public:
             instance.motionInitialized = command.motionInitialized;
             instance.grounded = command.grounded;
             instance.active = command.active;
+            instance.activationPending = !command.active;
             instance.alarms = command.alarms;
             instance.depth = definition.depth;
             createHandler(instance);

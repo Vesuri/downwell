@@ -857,23 +857,6 @@ void StartupRuntime::updateMainEnemyInteractions() {
 
 void StartupRuntime::updateMainLifecycle() {
     const float viewTop = mainCameraViewY();
-    const float viewBottom = viewTop + surfaceHeight;
-    if (viewBottom > static_cast<float>(mainActivationY_ - 112)) {
-        mainActivationY_ += 16;
-        for (std::size_t index = 0; index < instances_.size(); ++index) {
-            InstanceRecord& instance = instances_.at(index);
-            const bool enemy = instance.objectId == 111 ||
-                               instance.objectId == 112 ||
-                               instance.objectId == 113 ||
-                               instance.objectId == 116 ||
-                               instance.objectId == 117 ||
-                               instance.objectId == 119;
-            if (!instance.active && enemy && instance.y <= mainActivationY_) {
-                instance.active = true;
-                ++mainEnemiesActivated_;
-            }
-        }
-    }
 
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         InstanceRecord& instance = instances_.at(index);
@@ -1277,6 +1260,23 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
 void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!mainPlayerInitialized_)
         return;
+
+    // The first operation in recovered objPlayer_n Begin Step, before motion.
+    if (mainCameraViewY() + surfaceHeight > mainActivationY_ - 112) {
+        mainActivationY_ += 16;
+        for (std::size_t index = 0; index < instances_.size(); ++index) {
+            InstanceRecord& enemy = instances_.at(index);
+            const bool enemyObject = enemy.objectId == 111 || enemy.objectId == 112 ||
+                enemy.objectId == 113 || enemy.objectId == 116 || enemy.objectId == 117 ||
+                enemy.objectId == 119;
+            if (!enemy.active && enemy.activationPending && enemyObject &&
+                enemy.y <= mainActivationY_) {
+                enemy.active = true;
+                enemy.activationPending = false;
+                ++mainEnemiesActivated_;
+            }
+        }
+    }
 
     const bool wasGrounded = mainPlayerGrounded_;
     // scrPlayerInit + scrPlMovement, default style outside water.
@@ -2267,6 +2267,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(instance.depth);
         digest.addBool(instance.persistent);
         digest.addBool(instance.active);
+        digest.addBool(instance.activationPending);
         digest.addI32(instance.health);
         digest.addI32(instance.reward);
         digest.addF32(instance.preciseX);

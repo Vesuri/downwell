@@ -420,10 +420,13 @@ int main() {
                                0, 0, 15, 12,
                                0, 0, -1, -1, 180, 320, false),
             "generated bat retains direction and deferred activation");
+    for (unsigned frame = 0; frame < 10; ++frame) bat.step(0);
+    require(!bat.enemyAt(0).active && bat.enemyAt(0).activationPending,
+            "activation frontier advances only sixteen pixels per Begin Step");
     bat.step(0);
     require(bat.enemyAt(0).active && !bat.enemyAt(0).activationPending &&
-                bat.enemyAt(0).preciseX == 40L * 256L,
-            "visible dormant bat activates after the current simulation phase");
+                bat.enemyAt(0).preciseX < 40L * 256L,
+            "world-y 176 enemy activates on frontier step eleven before movement");
     bat.step(0);
     require(bat.enemyAt(0).preciseX < 40L * 256L &&
                 bat.enemyAt(0).moveSpeed >= 256 &&

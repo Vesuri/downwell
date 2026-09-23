@@ -26,6 +26,7 @@ struct InstanceRecord {
     std::int32_t depth = 0;
     bool persistent = false;
     bool active = true;
+    bool activationPending = false;
     std::int32_t health = 0;
     std::int32_t reward = 0;
     float preciseX = 0.0F;

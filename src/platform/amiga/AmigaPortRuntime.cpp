@@ -54,7 +54,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
     : player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
-      cameraPixelX_(0),
+      cameraPixelX_(0), activationY_(0),
       enemyCount_(0), enemiesDefeated_(0), enemyRandom_(2),
       health_(4), invulnerability_(0),
       dead_(false), deathFrames_(0),
@@ -412,6 +412,19 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     if (dead_)
         ++deathFrames_;
     downwell::Input input = downwell::unpackReplayInput(packedInput);
+    // objPlayer_n Begin Step advances activatey once, before gravity/motion.
+    // Native camera offsets map to world view bottom 318 + cameraY.
+    if (318L * 256L + cameraY_ > (long)(activationY_ - 112) * 256L) {
+        activationY_ += 16;
+        for (unsigned i = 0; i < enemyCount_; ++i) {
+            EnemyState& enemy = enemies_[i];
+            if (!enemy.active && enemy.activationPending &&
+                enemy.y + 176 <= activationY_) {
+                enemy.active = true;
+                enemy.activationPending = false;
+            }
+        }
+    }
     if (dead_)
         input = downwell::Input{};
     // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
@@ -867,11 +880,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
-        if (!enemy.active && enemy.activationPending &&
-            enemy.y - cameraPixelY_ <= 254) {
-            enemy.active = true;
-            enemy.activationPending = false;
-        }
         // scrOutofview (rmMain): y < viewTop-160 or y > viewTop+3000.
         // Native coordinates are relative to player start y=176; viewTop
         // starts at 34, hence -302 / +2858. Future prebuilt enemies are not

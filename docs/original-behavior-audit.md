@@ -4,6 +4,9 @@ Both ports must reproduce the Windows game. SDL is a development comparison,
 not an oracle. Cross-target replay proves execution consistency for its tape,
 not equivalence with Windows. Historical SDL-parity notes do not supersede this.
 
+See also [activation lifecycle findings](activation-fidelity.md) for the
+source-backed frontier/phase correction and remaining region-boundary gaps.
+
 ## Default player horizontal movement
 
 Inspected export: `extracted/utmt-0.9.2.0/Assembly/`.

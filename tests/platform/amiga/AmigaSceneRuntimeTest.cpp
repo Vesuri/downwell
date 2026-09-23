@@ -668,6 +668,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         const auto& native = gameplay.enemyAt(enemyOrdinal++);
         if (!enemy.active && enemy.health > 0 &&
             enemy.y < reference.mainCameraViewY() - 160) {
+            require(!enemy.activationPending,
+                    "retired SDL enemies are not eligible for later region activation");
             require(!native.active && !native.awake && !native.activationPending,
                     "SDL-retired enemies no longer remain live in Amiga");
             ++retiredCompared;
