@@ -26,6 +26,7 @@ AmigaPlayer::AmigaPlayer(bool startsGrounded, int landingOffset)
       grounded_(startsGrounded), priorFire_(false),
       jumpShootLocked_(false), airborneShot_(false),
       running_(false), runPhaseTenths_(0),
+      idling_(startsGrounded), idlePhaseTenths_(0),
       shotDelay_(startsGrounded ? 0u : 1u), facing_(1),
       jumps_(0), shots_(0)
 {
@@ -211,6 +212,17 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
     }
     running_ = nowRunning;
 
+    const bool nowIdling = grounded_ && speedX_ == 0;
+    if (nowIdling) {
+        if (!idling_)
+            idlePhaseTenths_ = 0;
+        else
+            idlePhaseTenths_ = (idlePhaseTenths_ + 1) % 40;
+    } else {
+        idlePhaseTenths_ = 0;
+    }
+    idling_ = nowIdling;
+
     priorFire_ = input.fire;
     pixelX_ = fixedToPixel(x_);
     pixelY_ = fixedToPixel(y_);
@@ -226,7 +238,8 @@ int AmigaPlayer::spriteId() const
 
 unsigned AmigaPlayer::spriteFrame() const
 {
-    if (grounded_) return running_ ? runPhaseTenths_ / 10 : 0;
+    if (grounded_)
+        return running_ ? runPhaseTenths_ / 10 : idlePhaseTenths_ / 10;
     if (airborneShot_) return 0;
     if (speedY_ < -2 * fixedOne) return 0;
     if (speedY_ < 0) return 1;

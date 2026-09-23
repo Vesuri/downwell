@@ -97,6 +97,8 @@
   and showing its hardware sprite during the invulnerability alarm.
 - [x] Animate the grounded standard-style player with the recovered eight-frame
   run sprite, exact 0.3-frame cadence, and run-entry reset.
+- [x] Advance the four-frame standard-style idle sprite at its recovered
+  0.1-frame cadence on hardware sprite 0.
 - Replace the smoke-state class with a GameMaker-compatible value/state layer.
 - [x] Recover the Windows runner's WELL512 stream and integer-range semantics
   from `Downwell.exe`, then pin portable test vectors.

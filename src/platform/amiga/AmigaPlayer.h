@@ -72,6 +72,8 @@ private:
     bool airborneShot_;
     bool running_;
     unsigned runPhaseTenths_;
+    bool idling_;
+    unsigned idlePhaseTenths_;
     unsigned shotDelay_;
     int facing_;
     unsigned jumps_;

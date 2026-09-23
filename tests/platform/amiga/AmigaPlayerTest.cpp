@@ -31,6 +31,16 @@ int main() {
     require(player.spriteId() == 31 && player.spriteFrame() == 0,
             "grounded player selects the recovered idle frame");
 
+    downwell::Input neutralInput;
+    for (unsigned frame = 0; frame < 10; ++frame)
+        player.step(neutralInput);
+    require(player.spriteFrame() == 1,
+            "the four-frame idle sequence advances at recovered 0.1 speed");
+    for (unsigned frame = 0; frame < 30; ++frame)
+        player.step(neutralInput);
+    require(player.spriteFrame() == 0,
+            "the recovered idle sequence loops after forty steps");
+
     input.fire = true;
     player.step(input);
     require(!player.grounded() && player.jumps() == 1 && player.shots() == 0,
