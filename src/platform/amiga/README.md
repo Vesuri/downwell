@@ -78,3 +78,11 @@ pinned SHA-256, decodes the visible 160-pixel aperture to
 `build/amiga-style-frame.png`, and restores the normal executable. This makes
 style clipping, alignment, palette use, and text composition inspectable
 without relying on a host-window screenshot.
+
+`make verify-amiga-menu-wake-frame` captures the first walking garden frame as
+the two immutable 512x384 cache planes, their independent pointer/fine-scroll
+state, and hardware sprite 0.  Its host decoder reconstructs the centered
+160x284 aperture in `build/amiga-menu-wake-frame.png` and pins the complete
+capture hash.  This also guards the monochrome cache rule: recovered white art
+is retained while opaque source black clears the layer instead of becoming a
+solid white silhouette.

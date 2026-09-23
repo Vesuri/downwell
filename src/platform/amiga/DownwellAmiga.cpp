@@ -174,6 +174,18 @@ extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
 
+struct DownwellMenuFrameCapture {
+    ULONG foregroundOffset;
+    ULONG backgroundOffset;
+    UWORD scrollControl;
+    UWORD titlePartCount;
+};
+
+volatile DownwellMenuFrameCapture gDownwellMenuFrameCapture;
+volatile const UBYTE* gDownwellMenuForeground;
+volatile const UBYTE* gDownwellMenuBackground;
+volatile const UWORD* gDownwellMenuPlayerSprite;
+
 __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
@@ -181,7 +193,14 @@ __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
 __attribute__((noinline, used)) void downwellSplashFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
+
+__attribute__((noinline, used)) void downwellMenuWakeFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
 }
+}
+
+static_assert(sizeof(DownwellMenuFrameCapture) == 12,
+              "menu capture has a stable debugger wire format");
 
 extern "C" __attribute__((noinline, used)) void downwellSceneGameplayReady(void) {
     __asm__ volatile("" ::: "memory");
@@ -888,6 +907,7 @@ int main(void) {
     bool sceneGameplayActiveReported = false;
     bool sceneMenuTitleReported = false;
     bool sceneMenuEntryReported = false;
+    bool sceneMenuWakeFrameReported = false;
     bool sceneStyleFrameReported = false;
     bool sceneSplashFrameReported = false;
     int sceneGameplayLandedCameraY = 0;
@@ -1248,6 +1268,7 @@ int main(void) {
                 }
                 if (presentedScene == AmigaScene::menu) {
                     bool menuFrameReady = true;
+                    AmigaMenuScrollState menuScroll = {0, 0, 0};
                     unsigned titlePartCount = 0;
                     UWORD* titleSprites = memory.menuSprites() +
                         back * menuTitleSpriteParts *
@@ -1303,15 +1324,14 @@ int main(void) {
                                 nullSprite, palette,
                                 scenes.menuCameraY() - 142);
                         } else {
-                            const AmigaMenuScrollState scroll =
-                                amigaMenuScrollState(
-                                    scenes.menuCameraX() - 80,
-                                    scenes.menuCameraY() - 142);
+                            menuScroll = amigaMenuScrollState(
+                                scenes.menuCameraX() - 80,
+                                scenes.menuCameraY() - 142);
                             menuFrameReady = buildMenuCopper(
                                 copperLists[back], memory.menuForeground(),
                                 memory.menuBackground(), playerSprites[back],
                                 titleSprites, titlePartCount,
-                                nullSprite, palette, scroll);
+                                nullSprite, palette, menuScroll);
                         }
                     }
                     if (!menuFrameReady)
@@ -1321,6 +1341,25 @@ int main(void) {
                     if (++menuSpriteFrameCount == 2)
                         downwellMenuSpriteReady();
 #ifdef DOWNWELL_SCENE_VERIFY
+                    if (!sceneMenuWakeFrameReported && !menuEntry &&
+                        !scenes.menuPlayerNapping() &&
+                        scenes.menuPlayerVisible() &&
+                        scenes.menuPlayerSprite() == 27) {
+                        sceneMenuWakeFrameReported = true;
+                        gDownwellMenuFrameCapture.foregroundOffset =
+                            menuScroll.foregroundOffset;
+                        gDownwellMenuFrameCapture.backgroundOffset =
+                            menuScroll.backgroundOffset;
+                        gDownwellMenuFrameCapture.scrollControl =
+                            menuScroll.scrollControl;
+                        gDownwellMenuFrameCapture.titlePartCount =
+                            (UWORD)titlePartCount;
+                        gDownwellMenuForeground = memory.menuForeground();
+                        gDownwellMenuBackground = memory.menuBackground();
+                        gDownwellMenuPlayerSprite =
+                            memory.playerSprite(back);
+                        downwellMenuWakeFrameReady();
+                    }
                     if (!sceneMenuTitleReported &&
                         scenes.menuTitleFrame() == 9 &&
                         titlePartCount == menuTitleSpriteParts) {

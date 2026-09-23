@@ -25,8 +25,8 @@ const UBYTE* find(const UBYTE* pack, const UBYTE* end, UWORD sprite, UWORD frame
     return 0;
 }
 
-bool drawMask(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
-              UWORD sprite, UWORD frame, int anchorX, int anchorY) {
+bool drawMonochrome(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
+                    UWORD sprite, UWORD frame, int anchorX, int anchorY) {
     const UBYTE* record = find(pack, end, sprite, frame);
     if (!record) return false;
     const int originX = (WORD)word(record + 4);
@@ -44,11 +44,24 @@ bool drawMask(Bitmap& destination, const UBYTE* pack, const UBYTE* end,
     if (left + drawWidth > destination.width) drawWidth = destination.width - left;
     if (top + drawHeight > destination.height) drawHeight = destination.height - top;
     if (drawWidth <= 0 || drawHeight <= 0) return true;
-    Bitmap mask((void*)(data + planeBytes * 2), width, height, 1,
-                false, false, dataWidth);
-    destination.patternWithMask(mask, (UWORD)left, (UWORD)top,
+    /*
+     * The recovered pack distinguishes white (01) from opaque black (11).
+     * Using its opacity mask here turns both into white silhouettes.  Apply
+     * plane zero as white, then plane one as a clear mask: white remains set,
+     * source black clears earlier art in this layer, and transparency leaves
+     * it untouched.  The garden assets are monochrome; red is reserved for
+     * the title/player hardware sprites.
+     */
+    Bitmap white((void*)data, width, height, 1,
+                 false, false, dataWidth);
+    Bitmap black((void*)(data + planeBytes), width, height, 1,
+                 false, false, dataWidth);
+    destination.patternWithMask(white, (UWORD)left, (UWORD)top,
                                 (UWORD)sourceX, (UWORD)sourceY,
                                 (UWORD)drawWidth, (UWORD)drawHeight, 0xffff);
+    destination.patternWithMask(black, (UWORD)left, (UWORD)top,
+                                (UWORD)sourceX, (UWORD)sourceY,
+                                (UWORD)drawWidth, (UWORD)drawHeight, 0x0000);
     return true;
 }
 }
@@ -66,16 +79,17 @@ bool amigaRenderMenuCache(const AmigaMenuDrawList& list,
     for (unsigned i = 0; i < list.count; ++i) {
         const AmigaMenuDrawItem& item = list.items[i];
         if (item.objectId == 312) {
-            if (!drawMask(backgroundBitmap, pack, packEnd,
-                          (UWORD)item.spriteId, (UWORD)item.frame, 120, 129))
+            if (!drawMonochrome(backgroundBitmap, pack, packEnd,
+                                (UWORD)item.spriteId, (UWORD)item.frame,
+                                120, 129))
                 return false;
         } else {
-            if (!drawMask(foregroundBitmap, pack, packEnd,
-                          (UWORD)item.spriteId, (UWORD)item.frame,
-                          item.x, item.y - amigaMenuCacheWorldY) ||
-                !drawMask(entryBitmap, pack, packEnd,
-                          (UWORD)item.spriteId, (UWORD)item.frame,
-                          item.x - amigaMenuEntryWorldX, item.y))
+            if (!drawMonochrome(foregroundBitmap, pack, packEnd,
+                                (UWORD)item.spriteId, (UWORD)item.frame,
+                                item.x, item.y - amigaMenuCacheWorldY) ||
+                !drawMonochrome(entryBitmap, pack, packEnd,
+                                (UWORD)item.spriteId, (UWORD)item.frame,
+                                item.x - amigaMenuEntryWorldX, item.y))
                 return false;
         }
     }
