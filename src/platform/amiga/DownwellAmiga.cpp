@@ -81,7 +81,10 @@ enum {
     mainInitialViewY = 34,
     mainBuilderStartY = 1168,
     gameplayPlayerStartY = 142,
-    gameplayPlayerGroundY = 200
+    gameplayPlayerGroundY = 200,
+    gameplayPrefetchLines = 16,
+    gameplayPrefetchScreenY =
+        downwellDisplayHeight - gameplayPrefetchLines
 };
 
 static_assert((unsigned)amigaSplashPlaneBytes ==
@@ -377,7 +380,7 @@ static void drawMainWorldLine(
     const AmigaPortRuntime* runtime,
     int viewX, int worldY, int screenY);
 
-static void drawMainWorld(
+static void drawMainWorldSpan(
     AmigaRenderer* renderer,
     const downwell::RoomPack& rooms,
     const downwell::PackedRoom& room,
@@ -387,15 +390,17 @@ static void drawMainWorld(
     const AmigaTerrainDecoration* decorations,
     unsigned decorationCount,
     const AmigaPortRuntime* runtime,
-    int viewX, int viewY) {
+    int viewX, int viewY, int clipY, int clipHeight) {
     unsigned index;
-    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0,
-                            downwellPlayfieldWidth, downwellDisplayHeight);
+    const int firstWorldY = viewY + clipY;
+    const int finalWorldY = firstWorldY + clipHeight;
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, clipY,
+                            downwellPlayfieldWidth, clipHeight);
     for (index = 0; index < room.instanceCount; ++index) {
         downwell::PackedRoomInstance instance;
         if (!rooms.roomInstance(room, index, instance) ||
-            instance.objectId != 60 || instance.y + 8 < viewY ||
-            instance.y - 8 >= viewY + downwellDisplayHeight)
+            instance.objectId != 60 || instance.y + 8 < firstWorldY ||
+            instance.y - 8 >= finalWorldY)
             continue;
         drawGameAsset(renderer, 51,
                       mainWallFrame(rooms, room, instance.x, instance.y),
@@ -403,8 +408,7 @@ static void drawMainWorld(
                       instance.y - viewY, 0);
     }
     for (int wallY = 704; wallY < mainBuilderStartY; wallY += 16) {
-        if (wallY + 8 < viewY ||
-            wallY - 8 >= viewY + downwellDisplayHeight)
+        if (wallY + 8 < firstWorldY || wallY - 8 >= finalWorldY)
             continue;
         drawGameAsset(renderer, 51, 0, downwellPlayfieldX,
                       wallY - viewY, 0);
@@ -417,8 +421,7 @@ static void drawMainWorld(
         for (UWORD row = 0; row < fragment.pattern.rowCount; ++row) {
             const int rowY = fragment.y + (int)row * 16;
             ULONG width = 0;
-            if (rowY + 8 < viewY ||
-                rowY - 8 >= viewY + downwellDisplayHeight)
+            if (rowY + 8 < firstWorldY || rowY - 8 >= finalWorldY)
                 continue;
             if (row + 1 < fragment.pattern.rowCount) {
                 const int firstX = fragment.sideRoom
@@ -462,8 +465,7 @@ static void drawMainWorld(
             const int secondX = fragment.reversed ? 320 : 160;
             for (int padding = 0; padding < 3; ++padding) {
                 const int rowY = finalRowY + padding * 16;
-                if (rowY + 8 < viewY ||
-                    rowY - 8 >= viewY + downwellDisplayHeight)
+                if (rowY + 8 < firstWorldY || rowY - 8 >= finalWorldY)
                     continue;
                 drawGameAsset(renderer, 51, 0,
                               downwellPlayfieldX + firstX - viewX,
@@ -476,8 +478,8 @@ static void drawMainWorld(
     }
     for (index = 0; index < decorationCount; ++index) {
         const AmigaTerrainDecoration& decoration = decorations[index];
-        if (decoration.y + 24 < viewY ||
-            decoration.y - 24 >= viewY + downwellDisplayHeight)
+        if (decoration.y + 24 < firstWorldY ||
+            decoration.y - 24 >= finalWorldY)
             continue;
         drawGameAsset(renderer, (UWORD)decoration.spriteId,
                       (UWORD)decoration.frame,
@@ -486,6 +488,23 @@ static void drawMainWorld(
                       decoration.flipX ? 1 : 0);
     }
     amigaRendererClearClipRect(renderer);
+}
+
+static void drawMainWorld(
+    AmigaRenderer* renderer,
+    const downwell::RoomPack& rooms,
+    const downwell::PackedRoom& room,
+    const downwell::BuilderPatternPack& builders,
+    const AmigaTerrainFragment* fragments,
+    unsigned fragmentCount,
+    const AmigaTerrainDecoration* decorations,
+    unsigned decorationCount,
+    const AmigaPortRuntime* runtime,
+    int viewX, int viewY) {
+    drawMainWorldSpan(renderer, rooms, room, builders,
+                      fragments, fragmentCount,
+                      decorations, decorationCount, runtime,
+                      viewX, viewY, 0, downwellDisplayHeight);
 }
 
 static void buildReferencePicture(
@@ -690,6 +709,30 @@ static void drawRevealedGameLine(AmigaRenderer* renderer,
                       viewX, worldY, y);
 }
 
+static void drawFutureGameBlock(
+    AmigaRenderer* renderer,
+    const downwell::RoomPack& rooms,
+    const downwell::PackedRoom& room,
+    const downwell::BuilderPatternPack& builders,
+    const AmigaTerrainFragment* fragments,
+    unsigned fragmentCount,
+    const AmigaTerrainDecoration* decorations,
+    unsigned decorationCount,
+    const AmigaPortRuntime* runtime,
+    unsigned ringOrigin, int viewX, int viewY) {
+    const unsigned futureOrigin =
+        (ringOrigin + gameplayPrefetchLines) % downwellGameRingHeight;
+    const int futureViewY = viewY + gameplayPrefetchLines;
+    amigaRendererSetGameOrigin(renderer, futureOrigin);
+    amigaRendererClearGameRows(renderer, gameplayPrefetchScreenY,
+                               gameplayPrefetchLines, 0);
+    drawMainWorldSpan(renderer, rooms, room, builders,
+                      fragments, fragmentCount,
+                      decorations, decorationCount, runtime,
+                      viewX, futureViewY,
+                      gameplayPrefetchScreenY, gameplayPrefetchLines);
+}
+
 static bool buildCopper(CopperList& list,
                         const Bitmap& game, const Bitmap& hud,
                         const Sprite& playerSprite,
@@ -844,6 +887,7 @@ int main(void) {
     unsigned front = 0;
     int worldViewX = mainViewX;
     int worldViewY = mainInitialViewY;
+    int gameplayPrefetchRemaining = 0;
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin);
@@ -1194,12 +1238,21 @@ int main(void) {
                         drawMenu(&renderer, menuDrawList, scenes);
                 }
                 else if (presentedScene != AmigaScene::styleSelect &&
-                         presentationChanged)
+                         presentationChanged) {
                     buildReferencePicture(
                         &renderer, rooms, mainRoom, builders,
                         fragments, amigaInitialTerrainFragmentCount,
                         generatedDecorations, generatedDecorationCount,
                         &port, worldViewX, worldViewY);
+                    if (presentedScene == AmigaScene::gameplay) {
+                        drawFutureGameBlock(
+                            &renderer, rooms, mainRoom, builders,
+                            fragments, amigaInitialTerrainFragmentCount,
+                            generatedDecorations, generatedDecorationCount,
+                            &port, port.ringOrigin(), worldViewX, worldViewY);
+                        gameplayPrefetchRemaining = gameplayPrefetchLines;
+                    }
+                }
                 if (presentedScene == AmigaScene::menu) {
                     bool menuFrameReady = true;
                     unsigned titlePartCount = 0;
@@ -1380,17 +1433,40 @@ int main(void) {
                         origin += downwellGameRingHeight;
                     if (origin >= downwellGameRingHeight)
                         origin -= downwellGameRingHeight;
-                    drawRevealedGameLine(
+                    if (direction > 0 && gameplayPrefetchRemaining > 0) {
+                        --gameplayPrefetchRemaining;
+                        if (gameplayPrefetchRemaining == 0) {
+                            drawFutureGameBlock(
+                                &renderer, rooms, mainRoom, builders,
+                                fragments,
+                                amigaInitialTerrainFragmentCount,
+                                generatedDecorations,
+                                generatedDecorationCount,
+                                &port, (unsigned)origin,
+                                worldViewX, worldViewY);
+                            gameplayPrefetchRemaining =
+                                gameplayPrefetchLines;
+                        }
+                    } else {
+                        drawRevealedGameLine(
+                            &renderer, rooms, mainRoom, builders,
+                            fragments, amigaInitialTerrainFragmentCount,
+                            generatedDecorations, generatedDecorationCount,
+                            &port, (unsigned)origin, worldViewX,
+                            direction > 0
+                                ? worldViewY + downwellDisplayHeight - 1
+                                : worldViewY,
+                            direction > 0
+                                ? downwellDisplayHeight - 1 : 0);
+                    }
+                }
+                if (direction < 0) {
+                    drawFutureGameBlock(
                         &renderer, rooms, mainRoom, builders,
                         fragments, amigaInitialTerrainFragmentCount,
                         generatedDecorations, generatedDecorationCount,
-                        &port,
-                        (unsigned)origin,
-                        worldViewX,
-                        direction > 0
-                            ? worldViewY + downwellDisplayHeight - 1
-                            : worldViewY,
-                        direction > 0 ? downwellDisplayHeight - 1 : 0);
+                        &port, port.ringOrigin(), worldViewX, worldViewY);
+                    gameplayPrefetchRemaining = gameplayPrefetchLines;
                 }
             }
             if (cameraXChanged) {
@@ -1404,6 +1480,12 @@ int main(void) {
                         &port,
                         port.ringOrigin(), worldViewX,
                         worldViewY + screenY, screenY);
+                drawFutureGameBlock(
+                    &renderer, rooms, mainRoom, builders,
+                    fragments, amigaInitialTerrainFragmentCount,
+                    generatedDecorations, generatedDecorationCount,
+                    &port, port.ringOrigin(), worldViewX, worldViewY);
+                gameplayPrefetchRemaining = gameplayPrefetchLines;
             }
             if (destroyedBlockCount != 0) {
                 for (unsigned block = 0;

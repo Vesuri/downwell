@@ -47,6 +47,13 @@ PF2 has priority over PF1. Pen zero remains transparent on both layers, with
 COLOR00 black, so the two layers can use white and red independently without
 painting opaque black rectangles over one another.
 
+The 36 rows hidden below PF1's 284-line viewport are terrain lookahead. The
+renderer composes the next 16 world lines there as one block; vertical camera
+movement then consumes those rows solely by advancing the circular bitplane
+pointers. After 16 downward pixels it refills the next hidden block. Upward
+movement and horizontal side-room changes invalidate and rebuild the lookahead
+so stale terrain can never enter the display.
+
 PF1 is cleared outside the central well. PF2 is cleared inside the well except
 for intentional overlays. The tablet-border art belongs to PF2 and straddles
 the well edges exactly as recovered: x=-2 and mirrored x=162 in 160-pixel
