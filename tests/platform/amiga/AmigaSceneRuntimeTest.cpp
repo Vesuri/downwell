@@ -210,6 +210,24 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             "reference remains in gameplay during comparison");
     require(amiga.generationSucceeded(),
             "live terrain generation succeeds throughout the comparison tape");
+    unsigned referenceEnemyCount = 0;
+    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i)
+        if (amigaEnemyHealth(reference.instanceAt(i).objectId)) ++referenceEnemyCount;
+    if (amiga.tick() <= 265)
+        require(referenceEnemyCount == amiga.enemyCount(),
+                "first four enemy births occur on matching Step frames");
+    if (std::getenv("DOWNWELL_TRACE_BIRTHS")) {
+        static unsigned nativeSeen = 0, referenceSeen = 0;
+        const unsigned count = referenceEnemyCount;
+        if (nativeSeen != amiga.enemyCount() || referenceSeen != count) {
+            std::cout << "ACTOR BIRTH tick=" << amiga.tick()
+                      << " native=" << amiga.enemyCount() << " SDL=" << count
+                      << " cameras=" << 34 + amiga.cameraOffsetY() << ','
+                      << reference.mainCameraViewY() << '\n';
+            nativeSeen = amiga.enemyCount();
+            referenceSeen = count;
+        }
+    }
     // First generated snake traverses fractional positions over adjoining
     // tiles. This caught SDL's subpixel cracks and native stale-X probes.
     if (amiga.enemyCount() && amiga.enemyAt(0).objectId == 111) {
@@ -509,6 +527,15 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "generated native enemy is configured from recovered data");
     }
     AmigaPortRuntime gameplay(300, false, 1201 - 176, true);
+    int builderOrder = -1, cameraOrder = -1;
+    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+        downwell::PackedObjectEvent event;
+        if (!objects.findEvent(reference.instanceAt(i).objectId, 3, 0, event)) continue;
+        if (event.codeId == 1003) builderOrder = static_cast<int>(i);
+        if (event.codeId == 999) cameraOrder = static_cast<int>(i);
+    }
+    require(builderOrder >= 0 && cameraOrder > builderOrder,
+            "recovered rmMain ordinary Step order places builder before camera");
     LiveSceneWorld live(patterns, objects);
     live.bind(gameplay, rooms, terrainRoom);
     compareInitialGameplay(gameplay, reference);

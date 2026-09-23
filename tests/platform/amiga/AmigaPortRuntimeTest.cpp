@@ -42,6 +42,8 @@ struct GenerationOrderProbe {
         ++probe.calls;
         require(bottom >= 318, "generation receives world-space viewport bottom");
         if (probe.calls == 1) {
+            require(bottom == 323,
+                    "builder sees entry camera before the camera Step advances it");
             probe.expected.irandomSmall(180); // Existing turtle alarm fires first.
             require(random.drawCount() == probe.expected.drawCount(),
                     "existing enemy alarm RNG precedes generation");
@@ -295,6 +297,20 @@ int main() {
                 frog.enemyAt(0).spriteId == 168 &&
                 frog.enemyAt(0).imageFrame == 0,
             "frog alarm launches its recovered directional jump");
+
+    AmigaPortRuntime unsupportedFrog(300);
+    unsupportedFrog.configureSolidResolver(flatGround, nullptr);
+    require(unsupportedFrog.configureEnemy(0, 113, 171, 40, 1,
+                0, 0, 35, 20, 0, 0, -1, 60), "configure frog on removable support");
+    unsupportedFrog.step(0);
+    require(unsupportedFrog.enemyAt(0).grounded, "frog initially lands on support");
+    const long supportedY = unsupportedFrog.enemyAt(0).preciseY;
+    unsupportedFrog.configureSolidResolver(noSolid, nullptr);
+    unsupportedFrog.step(0);
+    require(!unsupportedFrog.enemyAt(0).grounded &&
+                unsupportedFrog.enemyAt(0).preciseY > supportedY &&
+                unsupportedFrog.enemyAt(0).alarm1 > 0,
+            "frog falls immediately when support disappears, without waiting for jump alarm");
 
     AmigaPortRuntime snail(300);
     snail.configureSolidResolver(shortRightWall, 0);

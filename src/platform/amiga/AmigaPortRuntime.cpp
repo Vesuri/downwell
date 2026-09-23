@@ -404,6 +404,10 @@ void AmigaPortRuntime::advanceEnemyAlarms()
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
     DW_PROFILE_PHASE(profilePlayer);
+    // The reference dispatches the builder before the camera in rmMain's
+    // ordinary Step instance order. Generation observes the previous camera,
+    // not the camera position being prepared for this frame's display.
+    const long generationCameraY = cameraY_;
     const int oldAmmo = player_.ammo();
     const int oldHealth = health_;
     const unsigned oldCurrency = currency_;
@@ -466,7 +470,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     if (generationStep_ && generationSucceeded_) {
         // Camera centre is 176 + cameraY_/256; view bottom is 142 below it.
-        const long bottom = cameraY_ + 318L * 256L;
+        const long bottom = generationCameraY + 318L * 256L;
         const int bottomCeiling = bottom >= 0 ? (int)((bottom + 255) / 256)
                                               : -(int)((-bottom) / 256);
         generationSucceeded_ = generationStep_(generationContext_, *this,
@@ -632,26 +636,32 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 enemy.preciseY = nextPreciseY;
         } else if (enemy.objectId == 113) {
             enum { halfWidth = 7, foot = 8 };
+            // Ground support is queried every Step in the recovered frog
+            // logic. A remembered landing cannot hold it over a destroyed
+            // block until its jump alarm fires.
+            if (enemy.grounded && !solidResolver_(solidResolverContext_,
+                    (int)downwell::floorQ8Coordinate(enemy.preciseX),
+                    (int)downwell::floorQ8Coordinate(enemy.preciseY) + foot + 1))
+                enemy.grounded = false;
             if (!enemy.grounded) {
                 enemy.speedY += 38;
                 if (enemy.speedY > 7 * 256)
                     enemy.speedY = 7 * 256;
-                const int nextX =
-                    (int)((enemy.preciseX + enemy.speedX) / 256L);
+                const int nextX = (int)downwell::floorQ8Coordinate(enemy.preciseX + enemy.speedX);
                 const int edge = nextX +
                     (enemy.speedX < 0 ? -halfWidth : halfWidth);
-                if (solidResolver_(solidResolverContext_, edge, enemy.y))
+                if (solidResolver_(solidResolverContext_, edge,
+                        (int)downwell::floorQ8Coordinate(enemy.preciseY)))
                     enemy.speedX = -(enemy.speedX * 77L) / 256L;
                 else
                     enemy.preciseX += enemy.speedX;
-                const int nextY =
-                    (int)((enemy.preciseY + enemy.speedY) / 256L);
+                const int nextY = (int)downwell::floorQ8Coordinate(enemy.preciseY + enemy.speedY);
+                const int movedX = (int)downwell::floorQ8Coordinate(enemy.preciseX);
                 if (enemy.speedY > 0 && solidResolver_(
-                        solidResolverContext_, enemy.x, nextY + foot)) {
-                    while (!solidResolver_(solidResolverContext_, enemy.x,
-                                           enemy.y + foot + 1)) {
-                        ++enemy.y;
-                        enemy.preciseY = (long)enemy.y * 256L;
+                        solidResolverContext_, movedX, nextY + foot)) {
+                    while (!solidResolver_(solidResolverContext_, movedX,
+                            (int)downwell::floorQ8Coordinate(enemy.preciseY) + foot + 1)) {
+                        enemy.preciseY += 256L;
                     }
                     enemy.speedY = 0;
                     enemy.grounded = true;

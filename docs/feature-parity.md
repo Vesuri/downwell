@@ -320,3 +320,23 @@ Validation: full host suite passes. The bounded 68000 cache run reaches 600
 simulation ticks with five generated fragments and three enemies, 101
 fresh-composition comparisons and zero reported cache/buffer mismatches.
 No overflow BOB comparisons occurred in that run; it does not cover that path.
+
+### Frog support and generation event order
+
+The native frog now rechecks support each Step instead of remembering a
+grounded flag indefinitely when a destructible block disappears. A regression
+removes its support before its jump alarm expires and requires immediate
+falling. Its point probes also use precise floored coordinates and retain
+fractional landing positions consistently with the reference adaptation.
+
+The optional `DOWNWELL_TRACE_BIRTHS=1` trace identified a separate timing issue:
+native generation used the new camera position, whereas objBuilder runs
+before camMain in the reference's ordinary Step instance order (both are
+Step_0 events, not End Step). Generation now uses the previous camera value.
+The first four enemy births match SDL at ticks 134,166,237,265; this prefix is
+asserted at each sampled comparison, alongside a direct first-camera test.
+Later births still differ (native tick 340 versus SDL 339), accompanying the
+existing player/camera drift. The first >1-pixel actor diagnostic is now the
+frog at tick 272: y=1954.86 versus 1955.9, with native gravity 38/256 rather
+than exactly 0.15. Neither the later birth timing nor complete frog collision
+semantics is claimed solved.
