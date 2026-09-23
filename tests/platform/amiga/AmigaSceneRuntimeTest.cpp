@@ -732,6 +732,20 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << " player=" << 240 + gameplay.player().offsetX() << ',' << 176 + gameplay.player().offsetY()
                           << " SDL=" << reference.mainPlayerX() << ',' << reference.mainPlayerY() << '\n';
                 reported = true;
+                for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {
+                    const auto& enemy = gameplay.enemyAt(i);
+                    std::cout << "COMBAT NATIVE ENEMY " << i << ' ' << enemy.objectId
+                              << " active=" << enemy.active << " hp=" << enemy.health
+                              << " position=" << 240 + enemy.x << ',' << 176 + enemy.y << '\n';
+                }
+                for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                    const auto& enemy = reference.instanceAt(i);
+                    if (enemy.objectId == 111 || enemy.objectId == 112 || enemy.objectId == 113 ||
+                        enemy.objectId == 116 || enemy.objectId == 117 || enemy.objectId == 119)
+                        std::cout << "COMBAT SDL ENEMY " << enemy.objectId
+                                  << " active=" << enemy.active << " hp=" << enemy.health
+                                  << " position=" << enemy.x << ',' << enemy.y << '\n';
+                }
             }
         }
         std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()

@@ -196,6 +196,16 @@ int main() {
                 burst.bulletAt(0).active && burst.bulletAt(1).active &&
                 burst.bulletAt(0).y > burst.bulletAt(1).y,
             "held gunboots retain simultaneous seven-tick shots");
+    require(burst.bulletAt(0).x == -1 && burst.bulletAt(1).x == 1,
+            "original default gun alternates left and right boot emission offsets");
+    AmigaPortRuntime movingShot(300, false, 1000);
+    for (unsigned frame = 0; frame < 12; ++frame) movingShot.step(2);
+    const int muzzleX = downwell::roundGameMakerQ8(movingShot.player().offsetXFixed());
+    const int muzzleY = downwell::roundGameMakerQ8(movingShot.player().offsetYFixed());
+    movingShot.step(2 | 4);
+    require(movingShot.bulletAt(0).x == muzzleX - 1 &&
+                movingShot.bulletAt(0).y == muzzleY + 4 + 8,
+            "shot originates at pre-movement rounded instance coordinates before its own Step");
 
     AmigaPortRuntime destructible(300);
     const int blockX[] = {-1};
@@ -566,7 +576,7 @@ int main() {
     }
     std::cout << "Native trajectory digest: " << std::hex
               << replayRuntime.trajectoryDigest() << std::dec << '\n';
-    require(replayRuntime.trajectoryDigest() == 0xb112ca1f7174a6e1ULL,
+    require(replayRuntime.trajectoryDigest() == 0xbfbbd762b9b62a59ULL,
             "cross-target trajectory digest remains pinned");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;

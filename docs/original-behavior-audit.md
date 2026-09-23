@@ -86,3 +86,27 @@ The kill mismatch at tick 601 remains even with player positions within a
 pixel: native (172,2096), SDL (171.1,2096.7). Final health 3/3, kills 1/1 and
 currency 12/4 still fail the extended combat gate. This supersedes the earlier
 combat endpoint, not the outstanding mask/ordering concerns.
+
+## Bullet muzzle coordinates
+
+`scrPlayerInit` sets the default shootLeg to -1. `scrPlayerEmitBullet` adds it
+to the supplied muzzle X and negates it on each emission. Amiga previously
+always used -1; it now alternates -1/+1 for actual default-gun shots.
+`scrPlayerShootN` captures instance x and y+4 before the Begin Step integrates
+xx/yy. Amiga now captures rounded pre-movement coordinates instead of using
+the post-movement position. SDL now uses the instance coordinates rather than
+unrounded precise coordinates, with player x/y rounding using the same
+ties-to-even helper as enemies.
+
+Independent native tests check both alternating origins and a moving airborne
+shot's pre-movement rounded origin followed by its eight-pixel bullet Step.
+The canonical native digest changes to `bfbbd762b9b62a59`.
+Full host tests and the bounded A500 replay pass with that digest; the 68000
+instruction/helper audits are clean. The playable SDL build was rebuilt too.
+These are default-gun corrections, not implementation of other weapon types.
+
+The extended comparison still fails: SDL kills the later snake at tick 600
+while native has not. The snake positions differ by one pixel (198/199 world
+X), relevant to a bullet at the collision boundary. The inactive native bat
+versus active SDL bat also needs investigation. Final health 2/3, kills 2/1,
+currency 6/6: matching total currency does not establish matching combat.

@@ -525,8 +525,8 @@ void StartupRuntime::fireMainGun(InstanceRecord& instance) {
     }
     if (mainBulletCount_ < mainBulletCapacity) {
         mainBullets_[mainBulletCount_++] = {
-            mainPlayerX_ + static_cast<float>(mainShootLeg_),
-            mainPlayerY_ + 4.0F
+            static_cast<float>(instance.x + mainShootLeg_),
+            static_cast<float>(instance.y + 4)
         };
     }
     mainShootLeg_ *= -1;
@@ -1361,8 +1361,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     } else {
         mainPlayerImageIndex_ = 4.0F;
     }
-    instance.x = static_cast<std::int32_t>(std::round(mainPlayerX_));
-    instance.y = static_cast<std::int32_t>(std::round(mainPlayerY_));
+    instance.x = static_cast<std::int32_t>(roundGameMakerCoordinate(mainPlayerX_));
+    instance.y = static_cast<std::int32_t>(roundGameMakerCoordinate(mainPlayerY_));
     instance.imageIndex = mainPlayerImageIndex_;
 }
 

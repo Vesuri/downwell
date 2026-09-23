@@ -414,6 +414,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     if (dead_)
         input = downwell::Input{};
+    // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
+    const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
+    const int muzzleY = (int)downwell::roundGameMakerQ8(player_.offsetYFixed()) + 4;
     AmigaPlayerMotion motion = player_.step(input);
     if (player_.shots() != oldShots) {
         unsigned index;
@@ -421,8 +424,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             BulletState& bullet = bullets_[index];
             if (!bullet.active) {
                 bullet.active = true;
-                bullet.x = player_.offsetX() - 1;
-                bullet.y = player_.offsetY() + 4;
+                // Default scrPlayerInit starts shootLeg at -1;
+                // scrPlayerEmitBullet negates it after every actual shot.
+                bullet.x = muzzleX + ((oldShots & 1u) ? 1 : -1);
+                bullet.y = muzzleY;
                 bulletChanged = true;
                 break;
             }

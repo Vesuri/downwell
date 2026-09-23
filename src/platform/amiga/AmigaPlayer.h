@@ -34,6 +34,7 @@ public:
 
     int offsetX() const { return pixelX_; }
     int offsetY() const { return pixelY_; }
+    long offsetXFixed() const { return x_; }
     long offsetYFixed() const { return y_; }
     long speedXFixed() const { return speedX_; }
     int ammo() const { return ammo_; }
