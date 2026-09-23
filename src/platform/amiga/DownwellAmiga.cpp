@@ -173,6 +173,7 @@ downwellMenuEntryScrollReady(void) {
 extern "C" {
 volatile const UBYTE* gDownwellStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
+volatile const UBYTE* gDownwellControlsFrame;
 
 struct DownwellMenuFrameCapture {
     ULONG foregroundOffset;
@@ -201,6 +202,10 @@ __attribute__((noinline, used)) void downwellStyleFrameReady(void) {
 }
 
 __attribute__((noinline, used)) void downwellSplashFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellControlsFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
@@ -955,6 +960,7 @@ int main(void) {
     bool sceneMenuWakeFrameReported = false;
     bool sceneStyleFrameReported = false;
     bool sceneSplashFrameReported = false;
+    bool sceneControlsFrameReported = false;
     int sceneGameplayLandedCameraY = 0;
 #endif
     worldViewY += port.cameraOffsetY();
@@ -1283,6 +1289,13 @@ int main(void) {
                             gDownwellSplashFrame = amigaSplashFrame(
                                 memory.sceneCache(), presentedSplash);
                             downwellSplashFrameReady();
+                        }
+                        if (!sceneControlsFrameReported &&
+                            presentedSplash == 4) {
+                            sceneControlsFrameReported = true;
+                            gDownwellControlsFrame = amigaSplashFrame(
+                                memory.sceneCache(), presentedSplash);
+                            downwellControlsFrameReady();
                         }
 #endif
                     }

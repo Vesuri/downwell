@@ -73,6 +73,13 @@ Splash stages 2, 4, 5, and 6 now draw their recovered Devolver, controls, and
 dither sprites. Stage 3 credits require the font renderer and remain blank for
 now; fade-frame interpolation is also still pending.
 
+The two nonblank native splash rasters have independent emulator-backed
+regression gates. `make verify-amiga-splash-frame` pins the complete Devolver
+publisher frame and `make verify-amiga-controls-frame` pins the recovered
+controller/keyboard instructions. In this Steam data, the stage-5 dither frame
+is transparent, so its visible result is identical to stage 4 before stage 6
+clears the compact splash buffer.
+
 The cross-target replay and state-comparison contract is documented in
 [docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional
 GameMaker behavior is tracked separately in
