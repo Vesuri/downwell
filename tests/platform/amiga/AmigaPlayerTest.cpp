@@ -33,6 +33,15 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    AmigaPlayer edgeFall;
+    edgeFall.configureLandingResolver([](void*, int x, int) { return x < 1 ? 0 : 100; }, nullptr);
+    downwell::Input walkOff;
+    walkOff.right = true;
+    for (unsigned frame = 0; frame < 10 && edgeFall.grounded(); ++frame)
+        edgeFall.step(walkOff);
+    require(!edgeFall.grounded() && edgeFall.offsetYFixed() > 0,
+            "walking off support applies gravity on the first airborne frame");
+
     AmigaPlayer player;
     downwell::Input input;
     require(player.grounded() && player.ammo() == 8,

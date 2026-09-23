@@ -100,10 +100,10 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
 
     if (shotDelay_ > 0)
         --shotDelay_;
-    if (!grounded_) {
-        speedY_ += gravity;
-        if (speedY_ > fallMaximum) speedY_ = fallMaximum;
-    }
+    // Gravity precedes horizontal movement/support checks in the recovered
+    // player Step. Walking off an edge must start falling this same frame.
+    speedY_ += gravity;
+    if (speedY_ > fallMaximum) speedY_ = fallMaximum;
     if (fireReleased) {
         if (speedY_ < 0)
             speedY_ /= 2;
@@ -205,6 +205,7 @@ AmigaPlayerMotion AmigaPlayer::step(const downwell::Input& input)
         }
     }
 
+    if (grounded_) speedY_ = 0;
     pixelX_ = fixedToPixel(x_);
     pixelY_ = fixedToPixel(y_);
 

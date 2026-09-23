@@ -412,3 +412,22 @@ checks both speed and position; the first live-tape snake now also has exact
 grounded/sprite/frame assertions while active. Its former tick-138 mismatch
 is gone. The optional animation trace next reports a later snake at tick 343,
 after the separately documented one-frame-late birth. Full parity remains open.
+
+### Same-frame player edge fall closes the sampled birth gap
+
+Native player gravity was skipped whenever the frame began grounded. If
+horizontal movement then left a platform, that first airborne frame moved
+down by zero, unlike SDL/recovered Step ordering. Gravity now precedes support
+loss; a player that remains supported clears vertical speed at the end of
+the update. A focused test requires positive downward displacement on the
+very first frame without support.
+
+With this correction the entire current live tape has matching enemy counts
+at every sampled frame, including the last pair born at tick 339. All paired
+active actors now have exact grounded/sprite/integer-animation-frame assertions,
+in addition to the one-pixel position checks. This supersedes the earlier
+reported birth/frame differences on this tape, not the broader outstanding
+requirements (additional tapes, combat states, shops, later scenes and visual
+coverage). Full feature parity is still unproven.
+The full host suite, canonical cross-target replay (`64 95d0aaea 1be7256f`)
+and bounded 600-tick Amiga terrain cache check pass after this ordering change.

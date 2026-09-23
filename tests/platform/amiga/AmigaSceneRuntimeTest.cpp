@@ -215,9 +215,8 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
     unsigned referenceEnemyCount = 0;
     for (unsigned i = 0; i < reference.activeInstanceCount(); ++i)
         if (amigaEnemyHealth(reference.instanceAt(i).objectId)) ++referenceEnemyCount;
-    if (amiga.tick() <= 265)
-        require(referenceEnemyCount == amiga.enemyCount(),
-                "first four enemy births occur on matching Step frames");
+    require(referenceEnemyCount == amiga.enemyCount(),
+            "all enemy births occur on matching Step frames throughout this tape");
     if (std::getenv("DOWNWELL_TRACE_BIRTHS")) {
         static unsigned nativeSeen = 0, referenceSeen = 0;
         const unsigned count = referenceEnemyCount;
@@ -230,9 +229,8 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             referenceSeen = count;
         }
     }
-    // Compare every paired actor, not just the first snake. A newborn can
-    // temporarily be absent on one side due to the separately tracked camera
-    // threshold drift; never substitute a different actor for that ordinal.
+    // Counts above must match on every sampled frame; compare actors in
+    // recovered creation order, never substitute a different ordinal.
     unsigned comparedOrdinal = 0;
     for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
         const auto& enemy = reference.instanceAt(i);
@@ -256,10 +254,10 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             }
             require(native.objectId == enemy.objectId,
                     "paired actor identity matches throughout live comparison");
-            if (comparedOrdinal == 0 && enemy.objectId == 111 && enemy.active && native.active)
+            if (enemy.active && native.active)
                 require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
                             native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
-                        "first snake landing and presentation match exactly across targets");
+                        "all paired active actors match support, sprite and animation frame");
             if (enemy.objectId == 113 && enemy.active && native.active) {
                 require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
                             native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
