@@ -26,10 +26,11 @@ coordinate mapping.
 
 The current executable displays recovered area-one wall art on a 320-line
 circular PF1, the recovered 4:3 HUD on the fixed PF2, and the player on hardware
-sprite channel 0 in both the garden and gameplay. The garden background remains
-static while that sprite advances the recovered sleeping animation, then the
-existing camera redraw path takes over when the player wakes. It embeds and
-validates the recovered room, object/event, and
+sprite channel 0 in both the garden and gameplay. The garden foreground and
+background are precomposed into independent static bitplanes and moved by
+bitplane pointers and BPLCON1 while the player wakes above them. The vertical
+well-entry shaft is likewise a cached bitplane addressed directly by its camera
+position. It embeds and validates the recovered room, object/event, and
 builder-pattern packs with the same endian-safe readers as the SDL reference.
 The player alternates between recovered idle and air frames to make paired
 copper-list and sprite-pointer swaps visible. Port-1 joystick motion drives a
@@ -70,3 +71,10 @@ then walks into more than 256 pixels of circular-buffer scrolling. It stops
 only after a generated enemy is awake and that gameplay frame and copper list
 have been published. It also restores the normal playable executable after
 passing.
+
+`make verify-amiga-style-frame` stops on the first stable default-style frame,
+dumps the exact 176x284 two-plane Chip RAM image through GDB, verifies its
+pinned SHA-256, decodes the visible 160-pixel aperture to
+`build/amiga-style-frame.png`, and restores the normal executable. This makes
+style clipping, alignment, palette use, and text composition inspectable
+without relying on a host-window screenshot.

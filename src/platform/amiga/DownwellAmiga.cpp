@@ -170,6 +170,14 @@ downwellMenuEntryScrollReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
+extern "C" {
+volatile const UBYTE* gDownwellStyleFrame;
+
+__attribute__((noinline, used)) void downwellStyleFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+}
+
 extern "C" __attribute__((noinline, used)) void downwellSceneGameplayReady(void) {
     __asm__ volatile("" ::: "memory");
 }
@@ -186,12 +194,14 @@ downwellSceneGameplayActive(void) {
 
 #ifdef DOWNWELL_SCENE_VERIFY
 static downwell::Input sceneVerificationInput(
-    const AmigaSceneRuntime& scenes, bool gameplayLanded) {
+    const AmigaSceneRuntime& scenes, bool styleFrameReported,
+    bool gameplayLanded) {
     downwell::Input input;
     if (scenes.scene() == AmigaScene::menu)
         input.right = true;
     else if (scenes.scene() == AmigaScene::styleSelect &&
-             scenes.styleYOffset() == 0 && !scenes.styleSelected())
+             scenes.styleYOffset() == 0 && styleFrameReported &&
+             !scenes.styleSelected())
         input.fire = true;
     else if (scenes.scene() == AmigaScene::gameplay && gameplayLanded)
         input.right = true;
@@ -907,6 +917,7 @@ int main(void) {
     bool sceneGameplayActiveReported = false;
     bool sceneMenuTitleReported = false;
     bool sceneMenuEntryReported = false;
+    bool sceneStyleFrameReported = false;
     int sceneGameplayLandedCameraY = 0;
 #endif
     worldViewY += port.cameraOffsetY();
@@ -1194,7 +1205,8 @@ int main(void) {
 #else
 #ifdef DOWNWELL_SCENE_VERIFY
             const downwell::Input liveInput = sceneVerificationInput(
-                scenes, sceneGameplayLandedReported);
+                scenes, sceneStyleFrameReported,
+                sceneGameplayLandedReported);
 #else
             const downwell::Input liveInput = AmigaInput::sample();
 #endif
@@ -1368,6 +1380,17 @@ int main(void) {
                     platform.publish(copperLists[back]);
                     front = back;
                     presentedMenuHardware = false;
+#ifdef DOWNWELL_SCENE_VERIFY
+                    if (!sceneStyleFrameReported &&
+                        scenes.styleYOffset() == 0 &&
+                        !scenes.styleSelected()) {
+                        sceneStyleFrameReported = true;
+                        gDownwellStyleFrame =
+                            memory.sceneCache() +
+                                back * amigaStyleFrameBytes;
+                        downwellStyleFrameReady();
+                    }
+#endif
                     continue;
                 }
                 if (presentationChanged) {
