@@ -1175,19 +1175,15 @@ int main(void) {
                     if (presentationChanged || splashDitherChanged) {
                         CopperList* splashProgram =
                             &dynamicSplashLists[back];
-                        bool staticSplashProgram = false;
                         bool built = true;
                         if (presentationChanged && presentedSplash == 2) {
                             splashProgram = &splashLogoList;
-                            staticSplashProgram = true;
                         } else if (presentationChanged &&
                                    presentedSplash == 3) {
                             splashProgram = &splashCreditsList;
-                            staticSplashProgram = true;
                         } else if (presentationChanged &&
                                    presentedSplash == 4) {
                             splashProgram = &splashControlsList;
-                            staticSplashProgram = true;
                         } else {
                             built = dynamicSplashLists[back].buildNarrow(
                                 amigaSplashFrame(memory.sceneCache(),
@@ -1202,26 +1198,17 @@ int main(void) {
                         }
                         if (!built)
                             break;
+                        platform.publish(*splashProgram);
                         /*
-                         * These programs were completed before display DMA
-                         * started, and this branch runs immediately after
-                         * waitVblank().  Strobe COPJMP1 so the selected
-                         * screen begins in this vertical blank rather than
-                         * allowing the previous program one final field.
-                         * Animated dither programs remain deferred because
-                         * they are assembled during the current field.
-                         */
-                        platform.publish(*splashProgram, staticSplashProgram);
-                        /*
-                         * COP1LC is latched by the copper at the following
-                         * vertical blank.  Synchronize discrete splash
-                         * changes here so a quickly advanced stage cannot
-                         * remain merely queued.  The four static splash
-                         * programs are immutable; only per-frame dither
-                         * updates use the two alternating dynamic lists.
+                         * The VBlank handler makes the queued program live
+                         * and only then advances the frame counter. Hold each
+                         * discrete stage here until that handoff is complete.
                          */
                         if (presentationChanged)
                             platform.waitVblank();
+                        if (presentationChanged &&
+                            !platform.isLive(*splashProgram))
+                            break;
 #ifdef DOWNWELL_SCENE_VERIFY
                         if (!sceneCreditsFrameReported &&
                             presentedSplash == 3) {
@@ -1684,7 +1671,7 @@ int main(void) {
                 frameReady = false;
             if (!frameReady)
                 break;
-            /* COP1LC is sampled at the next VERTB; never restart mid-frame. */
+            /* AmigaPlatform makes the published list live at next VBlank. */
             platform.publish(gameplayCopperLists[back]);
             front = back;
 #ifdef DOWNWELL_SCENE_VERIFY

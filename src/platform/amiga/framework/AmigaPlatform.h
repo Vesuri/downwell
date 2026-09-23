@@ -17,7 +17,9 @@ public:
                   UWORD hStart, UWORD hStop,
                   UWORD vStart, UWORD vStop,
                   UWORD fetchStart, UWORD fetchStop);
-    void publish(const CopperList& copper, bool immediate = false);
+    /* Queue a complete copper program for the next vertical blank. */
+    void publish(const CopperList& copper);
+    bool isLive(const CopperList& copper) const;
     void waitVblank() const;
     void restore();
 
@@ -27,6 +29,8 @@ private:
 
     static ULONG vblankHandler();
     static volatile UWORD vblankCount_;
+    static const UWORD* volatile pendingCopper_;
+    static const UWORD* volatile liveCopper_;
 
     struct View* savedView_;
     const UWORD* osCopper_;

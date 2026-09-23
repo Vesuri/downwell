@@ -51,9 +51,11 @@ Its machine lifecycle is owned by the shared-style `AmigaPlatform` class and
 follows Rescue on Fractalus: allocation and the two
 `WaitTOF()` calls which retire the Workbench display happen before takeover;
 the live program owns the raw VERTB vector, forbids multitasking, and waits on
-its own interrupt counter. Normal copper swaps publish COP1LC without a
-COPJMP1 strobe and therefore become live at the next vertical blank. Teardown
-stops the display, restores `graphics.library`'s startup copper and the saved
+its own interrupt counter. Copper swaps are queued by the main loop; the raw
+VBlank handler installs COP1LC, strobes COPJMP1, and only then advances the
+counter that releases the main thread. This keeps published and live lists
+distinct and makes every swap occur at a known beam-safe point. Teardown stops
+the display, restores `graphics.library`'s startup copper and the saved
 interrupt/DMA state, permits multitasking, and only then restores the View.
 It exits back to Workbench on a fresh left-mouse click.
 
