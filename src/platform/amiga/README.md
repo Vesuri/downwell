@@ -95,7 +95,11 @@ Removing the splash branch's terminating `continue` makes this verifier report
 600 overwritten frames; the corrected scene sequence passes.
 
 `make verify-amiga-credits-frame` stops on splash stage 3 and captures the
-fixed 384x284 two-plane HUD backing raster.  Its decoder applies the real
+fixed 384x284 two-plane HUD backing raster. Before capturing, it audits the
+published copper program for both consecutive BPL1/BPL2 pointer pairs, the
+13632-byte plane separation, two-plane mode, 44-byte fetch and 4-byte modulos.
+This catches an uninitialized second DMA channel even when the raster is
+correct. Its decoder applies the real
 16-pixel hardware crop and writes `build/amiga-credits-frame.png`, pinning the
 recovered 4:3 placement of the three contributor blocks.  The frame is
 precomposed before it becomes visible and remains unchanged for the whole

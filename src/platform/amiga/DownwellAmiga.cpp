@@ -151,6 +151,7 @@ volatile const UBYTE* gDownwellSelectedStyleFrame;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
 volatile const UBYTE* gDownwellCreditsFrame;
+volatile const UWORD* gDownwellCreditsCopper;
 #ifdef DOWNWELL_SCENE_VERIFY
 volatile ULONG gDownwellSplashCheckedFrames[7];
 volatile ULONG gDownwellSplashPublicationFailures;
@@ -1230,6 +1231,7 @@ int main(void) {
                             presentedSplash == 3) {
                             sceneCreditsFrameReported = true;
                             gDownwellCreditsFrame = memory.hud();
+                            gDownwellCreditsCopper = platform.publishedCopper();
                             downwellCreditsFrameReady();
                         }
                         if (!sceneSplashFrameReported &&

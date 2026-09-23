@@ -186,7 +186,8 @@ bool DownwellSplashCopperList::buildWide(
         !move(bplcon1, 0) ||
         !move(bpl1mod, downwellFetchModulo) ||
         !move(bpl2mod, downwellFetchModulo) ||
-        !showBitmap(frame, 1, 2, downwellFetchCropBytes * 8, 0, 1) ||
+        // Single playfield: initialize both consecutive DMA channels.
+        !showBitmap(frame, 1, 1, downwellFetchCropBytes * 8, 0, 2) ||
         !hideSprites(*this, nullSprite) ||
         !setPalette(palette))
         return false;
