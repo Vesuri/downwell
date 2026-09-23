@@ -28,8 +28,8 @@ int main() {
     AmigaMenuScrollState state = amigaMenuScrollState(0, 284);
     require(state.foregroundOffset == 0 &&
                 state.backgroundOffset == 25 * 64 &&
-                state.scrollControl == 0,
-            "aligned intro origin preserves background vertical parallax");
+                state.scrollControl == 0xff,
+            "aligned intro origin uses the full extra-word delay");
 
     state = amigaMenuScrollState(95, 300);
     require(state.foregroundOffset != state.backgroundOffset,
@@ -38,15 +38,15 @@ int main() {
             "foreground pointer advances in sixteen-pixel words");
     require(state.backgroundOffset == 27 * 64,
             "background pointer applies recovered slow vertical parallax");
-    require(state.scrollControl == 0xff,
-            "independent fine-scroll nibbles preserve parallax remainder");
+    require(state.scrollControl == 0,
+            "fifteen-pixel offsets consume the extra-word delay");
 
     state = amigaMenuScrollState(192, 384);
     require(state.foregroundOffset == 100 * 64 + 24 &&
                 state.backgroundOffset == 34 * 64 + 4,
             "cached planes preserve independent parallax pointers");
-    require(state.scrollControl == 0,
-            "word-aligned parallax offsets need no fine scroll");
+    require(state.scrollControl == 0xff,
+            "word-aligned parallax offsets use the full delay");
 
     require(amigaMenuEntryOffset(306) == 306 * 22 &&
                 amigaMenuEntryOffset(858) == 858 * 22 &&

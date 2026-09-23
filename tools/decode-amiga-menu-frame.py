@@ -65,8 +65,8 @@ def main():
 
     foreground_y, foreground_byte = divmod(foreground_offset, BYTES_PER_ROW)
     background_y, background_byte = divmod(background_offset, BYTES_PER_ROW)
-    foreground_x = foreground_byte * 8 + (scroll & 15)
-    background_x = background_byte * 8 + ((scroll >> 4) & 15)
+    foreground_x = foreground_byte * 8 + (15 - (scroll & 15))
+    background_x = background_byte * 8 + (15 - ((scroll >> 4) & 15))
     if foreground_x + DISPLAY_WIDTH > CACHE_WIDTH or \
             background_x + DISPLAY_WIDTH > CACHE_WIDTH or \
             foreground_y + DISPLAY_HEIGHT > CACHE_HEIGHT or \

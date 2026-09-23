@@ -31,8 +31,15 @@ AmigaMenuScrollState amigaMenuScrollState(int viewX, int viewY) {
     AmigaMenuScrollState state;
     state.foregroundOffset = planeOffset(foregroundX, top);
     state.backgroundOffset = backgroundOffset(backgroundX, viewY);
+    /*
+     * PFxH is a display delay, not a source-pixel offset.  With the extra
+     * fetch word selected by DDFSTRT=$30, delay 15 is the word-aligned
+     * position.  Decrease the delay while the view advances through a word,
+     * then advance the pointer and wrap the delay back to 15.
+     */
     state.scrollControl = static_cast<std::uint16_t>(
-        (foregroundX & 15) | ((backgroundX & 15) << 4));
+        (15 - (foregroundX & 15)) |
+        ((15 - (backgroundX & 15)) << 4));
     return state;
 }
 
