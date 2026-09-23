@@ -17,7 +17,7 @@ public:
                   UWORD hStart, UWORD hStop,
                   UWORD vStart, UWORD vStop,
                   UWORD fetchStart, UWORD fetchStop);
-    void publish(const CopperList& copper);
+    void publish(const CopperList& copper, bool immediate = false);
     void waitVblank() const;
     void restore();
 

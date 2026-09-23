@@ -93,9 +93,9 @@ bool AmigaPlatform::takeover(const CopperList& firstCopper,
     return true;
 }
 
-void AmigaPlatform::publish(const CopperList& copper)
+void AmigaPlatform::publish(const CopperList& copper, bool immediate)
 {
-    AmigaHardware::setCopperList(copper);
+    AmigaHardware::setCopperList(copper, immediate);
 }
 
 void AmigaPlatform::waitVblank() const

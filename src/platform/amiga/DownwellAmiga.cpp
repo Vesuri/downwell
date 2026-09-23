@@ -1370,7 +1370,21 @@ int main(void) {
                         }
                         if (!built)
                             break;
-                        platform.publish(copperLists[splashCopper]);
+                        const bool staticSplashProgram =
+                            splashCopper == splashLogoCopper ||
+                            splashCopper == splashCreditsCopper ||
+                            splashCopper == splashControlsCopper;
+                        /*
+                         * These programs were completed before display DMA
+                         * started, and this branch runs immediately after
+                         * waitVblank().  Strobe COPJMP1 so the selected
+                         * screen begins in this vertical blank rather than
+                         * allowing the previous program one final field.
+                         * Animated dither programs remain deferred because
+                         * they are assembled during the current field.
+                         */
+                        platform.publish(copperLists[splashCopper],
+                                         staticSplashProgram);
                         /*
                          * COP1LC is latched by the copper at the following
                          * vertical blank.  Synchronize discrete splash
