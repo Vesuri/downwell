@@ -365,3 +365,23 @@ to the recovered arithmetic and exercise both wobble directions and inactive
 phase retention. The paired runtime fixture also compares phase and wobble.
 Active-menu composition and original runner subimage resolution remain pending;
 this clock change is not evidence of on-screen menu parity.
+
+## Shared menu layout contract
+
+`ShopMenuLayout.h` emits the supported Shop Draw branches in source order:
+description panel 489, cursor 484 (signed quarter-frame phase), numbered overlay
+498, full-size item frame 0, and centered/middle-anchored text requests. The
+panel tracks cameraHeight/2-85, while the case cursor remains world-anchored.
+Wobble offsets the cursor and the item/text in opposite directions. Sold-out
+and Leave replace the item block; an unaffordable price requests red text.
+The legacy state-zero choices are retained. State two (selling) explicitly
+returns unsupported instead of silently presenting a fabricated interface.
+
+Text requests retain semantic IDs and numeric values, not copyrighted localized
+payloads. The original English entries are in read-only data/language.ini;
+backends still need their extracted text/raster assets and middle alignment.
+`make test-shop-menu-layout` checks command order, IDs, frames, world/viewport
+coordinates, camera-height changes, affordability, sold-out/Leave, inactive and
+retired counters. This is a layout contract, not connected rendering yet;
+offline menu assets, negative-subimage resolution and on-target composition
+remain the next integration work.

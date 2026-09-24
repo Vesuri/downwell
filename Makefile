@@ -219,7 +219,13 @@ build/ammo-dividers-test: tests/core/AmmoDividersTest.cpp src/core/AmmoDividers.
 
 test: test-ammo-dividers test-ammo-fill
 test: test-shop-inventory
-test: test-shop-interaction
+test: test-shop-interaction test-shop-menu-layout
+.PHONY: test-shop-menu-layout
+build/shop-menu-layout-test: tests/core/ShopMenuLayoutTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-shop-menu-layout: build/shop-menu-layout-test
+	./build/shop-menu-layout-test
 test: test-shop-world
 test: test-shop-keeper
 .PHONY: test-shop-keeper
