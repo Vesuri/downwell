@@ -257,7 +257,7 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     constexpr int gaugeBottom = 233;
     constexpr int meterLength = 184;
     const int filled = static_cast<int>(meterLength *
-        (static_cast<float>(startup_.mainAmmo()) / 8.0F));
+        (static_cast<float>(startup_.mainAmmo()) / startup_.mainAmmoCapacity()));
     renderer.drawSprite(416, 0, gaugeX, gaugeTop);
     if (filled > 0)
         renderer.fillRect(gaugeX + 5, gaugeBottom - filled,

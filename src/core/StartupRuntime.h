@@ -152,6 +152,7 @@ public:
     int mainCameraRenderViewX() const { return mainCameraMotion_.pixelX() - surfaceWidth / 2; }
     int mainCameraRenderViewY() const { return mainCameraMotion_.pixelY() - surfaceHeight / 2; }
     int mainAmmo() const { return mainAmmo_; }
+    int mainAmmoCapacity() const { return mainPlayerMotion_.ammoCapacity(); }
     int mainPlayerHealth() const { return mainPlayerHealth_; }
     const PlayerDeathSequence& mainDeathSequence() const { return mainDeath_; }
     const RunGemStatistics& runGemStatistics() const { return runGemStatistics_; }

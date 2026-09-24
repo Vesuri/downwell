@@ -439,24 +439,39 @@ static void drawCurrencyDigit(AmigaRenderer* renderer, int x, int y,
 
 static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
                           unsigned digit) {
-    drawAsset(renderer, 65010, digit, x, y, 0);
+    if (digit < 10) {
+        drawAsset(renderer, 65010, digit, x, y, 0);
+    } else {
+        downwell::drawAmmoNumberLayers(x, y, digit, [renderer](unsigned frame, int px, int py) {
+            drawAsset(renderer, 413, frame, px, py, 0);
+        });
+    }
 }
 
-static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo) {
+static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo) {
     enum {
         gaugeX = 289,
         gaugeTop = 49,
         gaugeWidth = 10,
-        gaugeLength = 184,
-        maximumAmmo = 8
+        gaugeLength = 184
     };
     if (ammo > maximumAmmo)
         ammo = maximumAmmo;
-    const int filled = gaugeLength * (int)ammo / maximumAmmo;
+    const int filled = maximumAmmo ? gaugeLength * (int)ammo / maximumAmmo : 0;
     amigaRendererClearClipRect(renderer);
     // The label clear overlaps the gauge's lower rim. Restore the two gauge
     // layers in the source draw order when ammo changes, not every frame.
-    amigaRendererFillRect(renderer, 282, 232, 20, 20, 3);
+    static unsigned oldDigits = 1;
+    unsigned digits = 1;
+    for (unsigned value = ammo; value >= 10; value /= 10) ++digits;
+    const unsigned clearDigits = digits > oldDigits ? digits : oldDigits;
+    oldDigits = digits;
+    if (clearDigits == 1) {
+        amigaRendererFillRect(renderer, 282, 232, 20, 20, 3);
+    } else {
+        amigaRendererFillRect(renderer, 282 - (static_cast<int>(clearDigits) - 1) * 4,
+            231, 32 + (clearDigits - 1) * 8, 24 + clearDigits - 1, 0);
+    }
     drawAsset(renderer, 416, 0, 284, 43, 0);
     /*
      * The frame is static on PF2, but its interior follows gunboot charge.
@@ -2091,7 +2106,7 @@ int main(void) {
                 destroyedBlockY[block] = result.blockY[block];
             }
             if (result.ammoChanged)
-                redrawAmmo(&renderer, (unsigned)port.player().ammo());
+                redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity());
             if (result.healthChanged)
                 redrawHealth(&renderer, (unsigned)port.health());
             if (result.currencyChanged)

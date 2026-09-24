@@ -375,6 +375,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     // not the camera position being prepared for this frame's display.
     const long generationCameraY = viewCameraYQ8();
     const int oldAmmo = player_.ammo();
+    const int oldAmmoCapacity = player_.ammoCapacity();
     const int oldHealth = health_;
     const unsigned oldCurrency = currencyAccount_.currency;
     const unsigned oldGemStreak = currencyAccount_.streak;
@@ -772,7 +773,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     AmigaPortFrame frame = {};
     deathResults_.presentationStep();
     frame.playerMotion = motion;
-    frame.ammoChanged = player_.ammo() != oldAmmo;
+    frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity;
     frame.healthChanged = health_ != oldHealth;
     frame.currencyChanged = currencyAccount_.currency != oldCurrency;
     frame.streakChanged = currencyAccount_.streak != oldGemStreak;

@@ -35,7 +35,7 @@ public:
     void drawText(std::int32_t, const char*, float, float, downwell::Color,
                   downwell::TextAlign) override {}
 
-    std::array<SpriteCall, 64> calls{};
+    std::array<SpriteCall, 160> calls{};
     std::size_t count = 0;
 };
 
@@ -77,6 +77,17 @@ int main() {
                 renderer.calls[14].x == 100 && renderer.calls[14].y == 20,
             "single-digit ammo is centred on its recovered anchor");
 
+    renderer.count = 0;
+    downwell::drawHudAmmoNumber(renderer, 100, 20, 12);
+    require(renderer.count == 30 && renderer.calls[28].frame == 1 &&
+                renderer.calls[28].x == 96 && renderer.calls[28].y == 20 &&
+                renderer.calls[29].frame == 2 && renderer.calls[29].x == 104 &&
+                renderer.calls[29].y == 21, "multi-digit ammo is centered with source diagonal spacing");
+    for (unsigned i = 0; i < 28; ++i)
+        require(renderer.calls[i].frame >= 10, "all ammo outlines precede foreground digits");
+    unsigned calls = 0;
+    downwell::drawAmmoNumberLayers(100, 20, 0xffffffffu, [&](unsigned, int, int) { ++calls; });
+    require(calls == 150, "shared layout handles the entire unsigned counter range");
     std::puts("HUD number tests passed");
     return 0;
 }

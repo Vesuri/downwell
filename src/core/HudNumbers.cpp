@@ -65,33 +65,10 @@ void drawHudCurrencyNumber(Renderer& renderer, int x, int y, int value) {
 }
 
 void drawHudAmmoNumber(Renderer& renderer, int x, int y, int value) {
-    const std::string digits = digitsFor(value);
-    const int firstX = x - (static_cast<int>(digits.size()) - 1) * 4;
-    for (std::size_t index = 0; index < digits.size(); ++index) {
-        const std::uint32_t digit = static_cast<std::uint32_t>(digits[index] - '0');
-        const int digitX = firstX + static_cast<int>(index) * 8;
-        const int digitY = y + static_cast<int>(index);
-        renderer.drawSprite(numberSprite, digit + 20, digitX - 1, digitY);
-        renderer.drawSprite(numberSprite, digit + 20, digitX, digitY - 1);
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY);
-        renderer.drawSprite(numberSprite, digit + 20, digitX, digitY + 1);
-        renderer.drawSprite(numberSprite, digit + 20, digitX - 1, digitY + 1);
-        renderer.drawSprite(numberSprite, digit + 20, digitX, digitY);
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY + 1);
-        renderer.drawSprite(numberSprite, digit + 20, digitX, digitY + 2);
-        renderer.drawSprite(numberSprite, digit + 20, digitX, digitY);
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY - 1);
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 2, digitY);
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY + 1);
-        renderer.drawSprite(numberSprite, digit + 10, digitX, digitY + 1);
-        renderer.drawSprite(numberSprite, digit + 10, digitX + 1, digitY);
-    }
-    for (std::size_t index = 0; index < digits.size(); ++index) {
-        const std::uint32_t digit = static_cast<std::uint32_t>(digits[index] - '0');
-        renderer.drawSprite(numberSprite, digit,
-                            firstX + static_cast<int>(index) * 8,
-                            y + static_cast<int>(index));
-    }
+    drawAmmoNumberLayers(x, y, static_cast<unsigned>(value < 0 ? 0 : value),
+        [&renderer](unsigned frame, int px, int py) {
+            renderer.drawSprite(numberSprite, frame, px, py);
+        });
 }
 
 } // namespace downwell
