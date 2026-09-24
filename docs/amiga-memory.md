@@ -50,6 +50,22 @@ block, requested asset bytes and remaining Chip memory after allocations.
 
 ## Ordinary memory
 
+The executable is tested with the ordinary 4 KiB AmigaDOS task stack. An
+800-byte automatic menu-Copper verification buffer previously enlarged the
+main frame enough that the gameplay verification build corrupted an asset
+cache immediately below the task stack, eventually producing a bus error in
+HUD drawing. The identical binary passed with a diagnostic 16 KiB stack.
+That scratch buffer and long-lived scene state now use static storage instead;
+scene construction still happens explicitly at application entry.
+
+The 600-tick cache verifier now checks a CPU-initialized 256-byte canary at the
+bottom of the task stack. Its normal-stack run passes, including 101 terrain
+composition comparisons. This is bounded route coverage, not a proof of the
+maximum stack use of every scene or future feature. `VERIFY_STACK_BYTES` can
+override the verifier's stack for diagnosis; its default remains 4096. The
+emulator debugger did not reliably install memory canaries itself, so the
+verification executable initializes them before platform/scene construction.
+
 Serialized room/object/builder packs, prepared gameplay DMA source words,
 simulation state and the three-column terrain raster cache can reside in Fast
 RAM. Only DMA-read data belongs in Chip RAM. The three-column full-level cache

@@ -15,6 +15,11 @@ GDB_SOURCE="${GDB_SOURCE:-verify_startup.gdb}"
 READY_MARKER="${READY_MARKER:-DOWNWELL_MENU_SPRITE_READY}"
 READY_DESCRIPTION="${READY_DESCRIPTION:-splash and hardware-sprite menu loop}"
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-120}"
+VERIFY_STACK_BYTES="${VERIFY_STACK_BYTES:-4096}"
+if ! [[ "$VERIFY_STACK_BYTES" =~ ^[1-9][0-9]*$ ]]; then
+  echo "VERIFY_STACK_BYTES must be a positive integer" >&2
+  exit 1
+fi
 if ! [[ "$VERIFY_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "VERIFY_TIMEOUT_SECONDS must be a positive integer" >&2
   exit 1
@@ -29,7 +34,7 @@ fi
 fsuae_claim_port
 
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
-printf 'cd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
+printf 'Stack %s\ncd dh1:\nDownwell\n' "$VERIFY_STACK_BYTES" > "$DH0/s/startup-sequence"
 cp -f out/Downwell.exe "$DH1/Downwell"
 find "$RUN/state" -name '*.uss' -delete
 rm -f "$RUN/gdb-startup.log" "$RUN/fsuae-startup.log" \

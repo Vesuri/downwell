@@ -228,6 +228,7 @@ volatile ULONG gDownwellGameBufferFailures;
 volatile ULONG gDownwellGameplayBobChecks;
 volatile ULONG gDownwellGameplayBobFailures;
 volatile ULONG gDownwellTerrainRasterFailures;
+volatile ULONG gDownwellStackGuardReady;
 volatile ULONG gDownwellTerrainRasterChecks;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
@@ -1033,6 +1034,18 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
 #endif
 
 int main(void) {
+#ifdef DOWNWELL_SCENE_VERIFY
+    // The emulator debugger cannot reliably write target memory. Initialize
+    // the canary on the CPU, below this frame with room for this loop itself.
+    ULONG currentStack;
+    __asm__ volatile("move.l %%sp,%0" : "=r"(currentStack));
+    volatile ULONG* stackGuard = (volatile ULONG*)SysBase->ThisTask->tc_SPLower;
+    if (currentStack > (ULONG)stackGuard + 512) {
+        for (unsigned word = 0; word < 64; ++word)
+            stackGuard[word] = 0x57ac6a4d;
+        gDownwellStackGuardReady = 1;
+    }
+#endif
     AmigaPlatform platform;
     AmigaMemory memory;
     AmigaRenderer renderer;
@@ -1050,7 +1063,10 @@ int main(void) {
         AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true);
 #endif
 #ifndef DOWNWELL_REPLAY_VERIFY
-    AmigaSceneRuntime scenes;
+    // Long-lived scene state must not consume the small AmigaDOS call stack.
+    // Construct at entry (not before the framework startup), as for port.
+    alignas(AmigaSceneRuntime) static UBYTE sceneStorage[sizeof(AmigaSceneRuntime)];
+    AmigaSceneRuntime& scenes = *new (sceneStorage) AmigaSceneRuntime;
     AmigaScene presentedScene = scenes.scene();
 #ifdef DOWNWELL_SKIP_TO_GAME
     // Force the normal main-room presentation setup on the first frame.
@@ -1689,7 +1705,9 @@ int main(void) {
                         break;
 #ifdef DOWNWELL_SCENE_VERIFY
                     // Test the patched program against a freshly emitted oracle.
-                    UWORD oracleWords[downwellCopperWords];
+                    // Verification scratch is not nested/reentrant. Keep it
+                    // off the 4 KiB AmigaDOS stack shared with game stepping.
+                    static UWORD oracleWords[downwellCopperWords];
                     DownwellMenuCopperList oracle(oracleWords, downwellCopperWords);
                     Sprite oraclePlayer(menuPlayerData, playerSpriteHeight);
                     const bool oracleReady = oracle.buildScroll(
