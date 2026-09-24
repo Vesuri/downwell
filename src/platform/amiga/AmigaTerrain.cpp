@@ -125,7 +125,12 @@ void AmigaAreaOneTerrainBuilder::resetInitialCheckpoint(
 
 void AmigaAreaOneTerrainBuilder::resetRoom(int x, int y,
         downwell::GameMakerRandom& random) {
-    builder_.reset(x, y, random);
+    resetRoom(x, y, random, downwell::AreaOneBuilder::Setup{});
+}
+
+void AmigaAreaOneTerrainBuilder::resetRoom(int x, int y,
+        downwell::GameMakerRandom& random, const downwell::AreaOneBuilder::Setup& setup) {
+    builder_.reset(x, y, random, setup);
     fragmentCount_ = enemyCount_ = decorationCount_ = 0;
     failed_ = false;
 }

@@ -85,6 +85,8 @@ public:
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
     // New-run entry uses the source Create logic, not the seed-2 startup capture.
     void resetRoom(int x, int y, downwell::GameMakerRandom& random);
+    void resetRoom(int x, int y, downwell::GameMakerRandom& random,
+                   const downwell::AreaOneBuilder::Setup& setup);
     bool stepVisible(const downwell::BuilderPatternPack& patterns,
                      downwell::GameMakerRandom& random, int viewBottomCeiling,
                      downwell::AreaOneBuilderStep& result);

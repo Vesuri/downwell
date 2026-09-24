@@ -536,3 +536,21 @@ later stages. Runtime stage/style selection still uses ordinary 1-1 defaults;
 enemy scaling, stage transitions and complete source Create effects remain
 separate work. The generated-map fixtures collect Shop commands without running
 shop stock creation, so they are not yet full-world RNG parity evidence.
+
+## Generated-shop synchronous replay
+
+The native terrain adapter now forwards explicit AreaOneBuilder::Setup through
+resetRoom; the old overload keeps the default setup. A 16-seed host-side paired
+test runs the core builder and native terrain adapter through complete
+style-four first-level generation. Both Create observers register emitted Shop
+objects immediately on their builder's random stream, including stock rerolls
+and farewell selection, rather than merely counting commands. The test checks
+the full RNG state after every generation step, subsequent pattern/frontier
+selection, ordered object IDs/positions, shop coordinates, stock, discounted
+prices and farewell variant. Each path reaches the end with exactly one shop.
+
+The test isolates synchronous generation: it does not step all enemy/merchant
+events between builder steps, use actual runtime stage selection, or prove
+Windows equivalence. Gameplay still defaults to ordinary 1-1, and its setup and
+shop price context must be wired together when other styles/stages become
+available. No test-only forced shop was inserted into production 1-1.

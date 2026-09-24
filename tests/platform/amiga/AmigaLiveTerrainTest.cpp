@@ -12,6 +12,19 @@ void require(bool value, const char* message) {
     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
 }
 using Commands = std::vector<downwell::DeferredCreateInstance>;
+struct ShopCreates {
+    downwell::ShopWorld shops;
+    downwell::GameMakerRandom& random;
+    Commands commands;
+    static bool create(void* opaque, const downwell::DeferredCreateInstance& command) {
+        auto& self = *static_cast<ShopCreates*>(opaque);
+        self.commands.push_back(command);
+        if (command.objectId != 277) return true;
+        return self.shops.create(command.x, command.y,
+            [&](unsigned lo, unsigned hi) { return lo + self.random.irandomSmall(hi-lo); },
+            4, 1, false, 4, false) != nullptr;
+    }
+};
 bool collect(void* context, const downwell::DeferredCreateInstance& command) {
     static_cast<Commands*>(context)->push_back(command);
     return true;
@@ -236,6 +249,42 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     downwell::BuilderPatternPack patterns(bytes.data(), bytes.size());
     require(patterns.valid(), "builder pack validates");
+    for (unsigned seed = 1; seed <= 16; ++seed) {
+        downwell::GameMakerRandom hostRandom(seed), nativeRandom(seed);
+        downwell::AreaOneBuilder host;
+        AmigaTerrainFragment fragments[32];
+        AmigaAreaOneTerrainBuilder native(fragments, 32);
+        const downwell::AreaOneBuilder::Setup setup{1,4,false,true};
+        host.reset(240, 704, hostRandom, setup);
+        native.resetRoom(240, 704, nativeRandom, setup);
+        ShopCreates hostCreates{{},hostRandom,{}}, nativeCreates{{},nativeRandom,{}};
+        native.setCreateObserver(ShopCreates::create, &nativeCreates);
+        for (unsigned tick = 0; tick < 100 && !host.endReached(); ++tick) {
+            downwell::AreaOneBuilderStep a, b;
+            require(host.stepVisible(patterns, hostRandom, 100000, ShopCreates::create, &hostCreates, a) &&
+                native.stepVisible(patterns, nativeRandom, 100000, b), "generated shop paired traversal");
+            compareRandom(hostRandom, nativeRandom);
+            require(host.y() == native.frontierY() && a.patternGenerated == b.patternGenerated &&
+                a.family == b.family && a.patternIndex == b.patternIndex && a.reversed == b.reversed,
+                "shop Create RNG preserves subsequent pattern selection and frontier");
+        }
+        require(host.endReached() && native.endReached() && hostCreates.shops.allocatedCount == 1 &&
+            nativeCreates.shops.allocatedCount == 1, "actual generated shop registered once on both paths");
+        require(hostCreates.commands.size() == nativeCreates.commands.size(), "paired create stream length");
+        for (unsigned i = 0; i < hostCreates.commands.size(); ++i) {
+            const auto& a = hostCreates.commands[i]; const auto& b = nativeCreates.commands[i];
+            require(a.objectId == b.objectId && a.x == b.x && a.y == b.y,
+                "terrain and enemy creates remain aligned after stock random draws");
+        }
+        const auto& a = hostCreates.shops.instances[0]; const auto& b = nativeCreates.shops.instances[0];
+        require(a.x == b.x && a.y == b.y && a.farewellVariant == b.farewellVariant,
+            "generated shop location and farewell match");
+        for (unsigned i = 0; i < 3; ++i)
+            require(a.stock.items[i].upgrade == b.stock.items[i].upgrade &&
+                a.stock.items[i].price == b.stock.items[i].price &&
+                a.stock.items[i].remaining == b.stock.items[i].remaining,
+                "generated stock and style-discounted prices match");
+    }
     checkSchedule(patterns, false);
     checkSchedule(patterns, true);
     AmigaTerrainTiles boundedTiles;
