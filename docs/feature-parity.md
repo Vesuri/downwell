@@ -9,6 +9,27 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Stored snail orientation selects offline artwork
+
+The native snail draw-frame selector now reads `SnailMotion::verticalFlip`,
+the same stored orientation published as SDL's `image_yscale`, instead of
+inferring it from the Q8 velocity mirror. In `enmSnail_Step_0` VM blocks
+19–20, `image_yscale = -sign(ysp)` runs only when `ysp != 0`, inside the
+non-time-stop branch. Snail Create chooses velocity without setting this scale.
+Thus a newly descending snail is initially unflipped; zero velocity retains
+its previous orientation. The old selector violated both cases.
+
+Focused tests cover pre-Step creation, descending/ascending offline frame
+selection, retained zero-speed orientation and attachment during time stop.
+The live scene comparator now checks the actual native frame-256 variant
+against SDL's stored scale, in addition to shared motion state. No asset is
+generated or transformed at runtime, and no new time-stop mechanic is implied.
+Validation: focused native-runtime/shared-snail tests and the 600-update live
+combat comparison pass. The bounded direct-gameplay A500 capture retains its
+hash and matches SDL at all 99,968 visible pixels; this checkpoint is a broad
+rendering regression, not coverage of the new pre-Step/zero-speed fixtures.
+The normal executable was restored and both 68000 audits pass.
+
 ### Shared death flash presentation
 
 `PlayerDeathSequence::flashVisible()` now exposes `objDeathFlashFx`'s visual

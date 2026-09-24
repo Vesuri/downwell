@@ -645,6 +645,8 @@ int main() {
     require(snail.configureEnemy(0, 117, 177, 0, 0,
                                  0, 26, 20, 24),
             "generated wall snail can enter native actor storage");
+    require(snail.enemyAt(0).drawFrame() == snail.enemyAt(0).imageFrame,
+            "new descending snail retains default image orientation before its first Step");
     snail.step(0);
     require(snail.enemyAt(0).active &&
                 snail.enemyAt(0).motionState == 1 &&
@@ -652,6 +654,11 @@ int main() {
             "wall snail discovers and records its recovered wall side");
     require(snail.enemyAt(0).drawFrame() == snail.enemyAt(0).imageFrame + 256,
             "descending wall snail selects offline vertically flipped artwork");
+    auto stationarySnail = snail.enemyAt(0);
+    stationarySnail.speedY = 0;
+    stationarySnail.snail.vy = 0;
+    require(stationarySnail.drawFrame() == stationarySnail.imageFrame + 256,
+            "zero velocity must not discard the stored snail image orientation");
     for (unsigned frame = 0;
          frame < 120 && snail.enemyAt(0).speedY > 0; ++frame)
         snail.step(0);

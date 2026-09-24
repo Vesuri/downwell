@@ -42,8 +42,11 @@ int main() {
             "negative motion and left attachment retain source precision");
     SnailMotion paused;
     paused.initialize(0, 0, true);
-    require(paused.step(rightWall, true) && paused.attached && paused.y == 0,
+    require(paused.step(rightWall, true) && paused.attached && paused.y == 0 && paused.verticalFlip == 1,
             "attachment precedes the time-stop movement guard");
+    snail.vy = 0;
+    require(snail.step(rightWall) && snail.verticalFlip == -1,
+            "source nonzero-speed guard retains image orientation at zero speed");
     SnailMotion embedded;
     embedded.initialize(0, 0, true);
     require(!embedded.step([](int, int) { return true; }), "embedded spawn is destroyed");
