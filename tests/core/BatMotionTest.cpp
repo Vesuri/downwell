@@ -11,6 +11,24 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    BatMotion rightWall{0, 0, 2 * 256, 128, 0, 50};
+    resolveBatMotion(rightWall, [](int x, int) { return x >= 8; });
+    require(rightWall.x == 256 && rightWall.y == 128 &&
+                rightWall.speedX == 0 && rightWall.speedY == 128,
+            "right wing contacts before the origin; only blocked X velocity is cleared");
+    BatMotion leftWall{0, 0, -3 * 256, 0, 180, 50, -1};
+    resolveBatMotion(leftWall, [](int x, int) { return x <= -9; });
+    require(leftWall.x == -256 && leftWall.speedX == 0 && leftWall.facing == -1,
+            "mirrored asymmetric mask stops at the left wall and retains facing");
+    BatMotion floorContact{0, 0, 0, 5 * 256, 270, 50};
+    resolveBatMotion(floorContact, [](int, int y) { return y >= 8; });
+    require(floorContact.y == 4 * 256 && floorContact.speedY == 0,
+            "bat resolves to its last clear mask row before zeroing downward velocity");
+    BatMotion corner{0, 0, 2 * 256, 2 * 256, 315, 50};
+    resolveBatMotion(corner, [](int x, int y) { return x >= 8 && y >= 5; });
+    require(corner.x == 2 * 256 && corner.y == 256 &&
+                corner.speedX == 0 && corner.speedY == 0,
+            "source diagonal fallback walks X then Y and cancels both velocity components");
     struct RandomProbe {
         unsigned calls = 0;
         std::uint32_t nextU32() { ++calls; return 0x80000000u; }

@@ -244,6 +244,36 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared bat rectangle collision response
+
+`resolveBatMotion` replaces the previous center-point displacement rejection.
+It passes the recovered bat rectangle (sprite 153/154, including its asymmetric
+X bounds and current facing) through the shared `scrCheckCollisionWith`
+algorithm, zeros only blocked velocity components, preserves facing if X
+velocity becomes zero, and then integrates. Bat Step assembly blocks 36–44
+confirm this order and the target object 57. The current adapters' solid
+objects 60 and 92 inherit from 57; platform object 93 does not and is excluded.
+
+Q8 bat state converts exactly to the collision helper's fifth-Q8 units; no
+floating-point collision implementation is added to the target. Focused
+fixtures cover wing contact before origin contact, mirrored left contact,
+last-clear floor placement, and the source X-then-Y diagonal fallback. The
+scene comparator now checks awake bat positions, velocities, direction and
+facing exactly across adapters, as well as hit and alarm state. Current default
+combat finishes at health 3/3, kills 3/3 and currency 36/36; both adapters
+follow the same changed route without relaxed comparisons.
+
+The terrain query supports the current aligned 16x16 cells, not arbitrary
+thin or precise masks. Windows-runner fractional place_meeting conversion,
+other wall families, hanging activation and time-stop remain open. This is
+source-backed collision control flow, not a claim of complete bat fidelity.
+
+Validation: full host suite and SDL build pass, including both mandatory
+combat phases (phase 5 retains health 4/4, kills 2/2 and currency 2/2).
+Bounded cross-CPU player/gem replay passes unchanged, and the normal Amiga
+build is restored with clean 68000 instruction/helper audits. The CPU replay
+does not hash bat collision state; the dedicated tests above cover that scope.
+
 #### Shared surviving-bat hit response
 
 The active-bat movement adapter now uses shared `BatHitState` and

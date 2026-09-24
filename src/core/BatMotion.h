@@ -3,6 +3,8 @@
 
 #include "GameMakerRounding.h"
 #include "BatHitState.h"
+#include "SolidCollision.h"
+#include "EnemyContact.h"
 #include <cstdint>
 
 namespace downwell {
@@ -66,12 +68,37 @@ struct BatMotion {
     long speedX, speedY;
     int direction;
     int speedFortieths;
+    int facing = 1;
 };
+
+template<class Solid>
+bool batMeetsTiles(long x, long y, int facing, Solid solid) {
+    const auto b = contactWorldBounds({FixedCollisionMath::round(x) / 5,
+        FixedCollisionMath::round(y) / 5, facing, 1, 153});
+    return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
+           solid(b.left, b.bottom - 1) || solid(b.right - 1, b.bottom - 1);
+}
+
+// Bat Step calls scrCheckCollisionWith, zeros only the blocked components,
+// updates facing from the remaining horizontal velocity, then integrates.
+template<class Solid>
+void resolveBatMotion(BatMotion& bat, Solid solid) {
+    long x = bat.x * 5, y = bat.y * 5;
+    const auto contact = resolveSolidCollision<FixedCollisionMath>(x, y,
+        bat.speedX * 5, bat.speedY * 5, [&](long px, long py) {
+            return batMeetsTiles(px, py, bat.facing, solid);
+        });
+    if (contact.x) bat.speedX = 0;
+    if (contact.y) bat.speedY = 0;
+    if (bat.speedX != 0) bat.facing = bat.speedX < 0 ? -1 : 1;
+    bat.x = x / 5 + bat.speedX;
+    bat.y = y / 5 + bat.speedY;
+}
 
 // Active/non-stunned enmBat Step subset. Caller supplies exactly one nextU32
 // draw for random_range(-20,20); no extra or integer-rounded jitter draws.
-// Query remains the current point-solid adapter. Hanging and full sprite-mask
-// scrCheckCollisionWith remain separate fidelity work; stepActiveBat gates stun.
+// The rectangle query supports aligned 16x16 terrain cells. Exact runner mask
+// rounding and parentWall filtering remain adapter work. stepActiveBat gates stun.
 template<class Solid>
 void stepBatMotion(BatMotion& bat, long targetX, long targetY,
                    std::uint32_t random, Solid solid) {
@@ -93,12 +120,7 @@ void stepBatMotion(BatMotion& bat, long targetX, long targetY,
     bat.direction = batNormalizeDirection(bat.direction);
     bat.speedX = batSine(bat.direction + 90) * bat.speedFortieths / 5120;
     bat.speedY = -batSine(bat.direction) * bat.speedFortieths / 5120;
-    const long nextX = bat.x + bat.speedX;
-    const long nextY = bat.y + bat.speedY;
-    if (!solid((int)floorQ8Coordinate(nextX), (int)floorQ8Coordinate(bat.y)))
-        bat.x = nextX;
-    if (!solid((int)floorQ8Coordinate(bat.x), (int)floorQ8Coordinate(nextY)))
-        bat.y = nextY;
+    resolveBatMotion(bat, solid);
 }
 
 // Recovered active-bat hit branch precedes pursuit. Stun skips both movement

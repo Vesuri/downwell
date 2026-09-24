@@ -727,7 +727,8 @@ void StartupRuntime::updateMainEnemies() {
                 static_cast<long>(std::round(enemy.velocityX * 256.0F)),
                 static_cast<long>(std::round(enemy.velocityY * 256.0F)),
                 static_cast<int>(enemy.direction),
-                static_cast<int>(std::round(enemy.moveSpeed * 40.0F))
+                static_cast<int>(std::round(enemy.moveSpeed * 40.0F)),
+                enemy.scaleX < 0 ? -1 : 1
             };
             const bool hit = stepActiveBat(bat, enemy.batHit,
                 mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
@@ -745,7 +746,7 @@ void StartupRuntime::updateMainEnemies() {
             enemy.velocityY = bat.speedY / 256.0F;
             enemy.direction = static_cast<float>(bat.direction);
             enemy.moveSpeed = bat.speedFortieths / 40.0F;
-            enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
+            enemy.scaleX = static_cast<float>(bat.facing);
         } else if (enemy.objectId == 117) {
             const int hitAlarm = enemy.snailHit.consume(random_);
             if (hitAlarm >= 0) {

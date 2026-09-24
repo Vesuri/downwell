@@ -226,6 +226,14 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
                     native.batHit.stunned == enemy.batHit.stunned &&
                     native.batHit.direction == enemy.batHit.direction,
                     "surviving bat hit state matches across both adapters");
+        if (enemy.objectId == 116 && enemy.active && native.active && native.awake)
+            require(native.preciseX == std::lround((enemy.preciseX - 240) * 256) &&
+                    native.preciseY == std::lround((enemy.preciseY - 176) * 256) &&
+                    native.speedX == std::lround(enemy.velocityX * 256) &&
+                    native.speedY == std::lround(enemy.velocityY * 256) &&
+                    native.direction == static_cast<int>(enemy.direction) &&
+                    native.facing == (enemy.scaleX < 0 ? -1 : 1),
+                    "awake bat collision and flight state match exactly across adapters");
         if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.active && native.active) {
             const auto& a = native.walker;
             const auto& b = enemy.walker;

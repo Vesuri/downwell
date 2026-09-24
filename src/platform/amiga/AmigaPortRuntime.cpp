@@ -594,7 +594,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.grounded = enemy.walker.grounded;
         } else if (enemy.objectId == 116) {
             downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
-                enemy.direction, (enemy.moveSpeed * 40 + 128) / 256};
+                enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing};
             const bool hit = downwell::stepActiveBat(bat, enemy.batHit, player_.frameStartXFixed(),
                 player_.frameStartYFixed(), enemyRandom_,
                 [this](int x, int y) {
@@ -610,6 +610,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.speedX = bat.speedX;
             enemy.speedY = bat.speedY;
             enemy.direction = bat.direction;
+            enemy.facing = bat.facing;
             enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         } else if (enemy.objectId == 113) {
             const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
