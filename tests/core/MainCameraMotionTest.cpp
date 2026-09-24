@@ -6,6 +6,17 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    for (long whole : {-3L, -2L, 0L, 1L, 2L, 1456L}) {
+        for (long fraction : {-2049L, -2048L, -2047L, 0L, 2047L, 2048L, 2049L}) {
+            downwell::MainCameraMotion pixel;
+            pixel.x = pixel.y = whole * 4096 + fraction;
+            const long expected = downwell::roundGameMakerCoordinate(pixel.x / 4096.0);
+            require(pixel.pixelX() == expected && pixel.pixelY() == expected,
+                    "published camera coordinates use exact Q12 nearest-even rounding");
+            require(pixel.x == whole * 4096 + fraction,
+                    "publication does not discard fractional camera easing state");
+        }
+    }
     downwell::MainCameraMotion camera;
     camera.step(240 * 256L, 176 * 256L);
     require(camera.targetX == 240L * 4096 && camera.targetY == 200L * 4096 &&

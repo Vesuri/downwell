@@ -47,7 +47,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
          */
         cameraMotion_.step(240 * 256L, 176 * 256L);
         cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
-        cameraPixelY_ = (int)(cameraY_ >> 8);
+        cameraPixelY_ = cameraMotion_.pixelY() - 176;
         ringOrigin_ = (ringOrigin_ + (unsigned)cameraPixelY_) % ringHeight;
     }
     for (index = 0; index < bulletCapacity; ++index) {
@@ -455,12 +455,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         const int oldCameraPixelY = cameraPixelY_;
         cameraMotion_.step(240L * 256 + player_.offsetXFixed(),
                            176L * 256 + player_.offsetYFixed(), dead_);
-        cameraPixelX_ = static_cast<int>(cameraMotion_.x / 4096) - 240;
+        cameraPixelX_ = cameraMotion_.pixelX() - 240;
         cameraXDelta = cameraPixelX_ - oldCameraPixelX;
         cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
-        cameraPixelY_ = cameraY_ >= 0
-                            ? (int)(cameraY_ >> 8)
-                            : -(int)((-cameraY_) >> 8);
+        cameraPixelY_ = cameraMotion_.pixelY() - 176;
         scrollDelta = cameraPixelY_ - oldCameraPixelY;
         motion.deltaY -= scrollDelta;
     } else if ((tick_ & 1u) == 0) {

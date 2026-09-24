@@ -9,7 +9,48 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Source-rounded camera/player and scrolling parity
+
+The scrolling mismatch described below is resolved for the tick-383 fixture:
+fresh native and SDL captures now have **zero differing pixels out of 99,968**.
+The active baseline is `df857829d2cfa20f8d0780e65164a602f489b6aff57e832b3dfc18340e94fc8a`.
+`verify-amiga-gameplay-active-frame` reads the native capture's simulation tick
+and replays SDL to that update before a strict full-window RGB comparison.
+It neither translates images nor excludes actors/HUD.
+
+Corrections were derived from original evidence, not just image alignment:
+
+- Serialized rmMain view 0 follows object 63 (camMain). Its Step assembly
+  publishes `round(xxFinal)` / `round(yyFinal)`. Shared Q12 nearest-even pixel
+  accessors now feed both rendered views; fractional easing state is retained.
+  The previous native truncation and SDL fractional rendered view disagreed
+  with that published position. The corrected tick-383 view is (160,1315).
+- Player Begin Step publishes rounded x/y, and `playerDraw` uses those instance
+  coordinates. SDL previously drew precise player state; native sprites used
+  truncated offsets. Both now draw the rounded published position.
+- Native ammo-label clearing erased part of the gauge's lower rim. Ammo-change
+  redraws now restore its base/interior/outline order. This remains dirty-state
+  rendering, not a new per-frame HUD repaint.
+- `scrGemmyText` assembly emits red left/up, black right/down, then white.
+  Both previous text paths were incomplete. A shared five-pass layout now
+  drives SDL glyph draws and Amiga prepacked glyph blits; an order/color test
+  covers the passes.
+
+Camera tests include positive/negative Q12 half ties and preserving precise
+state. Fractional visibility/lifetime queries elsewhere still require their
+own source-phase audit; this change fixes published presentation, not every
+use of view state. Streak positioning/animation and full original HUD effects
+also remain beyond this five-pass text correction.
+The full host suite, fresh landing and scrolling pixel gates, bounded A500
+600-tick terrain check (101 compositions, intact stack margin), and canonical
+cross-CPU replay all pass. Replay digest remains
+`64 9f0d3943 e7900d2b 400 8d8e8642 25e003ee 7f`; this fixture does not by itself
+cover the changed scrolling camera. The image/ring gates provide that coverage.
+Normal SDL/Amiga builds are restored and the 68000 audits remain clean.
+
 ### Scrolling capture and SDL rasterization audit
+
+Historical diagnosis (superseded by the source-rounded correction above):
 
 The native active-gameplay capture now publishes its simulation tick, Q8 player
 position and displayed integer camera origin. The current capture is tick 383,
@@ -81,8 +122,8 @@ DMA, and rejects every differing RGB pixel. It includes terrain, actors and
 HUD, rather than silently masking dynamic regions. The target uses a unique
 ignored capture directory and restores the normal Amiga build on success.
 The comparator has dimension, crop, single-pixel mismatch and nonuniform-scale
-tests. The active-scrolling checksum remains unchanged and still needs its
-own matching-state audit. Exact port-to-port agreement at this landing does
+tests. The subsequent active-scrolling audit is recorded above.
+Exact port-to-port agreement at this landing does
 not establish unimplemented source pillar/diagonal rules or general Windows
 presentation fidelity.
 
@@ -150,7 +191,7 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Bullets and gems | Shared usual-bullet segment arbitration, recovered enemy rectangles and fractional-camera expiry, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet collision-event scheduling, spread and wall selection; source bounce/terrain semantics and dense encounters |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
 | Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency, ordered gem motion and player presentation | Longer routes, dense reward bursts and broader actor states remain unverified |
-| HUD | Health, ammo, currency and streak implementations | State-driven image comparisons for damage, depletion and streak expiry |
+| HUD | Health, ammo, currency and streak implementations; exact landing/full-ammo and scrolling/empty-ammo images including currency/streak 2 | More damage, refill and streak-expiry image coverage; complete source HUD effects |
 | Death | Native control lock and death timer | End-to-end SDL/native death-state comparison |
 
 Sound playback, complete shops/upgrades, later areas and a complete death/restart

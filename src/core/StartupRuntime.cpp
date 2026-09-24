@@ -1298,8 +1298,8 @@ void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     mainCameraX_ = mainCameraMotion_.x / 4096.0F;
     mainCameraY_ = mainCameraMotion_.y / 4096.0F;
     mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
-    instance.x = static_cast<std::int32_t>(std::round(mainCameraX_));
-    instance.y = static_cast<std::int32_t>(std::round(mainCameraY_));
+    instance.x = mainCameraMotion_.pixelX();
+    instance.y = mainCameraMotion_.pixelY();
 }
 
 void StartupRuntime::updateMenuCamera() {

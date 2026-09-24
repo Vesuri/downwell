@@ -32,5 +32,13 @@ inline long roundGameMakerQ8(long value) {
     return whole;
 }
 
+inline long roundGameMakerQ12(long value) {
+    const long whole = value / 4096;
+    const long fraction = value % 4096;
+    if (fraction > 2048 || (fraction == 2048 && whole % 2 != 0)) return whole + 1;
+    if (fraction < -2048 || (fraction == -2048 && whole % 2 != 0)) return whole - 1;
+    return whole;
+}
+
 } // namespace downwell
 #endif

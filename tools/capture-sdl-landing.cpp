@@ -74,6 +74,7 @@ int main(int argc, char** argv) {
                   << " simulation_tick=" << mainTicks - 1
                   << " player=" << state.mainPlayerX() << ',' << state.mainPlayerY()
                   << " view=" << state.mainCameraViewX() << ',' << state.mainCameraViewY()
+                  << " render_view=" << state.mainCameraRenderViewX() << ',' << state.mainCameraRenderViewY()
                   << " sprite=" << state.mainPlayerSpriteId() << ',' << state.mainPlayerImageIndex() << '\n';
         game.render(platform);
         // Exercise target restoration as well as direct framebuffer readback.

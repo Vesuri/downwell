@@ -42,6 +42,18 @@ public:
 } // namespace
 
 int main() {
+    unsigned layer = 0;
+    const int expectedX[] = {9, 10, 11, 10, 10};
+    const int expectedY[] = {20, 19, 20, 21, 20};
+    downwell::drawGemmyTextLayers(10, 20, [&](int x, int y, downwell::Color color) {
+        require(layer < 5 && x == expectedX[layer] && y == expectedY[layer],
+                "gemmy text offset passes follow original draw order");
+        require(color.a == 255 && color.r == (layer == 2 || layer == 3 ? 0 : 255) &&
+                color.g == (layer == 4 ? 255 : 0) && color.b == color.g,
+                "gemmy text uses source red, black, white passes");
+        ++layer;
+    });
+    require(layer == 5, "gemmy text emits all five source layers");
     RecordingRenderer renderer;
 
     downwell::drawHudHealthNumber(renderer, 100, 20, 4, 4);

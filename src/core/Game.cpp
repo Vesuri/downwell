@@ -122,8 +122,8 @@ void Game::renderMain(Renderer& renderer) const {
     if (player == nullptr)
         return;
 
-    const float viewX = startup_.mainCameraViewX();
-    const float viewY = startup_.mainCameraViewY();
+    const float viewX = static_cast<float>(startup_.mainCameraRenderViewX());
+    const float viewY = static_cast<float>(startup_.mainCameraRenderViewY());
     const auto hasWallAt = [this](std::int32_t x, std::int32_t y) {
         for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
             const InstanceRecord& candidate = startup_.instanceAt(index);
@@ -178,7 +178,7 @@ void Game::renderMain(Renderer& renderer) const {
     renderer.drawSpriteTransformed(
         startup_.mainPlayerSpriteId(),
         static_cast<std::uint32_t>(startup_.mainPlayerImageIndex()),
-        startup_.mainPlayerX() - viewX, startup_.mainPlayerY() - viewY,
+        player->x - viewX, player->y - viewY,
         static_cast<float>(startup_.mainPlayerFacing()), 1.0F, 0.0F);
     for (std::size_t index = 0; index < startup_.mainBulletCount(); ++index) {
         const StartupRuntime::MainBulletState& bullet =
@@ -236,8 +236,9 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     if (startup_.mainGemStreak() > 0) {
         const std::string streak = std::to_string(startup_.mainGemStreak());
         renderer.drawSprite(133, 0, origin + 65, 55);
-        renderer.drawText(2, streak.c_str(), origin + 81, 51,
-                          {255, 255, 255, 255}, TextAlign::center);
+        drawGemmyTextLayers(origin + 81, 51, [&](int x, int y, Color color) {
+            renderer.drawText(2, streak.c_str(), x, y, color, TextAlign::center);
+        });
     }
 }
 

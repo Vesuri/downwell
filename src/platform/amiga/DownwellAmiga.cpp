@@ -22,6 +22,8 @@
 #include "AmigaStyleRenderer.h"
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
+#include "core/GameMakerRounding.h"
+#include "core/HudNumbers.h"
 #include "framework/AmigaMemory.h"
 #include "framework/AmigaPlatform.h"
 #include "framework/Bitmap.h"
@@ -378,10 +380,11 @@ static void drawGameAsset(AmigaRenderer* renderer, UWORD sprite, UWORD frame,
 
 static void drawGameText(AmigaRenderer* renderer, UWORD text,
                          int x, int y) {
-    amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
-                              text, 0, x, y + 1, 0, 2);
-    amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
-                              text, 0, x, y, 0, 1);
+    downwell::drawGemmyTextLayers(x, y, [&](int px, int py, downwell::Color color) {
+        const unsigned pen = color.r == 0 ? 3 : color.g == 0 ? 2 : 1;
+        amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
+                                  text, 0, px, py, 0, pen);
+    });
 }
 
 static void drawHealthNumber(AmigaRenderer* renderer, int x, int y,
@@ -432,6 +435,10 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo) {
         ammo = maximumAmmo;
     const int filled = gaugeLength * (int)ammo / maximumAmmo;
     amigaRendererClearClipRect(renderer);
+    // The label clear overlaps the gauge's lower rim. Restore the two gauge
+    // layers in the source draw order when ammo changes, not every frame.
+    amigaRendererFillRect(renderer, 282, 232, 20, 20, 3);
+    drawAsset(renderer, 416, 0, 284, 43, 0);
     /*
      * The frame is static on PF2, but its interior follows gunboot charge.
      * Clear the previous white column before filling upward from the recovered
@@ -443,7 +450,7 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo) {
         amigaRendererFillRect(renderer, gaugeX,
                               gaugeTop + gaugeLength - filled,
                               gaugeWidth, filled, 1);
-    amigaRendererFillRect(renderer, 282, 232, 20, 20, 3);
+    drawAsset(renderer, 416, 1, 284, 43, 0);
     drawAmmoDigit(renderer, 290, 239, ammo);
 }
 
@@ -2179,11 +2186,11 @@ int main(void) {
             if (port.playerVisible() && !appendGameplayActor(actors, actorCount,
                     (UWORD)(port.dead() ? 0 : port.player().spriteId()),
                     (UWORD)(port.dead() ? 0 : port.player().spriteFrame()),
-                    downwellPlayfieldX + 80 + port.player().offsetX() - port.cameraOffsetX(),
+                    downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(port.player().offsetXFixed()) - port.cameraOffsetX(),
 #ifdef DOWNWELL_REPLAY_VERIFY
                     gameplayPlayerGroundY + port.player().offsetY(),
 #else
-                    gameplayPlayerStartY + port.player().offsetY() - port.cameraOffsetY(),
+                    gameplayPlayerStartY + downwell::roundGameMakerQ8(port.player().offsetYFixed()) - port.cameraOffsetY(),
 #endif
                     port.player().facing() < 0)) frameReady = false;
             for (unsigned index = 0; index < AmigaPortRuntime::bulletCapacity; ++index) {

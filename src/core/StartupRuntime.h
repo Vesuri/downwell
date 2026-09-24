@@ -144,6 +144,8 @@ public:
     float mainPlayerImageIndex() const { return mainPlayerImageIndex_; }
     float mainCameraViewX() const { return mainCameraX_ - surfaceWidth / 2.0F; }
     float mainCameraViewY() const { return mainCameraY_ - surfaceHeight / 2.0F; }
+    int mainCameraRenderViewX() const { return mainCameraMotion_.pixelX() - surfaceWidth / 2; }
+    int mainCameraRenderViewY() const { return mainCameraMotion_.pixelY() - surfaceHeight / 2; }
     int mainAmmo() const { return mainAmmo_; }
     int mainPlayerHealth() const { return mainPlayerHealth_; }
     int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }

@@ -40,7 +40,7 @@ def main():
             differences = compare(host, native)
     except ValueError as error:
         raise SystemExit(str(error))
-    print(f"SDL/native landing raster: {differences} differing pixels of {352 * 284}")
+    print(f"SDL/native gameplay raster: {differences} differing pixels of {352 * 284}")
     if differences:
         raise SystemExit(1)
 

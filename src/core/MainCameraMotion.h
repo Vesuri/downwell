@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_MAIN_CAMERA_MOTION_H
 #define DOWNWELL_CORE_MAIN_CAMERA_MOTION_H
+#include "GameMakerRounding.h"
 namespace downwell {
 // camMain's default 480-pixel rmMain shaft/side-room rules. Q12 easing
 // accommodates the serialized 300000-pixel room height in signed 32 bits;
@@ -8,6 +9,9 @@ struct MainCameraMotion {
     long x = 240L * 4096, y = 176L * 4096;
     long targetX = x, targetY = y;
     int slowdownX = 1, slowdownY = 5;
+    // rmMain's serialized view follows camMain's rounded instance x/y.
+    int pixelX() const { return static_cast<int>(roundGameMakerQ12(x)); }
+    int pixelY() const { return static_cast<int>(roundGameMakerQ12(y)); }
     void reset(int px, int py) {
         x = targetX = px * 4096L; y = targetY = py * 4096L;
         slowdownX = 1; slowdownY = 5;
