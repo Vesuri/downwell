@@ -219,6 +219,13 @@ build/ammo-dividers-test: tests/core/AmmoDividersTest.cpp src/core/AmmoDividers.
 
 test: test-ammo-dividers test-ammo-fill
 test: test-shop-inventory
+test: test-consumables
+.PHONY: test-consumables
+build/consumables-test: tests/core/ConsumablesTest.cpp src/core/PlayerMotion.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-consumables: build/consumables-test
+	./build/consumables-test
 .PHONY: test-shop-inventory
 build/shop-inventory-test: tests/core/ShopInventoryTest.cpp src/core/ShopInventory.h src/core/CurrencyAccount.h src/core/GameMakerRounding.h
 	@mkdir -p build

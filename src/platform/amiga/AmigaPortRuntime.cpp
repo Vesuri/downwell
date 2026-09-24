@@ -408,6 +408,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     ++tick_;
     currencyAccount_.beginStep();
+    run_.consumables.beginStep(player_, health_, run_.combo.healthReserve);
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     run_.results.beginStep(input);
     death_.beginStep(input.fire);

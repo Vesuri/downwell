@@ -264,6 +264,7 @@ volatile ULONG gDownwellSplashCheckedFrames[7];
 volatile ULONG gDownwellSplashPublicationFailures;
 volatile const UWORD* gDownwellMenuSpriteOracle;
 volatile ULONG gDownwellMenuCopperPatchFailures;
+volatile ULONG gDownwellConsumableChecks, gDownwellConsumableFailures;
 volatile ULONG gDownwellCaptureTick;
 volatile LONG gDownwellCapturePlayerXQ8, gDownwellCapturePlayerYQ8;
 volatile LONG gDownwellCaptureViewX, gDownwellCaptureViewY;
@@ -2749,6 +2750,30 @@ int main(void) {
                 }
                 if (changedHudBytes < 100) ++gDownwellResultsBackdropFailures;
                 ++gDownwellResultsBackdropChecks;
+                // Run the same deferred consumable code on the actual 68000,
+                // isolated from the 600-update world's replay and terrain.
+                alignas(PlayerMotion) static UBYTE itemPlayerStorage[sizeof(PlayerMotion)];
+                auto& itemPlayer = *new (itemPlayerStorage) PlayerMotion(false);
+                static downwell::Consumables itemQueue;
+                itemQueue = {};
+                downwell::CurrencyAccount itemCurrency;
+                downwell::HealthReserve itemHealth;
+                int hp = 4;
+                for (unsigned id = 100; id <= 105; ++id) itemQueue.grant(id, itemCurrency);
+                itemQueue.grant(100, itemCurrency);
+                itemQueue.beginStep(itemPlayer, hp, itemHealth);
+                ++gDownwellConsumableChecks;
+                if (hp != 6 || itemHealth.maximum != 6 || itemHealth.pieces != 0 ||
+                    itemPlayer.ammoCapacity() != 12 || itemPlayer.ammo() != 12 ||
+                    itemQueue.effects.count != 6 || itemQueue.pending[0] != 1)
+                    ++gDownwellConsumableFailures;
+                itemQueue.beginStep(itemPlayer, hp, itemHealth);
+                ++gDownwellConsumableChecks;
+                if (itemHealth.pieces != 1 || itemQueue.effects.count != 1 || itemQueue.pending[0])
+                    ++gDownwellConsumableFailures;
+                itemQueue.beginStep(itemPlayer, hp, itemHealth);
+                ++gDownwellConsumableChecks;
+                if (itemQueue.effects.count != 0) ++gDownwellConsumableFailures;
                 downwellGameplayLongRunReady();
             }
             static bool ammoFrameReported = false;

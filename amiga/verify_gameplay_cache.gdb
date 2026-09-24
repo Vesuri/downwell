@@ -36,6 +36,11 @@ if gDownwellResultsBackdropChecks != 1 || gDownwellResultsBackdropFailures != 0
     quit 1
 end
 printf "Results backdrop, rows and progress bar match scalar composition\n"
+if gDownwellConsumableChecks != 3 || gDownwellConsumableFailures != 0
+    printf "Deferred consumable mismatch: checks=%lu failures=%lu\n", gDownwellConsumableChecks, gDownwellConsumableFailures
+    quit 1
+end
+printf "Deferred consumables passed three controller updates on 68000\n"
 printf "Overflow actors: %lu scalar-oracle comparisons, %lu mismatched bytes\n", gDownwellGameplayBobChecks, gDownwellGameplayBobFailures
 printf "Gameplay cache verified through 600 simulation ticks: %lu fresh-composition comparisons\n", gDownwellTerrainRasterChecks
 printf "Task stack retained its 256-byte safety margin\n"

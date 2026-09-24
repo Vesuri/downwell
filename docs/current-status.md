@@ -21,7 +21,7 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
 
 - [x] Recover consumable stock selection and purchase order from VM assembly.
 - [x] Shared stock/pricing/transaction core and focused regression tests.
-- [ ] Apply queued consumables in the original controller phase.
+- [x] Apply queued consumables in the original controller phase on both runtimes.
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.

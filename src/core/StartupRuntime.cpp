@@ -303,6 +303,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     anyInput_ = anyInput;
     if (roomId_ == mainRoomId) currencyAccount_.beginStep();
     if (roomId_ == mainRoomId) {
+        run_.consumables.beginStep(mainPlayerMotion_, mainPlayerHealth_, run_.combo.healthReserve);
         Input resultsInput;
         resultsInput.left = left;
         resultsInput.right = right;

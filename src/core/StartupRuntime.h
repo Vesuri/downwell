@@ -162,6 +162,8 @@ public:
     const RunGemStatistics& runGemStatistics() const { return run_.gems; }
     std::uint32_t runTimeTicks() const { return run_.clock.ticks; }
     const RunCombo& runCombo() const { return run_.combo; }
+    bool grantConsumable(unsigned id) { return run_.consumables.grant(id, currencyAccount_); }
+    const Consumables& consumables() const { return run_.consumables; }
     const RunStage& runStage() const { return run_.stage; }
     int mainPlayerHealthMaximum() const { return run_.combo.healthReserve.maximum; }
     const HealthReserve& mainHealthReserve() const { return run_.combo.healthReserve; }

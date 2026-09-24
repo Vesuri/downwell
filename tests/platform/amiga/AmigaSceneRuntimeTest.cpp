@@ -1155,6 +1155,28 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(pairedDeadFrames >= 120,
                     "death-state regression includes at least 120 paired depleted-health updates");
     }
+    // Exercise the real controller boundaries after the existing tape, without
+    // changing its inputs, digests or required combat encounters.
+    const int chargeBefore = gameplay.player().ammoCapacity();
+    for (unsigned id : {101u, 101u, 105u}) {
+        require(gameplay.grantConsumable(id) && reference.grantConsumable(id), "both runtimes accept queued purchases");
+    }
+    require(gameplay.player().ammoCapacity() == chargeBefore && reference.mainAmmoCapacity() == chargeBefore,
+            "purchase grant is not an immediate refill");
+    for (unsigned step = 0; step < 3; ++step) {
+        const auto frame = gameplay.step(0);
+        reference.step(downwell::Input{}, false);
+        require(gameplay.player().ammoCapacity() == reference.mainAmmoCapacity() &&
+                gameplay.health() == reference.mainPlayerHealth() &&
+                gameplay.healthMaximum() == reference.mainPlayerHealthMaximum(), "live consumable application matches");
+        require(gameplay.consumables().effects.count == (step == 0 ? 2u : step == 1 ? 1u : 0u) &&
+                gameplay.consumables().effects.count == reference.consumables().effects.count,
+                "both controller paths consume one of each type per update");
+        if (step < 2) require(frame.ammoChanged, "native HUD invalidates after queued charge grants");
+        for (unsigned i = 0; i < 6; ++i)
+            require(gameplay.consumables().pending[i] == reference.consumables().pending[i], "pending counts match");
+    }
+    require(gameplay.player().ammoCapacity() == chargeBefore + 2, "two batteries consumed over two updates");
     if (std::getenv("DOWNWELL_COMPARE_ACTORS")) {
         for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {
             const auto& e = gameplay.enemyAt(i);

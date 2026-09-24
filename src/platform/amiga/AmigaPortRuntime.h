@@ -199,6 +199,8 @@ public:
     const downwell::RunGemStatistics& runGemStatistics() const { return run_.gems; }
     std::uint32_t runTimeTicks() const { return run_.clock.ticks; }
     const downwell::RunCombo& runCombo() const { return run_.combo; }
+    bool grantConsumable(unsigned id) { return run_.consumables.grant(id, currencyAccount_); }
+    const downwell::Consumables& consumables() const { return run_.consumables; }
     const downwell::RunStage& runStage() const { return run_.stage; }
     int healthMaximum() const { return run_.combo.healthReserve.maximum; }
     const downwell::HealthReserve& healthReserve() const { return run_.combo.healthReserve; }

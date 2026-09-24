@@ -22,8 +22,18 @@ The injected grant must implement `scrGainUg`, not immediately heal or refill
 for IDs 100–105: those counts are consumed later by `scrControlBeginstepCheck`,
 one unit per item type per update in increasing ID order. Curry increases maximum
 health before `gainHp(1)`. At ownership cap, `scrGainUg` refunds 100 currency.
-These deferred effects and live world/menu integration are the next work, not
-implemented by this inventory module.
+`Consumables` now implements that deferred grant/consumption path in `RunSession`.
+Both runtimes call it at the controller boundary before player movement. Six
+independent ID-ordered checks consume at most one of each item per update; they
+are outside the source's pause/time-stop guard. Batteries refill current charge
+after increasing capacity. Energy Drink heals before increasing charge. Curry
+raises maximum health, then heals only one point (not to full health). Existing
+`HealthReserve` preserves overflow healing and heart-piece conversion.
+
+The queue resets with the run. It exposes ordered notification requests and
+healing/max-health message requests without drawing or playing sounds; those
+presentation consumers remain open. It is not a live shop menu: shop entry,
+purchase input, case destruction and merchant feedback still need integration.
 
 The range callback must use the shared Windows-runner RNG. This module covers
 only the stock-selection segment, not random effects from other objects created
@@ -37,3 +47,15 @@ The focused tests pass. Instantiating both paths with the native 68000 compiler
 succeeds; undefined arithmetic helpers are only 32-bit unsigned divide/modulo.
 No emulator run is claimed for this unconnected module, and neither playable
 executable is changed by this initial stock/transaction implementation.
+
+`make test-consumables` checks all six effects together in source order, stacked
+items over successive updates, notifications, injured Curry behavior, and a
+capped grant through the actual purchase transaction. The full host suite also
+exercises queued batteries/Curry through both live runtime controllers, comparing
+counts and resulting health/charge while requiring native HUD invalidation.
+The native cache verifier includes an isolated three-update consumable fixture
+on the 68000; it does not change the main gameplay tape or pretend to visit a shop.
+Full host tests and that bounded direct-entry A500 verifier pass: three consumable
+updates, 101 fresh terrain compositions and the task-stack guard. Native 68000
+instruction/helper audits are clean. Notification art/audio are still requests,
+not implemented presentation, and no end-to-end shop purchase is claimed.

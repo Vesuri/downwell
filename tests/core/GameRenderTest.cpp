@@ -104,6 +104,7 @@ int main() {
     session.stage = {3, 2};
     session.results.open(true, 123, 123);
     session.results.previous.fire = true;
+    session.consumables.pending[0] = 2;
     const auto saved = session.records();
     session.reset(saved);
     require(session.gems.lifetime == 123 && session.gems.record == 123 &&
@@ -116,6 +117,7 @@ int main() {
         session.combo.reward.combo == 0 && !session.combo.completion.saveRecord &&
         !session.results.active && !session.results.previous.fire,
         "new run clears upgrades, pending effects and results input history");
+    require(session.consumables.pending[0] == 0, "new run discards unconsumed purchases");
     require(session.gems.observeDeathMovement(true, 7) &&
         !session.gems.observeDeathMovement(true, 7) && session.gems.lifetime == 130,
         "next run death adds its own gems exactly once");
