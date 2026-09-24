@@ -98,7 +98,7 @@ AMIGA_CREDITS_FRAME_SHA256 := 9e7137cae00e1925f0a61c045f23ed1571358e9e02451b2acf
 AMIGA_MENU_WAKE_FRAME_SHA256 := 5f84cd99630daab845d51ecda5709970caa5bb265364bee92b0be7cd229c45fa
 AMIGA_MENU_TITLE_FRAME_SHA256 := d9fcc0c40f37e61e239593aa8520a47415c054439283d7992264c40b63b39f2a
 AMIGA_MENU_ENTRY_FRAME_SHA256 := f734aa6e16f4014ddbba20d84a4ba871aa8eaa339f4bdf383bb0a25f33e20d2b
-AMIGA_GAMEPLAY_FRAME_SHA256 := 89d8eaead3edbf99b5738020aed05948218659069e6c5682b2476936a1197ba8
+AMIGA_GAMEPLAY_FRAME_SHA256 := be204c3e9423423263047d6b745aeb19853dcf160e83770476d557a9a08f18a7
 AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256 := 29f23088128a0405f0869b740db88c5cd6a6d7428beef29e7e35bb93d48d26dd
 AREA_ONE_TRACE_TARGET := build/trace-area-one
 AREA_ONE_TRACE_SOURCES := tools/trace-area-one.cpp src/core/StartupRuntime.cpp src/core/PlayerMotion.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
@@ -120,6 +120,11 @@ test: build/standard-bullet-test
 test: build/crawler-motion-test
 test: build/snail-motion-test
 test: build/walking-enemy-test
+
+test: test-gameplay-capture-comparison
+.PHONY: test-gameplay-capture-comparison
+test-gameplay-capture-comparison:
+	python3 tests/compare-gameplay-captures-test.py
 
 build/walking-enemy-test: tests/core/WalkingEnemyMotionTest.cpp src/core/WalkingEnemyMotion.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
 	@mkdir -p build
@@ -452,11 +457,14 @@ verify-amiga-menu-entry-frame:
 	python3 tools/verify-amiga-entry-continuity.py
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
-verify-amiga-gameplay-frame:
+verify-amiga-gameplay-frame: build/capture-sdl-landing
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_FRAME_READY READY_DESCRIPTION="first grounded gameplay raster" amiga/verify_startup.sh'
 	printf '%s  %s\n' '$(AMIGA_GAMEPLAY_FRAME_SHA256)' 'amiga/.run/gameplay-frame.bin' | shasum -a 256 -c -
 	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-frame.bin build/amiga-gameplay-frame.png
+	@capture_dir=$$(mktemp -d build/landing-XXXXXX); \
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-landing "$$capture_dir" && \
+	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-frame.png
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 verify-amiga-gameplay-active-frame:
@@ -520,5 +528,9 @@ amiga:
 clean:
 	$(RM) -r build
 	$(MAKE) -C amiga clean
+
+build/capture-sdl-landing: tools/capture-sdl-landing.cpp $(filter-out src/main.cpp,$(SOURCES)) $(HOST_CHECK_HEADERS) src/platform/sdl/PlatformSDL.h
+	@mkdir -p build
+	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
 
 -include $(DEPS)

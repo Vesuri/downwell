@@ -24,17 +24,34 @@ the recorded planar-frame checksum. Its decoded 160x284 image was inspected:
 the leftmost player illustration is intact. This is a captured bitmap plus
 copper-configuration check, not a new recording of the monitor output.
 
-The first-grounded-gameplay capture reaches its breakpoint and passes its
-terrain/backing-buffer assertions, **but its recorded frame checksum fails**.
+The first-grounded-gameplay capture reached its breakpoint and passed its
+terrain/backing-buffer assertions, but initially failed its old frame checksum.
 Expected `89d8eaead3edbf99b5738020aed05948218659069e6c5682b2476936a1197ba8`;
 captured `be204c3e9423423263047d6b745aeb19853dcf160e83770476d557a9a08f18a7`.
 The old checksum was introduced in `ef26d11`, before live emitted terrain
 rendering (`f6daa65`) and subsequent actor behavior corrections. The retained
 old PNG and current decoded image visibly differ in terrain edge selection
-and enemy presentation. This history explains why an old baseline is suspect,
-but does not prove every current pixel correct. Do not refresh the checksum
-until a matching-state source/SDL comparison explains the differences. Normal
-target build restoration was run explicitly after this failed check.
+and enemy presentation. A subsequent fresh SDL capture resolves this baseline
+mismatch: its complete displayed region matches the current native capture
+with **zero differing pixels out of 99,968**. The captured SDL landing is
+player (240,1200), view (160,1058), sprite/frame (31,0), main update 165.
+Both current renderers select area-one wall art from the four cardinal wall
+neighbours, as in `objWall_n_Step_2`; the older native image predates the move
+from forecast patterns to emitted live terrain. The first-landing checksum is
+now refreshed to the current value above, backed by that exact comparison.
+
+`verify-amiga-gameplay-frame` now also builds `capture-sdl-landing`, replays the
+full startup/locked-style visit/usual-style selection with a 6000-update bound,
+and renders the first landing through the actual SDL backend. Comparison
+requires uniform integer scaling, crops only logical x=16..367 to match native
+DMA, and rejects every differing RGB pixel. It includes terrain, actors and
+HUD, rather than silently masking dynamic regions. The target uses a unique
+ignored capture directory and restores the normal Amiga build on success.
+The comparator has dimension, crop, single-pixel mismatch and nonuniform-scale
+tests. The active-scrolling checksum remains unchanged and still needs its
+own matching-state audit. Exact port-to-port agreement at this landing does
+not establish unimplemented source pillar/diagonal rules or general Windows
+presentation fidelity.
 
 Scope inventory: `PlatformSDL` exposes rendering, input, frame timing and PNG
 capture, but no sound playback operation; startup records sound requests.
