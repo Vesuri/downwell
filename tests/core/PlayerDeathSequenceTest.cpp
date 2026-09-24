@@ -34,6 +34,7 @@ int main() {
     publication.advanceAlarms(false);
     require(publication.active && !publication.movementDead() && publication.alarm == -1,
             "end of Begin Step publishes death without retroactively changing movement or starting alarm");
+    require(!publication.flashVisible(), "health publication does not draw flash early");
     publication.beginStep(false);
     publication.publishHealth(0);
     publication.advanceAlarms(false);
@@ -52,6 +53,8 @@ int main() {
         const bool effect = death.advanceAlarms(true);
         require(death.frames == tick && death.skipPresses == 0,
                 "holding fire across death does not generate skip edges");
+        require(death.flashVisible() == (tick < 3),
+                "flash is visible until the same-frame-decremented three-tick alarm fires");
         require(effect == (tick == 30), "grounded landing effect occurs once at first alarm");
         require(death.menuReady == (tick == 150), "menu opens after 30 then 120 updates");
         if (tick == 1) require(death.alarm == 29, "flash Create changes speed before same-frame countdown");

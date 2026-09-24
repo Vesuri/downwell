@@ -25,6 +25,10 @@ struct PlayerDeathSequence {
     // playerSpriteControl runs inside movement, before health publication.
     // started corresponds to the first execution of the death movement branch.
     bool movementDead() const { return started; }
+    // objDeathFlashFx is created at first death movement. Its alarm[0]=3
+    // advances in that same update, so Draw sees white on updates 1 and 2.
+    // Alarm[1]=20 and sleep(46) control pacing, not this visibility interval.
+    bool flashVisible() const { return started && frames < 3; }
     // DeathFlashFx Create runs synchronously before scrPlMovement reads
     // room_speed for alarm[0], and sets it to 20 (not the usual 60).
     void beginStep(bool fireHeld, int roomSpeedAfterFlash = 20) {

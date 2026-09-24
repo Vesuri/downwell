@@ -9,6 +9,33 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared death flash presentation
+
+`PlayerDeathSequence::flashVisible()` now exposes `objDeathFlashFx`'s visual
+interval to both renderers. Its recovered Create sets `flash=1` and alarm 0 to
+three; creation during player Begin Step means the same update decrements the
+alarm. The first two death-movement Draws are white; the third is clear. Health
+publication alone does not flash early. This is derived from the existing shared
+death frame count, with no second platform-specific timer or new replay state.
+
+SDL overlays the 160-pixel world view before the outside HUD. Amiga fills the
+same region of PF2 on entry, then clears it to transparent on exit. Existing
+PF2 priority covers both PF1 and hardware sprites. Only the two visibility edges
+write the overlay; terrain backing, circular buffers and scrolling are untouched.
+The normal death path has already removed the gem-streak overlay before this
+region is cleared; the later results overlay is drawn after the flash operation.
+
+Tests cover the source interval, live cross-target visibility and the host's
+natural death/Retry rendering. The target cache verifier additionally compares
+both actual Chip/blitter overlay edges against scalar rectangles and checks that
+the world buffer is unchanged. This implements the white flash only: original
+room-speed changes and Draw's `sleep(46)` pacing remain unimplemented, so its
+wall-clock duration is not yet original-faithful.
+Validation: full host suite and the bounded direct-entry A500 600-update cache
+verifier pass, including both overlay-edge comparisons and 101 fresh terrain
+compositions. The 68000 instruction/helper audits are clean. The target fixture
+exercises the real blitter edges; it is not a recording of a natural native death.
+
 ### Ammo underlay geometry
 
 `AmmoFill` shares the source's white `sprDot` underlay geometry between SDL and

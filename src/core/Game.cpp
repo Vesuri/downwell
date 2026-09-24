@@ -245,7 +245,8 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<int>(gem.x - viewX),
                             static_cast<int>(gem.y - viewY));
     }
-
+    if (startup_.mainDeathSequence().flashVisible())
+        renderer.fillRect(0, 0, 160, logicalHeight, {255, 255, 255, 255});
 }
 
 void Game::renderLandscapeHud(Renderer& renderer) const {

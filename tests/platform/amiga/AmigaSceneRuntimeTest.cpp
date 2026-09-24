@@ -911,6 +911,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
+            require(nativeDeath.flashVisible() == hostDeath.flashVisible(),
+                    "both live paths publish the same death flash interval");
             require(gameplay.ammoHudOffset() == reference.mainAmmoHudOffset(),
                     "both live HUDs share firing offset and decay on every combat update");
             require(gameplay.ammoMeterOffset() == reference.mainAmmoMeterOffset(),

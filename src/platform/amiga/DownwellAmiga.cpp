@@ -532,6 +532,11 @@ static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
                  downwellPlayfieldX + 81, 51);
 }
 
+static void composeDeathFlash(AmigaRenderer* renderer, bool visible) {
+    amigaRendererClearClipRect(renderer); // selects the non-scrolling HUD layer
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 0, 160, 284, visible ? 1 : 0);
+}
+
 static void composeResultsBackdrop(AmigaRenderer* renderer,
                                     int offset, int viewX, int viewY,
                                     int top = 0, int bottom = 284) {
@@ -2243,6 +2248,7 @@ int main(void) {
 #endif
             DW_PROFILE_PHASE(profileSimulation);
             const bool wasDead = port.dead();
+            const bool wasDeathFlash = port.deathSequence().flashVisible();
             const AmigaPortFrame result = port.step(packedInput);
             if (!port.generationSucceeded()) break;
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -2284,6 +2290,12 @@ int main(void) {
                 redrawCurrency(&renderer, port.currency());
             if ((result.streakChanged || wasDead != port.dead()) && !port.deathResults().active)
                 redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
+            if (wasDeathFlash != port.deathSequence().flashVisible()) {
+                // PF2 is above the world AND hardware sprites. Only touch this
+                // overlay on the two visibility edges; preserve the terrain
+                // backing and both hardware-scrolled world buffers throughout.
+                composeDeathFlash(&renderer, port.deathSequence().flashVisible());
+            }
             if (port.deathResults().active) {
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -2679,6 +2691,16 @@ int main(void) {
                 for (unsigned byte = 0; byte < downwellGameRingPlaneBytes * 2; ++byte)
                     gameHashBefore = (gameHashBefore ^ renderer.game[byte]) * 16777619UL;
                 resultsOracle.blitterEnabled = 0;
+                // Verify both flash edges, not only the cleared final state.
+                for (unsigned flash = 0; flash < 2; ++flash) {
+                    composeDeathFlash(&renderer, flash == 0);
+                    amigaRendererClearClipRect(&resultsOracle);
+                    amigaRendererFillRect(&resultsOracle, downwellPlayfieldX, 0, 160, 284,
+                        flash == 0 ? 1 : 0);
+                    AmigaHardware::blitterDrain();
+                    for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
+                        if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsBackdropFailures;
+                }
                 composeResultsBackdrop(&resultsOracle, 4, 160, 34);
                 composeResultsBackdrop(&renderer, 4, 160, 34);
                 downwell::DeathMenuSequence rowFixture;

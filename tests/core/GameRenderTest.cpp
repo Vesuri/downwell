@@ -37,7 +37,11 @@ public:
         ++setClipCount;
     }
     void clearClipRect() override { ++clearClipCount; }
-    void fillRect(int, int, int, int, downwell::Color) override {}
+    void fillRect(int x, int y, int w, int h, downwell::Color color) override {
+        if (x == 110 && y == 0 && w == 160 && h == 284 &&
+            color.r == 255 && color.g == 255 && color.b == 255 && color.a == 255)
+            ++deathFlashCount;
+    }
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
     void drawSprite(std::int32_t, std::uint32_t, int, int) override {}
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
@@ -68,6 +72,7 @@ public:
 
     downwell::Color clearColor{};
     int clearCount = 0;
+    unsigned deathFlashCount = 0;
     int setClipCount = 0;
     int clearClipCount = 0;
     int clipX = 0;
@@ -380,6 +385,7 @@ int main() {
     bool entranceLanded = false;
     unsigned approachTicks = 0;
     bool retried = false;
+    unsigned observedFlashFrames = 0;
     for (unsigned frame = 0; frame < 14000 && !retried; ++frame) {
         const auto& runtime = naturalDeath.startup();
         input = {};
@@ -417,6 +423,14 @@ int main() {
         const bool wasDeadWithResults = runtime.mainPlayerHealth() == 0 && runtime.deathResults().active;
         const auto lifetime = runtime.runGemStatistics().lifetime;
         naturalDeath.update(input, 42);
+        if (runtime.mainDeathSequence().started && runtime.mainDeathSequence().frames <= 3) {
+            RecordingRenderer flashRenderer;
+            naturalDeath.render(flashRenderer);
+            const unsigned expected = runtime.mainDeathSequence().frames < 3 ? 1 : 0;
+            require(flashRenderer.deathFlashCount == expected,
+                    "live rendering flashes only the central playfield on the source interval");
+            observedFlashFrames += flashRenderer.deathFlashCount;
+        }
         // The original event can acknowledge its last unlock and confirm the
         // selected action on the same press. Observe that path as well.
         if (wasDeadWithResults && !runtime.deathResults().active) {
@@ -433,6 +447,7 @@ int main() {
         naturalDeath.startup().deathResults().menu.goalPassed,
         naturalDeath.startup().deathResults().menu.goalNotice);
     require(retried, "bounded natural-death tape reaches and executes Retry");
+    require(observedFlashFrames == 2, "natural death renders both white flash frames before Retry");
     std::puts("game render tests passed");
     return 0;
 }
