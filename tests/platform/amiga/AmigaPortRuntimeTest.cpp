@@ -5,6 +5,7 @@
 #include "core/Replay.h"
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
+#include "core/MainRoomLifetime.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -125,14 +126,42 @@ int main() {
     require(lifecycle.configureEnemy(1, 111, 163, 0, -302, 0, 0, 5, 6),
             "configure enemy exactly on upper cleanup boundary");
     require(lifecycle.configureEnemy(2, 111, 163, 0, 4000, 0, 0, 5, 6),
-            "configure future prebuilt enemy");
+            "configure active enemy beyond lower cleanup boundary");
+    require(lifecycle.configureEnemy(3, 111, 163, 0, 4000, 0, 0, 5, 6,
+                0, 0, -1, -1, 0, 320, false),
+            "configure genuinely inactive future enemy");
     lifecycle.step(0);
     require(!lifecycle.enemyAt(0).active && !lifecycle.enemyAt(0).activationPending,
             "enemy above viewTop minus 160 is retired, not queued for reactivation");
     require(lifecycle.enemyAt(1).active,
             "cleanup comparison is strictly less than the boundary");
-    require(lifecycle.enemyAt(2).active && !lifecycle.enemyAt(2).awake,
-            "future prebuilt enemies are not mistaken for out-of-view live instances");
+    require(!lifecycle.enemyAt(2).active && !lifecycle.enemyAt(2).activationPending,
+            "render awakening does not exempt active instances from source End Step");
+    require(!lifecycle.enemyAt(3).active && lifecycle.enemyAt(3).activationPending,
+            "inactive future instances receive no End Step and remain pending");
+    {
+        downwell::LifetimeInstance instances[] = {
+            {116, -160, true}, {116, 3000, true}, {116, -161, true},
+            {116, 3001, true}, {60, -161, true}, {92, -161, true},
+            {116, -161, false}, {31, -161, true}
+        };
+        const auto retired = [&](int room, int area, long top) {
+            unsigned mask = 0;
+            downwell::retireMainRoomObjects(8, room, area, top,
+                [&](unsigned i) { return instances[i]; },
+                [&](unsigned i) { mask |= 1u << i; });
+            return mask;
+        };
+        require(retired(11, 1, 0) == ((1u << 2) | (1u << 3) | (1u << 5)),
+                "shared retirement preserves boundary equality, stones, inactive and unrelated objects");
+        require(retired(11, 1, 1) == ((1u << 0) | (1u << 2) | (1u << 3) | (1u << 5)),
+                "one Q12 camera subpixel changes the strict upper boundary");
+        require(retired(11, 1, -1) == ((1u << 1) | (1u << 2) | (1u << 3) | (1u << 5)),
+                "one negative camera subpixel changes the strict lower boundary");
+        require(retired(11, 5, 0) == ((1u << 2) | (1u << 3) | (1u << 4) | (1u << 5)),
+                "stone retirement is restricted to the original area-five guard");
+        require(retired(10, 1, 0) == 0, "scrOutofview does not destroy outside rmMain");
+    }
     lifecycle.step(0);
     require(!lifecycle.enemyAt(0).active && !lifecycle.enemyAt(0).awake,
             "retired enemy stays retired on subsequent ticks");

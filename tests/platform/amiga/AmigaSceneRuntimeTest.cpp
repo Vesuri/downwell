@@ -217,6 +217,9 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (!amigaEnemyHealth(enemy.objectId)) continue;
         require(ordinal < amiga.enemyCount(), "frog diagnostic retains creation-order pairing");
         const auto& native = amiga.enemyAt(ordinal++);
+        require(native.active == enemy.active &&
+                    native.activationPending == enemy.activationPending,
+                "enemy activation/retirement agrees, including inactive instances");
         if (enemy.active && native.active)
             require(native.alarm0 == enemy.alarms.get(0) && native.alarm1 == enemy.alarms.get(1),
                     "live enemy alarm slots match exactly across compact and full stores");

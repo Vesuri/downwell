@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "MainRoomLifetime.h"
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
@@ -845,30 +846,16 @@ void StartupRuntime::updateMainEnemyInteractions() {
 }
 
 void StartupRuntime::updateMainLifecycle() {
-    const float viewTop = mainCameraViewY();
-
-    for (std::size_t index = 0; index < instances_.size(); ++index) {
-        InstanceRecord& instance = instances_.at(index);
-        if (!instance.active)
-            continue;
-        // objWall_n's scrOutofview call is guarded by global.area == 5.
-        // This area-one implementation must retain its stone walls.
-        const bool generated = instance.objectId == 92 ||
-                               instance.objectId == 93 ||
-                               instance.objectId == 111 ||
-                               instance.objectId == 112 ||
-                               instance.objectId == 113 ||
-                               instance.objectId == 116 ||
-                               instance.objectId == 117 ||
-                               instance.objectId == 119 ||
-                               instance.objectId == 289;
-        if (generated &&
-            (instance.y < viewTop - 160.0F ||
-             instance.y > viewTop + 3000.0F)) {
-            instance.active = false;
+    retireMainRoomObjects(static_cast<unsigned>(instances_.size()), roomId_, 1,
+        mainCameraMotion_.y - surfaceHeight / 2L * 4096,
+        [this](unsigned i) {
+            const auto& instance = instances_.at(i);
+            return LifetimeInstance{instance.objectId, instance.y, instance.active};
+        },
+        [this](unsigned i) {
+            instances_.at(i).active = false;
             ++mainInstancesRetired_;
-        }
-    }
+        });
 }
 
 void StartupRuntime::syncMainBuilderState() {

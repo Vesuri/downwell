@@ -244,6 +244,40 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared main-room lifetime pass
+
+`MainRoomLifetime.h` now owns the retirement iteration, implemented-object
+policy, active-instance check and strict fractional-camera boundaries. SDL
+exposes its instance records; the native storage adapter exposes enemy and
+breakable records with their world-coordinate offset. Neither adapter owns a
+second copy of the decision. The supported area remains one; the policy's
+area-five stone guard is tested but does not implement area-five gameplay.
+
+The previous native enemy pass rounded the camera and required the rendering
+`awake` flag. Original `scrOutofview` assembly uses strict LT/GT comparisons
+against viewY-160 and viewY+3000, guarded by room 11; the implemented enemy End
+Steps call it without a render-visibility condition. Active offscreen enemies
+now retire accordingly. Inactive pending instances remain pending, since
+inactive instances do not receive End Step. The old fixture labelled an active
+far-away enemy as a future inactive instance; separate fixtures now distinguish
+those states instead of preserving that native-only exemption.
+
+Fixtures cover both exact boundaries, one Q12 subpixel on either side, room
+filtering, the stone area guard, unrelated objects and inactive instances.
+Paired combat tests additionally compare enemy active/pending flags, rather
+than skipping state checks whenever one adapter has already retired an enemy.
+The camera trace setter now updates the authoritative Q12 state as well.
+
+Validation: full host suite, both combat tapes with exact active/pending
+checks, 16,562 offline rendering comparisons, bounded A500 600-tick cache run
+(101 comparisons and intact stack guard), and cross-CPU player/gem replay
+pass. The replay digest is unchanged and both 68000 audits are clean. These
+finite tests do not cover every lifetime interaction or original event order.
+
+This consolidates the pass, not the entire event scheduler: both adapters still
+invoke it after their current combat/currency work. Original global event
+ordering and destruction-event side effects remain separate fidelity work.
+
 #### Shared hanging-bat activation and area-one terrain lifetime
 
 `BatBehavior` now owns support discovery, wake decisions, hit/pursuit selection

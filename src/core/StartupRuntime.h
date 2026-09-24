@@ -207,6 +207,8 @@ public:
     void traceSetMainCameraViewY(float viewY) {
         mainCameraY_ = viewY + surfaceHeight / 2.0F;
         mainCameraTargetY_ = mainCameraY_;
+        mainCameraMotion_.y = mainCameraMotion_.targetY =
+            static_cast<long>(mainCameraY_ * 4096.0F);
     }
 #endif
 

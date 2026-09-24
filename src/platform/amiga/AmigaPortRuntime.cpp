@@ -1,4 +1,5 @@
 #include "AmigaPortRuntime.h"
+#include "core/MainRoomLifetime.h"
 #include "AmigaProfile.h"
 
 #include "core/PortCheckpoint.h"
@@ -770,30 +771,25 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
-    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
-        EnemyState& enemy = enemies_[enemyIndex];
-        // scrOutofview (rmMain): y < viewTop-160 or y > viewTop+3000.
-        // Native coordinates are relative to player start y=176; viewTop
-        // starts at 34, hence -302 / +2858. Future prebuilt enemies are not
-        // yet live instances and must not be destroyed before activation.
-        if (enemy.active && enemy.awake &&
-            (enemy.y - cameraPixelY_ < -302 || enemy.y - cameraPixelY_ > 2858)) {
+    const long viewTop = followCamera_ ? cameraMotion_.y - 142L * 4096
+        : 34L * 4096 + cameraY_ * 16;
+    downwell::retireMainRoomObjects(enemyCount_, 11, 1, viewTop,
+        [this](unsigned i) {
+            const auto& enemy = enemies_[i];
+            return downwell::LifetimeInstance{enemy.objectId, enemy.y + 176, enemy.active};
+        },
+        [this](unsigned i) {
+            auto& enemy = enemies_[i];
             enemy.active = false;
             enemy.awake = false;
             enemy.activationPending = false;
-        }
-    }
-
-    // objBox_n End Step calls scrOutofview. Stone objWall_n calls it only
-    // in area 5, so area-one stone collision cells must remain present.
-    const long viewTop = followCamera_ ? cameraMotion_.y - 142L * 4096
-        : 34L * 4096 + cameraY_ * 16;
-    for (unsigned i = 0; i < breakableCount_; ++i) {
-        auto& box = breakables_[i];
-        const long y = (box.y + 176L) * 4096;
-        if (box.active && (y < viewTop - 160L * 4096 || y > viewTop + 3000L * 4096))
-            box.active = false;
-    }
+        });
+    downwell::retireMainRoomObjects(breakableCount_, 11, 1, viewTop,
+        [this](unsigned i) {
+            const auto& box = breakables_[i];
+            return downwell::LifetimeInstance{92, box.y + 176, box.active};
+        },
+        [this](unsigned i) { breakables_[i].active = false; });
 
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
