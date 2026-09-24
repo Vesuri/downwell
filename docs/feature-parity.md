@@ -9,6 +9,29 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Ammo underlay geometry
+
+`AmmoFill` shares the source's white `sprDot` underlay geometry between SDL and
+Amiga. VM `scrDrawHud4x3` stores `stammoMeter = 184 * (stammo/ammo)`, then draws
+at Y=232 with scale Y=`5-stammoMeter`. The former rectangle instead ended at 233
+and omitted the five-pixel adjustment. Full charge now spans [53,232), and 1/8
+charge spans [214,232). Empty charge emits nothing; very low nonzero charge can
+produce a positive scale extending below 232. Current nonnegative recharge jiggle
+always leaves the source's clamped underlay anchor at 232.
+
+Tests compare unquantized binary64 geometry at every charge for capacities 1–512,
+plus large-capacity and zero-scale fixtures. The oracle explicitly stores the
+meter before subtraction so a host fused multiply-add cannot bypass VM rounding.
+Both integer rectangle backends currently floor the top and height separately.
+That fractional-edge policy remains provisional pending Windows raster captures;
+matching SDL is not evidence of original GPU pixel coverage. Integral geometry
+is exact. Rendering remains in the original layer order and native updates use
+the existing HUD invalidation, not a new per-frame repaint.
+The full host suite passes. Bounded direct-entry Amiga captures while firing and
+recharging match SDL at all 99,968 visible pixels; both 68000 instruction and
+64-bit helper audits are clean. These checks do not establish fractional Windows
+rasterization or a 20 ms frame time.
+
 ### Source ammo dividers
 
 Both renderers now use the two divider loops from `scrDrawHud4x3`: the optional

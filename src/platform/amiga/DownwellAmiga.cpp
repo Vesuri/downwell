@@ -26,6 +26,7 @@
 #include "core/GameMakerRounding.h"
 #include "core/HudNumbers.h"
 #include "core/AmmoDividers.h"
+#include "core/AmmoFill.h"
 #include "core/DeathResultsBackdrop.h"
 #include "core/DeathResultsRows.h"
 #include "core/DeathResultsChoices.h"
@@ -447,15 +448,8 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
 
 static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
                        const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
-    enum {
-        gaugeX = 289,
-        gaugeTop = 49,
-        gaugeWidth = 10,
-        gaugeLength = 184
-    };
     if (ammo > maximumAmmo)
         ammo = maximumAmmo;
-    const int filled = maximumAmmo ? gaugeLength * (int)ammo / maximumAmmo : 0;
     amigaRendererClearClipRect(renderer);
     // Gauge rims move during recharge; clear their complete swept rectangle.
     amigaRendererFillRect(renderer, 282, 40, 24, 216, 3);
@@ -474,10 +468,10 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
     }
     drawAsset(renderer, 416, 0, 284, 43 + meterOffset, 0);
     // The underlay stays fixed while the frame and charge rows jiggle.
-    if (filled > 0)
-        amigaRendererFillRect(renderer, gaugeX,
-                              gaugeTop + gaugeLength - filled,
-                              gaugeWidth, filled, 1);
+    downwell::drawAmmoFill(ammo, maximumAmmo, 289,
+        [renderer](int x, unsigned y, unsigned w, unsigned h) {
+            amigaRendererFillRect(renderer, x, y, w, h, 1);
+        });
     if (rows) rows->draw(288, 229 + 4 * meterOffset,
         [renderer](unsigned sprite, unsigned frame, int x, int y) {
             // GameMaker wraps subimages; the bottom divider has only two frames.

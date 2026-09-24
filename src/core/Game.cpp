@@ -2,6 +2,7 @@
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
 #include "AmmoDividers.h"
+#include "AmmoFill.h"
 #include "DeathResultsBackdrop.h"
 #include "DeathResultsRows.h"
 #include "DeathResultsChoices.h"
@@ -271,14 +272,11 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     constexpr int gaugeX = origin + 174;
     const int meterOffset = static_cast<int>(startup_.mainAmmoMeterOffset());
     const int gaugeTop = 43 + meterOffset;
-    constexpr int gaugeBottom = 233;
-    constexpr int meterLength = 184;
-    const int filled = static_cast<int>(meterLength *
-        (static_cast<float>(startup_.mainAmmo()) / startup_.mainAmmoCapacity()));
     renderer.drawSprite(416, 0, gaugeX, gaugeTop);
-    if (filled > 0)
-        renderer.fillRect(gaugeX + 5, gaugeBottom - filled,
-                          10, filled, {255, 255, 255, 255});
+    drawAmmoFill(startup_.mainAmmo(), startup_.mainAmmoCapacity(), gaugeX + 5,
+        [&](int x, unsigned y, unsigned w, unsigned h) {
+            renderer.fillRect(x, y, w, h, {255, 255, 255, 255});
+        });
     startup_.mainAmmoGauge().draw(gaugeX + 4, 229 + 4 * meterOffset,
         [&](unsigned sprite, unsigned frame, int x, int y) { renderer.drawSprite(sprite, frame, x, y); });
     drawAmmoDividers(startup_.mainAmmo(), startup_.mainAmmoCapacity(), 1,

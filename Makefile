@@ -217,7 +217,13 @@ build/ammo-dividers-test: tests/core/AmmoDividersTest.cpp src/core/AmmoDividers.
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/AmmoDividersTest.cpp
 
-test: test-ammo-dividers
+test: test-ammo-dividers test-ammo-fill
+.PHONY: test-ammo-fill
+build/ammo-fill-test: tests/core/AmmoFillTest.cpp src/core/AmmoFill.h src/core/HudReal.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-ammo-fill: build/ammo-fill-test
+	./build/ammo-fill-test
 .PHONY: test-ammo-dividers
 test-ammo-dividers: build/ammo-dividers-test
 	./build/ammo-dividers-test
