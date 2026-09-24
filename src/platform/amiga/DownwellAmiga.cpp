@@ -2167,7 +2167,7 @@ int main(void) {
             for (unsigned index = 0; index < AmigaPortRuntime::gemCapacity; ++index) {
                 const auto& gem = port.gemAt(index);
                 if (gem.active && !appendGameplayActor(actors, actorCount,
-                        (UWORD)(gem.large ? 134 : 133), (UWORD)((gem.age / 2u) & 3u),
+                        (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),
                         downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
                         gameplayPlayerStartY + gem.y - port.cameraOffsetY(), 0))
                     frameReady = false;

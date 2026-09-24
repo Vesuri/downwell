@@ -7,6 +7,27 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    for (unsigned choice = 0; choice < 4; ++choice) {
+        struct Choice {
+            unsigned value, calls = 0;
+            unsigned irandomSmall(unsigned upper) {
+                require(upper == 3, "animation uses the recovered four-way choice");
+                ++calls; return value;
+            }
+        } choiceRandom{choice};
+        downwell::GemAnimation animation;
+        animation.initialize(choiceRandom);
+        const int rates[] = {-5, -3, 3, 5};
+        require(choiceRandom.calls == 1 && animation.rateTenths == rates[choice] && animation.frame() == 0,
+                "each source animation choice consumes one draw and starts frame zero");
+        for (int tick = 1; tick <= 400; ++tick) {
+            animation.advance();
+            const int phase = ((tick * rates[choice]) % 40 + 40) % 40;
+            require(animation.phaseTenths == static_cast<unsigned>(phase) &&
+                    animation.frame() == static_cast<unsigned>(phase / 10),
+                    "signed animation wraps correctly with no accumulated rounding drift");
+        }
+    }
     downwell::GemLifetime loose, attracted;
     for (unsigned age = 1; age <= 400; ++age) {
         require(attracted.advance(true), "attracted gem survives its source expiry alarm");

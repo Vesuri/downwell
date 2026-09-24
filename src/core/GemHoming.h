@@ -14,7 +14,6 @@ struct GemHoming {
     }
     template<class Random>
     void initialize(Random& random) {
-        random.irandomSmall(3); // image-speed choice precedes heading
         // VM evaluates choose's second argument before its first.
         const int second = 170 + static_cast<int>(random.irandomSmall(70));
         const int first = static_cast<int>(random.irandomSmall(70)) - 60;

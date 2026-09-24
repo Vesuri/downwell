@@ -2149,6 +2149,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(gem.motion.homing.direction);
         digest.addI32(gem.motion.homing.turnFifths);
         digest.addI32(gem.motion.homing.speedEighths);
+        digest.addI32(gem.motion.animation.rateTenths);
+        digest.addU32(gem.motion.animation.phaseTenths);
     }
     digest.addU32(mainCurrencyTotal_);
     digest.addU32(mainGameGemTotal_);

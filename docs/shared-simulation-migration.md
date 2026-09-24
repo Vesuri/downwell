@@ -642,3 +642,25 @@ source disappearing flag is exposed but its Draw flashing is not yet wired.
 Full host regressions and the bounded 68000 replay (`64 9f0d3943 e7900d2b`)
 pass. The replay is a target regression, not a direct test of the 310-tick
 gem lifetime; those boundary cases are exercised by the shared core tests.
+
+## Shared currency animation
+
+objCurrency Create's VM chooses image_speed from [-0.5,-0.3,0.3,0.5]. Both
+ports previously consumed but discarded that random choice and displayed
+(age/2)%4, making every gem animate forward at 0.5. GemAnimation now retains
+the choice and advances a signed, wrapping four-frame phase in exact tenths.
+The same Create draw remains before the two randomized heading candidates;
+no extra RNG draws were introduced. Both SDL drawing and Amiga actor submission
+read this shared phase. All four frames were already exported offline.
+
+Tests exercise all four choices through 400 updates each, including reverse
+wrap and one-draw initialization. The combat tape compares the multiset of live
+gem ages, amounts, selected rates and full phases on every update, accounting
+for differing slot reuse, and requires actual live-gem coverage. It passes
+along with the full host suite and unchanged health/kill/currency counters.
+This recovers the selected rate/direction, not proof of original-runner animation
+phase on an instance's creation frame. Time-stop and disappearing Draw flashing
+remain unimplemented; the latter is not silently approximated here.
+The bounded 68000 replay (`64 9f0d3943 e7900d2b`) and 600-tick target
+terrain-cache oracle pass with this frame-selection path. They do not replace
+the outstanding original-Windows creation-phase and flashing checks.

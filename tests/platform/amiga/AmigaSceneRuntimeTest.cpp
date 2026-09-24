@@ -12,12 +12,15 @@
 #include <iostream>
 #include <iterator>
 #include <vector>
+#include <array>
+#include <algorithm>
 
 namespace {
 int parityFrame = 0;
 bool sawExtendedEnemyAnimation = false;
 bool sawPairedFrogAir = false, sawPairedFrogGround = false;
 bool sawPairedFrogHit = false;
+bool sawPairedCurrencyAnimation = false;
 
 void require(bool condition, const char* message) {
     if (!condition) {
@@ -802,6 +805,23 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired() << '\n';
             require(gameplay.generationSucceeded(), "combat continuation retains successful live generation");
             verifyFrogMotion(gameplay, reference);
+            // Slot reuse differs between adapters; compare the multiset of
+            // live gem birth ages, values and authoritative animation state.
+            std::vector<std::array<long, 4>> nativeGems, referenceGems;
+            for (unsigned i = 0; i < gameplay.gemCapacity; ++i) {
+                const auto& gem = gameplay.gemAt(i);
+                if (gem.active) nativeGems.push_back({static_cast<long>(gem.age), gem.amount,
+                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths)});
+            }
+            for (unsigned i = 0; i < reference.mainCurrencyCount(); ++i) {
+                const auto& gem = reference.mainCurrencyAt(i);
+                referenceGems.push_back({static_cast<long>(gem.age), gem.amount,
+                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths)});
+            }
+            std::sort(nativeGems.begin(), nativeGems.end());
+            std::sort(referenceGems.begin(), referenceGems.end());
+            require(nativeGems == referenceGems, "live currency animation choices and phases agree across adapters");
+            sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
             require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
                     gameplay.player().spriteFrame() ==
                         static_cast<unsigned>(reference.mainPlayerImageIndex()),
@@ -847,6 +867,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
                   << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
                   << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal() << '\n';
+        require(sawPairedCurrencyAnimation, "combat tape actually covers live currency animation");
         require(gameplay.enemiesDefeated() > 0 && reference.mainEnemiesDefeated() > 0 &&
                     gameplay.currency() > 0 && reference.mainCurrencyTotal() > 0,
                 "combat diagnostic actually exercises kills and reward collection on both targets");

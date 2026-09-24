@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GEM_MOTION_H
 #include "GemHoming.h"
 #include "GemLifetime.h"
+#include "GemAnimation.h"
 namespace downwell {
 // Positions in 1/12800 pixels keep .035 gravity exact, with no 64-bit math.
 // Terrain probes remain provisional, not the source sprite-mask solver.
@@ -9,6 +10,7 @@ struct GemMotion {
     long x = 0, y = 0, vx = 0, vy = 0;
     GemHoming homing;
     GemLifetime lifetime;
+    GemAnimation animation;
     bool attracted = false;
     static long q8(long value) { return value < 0 ? -((-value + 25) / 50) : (value + 25) / 50; }
     static int pixel(long value) { return static_cast<int>(value / 12800 - (value % 12800 < 0)); }
@@ -25,11 +27,13 @@ struct GemMotion {
         x = px * 12800L; y = py * 12800L; attracted = attract;
         vx = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
         vy = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
+        animation.initialize(random);
         homing.initialize(random);
     }
     template<class Solid, class Random>
     bool step(long targetX, long targetY, Solid solid, Random& random) {
         if (!lifetime.advance(attracted)) return false;
+        animation.advance();
         const long dx = targetX - q8(x), dy = targetY - q8(y);
         if (attracted) {
             long sx, sy;
