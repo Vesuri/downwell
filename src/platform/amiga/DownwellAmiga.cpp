@@ -133,14 +133,18 @@ static bool generateLiveTerrain(void*, AmigaPortRuntime&,
 
 static bool appendGeneratedTerrain(void* opaque,
     const downwell::DeferredCreateInstance& command) {
+    DW_PROFILE_SCOPE(profileGeneratedRegistration);
     auto& live = *static_cast<LiveGenerationContext*>(opaque);
     // The live builder is stepping on this runtime's RNG stream. Register
     // synchronously so stock/farewell draws precede the next pattern cell.
     if (command.objectId == 277)
         return live.runtime->registerShop(command.x, command.y) != nullptr;
     if (command.objectId == 306) live.runtime->registerLevelExit(command.y);
-    if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
-        !terrainTiles.append(command)) return false;
+    {
+        DW_PROFILE_SCOPE(profileGeneratedIndex);
+        if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
+            !terrainTiles.append(command)) return false;
+    }
     if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||
         command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
         command.objectId == 109) {

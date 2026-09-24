@@ -52,6 +52,21 @@ The full host suite, bounded native cross-target replay and both 68000
 audits pass. All replay digests remain unchanged; the verification workflow
 restores the ordinary non-skip executable.
 
+### Generation callback attribution
+
+Probe phases 35 (generated-object registration) and 36 (terrain index/tile
+append) split callback work out of phase 32. Before further RNG changes, the
+same 600-update tape reports 432.597 ms remaining in the builder, 50.429 ms
+in registration and 56.472 ms in index/tile append (203 generated callbacks).
+Most measured generation work therefore remains outside those callbacks.
+Evidence: `/tmp/downwell-generation-detail-profile.log`.
+
+Nested probes split one long callback into many exclusive brackets. Its old
+102 ms maximum cannot be compared with the new 9.514 ms phase-32 bracket as
+though the stall were fixed. The extra probes also add overhead: this run
+uses 1,136 fields and has a 159.643 ms maximum whole frame. Use uninstrumented
+FPSCOUNT for shipping performance; all new callbacks compile out otherwise.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in

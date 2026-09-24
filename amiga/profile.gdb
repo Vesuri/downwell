@@ -15,6 +15,7 @@ printf "Additional phases: 14=terrain_collision 15=game_dirty_copy 16=player 17=
 set $i = 0
 printf "Ammo phases: 27=base_and_fill 28=rows 29=dividers 30=rim_and_label\n"
 printf "Runtime phases: 31=camera 32=generation 33=lifecycle 34=hud_state\n"
+printf "Generation phases: 35=object_registration 36=terrain_index_and_tiles\n"
 while $i < sizeof(gDownwellProfileTicks[0])/sizeof(gDownwellProfileTicks[0][0])
     printf "%u %lu %.3f %.3f %.3f\n", $i, gDownwellProfileCalls[$s][$i], gDownwellProfileTicks[$s][$i]*20.0/80128.0, gDownwellProfileTicks[$s][$i]*20.0/80128.0/gDownwellProfileFrames[$s], gDownwellProfileMax[$s][$i]*20.0/80128.0
     set $i = $i + 1
