@@ -122,6 +122,17 @@ int main(int argc, char** argv) {
             "fully clipped hardware sprite produces a hidden record");
 
     require(argc == 3, "Amiga game and HUD pack paths are supplied");
+    int bx, by, bw, bh;
+    require(amigaRendererAssetBounds(pack, pack + sizeof pack, 7, 0, 20, 10, 0, &bx, &by, &bw, &bh),
+        "asset lookup primes same-address bank cache");
+    putLong(pack, 20, 8UL << 16);
+    require(!amigaRendererAssetBounds(pack, pack + sizeof pack, 7, 0, 20, 10, 0, &bx, &by, &bw, &bh) &&
+        amigaRendererAssetBounds(pack, pack + sizeof pack, 8, 0, 20, 10, 0, &bx, &by, &bw, &bh),
+        "same-size bank replacement cannot return a cached different resource");
+    putLong(pack, 8, 0);
+    require(!amigaRendererAssetBounds(pack, pack + sizeof pack, 8, 0, 20, 10, 0, &bx, &by, &bw, &bh),
+        "shrunk directory cannot return an old cached record");
+    buildOpaqueSpritePack(pack, sizeof pack);
     std::ifstream input(argv[1], std::ios::binary);
     const std::vector<UBYTE> gamePack{
         std::istreambuf_iterator<char>(input),

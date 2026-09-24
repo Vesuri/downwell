@@ -30,14 +30,19 @@ int main(int argc, char** argv) {
         require(std::memcmp(target + 12, source.data() + 12, 8) == 0, "input provenance prefix preserved");
         const unsigned count = AmigaClearBank::longword(target + 8);
         require(count >= 9 && count <= 18, "duplicates deduplicated by resource ID/frame");
-        for (unsigned i = 2; i < 6; ++i) {
-            const auto* record = target + 20 + i * 24;
-            require(AmigaClearBank::word(record) == downwell::levelBorderSprite(area + (i - 2) / 2) &&
-                AmigaClearBank::word(record + 2) == (i % 2 ? 13 : 7),
-                "only current/incoming area border frames are selected");
-        }
+        unsigned borders = 0;
         for (unsigned i = 0; i < count; ++i) {
             const auto* copied = target + 20 + i * 24;
+            const auto key = AmigaClearBank::longword(copied);
+            require(i == 0 || AmigaClearBank::longword(copied - 24) < key,
+                "selected directory is strictly ordered for renderer binary search");
+            if (AmigaClearBank::word(copied + 2) != 0) {
+                const unsigned id = AmigaClearBank::word(copied);
+                require((id == downwell::levelBorderSprite(area) || id == downwell::levelBorderSprite(area + 1)) &&
+                    (AmigaClearBank::word(copied + 2) == 7 || AmigaClearBank::word(copied + 2) == 13),
+                    "only current/incoming border frames are banked");
+                ++borders;
+            }
             const std::uint8_t* originalRecord = nullptr;
             for (unsigned j = 0; j < AmigaClearBank::longword(source.data() + 8); ++j) {
                 const auto* candidate = source.data() + 20 + j * 24;
@@ -52,6 +57,7 @@ int main(int argc, char** argv) {
                 std::memcmp(target + offset, source.data() + AmigaClearBank::longword(originalRecord + 16), length) == 0,
                 "all selected planar payload bytes preserved");
         }
+        require(borders == 4, "both border frames from both selected areas survive sorting");
         for (unsigned i = 0; i < 16; ++i)
             require(storage[i] == 0xa5 && storage[storage.size() - 1 - i] == 0xa5, "adjacent staging/HUD guards intact");
     }

@@ -37,6 +37,16 @@ struct AmigaClearBank {
                 if (!found) ids[count++] = id;
             }
         }
+        // Renderer lookup is binary search over (resource ID, frame), not
+        // selection order. Sort the small directory before locating payloads.
+        for (unsigned i = 1; i < count; ++i) {
+            const unsigned id = ids[i], frame = frames[i];
+            unsigned j = i;
+            while (j && (ids[j - 1] > id || (ids[j - 1] == id && frames[j - 1] > frame))) {
+                ids[j] = ids[j - 1]; frames[j] = frames[j - 1]; --j;
+            }
+            ids[j] = id; frames[j] = frame;
+        }
         const std::uint8_t* records[18] = {};
         unsigned bytes = 20 + count * 24;
         if (bytes > capacity) return 0;

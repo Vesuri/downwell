@@ -194,12 +194,8 @@ static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
     ULONG count;
     ULONG first = 0;
     ULONG last;
-#ifdef DOWNWELL_PLATFORM_AMIGA
     static struct { const UBYTE* pack; const UBYTE* end; ULONG key; const UBYTE* record; } cache[64];
     const unsigned slot = (sprite ^ (frame * 17u)) & 63u;
-    if (cache[slot].pack == pack && cache[slot].end == packEnd && cache[slot].key == wanted)
-        return cache[slot].record;
-#endif
     if (packEnd - pack < 20 || readLong(pack) != 0x44574150UL ||
         readWord(pack + 4) != 2)
         return 0;
@@ -207,6 +203,13 @@ static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
     records = pack + readWord(pack + 6);
     if (records < pack || records + count * 24 > packEnd)
         return 0;
+    /* A selected artwork bank may be replaced in place, even at equal size.
+       A matching address/key alone does not identify the new directory slot.
+       Keep the cache enabled in host tests so this target path is exercised. */
+    if (cache[slot].pack == pack && cache[slot].end == packEnd && cache[slot].key == wanted &&
+        cache[slot].record >= records && cache[slot].record < records + count * 24 &&
+        readLong(cache[slot].record) == wanted)
+        return cache[slot].record;
     last = count;
     while (first < last) {
         const ULONG middle = first + (last - first) / 2;
@@ -217,12 +220,10 @@ static const UBYTE* findAsset(const UBYTE* pack, const UBYTE* packEnd,
         else if (key > wanted)
             last = middle;
         else {
-#ifdef DOWNWELL_PLATFORM_AMIGA
             cache[slot].pack = pack;
             cache[slot].end = packEnd;
             cache[slot].key = wanted;
             cache[slot].record = record;
-#endif
             return record;
         }
     }

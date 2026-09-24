@@ -305,6 +305,18 @@ for a loader (the SDL screen consequently stops under its final wipe), and the
 Amiga application has not yet switched to this presenter. This is visible SDL
 integration, not completed progression, native presentation or Windows parity.
 
+Native presenter integration exposed a directory-contract bug in the selected
+clear bank: renderer lookups require records sorted by resource ID/frame, while
+the builder had emitted selection order. The builder now sorts its bounded
+18-entry directory before copying payloads. All 256 bank fixtures verify strict
+ordering, four correct area-border frames and unchanged payload bytes.
+The renderer lookup cache now validates its record against the current directory
+before reuse, preventing same-address/same-size bank replacement from returning
+a different resource at an old slot. This cache path is also enabled in host
+tests; replacement and directory-shrink regressions plus the existing 20,580
+offline sprite comparisons pass. These fixes prepare safe native lookup; they
+do not complete the result presenter or its DMA handoff.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
