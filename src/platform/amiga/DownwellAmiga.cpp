@@ -25,6 +25,7 @@
 #include "framework/AmigaHardware.h"
 #include "core/GameMakerRounding.h"
 #include "core/HudNumbers.h"
+#include "core/DeathResultsBackdrop.h"
 #include "framework/AmigaMemory.h"
 #include "framework/AmigaPlatform.h"
 #include "framework/Bitmap.h"
@@ -178,6 +179,8 @@ volatile ULONG gDownwellStartupChipRemaining;
 const UBYTE* gDownwellResultsPack;
 volatile ULONG gDownwellResultsAssetBytes;
 volatile ULONG gDownwellResultsAssetFailures;
+volatile ULONG gDownwellResultsBackdropFailures;
+volatile ULONG gDownwellResultsBackdropChecks;
 }
 
 #if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_REPLAY_VERIFY)
@@ -508,6 +511,45 @@ static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
     drawGameAsset(renderer, 133, 0, downwellPlayfieldX + 65, 55, 0);
     drawGameText(renderer, (UWORD)(streakTextBase + streak),
                  downwellPlayfieldX + 81, 51);
+}
+
+static void composeResultsBackdrop(AmigaRenderer* renderer,
+                                    int offset, int viewX, int viewY) {
+    UBYTE* saved = renderer->target;
+    renderer->target = renderer->hud;
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 0, 160, 284, 0);
+    struct Sink {
+        AmigaRenderer* renderer;
+        void sprite(int frame, int x, int y) {
+            amigaRendererDrawAsset(renderer, gDownwellResultsPack,
+                gDownwellResultsPack + gDownwellResultsAssetBytes, 733, frame,
+                downwellPlayfieldX + x, y, 0);
+        }
+        void blackRect(int x, int y, int w, int h) {
+            amigaRendererFillRect(renderer, downwellPlayfieldX + x, y, w, h, 3);
+        }
+        void title(int x, int y, bool black) {
+            amigaRendererDrawAssetPen(renderer, gDownwellResultsPack,
+                gDownwellResultsPack + gDownwellResultsAssetBytes, 65300, 0,
+                downwellPlayfieldX + x, y, 0, black ? 3 : 1);
+        }
+    } sink{renderer};
+    downwell::drawDeathResultsBackdrop(sink, offset, viewX, viewY);
+    amigaRendererClearClipRect(renderer);
+    renderer->target = saved;
+}
+
+static void redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntime& port) {
+    const int viewX = mainViewX + port.cameraOffsetX();
+    const int viewY = mainInitialViewY + port.cameraOffsetY();
+    const int offset = port.deathResults().menu.titleOffset;
+    static int lastX = -1, lastY = -1, lastOffset = -1;
+    const int phaseX = ((viewX % 8) + 8) % 8;
+    const int phaseY = ((viewY % 8) + 8) % 8;
+    if (lastX == phaseX && lastY == phaseY && lastOffset == offset) return;
+    lastX = phaseX; lastY = phaseY; lastOffset = offset;
+    composeResultsBackdrop(renderer, offset, viewX, viewY);
 }
 
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -1954,6 +1996,7 @@ int main(void) {
                 continue;
 #endif
             DW_PROFILE_PHASE(profileSimulation);
+            const bool wasDead = port.dead();
             const AmigaPortFrame result = port.step(packedInput);
             if (!port.generationSucceeded()) break;
             DW_PROFILE_PHASE(profileTitle);
@@ -1974,8 +2017,10 @@ int main(void) {
                 redrawHealth(&renderer, (unsigned)port.health());
             if (result.currencyChanged)
                 redrawCurrency(&renderer, port.currency());
-            if (result.streakChanged)
-                redrawStreak(&renderer, port.gemStreak());
+            if ((result.streakChanged || wasDead != port.dead()) && !port.deathResults().active)
+                redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
+            if (port.deathResults().active)
+                redrawResultsBackdrop(&renderer, port);
         }
         {
             const unsigned back = front ^ 1u;
@@ -2336,6 +2381,23 @@ int main(void) {
                         if (activeHudPack[byte] != amiga_hud_pack[byte])
                             ++gDownwellResultsAssetFailures;
                 }
+                // Exercise the real Chip/blitter overlay against the scalar
+                // compositor without changing this gameplay replay's death state.
+                static UBYTE savedHud[downwellLayerBytes], expectedHud[downwellLayerBytes];
+                AmigaHardware::blitterDrain();
+                for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
+                    savedHud[byte] = expectedHud[byte] = renderer.hud[byte];
+                AmigaRenderer resultsOracle = renderer;
+                resultsOracle.hud = resultsOracle.target = expectedHud;
+                resultsOracle.blitterEnabled = 0;
+                composeResultsBackdrop(&resultsOracle, 4, 160, 34);
+                composeResultsBackdrop(&renderer, 4, 160, 34);
+                AmigaHardware::blitterDrain();
+                for (unsigned byte = 0; byte < downwellLayerBytes; ++byte) {
+                    if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsBackdropFailures;
+                    renderer.hud[byte] = savedHud[byte];
+                }
+                ++gDownwellResultsBackdropChecks;
                 downwellGameplayLongRunReady();
             }
             if (!sceneGameplayLandedReported && port.player().grounded()) {

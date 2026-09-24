@@ -2,6 +2,8 @@
 #include "core/RoomPack.h"
 #include "core/ObjectPack.h"
 #include "core/BuilderPatternPack.h"
+#include "core/DeathResultsBackdrop.h"
+#include "core/StateDigest.h"
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -39,9 +41,16 @@ public:
                                float, float, float) override {
         if (sprite == targetPlayer) ++playerDraws;
     }
-    void drawText(std::int32_t, const char* text, float x, float,
+    void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
                   downwell::TextAlign align) override {
+        if (std::strcmp(text, "GAME OVER") == 0) {
+            ++resultsTitleDraws;
+            if (color.r == 255) {
+                resultsTitleX = x;
+                resultsTitleY = y;
+            }
+        }
         if (color.r == 255 &&
             ((color.g == 255 && color.b == 255) ||
              (color.g == 0 && color.b == 0)) &&
@@ -67,11 +76,32 @@ public:
     bool sawRightCredit = false;
     int targetPlayer = -1;
     unsigned playerDraws = 0;
+    unsigned resultsTitleDraws = 0;
+    float resultsTitleX = 0, resultsTitleY = 0;
 };
 
 } // namespace
 
 int main() {
+    struct BackdropProbe {
+        unsigned tiles = 0, titles = 0;
+        bool panel = false;
+        void sprite(int frame, int x, int y) {
+            require(frame >= 0 && frame <= 7 && x >= -7 && x <= 160 && y >= -7 && y < 284,
+                    "results backdrop stays in source tiling range");
+            ++tiles;
+        }
+        void blackRect(int x, int y, int width, int height) {
+            panel = x == 0 && y == 80 && width == 161 && height == 129;
+        }
+        void title(int x, int y, bool black) {
+            require(black || (x == 80 && y == 68), "source title position with entry bounce");
+            ++titles;
+        }
+    } backdrop;
+    downwell::drawDeathResultsBackdrop(backdrop, 4, 160, 0);
+    require(backdrop.tiles == 1056 && backdrop.titles == 5 && backdrop.panel,
+            "source tiled shade, two gradients, inclusive panel and four-way title outline");
     downwell::Game game;
     RecordingRenderer renderer;
     game.render(renderer);
@@ -146,6 +176,22 @@ int main() {
     }
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
+    // Renderer fixture only: natural death entry is exercised by the long
+    // paired simulation replay. This tape deliberately ends after recovery.
+    auto& resultsFixture = const_cast<downwell::DeathResults&>(damagedGame.startup().deathResults());
+    resultsFixture.open(true, 0, 0);
+    for (int offset = 4; offset >= 0; --offset) {
+        resultsFixture.menu.titleOffset = offset;
+        downwell::StateDigest before, after;
+        resultsFixture.appendState(before);
+        renderer.resultsTitleDraws = 0;
+        damagedGame.render(renderer);
+        resultsFixture.appendState(after);
+        require(renderer.resultsTitleDraws == 5 && renderer.resultsTitleX == 190 &&
+                    renderer.resultsTitleY == 64 + offset,
+                "Game renderer submits results title and four-way outline at source anchors");
+        require(before.value() == after.value(), "drawing results never advances simulation");
+    }
     std::puts("game render tests passed");
     return 0;
 }

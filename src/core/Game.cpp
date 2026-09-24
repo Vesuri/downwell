@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
+#include "DeathResultsBackdrop.h"
 #include "ObjectPack.h"
 #include <array>
 #include <cmath>
@@ -115,6 +116,23 @@ void Game::render(Renderer& renderer) const {
         renderer.clearClipRect();
     if (startup_.inMainRoom())
         renderLandscapeHud(renderer);
+    if (startup_.inMainRoom() && startup_.deathResults().active) {
+        renderer.setClipRect(playfieldX, 0, 160, logicalHeight);
+        struct Sink {
+            Renderer& renderer;
+            void sprite(int frame, int x, int y) { renderer.drawSprite(733, frame, x, y); }
+            void blackRect(int x, int y, int w, int h) {
+                renderer.fillRect(x, y, w, h, {0, 0, 0, 255});
+            }
+            void title(int x, int y, bool black) {
+                const std::uint8_t c = black ? 0 : 255;
+                renderer.drawText(2, "GAME OVER", x, y, {c, c, c, 255}, TextAlign::center);
+            }
+        } sink{playfield};
+        drawDeathResultsBackdrop(sink, startup_.deathResults().menu.titleOffset,
+            startup_.mainCameraRenderViewX(), startup_.mainCameraRenderViewY());
+        renderer.clearClipRect();
+    }
 }
 
 void Game::renderMain(Renderer& renderer) const {
@@ -234,7 +252,7 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     drawHudCurrencyNumber(renderer, currencyX - 8, 18,
                           startup_.mainCurrencyTotal());
 
-    if (startup_.mainGemStreak() > 0) {
+    if (startup_.mainGemStreak() > 0 && !startup_.mainDeathSequence().active) {
         const std::string streak = std::to_string(startup_.mainGemStreak());
         renderer.drawSprite(133, 0, origin + 65, 55);
         drawGemmyTextLayers(origin + 81, 51, [&](int x, int y, Color color) {

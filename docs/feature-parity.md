@@ -9,6 +9,30 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### First visible results overlay on both backends
+
+`DeathResultsBackdrop` supplies DeathMenu Draw's tiled frame-5 shading,
+two eight-stage gradients, inclusive black panel and four-way outlined title
+to both renderers. Coordinates are view-local; background tiling retains the
+room-relative eight-pixel phase. SDL uses recovered sprites/font 2; Amiga uses
+the loaded planar pack on PF2, above gameplay. The native backdrop redraws only
+when its camera phase or entry-title offset changes, not on every settled frame.
+Its initial composition still issues individual tile blits; 20 ms performance
+has not been established. Original scrDrawHud4x3Top's death guard now suppresses
+the streak on both targets, avoiding stale HUD content behind the overlay.
+
+This is deliberately incomplete presentation: result rows, progress bar,
+unlock notices and actionable menu choices are not drawn yet. No placeholder
+numbers are displayed for missing run metrics. Native cache verification draws
+the backdrop with the real blitter and compares every HUD byte against a scalar
+composition, then restores gameplay. The bounded target test passes. Host
+renderer fixtures check all five title positions and that rendering does not
+mutate results state; natural entry is covered separately by the paired death
+replay, not by the injected renderer fixture. Cross-backend results screenshots
+and a Windows visual comparison remain outstanding.
+Final full host suite passes; normal SDL and Amiga builds are restored, with
+clean 68000 instruction/helper audits.
+
 ### Native results pack is loaded and survives gameplay reuse
 
 The native executable now embeds the results pack and copies its already planar
