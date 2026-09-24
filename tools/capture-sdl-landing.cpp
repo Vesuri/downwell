@@ -89,7 +89,8 @@ int main(int argc, char** argv) {
                 const auto& bullet = state.mainBulletAt(i);
                 const int x = static_cast<int>(bullet.x) - state.mainCameraRenderViewX();
                 const int y = static_cast<int>(bullet.y) - state.mainCameraRenderViewY();
-                if (bullet.gemHigh && x >= 8 && x < 152 && y >= 8 && y < 276) ++visible;
+                if (bullet.gemHigh && bullet.animation.frame() != 0 &&
+                        x >= 8 && x < 152 && y >= 8 && y < 276) ++visible;
             }
             if (!gemHighInjected || visible == 0) {
                 if (!targetTick) continue;

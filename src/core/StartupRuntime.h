@@ -7,6 +7,7 @@
 #include "GameMakerRandom.h"
 #include "GameplayLimits.h"
 #include "GemMotion.h"
+#include "ProjectileAnimation.h"
 #include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
@@ -40,6 +41,7 @@ public:
         float x = 0.0F;
         float y = 0.0F;
         bool gemHigh = false;
+        ProjectileAnimation animation;
     };
     struct MainCurrencyState {
         GemMotion motion;

@@ -1342,6 +1342,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 const auto& hostBullet = reference.mainBulletAt(bulletOrdinal++);
                 require(bullet.gemHigh == hostBullet.gemHigh,
                         "live bullets retain matching birth-time weapon levels");
+                require(bullet.animation.index.equal(hostBullet.animation.index),
+                        "live bullets retain identical shared animation phase");
                 sawHighBullet |= bullet.gemHigh;
                 requireNear(bullet.x + 240, hostBullet.x, 1.0F,
                             "combat bullet X matches in creation order");

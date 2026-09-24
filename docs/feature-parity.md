@@ -9,6 +9,38 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared six-frame projectile animation
+
+`ProjectileAnimation` now supplies both runtime adapters and both renderers.
+The VM Create event assigns image index zero and speed 0.3; source sprites
+458 and 459 each contain six frames. The shared clock preserves repeated
+binary64 addition and wrapping without native floating-point helpers. An
+independent host double comparison checks the entire accumulator over 100,000
+updates, including the tenth update (still frame 2, unlike exact-tenths frame
+3). Paired live combat compares animation state on every surviving shot;
+slot-compaction/reuse tests require newborn phase without resetting survivors.
+Startup digest schema 42 includes the phase; its startup-only baseline is
+`df6f5bbcfe64b702`, an intentional schema change rather than gameplay drift.
+
+All six source frames and downward quarter-turn variants are packed offline.
+Transparent padding is cropped with the anchor retained, and obsolete packed
+whole-number streak strings 10..99 are removed now that the HUD uses digits.
+The resulting pack is 309,390 bytes, SHA-256
+`5d5f9cda57fe7aa809534339eeade7db473db4d84f5a48703d0f1e58c51af8d1`;
+it passes the unchanged resident Chip asset budget. All 22,834 offline sprite
+comparisons, the full host suite and the slot-reuse regression pass.
+
+The native powered-shot capture now requires a visible nonzero animation
+frame, not merely a powered shot on frame zero. This supersedes the earlier
+frame-zero-only fixture. With the final cropped pack, the bounded A500 run
+captures update 260 and matches all 99,968 SDL pixels; both 68000 audits pass
+and the ordinary executable is restored. Source frame count/rate/initial value are checked
+against the extracted metadata and VM. Original Windows runner animation
+event timing and real-time frame cost still need independent verification;
+both adapters currently advance new shots in their first projectile update.
+Random spread, fractional vector motion and rotated collision behavior remain
+open. A matching renderer capture does not prove these missing semantics.
+
 ### Projectile artwork follows the current firing direction
 
 Both renderers previously drew machine-gun frame zero without rotation. The

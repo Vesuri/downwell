@@ -528,6 +528,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             bullet.x = muzzleX + ((oldShots & 1u) ? 1 : -1);
             bullet.y = muzzleY;
             bullet.gemHigh = run_.gemHigh;
+            bullet.animation = {};
             bulletChanged = true;
         }
     }
@@ -580,6 +581,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             if (!bullet.active)
                 continue;
             bulletChanged = true;
+            bullet.animation.advance();
             bullet.active = downwell::stepStandardBullet(bullet.x, bullet.y,
                 [this, &bullet](const downwell::StandardBulletPath& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {

@@ -2942,7 +2942,7 @@ int main(void) {
                 // Offline quarter-turn variant: the current vertical shot's
                 // image_angle is 270, not the artwork's authored zero angle.
                 if (bullet.active && !appendGameplayActor(actors, actorCount,
-                        downwell::machineGunProfile(bullet.gemHigh).sprite, 768,
+                        downwell::machineGunProfile(bullet.gemHigh).sprite, 768 + bullet.animation.frame(),
                         downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
                         gameplayPlayerStartY + bullet.y - port.cameraOffsetY(), 0))
                     frameReady = false;
@@ -3247,7 +3247,8 @@ int main(void) {
                     const auto& bullet = port.bulletAt(i);
                     const int x = 80 + bullet.x - port.cameraOffsetX();
                     const int y = gameplayPlayerStartY + bullet.y - port.cameraOffsetY();
-                    if (bullet.active && bullet.gemHigh && x >= 8 && x < 152 && y >= 8 && y < 276)
+                    if (bullet.active && bullet.gemHigh && bullet.animation.frame() != 0 &&
+                            x >= 8 && x < 152 && y >= 8 && y < 276)
                         ++visible;
                 }
                 if (visible) {

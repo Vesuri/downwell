@@ -101,8 +101,8 @@ SELECTIONS = {
         188: None,   # sprGroundedTurtleWalk
         278: None,   # sprCrawler
         369: None,   # bgNightsky
-        458: [0],    # sprBulScatter2 (gem-high machine gun projectile)
-        459: [0],    # sprBulScatter1 (usual gunboot projectile)
+        458: None,   # sprBulScatter2 (six-frame gem-high projectile)
+        459: None,   # sprBulScatter1 (six-frame usual gunboot projectile)
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
         482: [0],    # sprShopCase, intact fixture (sold cases stay intact)
@@ -183,10 +183,10 @@ CREDIT_TEXT_ANCHOR_X = {
 
 # The recovered streak counter uses font 2 and is drawn over the playfield by
 # the fixed HUD layer. IDs 65100..65109 are offline decimal glyphs used by
-# native dirty-HUD composition for arbitrary counters. Retain the older
-# two-digit assets for pack compatibility; they no longer bound the value.
+# native dirty-HUD composition for arbitrary counters. Obsolete whole-number
+# strings 10..99 are unnecessary now that counters compose these ten glyphs.
 TEXT_SELECTIONS["game"].update({65100 + value: str(value)
-                                for value in range(100)})
+                                for value in range(10)})
 
 # The original 320x800 style-transition sprites are almost entirely opaque
 # black.  Only the 160x80 gradient edge that crosses the logical playfield
@@ -394,12 +394,13 @@ def build_pack(manifest, extracted, profile, language_path=None):
             canvas = frame_canvas(sprite, frame, items, pages)
             if profile == "game" and sprite_id in (153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 177, 178, 186, 187, 188, 278,
-                    485, 486, 487, 496, 497):
+                    458, 459, 485, 486, 487, 496, 497):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
-                turns = 2 if snail else 4 if sprite_id == 278 else 1
-                for turn in range(turns):
+                bullet = sprite_id in (458, 459)
+                turns = (0, 3) if bullet else range(2 if snail else 4 if sprite_id == 278 else 1)
+                for turn in turns:
                     if turn == 0:
                         variant = canvas
                     elif snail:
@@ -415,6 +416,11 @@ def build_pack(manifest, extracted, profile, language_path=None):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
                     require(bounds is not None, "empty oriented actor frame")
+                    if bullet:
+                        # Some projectile art sits beyond its origin. Keep
+                        # that anchor inside the DMA frame when cropping.
+                        bounds = (min(bounds[0], ox), min(bounds[1], oy),
+                                  max(bounds[2], ox + 1), max(bounds[3], oy + 1))
                     original = variant
                     variant = variant.crop(bounds)
                     for y in range(original.height):
@@ -433,7 +439,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
                     # shopKeeper never changes image_xscale. Keep only the
                     # used planar facing; DMA variants remain independently
                     # generated below and checked against the pixel oracle.
-                    facings = (False,) if sprite_id in (485, 486, 487, 496, 497) else (False, True)
+                    facings = (False,) if bullet or sprite_id in (485, 486, 487, 496, 497) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]
@@ -450,9 +456,8 @@ def build_pack(manifest, extracted, profile, language_path=None):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
-            if ((profile == "shop" and sprite_id == 484) or
-                    (profile == "game" and sprite_id in (458, 459))):
-                # Leave and downward bullets draw at 270 degrees. As with crawler
+            if profile == "shop" and sprite_id == 484:
+                # Leave draws at 270 degrees. As with crawler
                 # art, encode quarter turns in the high byte of the frame ID.
                 rotated = canvas.transpose(Image.Transpose.ROTATE_270)
                 pixels = [pixel_to_pen(pixel) for pixel in rotated.get_flattened_data()]

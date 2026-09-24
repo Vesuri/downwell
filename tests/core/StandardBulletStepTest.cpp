@@ -1,4 +1,6 @@
 #include "core/StandardBulletStep.h"
+#include "core/ProjectileAnimation.h"
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -7,6 +9,26 @@ static void require(bool value, const char* message) {
 }
 
 int main() {
+    downwell::ProjectileAnimation animation;
+    double reference = 0;
+    unsigned seen = 0;
+    for (unsigned tick = 0; tick < 100000; ++tick) {
+        require(animation.frame() == static_cast<unsigned>(reference),
+                "projectile clock matches binary64 accumulation across wraps");
+        seen |= 1u << animation.frame();
+        reference += 0.3;
+        if (reference >= 6) reference -= 6;
+        animation.advance();
+        require(std::ldexp(static_cast<double>(animation.index.mantissa),
+                           animation.index.exponent - 52) == reference,
+                "projectile animation retains the entire fractional phase");
+        if (tick == 9) require(animation.frame() == 2,
+                "binary64 ten-update boundary must not become exact-tenths frame three");
+    }
+    require(seen == 63, "projectile animation visits all six source frames");
+    animation = {};
+    require(animation.frame() == 0 && animation.index.mantissa == 0,
+            "reused bullet slots restart at source Create frame zero");
     using downwell::standardBulletOutsideView;
     const long top = 34L * 4096;
     require(!standardBulletOutsideView(top - 100L * 4096, top) &&

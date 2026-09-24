@@ -553,7 +553,7 @@ void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
     if (mainBulletCount_ < mainBulletCapacity) {
         mainBullets_[mainBulletCount_++] = {
             static_cast<float>(instance.x + mainShootLeg_),
-            static_cast<float>(instance.y + 4), run_.gemHigh
+            static_cast<float>(instance.y + 4), run_.gemHigh, {}
         };
     }
     mainShootLeg_ *= -1;
@@ -581,6 +581,7 @@ void StartupRuntime::updateMainBullets() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
+        bullet.animation.advance();
         int nextY = static_cast<int>(bullet.y);
         bool alive = stepStandardBullet(static_cast<int>(bullet.x), nextY,
           [this, &bullet](const StandardBulletPath& path) {
@@ -2123,7 +2124,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(41); // Includes weapon level and each projectile's birth level.
+    digest.addU32(42); // Includes each projectile's animation accumulator.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2233,6 +2234,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(mainBullets_[index].x);
         digest.addF32(mainBullets_[index].y);
         digest.addBool(mainBullets_[index].gemHigh);
+        digest.addU64(mainBullets_[index].animation.index.mantissa);
+        digest.addI32(mainBullets_[index].animation.index.exponent);
     }
     digest.addU32(static_cast<std::uint32_t>(mainCurrencyCount_));
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {

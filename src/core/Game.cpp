@@ -314,7 +314,7 @@ void Game::renderMain(Renderer& renderer) const {
     for (std::size_t index = 0; index < startup_.mainBulletCount(); ++index) {
         const StartupRuntime::MainBulletState& bullet =
             startup_.mainBulletAt(index);
-        renderer.drawSpriteTransformed(machineGunProfile(bullet.gemHigh).sprite, 0,
+        renderer.drawSpriteTransformed(machineGunProfile(bullet.gemHigh).sprite, bullet.animation.frame(),
                             static_cast<int>(bullet.x - viewX),
                             static_cast<int>(bullet.y - viewY), 1.0F, 1.0F, 270.0F);
     }

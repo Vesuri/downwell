@@ -6,6 +6,7 @@
 #include "core/StateDigest.h"
 #include "core/GameplayLimits.h"
 #include "core/GemMotion.h"
+#include "core/ProjectileAnimation.h"
 #include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
@@ -78,6 +79,7 @@ public:
         int y;
         bool active;
         bool gemHigh = false;
+        downwell::ProjectileAnimation animation;
     };
     struct EnemyState {
         int objectId;

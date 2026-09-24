@@ -95,10 +95,10 @@ void testReplayProducesStableStartupState() {
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
     const std::uint64_t digest = runtime.stateDigest();
-    if (digest != 0xcbab746ebc87d041ULL)
+    if (digest != 0xdf6f5bbcfe64b702ULL)
         std::cerr << "startup state digest: 0x" << std::hex << digest
                   << std::dec << '\n';
-    require(digest == 0xcbab746ebc87d041ULL,
+    require(digest == 0xdf6f5bbcfe64b702ULL,
             "startup state digest remains wire-stable");
 }
 

@@ -312,6 +312,11 @@ int main() {
                 burst.bulletAt(1).active && burst.bulletAt(1).x == -1 &&
                 burst.bulletAt(0).y > burst.bulletAt(1).y,
             "new shots append after older survivors rather than reusing earlier holes");
+    downwell::ProjectileAnimation newborn;
+    newborn.advance();
+    require(burst.bulletAt(1).animation.index.equal(newborn.index) &&
+                !burst.bulletAt(0).animation.index.equal(newborn.index),
+            "slot reuse resets new-shot animation without resetting surviving bullets");
     AmigaPortRuntime movingShot(300, false, 1000);
     for (unsigned frame = 0; frame < 12; ++frame) movingShot.step(2);
     const int muzzleX = downwell::roundGameMakerQ8(movingShot.player().offsetXFixed());
