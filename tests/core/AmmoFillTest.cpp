@@ -29,6 +29,12 @@ static void check(unsigned ammo, unsigned cap) {
     if (calls != (height >= 1 ? 1u : 0u)) std::abort();
 }
 int main() {
+    std::uint32_t random = 1;
+    for (unsigned i = 0; i < 100000; ++i) {
+        random = random * 1664525u + 1013904223u;
+        const auto integer = downwell::HudReal::integer(random);
+        if (real(integer) != double(random) || integer.floor() != random) std::abort();
+    }
     check(0, 0);
     for (unsigned cap = 1; cap <= 512; ++cap)
         for (unsigned ammo = 0; ammo <= cap; ++ammo) check(ammo, cap);

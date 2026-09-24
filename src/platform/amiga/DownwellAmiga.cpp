@@ -18,6 +18,7 @@
 #include "AmigaPortRuntime.h"
 #include "core/ShopFixtures.h"
 #include "AmigaRenderer.h"
+#include "AmigaAmmoHud.h"
 #include "AmigaSceneRuntime.h"
 #include "GameplaySceneStorage.h"
 #include "AmigaExitMask.h"
@@ -532,43 +533,11 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
     }
 }
 
+static AmigaAmmoHud ammoHud;
 static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
                        const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
-    if (ammo > maximumAmmo)
-        ammo = maximumAmmo;
-    amigaRendererClearClipRect(renderer);
-    // Gauge rims move during recharge; clear their complete swept rectangle.
-    amigaRendererFillRect(renderer, 282, 40, 24, 216, 3);
-    // The label clear overlaps the gauge's lower rim. Restore the two gauge
-    // layers in the source draw order when ammo changes, not every frame.
-    static unsigned oldDigits = 1;
-    unsigned digits = 1;
-    for (unsigned value = ammo; value >= 10; value /= 10) ++digits;
-    const unsigned clearDigits = digits > oldDigits ? digits : oldDigits;
-    oldDigits = digits;
-    if (clearDigits == 1) {
-        amigaRendererFillRect(renderer, 282, 232, 24, 24, 3);
-    } else {
-        amigaRendererFillRect(renderer, 282 - (static_cast<int>(clearDigits) - 1) * 4,
-            231, 34 + (clearDigits - 1) * 8, 26 + clearDigits - 1, 0);
-    }
-    drawAsset(renderer, 416, 0, 284, 43 + meterOffset, 0);
-    // The underlay stays fixed while the frame and charge rows jiggle.
-    downwell::drawAmmoFill(ammo, maximumAmmo, 289,
-        [renderer](int x, unsigned y, unsigned w, unsigned h) {
-            amigaRendererFillRect(renderer, x, y, w, h, 1);
-        });
-    if (rows) rows->draw(288, 229 + 4 * meterOffset,
-        [renderer](unsigned sprite, unsigned frame, int x, int y) {
-            // GameMaker wraps subimages; the bottom divider has only two frames.
-            drawAsset(renderer, sprite, sprite == 421 ? frame % 2 : frame, x, y, 0);
-        });
-    downwell::drawAmmoDividers(ammo, maximumAmmo, 1, 288, 229 + 4 * meterOffset,
-        [renderer](unsigned sprite, unsigned frame, int x, unsigned y) {
-            drawAsset(renderer, sprite, frame, x, y, 0);
-        });
-    drawAsset(renderer, 416, 1, 284, 43 + meterOffset, 0);
-    drawAmmoDigit(renderer, 290 + offset, 239 + offset, ammo);
+    ammoHud.draw(renderer, activeHudPack, activeHudPackEnd, ammo, maximumAmmo, offset, rows, meterOffset);
+    DW_PROFILE_PHASE(profileTitle);
 }
 
 static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maximum,
@@ -1180,6 +1149,7 @@ static void buildReferencePicture(
     int viewX, int viewY) {
 
     amigaRendererClear(renderer, 0);
+    ammoHud.invalidate();
     dirtyGameRows(0, 0, downwellGameRingHeight);
     drawMainWorld(renderer, rooms, room, builders,
                   fragments, fragmentCount,
@@ -1204,6 +1174,10 @@ static void buildReferencePicture(
     drawAsset(renderer, 376, 0, 362, 18, 0);
     drawCurrencyDigit(renderer, 354, 18, 0);
     drawAmmoDigit(renderer, 290, 239, 8);
+    // Prepare retained HUD geometry/artwork with the level's initial picture,
+    // not on the first shot. Subsequent frames only update changed strips.
+    if (runtime) redrawAmmo(renderer, runtime->player().ammo(), runtime->player().ammoCapacity(),
+        runtime->ammoHudOffset(), &runtime->ammoGauge(), runtime->ammoMeterOffset());
 }
 
 static AmigaMenuDrawList menuDrawList;

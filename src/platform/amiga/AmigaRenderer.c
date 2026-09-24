@@ -26,6 +26,15 @@ static ULONG readLong(const UBYTE* data) {
 #endif
 }
 
+static void writeWord(UBYTE* data, UWORD value) {
+#ifdef DOWNWELL_PLATFORM_AMIGA
+    *(UWORD*)data = value;
+#else
+    data[0] = (UBYTE)(value >> 8);
+    data[1] = (UBYTE)value;
+#endif
+}
+
 static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {
     UBYTE* row;
     UBYTE mask;
@@ -75,6 +84,18 @@ static UBYTE spanMask(int first, int last) {
     return mask;
 }
 
+static UWORD sourceSpanWord(const UBYTE* row, int planeBytes, int x) {
+    unsigned byte, shift;
+    ULONG window;
+    if (x < 0) return (UWORD)(readWord(row) >> -x);
+    byte = (unsigned)(x >> 4) * 2;
+    if (byte >= (unsigned)planeBytes) return 0;
+    shift = x & 15;
+    window = (ULONG)readWord(row + byte) << 16;
+    if (byte + 2 < (unsigned)planeBytes) window |= readWord(row + byte + 2);
+    return (UWORD)((window << shift) >> 16);
+}
+
 /*
  * The packed assets already contain native one-bit planes.  Compose one
  * destination byte at a time instead of sending every set source pixel
@@ -114,6 +135,63 @@ static void drawAssetNormal(AmigaRenderer* renderer,
     destinationPlaneBytes = renderer->target == renderer->game
                                 ? downwellGameRingPlaneBytes
                                 : downwellPlaneBytes;
+    /* The ammo animation emits 184 overlapping 12x8 assets. Each fits one
+       aligned word; setting up/draining two masked blits per tiny asset costs
+       much more than these native word operations. The existing blitter
+       wrappers drain before returning, so CPU writes cannot race pending DMA.
+       Keep the general clipped/ring paths below for all other geometry. */
+    if (renderer->target == renderer->hud && planeBytes == 2 && width <= 16 &&
+        height <= 8 && left >= 0 && !(left & 15)) {
+        const UWORD clipMask = (UWORD)((0xffffu >> (clipLeft - left)) &
+            (0xffffu << (16 - (clipRight - left))));
+        const ULONG sourcePlaneBytes = 2u * (unsigned)height;
+        const UBYTE* source = data + 2 * (firstY - top);
+        UBYTE* target = renderer->target + firstY * downwellBytesPerPlaneLine + (left >> 3);
+        for (y = firstY; y < lastY; ++y) {
+            UWORD low = readWord(source);
+            UWORD high = readWord(source + sourcePlaneBytes);
+            const UWORD mask = (low | high) & clipMask;
+            if (mask) {
+                if (outputPen >= 0) {
+                    low = outputPen & 1 ? 0xffff : 0;
+                    high = outputPen & 2 ? 0xffff : 0;
+                }
+                writeWord(target, (readWord(target) & (UWORD)~mask) | (low & mask));
+                writeWord(target + destinationPlaneBytes,
+                    (readWord(target + destinationPlaneBytes) & (UWORD)~mask) | (high & mask));
+            }
+            source += 2;
+            target += downwellBytesPerPlaneLine;
+        }
+        return;
+    }
+    if (renderer->target == renderer->hud && width <= 32 &&
+        (!renderer->blitterEnabled || lastY-firstY <= 24) && !(planeBytes & 1)) {
+        const int firstWord = clipLeft >> 4, lastWord = (clipRight-1) >> 4;
+        const UWORD firstMask = (UWORD)(0xffffu >> (clipLeft & 15));
+        const UWORD lastMask = (UWORD)(0xffffu << (15 - ((clipRight-1) & 15)));
+        const ULONG sourcePlaneBytes = (ULONG)planeBytes * height;
+        UBYTE* targetRow = renderer->hud + firstY * downwellBytesPerPlaneLine;
+        const UBYTE* source = data + (firstY-top)*planeBytes;
+        for (y = firstY; y < lastY; ++y) {
+            int word;
+            for (word = firstWord; word <= lastWord; ++word) {
+                UWORD low = sourceSpanWord(source, planeBytes, word*16-left);
+                UWORD high = sourceSpanWord(source+sourcePlaneBytes, planeBytes, word*16-left);
+                UWORD mask = low | high;
+                UBYTE* target = targetRow + word*2;
+                if (word == firstWord) mask &= firstMask;
+                if (word == lastWord) mask &= lastMask;
+                if (!mask) continue;
+                if (outputPen >= 0) { low = outputPen & 1 ? 0xffff : 0; high = outputPen & 2 ? 0xffff : 0; }
+                writeWord(target, (readWord(target) & (UWORD)~mask) | (low & mask));
+                writeWord(target+downwellPlaneBytes,
+                    (readWord(target+downwellPlaneBytes) & (UWORD)~mask) | (high & mask));
+            }
+            source += planeBytes; targetRow += downwellBytesPerPlaneLine;
+        }
+        return;
+    }
     if (renderer->blitterEnabled) {
         const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
         int remaining = lastY - firstY;
@@ -353,6 +431,31 @@ void amigaRendererFillRect(AmigaRenderer* renderer,
     if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
     if (left >= right || top >= bottom)
         return;
+    if (renderer->target == renderer->hud && right-left <= 96 &&
+        (!renderer->blitterEnabled || bottom-top <= 32)) {
+        const int firstWord = left >> 4, lastWord = (right-1) >> 4;
+        const UWORD firstMask = (UWORD)(0xffffu >> (left & 15));
+        const UWORD lastMask = (UWORD)(0xffffu << (15 - ((right-1) & 15)));
+        const UWORD low = pen & 1 ? 0xffff : 0, high = pen & 2 ? 0xffff : 0;
+        UBYTE* row = renderer->hud + top*downwellBytesPerPlaneLine;
+        for (py = top; py < bottom; ++py) {
+            int word;
+            for (word = firstWord; word <= lastWord; ++word) {
+                UWORD mask = 0xffff;
+                UBYTE* target = row + word*2;
+                if (word == firstWord) mask &= firstMask;
+                if (word == lastWord) mask &= lastMask;
+                if (mask == 0xffff) { writeWord(target, low); writeWord(target+downwellPlaneBytes, high); }
+                else {
+                    writeWord(target, (readWord(target) & (UWORD)~mask) | (low & mask));
+                    writeWord(target+downwellPlaneBytes,
+                        (readWord(target+downwellPlaneBytes) & (UWORD)~mask) | (high & mask));
+                }
+            }
+            row += downwellBytesPerPlaneLine;
+        }
+        return;
+    }
     if (renderer->blitterEnabled && renderer->target == renderer->hud &&
         amigaBlitterSolidRect(renderer->hud, downwellDisplayHeight,
                              left, top, right - left, bottom - top, pen)) return;
@@ -390,6 +493,159 @@ void amigaRendererFillRect(AmigaRenderer* renderer,
         }
     }
     }
+}
+
+void amigaRendererCacheHudColumns(UWORD* cache, const UBYTE* source, unsigned firstWord, unsigned words) {
+    unsigned y, plane, word;
+    for (y = 0; y < downwellDisplayHeight; ++y)
+        for (plane = 0; plane < 2; ++plane)
+            for (word = 0; word < words; ++word)
+                *cache++ = readWord(source + plane*downwellPlaneBytes + y*downwellBytesPerPlaneLine + (firstWord+word)*2);
+}
+
+void amigaRendererApplyHudColumns(AmigaRenderer* renderer, const UWORD* cache,
+    unsigned firstWord, unsigned words, int shiftY, int top, int bottom, int masked) {
+    int y, word;
+    UWORD clips[3];
+    const UWORD* source;
+    UBYTE* targetRow;
+    if (words > 3) return;
+    if (top < renderer->clipY) top = renderer->clipY;
+    if (bottom > renderer->clipY + renderer->clipHeight) bottom = renderer->clipY + renderer->clipHeight;
+    if (top < shiftY) top = shiftY;
+    if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+    if (bottom > downwellDisplayHeight + shiftY) bottom = downwellDisplayHeight + shiftY;
+    if (top < 0) top = 0;
+    for (word = 0; word < (int)words; ++word) {
+        const int x = (firstWord+word)*16;
+        int left = renderer->clipX > x ? renderer->clipX-x : 0;
+        int right = renderer->clipX+renderer->clipWidth-x;
+        if (right > 16) right = 16;
+        clips[word] = left >= right || x >= downwellVisibleWidth ? 0 :
+            (UWORD)((0xffffu >> left) & (0xffffu << (16-right)));
+    }
+    source = cache + (top-shiftY)*words*2;
+    targetRow = renderer->hud + top*downwellBytesPerPlaneLine + firstWord*2;
+    for (y = top; y < bottom; ++y) {
+        for (word = 0; word < (int)words; ++word) {
+            UWORD mask = clips[word];
+            UBYTE* target;
+            if (masked) mask &= source[word] | source[words+word];
+            if (!mask) continue;
+            target = targetRow + word*2;
+            if (mask == 0xffff) {
+                writeWord(target, source[word]); writeWord(target+downwellPlaneBytes, source[words+word]);
+            } else {
+                writeWord(target, (readWord(target) & (UWORD)~mask) | (source[word] & mask));
+                target += downwellPlaneBytes;
+                writeWord(target, (readWord(target) & (UWORD)~mask) | (source[words+word] & mask));
+            }
+        }
+        source += words*2; targetRow += downwellBytesPerPlaneLine;
+    }
+}
+
+unsigned amigaRendererCopyHudWords(UBYTE* destination, const UBYTE* source,
+                                    int left, int top, int right, int bottom, int changedOnly) {
+    unsigned writes = 0, plane;
+    int y;
+    if (left < 0) left = 0;
+    if (right > downwellVisibleWidth) right = downwellVisibleWidth;
+    if (top < 0) top = 0;
+    if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+    if (left >= right || top >= bottom) return 0;
+    left >>= 4; right = (right+15) >> 4;
+    for (plane = 0; plane < 2; ++plane) {
+        const ULONG start = plane*downwellPlaneBytes + top*downwellBytesPerPlaneLine + left*2;
+        UBYTE* target = destination + start;
+        const UBYTE* input = source + start;
+        for (y = top; y < bottom; ++y) {
+            int word;
+            for (word = 0; word < right-left; ++word) {
+                const UWORD value = readWord(input + word*2);
+                if (!changedOnly || readWord(target + word*2) != value) {
+                    writeWord(target + word*2, value); ++writes;
+                }
+            }
+            target += downwellBytesPerPlaneLine; input += downwellBytesPerPlaneLine;
+        }
+    }
+    return writes;
+}
+
+int amigaRendererPrepareWordStamp(AmigaWordStamp* stamp, const UBYTE* pack,
+                                  const UBYTE* end, UWORD sprite, UWORD frame) {
+    const UBYTE* record = findAsset(pack, end, sprite, frame);
+    unsigned row, height, width;
+    const UBYTE* data;
+    if (!record || readWord(record+4) || readWord(record+6) || readWord(record+12) != 16) return 0;
+    width = readWord(record+8); height = readWord(record+10);
+    if (!width || width > 16 || !height || height > 8) return 0;
+    if (readLong(record+16) > (ULONG)(end-pack) ||
+        (ULONG)(end-pack) - readLong(record+16) < height*4) return 0;
+    data = pack + readLong(record+16);
+    stamp->first = 8; stamp->last = 0;
+    for (row = 0; row < 8; ++row) {
+        stamp->low[row] = row < height ? readWord(data + row*2) : 0;
+        stamp->high[row] = row < height ? readWord(data + height*2 + row*2) : 0;
+        stamp->mask[row] = (stamp->low[row] | stamp->high[row]) & (UWORD)(0xffffu << (16-width));
+        if (stamp->mask[row]) {
+            if (row < stamp->first) stamp->first = row;
+            stamp->last = row+1;
+        }
+    }
+    /* Retain all short row-overlap combinations. Repeated stamps drawn one
+       pixel upward become one output word per scanline instead of eight
+       overlapping masked draws. Highest source row is drawn last. */
+    for (row = 0; row < 8; ++row) {
+        unsigned last;
+        UWORD low = 0, high = 0, mask = 0;
+        for (last = row; last < 8; ++last) {
+            const UWORD next = stamp->mask[last];
+            low = (low & (UWORD)~next) | (stamp->low[last] & next);
+            high = (high & (UWORD)~next) | (stamp->high[last] & next);
+            mask |= next;
+            stamp->runLow[row*8+last] = low;
+            stamp->runHigh[row*8+last] = high;
+            stamp->runMask[row*8+last] = mask;
+        }
+    }
+    return 1;
+}
+
+int amigaRendererDrawWordStamp(AmigaRenderer* renderer, const AmigaWordStamp* stamp, int x, int y) {
+    return amigaRendererDrawWordStampRun(renderer, stamp, x, y, 1);
+}
+int amigaRendererDrawWordStampRun(AmigaRenderer* renderer, const AmigaWordStamp* stamp, int x, int y, unsigned count) {
+    int first = y + stamp->first - (int)count + 1, last = y + stamp->last, left, right, row;
+    UWORD clip;
+    UBYTE* target;
+    if (renderer->target != renderer->hud || x < 0 || (x & 15)) return 0;
+    if (!count || stamp->first >= stamp->last) return 1;
+    left = renderer->clipX > x ? renderer->clipX : x;
+    right = renderer->clipX + renderer->clipWidth;
+    if (right > x+16) right = x+16;
+    if (right > downwellVisibleWidth) right = downwellVisibleWidth;
+    if (first < renderer->clipY) first = renderer->clipY;
+    if (first < 0) first = 0;
+    if (last > renderer->clipY + renderer->clipHeight) last = renderer->clipY + renderer->clipHeight;
+    if (last > downwellDisplayHeight) last = downwellDisplayHeight;
+    if (first >= last || left >= right) return 1;
+    clip = (UWORD)((0xffffu >> (left-x)) & (0xffffu << (16-(right-x))));
+    target = renderer->hud + first*downwellBytesPerPlaneLine + (x >> 3);
+    for (row = first-y; row < last-y; ++row) {
+        const unsigned startRow = row < 0 ? 0 : row;
+        const unsigned endRow = row + (int)count - 1 > 7 ? 7 : row + count - 1;
+        const unsigned index = startRow*8 + endRow;
+        const UWORD mask = stamp->runMask[index] & clip;
+        if (mask) {
+            writeWord(target, (readWord(target) & (UWORD)~mask) | (stamp->runLow[index] & mask));
+            writeWord(target + downwellPlaneBytes,
+                (readWord(target + downwellPlaneBytes) & (UWORD)~mask) | (stamp->runHigh[index] & mask));
+        }
+        target += downwellBytesPerPlaneLine;
+    }
+    return 1;
 }
 
 int amigaRendererAssetBounds(const UBYTE* pack, const UBYTE* packEnd,

@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaRenderer.h"
+#include "platform/amiga/AmigaAmmoHud.h"
 #include "platform/amiga/GameplaySceneStorage.h"
 #include "platform/amiga/AmigaExitMask.h"
 #include "core/ShopFixtures.h"
@@ -378,6 +379,96 @@ int main(int argc, char** argv) {
     std::ifstream hudInput(argv[2], std::ios::binary);
     const std::vector<UBYTE> hudPack{std::istreambuf_iterator<char>(hudInput), {}};
     require(!hudPack.empty(), "HUD pack can be read");
+    // Force the established byte-span path for the oracle by giving its
+    // destination neither the HUD nor game identity (ordinary planar stride).
+    // Compare every narrow HUD frame, clipped edges and replacement pens.
+    actualRenderer.target = actualRenderer.hud;
+    expectedRenderer.target = expectedRenderer.hud;
+    expectedRenderer.hud = nullptr;
+    for (unsigned sprite : {418u, 419u, 421u})
+      for (unsigned frame = 0; frame < (sprite == 421 ? 2u : 4u); ++frame)
+        for (int y : {-4, 0, 100, 280}) for (int inset : {0, 1, 5, 11})
+          for (int pen : {-1, 0, 1, 2, 3}) {
+            std::fill(actualHud.begin(), actualHud.end(), 0x5a);
+            std::fill(expectedHud.begin(), expectedHud.end(), 0x5a);
+            amigaRendererSetClipRect(&actualRenderer, 288 + inset, 0, 12 - inset, 284);
+            amigaRendererSetClipRect(&expectedRenderer, 288 + inset, 0, 12 - inset, 284);
+            actualRenderer.target = actualHud.data();
+            expectedRenderer.target = expectedHud.data();
+            for (auto* renderer : {&actualRenderer, &expectedRenderer}) {
+                if (pen < 0) amigaRendererDrawAsset(renderer, hudPack.data(), hudPack.data() + hudPack.size(),
+                    sprite, frame, 288, y, 0);
+                else amigaRendererDrawAssetPen(renderer, hudPack.data(), hudPack.data() + hudPack.size(),
+                    sprite, frame, 288, y, 0, pen);
+            }
+            require(actualHud == expectedHud, "aligned HUD word path matches clipped byte-span oracle");
+        }
+    expectedRenderer.hud = expectedHud.data();
+    expectedRenderer.hud = nullptr;
+    for (unsigned sprite : {413u, 65010u, 418u, 419u, 421u})
+      for (unsigned frame = 0; frame < (sprite == 413 ? 30u : sprite == 65010 ? 10u : sprite == 421 ? 2u : 4u); ++frame)
+        for (int shift = 0; shift < 16; ++shift) for (int y : {-4, 100, 280}) {
+            std::fill(actualHud.begin(), actualHud.end(), 0x5a);
+            std::fill(expectedHud.begin(), expectedHud.end(), 0x5a);
+            for (auto* renderer : {&actualRenderer, &expectedRenderer}) {
+                renderer->clipX = 283; renderer->clipY = 1;
+                renderer->clipWidth = 28; renderer->clipHeight = 281;
+                renderer->target = renderer == &actualRenderer ? actualHud.data() : expectedHud.data();
+                amigaRendererDrawAsset(renderer, hudPack.data(), hudPack.data()+hudPack.size(),
+                    sprite, frame, 280+shift, y, 0);
+                amigaRendererFillRect(renderer, 281+shift, y+2, 19, 6, shift%4);
+            }
+            require(actualHud == expectedHud, "shifted small HUD words/clears match byte-span oracle");
+        }
+    expectedRenderer.hud = expectedHud.data();
+    {
+        AmigaAmmoHud retained;
+        downwell::AmmoGaugeRows rows;
+        unsigned previousDigits = 1;
+        auto fullRedraw = [&](unsigned ammo, unsigned cap, unsigned offset, unsigned meter) {
+            auto* renderer = &expectedRenderer;
+            amigaRendererClearClipRect(renderer);
+            auto asset = [&](unsigned sprite, unsigned frame, int x, int y) {
+                amigaRendererDrawAsset(renderer, hudPack.data(), hudPack.data()+hudPack.size(), sprite, frame, x, y, 0);
+            };
+            amigaRendererFillRect(renderer, 282, 40, 24, 216, 3);
+            unsigned digits = 1;
+            for (unsigned value = ammo; value >= 10; value /= 10) ++digits;
+            const unsigned clearDigits = digits > previousDigits ? digits : previousDigits;
+            previousDigits = digits;
+            if (clearDigits == 1) amigaRendererFillRect(renderer, 282, 232, 24, 24, 3);
+            else amigaRendererFillRect(renderer, 282-(int(clearDigits)-1)*4, 231,
+                34+(clearDigits-1)*8, 26+clearDigits-1, 0);
+            asset(416, 0, 284, 43+meter);
+            downwell::drawAmmoFill(ammo, cap, 289, [&](int x, unsigned y, unsigned w, unsigned h) {
+                amigaRendererFillRect(renderer, x, y, w, h, 1);
+            });
+            rows.draw(288, 229+4*meter, [&](unsigned sprite, unsigned frame, int x, int y) {
+                asset(sprite, sprite == 421 ? frame%2 : frame, x, y);
+            });
+            downwell::drawAmmoDividers(ammo, cap, 1, 288, 229+4*meter, asset);
+            asset(416, 1, 284, 43+meter);
+            if (ammo < 10) asset(65010, ammo, 290+offset, 239+offset);
+            else downwell::drawAmmoNumberLayers(290+offset, 239+offset, ammo,
+                [&](unsigned frame, int x, int y) { asset(413, frame, x, y); });
+        };
+        std::fill(actualHud.begin(), actualHud.end(), 0x5a);
+        std::fill(expectedHud.begin(), expectedHud.end(), 0x5a);
+        for (unsigned cap : {8u, 15u, 1u, 64u, 127u}) {
+            for (unsigned tick = 0; tick < (cap+1)*10; ++tick) {
+                const unsigned ammo = (tick / 5) % (cap + 1);
+                const unsigned meter = tick % 19 < 4 ? 3 - tick % 19 : 0;
+                rows.step(ammo, cap);
+                retained.draw(&actualRenderer, hudPack.data(), hudPack.data() + hudPack.size(),
+                    ammo, cap, tick % 3, &rows, meter);
+                fullRedraw(ammo, cap, tick%3, meter);
+                require(actualHud == expectedHud, "retained ammo strips match complete reconstruction");
+                retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(),
+                    ammo, cap, tick%3, &rows, meter);
+                require(retained.lastWordWrites == 0, "unchanged gauge does not write either visible plane");
+            }
+        }
+    }
     amigaRendererClearClipRect(&actualRenderer);
     amigaRendererClearClipRect(&expectedRenderer);
     const int offsets[][2] = {{-1,0},{0,-1},{1,0},{0,1},{-1,1},{0,0},

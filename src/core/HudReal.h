@@ -27,7 +27,15 @@ struct HudReal {
         return {m, exponent};
     }
     static HudReal integer(unsigned value) {
-        return rounded(static_cast<std::uint64_t>(value) << 3, 52);
+        if (!value) return {};
+        unsigned leading = 0;
+        std::uint32_t normalized = value;
+        if (!(normalized & 0xffff0000u)) { normalized <<= 16; leading += 16; }
+        if (!(normalized & 0xff000000u)) { normalized <<= 8; leading += 8; }
+        if (!(normalized & 0xf0000000u)) { normalized <<= 4; leading += 4; }
+        if (!(normalized & 0xc0000000u)) { normalized <<= 2; leading += 2; }
+        if (!(normalized & 0x80000000u)) { normalized <<= 1; ++leading; }
+        return {static_cast<std::uint64_t>(normalized) << 21, 31 - static_cast<int>(leading)};
     }
     static HudReal ratio(unsigned numerator, unsigned denominator) {
         if (!numerator || !denominator) return {};
@@ -96,9 +104,14 @@ struct HudReal {
     }
     unsigned floor() const {
         if (!mantissa || exponent < 0) return 0;
-        auto value = mantissa;
-        for (int bit = exponent; bit < 52; ++bit) value >>= 1;
-        return static_cast<unsigned>(value);
+        const auto high = static_cast<std::uint32_t>(mantissa >> 32);
+        const auto low = static_cast<std::uint32_t>(mantissa);
+        // Same truncation as the previous one-bit 64-bit loop, using only
+        // native-width variable shifts. HUD coordinates usually take branch 1.
+        if (exponent <= 20) return high >> (20 - exponent);
+        if (exponent >= 52) return low;
+        const unsigned shift = 52 - exponent;
+        return (low >> shift) | (high << (32 - shift));
     }
 };
 }

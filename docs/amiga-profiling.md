@@ -1,6 +1,14 @@
 # Amiga performance instrumentation
 
-## Gameplay result: 600 frames without a missed PAL field
+## Current checkpoint (2026-09-25)
+
+The historical 50 FPS result below predates subsequent fidelity work and is
+not the current performance claim. The retained ammo HUD fixes visible clears
+and reduces its measured work roughly tenfold, but the current 600-update
+firing tape runs at 28.85 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+for exact scope, phase timings, remaining budget work and pixel verification.
+
+## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in
 600 PAL fields: 50.00 FPS, maximum gap one field**. This includes the

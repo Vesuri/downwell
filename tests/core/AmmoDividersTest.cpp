@@ -1,4 +1,5 @@
 #include "core/AmmoDividers.h"
+#include "core/AmmoDividerLayout.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -28,6 +29,13 @@ static void check(unsigned ammo, unsigned cap, unsigned cost, unsigned bottom) {
             if (sprite != 421 || x != 288) std::abort();
             actual.push_back({frame, y});
         });
+    static downwell::AmmoDividerLayout layout;
+    std::vector<Draw> cached;
+    layout.draw(ammo, cap, cost, 288, bottom,
+        [&](unsigned, unsigned frame, int, unsigned y) { cached.push_back({frame, y}); });
+    if (cached.size() != actual.size()) std::abort();
+    for (unsigned i = 0; i < actual.size(); ++i)
+        if (cached[i].frame != actual[i].frame || cached[i].y != actual[i].y) std::abort();
     bool equal = expected.size() == actual.size();
     for (unsigned i = 0; equal && i < expected.size(); ++i)
         equal = expected[i].frame == actual[i].frame && expected[i].y == actual[i].y;

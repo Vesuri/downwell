@@ -53,6 +53,18 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,
                             int anchorX, int anchorY, int flipX);
+/* Native words copied from an offline planar asset, not pixel conversion. */
+typedef struct AmigaWordStamp {
+    UWORD low[8], high[8], mask[8];
+    UWORD runLow[64], runHigh[64], runMask[64];
+    unsigned first, last;
+} AmigaWordStamp;
+int amigaRendererPrepareWordStamp(AmigaWordStamp*, const UBYTE*, const UBYTE*, UWORD, UWORD);
+int amigaRendererDrawWordStamp(AmigaRenderer*, const AmigaWordStamp*, int, int);
+int amigaRendererDrawWordStampRun(AmigaRenderer*, const AmigaWordStamp*, int, int, unsigned);
+unsigned amigaRendererCopyHudWords(UBYTE*, const UBYTE*, int, int, int, int, int);
+void amigaRendererCacheHudColumns(UWORD*, const UBYTE*, unsigned, unsigned);
+void amigaRendererApplyHudColumns(AmigaRenderer*, const UWORD*, unsigned, unsigned, int, int, int, int);
 int amigaRendererAssetBounds(const UBYTE* pack, const UBYTE* packEnd,
                              UWORD sprite, UWORD frame, int anchorX,
                              int anchorY, int flipX, int* x, int* y,
