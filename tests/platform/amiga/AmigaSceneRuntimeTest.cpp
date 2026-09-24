@@ -809,6 +809,38 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired() << '\n';
             require(gameplay.generationSucceeded(), "combat continuation retains successful live generation");
             verifyFrogMotion(gameplay, reference);
+            if (std::getenv("DOWNWELL_TRACE_GEM_MOTION")) {
+                {
+                    for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {
+                        const auto& e = gameplay.enemyAt(i);
+                        if (e.active) std::cout << "GE N " << gameplay.tick() << ' ' << i << ' ' << e.objectId
+                            << ' ' << e.x << ',' << e.y << ' ' << e.preciseX << ',' << e.preciseY << '\n';
+                    }
+                    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                        const auto& e = reference.instanceAt(i);
+                        if (e.active && (e.objectId == 111 || e.objectId == 112 || e.objectId == 113 || e.objectId == 116 || e.objectId == 117 || e.objectId == 119))
+                            std::cout << "GE S " << gameplay.tick() << ' ' << i << ' ' << e.objectId
+                                << ' ' << e.x - 240 << ',' << e.y - 176 << ' '
+                                << (e.preciseX - 240) * 256 << ',' << (e.preciseY - 176) * 256 << '\n';
+                    }
+                }
+                std::cout << "GPLAYER " << gameplay.tick() << ' '
+                          << gameplay.player().offsetXFixed() << ',' << gameplay.player().offsetYFixed()
+                          << ' ' << (reference.mainPlayerX() - 240) * 256 << ','
+                          << (reference.mainPlayerY() - 176) * 256 << '\n';
+                for (unsigned i = 0; i < gameplay.gemCapacity; ++i) {
+                    const auto& gem = gameplay.gemAt(i);
+                    if (gem.active) std::cout << "GEM N " << gameplay.tick() << ' ' << gem.age
+                        << ' ' << gem.motion.x << ',' << gem.motion.y << ' '
+                        << gem.motion.vx << ',' << gem.motion.vy << ' ' << gem.attracted << '\n';
+                }
+                for (unsigned i = 0; i < reference.mainCurrencyCount(); ++i) {
+                    const auto& gem = reference.mainCurrencyAt(i);
+                    std::cout << "GEM S " << gameplay.tick() << ' ' << gem.age
+                        << ' ' << gem.motion.x << ',' << gem.motion.y << ' '
+                        << gem.motion.vx << ',' << gem.motion.vy << ' ' << gem.attracted << '\n';
+                }
+            }
             // Slot reuse differs between adapters; compare the multiset of
             // live gem birth ages, values and authoritative animation state.
             std::vector<std::array<long, 4>> nativeGems, referenceGems;

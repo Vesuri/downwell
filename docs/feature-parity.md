@@ -92,6 +92,33 @@ tape ends health 3/3, kills 3/3, currency 38/38. Full host tests, the bounded
 600-tick A500 cache check and the unchanged cross-CPU replay pass; normal
 builds were restored and the 68000 audits are clean.
 
+#### Phase-5 divergence traced to crawler motion
+
+Run the strict scene test with `DOWNWELL_COMBAT_FIRE_PHASE=5` and
+`DOWNWELL_TRACE_GEM_MOTION=1` to print player Q8 state, published/precise enemy
+positions, and authoritative gem positions/velocities (1/12800 pixels).
+Native enemy coordinates and SDL trace coordinates are both relative to
+(240,176); actor storage indices intentionally differ.
+
+The first crawler (object 119) is created at tick 618. At tick 619 its native
+Q8 Y is 622745 versus SDL 622746: native gravity adds 51 Q8 units, while the
+SDL path adds 0.2 pixels. At tick 621 native remains airborne at Y=623102,
+while SDL has landed at Y=622899. The native alarm path subsequently snaps
+precise coordinates to integer x/y; SDL retains fractional coordinates.
+By tick 861 their published crawler Y values differ by two pixels. Its death
+at tick 862 emits three gems with identical initial velocities but native
+positions exactly 25600 gem units (two pixels) lower. Attraction consequently
+starts on different updates, producing the tick-890 collection discrepancy.
+
+This is upstream of shared gem motion, not an animation/rendering fault.
+Do not compensate reward positions or change collection radii. Both current
+crawler paths also simplify the recovered behavior: Step uses
+`scrCheckCollisionWith(57)` before latching, and Alarm 0 follows walls using
+four directions, rectangle `place_meeting` tests and visibility checks.
+The next implementation must consolidate those source rules rather than copy
+either existing approximation. This trace establishes the reproduction and
+causal chain; it does not fix crawler fidelity.
+
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
 steps, alternates horizontal direction every 90 frames and holds fire for five
