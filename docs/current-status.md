@@ -112,6 +112,15 @@ creation; a host regression checks the camera limit and reset. SDL and native
 68000 builds pass. This proves the Create path, not live exit collision, Draw
 dispatch, or level progression.
 
+Shared PlayerMotion now accepts the original goalStop distinction: it skips
+ordinary X/Y integration without skipping gravity, movement processing or
+collision correction. Its existing collision adapter remains an approximation
+of scrWallCol, not a newly completed exact collision port. Focused tests check
+stationary position with advancing velocities/callbacks, resumed motion, and
+predicted landing correction while stopped. Both runtime callers still leave
+this flag false until exit collision/transition dispatch is connected; this
+does not yet stop the live player at the exit.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.

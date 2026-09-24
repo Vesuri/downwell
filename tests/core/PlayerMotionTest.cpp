@@ -35,6 +35,30 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    PlayerMotion goalStopped(false, 10000);
+    downwell::Input goalInput;
+    goalInput.right = true;
+    unsigned movementPhases = 0;
+    goalStopped.configureMovementBoundary([](void* context) {
+        ++*static_cast<unsigned*>(context);
+    }, &movementPhases);
+    for (unsigned tick = 0; tick < 40; ++tick) {
+        const auto delta = goalStopped.step(goalInput, false, false, false, true);
+        require(delta.deltaX == 0 && delta.deltaY == 0 &&
+            goalStopped.offsetXFixed() == 0 && goalStopped.offsetYFixed() == 0,
+            "goalStop suppresses both position integrations");
+    }
+    require(goalStopped.speedXFixed() > 0 && goalStopped.speedYFixed() > 0 &&
+        movementPhases == 40,
+        "goalStop preserves movement/gravity processing rather than freezing the update");
+    const auto resumedGoal = goalStopped.step(goalInput);
+    require(resumedGoal.deltaX > 0 && resumedGoal.deltaY > 0,
+        "clearing goalStop resumes retained velocity");
+    PlayerMotion goalLanding(false, 1);
+    for (unsigned tick = 0; tick < 10 && !goalLanding.grounded(); ++tick)
+        goalLanding.step({}, true, false, false, true);
+    require(goalLanding.grounded() && goalLanding.offsetY() == 1,
+        "goalStop retains predicted floor correction and landing");
     PlayerMotion entry(false, 10000);
     entry.initializeEntryInput(false);
     PlayerMotion shortDelay(false, 10000);

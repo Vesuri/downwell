@@ -123,7 +123,7 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
 }
 
 PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool controlsLocked, bool dead,
-                                   bool interactable)
+                                   bool interactable, bool goalStopped)
 {
     const auto input = downwell::playerGameplayInput(rawInput, dead ? 0 : 1);
     frameStartX_ = x_;
@@ -217,6 +217,9 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         speedX_ = 0;
         horizontalCollision = true;
     }
+    // objPlayer_n Begin Step still calls scrWallCol when goalStop is set.
+    // Retain collision correction, but skip ordinary xx += xsp integration.
+    if (goalStopped && !horizontalCollision) x_ = frameStartX_;
     if (landingResolver_ != 0) {
         landingY_ = landingResolver_(landingResolverContext_,
                                     fixedToPixel(x_), fixedToPixel(y_)) *
@@ -303,9 +306,13 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         }
         const long displacement = speedY_ * 5 + gravityRemainder_ +
                                   verticalPositionRemainder_;
-        y_ += displacement / 5;
-        verticalPositionRemainder_ = (int)(displacement % 5);
-        if (y_ >= landingY_) {
+        const long nextY = y_ + displacement / 5;
+        if (!goalStopped) {
+            y_ = nextY;
+            verticalPositionRemainder_ = (int)(displacement % 5);
+        }
+        // A predicted landing is scrWallCol correction, not yy += ysp.
+        if (nextY >= landingY_) {
             y_ = landingY_;
             speedY_ = 0;
             gravityRemainder_ = 0;
