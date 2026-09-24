@@ -19,6 +19,7 @@ struct ShopWorld {
     };
     Instance instances[capacity];
     unsigned allocatedCount = 0;
+    unsigned fixtureRevision = 0;
     bool noControl = false, interactable = false;
     Input previous;
 
@@ -30,6 +31,7 @@ struct ShopWorld {
             shop.x = x; shop.y = y; shop.present = true;
             shop.allocated = shop.wallPresent = true;
             ++allocatedCount;
+            ++fixtureRevision;
             shop.stock.create(random, health, area, hard, style, member);
             return &shop;
         }
@@ -106,8 +108,10 @@ struct ShopWorld {
     }
     void endStep(int viewY) {
         for (auto& shop : instances) {
-            if (shop.present && (shop.y < viewY - 320 || shop.y > viewY + 3000))
+            if (shop.present && (shop.y < viewY - 320 || shop.y > viewY + 3000)) {
                 shop.present = false;
+                ++fixtureRevision;
+            }
             if (shop.wallPresent && (shop.y + 8 < viewY - 160 || shop.y + 8 > viewY + 3000))
                 shop.wallPresent = false;
         }

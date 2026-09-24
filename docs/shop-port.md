@@ -205,3 +205,32 @@ Validation: full host tests and SDL build pass, including the paired counter-wal
 fixture. The bounded SKIP_TO_GAME 600-update A500 cache regression passes with
 clean 68000 instruction/helper audits. No target-side visit to a shop is claimed;
 the ordinary first-level emulator tape checks existing gameplay for regressions.
+
+## Static fixture drawing
+
+Both backends now consume `drawShopFixtures`: counter 480, table 481 and three
+intact cases 482, frame zero, at recovered Shop Create positions. The counter
+disappears on its retirement; surviving table/cases remain drawable. Purchases
+do not change the case image. The helper emits creation order; final overlap
+ordering with merchant/items and original equal-depth instances still needs
+Windows presentation validation.
+
+The game planar pack includes those three frames, converted offline by the
+existing generator. SDL draws the shared stream before the player; the Amiga
+terrain compositor draws it into cached static rows. Registration/counter
+retirement advances a fixture revision and marks only intersecting art rows
+dirty in the terrain cache, to be refreshed on subsequent composition. A purchase
+does not invalidate furniture. This does not yet implement live generation or
+an immediate visible-region refresh for dynamically registered on-screen shops.
+
+Merchant animation, item-child drawing and active menu/text remain unfinished.
+Normal 1-1 still contains no shop. Focused tests verify the static command stream,
+resource IDs, coordinates and revision behavior; existing planar renderer tests
+exercise the generated pack. No complete shop screenshot is claimed yet.
+
+The generated game pack is 294020 bytes, SHA-256
+`cf990f9f640477e3b14b6fb43d434634a1f3882b5cce1ec2ba092b95d3d912b8`;
+copyrighted payload remains ignored. Full host tests, SDL build, offline pack
+verification and the bounded direct-entry A500 600-update cache regression pass.
+The resident Chip-art budget assertion and 68000 helper/instruction audits pass.
+This target tape still exercises ordinary gameplay, not an on-screen shop.

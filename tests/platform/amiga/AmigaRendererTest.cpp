@@ -128,6 +128,12 @@ int main(int argc, char** argv) {
     };
     for (const auto& requirement : runtimeSprites)
         requireRuntimeSprite(gamePack, requirement[0], requirement[1]);
+    for (unsigned sprite : {480u, 481u, 482u}) {
+        int left, top, width, height;
+        require(amigaRendererAssetBounds(gamePack.data(), gamePack.data() + gamePack.size(),
+            sprite, 0, 197, 93, 0, &left, &top, &width, &height) && width > 0 && height > 0,
+            "offline game pack contains every static shop fixture");
+    }
 
     require(amigaRendererHardwareSpritePartCount(
                 gamePack.data(), gamePack.data() + gamePack.size(),

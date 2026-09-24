@@ -16,6 +16,7 @@
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
+#include "core/ShopFixtures.h"
 #include "AmigaRenderer.h"
 #include "AmigaSceneRuntime.h"
 #include "GameplaySceneStorage.h"
@@ -746,6 +747,7 @@ enum { terrainRasterRows = 8192, terrainRasterWords = 11, terrainRasterX = 96 };
 static UWORD terrainRaster[3][terrainRasterRows][2][terrainRasterWords];
 static bool terrainRasterDirty[3][terrainRasterRows];
 static bool terrainRasterReady;
+static unsigned terrainShopFixtureRevision;
 
 static bool generateLiveTerrain(void* opaque, AmigaPortRuntime& runtime,
     downwell::GameMakerRandom& random, int bottom) {
@@ -910,6 +912,18 @@ static void drawMainWorldSpan(
     unsigned index;
     const int firstWorldY = viewY + clipY;
     const int finalWorldY = firstWorldY + clipHeight;
+    if (runtime && runtime->shops().fixtureRevision != terrainShopFixtureRevision) {
+        terrainShopFixtureRevision = runtime->shops().fixtureRevision;
+        // Registration/retirement invalidates only the fixture art's rows.
+        // Ordinary frames and purchases do not repaint static shop furniture.
+        for (const auto& shop : runtime->shops().instances) if (shop.allocated) {
+            int first = shop.y - 21, end = shop.y + 12;
+            if (first < 0) first = 0;
+            if (end > terrainRasterRows) end = terrainRasterRows;
+            for (unsigned column = 0; column < 3; ++column)
+                for (int y = first; y < end; ++y) terrainRasterDirty[column][y] = true;
+        }
+    }
     dirtyGameRows(renderer->gameOrigin, clipY, clipHeight);
     const bool cacheable = viewX >= mainViewX - 160 && viewX <= mainViewX + 160 &&
         (viewX - mainViewX) % 160 == 0 && firstWorldY >= 0 &&
@@ -999,6 +1013,10 @@ static void drawMainWorldSpan(
                       decoration.flipX ? 1 : 0);
     }
     }
+    if (runtime) downwell::drawShopFixtures(runtime->shops(), [&](int sprite, int frame, int x, int y) {
+        if (y + 24 >= firstWorldY && y - 24 < finalWorldY)
+            drawGameAsset(renderer, sprite, frame, downwellPlayfieldX + x - viewX, y - viewY, 0);
+    });
     amigaRendererClearClipRect(renderer);
     if (terrainRasterReady && cacheable && refresh) {
         AmigaHardware::blitterDrain();

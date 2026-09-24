@@ -79,6 +79,9 @@ SELECTIONS = {
         278: None,   # sprCrawler
         369: None,   # bgNightsky
         459: [0],    # sprBulScatter1 (usual gunboot projectile)
+        480: [0],    # sprShopCounter
+        481: [0],    # sprShopTable
+        482: [0],    # sprShopCase, intact fixture (sold cases stay intact)
         550: None,   # sprScattered (generated plants)
         568: None,   # sprDungTorch
         569: None,   # sprGemChunk

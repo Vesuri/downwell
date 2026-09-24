@@ -29,6 +29,8 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
   (rendering/audio consumers still pending).
 - [x] Table, glass-case and invisible-wall player collision masks shared by
   both adapters, including separate retirement rules.
+- [x] Shared static counter/table/case drawing and offline planar fixtures;
+  Amiga composition uses the terrain cache, not recurring furniture redraws.
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.

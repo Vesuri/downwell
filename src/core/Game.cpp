@@ -9,6 +9,7 @@
 #include "DeathResultsProgressBar.h"
 #include "DeathResultsProgressLabels.h"
 #include "ObjectPack.h"
+#include "ShopFixtures.h"
 #include <array>
 #include <cmath>
 #include <string>
@@ -224,6 +225,9 @@ void Game::renderMain(Renderer& renderer) const {
                 instance.scaleX, instance.scaleY, instance.rotation);
     }
 
+    drawShopFixtures(startup_.shops(), [&](int sprite, int frame, int x, int y) {
+        renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
+    });
     if (startup_.mainPlayerVisible())
         renderer.drawSpriteTransformed(
             startup_.mainPlayerSpriteId(),
