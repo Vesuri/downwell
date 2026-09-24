@@ -1540,9 +1540,16 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     "extended combat tape must match movement, health, kills and currency");
         if (std::getenv("DOWNWELL_VERIFY_FROG_MOTION"))
             require(sawPairedFrogHit, "strict combat tape exercises a surviving frog hit on both adapters");
-        if (std::getenv("DOWNWELL_VERIFY_DEATH"))
+        if (std::getenv("DOWNWELL_VERIFY_DEATH")) {
             require(pairedDeadFrames >= 120,
                     "death-state regression includes at least 120 paired depleted-health updates");
+            require(gameplay.deathSequence().menuReady && reference.mainDeathSequence().menuReady &&
+                    gameplay.deathResults().active && reference.deathResults().active &&
+                    gameplay.runGemStatistics().recorded && reference.runGemStatistics().recorded,
+                    "natural death reaches both results controllers and records both runs");
+            std::cout << "DEATH COVERAGE pairedDeadFrames=" << pairedDeadFrames
+                      << " results=active statistics=recorded\n";
+        }
         if (std::getenv("DOWNWELL_VERIFY_SURVIVAL"))
             require(combatTicks == 6000 && pairedDeadFrames == 0 &&
                     gameplay.health() > 0 && reference.mainPlayerHealth() > 0 &&

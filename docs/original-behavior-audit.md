@@ -12,11 +12,12 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 The historical tick-600/666/702 failures below are superseded by the current
 shared-simulation work documented in `shared-simulation-migration.md` and
 `feature-parity.md`. Both 6,000-update continuations now pass the combat and
-death/survival checks: after correcting normal machine-gun damage from ten
-to nine, firing phase 1 finishes with health 0, kills 10, currency 84 and best
-combo 3 on both adapters; phase 5 now survives with 2, 8, 90 and 2.
-The former phase-5 death expectation (0, 3, 46, 1) was superseded by that
-source-backed correction, not retained as an oracle. Phase 1 still requires
+death/survival checks with live fractional machine-gun spread: firing phase 6
+finishes with health 0, kills 7, currency 74 and best combo 2 on both adapters;
+phase 5 survives with 2, 6, 76 and 2. Phase 1 now survives to the exit, so it
+cannot serve as a death-coverage tape. Previous totals from the vertical-shot
+implementation and temporary ten-damage profile are historical evidence, not
+an oracle to preserve after source-backed corrections. Phase 6 requires
 at least 120 updates with both players dead; phase 5 explicitly requires
 survival through 6,000 updates. The paired comparison checks
 death/result state, input suppression, reward motion, HUD state and combat

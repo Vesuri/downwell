@@ -9,6 +9,25 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Restored natural-death coverage after live spread
+
+The long death gate now uses firing phase 6 (the same five-held/five-released
+cycle shifted by six updates); movement, health, enemies and RNG are not
+injected or modified. This route naturally dies and covers 3,497 paired
+depleted-health updates in its 6,000-update continuation. Both adapters finish
+with health 0, kills 7, currency 74 and best combo 2. In addition to the retained
+per-update death, camera, input-suppression, results, reward and RNG comparisons,
+the gate explicitly requires active results controllers and recorded run
+statistics. The strengthened test passes in an optimized host build; the
+selected death/survival pair also passes the ordinary debug verification target.
+
+The phase-5 survival companion remains unchanged (health 2, kills 6,
+currency 76, best combo 2). This supersedes the open death-route coverage gap
+described in the integration checkpoint below. These are deterministic host
+runs of both adapters, not Windows gameplay recordings or new native emulator
+evidence. Neither production code nor the original damage rules changed to
+make a tape end in death.
+
 ### Live fractional machine-gun integration
 
 Both runtime adapters now use `stepMachineGunBullet`, retaining the shared
