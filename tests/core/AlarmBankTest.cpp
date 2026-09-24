@@ -63,6 +63,19 @@ void testMissingEventDoesNotCountDown() {
 } // namespace
 
 int main() {
+    for (int start = -5; start <= 5; ++start) {
+        for (bool hasEvent : {false, true}) {
+            int compact = start;
+            downwell::AlarmBank bank;
+            bank.set(0, start);
+            for (int tick = 0; tick < 8; ++tick) {
+                const bool fired = downwell::AlarmBank::advanceValue(compact, hasEvent);
+                const auto mask = bank.advance(hasEvent ? 1 : 0);
+                require(fired == downwell::AlarmBank::fired(mask, 0) && compact == bank.get(0),
+                        "compact and full alarm stores share identical transitions");
+            }
+        }
+    }
     testResetAndCountdown();
     testSimultaneousAndRearm();
     testZeroAndNegativeDoNotCount();

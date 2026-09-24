@@ -5,6 +5,8 @@
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
 #include "core/EnemyContact.h"
+#include "core/EnemyAlarmEvents.h"
+#include "core/AlarmBank.h"
 #include "core/FrogBehavior.h"
 #include "core/FrogMotion.h"
 #include "core/StandardBulletStep.h"
@@ -308,11 +310,9 @@ void AmigaPortRuntime::advanceEnemyAlarms()
             continue;
         if (enemy.objectId == 113) enemy.frogHit.advanceFrame();
         if (enemy.objectId == 117) enemy.snailHit.advanceFrame();
-        bool alarm0Fired = false, alarm1Fired = false;
-        if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
-            alarm0Fired = true;
-        if (enemy.alarm1 > 0 && --enemy.alarm1 == 0)
-            alarm1Fired = true;
+        const unsigned events = downwell::enemyAlarmEvents(enemy.objectId);
+        const bool alarm0Fired = downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
+        const bool alarm1Fired = downwell::AlarmBank::advanceValue(enemy.alarm1, (events & 2) != 0);
 
         if (enemy.objectId == 112 && alarm1Fired) {
             enemy.auxiliaryState = -enemy.auxiliaryState;

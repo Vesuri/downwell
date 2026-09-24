@@ -22,18 +22,20 @@ public:
     std::int32_t get(std::size_t index) const { return values_[index]; }
     void set(std::size_t index, std::int32_t value) { values_[index] = value; }
 
+    // Also used by compact target-side stores; no twelve-slot allocation is
+    // required to preserve the same countdown and zero retirement rules.
+    template<class Integer>
+    static bool advanceValue(Integer& value, bool hasEvent = true) {
+        if (!hasEvent || value < 0) return false;
+        if (value == 0) { value = inactive; return false; }
+        return --value == 0;
+    }
+
     FiredMask advance(FiredMask implementedEvents = allEvents) {
         FiredMask fired = 0;
         for (std::size_t index = 0; index < count; ++index) {
             const FiredMask eventBit = static_cast<FiredMask>(1U << index);
-            if ((implementedEvents & eventBit) == 0 || values_[index] < 0)
-                continue;
-            if (values_[index] == 0) {
-                values_[index] = inactive;
-                continue;
-            }
-            --values_[index];
-            if (values_[index] == 0) {
+            if (advanceValue(values_[index], (implementedEvents & eventBit) != 0)) {
                 fired |= eventBit;
             }
         }

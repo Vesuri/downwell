@@ -337,6 +337,13 @@ int main() {
             "shared walking predicate preserves GML truth values and airborne art");
 
     AmigaPortRuntime frog(300);
+    AmigaPortRuntime firedAlarmFrog(300);
+    require(firedAlarmFrog.configureEnemy(0, 113, 166, 40, 1, 0, 0, 35, 20,
+                0, 0, 0, -1, 0, 0, true, false, true),
+            "configure a frog with an already-fired alarm and no motion resolver");
+    firedAlarmFrog.step(0);
+    require(firedAlarmFrog.enemyAt(0).alarm0 == -1,
+            "a fired native alarm retires to minus one on the next alarm phase");
     AmigaPortRuntime simultaneousFrog(300);
     simultaneousFrog.configureSolidResolver(flatGround, nullptr);
     require(simultaneousFrog.configureEnemy(0, 113, 166, 40, 1, 0, 0, 35, 20,
@@ -552,7 +559,10 @@ int main() {
     require(hitSnail.enemyAt(0).spriteId == 178 && hitSnail.enemyAt(0).snailHit.alarm2 == 4 &&
             hitSnail.enemyAt(0).alarm0 == 0 && hitSnail.enemyAt(0).alarm1 >= 50 &&
             hitSnail.enemyAt(0).alarm1 < 80, "snail hit selects damage art and source alarm changes");
+    const int unusedSnailAlarm = hitSnail.enemyAt(0).alarm1;
     for (unsigned i = 0; i < 4; ++i) hitSnail.step(0);
+    require(hitSnail.enemyAt(0).alarm0 == 0 && hitSnail.enemyAt(0).alarm1 == unusedSnailAlarm,
+            "snail alarm slots without source events do not count down");
     require(hitSnail.enemyAt(0).spriteId == 177 && !hitSnail.enemyAt(0).snailHit.stunned,
             "snail returns to normal artwork after the hit alarm");
     detachedSnail.configureSolidResolver(noSolid, 0);

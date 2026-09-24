@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_SNAIL_HIT_STATE_H
 #define DOWNWELL_CORE_SNAIL_HIT_STATE_H
+#include "AlarmBank.h"
 namespace downwell {
 // Queued like the existing frog adapter until world collision-event dispatch
 // is consolidated. Unlike frog hit-stun, snail Alarm 2 is extended, not reset.
@@ -8,8 +9,7 @@ struct SnailHitState {
     int alarm2 = -1;
     void advanceFrame() {
         ready = pending; pending = false;
-        if (alarm2 == 0) alarm2 = -1;
-        else if (alarm2 > 0 && --alarm2 == 0) stunned = false;
+        if (AlarmBank::advanceValue(alarm2)) stunned = false;
     }
     template<class Random>
     int consume(Random& random) {

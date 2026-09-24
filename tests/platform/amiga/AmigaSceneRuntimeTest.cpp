@@ -3,6 +3,7 @@
 #include "platform/amiga/AmigaTerrain.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
+#include "core/EnemyAlarmEvents.h"
 #include "core/Replay.h"
 #include "core/RoomPack.h"
 #include "core/StartupRuntime.h"
@@ -216,6 +217,9 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (!amigaEnemyHealth(enemy.objectId)) continue;
         require(ordinal < amiga.enemyCount(), "frog diagnostic retains creation-order pairing");
         const auto& native = amiga.enemyAt(ordinal++);
+        if (enemy.active && native.active)
+            require(native.alarm0 == enemy.alarms.get(0) && native.alarm1 == enemy.alarms.get(1),
+                    "live enemy alarm slots match exactly across compact and full stores");
         if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.active && native.active) {
             const auto& a = native.walker;
             const auto& b = enemy.walker;
@@ -468,6 +472,15 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     const std::vector<std::uint8_t> patternBytes = readFile(builderPatternPath);
     const downwell::RoomPack rooms(roomBytes.data(), roomBytes.size());
     const downwell::ObjectPack objects(objectBytes.data(), objectBytes.size());
+    for (int object : {111, 112, 113, 116, 117, 119}) {
+        unsigned mask = 0;
+        for (int alarm = 0; alarm < 12; ++alarm) {
+            downwell::PackedObjectEvent event;
+            if (objects.findEvent(object, 2, alarm, event)) mask |= 1u << alarm;
+        }
+        require(mask == downwell::enemyAlarmEvents(object),
+                "compact native enemy alarm masks match recovered inherited event metadata");
+    }
     const downwell::BuilderPatternPack patterns(patternBytes.data(),
                                                 patternBytes.size());
     require(rooms.valid() && objects.valid() && patterns.valid(),

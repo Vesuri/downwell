@@ -125,7 +125,7 @@ build/walking-enemy-test: tests/core/WalkingEnemyMotionTest.cpp src/core/Walking
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/WalkingEnemyMotionTest.cpp
 
-build/snail-motion-test: tests/core/SnailMotionTest.cpp src/core/SnailMotion.h src/core/SnailHitState.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
+build/snail-motion-test: tests/core/SnailMotionTest.cpp src/core/SnailMotion.h src/core/SnailHitState.h src/core/AlarmBank.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/SnailMotionTest.cpp
 

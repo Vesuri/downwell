@@ -244,6 +244,32 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared alarm countdown across runtime stores
+
+Both the SDL twelve-slot alarm bank and compact native enemy slots now call
+`AlarmBank::advanceValue`. A positive alarm fires when it reaches zero; zero
+becomes -1 on the next alarm phase without firing again. Slots without a
+serialized/inherited event remain untouched. The previous native loop kept
+zero indefinitely and decremented every positive slot, including the snail's
+unused Alarm 1 written by its hit response.
+
+The native presence masks for all six supported enemy objects are checked
+against `ObjectPack::findEvent` for all twelve slots, including inheritance.
+Snail Alarm 2 also uses the same countdown primitive. Compact storage does
+not require allocating twelve integers per enemy. Focused fixtures verify
+zero retirement and preservation of unused snail slots, while the paired
+scene test now compares live enemy Alarm 0/1 values exactly every update.
+
+This consolidates countdown semantics, not the complete world scheduler.
+Event body dispatch, creation/activation timing and queued collision hit
+responses still have separate adapters. Event presence does not imply that
+every recovered event body is implemented (notably bat/crawler hit response).
+
+Validation: full host suite (including both exact live-alarm combat tapes),
+SDL build, bounded 68000 player/gem replay and normal target rebuild pass.
+The narrow CPU replay digest is unchanged; it does not replace the host
+alarm fixtures or prove the complete original event scheduler.
+
 #### Shared snake and ground-turtle movement
 
 `WalkingEnemyMotion` now owns the dry-world movement algorithm for both
