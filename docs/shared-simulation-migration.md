@@ -384,3 +384,34 @@ The corrected alarm changes the finite combat tape's outcome on both ports:
 health remains 3/3, kills become 1/1 and currency 12/12 (previously 2/2 and
 16/16). All per-update comparison checks still pass and the tape still
 exercises kills and collection. No test tolerance or coverage was reduced.
+
+## Frog fractional displacement and strict motion diagnostic
+
+Native frog gravity retained fifth-Q8 velocity remainders but discarded them
+when integrating yy. Starting at y=1, its first two updates displaced 114 Q8
+units instead of 115 + 1/5. The source .15 gravity and yy += ysp require both
+velocity and position residuals. FractionalMotion::integrateFifthsQ8 now keeps
+that displacement, including negative velocities; landing clears the residual.
+The forty-update free-fall fixture checks the closed-form displacement and
+both remainders, rather than comparing against SDL's implementation.
+
+`DOWNWELL_VERIFY_FROG_MOTION=1` adds a strict Q8-normalized position/velocity
+comparison to the live scene test. Native remainders are included before
+rounding, avoiding a false mismatch from comparing its integer component to
+SDL's complete float. Initial entry motion now passes this stronger check.
+With `DOWNWELL_VERIFY_COMBAT=1` as well, the first remaining disagreement is
+tick 478, actor 2: native Y=498508 versus SDL Y=498509 Q8 units; X and velocity
+agree. This diagnostic is deliberately still failing for the extended tape,
+not enabled as a supposedly passing full-precision default gate.
+
+Source collision audit: enmFrog Step checks parentThinwall (87) before parentWall
+(57), then rechecks support before integrating. sprFrogIdle's fixed rectangle
+is x[-6,6), y[-5,8); sprThinPlatform's is x[-8,8), y[-8,-6). Existing native
+and SDL point-query movement does not yet implement this sequence faithfully.
+In particular, the native seven-pixel side probe differs from SDL's six-pixel
+probe, and SDL currently resolves vertical motion before horizontal motion.
+These are unresolved migration targets, not reasons to pick one port as oracle.
+
+Default host tests and combat counters pass unchanged. Bounded 68000 replay
+and A500 terrain-cache checks pass; normal target build and clean 68000 audits
+are restored. Full frog physics consolidation remains unfinished.

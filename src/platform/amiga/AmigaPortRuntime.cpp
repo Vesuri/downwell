@@ -6,6 +6,7 @@
 #include "core/EnemyPresentation.h"
 #include "core/EnemyContact.h"
 #include "core/FrogBehavior.h"
+#include "core/FractionalMotion.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
@@ -685,8 +686,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     enemy.speedY = 0;
                     enemy.grounded = true;
                     enemy.gravityRemainder = 0;
+                    enemy.gravityPositionRemainder = 0;
                 } else {
-                    enemy.preciseY += enemy.speedY;
+                    downwell::integrateFifthsQ8(enemy.preciseY,
+                        enemy.gravityPositionRemainder, enemy.speedY, enemy.gravityRemainder);
                 }
             } else {
                 enemy.speedY = 0;

@@ -71,7 +71,7 @@ public:
         long speedX;
         long speedY;
         unsigned char gravityRemainder; // fifths of one Q8 velocity unit
-        unsigned char gravityPositionRemainder; // snake/turtle integration residual
+        unsigned char gravityPositionRemainder; // fifth-Q8 integration residual
         int motionState;
         int auxiliaryState;
         int alarm0;

@@ -396,6 +396,10 @@ int main() {
         const auto& state = fallingFrog.enemyAt(0);
         require(state.speedY == tick * 192 / 5 && state.gravityRemainder == tick * 2 % 5,
                 "frog gravity retains exact fifth-unit velocity remainder");
+        const long displacementFifths = tick * (tick + 1) * 96;
+        require(state.preciseY == 256 + displacementFifths / 5 &&
+                state.gravityPositionRemainder == displacementFifths % 5,
+                "frog position integrates the gravity remainder rather than discarding it");
         const double expectedY = 1.0 + 0.15 * tick * (tick + 1) / 2.0;
         require(std::fabs(state.preciseY / 256.0 - expectedY) < tick / 256.0,
                 "frog ballistic position stays within one Q8 unit per integration step");

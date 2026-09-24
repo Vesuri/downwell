@@ -1,4 +1,5 @@
 #include "core/FrogBehavior.h"
+#include "core/FractionalMotion.h"
 #include <cstdlib>
 #include <iostream>
 
@@ -7,6 +8,14 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    long position = 0;
+    unsigned char remainder = 0;
+    downwell::integrateFifthsQ8(position, remainder, -1, 1);
+    require(position == -1 && remainder == 1,
+            "negative displacement preserves a nonnegative residual");
+    downwell::integrateFifthsQ8(position, remainder, 0, 4);
+    require(position == 0 && remainder == 0,
+            "opposite fractional displacements cancel exactly");
     using downwell::frogPreparationDirection;
     auto direction = [](long x, long y, long playerX, bool grounded = true) {
         return frogPreparationDirection(grounded, x, y, playerX,

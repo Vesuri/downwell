@@ -203,6 +203,33 @@ void compareStyle(const AmigaSceneRuntime& amiga,
                 "style exit dither follows decoded runtime");
 }
 
+void verifyFrogMotion(const AmigaPortRuntime& amiga,
+                      const downwell::StartupRuntime& reference) {
+    if (!std::getenv("DOWNWELL_VERIFY_FROG_MOTION")) return;
+    unsigned ordinal = 0;
+    for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+        const auto& enemy = reference.instanceAt(i);
+        if (!amigaEnemyHealth(enemy.objectId)) continue;
+        require(ordinal < amiga.enemyCount(), "frog diagnostic retains creation-order pairing");
+        const auto& native = amiga.enemyAt(ordinal++);
+        if (enemy.objectId != 113 || !enemy.active || !native.active) continue;
+        require(native.objectId == 113, "frog diagnostic pairs the same object type");
+        const long referenceX = static_cast<long>(std::round((enemy.preciseX - 240.0F) * 256.0F));
+        const long referenceY = static_cast<long>(std::round((enemy.preciseY - 176.0F) * 256.0F));
+        const long referenceVX = static_cast<long>(std::round(enemy.velocityX * 256.0F));
+        const long referenceVY = static_cast<long>(std::round(enemy.velocityY * 256.0F));
+        const long nativeY = static_cast<long>(std::round(native.preciseY + native.gravityPositionRemainder / 5.0));
+        const long nativeVY = static_cast<long>(std::round(native.speedY + native.gravityRemainder / 5.0));
+        const bool matching = native.preciseX == referenceX && nativeY == referenceY &&
+            native.speedX == referenceVX && nativeVY == referenceVY;
+        if (!matching)
+            std::cerr << "FROG MOTION tick=" << amiga.tick() << " actor=" << ordinal - 1
+                      << " Q8 native=" << native.preciseX << ',' << nativeY << ',' << native.speedX << ',' << nativeVY
+                      << " SDL=" << referenceX << ',' << referenceY << ',' << referenceVX << ',' << referenceVY << '\n';
+        require(matching, "frog adapters must agree at Q8 precision, not within a one-pixel allowance");
+    }
+}
+
 void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             const downwell::StartupRuntime& reference,
                             float playerYTolerance = 0.0F,
@@ -210,6 +237,7 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             bool allowGroundingPhase = false) {
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
+    verifyFrogMotion(amiga, reference);
     require(amiga.generationSucceeded(),
             "live terrain generation succeeds throughout the comparison tape");
     unsigned referenceEnemyCount = 0;
@@ -749,6 +777,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << " ground=" << gameplay.player().grounded() << ',' << reference.mainPlayerGrounded()
                           << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired() << '\n';
             require(gameplay.generationSucceeded(), "combat continuation retains successful live generation");
+            verifyFrogMotion(gameplay, reference);
             require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
                     gameplay.player().spriteFrame() ==
                         static_cast<unsigned>(reference.mainPlayerImageIndex()),
