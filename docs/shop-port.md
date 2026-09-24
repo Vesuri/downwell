@@ -108,7 +108,8 @@ zero horizontal speed, grounded state and the instance's interactOk. The existin
 shared player lacked that up-button gate. It now accepts the retained interactable
 state and suppresses the grounded press/jump branch only, as in
 `scrUpButtonFunctions`; airborne held fire is a separate branch. World adapters
-do not yet supply this state because live shop instances are not registered.
+now supply this state for explicitly registered shops (see below); ordinary
+generation still does not register the shop and its children.
 
 The same audit found `controlsLocked` suppressed jumping/horizontal input but
 not firing, empty-charge braking or release handling. `scrPlMovement` skips the
@@ -120,3 +121,38 @@ press guard and the independently allowed airborne held-fire branch.
 The full host suite and bounded direct-entry A500 600-update cache check pass;
 68000 instruction/helper audits remain clean. That target tape is a regression
 check, not a visit to a shop; focused shared-player tests exercise the new guards.
+
+## Registered shop world integration
+
+`RunSession::shops` owns up to eight registered counters, inventories and menus.
+Registration reports exhaustion with a null pointer before consuming randomness.
+Run reset clears instances, input history, interaction eligibility and the shop
+control lock. End Step retires counters outside the source's strict
+viewY-320/viewY+3000 bounds, without inventing an unlock on destruction.
+
+Both runtime adapters expose `registerShop` for the currently supported default
+style/normal-mode setup and use their existing shared RNG stream. Player movement
+sees retained eligibility; the post-movement mask query refreshes it before menu
+input. Raw input edges continue advancing while movement is locked. Opening faces
+the counter, consumes confirmation and suppresses jumping; purchases queue the
+existing controller-phase consumables. Directional edges navigate without moving
+the player. The shared world supports criminal/mask invalidation, but the adapters
+still supply criminal=false because that gameplay state is not implemented.
+
+The host paired-runtime fixture explicitly registers a counter at the entrance
+floor, compares randomized stock, opens it, checks held input and insufficient
+funds, then uses a test-only free battery to verify deferred grant timing. Leave
+and reentry retain sold stock. This is separate from the ordinary generation and
+combat tape. `test-shop-world` also covers inclusive integer mask edges, movement
+eligibility, capacity exhaustion, retirement and run reset.
+
+Remaining integration: production creation and children, source-wide ordinary
+Step dispatch (including multiple shops), fractional mask queries, cancellation
+input mapping, merchant/case/audio feedback and rendering. Current runtime hooks
+run the menu immediately after player movement and discard presentation requests;
+they are not a claim that the full original Shop event has been implemented.
+
+Validation: the full host suite (including both runtime fixtures) and normal SDL
+build pass. The bounded SKIP_TO_GAME A500 600-update cache verifier passes with
+clean 68000 instruction/helper audits. That emulator tape contains no shop;
+registered-shop lifecycle evidence is currently from the host paired fixture.

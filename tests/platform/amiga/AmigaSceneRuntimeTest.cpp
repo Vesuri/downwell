@@ -501,7 +501,7 @@ void compareGameplayShot(const AmigaPortRuntime& amiga,
 }
 
 void testDecodedSceneParity(const char* roomPath, const char* objectPath,
-                            const char* builderPatternPath) {
+                            const char* builderPatternPath, bool shopFixture = false) {
     const std::vector<std::uint8_t> roomBytes = readFile(roomPath);
     const std::vector<std::uint8_t> objectBytes = readFile(objectPath);
     const std::vector<std::uint8_t> patternBytes = readFile(builderPatternPath);
@@ -764,6 +764,55 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     }
     require(gameplay.player().grounded() && reference.mainPlayerGrounded(),
             "both gameplay runtimes land on the recovered entrance floor");
+    if (shopFixture) {
+        // Isolated fixture, not a modification of ordinary 1-1 generation.
+        const int x = 240 + gameplay.player().offsetX() + 5;
+        const int y = 176 + gameplay.player().offsetY();
+        auto* nativeShop = gameplay.registerShop(x, y);
+        auto* hostShop = reference.registerShop(x, y);
+        require(nativeShop && hostShop, "both world adapters register a shop");
+        for (unsigned i = 0; i < 3; ++i)
+            require(nativeShop->stock.items[i].upgrade == hostShop->stock.items[i].upgrade &&
+                nativeShop->stock.items[i].price == hostShop->stock.items[i].price,
+                "registered stock uses identical shared RNG state");
+        auto tickShop = [&](bool pressed, bool goLeft = false) {
+            downwell::Input input; input.fire = pressed; input.left = goLeft;
+            gameplay.step(downwell::packReplayInput(input));
+            reference.step(input, pressed);
+            require(gameplay.shops().noControl == reference.shops().noControl &&
+                gameplay.shops().interactable == reference.shops().interactable &&
+                nativeShop->menu.cursor == hostShop->menu.cursor &&
+                nativeShop->menu.active == hostShop->menu.active &&
+                gameplay.player().grounded() && reference.mainPlayerGrounded(),
+                "world interaction and grounded input suppression agree across adapters");
+        };
+        tickShop(false); tickShop(true);
+        require(nativeShop->menu.active && gameplay.shops().noControl,
+            "live controller opens and locks movement instead of jumping");
+        tickShop(true);
+        require(nativeShop->stock.items[0].remaining == 1, "held opening press does not buy");
+        tickShop(false); tickShop(true);
+        require(nativeShop->stock.items[0].remaining == 1 && hostShop->stock.items[0].remaining == 1,
+            "unfunded purchase preserves stock in both runtimes");
+        // Test-only free battery isolates queued grant timing from gem collection.
+        nativeShop->stock.items[0] = hostShop->stock.items[0] = {101, 1, 0};
+        const int capacity = gameplay.player().ammoCapacity();
+        tickShop(false); tickShop(true);
+        require(gameplay.consumables().pending[1] == 1 && reference.consumables().pending[1] == 1 &&
+            gameplay.player().ammoCapacity() == capacity && reference.mainAmmoCapacity() == capacity,
+            "purchase queues, rather than immediately applies, battery");
+        tickShop(false, true);
+        require(gameplay.player().ammoCapacity() == capacity + 1 &&
+            reference.mainAmmoCapacity() == capacity + 1 && nativeShop->menu.cursor == 0,
+            "next controller phase consumes grant while left selects Leave");
+        tickShop(true);
+        require(!gameplay.shops().noControl && !nativeShop->menu.active,
+            "live Leave releases movement lock");
+        tickShop(false); tickShop(true);
+        require(nativeShop->menu.active && nativeShop->stock.items[0].remaining == 0 &&
+            hostShop->stock.items[0].remaining == 0, "live reentry preserves sold stock");
+        return;
+    }
     require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&
                 gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) ==
                     static_cast<unsigned>(reference.mainPlayerImageIndex()),
@@ -1288,8 +1337,10 @@ int main(int argc, char** argv) {
         runtime.step(released);
     require(runtime.scene() == AmigaScene::gameplay,
             "style descent enters gameplay");
-    if (argc >= 4)
+    if (argc >= 4) {
         testDecodedSceneParity(argv[1], argv[2], argv[3]);
+        testDecodedSceneParity(argv[1], argv[2], argv[3], true);
+    }
     std::cout << "Amiga scene runtime tests passed\n";
     return 0;
 }

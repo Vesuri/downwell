@@ -80,6 +80,7 @@ public:
     }
     bool grounded() const { return grounded_; }
     int facing() const { return facing_; }
+    void face(int direction) { facing_ = direction < 0 ? -1 : 1; }
     int spriteId(bool dead = false) const;
     unsigned spriteFrame(bool dead = false, int deathAnimation = 1) const;
     unsigned jumps() const { return jumps_; }

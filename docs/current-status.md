@@ -23,6 +23,8 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
 - [x] Shared stock/pricing/transaction core and focused regression tests.
 - [x] Apply queued consumables in the original controller phase on both runtimes.
 - [x] Shared shop interaction and feedback requests (callable, not yet live).
+- [x] Shared shop world ownership and registered-shop input/purchase hooks in
+  both runtimes, verified with an isolated paired fixture.
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.
@@ -33,6 +35,9 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
 marks its shop as already made; reaching shops naturally also needs subsequent
 level progression. Do not silently change the original first-level generator
 to make a shop appear for testing.
+Explicit registration now drives interaction in both runtimes, but production
+generation, shop children and rendering are not connected yet. The fixture is
+not proof of a complete shop or Windows event-order equivalence.
 
 ## Still open beyond that milestone
 

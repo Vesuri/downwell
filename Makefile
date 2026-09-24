@@ -220,6 +220,13 @@ build/ammo-dividers-test: tests/core/AmmoDividersTest.cpp src/core/AmmoDividers.
 test: test-ammo-dividers test-ammo-fill
 test: test-shop-inventory
 test: test-shop-interaction
+test: test-shop-world
+.PHONY: test-shop-world
+build/shop-world-test: tests/core/ShopWorldTest.cpp src/core/PlayerMotion.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-shop-world: build/shop-world-test
+	./build/shop-world-test
 .PHONY: test-shop-interaction
 build/shop-interaction-test: tests/core/ShopInteractionTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

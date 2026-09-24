@@ -201,6 +201,12 @@ public:
     const downwell::RunCombo& runCombo() const { return run_.combo; }
     bool grantConsumable(unsigned id) { return run_.consumables.grant(id, currencyAccount_); }
     const downwell::Consumables& consumables() const { return run_.consumables; }
+    downwell::ShopWorld::Instance* registerShop(int x, int y) {
+        return run_.shops.create(x, y, [this](unsigned lo, unsigned hi) {
+            return lo + enemyRandom_.irandomSmall(hi - lo);
+        }, health_, run_.stage.area > 0 ? run_.stage.area : 1);
+    }
+    const downwell::ShopWorld& shops() const { return run_.shops; }
     const downwell::RunStage& runStage() const { return run_.stage; }
     int healthMaximum() const { return run_.combo.healthReserve.maximum; }
     const downwell::HealthReserve& healthReserve() const { return run_.combo.healthReserve; }

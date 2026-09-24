@@ -456,7 +456,16 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         auto& runtime = *static_cast<AmigaPortRuntime*>(context);
         runtime.run_.gems.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
-    AmigaPlayerMotion motion = player_.step(input, false, death_.movementDead());
+    AmigaPlayerMotion motion = player_.step(input, run_.shops.noControl,
+        death_.movementDead(), run_.shops.interactable);
+    const int shopPlayerX = 240 + downwell::roundGameMakerQ8(player_.offsetXFixed());
+    const int shopPlayerY = 176 + downwell::roundGameMakerQ8(player_.offsetYFixed());
+    run_.shops.observePlayer(shopPlayerX, shopPlayerY, player_.grounded(), player_.speedXFixed());
+    int shopFacing = player_.facing();
+    run_.shops.step(input, shopPlayerX, shopPlayerY, false, death_.active,
+        shopFacing, currencyAccount_, [this] { return 1u + enemyRandom_.irandomSmall(2); },
+        [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
+    player_.face(shopFacing);
     player_.configureComboCompletion(nullptr, nullptr);
     player_.configureMovementBoundary(nullptr, nullptr);
     // Normal rmMain subset, with the same unsupported ending/time-field guards
@@ -802,6 +811,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     trajectory_.addU64(checkpoint_);
 #endif
 
+    run_.shops.endStep(34 + downwell::floorQ8Coordinate(viewCameraYQ8()));
     AmigaPortFrame frame = {};
     run_.results.presentationStep();
     frame.playerMotion = motion;

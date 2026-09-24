@@ -164,6 +164,12 @@ public:
     const RunCombo& runCombo() const { return run_.combo; }
     bool grantConsumable(unsigned id) { return run_.consumables.grant(id, currencyAccount_); }
     const Consumables& consumables() const { return run_.consumables; }
+    ShopWorld::Instance* registerShop(int x, int y) {
+        return run_.shops.create(x, y, [this](unsigned lo, unsigned hi) {
+            return lo + random_.irandomSmall(hi - lo);
+        }, mainPlayerHealth_, run_.stage.area > 0 ? run_.stage.area : 1);
+    }
+    const ShopWorld& shops() const { return run_.shops; }
     const RunStage& runStage() const { return run_.stage; }
     int mainPlayerHealthMaximum() const { return run_.combo.healthReserve.maximum; }
     const HealthReserve& mainHealthReserve() const { return run_.combo.healthReserve; }

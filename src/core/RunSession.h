@@ -9,6 +9,7 @@
 #include "AmmoHudMotion.h"
 #include "AmmoGaugeRows.h"
 #include "Consumables.h"
+#include "ShopWorld.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -31,6 +32,7 @@ struct RunSession {
     AmmoHudMotion ammoHud;
     AmmoGaugeRows ammoGauge;
     Consumables consumables;
+    ShopWorld shops;
 
     RunRecords records() const {
         return {gems.lifetime, gems.record, combo.state.record};
@@ -47,6 +49,7 @@ struct RunSession {
         ammoHud = {};
         ammoGauge = {};
         consumables = {};
+        shops = {};
     }
     ResultsDestination restart(DeathMenuSequence::Action action, const RunRecords& saved) {
         const auto destination = resultsDestination(action);

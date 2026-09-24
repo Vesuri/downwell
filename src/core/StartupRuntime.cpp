@@ -371,6 +371,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         updateMainEnemyInteractions();
         updateMainCurrency();
         updateMainLifecycle();
+        run_.shops.endStep(mainCameraRenderViewY());
         run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
         run_.results.presentationStep();
@@ -1329,7 +1330,17 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         auto& runtime = *static_cast<StartupRuntime*>(context);
         runtime.run_.gems.observeDeathMovement(runtime.mainDeath_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
-    mainPlayerMotion_.step(input, controlsLocked_, mainDeath_.movementDead());
+    mainPlayerMotion_.step(input, controlsLocked_ || run_.shops.noControl,
+        mainDeath_.movementDead(), run_.shops.interactable);
+    const int shopPlayerX = mainPlayerOriginX_ + roundGameMakerQ8(mainPlayerMotion_.offsetXFixed());
+    const int shopPlayerY = mainPlayerOriginY_ + roundGameMakerQ8(mainPlayerMotion_.offsetYFixed());
+    run_.shops.observePlayer(shopPlayerX, shopPlayerY, mainPlayerMotion_.grounded(),
+        mainPlayerMotion_.speedXFixed());
+    int shopFacing = mainPlayerMotion_.facing();
+    run_.shops.step(input, shopPlayerX, shopPlayerY, false, mainDeath_.active,
+        shopFacing, currencyAccount_, [this] { return 1u + random_.irandomSmall(2); },
+        [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
+    mainPlayerMotion_.face(shopFacing);
     mainPlayerMotion_.configureComboCompletion(nullptr, nullptr);
     mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
     // Default rmMain subset: boss endings/goal stops and goalTimeField creation
