@@ -10,6 +10,8 @@
 #include "DeathResultsProgressLabels.h"
 #include "ObjectPack.h"
 #include "ShopFixtures.h"
+#include "ShopMenuText.h"
+#include "../../generated/amiga-shop.text.h"
 #include <array>
 #include <cmath>
 #include <string>
@@ -254,6 +256,30 @@ void Game::renderMain(Renderer& renderer) const {
     }
     if (startup_.mainDeathSequence().flashVisible())
         renderer.fillRect(0, 0, 160, logicalHeight, {255, 255, 255, 255});
+    else if (!startup_.deathResults().active) {
+        struct Sink {
+            Renderer& renderer;
+            void asset(int id, unsigned frame, int x, int y) { renderer.drawSprite(id, frame, x, y); }
+            void arrow(int phase, int x, int y, int angle) {
+                renderer.drawSpriteTransformed(484, phase < 0 ? 0 : phase / 4,
+                    x, y, 1, 1, angle);
+            }
+            void mask(int id, int x, int y, unsigned pen) {
+                const char* label = shopMenuLabel(id);
+                int height = 10;
+                for (const char* c = label; *c; ++c) if (*c == '\n') height += 12;
+                renderer.drawText(2, label, x, y - height / 2,
+                    pen == 3 ? Color{0,0,0,255} : pen == 2 ? Color{255,0,0,255} : Color{255,255,255,255},
+                    TextAlign::center);
+            }
+            void text(ShopMenuText kind, unsigned value, int x, int y, bool red) {
+                drawShopMenuText(*this, kind, value, x, y, red);
+            }
+        } sink{renderer};
+        for (const auto& shop : startup_.shops().instances)
+            drawShopMenu(shop, int(viewX), int(viewY), logicalHeight,
+                         startup_.mainCurrencyTotal(), sink);
+    }
 }
 
 void Game::renderLandscapeHud(Renderer& renderer) const {

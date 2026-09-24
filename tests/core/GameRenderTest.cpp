@@ -43,7 +43,9 @@ public:
             ++deathFlashCount;
     }
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
-    void drawSprite(std::int32_t, std::uint32_t, int, int) override {}
+    void drawSprite(std::int32_t id, std::uint32_t, int x, int y) override {
+        if (id == 489 && x == 110 && y == 57) ++shopPanels;
+    }
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
                                float, float, float) override {
         if (sprite == targetPlayer) ++playerDraws;
@@ -51,6 +53,8 @@ public:
     void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
                   downwell::TextAlign align) override {
+        if (x == 190 && y == 64 && color.r == 255 && color.g == 255 &&
+            align == downwell::TextAlign::center) ++shopNameCenters;
         if (std::strcmp(text, "GAME OVER") == 0) {
             ++resultsTitleDraws;
             if (color.r == 255) {
@@ -73,6 +77,7 @@ public:
     downwell::Color clearColor{};
     int clearCount = 0;
     unsigned deathFlashCount = 0;
+    unsigned shopPanels = 0, shopNameCenters = 0;
     int setClipCount = 0;
     int clearClipCount = 0;
     int clipX = 0;
@@ -450,6 +455,27 @@ int main() {
         naturalDeath.startup().deathResults().menu.goalNotice);
     require(retried, "bounded natural-death tape reaches and executes Retry");
     require(observedFlashFrames == 2, "natural death renders both white flash frames before Retry");
+    downwell::Game shopGame(&rooms, &objects, &builders);
+    auto& shopRuntime = const_cast<downwell::StartupRuntime&>(shopGame.startup());
+    shopRuntime.skipToGameForTesting();
+    auto* shop = shopRuntime.registerShop(250, 240);
+    require(shop != nullptr, "shop renderer fixture registration");
+    shop->menu.active = true;
+    shop->menu.menuState = 1;
+    shop->menu.cursor = 1;
+    const int phaseBefore = shop->menu.cursorPhaseQuarters;
+    RecordingRenderer shopRenderer;
+    shopGame.render(shopRenderer);
+    shopGame.render(shopRenderer);
+    require(shopRenderer.shopPanels == 2 && shopRenderer.shopNameCenters == 2,
+        "Game renders shared shop panel and middle-centered item text at landscape offset");
+    require(shop->menu.cursorPhaseQuarters == phaseBefore,
+        "extra rendering cannot advance shop cursor presentation state");
+    shop->menu.active = false;
+    RecordingRenderer closedShop;
+    shopGame.render(closedShop);
+    require(closedShop.shopPanels == 0 && closedShop.shopNameCenters == 0,
+        "closed shop no longer submits menu overlay");
     std::puts("game render tests passed");
     return 0;
 }

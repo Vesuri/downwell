@@ -477,3 +477,21 @@ shop generation. SDL menu integration, original-runner screenshot comparisons,
 interaction prompts/merchant speech and natural side-room progression remain
 open. Matching the scalar compositor alone does not prove original-game pixels
 or event/depth ordering, and menu frame-time profiling remains necessary.
+
+## SDL menu adapter
+
+Game::renderMain now submits the same shop layout and five-pass text composition
+as the native overlay. Host labels are generated beside the planar bank from
+the same English input (amiga-shop.text.h, ignored), and their reproducibility
+is checked with the bank/provenance. Build prerequisites generate the header
+before compiling Game; no localized payload was added to tracked game code.
+The adapter converts center/middle anchors to the SDL font renderer's top
+anchor using the shared ten-pixel glyph canvas and twelve-pixel line spacing.
+Sprites retain original resource IDs; the host rotates the Leave arrow while
+Amiga selects the corresponding offline variant.
+
+The Game renderer fixture explicitly registers a shop, checks landscape panel
+and item-name anchors, repeats rendering without advancing cursor state, and
+checks that closing stops submissions. This does not yet establish a Windows
+pixel match or natural shop appearance. Production generation, merchant speech,
+prompts and end-to-end original-game comparisons remain open.
