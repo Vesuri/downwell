@@ -40,6 +40,9 @@ int main() {
         require(room.step(confirm, false, false, heartGoal, inventory, consumables,
             currency, player, health, reserve, random, effect), "shared controller Step succeeds");
         if (tick == 60) {
+            require(room.motion.cameraTarget.floor() == 340 && room.motion.playerTarget.floor() == 302 &&
+                room.motion.playerDivisor == 10 && room.motion.viewY() == 20,
+                "showChoices switches easing targets before the same update's motion");
             for (unsigned i = 0; i < 3; ++i) require(room.offers.ids[i] == expected.ids[i], "actual inventory drives original offers");
             require(!heartGoal && room.heartReceived && health == 2, "heart-goal snapshot applied before choices");
             require(random.drawCount() == oracle.drawCount(), "Create and selection RNG order matches");
@@ -48,11 +51,18 @@ int main() {
                 require(random.stateWord(word) == oracle.stateWord(word), "composed controller full RNG state matches");
         }
         if (tick == 91) require(health == 2, "source repeats heart snapshot before departure, rather than retaining prior upgrade healing");
+        if (tick == 91) require(!room.motion.acceleration.mantissa,
+            "entering next=7 does not execute the departure else branch immediately");
+        if (tick == 92) require(room.motion.acceleration.mantissa && room.motion.playerTarget.floor() == 302,
+            "first departure update adds zero acceleration before incrementing it");
     }
     require(grants == 1 && advances == 1 && inventory.count == 1, "one selected grant and one level request");
     inventory.levels[6] = 1;
     require(room.create(2, false, health, inventory, player, random) && room.selection.lastIndex == 2,
         "Youth and Boulder option-count adjustments combine at room creation");
+    require(room.motion.cameraY.floor() == 142 && !room.motion.playerY.mantissa &&
+        !room.motion.acceleration.mantissa && room.motion.playerDivisor == 20,
+        "room creation resets presentation motion after the previous departure");
     require(room.create(4, false, health, inventory, player, random) && room.selection.lastIndex == 3 &&
         room.upgradesRemaining == 0, "Handstand retains source layout setup but offers no upgrade");
     std::puts("Shared level-clear creation, offers, grants and heart-goal ordering passed");

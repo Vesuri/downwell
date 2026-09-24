@@ -223,6 +223,16 @@ same bank; passing the bounds test does not establish safe scene ownership.
 
 ## Still open beyond that milestone
 
+Shared LevelClearMotion now implements Result's player/camera easing and
+departure acceleration. Showing choices changes targets before that same
+update's easing; entering next=7 does not accelerate until the following Step.
+HudReal's small-divisor operation preserves binary64 rounding without target
+floating point. Tests compare 20,000 divisions and 10,000 motion updates with
+host binary64, and controller tests cover transition ordering and room reset.
+A freestanding -m68000 compile probe has no undefined arithmetic helpers.
+This is not a frame-time measurement: live room loading/rendering still needs
+integration, and the signed horizontal carousel remains separate work.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

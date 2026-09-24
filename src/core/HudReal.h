@@ -49,6 +49,24 @@ struct HudReal {
                              (mantissa << 4) + (mantissa << 3);
         return rounded(product << 3, exponent);
     }
+    // Small positive divisors used by Result's easing. Normalize before
+    // division to retain three rounding bits plus a sticky remainder. The
+    // bitwise quotient avoids a 64-bit divide helper on the 68000.
+    HudReal divideSmall(unsigned divisor) const {
+        if (!mantissa || !divisor || divisor > 32) return {};
+        unsigned power = 0, ceiling = 1;
+        while (ceiling < divisor) { ceiling <<= 1; ++power; }
+        std::uint64_t dividend = mantissa << 3, mask = std::uint64_t{1} << 55;
+        for (unsigned i = 0; i < power; ++i) { dividend <<= 1; mask <<= 1; }
+        std::uint64_t quotient = 0;
+        unsigned remainder = 0;
+        for (unsigned i = 0; i < 56 + power; ++i) {
+            remainder = (remainder << 1) | ((dividend & mask) ? 1u : 0u);
+            dividend <<= 1; quotient <<= 1;
+            if (remainder >= divisor) { remainder -= divisor; quotient |= 1; }
+        }
+        return rounded(quotient | (remainder ? 1u : 0u), exponent - static_cast<int>(power));
+    }
     bool less(HudReal other) const {
         if (!mantissa) return other.mantissa != 0;
         if (!other.mantissa) return false;

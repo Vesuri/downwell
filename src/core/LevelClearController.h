@@ -3,12 +3,14 @@
 #include "LevelClearSelection.h"
 #include "LevelUpgradeOffers.h"
 #include "UpgradeInventory.h"
+#include "LevelClearMotion.h"
 namespace downwell {
 // Shared non-rendering Result-room controller. Room loading, presentation and
 // audio playback stay outside; nextLevel is a request, not a direct stage jump.
 struct LevelClearController {
     LevelClearSelection selection;
     LevelUpgradeOffers offers;
+    LevelClearMotion motion;
     unsigned upgradesRemaining = 1;
     int healthAtEntry = 0;
     bool wasHeartGoal = false, heartReceived = true;
@@ -41,8 +43,10 @@ struct LevelClearController {
             heartGoal = false;
         }
         bool ok = true;
+        const bool departureBranch = selection.next >= 7 && heartReceived;
         selection.step(confirm, leftPressed, rightPressed, upgradesRemaining,
             [&](LevelClearSelection::Effect effect, unsigned value) {
+                if (effect == LevelClearSelection::Effect::showChoices) motion.showChoices();
                 if (effect == LevelClearSelection::Effect::rollOffers)
                     ok = offers.randomize(selection.lastIndex, UpgradeInventory::highestId, random,
                         [&](unsigned id) { return inventory.eligible(id); }) && ok;
@@ -50,6 +54,7 @@ struct LevelClearController {
                     ok = inventory.grant(offers.ids[value], consumables, currency, player, health, reserve) && ok;
                 emit(effect, value);
             });
+        motion.step(departureBranch);
         return ok;
     }
 };
