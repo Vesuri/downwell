@@ -7,6 +7,20 @@ static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    for (unsigned farewell = 0; farewell < 3; ++farewell) {
+        downwell::ShopWorld world;
+        unsigned call = 0;
+        const unsigned lower[] = {100, 100, 102, 102, 0};
+        const unsigned upper[] = {101, 103, 105, 105, 2};
+        const unsigned values[] = {100, 101, 104, 105, farewell};
+        auto* created = world.create(0, 0, [&](unsigned lo, unsigned hi) {
+            require(call < 5 && lo == lower[call] && hi == upper[call],
+                "source stock ranges precede scrShopAssignText's three-way choice");
+            return values[call++];
+        }, 4, 1);
+        require(call == 5 && created->stock.items[2].upgrade == 105 &&
+            created->farewellVariant == farewell, "all three creation-time farewell choices are retained");
+    }
     using Feedback = downwell::ShopFeedback;
     using Effect = downwell::ShopInteraction::Effect;
     Feedback feedback;
@@ -45,7 +59,8 @@ int main() {
     unsigned draws = 0;
     auto range = [&](unsigned lo, unsigned) { ++draws; return lo + (draws % 4 == 2 ? 1 : 0); };
     auto* shop = run.shops.create(5, 0, range, 4, 1);
-    require(shop && draws == 4, "registration consumes stock RNG once");
+    require(shop && draws == 5 && shop->farewellVariant == 0,
+        "registration consumes stock rolls followed by one farewell choice");
     unsigned fixtures = 0;
     downwell::drawShopFixtures(run.shops, [&](int sprite, int frame, int x, int y) {
         const int expectedSprite[] = {480, 481, 482, 482, 482, 152, 143, 151};
@@ -134,6 +149,7 @@ int main() {
         "thanked exit requests keeper goodbye and rising text");
     tick(false); tick(true);
     require(shop->menu.active && shop->stock.items[0].remaining == 0, "reentry retains sold stock");
+    require(shop->farewellVariant == 0, "exit and reentry do not reroll farewell text");
     require(shop->feedback.goodbye == 0 && shop->feedback.thankful == 0 &&
         !shop->feedback.itemPresent[0], "opening clears keeper thanks/goodbye without respawning contents");
     using World = downwell::ShopWorld;

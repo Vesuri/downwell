@@ -14,6 +14,7 @@ struct ShopWorld {
         int x = 0, y = 0;
         bool allocated = false, wallPresent = false;
         unsigned artRevision = 0;
+        unsigned farewellVariant = 0; // scrShopAssignText chooses shopBye0..2 once
         bool present = false, maskEnabled = true, interactOk = true;
         ShopInventory stock;
         ShopInteraction menu;
@@ -37,6 +38,7 @@ struct ShopWorld {
             ++allocatedCount;
             ++fixtureRevision;
             shop.stock.create(random, health, area, hard, style, member);
+            shop.farewellVariant = random(0, 2);
             return &shop;
         }
         return nullptr; // Caller must handle exhaustion; do not consume RNG.

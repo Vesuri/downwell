@@ -772,6 +772,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         auto* nativeShop = gameplay.registerShop(x, y);
         auto* hostShop = reference.registerShop(x, y);
         require(nativeShop && hostShop, "both world adapters register a shop");
+        require(nativeShop->farewellVariant == hostShop->farewellVariant,
+            "shop creation chooses the same persistent farewell variant on both streams");
         for (unsigned i = 0; i < 3; ++i)
             require(nativeShop->stock.items[i].upgrade == hostShop->stock.items[i].upgrade &&
                 nativeShop->stock.items[i].price == hostShop->stock.items[i].price,

@@ -327,3 +327,16 @@ SKIP_TO_GAME A500 cache regression pass. The final pack uses 274764 resident
 Chip bytes, leaving 19344 bytes at startup in that configuration. The target
 retains its task-stack safety margin; 68000 instruction/helper audits are clean.
 The cache verifier now reports resident art and startup headroom on every run.
+
+## Creation-time farewell RNG correction
+
+Menu-text recovery exposed a previously missing creation-time RNG call:
+`Shop Create` ends with `scrShopAssignText`, whose VM pushes shopBye2/1/0 and
+calls choose(argc=3) to initialize logThank. Registration now draws inclusive
+0..2 on the same stream after stock setup and retains that farewell variant.
+It is not rerolled when the merchant thanks the player or on reentry. The
+inventory module remains stock-only; this extra draw belongs to world creation.
+Focused tests assert the complete range-call order (including the discarded
+third-stock roll) for all three farewell outcomes, and both runtime fixtures
+compare the selected variant. The earlier stock-only registration omitted this
+draw and therefore was not equivalent to the complete source Create event.
