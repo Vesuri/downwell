@@ -139,9 +139,20 @@ overshoot. Both adapters advance this state and latch its source sound request
 (187, priority 80, UI; no playback yet). SDL draws sprite 128 after the HUD,
 clipped to the 160-pixel room surface. Focused/paired tests cover moving camera,
 sound timing, matching world coordinates and repeat-render independence.
-Amiga dither presentation remains pending: its immutable mask needs a gameplay
-row-stride-compatible DMA layout and copper/palette integration, not the narrow
-style screen's mask pointer or per-frame terrain repainting.
+Amiga now copies a host-generated 384x648 single-plane mask into the retired
+garden artwork bank once, then patches its DMA pointers. It temporarily enables
+BPL5/6 with that same mask: both playfields' high pens are black and PF2 keeps
+its existing HUD/sprite priority. This preserves the circular terrain buffers;
+the world is not repainted for the wipe. Ordinary gameplay remains four planes.
+The bank is pinned against shop/results replacement while the mask is in use,
+and scene initialization releases that ownership after the prior scene retires.
+The 31,104-byte mask fits the existing 32,140-byte bank with no new Chip allocation.
+Every mask bit is tested against the recovered edge; all 284-line DMA windows
+are bounded. Its ignored manifest records source/extractor and output hashes.
+The bounded SKIP_TO_GAME exit fixture presents 48 wipe frames on A500 and checks
+both live copper pointers, six-plane mode and the bank's bytes through full
+coverage. It is not a Windows visual comparison, natural full-level playthrough,
+or a 20ms performance claim. Result-room loading remains unimplemented.
 
 ## Still open beyond that milestone
 

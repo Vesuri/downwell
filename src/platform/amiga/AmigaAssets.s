@@ -14,6 +14,13 @@ amiga_game_pack:
 amiga_game_pack_end:
 
 	.balign 4
+	.globl amiga_exit_mask
+amiga_exit_mask:
+	.incbin "../generated/amiga-game.exit-mask"
+	.globl amiga_exit_mask_end
+amiga_exit_mask_end:
+
+	.balign 4
 	.globl amiga_results_pack
 amiga_results_pack:
 	.incbin "../generated/amiga-results.dwap"

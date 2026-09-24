@@ -43,8 +43,11 @@ public:
                const Sprite& overflowSprite,
                const Palette& palette, unsigned ringOrigin);
     bool update(const Bitmap& game, unsigned ringOrigin);
+    bool updateExitMask(const UBYTE* mask);
 private:
     unsigned planeOffset_, wrapWaitOffset_;
+    unsigned exitModeOffset_, exitMaskOffset_;
+    const UBYTE* exitMaskData_ = nullptr;
     const void* gameData_ = nullptr;
 };
 

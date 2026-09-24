@@ -12,6 +12,7 @@ REPLAY_VERIFY ?= 0
 SCENE_VERIFY ?= 0
 RESULTS_RESTART_VERIFY ?= 0
 BOB_VERIFY ?= 0
+EXIT_WIPE_VERIFY ?= 0
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
 PROBES ?= 0
@@ -28,6 +29,9 @@ endif
 CFLAGS := -g -O3 -flto -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA
+ifeq ($(EXIT_WIPE_VERIFY),1)
+CFLAGS += -DDOWNWELL_EXIT_WIPE_VERIFY
+endif
 ifeq ($(REPLAY_VERIFY),1)
 CFLAGS += -DDOWNWELL_REPLAY_VERIFY
 endif
@@ -71,6 +75,7 @@ LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
 AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
+AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
 AMIGA_RESULTS := $(REPO)/generated/amiga-results.dwap
 AMIGA_SHOP := $(REPO)/generated/amiga-shop.dwap
 ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
@@ -286,7 +291,10 @@ $(OBJECT_PACK):
 $(BUILDER_PACK):
 	$(MAKE) -C $(REPO) generate-builder-pattern-pack
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) \
+$(AMIGA_EXIT_MASK): $(AMIGA_GAME)
+	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
+
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) \
 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(ROOM_PACK) $(OBJECT_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<

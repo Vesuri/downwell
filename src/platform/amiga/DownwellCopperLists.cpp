@@ -153,6 +153,13 @@ bool DownwellGameplayCopperList::build(
     if (!showSprite(7, overflowSprite) || !setPalette(palette))
         return false;
 
+    exitModeOffset_ = moveOffset(bplcon0);
+    exitMaskOffset_ = size();
+    // The same high-bit cover masks both playfields. PF2 keeps its HUD and
+    // sprite priority; pens 4..7 and 12..15 are black. No world repaint.
+    if (!pointer(bpl5pth, nullptr) || !pointer(bpl6pth, nullptr)) return false;
+    exitMaskData_ = nullptr;
+
     planeOffset_ = moveOffset(bpl1pth);
     wrapWaitOffset_ = size();
     // Fixed shape, including the PAL line-255 bridge, permits word patches.
@@ -160,6 +167,17 @@ bool DownwellGameplayCopperList::build(
         !showBitmap(game, 1, 2, downwellFetchCropBytes * 8, 0, 2) || !finish())
         return false;
     return update(game, ringOrigin);
+}
+
+bool DownwellGameplayCopperList::updateExitMask(const UBYTE* mask)
+{
+    if (mask == exitMaskData_) return true;
+    const UBYTE* fetch = mask ? mask + downwellFetchCropBytes : nullptr;
+    const bool ok = patchPointer(exitMaskOffset_, fetch) &&
+        patchPointer(exitMaskOffset_ + 4, fetch) &&
+        patchMove(exitModeOffset_, mask ? 0x6401 : 0x4401);
+    if (ok) exitMaskData_ = mask;
+    return ok;
 }
 
 bool DownwellGameplayCopperList::update(const Bitmap& game, unsigned ringOrigin)
