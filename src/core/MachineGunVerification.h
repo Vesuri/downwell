@@ -9,9 +9,10 @@
 #include "FrogHitState.h"
 #include "SnailHitState.h"
 #include "MachineGunTrajectory.h"
+#include "ProjectileSegment.h"
 #include "GameMakerRandom.h"
 namespace downwell {
-constexpr unsigned machineGunVerificationCoverage = 1023;
+constexpr unsigned machineGunVerificationCoverage = 4095;
 struct MachineGunVerificationResult { std::uint64_t digest; unsigned coverage; };
 
 // Focused CPU-equivalence fixture, not a Windows recording or rendering test.
@@ -30,7 +31,7 @@ inline MachineGunVerificationResult verifyMachineGun() {
     struct Random { unsigned irandomSmall(unsigned) { return 0; } } random;
     GameMakerRandom trajectoryRandom(2);
     VerificationDigest digest;
-    digest.addU32(2);
+    digest.addU32(3);
     Input fire; fire.fire = true;
     for (unsigned tick = 0; tick < 64; ++tick) {
         currency.beginStep();
@@ -57,6 +58,10 @@ inline MachineGunVerificationResult verifyMachineGun() {
         for (unsigned i = 0; i < count; ++i) {
             auto& shot = shots[i];
             if (!shot.hit) {
+                const ProjectileSegment segment(shot.trajectory);
+                const bool intersects = segment.intersects(239, 241, 240, 248);
+                digest.addBool(intersects);
+                coverage |= intersects ? 1024 : 2048;
                 shot.trajectory.advance();
                 if (shot.trajectory.x.fraction && shot.trajectory.y.fraction) coverage |= 512;
             }

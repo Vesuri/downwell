@@ -158,6 +158,15 @@ test: test-machine-gun-trajectory
 test-machine-gun-trajectory: build/machine-gun-trajectory-test
 	./build/machine-gun-trajectory-test
 
+.PHONY: test-projectile-segment
+test: test-projectile-segment
+test-projectile-segment: build/projectile-segment-test
+	./build/projectile-segment-test
+
+build/projectile-segment-test: tests/core/ProjectileSegmentTest.cpp src/core/ProjectileSegment.h $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/ProjectileSegmentTest.cpp
+
 build/machine-gun-trajectory-test: tests/core/MachineGunTrajectoryTest.cpp src/core/MachineGunTrajectory.h src/core/MachineGunProfile.h src/core/LevelClearTrig.h src/core/HudReal.h src/core/GameMakerRandom.h src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MachineGunTrajectoryTest.cpp src/core/GameMakerRandom.cpp

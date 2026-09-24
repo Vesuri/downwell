@@ -9,6 +9,33 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Sloped projectile segment geometry (live integration pending)
+
+`ProjectileSegment` clips a split-Q20 motion segment against half-open world
+rectangles and the existing recovered enemy contact bounds. It compares exact
+rational entry/exit parameters using split 32-bit products; intersection needs
+neither float nor division nor a 64-bit multiplication helper. Right/bottom
+edges remain excluded, including single-point corner touches; a segment can
+enter from an excluded edge without incorrectly counting the initial point.
+Far rectangles reject before relative fixed-point edge distances are formed.
+The API requires normalized fractions and the current eight-pixel step bound.
+
+An independent floating-point slab oracle agrees on 490,000 combinations of
+direction, position, independent X/Y fractions and rectangles. Focused tests
+cover large signed world positions, contact-mask delegation and boundary
+touches; address/undefined-behavior sanitizer checks pass. This validates the
+chosen half-open geometry convention, not the complete Windows runner's
+collision-event scheduling or rotated sprite masks.
+
+Weapon CPU-fixture schema 3 hashes actual segment intersections with a narrow
+test rectangle while retaining the fractional-motion/impact checks. Expected
+digest is `53327c8bf4c44bd1`, coverage `fff` (adds intersecting and missing
+segments). The bounded native replay matches the host, with the stack guard
+and both 68000 audits passing; the normal executable is restored.
+Live adapters still use their old vertical queries: the next change
+must connect this primitive and the retained trajectory together, including
+the Amiga terrain-index candidate selection, before calling spread implemented.
+
 ### Fractional machine-gun trajectory foundation (not yet live)
 
 `MachineGunTrajectory` implements the normal/high machine-gun kinematic
