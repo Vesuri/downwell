@@ -11,6 +11,9 @@ namespace downwell {
 struct FrogHorizontalMotion {
     long position = 0;
     long velocity = 0;
+    int pixel() const {
+        return static_cast<int>(position / 65536 - (position % 65536 < 0 ? 1 : 0));
+    }
     static long toQ8(long value) {
         return value < 0 ? -((-value + 128) / 256) : (value + 128) / 256;
     }

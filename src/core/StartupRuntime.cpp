@@ -671,30 +671,23 @@ void StartupRuntime::updateMainEnemies() {
             }
             enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
         } else if (enemy.objectId == 113) {
-            if (!enemy.frogHorizontalInitialized) {
+            if (!enemy.frogMotionInitialized) {
                 enemy.frogHorizontal.position = static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 65536.0F));
                 enemy.frogHorizontal.velocity = static_cast<long>(std::round(enemy.velocityX * 65536.0F));
-                enemy.frogHorizontalInitialized = true;
+                enemy.frogVertical.position = static_cast<long>(std::round((enemy.preciseY - mainPlayerOriginY_) * 1280.0F));
+                enemy.frogVertical.velocity = static_cast<long>(std::round(enemy.velocityY * 1280.0F));
+                enemy.frogMotionInitialized = true;
             }
-            enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.15F);
-            const float nextY = enemy.preciseY + enemy.velocityY;
-            // The recovered Step rechecks support at yy+1. A landed frog
-            // must not become airborne simply because its next subpixel
-            // fall has not yet reached the tile's first occupied pixel.
-            const bool supported = enemy.grounded &&
-                mainSolidAt(enemy.preciseX, enemy.preciseY + 9.0F);
-            if (enemy.velocityY > 0.0F &&
-                (supported || mainSolidAt(enemy.preciseX, nextY + 8.0F))) {
-                while (!mainSolidAt(enemy.preciseX,
-                                    enemy.preciseY + 9.0F))
-                    enemy.preciseY += 1.0F;
-                enemy.velocityY = 0.0F;
-                enemy.grounded = true;
-            } else {
-                enemy.preciseY = nextY;
-                enemy.grounded = false;
+            enemy.frogVertical.grounded = enemy.grounded;
+            enemy.frogVertical.step([this, &enemy](int y) {
+                return mainSolidAt(mainPlayerOriginX_ + enemy.frogHorizontal.pixel(), mainPlayerOriginY_ + y);
+            });
+            enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
+            enemy.velocityY = enemy.frogVertical.velocity / 1280.0F;
+            enemy.grounded = enemy.frogVertical.grounded;
+            if (!enemy.grounded) {
                 enemy.frogHorizontal.step([this, &enemy](int edge) {
-                    return mainSolidAt(mainPlayerOriginX_ + edge, enemy.preciseY);
+                    return mainSolidAt(mainPlayerOriginX_ + edge, mainPlayerOriginY_ + enemy.frogVertical.pixel());
                 });
                 enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
                 enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
@@ -1665,6 +1658,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         if (instance != nullptr) {
             if (instance->grounded) {
                 instance->velocityY = -4.0F;
+                instance->frogVertical.velocity = -4 * 1280L;
                 instance->velocityX = static_cast<float>(instance->motionState);
                 instance->frogHorizontal.velocity = instance->motionState * 65536L;
                 ++soundPlayRequests_;
@@ -2229,9 +2223,12 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addBool(instance.grounded);
         digest.addBool(instance.frogLanded);
         if (instance.objectId == 113) {
-            digest.addBool(instance.frogHorizontalInitialized);
+            digest.addBool(instance.frogMotionInitialized);
             digest.addI32(instance.frogHorizontal.position);
             digest.addI32(instance.frogHorizontal.velocity);
+            digest.addI32(instance.frogVertical.position);
+            digest.addI32(instance.frogVertical.velocity);
+            digest.addBool(instance.frogVertical.grounded);
         }
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm)
             digest.addI32(instance.alarms.get(alarm));

@@ -1,6 +1,7 @@
 #include "core/FrogBehavior.h"
 #include "core/FractionalMotion.h"
 #include "core/FrogHorizontalMotion.h"
+#include "core/FrogVerticalMotion.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -10,6 +11,25 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    downwell::FrogVerticalMotion vertical;
+    for (long tick = 1; tick <= 40; ++tick) {
+        vertical.step([](int) { return false; });
+        require(vertical.velocity == 192 * tick && vertical.position == 96 * tick * (tick + 1),
+                "shared dry gravity and displacement retain exact fifth-Q8 motion");
+    }
+    for (unsigned i = 0; i < 20; ++i) vertical.step([](int) { return false; });
+    require(vertical.velocity == 7 * 1280, "shared frog terminal speed is seven pixels");
+    vertical = {};
+    for (unsigned i = 0; i < 4; ++i) vertical.step([](int y) { return y >= 9; });
+    require(vertical.grounded && vertical.velocity == 0 && vertical.position == 1152,
+            "provisional support query retains complete fractional landing position");
+    vertical.step([](int) { return false; });
+    require(!vertical.grounded && vertical.position == 1344 && vertical.velocity == 192,
+            "removing support makes the shared frog fall immediately");
+    vertical = {0, -4 * 1280, true};
+    vertical.step([](int y) { return y >= 9; });
+    require(!vertical.grounded && vertical.position == -4928 && vertical.pixel() == -4,
+            "jump alarm launch retains negative fractional state and floor query coordinates");
     downwell::FrogHorizontalMotion horizontal;
     horizontal.velocity = -2 * 65536L;
     horizontal.step([](int) { return true; });

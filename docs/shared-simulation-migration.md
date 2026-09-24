@@ -471,3 +471,32 @@ replay retains `9f0d3943e7900d2b`, and the A500 terrain-cache oracle passes.
 Target instruction/helper audits are clean. Normal SDL/Amiga builds are
 restored after verification; no runtime sprite generation or scrolling
 architecture changes are involved.
+
+## Shared frog vertical arithmetic; strict tape now passing
+
+FrogVerticalMotion owns both ports' dry gravity, terminal speed, vertical
+integration and provisional support decision. Position and velocity are in
+fifths of Q8, representing .15 gravity exactly without float accumulation.
+Native reconstructs this state losslessly from its whole/remainder fields;
+SDL stores it authoritatively and only exports float mirrors. Both adapters
+use the shared horizontal state's pixel query instead of re-quantizing their
+different position mirrors before checking support.
+
+The previous tick-727 landing discrepancy disappears. The strict entry plus
+600-update combat test now passes and is enabled in make test. In addition
+to the prior Q8 checks it compares full Q16 X/velocity and full fifth-Q8
+Y/velocity/support state. Closed-form free-fall, cap, support-removal and
+upward-launch fixtures guard the numerical state independently of SDL.
+
+This deliberately retains the existing centre/foot point collision adapter;
+it is not the original mask-based scrCheckCollisionWith implementation. The
+core header labels that limitation. Thin platforms, full wall masks and
+collision ordering, in-view movement gating, hit-stun and water handling
+remain fidelity work. Matching two adapters that now share code is a useful
+regression check, not independent proof of original-game behavior.
+
+Validation: full host suite (now including the strict frog continuation),
+bounded 68000 replay and A500 600-tick terrain-cache oracle pass. Both target
+instruction/helper audits are clean; normal builds are restored. The short
+cross-CPU checksum remains `9f0d3943e7900d2b` and is not a substitute for the
+longer host-side actor-state comparison.

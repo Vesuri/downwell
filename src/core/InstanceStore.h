@@ -3,6 +3,7 @@
 
 #include "AlarmBank.h"
 #include "FrogHorizontalMotion.h"
+#include "FrogVerticalMotion.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -42,7 +43,8 @@ struct InstanceRecord {
     bool grounded = false;
     bool frogLanded = true; // enmFrog Create; cleared by an airborne Step
     FrogHorizontalMotion frogHorizontal;
-    bool frogHorizontalInitialized = false;
+    FrogVerticalMotion frogVertical;
+    bool frogMotionInitialized = false;
     AlarmBank alarms;
 };
 

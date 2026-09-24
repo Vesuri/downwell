@@ -231,7 +231,10 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         const bool matching = native.preciseX == referenceX && nativeY == referenceY &&
             native.speedX == referenceVX && nativeVY == referenceVY &&
             native.frogHorizontal.position == enemy.frogHorizontal.position &&
-            native.frogHorizontal.velocity == enemy.frogHorizontal.velocity;
+            native.frogHorizontal.velocity == enemy.frogHorizontal.velocity &&
+            native.preciseY * 5 + native.gravityPositionRemainder == enemy.frogVertical.position &&
+            native.speedY * 5 + native.gravityRemainder == enemy.frogVertical.velocity &&
+            native.grounded == enemy.frogVertical.grounded;
         if (!matching)
             std::cerr << "FROG MOTION tick=" << amiga.tick() << " actor=" << ordinal - 1
                       << " Q8 native=" << native.preciseX << ',' << nativeY << ',' << native.speedX << ',' << nativeVY

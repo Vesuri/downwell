@@ -6,7 +6,7 @@
 #include "core/EnemyPresentation.h"
 #include "core/EnemyContact.h"
 #include "core/FrogBehavior.h"
-#include "core/FractionalMotion.h"
+#include "core/FrogVerticalMotion.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
@@ -650,58 +650,23 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.direction = bat.direction;
             enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         } else if (enemy.objectId == 113) {
-            enum { foot = 8 };
-            // Ground support is queried every Step in the recovered frog
-            // logic. A remembered landing cannot hold it over a destroyed
-            // block until its jump alarm fires.
-            if (enemy.grounded && !solidResolver_(solidResolverContext_,
-                    (int)downwell::floorQ8Coordinate(enemy.preciseX),
-                    (int)downwell::floorQ8Coordinate(enemy.preciseY) + foot + 1))
-                enemy.grounded = false;
+            downwell::FrogVerticalMotion vertical{
+                enemy.preciseY * 5 + enemy.gravityPositionRemainder,
+                enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
+            vertical.step([this, &enemy](int y) {
+                return solidResolver_(solidResolverContext_, enemy.frogHorizontal.pixel(), y);
+            });
+            enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(vertical.position, 5);
+            enemy.gravityPositionRemainder = static_cast<unsigned char>(vertical.position - enemy.preciseY * 5);
+            enemy.speedY = downwell::FrogVerticalMotion::floorDivide(vertical.velocity, 5);
+            enemy.gravityRemainder = static_cast<unsigned char>(vertical.velocity - enemy.speedY * 5);
+            enemy.grounded = vertical.grounded;
             if (!enemy.grounded) {
-                // 0.15 * 256 = 38 + 2/5. Carry the remainder instead of
-                // permanently losing 0.4 Q8 units on every airborne frame.
-                enemy.gravityRemainder += 2;
-                enemy.speedY += 38;
-                if (enemy.gravityRemainder >= 5) {
-                    ++enemy.speedY;
-                    enemy.gravityRemainder -= 5;
-                }
-                if (enemy.speedY >= 7 * 256) {
-                    enemy.speedY = 7 * 256;
-                    enemy.gravityRemainder = 0;
-                }
-                const int nextY = (int)downwell::floorQ8Coordinate(enemy.preciseY + enemy.speedY);
-                const int movedX = (int)downwell::floorQ8Coordinate(enemy.preciseX);
-                if (enemy.speedY > 0 && solidResolver_(
-                        solidResolverContext_, movedX, nextY + foot)) {
-                    while (!solidResolver_(solidResolverContext_, movedX,
-                            (int)downwell::floorQ8Coordinate(enemy.preciseY) + foot + 1)) {
-                        enemy.preciseY += 256L;
-                    }
-                    enemy.speedY = 0;
-                    enemy.grounded = true;
-                    enemy.gravityRemainder = 0;
-                    // This provisional resolver only adds whole pixels to
-                    // preciseY; it does not snap its fraction. Preserve that
-                    // fraction too until source-mask collision replaces it.
-                } else {
-                    downwell::integrateFifthsQ8(enemy.preciseY,
-                        enemy.gravityPositionRemainder, enemy.speedY, enemy.gravityRemainder);
-                }
-                // enmFrog integrates xx only if still airborne AFTER support
-                // resolution. A landing frame must not add one more xsp.
-                if (!enemy.grounded) {
-                    enemy.frogHorizontal.step([this, &enemy](int edge) {
-                        return solidResolver_(solidResolverContext_, edge,
-                            (int)downwell::floorQ8Coordinate(enemy.preciseY));
-                    });
-                    enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
-                    enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
-                }
-            } else {
-                enemy.speedY = 0;
-                enemy.gravityRemainder = 0;
+                enemy.frogHorizontal.step([this, &vertical](int edge) {
+                    return solidResolver_(solidResolverContext_, edge, vertical.pixel());
+                });
+                enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
+                enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
             }
             // enmFrog Step: restart preparation only on a landing edge.
             if (enemy.grounded) {

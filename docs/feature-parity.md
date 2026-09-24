@@ -44,7 +44,10 @@ or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
 steps, alternates horizontal direction every 90 frames and holds fire for five
 of each ten frames. Both targets must exercise kills and currency collection.
 The default suite enables the strict continuation. It checks player sprite/frame
-and health/kill/currency equality on every update. Its existing movement guard
+and health/kill/currency equality on every update. Frog motion additionally
+compares authoritative Q16 horizontal and fifth-Q8 vertical state throughout
+entry and combat; this check is enabled by DOWNWELL_VERIFY_FROG_MOTION=1 in
+the default target. Its existing player movement guard
 still permits up to three pixels of vertical difference; it is not an exact
 whole-world comparison. After source-backed frog preparation corrections,
 current final counters are health 3/3, kills 1/1 and currency 12/12.
