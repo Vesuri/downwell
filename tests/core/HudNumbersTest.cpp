@@ -66,6 +66,35 @@ int main() {
             "health slash uses the recovered centred baseline");
 
     renderer.count = 0;
+    downwell::drawHudHealthNumber(renderer, 100, 20, 12, 105);
+    require(renderer.count == 24, "health emits every digit of both counters");
+    const unsigned frames[] = {1, 2, 0, 1, 0, 5};
+    const int positions[] = {79, 87, 96, 105, 113, 121};
+    for (unsigned i = 0; i < 6; ++i) {
+        const unsigned sprite = i == 2 ? 414 : 413;
+        const unsigned shadow = i == 2 ? 2 : frames[i] + 20;
+        const int dx[] = {1, 1, 0, 0};
+        const int dy[] = {0, 1, 1, 0};
+        for (unsigned pass = 0; pass < 4; ++pass) {
+            const auto& call = renderer.calls[i * 4 + pass];
+            require(call.sprite == static_cast<int>(sprite) &&
+                    call.frame == (pass == 3 ? frames[i] : shadow) &&
+                    call.x == positions[i] + dx[pass] && call.y == 15 + dy[pass],
+                    "multi-digit health follows VM glyph positions and shadow order");
+        }
+    }
+    renderer.count = 0;
+    downwell::drawHealthNumberLayers(100, 20, 0xffffffffu, 0xffffffffu,
+        [&](unsigned sprite, unsigned frame, int x, int y) {
+            renderer.drawSprite(sprite, frame, x, y);
+        });
+    require(renderer.count == 84, "health layout supports full unsigned counters");
+    renderer.count = 0;
+    downwell::drawHudHealthNumber(renderer, 100, 20, -1, 0);
+    require(renderer.count == 12 && renderer.calls[3].frame == 0 &&
+            renderer.calls[11].frame == 0, "zero health remains a visible zero");
+
+    renderer.count = 0;
     downwell::drawHudCurrencyNumber(renderer, 100, 20, 2);
     require(renderer.count == 5 && renderer.calls[4].frame == 2 &&
                 renderer.calls[4].x == 92 && renderer.calls[4].y == 15,

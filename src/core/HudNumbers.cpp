@@ -5,7 +5,6 @@ namespace downwell {
 namespace {
 
 constexpr std::int32_t numberSprite = 413;
-constexpr std::int32_t slashSprite = 414;
 
 std::string digitsFor(int value) {
     return std::to_string(value < 0 ? 0 : value);
@@ -15,34 +14,11 @@ std::string digitsFor(int value) {
 
 void drawHudHealthNumber(Renderer& renderer, int x, int y,
                          int health, int maximum) {
-    const int slashX = x - 4;
-    const int digitY = y - 5;
-    const std::string healthDigits = digitsFor(health);
-    const int healthX = slashX - static_cast<int>(healthDigits.size()) * 8 - 1;
-    for (std::size_t index = 0; index < healthDigits.size(); ++index) {
-        const std::uint32_t digit = static_cast<std::uint32_t>(healthDigits[index] - '0');
-        const int digitX = healthX + static_cast<int>(index) * 8;
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY);
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY + 1);
-        renderer.drawSprite(numberSprite, digit + 20, digitX, digitY + 1);
-        renderer.drawSprite(numberSprite, digit, digitX, digitY);
-    }
-
-    renderer.drawSprite(slashSprite, 2, slashX + 1, digitY);
-    renderer.drawSprite(slashSprite, 2, slashX + 1, digitY + 1);
-    renderer.drawSprite(slashSprite, 2, slashX, digitY + 1);
-    renderer.drawSprite(slashSprite, 0, slashX, digitY);
-
-    const std::string maximumDigits = digitsFor(maximum);
-    const int maximumX = slashX + 9;
-    for (std::size_t index = 0; index < maximumDigits.size(); ++index) {
-        const std::uint32_t digit = static_cast<std::uint32_t>(maximumDigits[index] - '0');
-        const int digitX = maximumX + static_cast<int>(index) * 8;
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY);
-        renderer.drawSprite(numberSprite, digit + 20, digitX + 1, digitY + 1);
-        renderer.drawSprite(numberSprite, digit + 20, digitX, digitY + 1);
-        renderer.drawSprite(numberSprite, digit, digitX, digitY);
-    }
+    drawHealthNumberLayers(x, y, health < 0 ? 0u : static_cast<unsigned>(health),
+        maximum < 0 ? 0u : static_cast<unsigned>(maximum),
+        [&renderer](unsigned sprite, unsigned frame, int px, int py) {
+            renderer.drawSprite(sprite, frame, px, py);
+        });
 }
 
 void drawHudCurrencyNumber(Renderer& renderer, int x, int y, int value) {

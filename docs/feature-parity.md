@@ -9,6 +9,22 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared health-number layout
+
+Both renderers now use `drawHealthNumberLayers`, following the digit placement
+and per-glyph shadow order in `gml_Script_drawSpriteHP` VM assembly. This removes
+the native single-digit assumption: a health value of 12 is rendered as two
+digits, not as sprite frame 12. The slash stays fixed, with health growing left
+and capacity growing right. The layout uses a bounded stack digit buffer and
+does not allocate. Tests cover 12/105, zero, the unsigned counter range and the
+unchanged 4/4 anchors. Heart-piece HUD indicators remain unimplemented; this
+change only addresses the numeric health label.
+
+Both builds and the 68000 instruction/helper audits pass. The bounded active
+gameplay capture retains its expected hash and matches SDL at all 99,968
+compared pixels. That capture covers the ordinary health label, not a live
+multi-digit health-upgrade sequence; the latter layout is covered by unit tests.
+
 ### Live results actions and native world reentry
 
 Game now consumes the shared results action after its simulation update, using

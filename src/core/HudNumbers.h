@@ -5,6 +5,33 @@
 
 namespace downwell {
 
+// drawSpriteHP: each digit's three shadow passes precede its foreground.
+// Keep the slash fixed; current health grows left and maximum grows right.
+template<class Draw>
+void drawHealthNumberLayers(int x, int y, unsigned health, unsigned maximum, Draw draw) {
+    const int slashX = x - 4;
+    const int digitY = y - 5;
+    const auto glyph = [&](unsigned sprite, unsigned frame, unsigned shadow, int px) {
+        draw(sprite, shadow, px + 1, digitY);
+        draw(sprite, shadow, px + 1, digitY + 1);
+        draw(sprite, shadow, px, digitY + 1);
+        draw(sprite, frame, px, digitY);
+    };
+    const auto number = [&](unsigned value, bool left) {
+        unsigned char digits[10];
+        unsigned count = 0;
+        do { digits[count++] = value % 10; value /= 10; } while (value);
+        const int firstX = left ? slashX - static_cast<int>(count) * 8 - 1 : slashX + 9;
+        for (unsigned i = 0; i < count; ++i) {
+            const unsigned digit = digits[count - 1 - i];
+            glyph(413, digit, digit + 20, firstX + static_cast<int>(i) * 8);
+        }
+    };
+    number(health, true);
+    glyph(414, 0, 2, slashX);
+    number(maximum, false);
+}
+
 // drawSpriteAmmoNumber: all outlines precede the foreground digits.
 template<class Draw>
 void drawAmmoNumberLayers(int x, int y, unsigned value, Draw draw) {

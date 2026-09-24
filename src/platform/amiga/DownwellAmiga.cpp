@@ -414,22 +414,10 @@ static void drawGameText(AmigaRenderer* renderer, UWORD text,
 
 static void drawHealthNumber(AmigaRenderer* renderer, int x, int y,
                              unsigned health, unsigned maximum) {
-    const int slashX = x - 4;
-    const int digitY = y - 5;
-    const int healthX = slashX - 9;
-    const int maximumX = slashX + 9;
-    drawAsset(renderer, 413, health + 20, healthX + 1, digitY, 0);
-    drawAsset(renderer, 413, health + 20, healthX + 1, digitY + 1, 0);
-    drawAsset(renderer, 413, health + 20, healthX, digitY + 1, 0);
-    drawAsset(renderer, 413, health, healthX, digitY, 0);
-    drawAsset(renderer, 414, 2, slashX + 1, digitY, 0);
-    drawAsset(renderer, 414, 2, slashX + 1, digitY + 1, 0);
-    drawAsset(renderer, 414, 2, slashX, digitY + 1, 0);
-    drawAsset(renderer, 414, 0, slashX, digitY, 0);
-    drawAsset(renderer, 413, maximum + 20, maximumX + 1, digitY, 0);
-    drawAsset(renderer, 413, maximum + 20, maximumX + 1, digitY + 1, 0);
-    drawAsset(renderer, 413, maximum + 20, maximumX, digitY + 1, 0);
-    drawAsset(renderer, 413, maximum, maximumX, digitY, 0);
+    downwell::drawHealthNumberLayers(x, y, health, maximum,
+        [renderer](unsigned sprite, unsigned frame, int px, int py) {
+            drawAsset(renderer, sprite, frame, px, py, 0);
+        });
 }
 
 static void drawCurrencyDigit(AmigaRenderer* renderer, int x, int y,
