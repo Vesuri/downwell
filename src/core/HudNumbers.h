@@ -71,6 +71,21 @@ void drawGemmyTextLayers(int x, int y, Draw draw) {
     draw(x, y, Color{255, 255, 255, 255});
 }
 
+// Font 2 decimal glyphs have an eight-pixel advance. Assets 65100..65109
+// retain the original glyph bearings and a four-pixel centered origin.
+// Compose whole-string layers in source order, not five layers per digit.
+template<class Draw>
+void drawGemmyNumberLayers(int x, int y, unsigned value, Draw draw) {
+    unsigned char digits[10];
+    unsigned count = 0;
+    do { digits[count++] = value % 10; value /= 10; } while (value);
+    drawGemmyTextLayers(x, y, [&](int px, int py, Color color) {
+        const int first = px - static_cast<int>(count - 1) * 4;
+        for (unsigned i = 0; i < count; ++i)
+            draw(digits[count - 1 - i], first + static_cast<int>(i) * 8, py, color);
+    });
+}
+
 void drawHudHealthNumber(Renderer& renderer, int x, int y,
                          int health, int maximum);
 void drawHudCurrencyNumber(Renderer& renderer, int x, int y, int value);

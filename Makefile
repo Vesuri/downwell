@@ -765,6 +765,17 @@ verify-amiga-gameplay-active-frame: build/capture-sdl-game
 	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-active-frame.png
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
+.PHONY: verify-amiga-gameplay-gemhigh-frame
+verify-amiga-gameplay-gemhigh-frame: build/capture-sdl-game
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 GEMHIGH_VERIFY=1 SKIP_TO_GAME=1'
+	bash -c '. amiga/env.sh && VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} GDB_SOURCE=verify_gameplay_gemhigh_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_GEMHIGH_FRAME_READY READY_DESCRIPTION="visible gem-high projectile" amiga/verify_startup.sh'
+	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-gemhigh-frame.bin build/amiga-gameplay-gemhigh-frame.png
+	@capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
+	capture_dir=$$(mktemp -d build/gemhigh-XXXXXX); \
+	DOWNWELL_CAPTURE_GEM_HIGH=1 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-game "$$capture_dir" "$$capture_tick" && \
+	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-gemhigh-frame.png
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
+
 verify-amiga-style-frame:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_style_frame.gdb READY_MARKER=DOWNWELL_STYLE_FRAME_READY READY_DESCRIPTION="stable style-select planar frame" amiga/verify_startup.sh'

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <cstring>
 
 namespace {
 
@@ -45,6 +46,25 @@ public:
 } // namespace
 
 int main() {
+    for (unsigned value : {0u, 9u, 10u, 99u, 100u, 1000u, 4294967295u}) {
+        char text[11];
+        std::snprintf(text, sizeof text, "%u", value);
+        const unsigned digits = std::strlen(text);
+        unsigned calls = 0;
+        const int dx[] = {-1,0,1,0,0}, dy[] = {0,-1,0,1,0};
+        downwell::drawGemmyNumberLayers(191, 51, value,
+            [&](unsigned digit, int x, int y, downwell::Color color) {
+                const unsigned layer = calls / digits, column = calls % digits;
+                require(digit == unsigned(text[column] - '0') &&
+                    x == 191 + dx[layer] - int(digits - 1) * 4 + int(column) * 8 &&
+                    y == 51 + dy[layer], "decimal streak centers every width with whole-string layer order");
+                require(color.r == (layer == 2 || layer == 3 ? 0 : 255) &&
+                    color.g == (layer == 4 ? 255 : 0), "streak retains source shadow and foreground colours");
+                require(x - 4 >= 148 && x + 4 <= 236, "all uint32 digits fit the native dirty region");
+                ++calls;
+            });
+        require(calls == digits * 5, "all streak digits appear in all five source layers");
+    }
     for (unsigned cap = 1; cap <= 512; ++cap)
         for (unsigned ammo = 0; ammo <= cap; ++ammo)
             require(downwell::ammoGaugeFilledRows(ammo, cap) ==

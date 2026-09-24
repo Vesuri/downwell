@@ -42,6 +42,8 @@ int main(int argc, char** argv) {
         !platform.loadFontAssets(fonts)) return 4;
     downwell::Game game(&rooms, &objects, &builders);
     bool styleSeen = false, lockedSeen = false, landed = false;
+    const bool gemHighFixture = std::getenv("DOWNWELL_CAPTURE_GEM_HIGH") != nullptr;
+    bool gemHighInjected = false;
     unsigned mainTicks = 0;
 #ifdef DOWNWELL_SKIP_TO_GAME
     // The constructor has already completed the room-creation transition,
@@ -67,6 +69,11 @@ int main(int argc, char** argv) {
             const unsigned firePhase = simulationTick % 16u;
             input.fire = firePhase == 0 || firePhase == 3;
         }
+        if (gemHighFixture && landed && !gemHighInjected) {
+            const_cast<downwell::RunCombo&>(state.runCombo()).state.count = 8;
+            input = {};
+            gemHighInjected = true;
+        }
         game.update(input);
         if (state.inPlayMenu() && state.playMenuYOffset() == 0 && !state.playMenuSelected()) {
             styleSeen = true;
@@ -75,7 +82,22 @@ int main(int argc, char** argv) {
         if (!state.inMainRoom()) continue;
         ++mainTicks;
         if (state.mainPlayerGrounded()) landed = true;
-        if (targetTick ? mainTicks - 1 != targetTick : !landed) continue;
+        if (targetTick ? mainTicks - 1 != targetTick : !gemHighFixture && !landed) continue;
+        if (gemHighFixture) {
+            unsigned visible = 0;
+            for (unsigned i = 0; i < state.mainBulletCount(); ++i) {
+                const auto& bullet = state.mainBulletAt(i);
+                const int x = static_cast<int>(bullet.x) - state.mainCameraRenderViewX();
+                const int y = static_cast<int>(bullet.y) - state.mainCameraRenderViewY();
+                if (bullet.gemHigh && x >= 8 && x < 152 && y >= 8 && y < 276) ++visible;
+            }
+            if (!gemHighInjected || visible == 0) {
+                if (!targetTick) continue;
+                std::cerr << "No powered shot at requested tick; streak=" << state.mainGemStreak() << '\n';
+                return 7;
+            }
+            std::cout << "gem_high_visible_shots=" << visible << '\n';
+        }
         std::cout << "capture total_ticks=" << game.tick() << " main_ticks=" << mainTicks
                   << " simulation_tick=" << mainTicks - 1
                   << " player=" << state.mainPlayerX() << ',' << state.mainPlayerY()

@@ -425,13 +425,15 @@ int main(int argc, char** argv) {
         for (auto byte : world) require(byte == 0x5a, "shop overlay never repaints the terrain ring");
         for (auto byte : retainedHud) require(byte == 0, "closed shop leaves no stale overlay pixels");
         auto overlay = [](AmigaRenderer* renderer, void*) {
-            amigaRendererFillRect(renderer, 175, 60, 20, 4, 1);
+            // Include the outer digits of a full-width streak, not just
+            // the old two-digit region in the middle of the panel.
+            amigaRendererFillRect(renderer, 150, 60, 84, 4, 1);
         };
         shop.menu.active = true;
         for (unsigned phase = 0; phase < 3; ++phase) {
             // Simulate another HUD component clearing pixels in its bounds.
             amigaRendererClearClipRect(&retainedRenderer);
-            amigaRendererFillRect(&retainedRenderer, 160, 44, 64, 24, 0);
+            amigaRendererFillRect(&retainedRenderer, 148, 44, 88, 24, 0);
             retained.invalidateStreak();
             if (phase == 2) shop.menu.active = false;
             require(retained.draw(&retainedRenderer, shopPack.data(), shopPack.data()+shopPack.size(),

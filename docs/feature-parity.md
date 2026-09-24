@@ -28,6 +28,33 @@ not native display pixels, collision geometry or real-time performance.
 The expanded replay passes on the 68000 with the same digest and coverage;
 the stack guard and both CPU audits pass, and the normal executable is restored.
 
+### Native gem-high capture and uncapped streak display
+
+`VERIFY_TIMEOUT_SECONDS=45 make verify-amiga-gameplay-gemhigh-frame` starts
+directly in gameplay. Its compile-time fixture injects an accumulated combo
+of eight after the first landing; normal shared landing rewards, weapon-level
+selection and firing produce a visible powered projectile. It captures the
+published native terrain/HUD rings and offline hardware sprites, then compares
+the SDL framebuffer at the same simulation update. The fixture checks terrain
+and display-ring diagnostics and restores the ordinary Amiga build on success.
+
+At update 180 the comparison passes with **0 differing pixels out of 99,968**
+(352x284), with one visible powered shot. The initial comparison exposed 118
+different HUD pixels: native code clamped the streak to 99 while SDL rendered
+100. Native rendering now composes offline decimal glyphs in the recovered
+`scrGemmyText` whole-string layer order, without clamping the number. Only the
+dirty HUD region is updated, and its shop-overlay restoration bounds include
+the full unsigned counter width. Tests cover digit positioning, layer order,
+colors and dirty bounds from zero through the 32-bit unsigned maximum.
+The full host suite and the expanded retained shop/HUD restoration test pass,
+including 20,678 offline sprite comparisons. The generator verifies the source
+font's eight-pixel decimal advances; the game asset pack remains unchanged.
+
+This is a synthetic reward/shot presentation fixture, not evidence of earning
+the combo through a full playthrough, complete original gem-high effects, or
+a production 20 ms frame budget. Source font metrics and shadow order govern
+the rendering; SDL/native raster agreement is only the backend parity gate.
+
 ### Live machine-gun gem-high selection and shot snapshots
 
 Both controller adapters now select the shared machine-gun level after the

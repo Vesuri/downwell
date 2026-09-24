@@ -182,8 +182,9 @@ CREDIT_TEXT_ANCHOR_X = {
 }
 
 # The recovered streak counter uses font 2 and is drawn over the playfield by
-# the fixed HUD layer.  Pre-render the bounded two-digit forms so the 68000
-# never needs a glyph compositor in the frame loop.
+# the fixed HUD layer. IDs 65100..65109 are offline decimal glyphs used by
+# native dirty-HUD composition for arbitrary counters. Retain the older
+# two-digit assets for pack compatibility; they no longer bound the value.
 TEXT_SELECTIONS["game"].update({65100 + value: str(value)
                                 for value in range(100)})
 
@@ -546,6 +547,11 @@ def build_pack(manifest, extracted, profile, language_path=None):
                             digit, stride, data))
 
     style_text = {}
+    if profile == "game":
+        glyphs = {glyph["character"]: glyph
+                  for glyph in manifest["resources"]["fonts"][2]["glyphs"]}
+        require(all(glyphs[ord(digit)]["shift"] == 8 for digit in "0123456789"),
+                "native streak compositor requires eight-pixel decimal advances")
     texts = (shop_texts(language_path) if profile == "shop" else
              clear_texts(language_path) if profile == "clear" else TEXT_SELECTIONS.get(profile, {}))
     for text_id, text in texts.items():

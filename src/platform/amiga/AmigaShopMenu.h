@@ -41,7 +41,7 @@ struct AmigaShopMenu {
         if (shop && !downwell::drawShopMenu(*shop, viewX, viewY, 284, currency, *this)) return false;
         if (!valid) return false;
         int left = 160, top = 284, right = 0, bottom = 0;
-        if (hudDirty) { left = 50; top = 44; right = 114; bottom = 68; }
+        if (hudDirty) { left = 38; top = 44; right = 126; bottom = 68; }
         auto include = [&](const Command& command) {
             int x, y, w, h;
             if (!amigaRendererAssetBounds(pack, end, command.id, command.frame,

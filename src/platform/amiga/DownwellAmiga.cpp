@@ -340,6 +340,13 @@ volatile const UWORD* gDownwellMenuSpriteOracle;
 volatile ULONG gDownwellMenuCopperPatchFailures;
 volatile ULONG gDownwellConsumableChecks, gDownwellConsumableFailures;
 volatile ULONG gDownwellCaptureTick;
+#ifdef DOWNWELL_GEMHIGH_VERIFY
+volatile ULONG gDownwellGemHighCapture = 1;
+#else
+volatile ULONG gDownwellGemHighCapture;
+#endif
+volatile ULONG gDownwellGemHighVisibleShots;
+volatile ULONG gDownwellGemHighStreak;
 volatile LONG gDownwellCapturePlayerXQ8, gDownwellCapturePlayerYQ8;
 volatile LONG gDownwellCaptureViewX, gDownwellCaptureViewY;
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
@@ -416,6 +423,10 @@ __attribute__((noinline, used)) void downwellGameplayFrameReady(void) {
 __attribute__((noinline, used)) void downwellGameplayAmmoFrameReady(void) { __asm__ volatile ("nop"); }
 __attribute__((noinline, used)) void downwellGameplayRechargeFrameReady(void) { __asm__ volatile ("nop"); }
 __attribute__((noinline, used)) void downwellGameplayActiveFrameReady(void) {
+    __asm__ volatile("" ::: "memory");
+}
+
+__attribute__((noinline, used)) void downwellGameplayGemHighFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 __attribute__((noinline, used)) void downwellGameplayLongRunReady(void) {
@@ -594,18 +605,20 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
 }
 
 static void composeStreak(AmigaRenderer* renderer, unsigned streak) {
-    enum { streakTextBase = 65100, maximumPackedStreak = 99 };
+    enum { streakTextBase = 65100 };
     if (streak == 0)
         return;
-    if (streak > maximumPackedStreak)
-        streak = maximumPackedStreak;
     drawGameAsset(renderer, 133, 0, downwellPlayfieldX + 65, 55, 0);
-    drawGameText(renderer, (UWORD)(streakTextBase + streak),
-                 downwellPlayfieldX + 81, 51);
+    downwell::drawGemmyNumberLayers(downwellPlayfieldX + 81, 51, streak,
+        [&](unsigned digit, int x, int y, downwell::Color color) {
+            const unsigned pen = color.r == 0 ? 3 : color.g == 0 ? 2 : 1;
+            amigaRendererDrawAssetPen(renderer, activeGamePack, activeGamePackEnd,
+                streakTextBase + digit, 0, x, y, 0, pen);
+        });
 }
 static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
     amigaRendererClearClipRect(renderer);
-    amigaRendererFillRect(renderer, 160, 44, 64, 24, 0);
+    amigaRendererFillRect(renderer, 148, 44, 88, 24, 0);
     composeStreak(renderer, streak);
 }
 
@@ -1867,6 +1880,13 @@ int main(void) {
                 scenes, sceneStyleFrameReported,
                 sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
+            if (gDownwellGemHighCapture == 1 && sceneGameplayLandedReported) {
+                // Synthetic accumulated combo only; normal landing rewards,
+                // controller selection, firing and rendering do the rest.
+                const_cast<downwell::RunCombo&>(port.runCombo()).state.count = 8;
+                liveInput = {}; // Let the grounded reward finish before jumping.
+                gDownwellGemHighCapture = 2;
+            }
 #ifdef DOWNWELL_CLEAR_VERIFY
             if (port.levelClearActive()) {
                 liveInput = {};
@@ -3218,6 +3238,23 @@ int main(void) {
                 downwellGameplayLongRunReady();
             }
             static bool ammoFrameReported = false;
+            if (gDownwellGemHighCapture == 2) {
+                gDownwellGemHighStreak = port.gemStreak();
+                unsigned visible = 0;
+                for (unsigned i = 0; i < AmigaPortRuntime::bulletCapacity; ++i) {
+                    const auto& bullet = port.bulletAt(i);
+                    const int x = 80 + bullet.x - port.cameraOffsetX();
+                    const int y = gameplayPlayerStartY + bullet.y - port.cameraOffsetY();
+                    if (bullet.active && bullet.gemHigh && x >= 8 && x < 152 && y >= 8 && y < 276)
+                        ++visible;
+                }
+                if (visible) {
+                    gDownwellGemHighVisibleShots = visible;
+                    gDownwellGemHighCapture = 3;
+                    exposeGameplayFrame(memory, gameDisplay[back], back, port);
+                    downwellGameplayGemHighFrameReady();
+                }
+            }
             static bool rechargeFrameReported = false;
             if (!rechargeFrameReported && port.ammoMeterOffset() == 3) {
                 rechargeFrameReported = true;
