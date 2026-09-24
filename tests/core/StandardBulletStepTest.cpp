@@ -30,6 +30,29 @@ int main() {
     require(animation.frame() == 0 && animation.index.mantissa == 0,
             "reused bullet slots restart at source Create frame zero");
     using downwell::standardBulletOutsideView;
+    using downwell::fractionalBulletOutsideView;
+    require(!fractionalBulletOutsideView({350,0},0,34*4096L) &&
+            fractionalBulletOutsideView({350,1},0,34*4096L),
+            "expiry keeps the last Q20 fraction instead of truncating it to Q12");
+    require(!fractionalBulletOutsideView({-66,0},0,34*4096L) &&
+            fractionalBulletOutsideView({-67,1048575},0,34*4096L),
+            "negative fractional coordinates expire strictly above the upper margin");
+    struct Random { unsigned draws = 0; unsigned nextU32() { ++draws; return 0x80000000u; } } random;
+    downwell::MachineGunTrajectory motion; motion.reset(20,10);
+    unsigned wallQueries = 0;
+    require(!downwell::stepMachineGunBullet(motion, random,
+        [&](const downwell::ProjectileSegment& path) {
+            require(random.draws == 1 && motion.y.pixel == 10,
+                    "first-Step spread precedes collision queries and movement");
+            return path.intersects(20,21,18,19);
+        }, [&](const downwell::ProjectileSegment&) { ++wallQueries; return true; }) &&
+        wallQueries == 0 && motion.y.pixel == 18,
+        "live segment helper retains enemy priority and commits retained velocity");
+    downwell::stepMachineGunBullet(motion, random,
+        [](const downwell::ProjectileSegment&) { return false; },
+        [](const downwell::ProjectileSegment&) { return false; });
+    require(random.draws == 1 && motion.y.pixel == 26,
+            "later Steps reuse velocity without drawing spread again");
     const long top = 34L * 4096;
     require(!standardBulletOutsideView(top - 100L * 4096, top) &&
             !standardBulletOutsideView(top + 316L * 4096, top),

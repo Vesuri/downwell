@@ -4,8 +4,8 @@
 #include "MachineGunProfile.h"
 #include <cstdint>
 namespace downwell {
-// Candidate shared machine-gun motion, not yet connected to live collision
-// adapters. Source: bulletStandard Step's one-time random_range(-3,3),
+// Shared machine-gun motion used by both live collision adapters.
+// Source: bulletStandard Step's one-time random_range(-3,3),
 // lengthdir_(8,270+spread), then retained xsp/ysp each Step. Other gun speeds,
 // aim angles and Laser Sight need explicit support rather than silent fallback.
 // Q20 velocity is a bounded approximation to the Windows binary64/libm path.

@@ -8,6 +8,7 @@
 #include "GameplayLimits.h"
 #include "GemMotion.h"
 #include "ProjectileAnimation.h"
+#include "ProjectileSegment.h"
 #include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
@@ -42,6 +43,7 @@ public:
         float y = 0.0F;
         bool gemHigh = false;
         ProjectileAnimation animation;
+        MachineGunTrajectory trajectory;
     };
     struct MainCurrencyState {
         GemMotion motion;
@@ -306,8 +308,8 @@ private:
     void updateMainEnemies();
     void updateCrawler(InstanceRecord& enemy, bool alarm);
     void updateMainEnemyInteractions();
-    InstanceRecord* mainBulletEnemyCollision(int x, int fromY, int toY);
-    InstanceRecord* mainBulletCollision(int x, int fromY, int toY);
+    InstanceRecord* mainBulletEnemyCollision(const ProjectileSegment& path);
+    InstanceRecord* mainBulletCollision(const ProjectileSegment& path);
     void dispatchInstancePhase(InstanceRecord& instance,
                                RoomInstancePhase phase);
     bool dispatchObjectEvent(InstanceRecord& instance,

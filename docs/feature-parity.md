@@ -9,6 +9,58 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Live fractional machine-gun integration
+
+Both runtime adapters now use `stepMachineGunBullet`, retaining the shared
+Q20 trajectory from birth through expiry. First-Step initialization consumes
+one runner RNG word per shot; subsequent updates reuse the velocity. Enemy
+and terrain queries use the complete fractional segment before movement.
+The native breakable index tests the four endpoint-coordinate combinations,
+including corner-adjacent tiles containing neither endpoint. Solid-cell
+queries also require an actual segment intersection. View expiry preserves
+the fractional tail and the source's strict comparisons.
+
+Paired combat checks every surviving projectile's exact translated position,
+fractions, velocity, direction and animation, and all sixteen RNG state words,
+cursor and draw count on every update. The changed RNG tape exposed a float
+rounding disagreement in SDL snail animation; SDL now uses the same existing
+twentieth-rate/Q8-with-remainder enemy clock as native. This removes an adapter
+disagreement, but does not establish original binary64 enemy-animation timing.
+Projectile animation retains its separate source-derived binary64 clock.
+
+Startup digest schema 43 is `33d680509a20d59f`; the native live replay digest
+is `70883a2c716f4684`. Bounded cross-CPU verification also passes the gem,
+combat and weapon fixtures, including weapon schema 3 `53327c8bf4c44bd1`.
+Native powered-shot update 260 and active-gameplay update 383 independently
+match all 99,968 SDL capture pixels. The active-frame SHA-256 is now
+`99df9f0d8470151c8499d741b544e804571b918a9d95d9ebbebfdd15efba24f2`.
+
+The traversal fixtures now use deterministic alternating movement to exercise
+actual descent, frog flight/landing and side-room entry on the changed RNG
+tape. The first side-room pattern is 4: its six recovered special markers
+contain no torch, unlike the former pattern 6. Candle combat needs 1,200
+updates to reach real damage; its extended-immunity assertion is retained.
+
+The full standard `make test` suite passes, including all upgraded combat
+tapes and 22,834 offline sprite comparisons. The shared step/culling tests
+also pass AddressSanitizer and UndefinedBehaviorSanitizer. The long combat
+test's clock assertion now includes the source `goalStop` guard (player Begin
+Step VM blocks 11..20), rather than assuming every live frame advances time.
+The 6,000-update phase-5 survival tape passes in an optimized host build:
+health 2, kills 6, currency 76, best combo 2 on both adapters. The debug
+phase-1 tape also retains paired state throughout, but ends alive (health 2,
+kills 7, currency 84, best combo 2). Therefore `verify-gameplay-death-state`
+remains failing its requirement for 120 depleted-health updates. Its earlier
+death-coverage claim is superseded: a replacement deterministic death route
+is still required, not removal of that assertion.
+
+This supersedes the two foundation sections' "not yet live" statements below.
+It does not finish source collision-event scheduling, original fractional
+mask conversion, other guns or Laser Sight. Projectile artwork and impact
+direction still use the downward 270-degree variant rather than captured
+spread direction. Native instruction/helper audits pass; no 20 ms claim is
+made for the new live collision path.
+
 ### Sloped projectile segment geometry (live integration pending)
 
 `ProjectileSegment` clips a split-Q20 motion segment against half-open world

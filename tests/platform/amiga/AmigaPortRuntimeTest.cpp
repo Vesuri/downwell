@@ -299,7 +299,11 @@ int main() {
                 burst.bulletAt(0).active && burst.bulletAt(1).active &&
                 burst.bulletAt(0).y > burst.bulletAt(1).y,
             "held gunboots retain simultaneous seven-tick shots");
-    require(burst.bulletAt(0).x == -1 && burst.bulletAt(1).x == 1,
+    auto birthCoordinate = [](downwell::MachineGunTrajectory::Coordinate p, int velocity, unsigned age) {
+        return p.pixel + (p.fraction - static_cast<double>(velocity) * age) / 1048576.0;
+    };
+    require(birthCoordinate(burst.bulletAt(0).trajectory.x, burst.bulletAt(0).trajectory.velocityX, 8) == -1 &&
+            birthCoordinate(burst.bulletAt(1).trajectory.x, burst.bulletAt(1).trajectory.velocityX, 1) == 1,
             "original default gun alternates left and right boot emission offsets");
     burst.configureSolidResolver([](void*, int, int y) { return y == 70; }, nullptr);
     burst.step(4);
@@ -308,8 +312,10 @@ int main() {
     burst.configureSolidResolver(nullptr, nullptr);
     for (unsigned frame = 9; frame <= 14; ++frame) burst.step(4);
     require(burst.player().shots() == 3 && burst.bulletCount() == 2 &&
-                burst.bulletAt(0).active && burst.bulletAt(0).x == 1 &&
-                burst.bulletAt(1).active && burst.bulletAt(1).x == -1 &&
+                burst.bulletAt(0).active &&
+                birthCoordinate(burst.bulletAt(0).trajectory.x, burst.bulletAt(0).trajectory.velocityX, 8) == 1 &&
+                burst.bulletAt(1).active &&
+                birthCoordinate(burst.bulletAt(1).trajectory.x, burst.bulletAt(1).trajectory.velocityX, 1) == -1 &&
                 burst.bulletAt(0).y > burst.bulletAt(1).y,
             "new shots append after older survivors rather than reusing earlier holes");
     downwell::ProjectileAnimation newborn;
@@ -322,8 +328,8 @@ int main() {
     const int muzzleX = downwell::roundGameMakerQ8(movingShot.player().offsetXFixed());
     const int muzzleY = downwell::roundGameMakerQ8(movingShot.player().offsetYFixed());
     movingShot.step(2 | 4);
-    require(movingShot.bulletAt(0).x == muzzleX - 1 &&
-                movingShot.bulletAt(0).y == muzzleY + 4 + 8,
+    require(birthCoordinate(movingShot.bulletAt(0).trajectory.x, movingShot.bulletAt(0).trajectory.velocityX, 1) == muzzleX - 1 &&
+            birthCoordinate(movingShot.bulletAt(0).trajectory.y, movingShot.bulletAt(0).trajectory.velocityY, 1) == muzzleY + 4,
             "shot originates at pre-movement rounded instance coordinates before its own Step");
 
     AmigaPortRuntime destructible(300);
@@ -419,8 +425,8 @@ int main() {
         immune.step(4);
         require(immune.enemyAt(0).active && immune.enemyAt(0).health == 20 &&
                     immune.bulletCount() == 0 && immune.enemiesDefeated() == 0 &&
-                    immune.randomDrawCount() == draws + 2,
-                "native immune impact absorbs the bullet and consumes choose's two WELL draws");
+                    immune.randomDrawCount() == draws + 3,
+                "native immune impact consumes one spread draw and choose's two WELL draws");
     }
     require(combat.configureEnemy(0, 111, 163, -1, 12,
                                   0, 0, 5, 6),
@@ -995,7 +1001,7 @@ int main() {
     }
     std::cout << "Native trajectory digest: " << std::hex
               << replayRuntime.trajectoryDigest() << std::dec << '\n';
-    require(replayRuntime.trajectoryDigest() == 0x9f0d3943e7900d2bULL,
+    require(replayRuntime.trajectoryDigest() == 0x70883a2c716f4684ULL,
             "cross-target trajectory digest remains pinned");
     const auto gems = downwell::verifyGemSimulation();
     std::cout << "Gem fixture digest: " << std::hex << gems.digest << std::dec

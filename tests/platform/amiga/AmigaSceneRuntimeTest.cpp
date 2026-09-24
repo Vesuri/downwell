@@ -399,6 +399,13 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                         native.speedY / 256.0F == enemy.velocityY,
                         "active bat adapters preserve exact shared state on the comparison tape");
             }
+            if (enemy.active && native.active &&
+                (native.grounded != enemy.grounded || native.spriteId != enemy.spriteId ||
+                 native.imageFrame != static_cast<unsigned>(enemy.imageIndex)))
+                std::cerr << "Actor presentation mismatch id=" << enemy.objectId << " tick=" << amiga.tick()
+                    << " grounded=" << native.grounded << ',' << enemy.grounded
+                    << " sprite=" << native.spriteId << ',' << enemy.spriteId
+                    << " frame=" << native.imageFrame << ',' << enemy.imageIndex << '\n';
             if (enemy.active && native.active)
                 require(native.grounded == enemy.grounded && native.spriteId == enemy.spriteId &&
                             native.imageFrame == static_cast<unsigned>(enemy.imageIndex),
@@ -1107,14 +1114,20 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
      */
     bool sawAwakeEnemy = false;
     const int postLandingCameraY = gameplay.cameraOffsetY();
+    bool traverseFire = false;
     for (int tick = 0; tick < 600; ++tick) {
         parityFrame += 1;
-        gameplay.step(downwell::packReplayInput(right));
-        reference.step(right, false);
+        downwell::Input traverse;
+        traverse.right = (tick / 90) % 2 == 0;
+        traverse.left = !traverse.right;
+        traverse.fire = gameplay.player().grounded();
+        gameplay.step(downwell::packReplayInput(traverse));
+        reference.step(traverse, traverse.fire && !traverseFire);
+        traverseFire = traverse.fire;
         compareInitialGameplay(gameplay, reference, 10.0F, 10.0F, true);
         for (unsigned enemy = 0; enemy < gameplay.enemyCount(); ++enemy)
             sawAwakeEnemy = sawAwakeEnemy || gameplay.enemyAt(enemy).awake;
-        if (sawAwakeEnemy &&
+        if (sawAwakeEnemy && sawExtendedEnemyAnimation && sawPairedFrogAir && sawPairedFrogGround &&
             gameplay.cameraOffsetY() >= postLandingCameraY + 256)
             break;
     }
@@ -1143,6 +1156,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     require(retiredCompared >= 2, "comparison exercises two out-of-view enemy retirements");
     require(sawExtendedEnemyAnimation,
             "SDL live tape actually displays enemy frames beyond the old two-frame cap");
+    if (!sawPairedFrogAir || !sawPairedFrogGround)
+        std::cerr << "Traversal coverage frog=" << sawPairedFrogAir << ',' << sawPairedFrogGround
+            << " player=" << reference.mainPlayerX() << ',' << reference.mainPlayerY()
+            << " health=" << reference.mainPlayerHealth() << " camera=" << gameplay.cameraOffsetY() << '\n';
     require(sawPairedFrogAir && sawPairedFrogGround,
             "frog presentation comparison covers both flight and landing");
     require(enemyOrdinal == gameplay.enemyCount(),
@@ -1214,6 +1231,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const auto beforeHostTime = reference.runTimeTicks();
             const bool nativePublishedDeath = gameplay.deathSequence().active;
             const bool hostPublishedDeath = reference.mainDeathSequence().active;
+            const bool nativeClockStopped = nativePublishedDeath || gameplay.goalStopped();
+            const bool hostClockStopped = hostPublishedDeath || reference.goalStopped();
             const unsigned gemsBeforeNative = gameplay.gameGemTotal();
             const unsigned gemsBeforeHost = reference.mainGameGemTotal();
             const bool nativeWasRecorded = gameplay.runGemStatistics().recorded;
@@ -1256,10 +1275,18 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     gameplay.runCombo().healthReserve.pieces == reference.runCombo().healthReserve.pieces &&
                     gameplay.player().ammoCapacity() == reference.mainAmmoCapacity(),
                     "live combo counters, records and grant reserves agree each update");
+            if (gameplay.runTimeTicks() != reference.runTimeTicks() ||
+                    gameplay.runTimeTicks() != beforeNativeTime + (nativeClockStopped ? 0u : 1u) ||
+                    reference.runTimeTicks() != beforeHostTime + (hostClockStopped ? 0u : 1u))
+                std::cerr << "Combat clock tick=" << gameplay.tick()
+                    << " before=" << beforeNativeTime << ',' << beforeHostTime
+                    << " after=" << gameplay.runTimeTicks() << ',' << reference.runTimeTicks()
+                    << " death=" << nativePublishedDeath << ',' << hostPublishedDeath
+                    << " health=" << gameplay.health() << ',' << reference.mainPlayerHealth() << '\n';
             require(gameplay.runTimeTicks() == reference.runTimeTicks() &&
-                        gameplay.runTimeTicks() == beforeNativeTime + (nativePublishedDeath ? 0u : 1u) &&
-                        reference.runTimeTicks() == beforeHostTime + (hostPublishedDeath ? 0u : 1u),
-                    "shared run clock agrees and uses pre-publication death on every update");
+                        gameplay.runTimeTicks() == beforeNativeTime + (nativeClockStopped ? 0u : 1u) &&
+                        reference.runTimeTicks() == beforeHostTime + (hostClockStopped ? 0u : 1u),
+                    "shared run clock agrees and respects pre-publication death and goal stop");
             const auto& nativeStats = gameplay.runGemStatistics();
             const auto& hostStats = reference.runGemStatistics();
             const auto& nativeResults = gameplay.deathResults();
@@ -1344,12 +1371,26 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                         "live bullets retain matching birth-time weapon levels");
                 require(bullet.animation.index.equal(hostBullet.animation.index),
                         "live bullets retain identical shared animation phase");
+                const auto& a = bullet.trajectory;
+                const auto& b = hostBullet.trajectory;
+                const bool same = a.x.pixel + 240 == b.x.pixel && a.y.pixel + 176 == b.y.pixel &&
+                    a.x.fraction == b.x.fraction && a.y.fraction == b.y.fraction &&
+                    a.velocityX == b.velocityX && a.velocityY == b.velocityY && a.direction == b.direction;
+                if (!same) std::cerr << "Projectile phase mismatch at " << gameplay.tick()
+                    << " directions=" << a.direction << ',' << b.direction << '\n';
+                require(same, "live bullets retain identical fractional positions, spread and velocities");
                 sawHighBullet |= bullet.gemHigh;
                 requireNear(bullet.x + 240, hostBullet.x, 1.0F,
                             "combat bullet X matches in creation order");
                 requireNear(bullet.y + 176, hostBullet.y, 3.0F,
                             "combat bullet Y matches in creation order");
             }
+            require(gameplay.randomDrawCount() == reference.randomDrawCount() &&
+                    gameplay.randomState().stateIndex() == reference.randomState().stateIndex(),
+                    "live combat retains matching RNG cursor and consumption after spread");
+            for (unsigned word = 0; word < 16; ++word)
+                require(gameplay.randomState().stateWord(word) == reference.randomState().stateWord(word),
+                        "live combat retains all runner RNG words after spread");
             verifyFrogMotion(gameplay, reference);
             if (std::getenv("DOWNWELL_TRACE_GEM_MOTION")) {
                 {

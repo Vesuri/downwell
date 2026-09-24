@@ -529,6 +529,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             bullet.y = muzzleY;
             bullet.gemHigh = run_.gemHigh;
             bullet.animation = {};
+            bullet.trajectory.reset(bullet.x, bullet.y);
             bulletChanged = true;
         }
     }
@@ -582,8 +583,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 continue;
             bulletChanged = true;
             bullet.animation.advance();
-            bullet.active = downwell::stepStandardBullet(bullet.x, bullet.y,
-                [this, &bullet](const downwell::StandardBulletPath& path) {
+            bullet.active = downwell::stepMachineGunBullet(bullet.trajectory, enemyRandom_,
+                [this, &bullet](const downwell::ProjectileSegment& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
                         EnemyState& enemy = enemies_[enemyIndex];
                         const downwell::ContactActor contact{
@@ -602,14 +603,22 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     }
                     return false;
                 }, [this, &destroyedBlockCount, &destroyedBlockX, &destroyedBlockY]
-                   (const downwell::StandardBulletPath& path) {
+                   (const downwell::ProjectileSegment& path) {
                     unsigned firstBlock = 0, endBlock = breakableCount_;
                     if (breakableIndexReady_) {
-                        int candidate = indexedBreakable(path.x, path.fromY);
-                        int next = indexedBreakable(path.x, path.toY);
-                        if (candidate >= 0 && !breakables_[candidate].active) candidate = -1;
-                        if (next >= 0 && !breakables_[next].active) next = -1;
-                        if (candidate < 0 || (next >= 0 && next < candidate)) candidate = next;
+                        int candidate = -1;
+                        // An eight-pixel segment can touch at most four
+                        // 16-pixel tiles, including a corner-adjacent tile
+                        // containing neither endpoint. Test all candidates.
+                        const int xs[] = {path.x.pixel, path.endX.pixel};
+                        const int ys[] = {path.y.pixel, path.endY.pixel};
+                        for (int x : xs) for (int y : ys) {
+                            const int next = indexedBreakable(x, y);
+                            if (next < 0) continue;
+                            const auto& block = breakables_[next];
+                            if (block.active && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8) &&
+                                    (candidate < 0 || next < candidate)) candidate = next;
+                        }
                         firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
                         endBlock = candidate < 0 ? 0 : firstBlock + 1;
                     }
@@ -629,15 +638,21 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     }
                     // An ordinary, non-wave bullet also stops at unbreakable walls.
                     if (solidResolver_ != 0) {
-                        for (int y = path.fromY; y <= path.toY; ++y) {
-                            if (solidResolver_(solidResolverContext_, path.x, y))
-                                return true;
-                        }
+                        const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
+                        const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
+                        const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
+                        const int bottom = path.y.pixel > path.endY.pixel ? path.y.pixel : path.endY.pixel;
+                        for (int y = top; y <= bottom; ++y)
+                            for (int x = left; x <= right; ++x)
+                                if (solidResolver_(solidResolverContext_, x, y) && path.intersects(x,x+1,y,y+1))
+                                    return true;
                     }
                     return false;
                 });
+            bullet.x = bullet.trajectory.x.pixel;
+            bullet.y = bullet.trajectory.y.pixel;
             const long cameraCentreQ12 = 176L * 4096 + viewCameraYQ8() * 16;
-            if (downwell::standardBulletOutsideView((bullet.y + 176L) * 4096,
+            if (downwell::fractionalBulletOutsideView(bullet.trajectory.y, 176,
                                                     cameraCentreQ12 - 142L * 4096))
                 bullet.active = false;
         }

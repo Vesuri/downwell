@@ -29,6 +29,9 @@ struct InstanceRecord {
     float rotation = 0.0F;
     float imageSpeed = 1.0F;
     float imageIndex = 0.0F;
+    unsigned enemyImagePhase = 0;
+    unsigned char enemyImageRemainder = 0;
+    bool enemyImageInitialized = false;
     std::int32_t spriteId = -1;
     std::int32_t creationCodeId = -1;
     std::int32_t preCreateCodeId = -1;

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_STANDARD_BULLET_STEP_H
 
 #include "EnemyContact.h"
+#include "ProjectileSegment.h"
 
 namespace downwell {
 // scrBulletOov uses strict comparisons to the published view position.
@@ -11,6 +12,33 @@ inline bool standardBulletOutsideView(long yQ12, long viewTopQ12,
                                      int viewHeight = 284) {
     return yQ12 > viewTopQ12 + (viewHeight + 32L) * 4096L ||
            yQ12 < viewTopQ12 - 100L * 4096L;
+}
+
+inline bool fractionalBulletOutsideView(MachineGunTrajectory::Coordinate y,
+                                       int originY, long viewTopQ12, int height = 284) {
+    y.pixel += originY;
+    auto compare = [&](long boundary) {
+        long pixel = boundary / 4096, fraction = boundary % 4096;
+        if (fraction < 0) { --pixel; fraction += 4096; }
+        if (y.pixel != pixel) return y.pixel < pixel ? -1 : 1;
+        const auto fixed = static_cast<std::uint32_t>(fraction) << 8;
+        return y.fraction == fixed ? 0 : y.fraction < fixed ? -1 : 1;
+    };
+    return compare(viewTopQ12 + (height + 32L) * 4096) > 0 ||
+           compare(viewTopQ12 - 100L * 4096) < 0;
+}
+
+// The adapters retain their current enemy-first impact scheduling. This
+// shares the source's first-Step initialization, full segment query and
+// retained fractional movement; it is not a full VM collision-event scheduler.
+template<class Random, class Enemy, class Wall>
+bool stepMachineGunBullet(MachineGunTrajectory& motion, Random& random,
+                         Enemy enemy, Wall wall) {
+    motion.initialize(random);
+    const ProjectileSegment path(motion);
+    const bool alive = !enemy(path) && !wall(path);
+    motion.advance();
+    return alive;
 }
 
 // Vertical usual-gun subset. scrBulCheckSolid suppresses wall processing

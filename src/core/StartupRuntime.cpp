@@ -516,8 +516,7 @@ bool StartupRuntime::mainSolidAt(float x, float y) const {
     return false;
 }
 
-InstanceRecord* StartupRuntime::mainBulletCollision(int x, int fromY, int toY) {
-    const StandardBulletPath path{x, fromY, toY};
+InstanceRecord* StartupRuntime::mainBulletCollision(const ProjectileSegment& path) {
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         InstanceRecord& wall = instances_.at(index);
         if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
@@ -528,8 +527,7 @@ InstanceRecord* StartupRuntime::mainBulletCollision(int x, int fromY, int toY) {
     return nullptr;
 }
 
-InstanceRecord* StartupRuntime::mainBulletEnemyCollision(int x, int fromY, int toY) {
-    const StandardBulletPath path{x, fromY, toY};
+InstanceRecord* StartupRuntime::mainBulletEnemyCollision(const ProjectileSegment& path) {
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         InstanceRecord& enemy = instances_.at(index);
         const bool enemyObject = enemy.objectId == 111 ||
@@ -553,8 +551,9 @@ void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
     if (mainBulletCount_ < mainBulletCapacity) {
         mainBullets_[mainBulletCount_++] = {
             static_cast<float>(instance.x + mainShootLeg_),
-            static_cast<float>(instance.y + 4), run_.gemHigh, {}
+            static_cast<float>(instance.y + 4), run_.gemHigh, {}, {}
         };
+        mainBullets_[mainBulletCount_ - 1].trajectory.reset(instance.x + mainShootLeg_, instance.y + 4);
     }
     mainShootLeg_ *= -1;
     ++soundPlayRequests_;
@@ -582,10 +581,9 @@ void StartupRuntime::updateMainBullets() {
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
         bullet.animation.advance();
-        int nextY = static_cast<int>(bullet.y);
-        bool alive = stepStandardBullet(static_cast<int>(bullet.x), nextY,
-          [this, &bullet](const StandardBulletPath& path) {
-            InstanceRecord* enemy = mainBulletEnemyCollision(path.x, path.fromY, path.toY);
+        bool alive = stepMachineGunBullet(bullet.trajectory, random_,
+          [this, &bullet](const ProjectileSegment& path) {
+            InstanceRecord* enemy = mainBulletEnemyCollision(path);
             if (enemy != nullptr) {
                 const auto impact = applyStandardBulletImpact(*enemy, mainEnemiesDefeated_, random_,
                     [this, enemy] {
@@ -599,8 +597,8 @@ void StartupRuntime::updateMainBullets() {
                 return true;
             }
             return false;
-          }, [this](const StandardBulletPath& path) {
-            InstanceRecord* wall = mainBulletCollision(path.x, path.fromY, path.toY);
+          }, [this](const ProjectileSegment& path) {
+            InstanceRecord* wall = mainBulletCollision(path);
             if (wall != nullptr) {
                 if (wall->objectId == 92) {
                     // objBox_n starts with wallHp = 1. The usual gun's bdmg
@@ -613,8 +611,9 @@ void StartupRuntime::updateMainBullets() {
             }
             return false;
           });
-        bullet.y = static_cast<float>(nextY);
-        if (standardBulletOutsideView(static_cast<long>(nextY) * 4096,
+        bullet.x = static_cast<float>(bullet.trajectory.x.pixel);
+        bullet.y = static_cast<float>(bullet.trajectory.y.pixel);
+        if (fractionalBulletOutsideView(bullet.trajectory.y, 0,
                                       mainCameraMotion_.viewTopQ12(),
                                       surfaceHeight))
             alive = false;
@@ -706,7 +705,13 @@ void StartupRuntime::updateMainEnemies() {
             enemy.motionInitialized = true;
         }
 
-        enemy.imageIndex += enemy.imageSpeed;
+        if (!enemy.enemyImageInitialized) {
+            enemy.enemyImagePhase = static_cast<unsigned>(std::lround(enemy.imageIndex * 256));
+            enemy.enemyImageInitialized = true;
+        }
+        advanceEnemyImageQ8(enemy.enemyImagePhase, enemy.enemyImageRemainder,
+                            static_cast<unsigned>(std::lround(enemy.imageSpeed * 20)));
+        enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
         if (enemy.objectId == 113)
             enemy.imageSpeed = enemy.frogPresentation.beginStepRate() / 20.0F;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
@@ -754,6 +759,7 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.alarms.set(1, 60);
                 enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
                 enemy.imageIndex = 0;
+                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
                 ++soundPlayRequests_;
             }
             enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
@@ -786,6 +792,7 @@ void StartupRuntime::updateMainEnemies() {
             if (effects.hit) {
                 enemy.alarms.set(0, 3);
                 enemy.imageIndex = 0;
+                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
                 ++soundPlayRequests_;
             }
             soundPlayRequests_ += effects.wakeSounds;
@@ -800,6 +807,7 @@ void StartupRuntime::updateMainEnemies() {
             const int hitAlarm = enemy.snailHit.consume(random_);
             if (hitAlarm >= 0) {
                 enemy.imageIndex = 0;
+                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
                 enemy.alarms.set(0, 0); enemy.alarms.set(1, hitAlarm);
                 ++soundPlayRequests_;
             }
@@ -836,11 +844,13 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.frogHit.remaining != 0, enemy.grounded,
                 enemy.auxiliaryState != 0, enemy.velocityY < 0.0F);
             enemy.spriteId = visual.sprite;
-            if (visual.forcedFrame >= 0) enemy.imageIndex = static_cast<float>(visual.forcedFrame);
+            if (visual.forcedFrame >= 0) {
+                enemy.enemyImagePhase = static_cast<unsigned>(visual.forcedFrame) * 256u;
+                enemy.enemyImageRemainder = 0;
+            }
         }
-        const float frames = static_cast<float>(enemySpriteFrameCount(enemy.spriteId));
-        if (enemy.imageIndex >= frames)
-            enemy.imageIndex = std::fmod(enemy.imageIndex, frames);
+        enemy.enemyImagePhase %= enemySpriteFrameCount(enemy.spriteId) * 256u;
+        enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
     }
 }
 
@@ -2124,7 +2134,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(42); // Includes each projectile's animation accumulator.
+    digest.addU32(43); // Includes retained fractional projectile trajectories.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2236,6 +2246,11 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addBool(mainBullets_[index].gemHigh);
         digest.addU64(mainBullets_[index].animation.index.mantissa);
         digest.addI32(mainBullets_[index].animation.index.exponent);
+        const auto& motion = mainBullets_[index].trajectory;
+        digest.addI32(motion.x.pixel); digest.addU32(motion.x.fraction);
+        digest.addI32(motion.y.pixel); digest.addU32(motion.y.fraction);
+        digest.addI32(motion.velocityX); digest.addI32(motion.velocityY);
+        digest.addU32(motion.direction); digest.addBool(motion.initialized);
     }
     digest.addU32(static_cast<std::uint32_t>(mainCurrencyCount_));
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
@@ -2308,6 +2323,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(instance.rotation);
         digest.addF32(instance.imageSpeed);
         digest.addF32(instance.imageIndex);
+        if (instance.enemyImageInitialized) {
+            digest.addU32(instance.enemyImagePhase);
+            digest.addU32(instance.enemyImageRemainder);
+        }
         digest.addI32(instance.spriteId);
         digest.addI32(instance.creationCodeId);
         digest.addI32(instance.preCreateCodeId);
