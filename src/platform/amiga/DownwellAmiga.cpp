@@ -22,6 +22,7 @@
 #include "GameplaySceneStorage.h"
 #include "AmigaSplashCache.h"
 #include "AmigaStyleRenderer.h"
+#include "AmigaShopMenu.h"
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
 #include "core/GameMakerRounding.h"
@@ -191,6 +192,7 @@ const UBYTE* gDownwellShopPack;
 volatile ULONG gDownwellShopAssetBytes;
 static UBYTE* overlayAssetStorage;
 static unsigned overlayAssetCapacity;
+static AmigaShopMenu shopMenuOverlay;
 
 // Results and shop are mutually exclusive users of the retired-garden gap.
 // Drain the blitter before replacing a bank it may still be reading. Hardware
@@ -2005,6 +2007,7 @@ int main(void) {
                     // Retired intro DMA is blank. Copy immutable, already planar
                     // assets once; never convert or copy them per results frame.
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
+                    shopMenuOverlay.reset();
                     if (!selectOverlayAssetBank(false)) {
                         ++gDownwellResultsAssetFailures;
                         exitCode = 20;
@@ -2352,13 +2355,21 @@ int main(void) {
                 // backing and both hardware-scrolled world buffers throughout.
                 composeDeathFlash(&renderer, port.deathSequence().flashVisible());
             }
-            bool shopMenuActive = false;
+            const downwell::ShopWorld::Instance* activeShop = nullptr;
             for (const auto& shop : port.shops().instances)
-                if (shop.present && shop.menu.active) shopMenuActive = true;
-            if (shopMenuActive && !port.deathResults().active && !selectOverlayAssetBank(true)) {
+                if (shop.present && shop.menu.active) { activeShop = &shop; break; }
+            if (activeShop && !port.deathResults().active && !selectOverlayAssetBank(true)) {
                 exitCode = 20;
                 break;
             }
+            if (!port.deathResults().active && !port.deathSequence().flashVisible() && gDownwellShopPack) {
+                const bool hadShop = shopMenuOverlay.previousCount != 0;
+                if (!shopMenuOverlay.draw(&renderer, gDownwellShopPack,
+                        gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
+                        mainViewX + port.cameraOffsetX(), mainInitialViewY + port.cameraOffsetY(),
+                        port.currency())) { exitCode = 20; break; }
+                if (hadShop && !activeShop) redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
+            } else shopMenuOverlay.reset();
             if (port.deathResults().active) {
                 if (!selectOverlayAssetBank(false)) { exitCode = 20; break; }
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
@@ -2792,6 +2803,35 @@ int main(void) {
                 for (unsigned byte = 0; byte < downwellGameRingPlaneBytes * 2; ++byte)
                     gameHashBefore = (gameHashBefore ^ renderer.game[byte]) * 16777619UL;
                 resultsOracle.blitterEnabled = 0;
+                if (!selectOverlayAssetBank(true)) ++gDownwellResultsAssetFailures;
+                else {
+                    static AmigaShopMenu shopActual, shopOracle;
+                    shopActual.reset(); shopOracle.reset();
+                    downwell::ShopWorld::Instance fixture;
+                    fixture.present = fixture.menu.active = true;
+                    fixture.menu.menuState = 1;
+                    fixture.x = 240; fixture.y = 240;
+                    fixture.stock.items[0] = {100,1,300};
+                    for (unsigned phase = 0; phase < 5; ++phase) {
+                        fixture.menu.cursorPhaseQuarters = phase * 4;
+                        if (phase == 1) fixture.menu.cursorWobbleX = 5;
+                        if (phase == 2) fixture.stock.items[0].remaining = 0;
+                        if (phase == 3) fixture.menu.cursor = 0;
+                        if (phase == 4) fixture.menu.active = false;
+                        // Phase 4 is closed; active phases stay in valid source range.
+                        if (!shopActual.draw(&renderer, gDownwellShopPack,
+                                gDownwellShopPack + gDownwellShopAssetBytes, &fixture, 160, 34, 200) ||
+                            !shopOracle.draw(&resultsOracle, gDownwellShopPack,
+                                gDownwellShopPack + gDownwellShopAssetBytes, &fixture, 160, 34, 200))
+                            ++gDownwellResultsAssetFailures;
+                        AmigaHardware::blitterDrain();
+                        for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
+                            if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsAssetFailures;
+                    }
+                    for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
+                        renderer.hud[byte] = expectedHud[byte] = savedHud[byte];
+                }
+                if (!selectOverlayAssetBank(false)) ++gDownwellResultsAssetFailures;
                 // Verify both flash edges, not only the cleared final state.
                 for (unsigned flash = 0; flash < 2; ++flash) {
                     composeDeathFlash(&renderer, flash == 0);

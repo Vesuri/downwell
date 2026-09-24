@@ -453,3 +453,27 @@ Validation: bounded SKIP_TO_GAME cache run passed 600 ticks/101 fresh terrain
 comparisons with bank checks enabled. Resident art remained 274764 bytes and
 startup Chip headroom 19344 bytes; task stack retained its 256-byte margin.
 Both native 68000 audits passed. Normal build restored after instrumentation.
+
+## Native menu composition
+
+`AmigaShopMenu` now consumes the shared layout/text requests using the offline
+bank on the HUD playfield. It retains bounded command arrays in static/Fast
+storage and computes dirty bounds from changed old/new asset commands. Only
+that rectangle is cleared and recomposed, including overlapping unchanged
+commands; the hardware-scrolled terrain ring is not repainted. Closing clears
+the old overlay, and results/death-flash ownership resets retained state.
+Text uses opaque-black pen 3 for outlines and white/red pens for foreground.
+The negative cursor phase resolves to the counter's zero image index; positive
+phases select integer subimages and Leave selects offline rotated variants.
+
+Host tests compare 64 incremental frames against fresh composition across
+camera motion, wobble, navigation, sold-out stock and closing. Sentinel world
+bytes prove this path never writes the terrain ring. The native cache verifier
+also exercises five shop states with the real Chip blitter and compares each
+HUD byte against scalar composition before restoring the gameplay HUD.
+
+This connects native drawing for explicitly registered shops, not production
+shop generation. SDL menu integration, original-runner screenshot comparisons,
+interaction prompts/merchant speech and natural side-room progression remain
+open. Matching the scalar compositor alone does not prove original-game pixels
+or event/depth ordering, and menu frame-time profiling remains necessary.

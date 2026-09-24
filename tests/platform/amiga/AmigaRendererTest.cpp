@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/GameplaySceneStorage.h"
 #include "core/ShopFixtures.h"
+#include "platform/amiga/AmigaShopMenu.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -371,6 +372,37 @@ int main(int argc, char** argv) {
         amigaRendererDrawAsset(&expectedRenderer, hudPack.data(), hudPack.data() + hudPack.size(),
             413, digit, 290, 239, 0);
         require(actualHud == expectedHud, "offline ammo digits match all fifteen original layers");
+    }
+    {
+        std::ifstream file("generated/amiga-shop.dwap", std::ios::binary);
+        std::vector<UBYTE> shopPack((std::istreambuf_iterator<char>(file)), {});
+        require(!shopPack.empty(), "offline shop bank exists");
+        std::vector<UBYTE> world(downwellGameRingBytes, 0x5a);
+        std::vector<UBYTE> retainedHud(downwellLayerBytes), freshHud(downwellLayerBytes);
+        AmigaRenderer retainedRenderer, freshRenderer;
+        amigaRendererInit(&retainedRenderer, world.data(), retainedHud.data());
+        amigaRendererInit(&freshRenderer, world.data(), freshHud.data());
+        AmigaShopMenu retained;
+        downwell::ShopWorld::Instance shop;
+        shop.present = shop.menu.active = true;
+        shop.menu.menuState = 1; shop.x = 240; shop.y = 240;
+        for (unsigned i = 0; i < 3; ++i) shop.stock.items[i] = {100+i,1,150+i*100};
+        for (unsigned tick = 0; tick < 64; ++tick) {
+            shop.menu.cursor = (tick / 8) % 4;
+            shop.menu.cursorWobbleX = int(tick % 11) - 5;
+            shop.menu.advancePresentation();
+            if (tick == 24) shop.stock.items[2].remaining = 0;
+            if (tick == 56) shop.menu.active = false;
+            require(retained.draw(&retainedRenderer, shopPack.data(), shopPack.data()+shopPack.size(),
+                &shop, 160, 34+tick/4, 200), "retained shop draw resolves every offline asset");
+            std::fill(freshHud.begin(), freshHud.end(), 0);
+            AmigaShopMenu fresh;
+            require(fresh.draw(&freshRenderer, shopPack.data(), shopPack.data()+shopPack.size(),
+                &shop, 160, 34+tick/4, 200), "fresh shop composition");
+            require(retainedHud == freshHud, "shop dirty bounds match fresh composition across navigation and closing");
+        }
+        for (auto byte : world) require(byte == 0x5a, "shop overlay never repaints the terrain ring");
+        for (auto byte : retainedHud) require(byte == 0, "closed shop leaves no stale overlay pixels");
     }
     std::cout << "Amiga renderer tests passed\n";
     return 0;
