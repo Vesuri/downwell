@@ -19,7 +19,7 @@ inline GemVerificationResult verifyGemSimulation() {
     bool alive[3] = {true, true, true};
     StateDigest digest;
     unsigned coverage = 0;
-    digest.addU32(1); // Fixture schema, independent of player checkpoint.
+    digest.addU32(2); // Source gem masks replace the provisional collection box.
     for (unsigned tick = 0; tick < 400; ++tick) {
         digest.addU32(tick);
         for (unsigned i = 0; i < 3; ++i) {
@@ -37,7 +37,7 @@ inline GemVerificationResult verifyGemSimulation() {
                 if (terrainHit) coverage |= 8;
                 if (!alive[i]) coverage |= 16;
                 if (alive[i] && gems[i].lifetime.age > 310) coverage |= 32;
-                digest.addBool(gems[i].collectible(targetX, targetY));
+                digest.addBool(gems[i].collectible(targetX, targetY, i == 1));
             }
             digest.addBool(alive[i]);
             digest.addI32(gems[i].x); digest.addI32(gems[i].y);

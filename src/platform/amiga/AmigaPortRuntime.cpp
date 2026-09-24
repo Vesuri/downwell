@@ -779,9 +779,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.speedX = downwell::GemMotion::q8(gem.motion.vx);
         gem.speedY = downwell::GemMotion::q8(gem.motion.vy);
         gem.attracted = gem.motion.attracted;
-        gem.x = downwell::roundGameMakerQ8(gem.preciseX);
-        gem.y = downwell::roundGameMakerQ8(gem.preciseY);
-        if (gem.motion.collectible(player_.offsetXFixed(), player_.offsetYFixed())) {
+        gem.x = downwell::GemMotion::rounded(gem.motion.x);
+        gem.y = downwell::GemMotion::rounded(gem.motion.y);
+        if (gem.motion.collectible(player_.offsetXFixed(), player_.offsetYFixed(), gem.large)) {
             currency_ += (unsigned)gem.amount;
             gemStreak_ += (unsigned)gem.amount;
             gemStreakTimer_ = 300;

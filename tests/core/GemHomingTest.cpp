@@ -7,6 +7,26 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    downwell::GemMotion contact;
+    contact.lifetime.age = 10;
+    require(contact.collectible(7 * 256, 0) && !contact.collectible(8 * 256, 0) &&
+            contact.collectible(-7 * 256, 0) && !contact.collectible(-8 * 256, 0),
+            "small gem and player rectangular masks overlap but edge-touch does not collect");
+    require(contact.collectible(0, -11 * 256) && !contact.collectible(0, -12 * 256) &&
+            contact.collectible(0, 7 * 256) && !contact.collectible(0, 8 * 256),
+            "collection preserves the source player's asymmetric vertical mask");
+    require(contact.collectible(9 * 256, 0, true) && !contact.collectible(10 * 256, 0, true) &&
+            contact.collectible(0, -13 * 256, true) && !contact.collectible(0, -14 * 256, true) &&
+            contact.collectible(0, 9 * 256, true) && !contact.collectible(0, 10 * 256, true),
+            "large gem uses its own twelve-pixel source mask");
+    contact.lifetime.age = 9;
+    require(!contact.collectible(0, 0, true), "collision cannot collect before obtainable alarm");
+    contact.lifetime.age = 10;
+    contact.x = 6401;
+    require(!contact.collectible(-7 * 256, 0), "rounding above a half does not lose precision via Q8");
+    require(downwell::GemMotion::rounded(6400) == 0 && downwell::GemMotion::rounded(19200) == 2 &&
+            downwell::GemMotion::rounded(-6400) == 0 && downwell::GemMotion::rounded(-19200) == -2 &&
+            downwell::GemMotion::rounded(-6401) == -1, "authoritative gem rounding uses signed ties-to-even");
     for (unsigned choice = 0; choice < 4; ++choice) {
         struct Choice {
             unsigned value, calls = 0;

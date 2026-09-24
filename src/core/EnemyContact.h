@@ -11,6 +11,8 @@ struct ContactBounds { int left, right, top, bottom; };
 inline ContactBounds contactSpriteBounds(int sprite) {
     switch (sprite) {
         case 31: return {-4, 4, -4, 8};
+        case 133: return {-4, 4, -4, 4};
+        case 134: return {-6, 6, -6, 6};
         case 153: return {-6, 7, -4, 4};
         case 154: return {-6, 7, -4, 4};
         case 157: return {-5, 5, -6, 6};

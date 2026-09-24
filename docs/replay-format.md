@@ -84,7 +84,7 @@ rebuilds the ordinary joystick-driven executable, preventing verification flags
 from leaking into an interactive build.
 
 The gate also runs the same isolated 400-update `GemVerification` fixture on
-host and target. Its schema-1 digest is `764abdd072bb4bbd` and required coverage
+host and target. Its schema-2 digest is `9543220ed0d8e596` and required coverage
 mask is `3f`: free motion, homing, acquisition, terrain contact, expiry and
 attracted survival past expiry must all occur. Every update hashes authoritative
 motion, lifetime, homing and animation fields plus RNG draw count/index; final
@@ -94,7 +94,7 @@ applied, deliberately keeping gems alive to reach lifetime boundaries.
 The full result line is:
 
 ```text
-64 9f0d3943 e7900d2b 400 764abdd0 72bb4bbd 3f
+64 9f0d3943 e7900d2b 400 9543220e d0d8e596 3f
 ```
 
 Both digests and coverage must agree; a host fixture with missing coverage

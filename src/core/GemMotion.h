@@ -3,6 +3,7 @@
 #include "GemHoming.h"
 #include "GemLifetime.h"
 #include "GemAnimation.h"
+#include "EnemyContact.h"
 namespace downwell {
 // Positions in 1/12800 pixels keep .035 gravity exact, with no 64-bit math.
 // Terrain probes remain provisional, not the source sprite-mask solver.
@@ -14,12 +15,20 @@ struct GemMotion {
     bool attracted = false;
     static long q8(long value) { return value < 0 ? -((-value + 25) / 50) : (value + 25) / 50; }
     static int pixel(long value) { return static_cast<int>(value / 12800 - (value % 12800 < 0)); }
-    // Existing provisional collection rectangle; source collision masks
-    // remain a separate task. Both adapters use rounded instance positions.
-    bool collectible(long playerX, long playerY) const {
-        const long dx = roundGameMakerQ8(playerX) - roundGameMakerQ8(q8(x));
-        const long dy = roundGameMakerQ8(playerY) - roundGameMakerQ8(q8(y));
-        return lifetime.obtainable() && dx >= -6 && dx <= 6 && dy >= -8 && dy <= 8;
+    static long rounded(long value) {
+        const long whole = value / 12800, fraction = value % 12800;
+        if (fraction > 6400 || (fraction == 6400 && whole % 2 != 0)) return whole + 1;
+        if (fraction < -6400 || (fraction == -6400 && whole % 2 != 0)) return whole - 1;
+        return whole;
+    }
+    // Serialized AxisAlignedRect masks, with rounded instance positions.
+    // Round directly from authoritative units, not through a Q8 midpoint.
+    bool collectible(long playerX, long playerY, bool large = false) const {
+        const ContactBounds player = contactWorldBounds({playerX, playerY, 1, 1, 31});
+        const ContactBounds gem = contactWorldBounds({rounded(x) * 256, rounded(y) * 256,
+                                                     1, 1, large ? 134 : 133});
+        return lifetime.obtainable() && player.left < gem.right && gem.left < player.right &&
+            player.top < gem.bottom && gem.top < player.bottom;
     }
     template<class Random>
     void initialize(int px, int py, bool attract, Random& random) {

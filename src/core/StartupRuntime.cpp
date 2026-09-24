@@ -597,7 +597,7 @@ void StartupRuntime::updateMainCurrency() {
         gem.speedY = gem.motion.vy / 12800.0F;
         gem.attracted = gem.motion.attracted;
         const bool collected = gem.motion.collectible(mainPlayerMotion_.offsetXFixed(),
-                                                      mainPlayerMotion_.offsetYFixed());
+                                                      mainPlayerMotion_.offsetYFixed(), gem.large);
         if (collected) {
             mainCurrencyTotal_ += static_cast<std::uint32_t>(gem.amount);
             mainGameGemTotal_ += static_cast<std::uint32_t>(gem.amount);

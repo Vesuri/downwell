@@ -681,3 +681,31 @@ pins both digests; the bounded runner compares both and the coverage mask.
 Verification-only code is excluded from normal Amiga builds. This closes the
 previous lack of direct target execution evidence for gem arithmetic without
 claiming the source collision/bounce/creation-order gaps are solved.
+
+## Source currency collection masks
+
+Currency collection now uses the serialized rectangular sprite masks rather
+than the shared provisional +/-6 by +/-8 centre-distance test. Source sprite
+133 is [-4,4) by [-4,4); sprite 134 is [-6,6) by [-6,6). The player's fixed
+mask 31 is [-4,4) by [-4,8), making vertical collection asymmetric. The
+objCurrency collision VM calls scrGainGem(getAmount), whose obtainable guard
+is retained. Draw selects the appropriate gem sprite/mask by size; object 248
+has no serialized explicit mask override. verify-enemy-contact.py now checks
+all thirteen player/enemy/currency rectangles against the hash-pinned export.
+
+Gem collection rounds directly from authoritative 1/12800-pixel units using
+ties-to-even. The previous route through Q8 could turn a value just above a
+half-pixel into an exact tie and shift the result by a pixel. Native gem x/y
+mirrors also use direct rounding. Fixtures cover both gem sizes, edge touching,
+the asymmetric vertical reach, unobtainable gems and signed half-pixel cases.
+
+The 600-update paired combat gate remains passing with unchanged final counters
+and no relaxed tolerance. The gem CPU fixture is explicitly schema 2, digest
+`9543220ed0d8e596`, because its collection predicate changed; both small and
+large masks are queried. This resolves gem/player rectangular overlap, not
+terrain collision, creation-frame mask/event ordering, water or bounce RNG.
+The expanded bounded 68000 replay matches this schema-2 digest and coverage
+`3f`; the full host suite passes from freshly rebuilt binaries. During this
+work, a stale host reference exposed missing header prerequisites in multi-file
+test/tool builds. Those executables now depend explicitly on shared headers,
+and a simulated GemVerification.h edit was checked to force recompilation.
