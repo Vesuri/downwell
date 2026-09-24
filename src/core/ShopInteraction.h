@@ -19,6 +19,16 @@ struct ShopInteraction {
     bool exitRequested = false;
     unsigned menuState = 0, menuSelect = 0, cursor = 1;
     int cursorWobbleX = 0;
+    // Exact quarter-frame representation of Shop Draw's cIndex/cSp. The
+    // source wraps at > (frameCount-1), NOT >= frameCount: retain negatives.
+    int cursorPhaseQuarters = 0;
+    void advancePresentation() {
+        cursorWobbleX -= (cursorWobbleX > 0) - (cursorWobbleX < 0);
+        if (active) {
+            ++cursorPhaseQuarters;
+            if (cursorPhaseQuarters > 12) cursorPhaseQuarters -= 16;
+        }
+    }
 
     template<class Emit>
     void requestExit(Emit emit) {

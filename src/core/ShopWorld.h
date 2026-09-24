@@ -107,6 +107,13 @@ struct ShopWorld {
             shop.keeper.advanceAnimation();
         }
     }
+    // Run once per simulated frame, not per render/capture or display-buffer
+    // refresh. Source Draw mutates these fields even while the menu is closed.
+    void advancePresentation() {
+        if (!allocatedCount) return;
+        for (auto& shop : instances) if (shop.present)
+            shop.menu.advancePresentation();
+    }
     template<class Choose, class Grant, class Emit>
     void step(const Input& held, int x, int y, bool criminal, bool dead,
               int& facing, CurrencyAccount& currency, Choose choose,

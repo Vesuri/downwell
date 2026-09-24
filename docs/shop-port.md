@@ -346,3 +346,22 @@ The same audit corrected the sound descriptor: soundPlayOL argument two is
 read from the playing sound and multiplied by gameVolume. `Sound::priority`
 now names the retained field correctly so future playback cannot mistake 90/50
 for gain. No sound playback is added by this correction.
+
+## Shared menu presentation clock
+
+Shop Create initializes cIndex=0 and cSp=0.25. Shop Draw's VM adds cSp,
+compares cIndex > sprite_get_number(sprShopArrow)-1, and subtracts the full
+frame count. Resource 484 has four frames: the thirteenth active draw therefore
+produces -0.75, not 3.25 or zero. Shared menu state retains exact signed quarter
+frames, without introducing target floating point or guessing how a negative
+subimage should resolve to a bitmap. Wobble moves one pixel toward zero before
+presentation, including when the menu is closed; cursor phase advances only
+while active and is not reset on reentry.
+
+Both runtime adapters advance this once per simulated frame for surviving shop
+counters. Rendering/capture calls must remain read-only, so repeated back-buffer
+composition cannot speed up the animation. Focused tests compare 10,000 updates
+to the recovered arithmetic and exercise both wobble directions and inactive
+phase retention. The paired runtime fixture also compares phase and wobble.
+Active-menu composition and original runner subimage resolution remain pending;
+this clock change is not evidence of on-screen menu parity.

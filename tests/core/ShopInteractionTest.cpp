@@ -34,6 +34,30 @@ struct Fixture {
     }
 };
 int main() {
+    Menu animated;
+    animated.active = true;
+    animated.cursorWobbleX = 6;
+    double sourceIndex = 0;
+    for (int tick = 1; tick <= 10000; ++tick) {
+        sourceIndex += 0.25;
+        if (sourceIndex > 3) sourceIndex -= 4;
+        animated.advancePresentation();
+        require(animated.cursorPhaseQuarters == int(sourceIndex * 4),
+            "cursor retains source negative fractional wrap over long runs");
+        require(animated.cursorWobbleX == (tick < 6 ? 6 - tick : 0),
+            "positive wobble decays before presentation without overshooting");
+        if (tick == 13) require(animated.cursorPhaseQuarters == -3,
+            "four-frame cursor wraps at 3.25, not at 4.0");
+    }
+    animated.active = false;
+    animated.cursorWobbleX = -6;
+    const int frozenPhase = animated.cursorPhaseQuarters;
+    for (int tick = 1; tick <= 8; ++tick) {
+        animated.advancePresentation();
+        require(animated.cursorPhaseQuarters == frozenPhase &&
+            animated.cursorWobbleX == (tick < 6 ? tick - 6 : 0),
+            "closed menu freezes cursor phase but still damps negative wobble");
+    }
     Fixture f;
     f.context.interactable = false;
     require(f.step({false,false,true}).confirm && !f.locked && f.choices == 0,

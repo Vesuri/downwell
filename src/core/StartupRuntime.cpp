@@ -1347,6 +1347,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
     mainPlayerMotion_.face(shopFacing);
     run_.shops.advanceKeepers(shopPlayerX, false, run_.stage.area, shopRandom);
+    run_.shops.advancePresentation();
     mainPlayerMotion_.configureComboCompletion(nullptr, nullptr);
     mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
     // Default rmMain subset: boss endings/goal stops and goalTimeField creation

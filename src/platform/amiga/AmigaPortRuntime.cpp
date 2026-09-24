@@ -472,6 +472,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
     player_.face(shopFacing);
     run_.shops.advanceKeepers(shopPlayerX, false, run_.stage.area, shopRandom);
+    run_.shops.advancePresentation();
     player_.configureComboCompletion(nullptr, nullptr);
     player_.configureMovementBoundary(nullptr, nullptr);
     // Normal rmMain subset, with the same unsupported ending/time-field guards

@@ -785,6 +785,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(gameplay.shops().noControl == reference.shops().noControl &&
                 gameplay.shops().interactable == reference.shops().interactable &&
                 nativeShop->menu.cursor == hostShop->menu.cursor &&
+                nativeShop->menu.cursorWobbleX == hostShop->menu.cursorWobbleX &&
+                nativeShop->menu.cursorPhaseQuarters == hostShop->menu.cursorPhaseQuarters &&
                 nativeShop->menu.active == hostShop->menu.active &&
                 gameplay.player().grounded() && reference.mainPlayerGrounded(),
                 "world interaction and grounded input suppression agree across adapters");
