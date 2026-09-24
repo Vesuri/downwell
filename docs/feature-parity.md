@@ -9,6 +9,30 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Gameplay-only verification entry
+
+The landing, active-gameplay and firing-frame emulator gates build with
+`SKIP_TO_GAME=1`. Their SDL comparator retains its headless, unpaced startup
+simulation (no startup frames are rendered). This supplies the original full-tape
+gameplay state used by the native checkpoint. Full-startup emulator scene
+verification remains separate. Ordinary SDL builds are not changed.
+
+Attempting to use SDL's existing shortcut directly exposed a different gameplay
+state: at simulation update 180 it produced player (201.961,1162.7), versus the
+full tape/native checkpoint's (215.945,1189.9), with 4,469 differing capture pixels.
+Shortcut initialization therefore still needs a separate state/RNG audit; its
+output must not replace the established comparator merely to make a test pass.
+
+`SCENE_VERIFY` contains intentionally expensive independent style rendering and
+byte comparisons. Those checks explain the style-screen slowdown in verification
+builds; gameplay-only runs now avoid that scene entirely. Emulator runs remain
+bounded and successful gates restore the normal Amiga executable.
+Direct-entry landing, firing and scrolling captures were checked against the
+established SDL tape: all matched at every one of 99,968 pixels. Scrolling retains
+its binary capture hash. The first-landing raw dump hash is updated for the
+direct-entry capture; its displayed pixels were independently compared, rather
+than assuming equality of the entire backing-buffer dump between entry paths.
+
 ### Shared animated ammo rows
 
 Both renderers now draw the original 184 row sprites using `AmmoGaugeRows`.
