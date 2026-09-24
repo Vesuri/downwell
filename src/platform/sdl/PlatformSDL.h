@@ -17,7 +17,7 @@ public:
     PlatformSDL();
     ~PlatformSDL() override;
 
-    bool ready() const { return renderer_ != nullptr; }
+    bool ready() const { return renderer_ != nullptr && framebuffer_ != nullptr; }
     Input pollInput();
     void present();
     bool saveScreenshot(const std::string& directory = {});
@@ -42,6 +42,7 @@ public:
 private:
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
+    SDL_Texture* framebuffer_ = nullptr;
     const SpritePack* spritePack_ = nullptr;
     const FontPack* fontPack_ = nullptr;
     std::array<SDL_Texture*, 8> texturePages_{};

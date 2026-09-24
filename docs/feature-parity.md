@@ -9,6 +9,39 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Scrolling capture and SDL rasterization audit
+
+The native active-gameplay capture now publishes its simulation tick, Q8 player
+position and displayed integer camera origin. The current capture is tick 383,
+player Q8 `(68056,371404)`, view `(160,1314)`. The old active-frame checksum
+still fails and has **not** been refreshed; current bytes hash to
+`903fa3be5bd02f6942b80bab4f94ef722c08d14f28ce15560f3fbab2ae103907`.
+Terrain/cache checks pass, but do not establish visual parity.
+
+`capture-sdl-landing OUTPUT_DIRECTORY 383` now reproduces the native input
+sequence beyond landing and captures that exact gameplay update (the room
+creation frame is excluded from simulation tick numbering). The SDL player
+position matches, while its fractional view Y is 1314.65. This exposed a host
+renderer defect: SDL logical-size scaling rasterized fractional geometry at
+window resolution, producing nonuniform 2x2 logical pixels. Original
+`scrInitialize.asm` calls `surface_resize(application_surface,160,cameraHeight)`
+and controller Draw GUI scales the resulting surface; it does not rasterize
+the game afresh at window resolution.
+
+SDL now draws to a fixed 380x284 composition texture (containing the clipped
+160x284 game view), then nearest-scales it for presentation. Screenshot readback
+uses that target's dimensions, so PNGs are logical 380x284 frames. The capture
+tool presents and redraws before reading back, exercising target restoration.
+The first-landing image remains an exact 99,968-pixel native match.
+
+The active capture still has **2,571 differing pixels** after this correction.
+A diagnostic one-row offset reduces interior-world differences from 2,521 to
+211; 43 HUD pixels also differ. That offset is diagnostic only: the strict
+comparator still fails and applies no alignment or masking. Resolve camera
+raster rounding and the remaining actor/HUD differences against original
+rendering semantics before changing the active baseline. The regular Amiga
+build was restored after the failed baseline check.
+
 ### Full-path presentation recheck (2026-09-24)
 
 After the shared combat/depleted-health changes, `verify-amiga-scenes` passes

@@ -11,13 +11,21 @@
 #include <iterator>
 #include <iostream>
 #include <vector>
+#include <cstdlib>
 
 static std::vector<std::uint8_t> read(const char* path) {
     std::ifstream file(path, std::ios::binary);
     return {std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
 }
 int main(int argc, char** argv) {
-    if (argc != 2) { std::cerr << "usage: capture-sdl-landing OUTPUT_DIRECTORY\n"; return 2; }
+    if (argc != 2 && argc != 3) { std::cerr << "usage: capture-sdl-landing OUTPUT_DIRECTORY [SIMULATION_TICK]\n"; return 2; }
+    unsigned targetTick = 0;
+    if (argc == 3) {
+        char* end = nullptr;
+        const auto value = std::strtoul(argv[2], &end, 10);
+        if (!*argv[2] || *end || value == 0 || value >= 6000) return 2;
+        targetTick = static_cast<unsigned>(value);
+    }
     const auto roomBytes = read("generated/downwell-rooms.dwrm");
     const auto objectBytes = read("generated/downwell-objects.dwob");
     const auto builderBytes = read("generated/downwell-builder-patterns.dwbp");
@@ -33,7 +41,7 @@ int main(int argc, char** argv) {
     if (!platform.ready() || !platform.loadSpriteAssets(sprites, "extracted/utmt-0.9.2.0/TexturePages") ||
         !platform.loadFontAssets(fonts)) return 4;
     downwell::Game game(&rooms, &objects, &builders);
-    bool styleSeen = false, lockedSeen = false;
+    bool styleSeen = false, lockedSeen = false, landed = false;
     unsigned mainTicks = 0;
     // Mirrors native sceneVerificationInput through the first landing. No
     // input during splash; walk right; visit locked style and return to usual.
@@ -46,6 +54,13 @@ int main(int argc, char** argv) {
             else if (state.playMenuCursor() != 0) input.left = true;
             else input.fire = true;
         }
+        else if (state.inMainRoom() && landed) {
+            const unsigned simulationTick = mainTicks - 1; // creation frame has no player Step
+            input.right = ((simulationTick / 120u) & 1u) == 0;
+            input.left = !input.right;
+            const unsigned firePhase = simulationTick % 16u;
+            input.fire = firePhase == 0 || firePhase == 3;
+        }
         game.update(input);
         if (state.inPlayMenu() && state.playMenuYOffset() == 0 && !state.playMenuSelected()) {
             styleSeen = true;
@@ -53,14 +68,19 @@ int main(int argc, char** argv) {
         }
         if (!state.inMainRoom()) continue;
         ++mainTicks;
-        if (!state.mainPlayerGrounded()) continue;
-        std::cout << "landing total_ticks=" << game.tick() << " main_ticks=" << mainTicks
+        if (state.mainPlayerGrounded()) landed = true;
+        if (targetTick ? mainTicks - 1 != targetTick : !landed) continue;
+        std::cout << "capture total_ticks=" << game.tick() << " main_ticks=" << mainTicks
+                  << " simulation_tick=" << mainTicks - 1
                   << " player=" << state.mainPlayerX() << ',' << state.mainPlayerY()
                   << " view=" << state.mainCameraViewX() << ',' << state.mainCameraViewY()
                   << " sprite=" << state.mainPlayerSpriteId() << ',' << state.mainPlayerImageIndex() << '\n';
         game.render(platform);
+        // Exercise target restoration as well as direct framebuffer readback.
+        platform.present();
+        game.render(platform);
         return platform.saveScreenshot(argv[1]) ? 0 : 5;
     }
-    std::cerr << "No landing within 6000 simulation updates\n";
+    std::cerr << "Requested capture not reached within 6000 simulation updates\n";
     return 6;
 }

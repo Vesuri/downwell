@@ -40,11 +40,25 @@ PlatformSDL::PlatformSDL() {
     }
 
     SDL_RenderSetLogicalSize(renderer_, Game::logicalWidth, Game::logicalHeight);
+    // The runner rasterizes the application surface before display scaling.
+    // Logical size alone scales geometry and exposes window-sized subpixels.
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+    framebuffer_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_TARGET, Game::logicalWidth, Game::logicalHeight);
+    if (!framebuffer_ || SDL_SetRenderTarget(renderer_, framebuffer_) != 0) {
+        std::fprintf(stderr, "SDL framebuffer: %s\n", SDL_GetError());
+        if (framebuffer_) SDL_DestroyTexture(framebuffer_);
+        framebuffer_ = nullptr;
+        return;
+    }
+    SDL_SetTextureBlendMode(framebuffer_, SDL_BLENDMODE_NONE);
+    SDL_RenderSetLogicalSize(renderer_, Game::logicalWidth, Game::logicalHeight);
     SDL_SetRenderDrawBlendMode(renderer_, SDL_BLENDMODE_NONE);
     nextTick_ = SDL_GetPerformanceCounter();
 }
 
 PlatformSDL::~PlatformSDL() {
+    if (framebuffer_) SDL_DestroyTexture(framebuffer_);
     for (SDL_Texture* texture : texturePages_) {
         if (texture)
             SDL_DestroyTexture(texture);
@@ -271,12 +285,16 @@ void PlatformSDL::drawText(std::int32_t fontId,
 }
 
 void PlatformSDL::present() {
-    // Read before Present: the renderer backbuffer is undefined afterwards.
+    // Capture the logical framebuffer, not the window-sized presentation.
     if (screenshotRequested_) {
         screenshotRequested_ = false;
         saveScreenshot();
     }
+    SDL_SetRenderTarget(renderer_, nullptr);
+    SDL_RenderSetLogicalSize(renderer_, Game::logicalWidth, Game::logicalHeight);
+    SDL_RenderCopy(renderer_, framebuffer_, nullptr, nullptr);
     SDL_RenderPresent(renderer_);
+    SDL_SetRenderTarget(renderer_, framebuffer_);
 }
 
 bool PlatformSDL::saveScreenshot(const std::string& directory) {
@@ -297,7 +315,9 @@ bool PlatformSDL::saveScreenshot(const std::string& directory) {
         return false;
     }
     int width = 0, height = 0;
-    if (SDL_GetRendererOutputSize(renderer_, &width, &height) != 0)
+    SDL_Texture* target = SDL_GetRenderTarget(renderer_);
+    if ((target ? SDL_QueryTexture(target, nullptr, nullptr, &width, &height)
+                : SDL_GetRendererOutputSize(renderer_, &width, &height)) != 0)
         return false;
     SDL_Surface* pixels = SDL_CreateRGBSurfaceWithFormat(
         0, width, height, 32, SDL_PIXELFORMAT_RGBA32);

@@ -2,6 +2,7 @@ set pagination off
 target remote 127.0.0.1:2345
 break downwellGameplayFrameReady
 continue
+printf "CAPTURE_STATE tick=%lu player_q8=%ld,%ld view=%ld,%ld\n", gDownwellCaptureTick, gDownwellCapturePlayerXQ8, gDownwellCapturePlayerYQ8, gDownwellCaptureViewX, gDownwellCaptureViewY
 if gDownwellTerrainRasterFailures != 0 || gDownwellTerrainRasterChecks == 0
     printf "Terrain raster differs from fresh composition\n"
     quit 1

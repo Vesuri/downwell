@@ -240,6 +240,9 @@ volatile ULONG gDownwellSplashCheckedFrames[7];
 volatile ULONG gDownwellSplashPublicationFailures;
 volatile const UWORD* gDownwellMenuSpriteOracle;
 volatile ULONG gDownwellMenuCopperPatchFailures;
+volatile ULONG gDownwellCaptureTick;
+volatile LONG gDownwellCapturePlayerXQ8, gDownwellCapturePlayerYQ8;
+volatile LONG gDownwellCaptureViewX, gDownwellCaptureViewY;
 #endif
 
 struct DownwellMenuFrameCapture {
@@ -1015,7 +1018,12 @@ static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
 
 #ifdef DOWNWELL_SCENE_VERIFY
 static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display, unsigned buffer,
-                                unsigned ringOrigin) {
+                                const AmigaPortRuntime& port) {
+    gDownwellCaptureTick = port.tick();
+    gDownwellCapturePlayerXQ8 = 240L * 256 + port.player().offsetXFixed();
+    gDownwellCapturePlayerYQ8 = 176L * 256 + port.player().offsetYFixed();
+    gDownwellCaptureViewX = 160 + port.cameraOffsetX();
+    gDownwellCaptureViewY = 34 + port.cameraOffsetY();
     gDownwellGameplayGame = (const UBYTE*)display.data;
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
         // Dirty rows include deliberately drawn BOBs, unlike pristine backing.
@@ -1029,7 +1037,7 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
         buffer * gameplayRegularSpriteCount *
             (bulletSpriteBytes / sizeof(UWORD));
     gDownwellGameplayOverflowSprite = memory.enemySprite(buffer);
-    gDownwellGameplayRingOrigin = (UWORD)ringOrigin;
+    gDownwellGameplayRingOrigin = (UWORD)port.ringOrigin();
 }
 #endif
 
@@ -2277,13 +2285,13 @@ int main(void) {
                             fragments, liveBuilder.fragmentCount(), generatedDecorations,
                             liveBuilder.decorationCount(), &port, x, worldViewY + strip, 0, count);
                     }
-                exposeGameplayFrame(memory, gameDisplay[back], back, port.ringOrigin());
+                exposeGameplayFrame(memory, gameDisplay[back], back, port);
                 downwellGameplayLongRunReady();
             }
             if (!sceneGameplayLandedReported && port.player().grounded()) {
                 sceneGameplayLandedReported = true;
                 sceneGameplayLandedCameraY = port.cameraOffsetY();
-                exposeGameplayFrame(memory, gameDisplay[back], back, port.ringOrigin());
+                exposeGameplayFrame(memory, gameDisplay[back], back, port);
                 downwellGameplayFrameReady();
                 downwellSceneGameplayLanded();
             } else if (sceneGameplayLandedReported &&
@@ -2295,7 +2303,7 @@ int main(void) {
                     awakeEnemy = awakeEnemy || port.enemyAt(enemy).awake;
                 if (awakeEnemy) {
                     sceneGameplayActiveReported = true;
-                    exposeGameplayFrame(memory, gameDisplay[back], back, port.ringOrigin());
+                    exposeGameplayFrame(memory, gameDisplay[back], back, port);
                     downwellGameplayActiveFrameReady();
                     downwellSceneGameplayActive();
                 }
