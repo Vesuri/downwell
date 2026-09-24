@@ -9,6 +9,23 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Recharge gauge motion
+
+`PlayerMotion` now counts successful `scrRecharge` operations: depleted landing,
+stomp and damage-bounce refills emit an event, while already-full calls and combo
+capacity grants do not. Both run sessions feed that event to `AmmoHudMotion`.
+The recovered recharge sets `meterJiggle` to four, then the 4:3 Draw path decrements
+it before positioning the gauge. Thus visible frame offsets are 3, 2, 1, 0;
+charge rows move at four times that offset and retain the source `y < 232` test.
+The ammo-number firing offset is independent. Native invalidation remains active
+through the return to rest and clears the whole gauge's swept area before drawing.
+This implements HUD feedback, not the recharge sound, spawned effect or shake.
+The full host suite and explicit landing/stomp/damage event tests pass. Bounded
+`SKIP_TO_GAME=1` A500 captures match SDL both during the refill (simulation update
+203) and at the later settled active-frame checkpoint, with zero differing
+pixels. The settled capture retains its expected hash. Normal builds and 68000
+instruction/helper audits pass; this does not establish a 20 ms frame budget.
+
 ### Gameplay-only verification entry
 
 The landing, active-gameplay and firing-frame emulator gates build with
@@ -57,7 +74,7 @@ Tests compare row selection against binary64 for capacities 1–512 and 100,000
 full-width random cases, and animation/draw order against 1,000 source-style
 updates. Native HUD invalidation stays active while row state changes and stops
 when it settles. This is not a completed reproduction of the entire gauge:
-shot-cost dividers, recharge jiggle and precise underlay geometry remain to be
+shot-cost dividers and precise underlay geometry remain to be
 finished. The existing white underlay is retained beneath the source row sprites.
 The 6,000-update live combat/death comparison checks every row in both runtimes.
 Both the settled active-frame gate and the new
@@ -85,7 +102,7 @@ setting them to three. `scrDrawHud4x3` draws 184 animated row sprites (418/419,
 with 421 for the bottom filled row), changes row frames by 0.8, and draws sprite
 421 dividers at both single-ammo and shot-consumption intervals. Recharge also
 drives `meterJiggle`, consumed before the vertical gauge coordinates are built.
-The row animation is now implemented above; dividers and recharge motion remain
+The row animation and recharge motion are now implemented above; dividers remain
 missing in both ports. Presentation state must keep redraws active until
 settled; ammo-value changes alone are insufficient. Fractional divider positions
 must be checked against the VM's floating-point loop before replacing them with

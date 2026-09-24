@@ -268,7 +268,8 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
                         startup_.mainPlayerHealth(), startup_.mainPlayerHealthMaximum());
 
     constexpr int gaugeX = origin + 174;
-    constexpr int gaugeTop = 43;
+    const int meterOffset = static_cast<int>(startup_.mainAmmoMeterOffset());
+    const int gaugeTop = 43 + meterOffset;
     constexpr int gaugeBottom = 233;
     constexpr int meterLength = 184;
     const int filled = static_cast<int>(meterLength *
@@ -277,7 +278,7 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     if (filled > 0)
         renderer.fillRect(gaugeX + 5, gaugeBottom - filled,
                           10, filled, {255, 255, 255, 255});
-    startup_.mainAmmoGauge().draw(gaugeX + 4, 229,
+    startup_.mainAmmoGauge().draw(gaugeX + 4, 229 + 4 * meterOffset,
         [&](unsigned sprite, unsigned frame, int x, int y) { renderer.drawSprite(sprite, frame, x, y); });
     renderer.drawSprite(416, 1, gaugeX, gaugeTop);
     const int ammoOffset = static_cast<int>(startup_.mainAmmoHudOffset());

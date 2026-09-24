@@ -7,12 +7,20 @@ namespace downwell {
 struct AmmoHudMotion {
     unsigned offset = 0;
     std::uint32_t previousShots = 0;
-    bool step(std::uint32_t shots) {
+    unsigned meterOffset = 0;
+    std::uint32_t previousRecharges = 0;
+    bool step(std::uint32_t shots, std::uint32_t recharges = 0) {
         const unsigned old = offset;
+        const unsigned oldMeter = meterOffset;
+        // scrRecharge sets four before Draw; scrDrawHud4x3 decays before
+        // calculating the vertical gauge and row anchors.
+        if (recharges != previousRecharges) meterOffset = 4;
+        previousRecharges = recharges;
+        if (meterOffset) --meterOffset;
         if (offset) --offset;
         if (shots != previousShots) offset = 2;
         previousShots = shots;
-        return old != offset;
+        return old != offset || oldMeter != meterOffset;
     }
 };
 }

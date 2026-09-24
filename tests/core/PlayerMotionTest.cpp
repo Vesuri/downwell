@@ -252,6 +252,11 @@ int main() {
         player.step(input);
     require(player.grounded() && player.ammo() == 8,
             "landing restores the full gunboot charge");
+    require(player.recharges() == 1, "depleted landing emits one successful recharge");
+    player.stompBounce();
+    require(player.recharges() == 1, "full-ammo bounce emits no recharge effect");
+    for (unsigned frame = 0; frame < 240 && !player.grounded(); ++frame)
+        player.step(input);
 
     input.right = true;
     const PlayerMotionDelta firstMove = player.step(input);
@@ -342,6 +347,16 @@ int main() {
             "vertical impulse uses pre-movement x and preserves existing xsp");
     require(damaged.ammo() == 8 && damaged.speedYFixed() == -512 && !damaged.grounded(),
             "scrFjump recharges damage knockback and applies vertical launch");
+    require(damaged.recharges() == 1, "damage recharge emits the shared presentation event");
+    damaged.increaseAmmoCapacity(1);
+    require(damaged.recharges() == 1 && damaged.ammo() == 9,
+            "capacity grant is not a scrRecharge event");
+    PlayerMotion stompRefill(false, 10000);
+    stompRefill.step(movingFire);
+    require(stompRefill.ammo() == 7, "stomp fixture starts depleted");
+    stompRefill.stompBounce();
+    require(stompRefill.ammo() == 8 && stompRefill.recharges() == 1,
+            "depleted stomp emits one successful recharge");
 
     PlayerMotion shallow;
     shallow.contactKnockback(1, 1);

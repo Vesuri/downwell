@@ -81,6 +81,12 @@ int main() {
     }
     for (unsigned i = 0; i < 5; ++i) rows.step(8, 8);
     require(!rows.step(8, 8), "settled row animation stops requesting redraws");
+    unsigned visibleRows = 0;
+    rows.draw(288, 241, [&](unsigned, unsigned, int, int y) {
+        require(y < 232, "recharge motion retains the source bottom clipping condition");
+        ++visibleRows;
+    });
+    require(visibleRows == 174, "three-pixel meter offset shifts rows by twelve pixels");
     downwell::AmmoHudMotion ammoMotion;
     require(!ammoMotion.step(0) && ammoMotion.offset == 0, "settled ammo label stays clean");
     require(ammoMotion.step(1) && ammoMotion.offset == 2, "shot immediately offsets ammo label");
@@ -90,6 +96,12 @@ int main() {
     require(ammoMotion.step(3) && ammoMotion.offset == 1, "held input without a shot decays");
     require(ammoMotion.step(3) && ammoMotion.offset == 0 && !ammoMotion.step(3),
             "ammo motion stops requesting redraws after settling");
+    require(ammoMotion.step(3, 1) && ammoMotion.meterOffset == 3,
+            "recharge sets four then source Draw decays to three");
+    for (unsigned expected : {2u, 1u, 0u})
+        require(ammoMotion.step(3, 1) && ammoMotion.meterOffset == expected,
+                "recharge gauge returns to rest one step at a time");
+    require(!ammoMotion.step(3, 1), "settled recharge does not request a redraw");
     for (unsigned pieces = 0; pieces < 4; ++pieces) {
         unsigned phase = 0;
         downwell::drawHeartPieceMeter(8, 6, pieces, 4,

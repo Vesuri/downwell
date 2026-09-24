@@ -84,6 +84,7 @@ public:
     unsigned spriteFrame(bool dead = false, int deathAnimation = 1) const;
     unsigned jumps() const { return jumps_; }
     unsigned shots() const { return shots_; }
+    unsigned recharges() const { return recharges_; }
     void stompBounce();
     void contactKnockback(int enemyX, int enemyY);
     void appendStateDigest(downwell::StateDigest& digest) const;
@@ -92,6 +93,8 @@ private:
     static int fixedToPixel(long value);
     static unsigned integerSquareRoot(unsigned value);
     void beginSpin();
+    void recharge();
+    unsigned recharges_ = 0; // Successful scrRecharge calls, not capacity grants.
 
     long x_;
     long y_;

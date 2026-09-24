@@ -62,7 +62,8 @@ struct AmmoGaugeRows {
         for (unsigned i = 0; i < 184; ++i) {
             const unsigned sprite = i < filled ? (i ? 419 : 421) : 418;
             const unsigned frame = state[i] < 4 ? state[i] : 3;
-            drawSprite(sprite, frame, x, bottom - static_cast<int>(i));
+            const int y = bottom - static_cast<int>(i);
+            if (y < 232) drawSprite(sprite, frame, x, y);
         }
     }
 };

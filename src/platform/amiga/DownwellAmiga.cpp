@@ -337,6 +337,7 @@ __attribute__((noinline, used)) void downwellGameplayFrameReady(void) {
 }
 
 __attribute__((noinline, used)) void downwellGameplayAmmoFrameReady(void) { __asm__ volatile ("nop"); }
+__attribute__((noinline, used)) void downwellGameplayRechargeFrameReady(void) { __asm__ volatile ("nop"); }
 __attribute__((noinline, used)) void downwellGameplayActiveFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
@@ -444,7 +445,7 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
 }
 
 static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
-                       const downwell::AmmoGaugeRows* rows = nullptr) {
+                       const downwell::AmmoGaugeRows* rows = nullptr, unsigned meterOffset = 0) {
     enum {
         gaugeX = 289,
         gaugeTop = 49,
@@ -455,6 +456,8 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
         ammo = maximumAmmo;
     const int filled = maximumAmmo ? gaugeLength * (int)ammo / maximumAmmo : 0;
     amigaRendererClearClipRect(renderer);
+    // Gauge rims move during recharge; clear their complete swept rectangle.
+    amigaRendererFillRect(renderer, 282, 40, 24, 216, 3);
     // The label clear overlaps the gauge's lower rim. Restore the two gauge
     // layers in the source draw order when ammo changes, not every frame.
     static unsigned oldDigits = 1;
@@ -468,24 +471,18 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
         amigaRendererFillRect(renderer, 282 - (static_cast<int>(clearDigits) - 1) * 4,
             231, 34 + (clearDigits - 1) * 8, 26 + clearDigits - 1, 0);
     }
-    drawAsset(renderer, 416, 0, 284, 43, 0);
-    /*
-     * The frame is static on PF2, but its interior follows gunboot charge.
-     * Clear the previous white column before filling upward from the recovered
-     * 233-pixel bottom anchor, exactly like the desktop 4:3 HUD path.
-     */
-    amigaRendererFillRect(renderer, gaugeX, gaugeTop,
-                          gaugeWidth, gaugeLength, 3);
+    drawAsset(renderer, 416, 0, 284, 43 + meterOffset, 0);
+    // The underlay stays fixed while the frame and charge rows jiggle.
     if (filled > 0)
         amigaRendererFillRect(renderer, gaugeX,
                               gaugeTop + gaugeLength - filled,
                               gaugeWidth, filled, 1);
-    if (rows) rows->draw(288, 229,
+    if (rows) rows->draw(288, 229 + 4 * meterOffset,
         [renderer](unsigned sprite, unsigned frame, int x, int y) {
             // GameMaker wraps subimages; the bottom divider has only two frames.
             drawAsset(renderer, sprite, sprite == 421 ? frame % 2 : frame, x, y, 0);
         });
-    drawAsset(renderer, 416, 1, 284, 43, 0);
+    drawAsset(renderer, 416, 1, 284, 43 + meterOffset, 0);
     drawAmmoDigit(renderer, 290 + offset, 239 + offset, ammo);
 }
 
@@ -2280,7 +2277,7 @@ int main(void) {
                 destroyedBlockY[block] = result.blockY[block];
             }
             if (result.ammoChanged)
-                redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset(), &port.ammoGauge());
+                redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset(), &port.ammoGauge(), port.ammoMeterOffset());
             if (result.healthChanged)
                 redrawHealth(&renderer, (unsigned)port.health(), (unsigned)port.healthMaximum(),
                              port.healthReserve().pieces, port.healthReserve().piecesPerHeart);
@@ -2734,6 +2731,12 @@ int main(void) {
                 downwellGameplayLongRunReady();
             }
             static bool ammoFrameReported = false;
+            static bool rechargeFrameReported = false;
+            if (!rechargeFrameReported && port.ammoMeterOffset() == 3) {
+                rechargeFrameReported = true;
+                exposeGameplayFrame(memory, gameDisplay[back], back, port);
+                downwellGameplayRechargeFrameReady();
+            }
             if (!ammoFrameReported && port.player().ammo() < port.player().ammoCapacity() && port.ammoHudOffset() == 2) {
                 ammoFrameReported = true;
                 exposeGameplayFrame(memory, gameDisplay[back], back, port);

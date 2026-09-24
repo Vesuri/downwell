@@ -521,6 +521,17 @@ verify-amiga-gameplay-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 .PHONY: verify-amiga-gameplay-ammo-frame
+.PHONY: verify-amiga-gameplay-recharge-frame
+verify-amiga-gameplay-recharge-frame: build/capture-sdl-game
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'
+	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_recharge_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_RECHARGE_FRAME_READY READY_DESCRIPTION="gameplay gauge during recharge" amiga/verify_startup.sh'
+	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-recharge-frame.bin build/amiga-gameplay-recharge-frame.png
+	@capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
+	capture_dir=$$(mktemp -d build/recharge-XXXXXX); \
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-game "$$capture_dir" "$$capture_tick" && \
+	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-recharge-frame.png
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
+
 verify-amiga-gameplay-ammo-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_ammo_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_AMMO_FRAME_READY READY_DESCRIPTION="gameplay gauge during a shot" amiga/verify_startup.sh'

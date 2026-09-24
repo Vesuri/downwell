@@ -89,7 +89,15 @@ void PlayerMotion::stompBounce()
     speedY_ = -640;
     gravityRemainder_ = 0;
     grounded_ = false;
-    ammo_ = ammoCapacity_;
+    recharge();
+}
+
+void PlayerMotion::recharge()
+{
+    if (ammo_ < ammoCapacity_) {
+        ammo_ = ammoCapacity_;
+        ++recharges_;
+    }
 }
 
 void PlayerMotion::contactKnockback(int enemyX, int enemyY)
@@ -108,7 +116,7 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
     // scrRecharge even for damage knockback (not only enemy stomps).
     if (impulseX != 0)
         speedX_ = impulseX;
-    ammo_ = ammoCapacity_;
+    recharge();
     speedY_ = -2 * fixedOne;
     gravityRemainder_ = 0;
     grounded_ = false;
@@ -303,7 +311,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             // before scrRecharge. A simultaneous wall hit defers completion.
             if (!horizontalCollision && comboCompletion_ && !comboTimeStopped_)
                 comboCompletion_(comboContext_);
-            ammo_ = ammoCapacity_;
+            recharge();
             airborneShot_ = false;
             spinJumping_ = false;
         }

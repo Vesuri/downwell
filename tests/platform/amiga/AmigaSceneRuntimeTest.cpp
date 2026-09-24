@@ -913,6 +913,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const auto& hostDeath = reference.mainDeathSequence();
             require(gameplay.ammoHudOffset() == reference.mainAmmoHudOffset(),
                     "both live HUDs share firing offset and decay on every combat update");
+            require(gameplay.ammoMeterOffset() == reference.mainAmmoMeterOffset(),
+                    "both live HUDs share successful recharge movement");
             require(gameplay.ammoGauge().filled == reference.mainAmmoGauge().filled,
                     "both live gauges agree on fractional fill boundaries");
             for (unsigned row = 0; row < 184; ++row)

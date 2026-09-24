@@ -370,7 +370,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         updateMainEnemyInteractions();
         updateMainCurrency();
         updateMainLifecycle();
-        run_.ammoHud.step(mainShotsFired_);
+        run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
         run_.results.presentationStep();
     }
