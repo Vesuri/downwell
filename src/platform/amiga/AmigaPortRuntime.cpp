@@ -306,6 +306,23 @@ int AmigaPortRuntime::indexedBreakable(int x, int y) const {
     return (int)breakableIndex_[(y >> 4) * 64 + (x >> 4)] - 1;
 }
 
+void AmigaPortRuntime::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect)
+{
+    if (effect.preparation >= 0) enemy.auxiliaryState = effect.preparation;
+    if (effect.setJumpSpeed) enemy.motionState = effect.jumpSpeed;
+    if (effect.setX) {
+        enemy.frogHorizontal.velocity = effect.xQ16;
+        enemy.speedX = downwell::FrogHorizontalMotion::toQ8(effect.xQ16);
+    }
+    if (effect.setY) {
+        enemy.speedY = downwell::FrogVerticalMotion::floorDivide(effect.yFifthsQ8, 5);
+        enemy.gravityRemainder = static_cast<unsigned char>(effect.yFifthsQ8 - enemy.speedY * 5);
+    }
+    if (effect.alarm == 0) enemy.alarm0 = effect.ticks;
+    else enemy.alarm1 = effect.ticks;
+    // Audio output is not yet implemented by this backend.
+}
+
 void AmigaPortRuntime::advanceEnemyAlarms()
 {
     DW_PROFILE_PHASE(profileEnemyAlarms);
@@ -324,32 +341,15 @@ void AmigaPortRuntime::advanceEnemyAlarms()
             enemy.auxiliaryState = -enemy.auxiliaryState;
             enemy.alarm1 = 120 + (int)enemyRandom_.irandomSmall(180);
         } else if (enemy.objectId == 113) {
+            if (alarm0Fired)
+                applyFrogAlarm(enemy, downwell::frogJumpAlarm(enemy.grounded, enemy.motionState));
             if (alarm1Fired) {
                 const int direction = downwell::frogPreparationDirection(
                     enemy.grounded, enemy.x * 256L, enemy.y * 256L,
                     player_.frameStartXFixed(), (cameraPixelX_ - 80) * 256L,
                     cameraY_ - 142 * 256L, (cameraPixelX_ + 80) * 256L,
                     cameraY_ + 142 * 256L);
-                if (direction != 0) {
-                    enemy.auxiliaryState = 1;
-                    enemy.speedX = direction * 256;
-                    enemy.frogHorizontal.velocity = direction * 65536L;
-                    enemy.motionState = direction * 2;
-                    enemy.alarm0 = 60;
-                } else {
-                    enemy.alarm1 = 60;
-                }
-            }
-            if (alarm0Fired) {
-                if (enemy.grounded) {
-                    enemy.speedY = -4 * 256;
-                    enemy.gravityRemainder = 0;
-                    enemy.speedX = enemy.motionState * 256;
-                    enemy.frogHorizontal.velocity = enemy.motionState * 65536L;
-                    enemy.grounded = false;
-                }
-                enemy.auxiliaryState = 0;
-                enemy.alarm1 = 60;
+                applyFrogAlarm(enemy, downwell::frogPreparationAlarm(direction));
             }
         } else if (enemy.objectId == 119 && alarm0Fired) {
             if (enemy.grounded) {
@@ -682,12 +682,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
             }
             // enmFrog Step: restart preparation only on a landing edge.
-            if (enemy.grounded) {
-                if (!enemy.frogLanded) enemy.alarm1 = 60;
-                enemy.frogLanded = true;
-            } else {
-                enemy.frogLanded = false;
-            }
+            if (downwell::frogLandingEdge(enemy.grounded, enemy.frogLanded)) enemy.alarm1 = 60;
         } else if (enemy.objectId == 117) {
             if (enemy.motionState == 0) {
                 if (solidResolver_(solidResolverContext_,

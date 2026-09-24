@@ -553,3 +553,26 @@ The bounded A500 allocation check reports 277,320 resident asset bytes and
 The bounded 68000 replay passes (`64 9f0d3943 e7900d2b`), as does the
 600-tick target terrain-cache oracle. The narrow replay does not cover full
 enemy state; the longer host paired tape provides the frog-state coverage.
+
+## Shared frog alarm effects and landing latch
+
+FrogBehavior now owns Alarm 1 preparation/retry and Alarm 0 jump decisions,
+including velocity units, preparation state, stored launch direction, alarm
+restart and sound resource IDs. Both runtimes apply those same effect records
+to their storage; there is no separate Amiga policy for those decisions.
+The landing-edge latch is also shared. Source evidence is the recovered
+enmFrog Alarm 0/1 assembly, Create's jumpsp=4, and Step blocks 27–30.
+
+The Amiga alarm adapter no longer clears grounded in Alarm 0: the original
+alarm changes velocity, not support. Simultaneous frog alarms now dispatch
+0 then 1, matching the shared EventScheduler, instead of the previous native
+1 then 0. A native fixture covers simultaneous expiry; shared fixtures cover
+both launch directions, failed preparation, airborne jump cancellation and
+landing-edge rearming. Original runner-wide event ordering remains a separate
+verification task; agreement with our scheduler is not proof of that behavior.
+
+Adapters still own alarm countdown/dispatch and state storage, and Amiga audio
+does not yet consume the shared sound requests. This extraction does not claim
+complete runtime consolidation or full original-game fidelity.
+The full host suite and bounded cross-target replay (`64 9f0d3943 e7900d2b`)
+pass after this extraction; normal SDL and Amiga builds are restored.

@@ -327,6 +327,18 @@ int main() {
             "ground turtle walks and reschedules its recovered animation alarm");
 
     AmigaPortRuntime frog(300);
+    AmigaPortRuntime simultaneousFrog(300);
+    simultaneousFrog.configureSolidResolver(flatGround, nullptr);
+    require(simultaneousFrog.configureEnemy(0, 113, 166, 40, 1, 0, 0, 35, 20,
+                2, 1, 1, 1, 0, 0, true, true, true),
+            "configure both frog alarms expiring together");
+    simultaneousFrog.step(0);
+    require(simultaneousFrog.enemyAt(0).auxiliaryState == 1 &&
+                simultaneousFrog.enemyAt(0).motionState == -2 &&
+                simultaneousFrog.enemyAt(0).frogHorizontal.velocity == -65536L &&
+                simultaneousFrog.enemyAt(0).alarm0 == 60 &&
+                simultaneousFrog.enemyAt(0).speedY < 0,
+            "alarm zero jump precedes alarm one preparation without prematurely clearing support");
     AmigaPortRuntime aimingFrog(300);
     aimingFrog.configureSolidResolver(flatGround, nullptr);
     require(aimingFrog.configureEnemy(0, 113, 166, 0, 1, 0, 0, 35, 20,

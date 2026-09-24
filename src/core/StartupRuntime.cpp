@@ -18,6 +18,21 @@
 
 namespace downwell {
 
+void StartupRuntime::applyFrogAlarm(InstanceRecord& instance, const FrogAlarmEffect& effect) {
+    if (effect.preparation >= 0) instance.auxiliaryState = effect.preparation;
+    if (effect.setJumpSpeed) instance.motionState = effect.jumpSpeed;
+    if (effect.setX) {
+        instance.frogHorizontal.velocity = effect.xQ16;
+        instance.velocityX = effect.xQ16 / 65536.0F;
+    }
+    if (effect.setY) {
+        instance.frogVertical.velocity = effect.yFifthsQ8;
+        instance.velocityY = effect.yFifthsQ8 / 1280.0F;
+    }
+    instance.alarms.set(effect.alarm, effect.ticks);
+    if (effect.sound >= 0) ++soundPlayRequests_;
+}
+
 StartupRuntime::StartupRuntime(PlatformProfile profile,
                                const RoomPack* roomPack,
                                const ObjectPack* objectPack,
@@ -713,12 +728,7 @@ void StartupRuntime::updateMainEnemies() {
             if (enemy.velocityX != 0.0F)
                 enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
             // enmFrog Step's landed latch is distinct from current support.
-            if (enemy.grounded) {
-                if (!enemy.frogLanded) enemy.alarms.set(1, 60);
-                enemy.frogLanded = true;
-            } else {
-                enemy.frogLanded = false;
-            }
+            if (frogLandingEdge(enemy.grounded, enemy.frogLanded)) enemy.alarms.set(1, 60);
         } else if (enemy.objectId == 116) {
             BatMotion bat{
                 static_cast<long>(std::round(enemy.preciseX * 256.0F)),
@@ -1661,30 +1671,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 static_cast<long>(std::round(mainCameraViewY() * 256.0F)),
                 static_cast<long>(std::round((mainCameraViewX() + surfaceWidth) * 256.0F)),
                 static_cast<long>(std::round((mainCameraViewY() + surfaceHeight) * 256.0F)));
-            if (direction != 0) {
-                instance->auxiliaryState = 1;
-                instance->velocityX = static_cast<float>(direction);
-                instance->frogHorizontal.velocity = direction * 65536L;
-                instance->motionState = direction * 2;
-                instance->alarms.set(0, 60);
-                ++soundPlayRequests_;
-            } else {
-                instance->alarms.set(1, 60);
-            }
+            applyFrogAlarm(*instance, frogPreparationAlarm(direction));
         }
         return;
     case 1207: // gml_Object_enmFrog_Alarm_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            if (instance->grounded) {
-                instance->velocityY = -4.0F;
-                instance->frogVertical.velocity = -4 * 1280L;
-                instance->velocityX = static_cast<float>(instance->motionState);
-                instance->frogHorizontal.velocity = instance->motionState * 65536L;
-                ++soundPlayRequests_;
-            }
-            instance->auxiliaryState = 0;
-            instance->alarms.set(1, 60);
+            applyFrogAlarm(*instance, frogJumpAlarm(instance->grounded, instance->motionState));
         }
         return;
     case 1254: // gml_Object_enmCrawler_Alarm_0

@@ -49,8 +49,10 @@ compares authoritative Q16 horizontal and fifth-Q8 vertical state throughout
 entry and combat; this check is enabled by DOWNWELL_VERIFY_FROG_MOTION=1 in
 the default target. Its existing player movement guard
 still permits up to three pixels of vertical difference; it is not an exact
-whole-world comparison. After source-backed frog preparation corrections,
-current final counters are health 3/3, kills 1/1 and currency 12/12.
+whole-world comparison. After source-backed frog preparation corrections
+and the shared hit response, current final counters are health 3/3, kills 2/2
+and currency 16/16. The tape requires a surviving frog hit and compares its
+pending hit, five-tick stun and damage sprite on both adapters.
 See [shared simulation migration](shared-simulation-migration.md)
 for the source-backed corrections and outstanding fidelity work.
 

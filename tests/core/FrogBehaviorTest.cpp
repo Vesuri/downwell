@@ -13,6 +13,34 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    for (int direction : {-1, 1}) {
+        const auto prepare = downwell::frogPreparationAlarm(direction);
+        require(prepare.preparation == 1 && prepare.setX && !prepare.setY &&
+                prepare.setJumpSpeed && prepare.xQ16 == direction * 65536L &&
+                prepare.jumpSpeed == direction * 2 && prepare.alarm == 0 &&
+                prepare.ticks == 60 && prepare.sound == 113,
+                "source preparation produces shared velocity, alarm and sound effects");
+        const auto jump = downwell::frogJumpAlarm(true, prepare.jumpSpeed);
+        require(jump.preparation == 0 && jump.setX && jump.setY &&
+                !jump.setJumpSpeed && jump.xQ16 == direction * 2 * 65536L &&
+                jump.yFifthsQ8 == -4 * 1280L && jump.alarm == 1 &&
+                jump.ticks == 60 && jump.sound == 116,
+                "source jump uses stored signed launch speed and resets preparation");
+    }
+    const auto retry = downwell::frogPreparationAlarm(0);
+    require(retry.preparation == -1 && !retry.setX && !retry.setY &&
+            !retry.setJumpSpeed && retry.alarm == 1 && retry.ticks == 60 && retry.sound == -1,
+            "failed preparation preserves state and retries without sound");
+    const auto airborne = downwell::frogJumpAlarm(false, 2);
+    require(airborne.preparation == 0 && !airborne.setX && !airborne.setY &&
+            airborne.alarm == 1 && airborne.ticks == 60 && airborne.sound == -1,
+            "airborne jump alarm cancels preparation without changing velocity");
+    bool landed = false;
+    require(!downwell::frogLandingEdge(false, landed) && !landed &&
+            downwell::frogLandingEdge(true, landed) && landed &&
+            !downwell::frogLandingEdge(true, landed) && landed &&
+            !downwell::frogLandingEdge(false, landed) && !landed,
+            "shared landing latch rearms only on an actual support edge");
     downwell::FrogHorizontalMotion sharedX{0, 2 * 65536L};
     downwell::FrogVerticalMotion sharedY{1000, 3 * 1280L, false};
     downwell::FrogHitState sharedHit;

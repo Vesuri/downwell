@@ -16,6 +16,7 @@ namespace downwell {
 class RoomPack;
 class ObjectPack;
 class BuilderPatternPack;
+struct FrogAlarmEffect;
 enum class RoomInstancePhase;
 
 enum class PlatformProfile {
@@ -205,6 +206,7 @@ public:
 #endif
 
 private:
+    void applyFrogAlarm(InstanceRecord& instance, const FrogAlarmEffect& effect);
     void controllerCreate(PlatformProfile profile);
     void initRoomCreate();
     void initRoomAlarm0();

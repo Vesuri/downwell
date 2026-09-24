@@ -3,6 +3,50 @@
 
 namespace downwell {
 
+// Source alarm decisions, independent of either runtime's storage format.
+// A negative preparation value means leave it unchanged (failed Alarm 1).
+struct FrogAlarmEffect {
+    int preparation = -1;
+    bool setX = false, setY = false, setJumpSpeed = false;
+    long xQ16 = 0, yFifthsQ8 = 0;
+    int jumpSpeed = 0;
+    unsigned alarm = 1;
+    int ticks = 60;
+    int sound = -1;
+};
+
+inline FrogAlarmEffect frogPreparationAlarm(int direction) {
+    FrogAlarmEffect result;
+    if (direction != 0) {
+        result.preparation = 1;
+        result.setX = result.setJumpSpeed = true;
+        result.xQ16 = direction * 65536L;
+        result.jumpSpeed = direction * 2;
+        result.alarm = 0;
+        result.sound = 113;
+    }
+    return result;
+}
+
+inline FrogAlarmEffect frogJumpAlarm(bool grounded, int jumpSpeed) {
+    FrogAlarmEffect result;
+    result.preparation = 0;
+    if (grounded) {
+        result.setX = result.setY = true;
+        result.xQ16 = jumpSpeed * 65536L;
+        result.yFifthsQ8 = -4 * 1280L; // enmFrog Create: jumpsp=4
+        result.sound = 116;
+    }
+    // The source alarm does not clear grounded; Step recomputes support.
+    return result;
+}
+
+inline bool frogLandingEdge(bool grounded, bool& landed) {
+    const bool justLanded = grounded && !landed;
+    landed = grounded;
+    return justLanded;
+}
+
 inline bool frogInsideView(long x, long y, long left, long top, long right, long bottom) {
     return x > left && x < right && y > top && y < bottom;
 }

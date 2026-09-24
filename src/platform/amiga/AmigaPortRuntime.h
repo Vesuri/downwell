@@ -7,6 +7,7 @@
 #include "core/GameplayLimits.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
+#include "core/FrogBehavior.h"
 
 #include <cstdint>
 
@@ -175,6 +176,7 @@ public:
     std::uint64_t trajectoryDigest() const { return trajectory_.value(); }
 
 private:
+    void applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect);
     void advanceEnemyAlarms();
     GenerationStep generationStep_ = nullptr;
     void* generationContext_ = nullptr;
