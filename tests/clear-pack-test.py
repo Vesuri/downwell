@@ -35,13 +35,16 @@ for i in range(pack.HEADER.unpack_from(data)[3]):
         assert (ox, oy) == (sprite["originX"], sprite["originY"])
     assert pack.decode_planar(data[offset:offset + length], width, height, stride) == [
         pack.pixel_to_pen(pixel) for pixel in expected.get_flattened_data()]
-assert len(records) == 96 and {(ident, 0) for ident in texts} <= records.keys()
+assert len(records) == 119 and {(ident, 0) for ident in texts} <= records.keys()
+for upgrade in range(23):
+    assert texts[64600 + upgrade] == texts[64100 + upgrade] + " 2"
 for area in range(1, 5):
     for level in range(1, 4):
         assert texts[64500 + (area - 1) * 3 + level - 1] == f"{area}-{level}\n{texts[64000]}"
 sprites = [524, 528, 512, 520, 518, 521, 522, 506, 507, 508, 509, 510,
            511, 516, 523, 525, 529, 530, 531, 532, 533, 534, 535]
-bundles = [records[sprite, 0][-1] + records[64100 + i, 0][-1] + records[64300 + i, 0][-1]
+bundles = [records[sprite, 0][-1] + max(records[64100 + i, 0][-1],
+           records[64600 + i, 0][-1] if i < 23 else 0) + records[64300 + i, 0][-1]
            for i, sprite in [*enumerate(sprites), (100, 152)]]
 # Conservative bound: ignore deduplication and reserve four distinct bundles.
 area_sprites = [51, 74, 72, 70, 55]

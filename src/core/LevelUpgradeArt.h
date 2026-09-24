@@ -1,6 +1,11 @@
 #ifndef DOWNWELL_CORE_LEVEL_UPGRADE_ART_H
 #define DOWNWELL_CORE_LEVEL_UPGRADE_ART_H
 namespace downwell {
+inline unsigned levelUpgradeNameLabel(unsigned id, unsigned owned = 0) {
+    if (id > 22 && id != 100) return 0;
+    if (!owned) return 64100 + id;
+    return id <= 22 && owned == 1 ? 64600 + id : 0;
+}
 inline unsigned levelClearStageLabel(unsigned area, unsigned level) {
     return area >= 1 && area <= 4 && level >= 1 && level <= 3 ?
         64500 + (area - 1) * 3 + level - 1 : 0;

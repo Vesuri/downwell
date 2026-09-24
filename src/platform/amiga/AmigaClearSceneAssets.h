@@ -21,21 +21,23 @@ struct AmigaClearSceneAssets {
     bool prepare(std::uint8_t* retiredStorage, unsigned retiredBytes, unsigned hudBytes,
                  const std::uint8_t* art, unsigned artBytes,
                  const std::uint8_t* mask, unsigned maskBytes,
-                 const unsigned* offers, unsigned offerCount, unsigned area, unsigned level) {
+                 const unsigned* offers, unsigned offerCount, unsigned area, unsigned level,
+                 const unsigned char* owned = nullptr) {
         const auto proposed = partition(retiredBytes, hudBytes);
         if (!retiredStorage || !proposed.valid || !mask || maskBytes != AmigaExitMask::bytes) return false;
         const unsigned bytes = AmigaClearBank::build(art, artBytes, offers, offerCount,
-            retiredStorage + proposed.resultsOffset, proposed.resultsCapacity, area, level);
+            retiredStorage + proposed.resultsOffset, proposed.resultsCapacity, area, level, owned);
         if (!bytes) return false;
         for (unsigned i = 0; i < maskBytes; ++i) retiredStorage[i] = mask[i];
         layout = proposed; bankBytes = bytes;
         return true;
     }
     bool changeOffers(std::uint8_t* retiredStorage, const std::uint8_t* art, unsigned artBytes,
-                      const unsigned* offers, unsigned offerCount, unsigned area, unsigned level) {
+                      const unsigned* offers, unsigned offerCount, unsigned area, unsigned level,
+                      const unsigned char* owned = nullptr) {
         if (!retiredStorage || !layout.valid || !bankBytes) return false;
         const unsigned bytes = AmigaClearBank::build(art, artBytes, offers, offerCount,
-            retiredStorage + layout.resultsOffset, layout.resultsCapacity, area, level);
+            retiredStorage + layout.resultsOffset, layout.resultsCapacity, area, level, owned);
         if (!bytes) return false;
         bankBytes = bytes;
         return true;

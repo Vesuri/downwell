@@ -35,11 +35,13 @@ int main(int argc, char** argv) {
             offers[i] = (sample * (i + 1) + i * 7) % 24;
             if (offers[i] == 23) offers[i] = 100;
         }
-        require(assets.changeOffers(storage, art.data(), art.size(), offers, 4, 1 + sample % 4, 1 + sample % 3),
+        unsigned char owned[23];
+        for (unsigned i = 0; i < 23; ++i) owned[i] = (sample + i) % 2;
+        require(assets.changeOffers(storage, art.data(), art.size(), offers, 4, 1 + sample % 4, 1 + sample % 3, owned),
             "rerolled offers fit alongside resident mask");
         std::vector<std::uint8_t> expected(layout.resultsCapacity);
         const unsigned bytes = AmigaClearBank::build(art.data(), art.size(), offers, 4, expected.data(), expected.size(),
-            1 + sample % 4, 1 + sample % 3);
+            1 + sample % 4, 1 + sample % 3, owned);
         require(bytes == assets.bankBytes && std::memcmp(storage + layout.resultsOffset, expected.data(), bytes) == 0,
             "resident selected artwork matches independently selected bank");
         require(std::memcmp(storage, mask.data(), mask.size()) == 0, "offer changes preserve every departure mask byte");

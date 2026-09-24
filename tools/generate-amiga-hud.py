@@ -289,6 +289,9 @@ def clear_texts(language_path):
     for area in range(1, 5):
         for level in range(1, 4):
             texts[64500 + (area - 1) * 3 + level - 1] = f"{area}-{level}\n{texts[64000]}"
+    # Source upgrade caps are at most one; Result Draw appends owned+1.
+    for upgrade in range(23):
+        texts[64600 + upgrade] = texts[64100 + upgrade] + " 2"
     return texts
 
 

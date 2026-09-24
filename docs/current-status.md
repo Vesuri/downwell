@@ -468,6 +468,24 @@ The emulator was stopped and the ordinary build restored with clean 68000
 instruction/helper audits. This verifies actual target-side copper words, not
 yet a visible clear-screen scene.
 
+The native clear draw-list adapter now consumes the shared source-order layout
+for all heading passes, upgrade icons and outlined descriptions, and returns the
+player position separately for hardware sprites. Black outlines use opaque PF2
+pen 3. Target trigonometry and raster-coordinate policy are explicit inputs and
+remain unresolved; the adapter is not yet connected to the live application.
+Offline artwork also covers Result Draw's owned-name suffix (`name + " 2"` for
+the source's maximum ownership of one); selected banks choose the matching name
+without runtime font composition. Unsupported ownership levels fail rather than
+silently dropping the suffix. The full clear pack is now 119 records / 60,224
+bytes, SHA-256
+`fa5aa8b7fd96673bb00b10c68fb9ef7ab3fd6b81701252077099391982205a4a`;
+the conservative selected-bank bound is 13,148 bytes. Source-pixel export checks,
+256 selected-bank and 256 simultaneous-mask-bank cases pass. A 360-frame fixture
+compares adapter commands against an independent shared-layout sink and retained
+pixels against full rendering, including alternating owned-name variants
+(1,310,223 pixels cleared). The adapter compiles for 68000 without unresolved
+runtime helpers; this is not a proof of original Windows rasterization or timing.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

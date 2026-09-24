@@ -25,8 +25,10 @@ int main(int argc, char** argv) {
         }
         const unsigned area = 1 + sample % 4;
         const unsigned level = 1 + sample % 3;
-        const unsigned bytes = AmigaClearBank::build(source.data(), source.size(), offers, 4, target, 32140, area, level);
-        require(bytes && bytes <= 12908, "selected offers, stage title and borders fit source-verified bound");
+        unsigned char owned[23];
+        for (unsigned i = 0; i < 23; ++i) owned[i] = (sample + i) % 2;
+        const unsigned bytes = AmigaClearBank::build(source.data(), source.size(), offers, 4, target, 32140, area, level, owned);
+        require(bytes && bytes <= 13148, "selected offers, stage title and borders fit source-verified bound");
         if (bytes > maximum) maximum = bytes;
         require(std::memcmp(target + 12, source.data() + 12, 8) == 0, "input provenance prefix preserved");
         const unsigned count = AmigaClearBank::longword(target + 8);
@@ -36,7 +38,7 @@ int main(int argc, char** argv) {
         for (unsigned i = 0; i < count; ++i) {
             const auto* copied = target + 20 + i * 24;
             const auto key = AmigaClearBank::longword(copied);
-            if (AmigaClearBank::word(copied) >= 64500) {
+            if (AmigaClearBank::word(copied) >= 64500 && AmigaClearBank::word(copied) < 64512) {
                 require(AmigaClearBank::word(copied) == downwell::levelClearStageLabel(area, level),
                     "bank includes only this stage's composed title");
                 ++titles;
@@ -66,10 +68,22 @@ int main(int argc, char** argv) {
         }
         require(borders == 4, "both border frames from both selected areas survive sorting");
         require(titles == 1, "exactly one stage title is banked");
+        for (unsigned id : offers) {
+            const unsigned wanted = downwell::levelUpgradeNameLabel(id, id < 23 ? owned[id] : 0);
+            unsigned found = 0;
+            for (unsigned i = 0; i < count; ++i)
+                found += AmigaClearBank::word(target + 20 + i * 24) == wanted;
+            require(found == 1, "exact owned-name variant banked once");
+        }
         for (unsigned i = 0; i < 16; ++i)
             require(storage[i] == 0xa5 && storage[storage.size() - 1 - i] == 0xa5, "adjacent staging/HUD guards intact");
     }
     const auto before = storage;
+    unsigned char invalidOwned[23] = {};
+    invalidOwned[0] = 2;
+    const unsigned ownedOffer[] = {0};
+    require(!AmigaClearBank::build(source.data(), source.size(), ownedOffer, 1, target, 32140, 1, 1, invalidOwned) &&
+        storage == before, "unsupported ownership level fails instead of displaying an incorrect name");
     unsigned bad[] = {99}, fallback[] = {100, 100, 100, 100};
     require(!AmigaClearBank::build(source.data(), source.size(), bad, 1, target, 32140) &&
         !AmigaClearBank::build(source.data(), 19, fallback, 4, target, 32140) &&

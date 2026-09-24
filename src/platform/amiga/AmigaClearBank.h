@@ -15,7 +15,8 @@ struct AmigaClearBank {
     }
     static unsigned build(const std::uint8_t* source, unsigned size,
             const unsigned* offers, unsigned offerCount,
-            std::uint8_t* target, unsigned capacity, unsigned area = 1, unsigned level = 1) {
+            std::uint8_t* target, unsigned capacity, unsigned area = 1, unsigned level = 1,
+            const unsigned char* owned = nullptr) { // optional 23-entry source inventory
         if (!source || !target || (offerCount && !offers) || offerCount > 4 || size < 20 ||
             longword(source) != 0x44574150u || word(source + 4) != 2 || word(source + 6) != 20)
             return 0;
@@ -31,7 +32,10 @@ struct AmigaClearBank {
         for (unsigned i = 0; i < offerCount; ++i) {
             const unsigned sprite = downwell::levelUpgradeSprite(offers[i]);
             if (!sprite) return 0;
-            const unsigned bundle[] = {sprite, 64100 + offers[i], 64300 + offers[i]};
+            const unsigned name = downwell::levelUpgradeNameLabel(offers[i],
+                owned && offers[i] < 23 ? owned[offers[i]] : 0);
+            if (!name) return 0;
+            const unsigned bundle[] = {sprite, name, 64300 + offers[i]};
             for (unsigned id : bundle) {
                 bool found = false;
                 for (unsigned j = 0; j < count; ++j) found |= ids[j] == id && frames[j] == 0;

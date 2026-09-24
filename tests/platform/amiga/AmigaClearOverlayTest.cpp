@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaClearOverlay.h"
+#include "platform/amiga/AmigaClearDrawList.h"
 #include "core/LevelClearLayout.h"
 #include <vector>
 #include <fstream>
@@ -38,6 +39,7 @@ int main(int argc, char** argv) {
         if (tick == 60) room.motion.showChoices();
         room.motion.step(tick >= 300);
         room.selection.cursor = (tick / 19) % 4;
+        for (unsigned id = 0; id < 23; ++id) inventory.levels[id] = tick % 2;
         room.carousel.step(room.selection.cursor);
         const auto frame = room.presentation.advance(1, 2, 4, tick >= 60 && tick < 300);
         struct Sink {
@@ -57,7 +59,10 @@ int main(int argc, char** argv) {
                 commands[count++] = {id, 0, 110 + coordinate(x), coordinate(y) - viewY, int(pen)};
             }
             void description(unsigned id, downwell::LevelClearCoordinate x, downwell::LevelClearCoordinate y, unsigned suffix) {
-                require(!suffix, "fixture uses unowned offers");
+                if (suffix) {
+                    require(suffix == 2 && id >= 64100 && id <= 64122, "source owned-name path");
+                    id += 500;
+                }
                 const int px = 110 + coordinate(x), py = coordinate(y) - viewY;
                 commands[count++] = {id, 0, px + 1, py, 3};
                 commands[count++] = {id, 0, px - 1, py, 3};
@@ -69,12 +74,23 @@ int main(int argc, char** argv) {
         downwell::drawLevelClear(sink, room, frame, inventory,
             sample(std::fabs(std::cos(frame.circle * (3.14159265358979323846 / 180.0)))),
             sample(std::fabs(std::sin(frame.time / 20.0))));
+        AmigaClearDrawList native;
+        require(native.build(room, frame, inventory,
+            sample(std::fabs(std::cos(frame.circle * (3.14159265358979323846 / 180.0)))),
+            sample(std::fabs(std::sin(frame.time / 20.0))),
+            [&](downwell::LevelClearCoordinate value) { return sink.coordinate(value); }),
+            "production draw-list adapter accepts shared source layout");
+        require(native.count == sink.count, "native layout retains every overlay command");
+        require(native.playerX == 190 && native.playerY == int(room.motion.playerY.floor()) - room.motion.viewY(),
+            "player sprite position remains separate from planar overlay commands");
+        for (unsigned i = 0; i < sink.count; ++i)
+            require(native.commands[i] == sink.commands[i], "native draw commands match independent source-order sink");
         const unsigned back = tick % 2;
         AmigaRenderer renderer;
         amigaRendererInit(&renderer, game.data(), hud[back].data());
         const auto before = renderer;
         unsigned painted = 0;
-        require(caches[back].render(renderer, pack.data(), pack.data() + pack.size(), sink.commands, sink.count, painted),
+        require(caches[back].render(renderer, pack.data(), pack.data() + pack.size(), native.commands, native.count, painted),
             "retained overlay accepts source layout commands");
         totalPainted += painted;
         require(renderer.target == before.target && renderer.clipX == before.clipX && renderer.clipWidth == before.clipWidth,
