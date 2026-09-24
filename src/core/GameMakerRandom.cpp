@@ -59,13 +59,12 @@ std::uint32_t GameMakerRandom::irandomSmall(
     if (!(divisor & (divisor - 1U))) return low & (divisor - 1U);
     /*
      * (high << 32 | low) % divisor, reduced a word at a time.  With a
-     * divisor of at most 65536 every product remains inside uint32_t.
+     * divisor of at most 65536, appending each low 16-bit word to a
+     * remainder fits uint32_t. No multiplication or 2^32 remainder needed.
      */
-    const std::uint32_t twoTo32Modulo =
-        ((0xffffffffU % divisor) + 1U) % divisor;
-    const std::uint32_t highRemainder =
-        ((high % divisor) * twoTo32Modulo) % divisor;
-    return (highRemainder + low % divisor) % divisor;
+    std::uint32_t remainder = high % divisor;
+    remainder = ((remainder << 16U) | (low >> 16U)) % divisor;
+    return ((remainder << 16U) | (low & 0xffffU)) % divisor;
 }
 
 std::uint32_t GameMakerRandom::randomIntegerSmall(

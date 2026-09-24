@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 33.22 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at about 33.2 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -66,6 +66,25 @@ Nested probes split one long callback into many exclusive brackets. Its old
 though the stall were fixed. The extra probes also add overhead: this run
 uses 1,136 fields and has a 159.643 ms maximum whole frame. Use uninstrumented
 FPSCOUNT for shipping performance; all new callbacks compile out otherwise.
+
+### Three-remainder small-range RNG reduction
+
+The non-power-of-two path now reduces the high word, appends the upper 16
+bits of the low word and reduces again, then appends the remaining 16 bits
+and reduces once more. Each intermediate fits uint32 because the remainder
+is below a divisor of at most 65536. This replaces six remainder operations
+and a multiply with three remainders, preserving both stream draws exactly.
+
+With the same detailed probes, builder-exclusive time falls from 432.597 to
+424.684 ms over 600 updates. Fields are 1,135 versus 1,136; the whole-frame
+maximum remains 159.589 ms with probes. This is a small arithmetic saving,
+not a solution to the generation stall. Evidence uses
+`/tmp/downwell-rng-word-`; all supported bounds are tested against the
+original positive-63-bit remainder and subsequent RNG stream word.
+FPSCOUNT reports 904 fields for 600 updates (33.19 FPS, maximum gap six),
+versus 903 previously: effectively unchanged, not a frame-rate improvement.
+The full host suite and bounded native replay pass with unchanged digests.
+Both 68000 audits pass, and the ordinary non-skip executable is restored.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 
