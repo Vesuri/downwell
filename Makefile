@@ -221,6 +221,13 @@ test: test-ammo-dividers test-ammo-fill
 test: test-shop-inventory
 test: test-shop-interaction test-shop-menu-layout
 test: test-level-exit
+test: test-level-upgrade-offers
+.PHONY: test-level-upgrade-offers
+build/level-upgrade-offers-test: tests/core/LevelUpgradeOffersTest.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/LevelUpgradeOffersTest.cpp src/core/GameMakerRandom.cpp
+test-level-upgrade-offers: build/level-upgrade-offers-test
+	./build/level-upgrade-offers-test
 test: test-goal-time-field
 .PHONY: test-goal-time-field
 build/goal-time-field-test: tests/core/GoalTimeFieldTest.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)

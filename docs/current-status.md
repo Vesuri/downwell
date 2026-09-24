@@ -154,6 +154,17 @@ both live copper pointers, six-plane mode and the bank's bytes through full
 coverage. It is not a Windows visual comparison, natural full-level playthrough,
 or a 20ms performance claim. Result-room loading remains unimplemented.
 
+The result-room prerequisite `LevelUpgradeOffers.h` now reproduces
+resultRandomizeUg from VM assembly: inclusive slot/ID bounds, upgrade-cap
+eligibility, duplicate rejection, 61 rejected rolls per slot, fallback 100 in
+the first three slots, and the source's unchanged fourth slot on exhaustion.
+Focused tests cover exhausted/single-candidate pools, final-attempt acceptance,
+and 256 seeded comparisons of offered IDs plus full runner RNG state. This
+component is not yet connected to a live level-clear menu or an upgrade
+inventory; selecting and applying upgrades, room rendering and progression
+remain work. It does not restrict the original upgrade pool to implemented
+effects merely to make a menu usable.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
