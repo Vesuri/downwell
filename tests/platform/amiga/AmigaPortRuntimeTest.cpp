@@ -69,6 +69,25 @@ struct GenerationOrderProbe {
 } // namespace
 
 int main() {
+    {
+        AmigaPortRuntime pool(0);
+        require(pool.bulletSlotEnd() == 0 && pool.gemSlotEnd() == 0, "new pools have empty occupied spans");
+        for (unsigned tick = 0; tick < 1200; ++tick) {
+            pool.step(tick % 97 < 70 ? 4 : 0);
+            require(pool.bulletSlotEnd() <= pool.bulletCapacity && pool.gemSlotEnd() <= pool.gemCapacity,
+                    "occupied spans stay within original capacities");
+            unsigned bullets = 0, gems = 0;
+            for (unsigned i = 0; i < pool.bulletCapacity; ++i) {
+                bullets += pool.bulletAt(i).active;
+                require(i < pool.bulletSlotEnd() || !pool.bulletAt(i).active, "no live bullet outside occupied span");
+            }
+            for (unsigned i = 0; i < pool.gemCapacity; ++i) {
+                gems += pool.gemAt(i).active;
+                require(i < pool.gemSlotEnd() || !pool.gemAt(i).active, "no live gem outside occupied span");
+            }
+            require(bullets == pool.bulletCount() && gems == pool.gemCount(), "bounded counts equal full scans");
+        }
+    }
     for (unsigned rate : {0u, 2u, 3u, 4u, 5u}) {
         unsigned phase = 0;
         unsigned char remainder = 0;
@@ -861,11 +880,13 @@ int main() {
                 stomp.gemAt(1).amount == 2 &&
                 stomp.gemAt(2).amount == 2,
             "six-value snake reward splits into three recovered small gems");
+    require(stomp.gemSlotEnd() == 3, "reward births extend the occupied gem span");
     for (unsigned frame = 0;
          frame < 120 && stomp.gemCount() != 0; ++frame)
         stomp.step(0);
     require(stomp.currency() == 6 && stomp.gemCount() == 0,
             "attracted stomp reward reaches the player and enters currency");
+    require(stomp.gemSlotEnd() == 0, "collected gem tail shrinks to an empty span");
     require(stomp.gameGemTotal() == 6, "native account retains the source run-wide gem total");
     require(stomp.gemStreak() == 6 && stomp.gemStreakTimer() == 300,
             "collected physical gems feed the recovered streak timer");

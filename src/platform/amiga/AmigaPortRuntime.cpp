@@ -54,6 +54,7 @@ bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, uns
     death_ = {};
     invulnerability_ = 0;
     enemyCount_ = enemiesDefeated_ = breakableCount_ = blocksDestroyed_ = 0;
+    bulletSlotEnd_ = gemSlotEnd_ = 0;
     for (unsigned i = 0; i < bulletCapacity; ++i) bullets_[i].active = false;
     for (unsigned i = 0; i < enemyCapacity; ++i) enemies_[i].active = false;
     for (unsigned i = 0; i < gemCapacity; ++i) gems_[i].active = false;
@@ -150,7 +151,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
 
 void AmigaPortRuntime::spawnReward(const EnemyState& enemy, bool attracted)
 {
-    unsigned next = downwell::compactCurrencySlots(gems_, gemCapacity);
+    unsigned next = downwell::compactCurrencySlots(gems_, gemSlotEnd_);
     downwell::spawnCurrencyReward(enemy.reward, enemy.x, enemy.y, attracted,
         gemCapacity - next, enemyRandom_, [this, &enemy, attracted, &next](const downwell::CurrencyBirth& birth) {
         GemState& gem = gems_[next++];
@@ -167,12 +168,13 @@ void AmigaPortRuntime::spawnReward(const EnemyState& enemy, bool attracted)
         gem.attracted = attracted;
         gem.active = true;
     }, run_.upgrades.levels[10] != 0);
+    gemSlotEnd_ = next;
 }
 
 unsigned AmigaPortRuntime::gemCount() const
 {
     unsigned count = 0;
-    for (unsigned index = 0; index < gemCapacity; ++index)
+    for (unsigned index = 0; index < gemSlotEnd_; ++index)
         if (gems_[index].active)
             ++count;
     return count;
@@ -255,7 +257,7 @@ unsigned AmigaPortRuntime::bulletCount() const
 {
     unsigned count = 0;
     unsigned index;
-    for (index = 0; index < bulletCapacity; ++index)
+    for (index = 0; index < bulletSlotEnd_; ++index)
         if (bullets_[index].active)
             ++count;
     return count;
@@ -270,7 +272,7 @@ AmigaPortRuntime::bulletAt(unsigned index) const
 int AmigaPortRuntime::bulletX() const
 {
     unsigned index;
-    for (index = 0; index < bulletCapacity; ++index)
+    for (index = 0; index < bulletSlotEnd_; ++index)
         if (bullets_[index].active)
             return bullets_[index].x;
     return 0;
@@ -279,7 +281,7 @@ int AmigaPortRuntime::bulletX() const
 int AmigaPortRuntime::bulletY() const
 {
     unsigned index;
-    for (index = 0; index < bulletCapacity; ++index)
+    for (index = 0; index < bulletSlotEnd_; ++index)
         if (bullets_[index].active)
             return bullets_[index].y;
     return 0;
@@ -522,10 +524,12 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }
     if (player_.shots() != oldShots) {
         const int muzzleOffset = emitter_.nextOffset();
-        const unsigned index = downwell::compactInstanceSlots(bullets_, bulletCapacity);
+        const unsigned index = downwell::compactInstanceSlots(bullets_, bulletSlotEnd_);
+        bulletSlotEnd_ = index;
         if (index < bulletCapacity) {
             BulletState& bullet = bullets_[index];
             bullet.active = true;
+            bulletSlotEnd_ = index + 1;
             bullet.x = muzzleX + muzzleOffset;
             bullet.y = muzzleY;
             bullet.gemHigh = run_.gemHigh;
@@ -580,7 +584,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     {
         unsigned bulletIndex;
         DW_PROFILE_PHASE(profileBullets);
-        for (bulletIndex = 0; bulletIndex < bulletCapacity; ++bulletIndex) {
+        for (bulletIndex = 0; bulletIndex < bulletSlotEnd_; ++bulletIndex) {
             BulletState& bullet = bullets_[bulletIndex];
             if (!bullet.active)
                 continue;
@@ -825,7 +829,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }
 
     DW_PROFILE_PHASE(profileGems);
-    for (unsigned gemIndex = 0; gemIndex < gemCapacity; ++gemIndex) {
+    for (unsigned gemIndex = 0; gemIndex < gemSlotEnd_; ++gemIndex) {
         GemState& gem = gems_[gemIndex];
         if (!gem.active)
             continue;
@@ -847,6 +851,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }
 
     DW_PROFILE_PHASE(profileLifecycle);
+    // Only discard inactive tails; holes stay in creation order until the
+    // existing stable compaction at the next birth. Never reorder live slots.
+    while (bulletSlotEnd_ && !bullets_[bulletSlotEnd_-1].active) --bulletSlotEnd_;
+    while (gemSlotEnd_ && !gems_[gemSlotEnd_-1].active) --gemSlotEnd_;
     run_.exitDither.step(cameraMotion_.pixelY() - 142, 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);

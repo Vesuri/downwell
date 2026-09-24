@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at about 33.3 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 34.97 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -106,6 +106,29 @@ FPSCOUNT-only result: 901 fields for 600 updates (33.30 FPS, maximum gap
 five fields), versus 904 fields and a six-field maximum before this change.
 The complete host suite, bounded native replay, and both 68000 audits pass.
 All replay digests are unchanged, and the normal non-skip executable is restored.
+
+### Bound traversal to occupied bullet/gem slots
+
+The native runtime retains an occupied-end index for each pool. Births still
+use the shared stable compaction in creation order, with the original full
+capacity available. Only inactive tails are trimmed after stepping; holes
+remain untouched until the next birth. Slots beyond the end are always
+inactive. Simulation, counting and actor presentation can omit this unused
+tail without changing event order, birth limits, RNG or sprite allocation.
+Level transitions reset both bounds along with their pools.
+
+Tests compare bounded counts with full-capacity scans over 1,200 updates and
+assert that no live slot is omitted; reward births and complete collection
+also exercise gem-bound expansion and contraction. Runtime fixture digests
+are unchanged. In the same 600-update probe tape, actor presentation costs
+1,512.311 ms (2.521 ms/update), gem stepping 58.330 ms (0.097 ms/update), and
+the instrumented tape uses 1,096 fields versus 1,136 previously. This is
+still not a 20 ms frame-budget pass. Evidence uses `/tmp/downwell-pool-span-`.
+The FPSCOUNT-only tape uses 858 PAL fields for 600 updates (**34.97 FPS**,
+maximum gap five fields), down from 901 fields / 33.30 FPS.
+The full host suite and bounded native replay pass with unchanged digests.
+The native gameplay shot capture has 0/99,968 differing pixels against SDL.
+Both 68000 audits pass; the ordinary non-skip executable is restored.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 

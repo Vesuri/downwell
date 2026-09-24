@@ -2915,7 +2915,7 @@ int main(void) {
                     gameplayPlayerStartY + downwell::roundGameMakerQ8(port.player().offsetYFixed()) - port.cameraOffsetY(),
 #endif
                     port.player().facing() < 0)) frameReady = false;
-            for (unsigned index = 0; index < AmigaPortRuntime::bulletCapacity; ++index) {
+            for (unsigned index = 0; index < port.bulletSlotEnd(); ++index) {
                 const auto& bullet = port.bulletAt(index);
                 // The pack generator checks every possible nearest-pixel
                 // sample over 267..273 degrees for all twelve source frames:
@@ -2928,7 +2928,7 @@ int main(void) {
                     frameReady = false;
             }
 #ifndef DOWNWELL_REPLAY_VERIFY
-            for (unsigned index = 0; index < AmigaPortRuntime::gemCapacity; ++index) {
+            for (unsigned index = 0; index < port.gemSlotEnd(); ++index) {
                 const auto& gem = port.gemAt(index);
                 if (gem.active && !appendGameplayActor(actors, actorCount,
                         (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),

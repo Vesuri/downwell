@@ -198,6 +198,8 @@ public:
     unsigned tick() const { return tick_; }
     unsigned ringOrigin() const { return ringOrigin_; }
     unsigned bulletCount() const;
+    unsigned bulletSlotEnd() const { return bulletSlotEnd_; }
+    unsigned gemSlotEnd() const { return gemSlotEnd_; }
     const BulletState& bulletAt(unsigned index) const;
     const EnemyState& enemyAt(unsigned index) const;
     unsigned enemyCount() const { return enemyCount_; }
@@ -313,6 +315,7 @@ private:
     int cameraPixelX_;
     int activationY_;
     BulletState bullets_[bulletCapacity];
+    unsigned bulletSlotEnd_ = 0, gemSlotEnd_ = 0;
     EnemyState enemies_[enemyCapacity];
     GemState gems_[gemCapacity];
     unsigned enemyCount_;
