@@ -103,10 +103,26 @@ void testReplayProducesStableStartupState() {
 }
 
 void testPortCheckpointIsStable() {
-    require(downwell::portCheckpointDigest(
-                50, 5, -12, 7, 6, false, 2, 3, 30, true, -1, 15) ==
-                0x0fbb9033af57691fULL,
-            "port checkpoint remains endian-stable");
+    PlayerMotion player(false, 300);
+    const auto checkpoint = downwell::portCheckpointDigest(
+        50, 5, player, 30, true, -1, 15);
+    require(checkpoint == 0x860ff3c3941bc1a5ULL,
+            "schema-three player-complete checkpoint remains wire-stable");
+    PlayerMotion delayed = player;
+    delayed.initializeEntryInput(false);
+    require(player.offsetX() == delayed.offsetX() && player.offsetY() == delayed.offsetY() &&
+            player.ammo() == delayed.ammo() && player.spriteId() == delayed.spriteId(),
+            "hidden-state fixture has identical visible player fields");
+    require(checkpoint != downwell::portCheckpointDigest(50, 5, delayed, 30, true, -1, 15),
+            "checkpoint detects different shot timers behind identical pixels");
+    PlayerMotion bounced = player;
+    bounced.stompBounce();
+    require(player.offsetX() == bounced.offsetX() && player.offsetY() == bounced.offsetY() &&
+            player.ammo() == bounced.ammo() && player.grounded() == bounced.grounded() &&
+            player.jumps() == bounced.jumps() && player.shots() == bounced.shots(),
+            "forced spin is invisible to all legacy player checkpoint fields");
+    require(checkpoint != downwell::portCheckpointDigest(50, 5, bounced, 30, true, -1, 15),
+            "checkpoint detects forced-jump velocity and spin state before any movement");
 }
 
 } // namespace

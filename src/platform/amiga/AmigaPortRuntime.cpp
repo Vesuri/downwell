@@ -889,9 +889,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
     checkpoint_ = downwell::portCheckpointDigest(
-        tick_, packedInput, player_.offsetX(), player_.offsetY(),
-        (std::uint32_t)player_.ammo(), player_.grounded(), player_.jumps(),
-        player_.shots(), ringOrigin_, firstBulletActive,
+        tick_, packedInput, player_, ringOrigin_, firstBulletActive,
         bulletX(), bulletY());
     trajectory_.addU64(checkpoint_);
 #endif

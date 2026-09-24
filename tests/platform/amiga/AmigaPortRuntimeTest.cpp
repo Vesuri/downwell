@@ -627,7 +627,7 @@ int main() {
     }
     std::cout << "Native trajectory digest: " << std::hex
               << replayRuntime.trajectoryDigest() << std::dec << '\n';
-    require(replayRuntime.trajectoryDigest() == 0xbfbbd762b9b62a59ULL,
+    require(replayRuntime.trajectoryDigest() == 0x9f0d3943e7900d2bULL,
             "cross-target trajectory digest remains pinned");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;

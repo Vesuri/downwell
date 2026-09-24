@@ -335,3 +335,27 @@ the renderer compares 13,916 offline variants. Bounded 68000 replay and A500
 600-tick terrain-cache checks pass, with clean target instruction/helper
 audits. Normal SDL and Amiga builds are restored. The short replay checksum
 is unchanged; it is not a complete digest of animation state.
+
+## Player-complete cross-target checkpoint (schema 3)
+
+PortCheckpoint now calls PlayerMotion::appendStateDigest instead of sampling
+only integer position, ammo, grounded state and jump/shot counters. Thus the
+actual 68000 replay comparison includes subpixel positions/velocities,
+fractional remainders, pre-movement position, shot delay, input locks, spin
+state and animation phase. Both SDL state hashing and target verification
+reuse the same serializer. Callback addresses remain excluded deliberately.
+
+A regression fixture gives two players identical display fields but different
+shot countdowns and requires different checkpoints. Schema 3's standalone
+fixture is `860ff3c3941bc1a5`; the unchanged 64-input tape's host trajectory is
+`9f0d3943e7900d2b` instead of schema 2's `bfbbd762b9b62a59`. This is an explicit
+serialization change, not a gameplay correction or a relaxed comparison.
+
+Scope remains limited: the checkpoint retains only the first bullet and does
+not yet serialize the complete enemy/gem/world state. The tape is still 64
+updates. Normal Amiga builds compile out checkpoint calculation, so the extra
+verification work does not consume the playable build's frame budget.
+
+Validation: bounded host/68000 replay agrees on `64 9f0d3943 e7900d2b`;
+target instruction and helper audits pass, and the verifier restores the
+normal Amiga build. No input tape or gameplay behavior changed in this slice.
