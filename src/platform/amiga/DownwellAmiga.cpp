@@ -266,6 +266,7 @@ extern "C" { volatile ULONG gDownwellStackGuardReady; }
 #ifdef DOWNWELL_REPLAY_VERIFY
 #include "core/GemVerification.h"
 #include "core/PlayerDeathVerification.h"
+#include "core/MachineGunVerification.h"
 extern "C" {
 volatile ULONG gReplayComplete;
 volatile ULONG gReplayFrames;
@@ -277,6 +278,9 @@ volatile ULONG gGemReplayCoverage;
 volatile ULONG gDeathReplayDigestHigh;
 volatile ULONG gDeathReplayDigestLow;
 volatile ULONG gDeathReplayCoverage;
+volatile ULONG gWeaponReplayDigestHigh;
+volatile ULONG gWeaponReplayDigestLow;
+volatile ULONG gWeaponReplayCoverage;
 
 __attribute__((noinline, used)) void downwellReplayComplete(void) {
     __asm__ volatile("" ::: "memory");
@@ -3261,6 +3265,10 @@ int main(void) {
             gDeathReplayDigestHigh = (ULONG)(death.digest >> 32);
             gDeathReplayDigestLow = (ULONG)death.digest;
             gDeathReplayCoverage = death.coverage;
+            const auto weapon = downwell::verifyMachineGun();
+            gWeaponReplayDigestHigh = (ULONG)(weapon.digest >> 32);
+            gWeaponReplayDigestLow = (ULONG)weapon.digest;
+            gWeaponReplayCoverage = weapon.coverage;
             gReplayComplete = 1;
             downwellReplayComplete();
             for (;;) platform.waitVblank();

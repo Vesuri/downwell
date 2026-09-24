@@ -17,7 +17,7 @@ while $guard_word < 64
     set $guard_word = $guard_word + 1
 end
 printf "Replay task stack retained its 256-byte safety margin\n"
-printf "DOWNWELL_REPLAY_RESULT %u %08x %08x 400 %08x %08x %02x 480 %08x %08x %03x\n", gReplayFrames, gReplayDigestHigh, gReplayDigestLow, gGemReplayDigestHigh, gGemReplayDigestLow, gGemReplayCoverage, gDeathReplayDigestHigh, gDeathReplayDigestLow, gDeathReplayCoverage
+printf "DOWNWELL_REPLAY_RESULT %u %08x %08x 400 %08x %08x %02x 480 %08x %08x %03x 64 %08x %08x %02x\n", gReplayFrames, gReplayDigestHigh, gReplayDigestLow, gGemReplayDigestHigh, gGemReplayDigestLow, gGemReplayCoverage, gDeathReplayDigestHigh, gDeathReplayDigestLow, gDeathReplayCoverage, gWeaponReplayDigestHigh, gWeaponReplayDigestLow, gWeaponReplayCoverage
 shell touch .run/gdb-ready.marker
 detach
 quit

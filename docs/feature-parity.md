@@ -9,6 +9,25 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Gem-high cross-CPU transition fixture
+
+The bounded native replay now also runs `verifyMachineGun`, a 64-update
+shared firing/impact fixture. A 100-gem streak expires at update 11; the
+fixture fires eight shots, checking both six/seven-update cadences and both
+birth profiles. Synthetic impacts happen ten updates after creation, so a
+powered shot must still apply fifteen damage after the current level has
+returned to normal. All eight impacts must retain the correct damage and
+queued bat-hit response. Sprite IDs and every shot's birth level are hashed.
+
+Schema 1 digest: `f69ed13f38139fca`; required coverage `7f` (normal/high
+births, both cadence gaps, retained powered impact after expiry, streak
+expiry and all-eight-impact accounting). Host tests pin this digest; the
+replay gate compares host/native results and retains its existing task-stack
+guard and 45-second emulator bound. This tests shared code on the 68000,
+not native display pixels, collision geometry or real-time performance.
+The expanded replay passes on the 68000 with the same digest and coverage;
+the stack guard and both CPU audits pass, and the normal executable is restored.
+
 ### Live machine-gun gem-high selection and shot snapshots
 
 Both controller adapters now select the shared machine-gun level after the

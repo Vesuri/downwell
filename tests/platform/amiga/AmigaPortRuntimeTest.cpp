@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaPortRuntime.h"
 #include "core/GemVerification.h"
+#include "core/MachineGunVerification.h"
 #include "platform/amiga/AmigaActorChannels.h"
 #include "core/PortReplay.h"
 #include "core/Replay.h"
@@ -996,6 +997,10 @@ int main() {
               << " coverage=" << gems.coverage << '\n';
     require(gems.coverage == 255 && gems.digest == 0x7e82f060aa3fcbf9ULL,
             "gem cross-CPU fixture covers motion plus collection/account expiry with a pinned digest");
+    const auto weapon = downwell::verifyMachineGun();
+    require(weapon.coverage == downwell::machineGunVerificationCoverage &&
+                weapon.digest == 0xf69ed13f38139fcaULL,
+            "weapon CPU fixture pins expiry, both cadences and delayed birth-profile impacts");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;
 }
