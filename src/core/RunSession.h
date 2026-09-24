@@ -14,6 +14,7 @@
 #include "GoalTimeField.h"
 #include "ExitDither.h"
 #include "UpgradeInventory.h"
+#include "CurrencyStep.h"
 #include "LevelClearController.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
@@ -39,6 +40,19 @@ struct RunSession {
     Consumables consumables;
     UpgradeInventory upgrades;
     ShopWorld shops;
+    // Pickup-only upgrade effects: nonGemGainGem (combo rewards) does not
+    // invoke scrRechargeGem. Ownership is sampled at collection, not birth.
+    template<class Solid, class Random>
+    CurrencyStepResult collectCurrency(GemMotion& motion, bool large, unsigned amount,
+        PlayerMotion& player, CurrencyAccount& currency, Solid solid, Random& random) {
+        const auto result = stepCurrency(motion, large, amount,
+            player.frameStartXFixed(), player.frameStartYFixed(),
+            player.offsetXFixed(), player.offsetYFixed(), currency, solid, random,
+            upgrades.levels[20] != 0);
+        if (result == CurrencyStepResult::collected && upgrades.levels[4])
+            player.rechargeFromGem(amount);
+        return result;
+    }
     // Shop Create snapshots prices from run ownership; acquiring a card later
     // does not reprice already-created stock. Other style/difficulty modes
     // remain separate from the current usual-style, normal run adapter.

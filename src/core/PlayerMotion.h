@@ -78,6 +78,16 @@ public:
     bool spinJumping() const { return spinJumping_; }
     int ammo() const { return ammo_; }
     int ammoCapacity() const { return ammoCapacity_; }
+    // scrRechargeGem: round(getAmount / 2), capped at capacity. This is not
+    // scrRecharge and must not publish its full-recharge counter/effects.
+    bool rechargeFromGem(unsigned amount) {
+        if (ammo_ >= ammoCapacity_) return false;
+        unsigned charge = amount / 2;
+        if ((amount & 1u) && (charge & 1u)) ++charge; // ties to even
+        const unsigned missing = static_cast<unsigned>(ammoCapacity_ - ammo_);
+        ammo_ += static_cast<int>(charge < missing ? charge : missing);
+        return true; // Source emits effects even if rounding produces zero.
+    }
     // comboRewardText Create increases global.ammo and refills global.stammo.
     void increaseAmmoCapacity(unsigned amount) {
         ammoCapacity_ += static_cast<int>(amount);

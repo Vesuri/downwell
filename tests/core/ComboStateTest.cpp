@@ -1,12 +1,46 @@
 #include "core/ComboState.h"
 #include "core/ComboGrants.h"
 #include "core/RunCombo.h"
+#include "core/RunSession.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    for (unsigned amount = 0; amount <= 15; ++amount) {
+        PlayerMotion player(false, 10000);
+        downwell::Input fire; fire.fire = true;
+        for (unsigned tick = 0; tick < 100; ++tick) player.step(fire);
+        require(player.ammo() == 0, "gem recharge fixture empties the gun in the air");
+        const unsigned before = player.recharges();
+        const unsigned halfEven[] = {0,0,1,2,2,2,3,4,4,4,5,6,6,6,7,8};
+        require(player.rechargeFromGem(amount) && player.ammo() == static_cast<int>(halfEven[amount]) &&
+                player.recharges() == before,
+                "gem recharge rounds half to even without a full-recharge event");
+        player.rechargeFromGem(100);
+        require(player.ammo() == player.ammoCapacity() && !player.rechargeFromGem(2),
+                "gem recharge clamps to capacity and does nothing when full");
+    }
+    for (bool owned : {false, true}) {
+        downwell::RunSession run;
+        downwell::CurrencyAccount currency;
+        PlayerMotion player(false, 10000);
+        downwell::Input fire; fire.fire = true;
+        player.step(fire);
+        const int before = player.ammo();
+        require(before == 7, "pickup fixture starts with one spent charge");
+        downwell::GemMotion gem;
+        gem.x = static_cast<int>(player.offsetXFixed() * 50);
+        gem.y = static_cast<int>(player.offsetYFixed() * 50);
+        gem.lifetime.age = 9;
+        run.upgrades.levels[4] = owned;
+        struct Random { unsigned randomIntegerSmall(unsigned) { return 0; } } random;
+        require(run.collectCurrency(gem, false, 2, player, currency,
+                [](int, int) { return false; }, random) == downwell::CurrencyStepResult::collected &&
+                player.ammo() == (owned ? 8 : before),
+                "shared pickup applies Gem Powered only with current ownership");
+    }
     for (bool upgraded : {false, true}) {
         downwell::RunCombo combo;
         downwell::CurrencyAccount currency;

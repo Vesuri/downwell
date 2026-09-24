@@ -1152,6 +1152,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "comparison exercises incremental terrain rather than a complete forecast");
     if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
         const bool candleFixture = std::getenv("DOWNWELL_VERIFY_CANDLE") != nullptr;
+        const bool poweredFixture = std::getenv("DOWNWELL_VERIFY_GEM_POWERED") != nullptr;
+        if (poweredFixture)
+            require(gameplay.grantUpgrade(4) && reference.grantUpgrade(4),
+                    "both live adapters grant Gem Powered before combat");
         const bool streakFixture = std::getenv("DOWNWELL_VERIFY_STREAK_UPGRADE") != nullptr;
         bool sawExtendedStreak = false;
         if (streakFixture)
@@ -1403,6 +1407,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     "live damage immunity agrees every combat update");
             require(gameplay.gemStreakTimer() == reference.mainGemStreakTimer(),
                     "live gem streak timers agree every combat update");
+            require(gameplay.player().ammo() == reference.mainAmmo(),
+                    "live charge agrees after all pickup effects, not just player movement");
             if (streakFixture && gameplay.gemStreakTimer() == 480) sawExtendedStreak = true;
             if (candleFixture && gameplay.invulnerability() == 240)
                 sawCandleDamage = true;
@@ -1461,6 +1467,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "Candle live fixture actually takes damage and publishes the extended interval");
         require(!streakFixture || sawExtendedStreak,
                 "streak fixture actually earns gems and publishes the extended interval");
+        require(!poweredFixture || gameplay.currency() > 0,
+                "Gem Powered combat fixture earns gems during the firing tape");
         std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
                   << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
                   << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()

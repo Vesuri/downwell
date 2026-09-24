@@ -9,6 +9,27 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Gem Powered pickup charge uses shared run logic
+
+`scrGainGem` invokes `scrRechargeGem` only when `pugGemPowered` (upgrade 4)
+is owned; `nonGemGainGem` does not. The recharge VM adds
+`round(getAmount / 2)` when charge is below capacity, then clamps to capacity.
+`PlayerMotion::rechargeFromGem` implements that arithmetic with integer
+ties-to-even rounding and does not emit the separate `scrRecharge` counter.
+Both adapters now use `RunSession::collectCurrency` for the pickup decision,
+Gem Sick timer configuration and Gem Powered charge effect. Ownership is
+read at pickup, not birth. SDL also republishes its player snapshot after
+pickup so charge is not stale until the next movement update.
+
+Tests cover amounts 0–15, full-capacity behavior, ownership and actual shared
+pickup, plus a paired Gem Powered combat tape comparing charge every update.
+The original recharge flash (sprite 111), sound 27 and camera shake (1,2)
+remain unimplemented here. This is the charge/accounting component of the
+upgrade, not a claim of complete audiovisual or original event-order fidelity.
+The full host suite and bounded native replay pass. Both 68000 audits are
+clean, and the ordinary build is restored. The native replay remains a
+default-run regression; the upgraded pickup/charge coverage is host-side.
+
 ### Gem Sick extends live pickup and combo streak timers
 
 Upgrade 20 maps to `pugLessResist` in `scrIncrementPug`. Both `scrGainGem`

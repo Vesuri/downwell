@@ -804,11 +804,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         GemState& gem = gems_[gemIndex];
         if (!gem.active)
             continue;
-        const auto result = downwell::stepCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
-            player_.frameStartXFixed(), player_.frameStartYFixed(),
-            player_.offsetXFixed(), player_.offsetYFixed(), currencyAccount_,
-            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_,
-            run_.upgrades.levels[20] != 0);
+        const auto result = run_.collectCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
+            player_, currencyAccount_,
+            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
         if (result != downwell::CurrencyStepResult::alive) {
             gem.active = false;
             continue;

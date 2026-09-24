@@ -644,13 +644,12 @@ void StartupRuntime::updateMainCurrency() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
         MainCurrencyState gem = mainCurrencyItems_[index];
-        const auto result = stepCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
-            mainPlayerMotion_.frameStartXFixed(), mainPlayerMotion_.frameStartYFixed(),
-            mainPlayerMotion_.offsetXFixed(), mainPlayerMotion_.offsetYFixed(), currencyAccount_,
-            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_,
-            run_.upgrades.levels[20] != 0);
+        const auto result = run_.collectCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
+            mainPlayerMotion_, currencyAccount_,
+            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_);
         if (result == CurrencyStepResult::expired) continue;
         if (result == CurrencyStepResult::collected) {
+            syncMainPlayerState();
             ++soundPlayRequests_;
             continue;
         }
