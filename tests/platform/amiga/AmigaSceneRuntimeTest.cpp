@@ -293,6 +293,10 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
                     a.vx == b.vx && a.vy == b.vy && a.direction == b.direction &&
                     a.latched == b.latched && native.alarm0 == enemy.alarms.get(0),
                     "shared crawler state and alarm match exactly across adapters");
+            require(a.imageDirection == b.imageDirection &&
+                    enemy.rotation == a.imageDirection * 90 &&
+                    native.drawFrame() / 256 == a.imageDirection % 4,
+                    "both crawler renderers consume the Step-published angle");
         }
         if (enemy.objectId != 113 || !enemy.active || !native.active) continue;
         if (std::getenv("DOWNWELL_TRACE_FROG_MOTION") && amiga.tick() >= 474)

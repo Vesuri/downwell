@@ -10,6 +10,7 @@ namespace downwell {
 struct CrawlerMotion {
     long x = 0, y = 0, vx = 1280, vy = 0;
     unsigned direction = 0; // 0 right, 1 up, 2 left, 3 down
+    unsigned imageDirection = 0; // Quarter turns, published by Step only.
     bool latched = false;
     bool initialized = false;
 
@@ -39,13 +40,17 @@ struct CrawlerMotion {
     }
     template<class Meeting>
     void step(bool clockwise, bool visible, Meeting meeting) {
-        if (latched || !visible) return;
-        vy += 256; // global.grav = .2; crawler source has no speed cap.
-        direction = clockwise ? 0 : 2;
-        vx = 0;
-        const auto collision = resolveSolidCollision<FixedCollisionMath>(x, y, vx, vy, meeting);
-        if (collision.y == 1) { vy = 0; latched = true; }
-        x += vx; y += vy;
+        if (!latched && visible) {
+            vy += 256; // global.grav = .2; crawler source has no speed cap.
+            direction = clockwise ? 0 : 2;
+            vx = 0;
+            const auto collision = resolveSolidCollision<FixedCollisionMath>(x, y, vx, vy, meeting);
+            if (collision.y == 1) { vy = 0; latched = true; }
+            x += vx; y += vy;
+        }
+        // enmCrawler Step publishes even outside the falling branch. Alarm 0
+        // changes movedir, not image_angle. Retain raw 360/450 degree values.
+        imageDirection = direction + (clockwise ? 0u : 2u);
     }
     template<class Meeting>
     void alarm(bool clockwise, bool visible, Meeting meeting) {

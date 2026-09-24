@@ -118,7 +118,7 @@ public:
         bool activationPending;
         unsigned drawFrame() const {
             if (objectId == 119)
-                return imageFrame + ((crawler.direction + (motionState > 0 ? 0u : 2u)) % 4u) * 256u;
+                return imageFrame + (crawler.imageDirection % 4u) * 256u;
             // Source enmSnail Step updates image_yscale only after nonzero
             // movement. Creation/time-stop/zero speed retain the stored flip.
             // Frame 256+n is host-generated, for both planar and DMA assets.

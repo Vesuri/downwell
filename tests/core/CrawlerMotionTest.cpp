@@ -7,6 +7,20 @@ static void require(bool ok, const char* message) {
 int main() {
     using downwell::CrawlerMotion;
     const auto empty = [](long, long) { return false; };
+    CrawlerMotion published;
+    published.initialize(0, 0);
+    require(published.imageDirection == 0, "Create retains the default image angle");
+    published.latched = true;
+    published.alarm(false, false, empty);
+    require(published.direction == 1 && published.imageDirection == 0,
+            "Alarm changes movement direction without publishing image_angle");
+    published.step(false, false, empty);
+    require(published.imageDirection == 3,
+            "Step publishes the counterclockwise angle even when outside view");
+    published.latched = true; published.direction = 3;
+    published.step(false, false, empty);
+    require(published.imageDirection == 5,
+            "shared presentation retains the source's unnormalized 450-degree angle");
     CrawlerMotion falling;
     falling.initialize(0, 0);
     for (int i = 0; i < 40; ++i) falling.step(true, true, empty);

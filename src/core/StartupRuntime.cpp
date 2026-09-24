@@ -682,7 +682,7 @@ void StartupRuntime::updateCrawler(InstanceRecord& enemy, bool alarm) {
     enemy.velocityX = enemy.crawler.vx / 1280.0F;
     enemy.velocityY = enemy.crawler.vy / 1280.0F;
     enemy.grounded = enemy.crawler.latched;
-    enemy.rotation = enemy.crawler.direction * 90 + (enemy.motionState > 0 ? 0 : 180);
+    enemy.rotation = enemy.crawler.imageDirection * 90;
 }
 
 void StartupRuntime::updateMainEnemies() {

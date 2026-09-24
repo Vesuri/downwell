@@ -9,6 +9,28 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Crawler angle publication follows Step
+
+`CrawlerMotion` now retains the image direction separately from movement
+direction. VM `enmCrawler_Step_0` blocks 13–15 publish `image_angle` after the
+falling branch; Create and Alarm 0 do not assign it. Previously native drawing
+derived the angle directly from movement direction, and SDL's common
+Step/Alarm adapter also published it during Alarm. Both now consume the shared
+Step-published value, retaining the default angle at creation and the previous
+angle between Alarm and Step. Source angles of 360/450 degrees are retained
+in shared state/SDL; only offline native variant lookup reduces modulo four.
+
+Tests distinguish Alarm direction changes from image publication, require
+publication outside the falling/visibility branch, and compare native variant
+selection with SDL's angle on live crawlers. The existing SDL digest already
+captures the published value as `instance.rotation`; its schema is unchanged.
+This does not add crawler hit-stun artwork or a complete time-stop subsystem.
+The full host suite passes, including live orientation comparisons and 20,580
+offline sprite-oracle comparisons. The bounded 68000 cross-target replay
+passes with native digest `9f0d3943e7900d2b`, both CPU audits are clean, and the
+ordinary executable is restored. That short replay is a platform regression;
+the focused crawler tests provide the Create/Alarm/Step ordering evidence.
+
 ### Stored snail orientation selects offline artwork
 
 The native snail draw-frame selector now reads `SnailMotion::verticalFlip`,
