@@ -20,6 +20,13 @@ impact path. The streak selector changes at 100, from
 projectile snapshot will not mutate when the player's weapon level changes.
 
 Focused tests pin both profiles, the 99/100 threshold and value-copy behavior.
+`tools/verify-machine-gun.py`, included in `make test`, independently checks
+all 34 profile fields against the level-indexed VM writes for gun 0. It pins
+the export's release hash/tool version, rejects duplicate assignments and
+requires both complete profiles. Shared player firing now reads normal charge
+cost and interval from this same profile instead of duplicating 1 and 7.
+The VM check and focused player/impact tests pass; this is a value-preserving
+refactor, not new powered-up gameplay or an emulator performance claim.
 This is not live gem-high support: the ordinary impact path explicitly selects
 level zero, and bullets still need birth-time property storage, source-ordered
 level publication, rendering, rate changes, random spread and effect wiring.

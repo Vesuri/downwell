@@ -3,6 +3,7 @@
 #include "core/PlayerLifeRules.h"
 #include "core/SolidCollision.h"
 #include "core/StateDigest.h"
+#include "core/MachineGunProfile.h"
 
 namespace {
 enum {
@@ -275,11 +276,11 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             speedY_ = 0;
             gravityRemainder_ = 0;
         }
-        --ammo_;
+        ammo_ -= downwell::machineGunProfile(false).consumption;
         ++shots_;
         airborneShot_ = true;
         shotFired = true;
-        shotDelay_ = 7;
+        shotDelay_ = downwell::machineGunProfile(false).interval;
     }
 
     // scrPlMovement's grounded branch runs after input/jump decisions.

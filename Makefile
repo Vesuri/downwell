@@ -475,6 +475,7 @@ trace-area-one: generate-room-pack generate-object-pack generate-builder-pattern
 test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack generate-amiga-game generate-amiga-hud $(TEST_TARGETS) $(PLAYER_CONTROLS_TEST_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/bat-motion-test build/enemy-contact-test build/frog-behavior-test
 	./build/frog-behavior-test
 	python3 tools/verify-enemy-contact.py
+	python3 tools/verify-machine-gun.py
 	./build/enemy-contact-test
 	./build/bat-motion-test
 	./build/gem-homing-test
