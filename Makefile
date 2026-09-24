@@ -598,6 +598,13 @@ build/amiga-clear-bank-test: tests/platform/amiga/AmigaClearBankTest.cpp $(HOST_
 test-amiga-clear-bank: generate-amiga-clear build/amiga-clear-bank-test
 	./build/amiga-clear-bank-test generated/amiga-clear.dwap
 test: test-amiga-clear-bank
+test: test-amiga-clear-border-cache
+.PHONY: test-amiga-clear-border-cache
+build/amiga-clear-border-cache-test: tests/platform/amiga/AmigaClearBorderCacheTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaClearBorderCacheTest.cpp src/platform/amiga/AmigaRenderer.c
+test-amiga-clear-border-cache: generate-amiga-clear build/amiga-clear-border-cache-test
+	./build/amiga-clear-border-cache-test generated/amiga-clear.dwap
 
 verify-amiga-game: generate-amiga-game
 	python3 tools/verify-amiga-menu-sprites.py

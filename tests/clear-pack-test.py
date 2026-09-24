@@ -17,6 +17,9 @@ records = {}
 for i in range(pack.HEADER.unpack_from(data)[3]):
     record = pack.RECORD.unpack_from(data, pack.HEADER.size + i * pack.RECORD.size)
     ident, frame, ox, oy, width, height, stride, flags, offset, length = record
+    if ident in (51, 74, 72, 70, 55):
+        expected_geometry = (32, 32, 16, 16) if ident == 70 else (16, 16, 8, 8)
+        assert (width, height, ox, oy) == expected_geometry, "circular border cache geometry contract"
     assert flags == 3 and (ident, frame) not in records
     records[ident, frame] = record
     if ident in texts:

@@ -317,6 +317,20 @@ tests; replacement and directory-shrink regressions plus the existing 20,580
 offline sprite comparisons pass. These fixes prepare safe native lookup; they
 do not complete the result presenter or its DMA handoff.
 
+AmigaClearBorderCache now tracks per-buffer rows in the existing 320-line ring.
+Camera/tile movement changes its origin; row signatures request painting only
+when a physical row's source content changes. Signatures preserve the overlapping
+current/incoming border seam and the finite source loops, including area-three
+speed and level-three replacement. Repeated frames produce no writes. A test
+paints requested scanlines with the real Amiga renderer and compares both planar
+buffers against fresh source-order drawing for 2,880 frames across all area/level
+combinations. After initial fill, every tested update paints fewer than 40 rows;
+total row writes are below ten percent of full repainting. Offline pack tests
+also enforce the recovered 16x16/origin(8,8) geometry and Limbo's overlapping
+32x32/origin(16,16) exception used by this planner.
+This cache is not yet published by the application's copper or measured on the
+68000; the comparison establishes pixel retention, not a 20ms frame budget.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
