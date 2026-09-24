@@ -1,5 +1,10 @@
 # Activation lifecycle correction
 
+Current checkpoint: the historical extended-combat failures recorded below
+are superseded by the passing two-cadence, 6,000-update checks in
+[the fidelity audit](original-behavior-audit.md#current-extended-combat-checkpoint).
+Exact GameMaker region/mask boundary behavior remains an open fidelity item.
+
 Source evidence is `gml_Object_objPlayer_n_Step_1.asm`: its first block tests
 view bottom > activatey - 112, adds exactly 16 to activatey, then activates the
 region before gravity and movement. `scrPlayerInit` initializes activatey=0.

@@ -1143,6 +1143,14 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const unsigned nativeJumps = gameplay.player().jumps(), hostJumps = reference.mainJumps();
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
+            if (160 + gameplay.cameraOffsetX() != reference.mainCameraRenderViewX() ||
+                    34 + gameplay.cameraOffsetY() != reference.mainCameraRenderViewY())
+                std::cerr << "COMBAT CAMERA tick=" << gameplay.tick()
+                          << " native=" << 160 + gameplay.cameraOffsetX() << ',' << 34 + gameplay.cameraOffsetY()
+                          << " SDL=" << reference.mainCameraRenderViewX() << ',' << reference.mainCameraRenderViewY() << '\n';
+            require(160 + gameplay.cameraOffsetX() == reference.mainCameraRenderViewX() &&
+                    34 + gameplay.cameraOffsetY() == reference.mainCameraRenderViewY(),
+                    "combat and death publish identical integer camera views on every update");
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
             require(nativeDeath.flashVisible() == hostDeath.flashVisible(),

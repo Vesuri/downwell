@@ -7,6 +7,27 @@ not equivalence with Windows. Historical SDL-parity notes do not supersede this.
 See also [activation lifecycle findings](activation-fidelity.md) for the
 source-backed frontier/phase correction and remaining region-boundary gaps.
 
+## Current extended-combat checkpoint
+
+The historical tick-600/666/702 failures below are superseded by the current
+shared-simulation work documented in `shared-simulation-migration.md` and
+`feature-parity.md`. Both 6,000-update continuations now pass the combat and
+death-state checks: firing phase 1 finishes with health 0, kills 10, currency
+84 and best combo 3 on both adapters; phase 5 finishes with 0, 3, 46 and 1.
+Each tape requires at least 120 updates with both players dead and checks
+death/result state, input suppression, reward motion, HUD state and combat
+outcomes throughout, not just those final totals.
+
+`make verify-gameplay-death-state` runs both cadences. The combat loop also
+requires exact equality of the published integer camera view on every update,
+including death; the earlier short approach-to-gameplay comparisons retain
+their independently documented tolerances. No combat tolerance was relaxed.
+
+This is host execution of both adapters, not a new native CPU replay or a
+Windows recording. It establishes broader implemented-feature agreement,
+not complete original-game fidelity. Existing source-boundary caveats remain
+open; older failure descriptions are retained as investigation history.
+
 ## Default player horizontal movement
 
 Inspected export: `extracted/utmt-0.9.2.0/Assembly/`.
