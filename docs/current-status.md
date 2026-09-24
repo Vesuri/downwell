@@ -165,6 +165,17 @@ inventory; selecting and applying upgrades, room rendering and progression
 remain work. It does not restrict the original upgrade pool to implemented
 effects merely to make a menu usable.
 
+`LevelClearSelection.h` models Result's default selection path: alarm 4 at 60
+updates enters next=4, initial offers arm a 30-update confirmation lock, separate
+right/left edges remain enabled during that lock, and a grant precedes feedback
+and decrement/reroll. The final grant hides choices; the following Step arms
+the 30-update departure alarm, followed by the source 90-update dither wait.
+Tests exercise held confirm, simultaneous direction edges, additional awards,
+zero-upgrade departure, event ordering and complete alarm timing. This is not
+yet wired into either runtime's room loading. Original heart-goal application,
+upgrade inventory/effects, presentation easing and result-room rendering remain
+required; the selection model does not replace them with direct stage advance.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.

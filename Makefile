@@ -222,6 +222,13 @@ test: test-shop-inventory
 test: test-shop-interaction test-shop-menu-layout
 test: test-level-exit
 test: test-level-upgrade-offers
+test: test-level-clear-selection
+.PHONY: test-level-clear-selection
+build/level-clear-selection-test: tests/core/LevelClearSelectionTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-level-clear-selection: build/level-clear-selection-test
+	./build/level-clear-selection-test
 .PHONY: test-level-upgrade-offers
 build/level-upgrade-offers-test: tests/core/LevelUpgradeOffersTest.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
