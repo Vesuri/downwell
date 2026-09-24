@@ -1,4 +1,5 @@
 #include "core/LevelClearMotion.h"
+#include "core/LevelClearCarousel.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -44,5 +45,22 @@ int main() {
     }
     require(asDouble(downwell::LevelClearMotion::approach(HudReal::integer(300), HudReal::integer(100), 10)) == 280,
         "downward target correction retains signed source arithmetic");
+    downwell::LevelClearCarousel carousel;
+    carousel.create(1);
+    double x = 42;
+    for (unsigned tick = 0; tick < 20000; ++tick) {
+        const unsigned cursor = (tick / 127) % 4;
+        carousel.step(cursor);
+        x += ((80 - 38 * int(cursor)) - x) / 5;
+        const auto real = carousel.position;
+        require((real.negative ? -1 : 1) * asDouble(real.magnitude) == x,
+            "signed carousel easing matches binary64 across zero and reversals");
+        for (unsigned index = 0; index < 4; ++index) {
+            const auto icon = carousel.optionX(index);
+            require((icon.negative ? -1 : 1) * asDouble(icon.magnitude) == x + 38 * index,
+                "option coordinates retain source addition rounding");
+        }
+    }
     std::puts("20000 divisions and 10000 level-clear motion updates match binary64");
+    std::puts("20000 signed carousel updates and option coordinates match binary64");
 }

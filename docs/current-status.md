@@ -231,7 +231,16 @@ floating point. Tests compare 20,000 divisions and 10,000 motion updates with
 host binary64, and controller tests cover transition ordering and room reset.
 A freestanding -m68000 compile probe has no undefined arithmetic helpers.
 This is not a frame-time measurement: live room loading/rendering still needs
-integration, and the signed horizontal carousel remains separate work.
+integration.
+
+LevelClearCarousel now preserves signed option positions and the source's
+subtract/divide-by-five/add rounding sequence. The shared controller initializes
+it from the style-dependent cursor and updates it after navigation/confirmation,
+including the last confirmation frame that hides the menu. Hidden/departing
+frames leave it unchanged. Tests compare 20,000 direction-changing updates and
+all four option X coordinates against binary64, plus controller ordering.
+A freestanding 68000 compile probe has no external arithmetic helpers. This
+does not yet render the options or implement their Draw-event vertical bobbing.
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.

@@ -63,6 +63,26 @@ int main() {
     require(room.motion.cameraY.floor() == 142 && !room.motion.playerY.mantissa &&
         !room.motion.acceleration.mantissa && room.motion.playerDivisor == 20,
         "room creation resets presentation motion after the previous departure");
+    room.selection.next = 4;
+    bool confirm = false;
+    auto ignore = [](LevelClearSelection::Effect, unsigned) {};
+    room.step(confirm, false, true, heartGoal, inventory, consumables, currency,
+        player, health, reserve, random, ignore);
+    require(room.carousel.target == 4 && room.carousel.position.magnitude.less(HudReal::integer(42)),
+        "navigation eases the carousel during confirmation lock");
+    auto expectedCarousel = room.carousel;
+    expectedCarousel.step(1);
+    room.selection.inputWait = false;
+    confirm = true;
+    room.step(confirm, true, false, heartGoal, inventory, consumables, currency,
+        player, health, reserve, random, ignore);
+    require(!room.selection.visible && room.carousel.target == 42 &&
+        room.carousel.position.magnitude.equal(expectedCarousel.position.magnitude),
+        "last confirmation still eases using the post-navigation cursor");
+    room.step(confirm, false, false, heartGoal, inventory, consumables, currency,
+        player, health, reserve, random, ignore);
+    require(room.carousel.position.magnitude.equal(expectedCarousel.position.magnitude),
+        "departure leaves the hidden carousel stationary");
     require(room.create(4, false, health, inventory, player, random) && room.selection.lastIndex == 3 &&
         room.upgradesRemaining == 0, "Handstand retains source layout setup but offers no upgrade");
     std::puts("Shared level-clear creation, offers, grants and heart-goal ordering passed");

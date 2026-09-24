@@ -4,6 +4,7 @@
 #include "LevelUpgradeOffers.h"
 #include "UpgradeInventory.h"
 #include "LevelClearMotion.h"
+#include "LevelClearCarousel.h"
 namespace downwell {
 // Shared non-rendering Result-room controller. Room loading, presentation and
 // audio playback stay outside; nextLevel is a request, not a direct stage jump.
@@ -11,6 +12,7 @@ struct LevelClearController {
     LevelClearSelection selection;
     LevelUpgradeOffers offers;
     LevelClearMotion motion;
+    LevelClearCarousel carousel;
     unsigned upgradesRemaining = 1;
     int healthAtEntry = 0;
     bool wasHeartGoal = false, heartReceived = true;
@@ -21,6 +23,7 @@ struct LevelClearController {
         if (style > 4 || last >= 4) return false;
         *this = LevelClearController{};
         selection.create(last);
+        carousel.create(selection.cursor);
         healthAtEntry = health;
         wasHeartGoal = heartGoal;
         heartReceived = !heartGoal;
@@ -44,6 +47,9 @@ struct LevelClearController {
         }
         bool ok = true;
         const bool departureBranch = selection.next >= 7 && heartReceived;
+        // The source enters the visible branch before confirmation can hide
+        // it, so the final grant still performs one carousel easing update.
+        const bool carouselBranch = selection.next == 4 && upgradesRemaining != 0;
         selection.step(confirm, leftPressed, rightPressed, upgradesRemaining,
             [&](LevelClearSelection::Effect effect, unsigned value) {
                 if (effect == LevelClearSelection::Effect::showChoices) motion.showChoices();
@@ -54,6 +60,7 @@ struct LevelClearController {
                     ok = inventory.grant(offers.ids[value], consumables, currency, player, health, reserve) && ok;
                 emit(effect, value);
             });
+        if (carouselBranch) carousel.step(selection.cursor);
         motion.step(departureBranch);
         return ok;
     }
