@@ -19,11 +19,11 @@ continue
 end
 break downwellClearReady
 continue
-if gDownwellClearFrames < 200 || gDownwellClearChoices < 30 || gDownwellClearFailures != 0
+if gDownwellClearFrames < 400 || gDownwellClearChoices < 60 || gDownwellClearFailures != 0
     printf "Clear presentation failed: frames=%lu choices=%lu pixel failures=%lu\n", gDownwellClearFrames, gDownwellClearChoices, gDownwellClearFailures
     quit 1
 end
-if gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 60
+if gDownwellClearReentries != 2 || gDownwellClearGameplayUpdates != 60
     printf "Clear departure did not resume gameplay\n"
     quit 1
 end
@@ -39,7 +39,7 @@ while $word < 64
     end
     set $word = $word + 1
 end
-printf "Clear choices, departure and 60 next-level updates passed; %lu planar frames compared\n", gDownwellClearFrames
+printf "Two clears and 60 third-level updates passed; %lu planar frames compared\n", gDownwellClearFrames
 printf "DOWNWELL_CLEAR_READY\n"
 shell touch .run/gdb-ready.marker
 detach

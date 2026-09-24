@@ -903,98 +903,121 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 gameplay.consumables().pending[0] == reference.consumables().pending[0],
                 "both runtime adapters apply identical grants, refunds and deferred consumables");
         }
-        require(gameplay.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
-            "both adapters consume the exit request at an explicit scene boundary");
-        const auto nativeTick = gameplay.tick();
-        const auto hostTick = reference.tick();
-        gameplay.step(0); reference.step({}, false);
-        require(gameplay.tick() == nativeTick && reference.tick() == hostTick,
-            "old gameplay dispatcher cannot advance while the clear room owns the runtime");
-        bool nativeHeart = false, hostHeart = false;
-        for (unsigned tick = 1; tick <= 211; ++tick) {
-            bool nativeConfirm = true, hostConfirm = true;
-            std::vector<unsigned> nativeEvents, hostEvents;
-            const bool right = tick == 61 || tick == 62;
-            const bool left = tick == 75;
-            require(gameplay.stepLevelClear(nativeConfirm, left, right, nativeHeart,
-                [&](downwell::LevelClearSelection::Effect event, unsigned value) {
-                    nativeEvents.push_back(unsigned(event)); nativeEvents.push_back(value);
-                }) && reference.stepLevelClear(hostConfirm, left, right, hostHeart,
-                [&](downwell::LevelClearSelection::Effect event, unsigned value) {
-                    hostEvents.push_back(unsigned(event)); hostEvents.push_back(value);
-                }), "both result adapters update successfully");
-            const auto& a = gameplay.levelClear();
-            const auto& b = reference.levelClear();
-            require(nativeEvents == hostEvents && nativeConfirm == hostConfirm && nativeHeart == hostHeart &&
-                a.selection.cursor == b.selection.cursor && a.selection.next == b.selection.next &&
-                a.selection.visible == b.selection.visible && a.motion.playerY.equal(b.motion.playerY) &&
-                a.motion.cameraY.equal(b.motion.cameraY) &&
-                a.carousel.position.magnitude.equal(b.carousel.position.magnitude) &&
-                a.carousel.position.negative == b.carousel.position.negative,
-                "result event order, input, camera, player and signed carousel match");
-            for (unsigned i = 0; i < 4; ++i)
-                require(a.offers.ids[i] == b.offers.ids[i], "actual runtime RNG produces matching upgrade offers");
-            require(gameplay.randomState().stateIndex() == reference.randomState().stateIndex() &&
-                gameplay.randomDrawCount() == reference.randomDrawCount(), "result RNG cursor/count match");
+        for (int completedLevel = 1; completedLevel <= 2; ++completedLevel) {
+            require(gameplay.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
+                "both adapters consume the exit request at an explicit scene boundary");
+            const auto nativeTick = gameplay.tick();
+            const auto hostTick = reference.tick();
+            gameplay.step(0); reference.step({}, false);
+            require(gameplay.tick() == nativeTick && reference.tick() == hostTick,
+                "old gameplay dispatcher cannot advance while the clear room owns the runtime");
+            bool nativeHeart = false, hostHeart = false;
+            for (unsigned tick = 1; tick <= 211; ++tick) {
+                bool nativeConfirm = true, hostConfirm = true;
+                std::vector<unsigned> nativeEvents, hostEvents;
+                const bool right = tick == 61 || tick == 62;
+                const bool left = tick == 75;
+                require(gameplay.stepLevelClear(nativeConfirm, left, right, nativeHeart,
+                    [&](downwell::LevelClearSelection::Effect event, unsigned value) {
+                        nativeEvents.push_back(unsigned(event)); nativeEvents.push_back(value);
+                    }) && reference.stepLevelClear(hostConfirm, left, right, hostHeart,
+                    [&](downwell::LevelClearSelection::Effect event, unsigned value) {
+                        hostEvents.push_back(unsigned(event)); hostEvents.push_back(value);
+                    }), "both result adapters update successfully");
+                const auto& a = gameplay.levelClear();
+                const auto& b = reference.levelClear();
+                require(nativeEvents == hostEvents && nativeConfirm == hostConfirm && nativeHeart == hostHeart &&
+                    a.selection.cursor == b.selection.cursor && a.selection.next == b.selection.next &&
+                    a.selection.visible == b.selection.visible && a.motion.playerY.equal(b.motion.playerY) &&
+                    a.motion.cameraY.equal(b.motion.cameraY) &&
+                    a.carousel.position.magnitude.equal(b.carousel.position.magnitude) &&
+                    a.carousel.position.negative == b.carousel.position.negative,
+                    "result event order, input, camera, player and signed carousel match");
+                for (unsigned i = 0; i < 4; ++i)
+                    require(a.offers.ids[i] == b.offers.ids[i], "actual runtime RNG produces matching upgrade offers");
+                require(gameplay.randomState().stateIndex() == reference.randomState().stateIndex() &&
+                    gameplay.randomDrawCount() == reference.randomDrawCount(), "result RNG cursor/count match");
+                for (unsigned i = 0; i < 16; ++i)
+                    require(gameplay.randomState().stateWord(i) == reference.randomState().stateWord(i),
+                        "result full RNG state matches");
+                require(gameplay.health() == reference.mainPlayerHealth() &&
+                    gameplay.player().ammo() == reference.mainAmmo() &&
+                    gameplay.currency() == reference.mainCurrencyTotal() &&
+                    gameplay.levelClearFrame().tileY == reference.levelClearFrame().tileY &&
+                    gameplay.levelClearFrame().time == reference.levelClearFrame().time &&
+                    gameplay.exitDither().y == reference.exitDither().y &&
+                    gameplay.nextLevelRequested() == (tick == 211) &&
+                    reference.nextLevelRequested() == (tick == 211),
+                    "result grants, presentation and departure requests match across adapters");
+            }
+            const auto carriedRandom = gameplay.randomState();
+            const auto carriedClock = gameplay.runTimeTicks();
+            const int carriedHealth = gameplay.health();
+            const auto carriedCurrency = gameplay.currency();
+            const auto carriedUpgrades = gameplay.upgrades().count;
+            const auto carriedInventory = gameplay.upgrades();
+            const int carriedCapacity = gameplay.player().ammoCapacity();
+            downwell::Input heldEntry; heldEntry.fire = true;
+            require(gameplay.prepareNextAreaOneLevel(heldEntry, 319) && reference.loadNextAreaOneLevel(heldEntry),
+                "both runtime adapters accept completed departure into the next area-one level");
+            require(gameplay.runStage().level == completedLevel + 1 &&
+                reference.runStage().level == completedLevel + 1 &&
+                !gameplay.levelClearActive() && !reference.levelClearActive() &&
+                gameplay.health() == carriedHealth && reference.mainPlayerHealth() == carriedHealth &&
+                gameplay.currency() == carriedCurrency && reference.mainCurrencyTotal() == carriedCurrency &&
+                gameplay.upgrades().count == carriedUpgrades && reference.upgrades().count == carriedUpgrades &&
+                gameplay.player().ammoCapacity() == carriedCapacity && reference.mainAmmoCapacity() == carriedCapacity &&
+                gameplay.player().ammo() == carriedCapacity && reference.mainAmmo() == carriedCapacity &&
+                gameplay.runTimeTicks() == carriedClock,
+                "native room retirement preserves actual grants, currency, health, clock and capacity");
+            for (unsigned id = 0; id < 23; ++id)
+                require(gameplay.upgrades().levels[id] == carriedInventory.levels[id] &&
+                    reference.upgrades().levels[id] == carriedInventory.levels[id],
+                    "every owned upgrade level survives both room transitions");
+            require(gameplay.bulletCount() == 0 && gameplay.enemyCount() == 0 && gameplay.gemCount() == 0 &&
+                gameplay.ringOrigin() == 319 && gameplay.player().jumpShootLocked() &&
+                gameplay.cameraOffsetY() == 0 && gameplay.cameraOffsetX() == 0,
+                "native old actors and camera retire without a large temporary world copy");
+            require(gameplay.randomDrawCount() == carriedRandom.drawCount() &&
+                gameplay.randomState().stateIndex() == carriedRandom.stateIndex(),
+                "native retirement neither reseeds nor consumes generation RNG");
+            for (unsigned i = 0; i < 16; ++i)
+                require(gameplay.randomState().stateWord(i) == carriedRandom.stateWord(i),
+                    "native next-room builder receives the untouched RNG state");
+            require(!gameplay.prepareNextAreaOneLevel(heldEntry, 0) && !reference.loadNextAreaOneLevel(heldEntry),
+                "duplicate next-room consumption cannot skip a stage");
+            live.bind(gameplay, rooms, terrainRoom, true);
+            require(gameplay.randomDrawCount() == reference.randomDrawCount() &&
+                gameplay.randomState().stateIndex() == reference.randomState().stateIndex(),
+                "native next-room builder initialization matches SDL room Create RNG");
             for (unsigned i = 0; i < 16; ++i)
                 require(gameplay.randomState().stateWord(i) == reference.randomState().stateWord(i),
-                    "result full RNG state matches");
-            require(gameplay.health() == reference.mainPlayerHealth() &&
-                gameplay.player().ammo() == reference.mainAmmo() &&
-                gameplay.currency() == reference.mainCurrencyTotal() &&
-                gameplay.levelClearFrame().tileY == reference.levelClearFrame().tileY &&
-                gameplay.levelClearFrame().time == reference.levelClearFrame().time &&
-                gameplay.exitDither().y == reference.exitDither().y &&
-                gameplay.nextLevelRequested() == (tick == 211) &&
-                reference.nextLevelRequested() == (tick == 211),
-                "result grants, presentation and departure requests match across adapters");
-        }
-        const auto carriedRandom = gameplay.randomState();
-        const auto carriedClock = gameplay.runTimeTicks();
-        const int carriedHealth = gameplay.health();
-        const auto carriedCurrency = gameplay.currency();
-        const auto carriedUpgrades = gameplay.upgrades().count;
-        const int carriedCapacity = gameplay.player().ammoCapacity();
-        downwell::Input heldEntry; heldEntry.fire = true;
-        require(gameplay.prepareNextAreaOneLevel(heldEntry, 319) && reference.loadNextAreaOneLevel(heldEntry),
-            "both runtime adapters accept completed departure into the next area-one level");
-        require(gameplay.runStage().level == 2 && reference.runStage().level == 2 &&
-            !gameplay.levelClearActive() && !reference.levelClearActive() &&
-            gameplay.health() == carriedHealth && reference.mainPlayerHealth() == carriedHealth &&
-            gameplay.currency() == carriedCurrency && reference.mainCurrencyTotal() == carriedCurrency &&
-            gameplay.upgrades().count == carriedUpgrades && reference.upgrades().count == carriedUpgrades &&
-            gameplay.player().ammoCapacity() == carriedCapacity && reference.mainAmmoCapacity() == carriedCapacity &&
-            gameplay.player().ammo() == carriedCapacity && reference.mainAmmo() == carriedCapacity &&
-            gameplay.runTimeTicks() == carriedClock,
-            "native room retirement preserves actual grants, currency, health, clock and capacity");
-        require(gameplay.bulletCount() == 0 && gameplay.enemyCount() == 0 && gameplay.gemCount() == 0 &&
-            gameplay.ringOrigin() == 319 && gameplay.player().jumpShootLocked() &&
-            gameplay.cameraOffsetY() == 0 && gameplay.cameraOffsetX() == 0,
-            "native old actors and camera retire without a large temporary world copy");
-        require(gameplay.randomDrawCount() == carriedRandom.drawCount() &&
-            gameplay.randomState().stateIndex() == carriedRandom.stateIndex(),
-            "native retirement neither reseeds nor consumes generation RNG");
-        for (unsigned i = 0; i < 16; ++i)
-            require(gameplay.randomState().stateWord(i) == carriedRandom.stateWord(i),
-                "native next-room builder receives the untouched RNG state");
-        require(!gameplay.prepareNextAreaOneLevel(heldEntry, 0) && !reference.loadNextAreaOneLevel(heldEntry),
-            "duplicate next-room consumption cannot skip a stage");
-        live.bind(gameplay, rooms, terrainRoom, true);
-        require(gameplay.randomDrawCount() == reference.randomDrawCount() &&
-            gameplay.randomState().stateIndex() == reference.randomState().stateIndex(),
-            "native next-room builder initialization matches SDL room Create RNG");
-        for (unsigned i = 0; i < 16; ++i)
-            require(gameplay.randomState().stateWord(i) == reference.randomState().stateWord(i),
-                "all RNG words match after next-room terrain reset");
-        for (unsigned tick = 0; tick < 90; ++tick) {
-            gameplay.step(0); reference.step({}, false);
-            require(gameplay.generationSucceeded() && reference.deferredCommandsSucceeded(),
-                "next-stage live generation succeeds on both adapters");
-            require(std::fabs(reference.mainPlayerX() - (240 + gameplay.player().offsetXFixed() / 256.0F)) < 0.01F &&
-                std::fabs(reference.mainPlayerY() - (176 + gameplay.player().offsetYFixed() / 256.0F)) < 0.01F &&
-                gameplay.player().grounded() == reference.mainPlayerGrounded() &&
-                gameplay.randomDrawCount() == reference.randomDrawCount(),
-                "next-stage movement, terrain collision and generation RNG remain paired");
+                    "all RNG words match after next-room terrain reset");
+            for (unsigned tick = 0; tick < 90; ++tick) {
+                gameplay.step(0); reference.step({}, false);
+                require(gameplay.generationSucceeded() && reference.deferredCommandsSucceeded(),
+                    "next-stage live generation succeeds on both adapters");
+                require(std::fabs(reference.mainPlayerX() - (240 + gameplay.player().offsetXFixed() / 256.0F)) < 0.01F &&
+                    std::fabs(reference.mainPlayerY() - (176 + gameplay.player().offsetYFixed() / 256.0F)) < 0.01F &&
+                    gameplay.player().grounded() == reference.mainPlayerGrounded() &&
+                    gameplay.randomDrawCount() == reference.randomDrawCount(),
+                    "next-stage movement, terrain collision and generation RNG remain paired");
+                require(160 + gameplay.cameraOffsetX() == reference.mainCameraRenderViewX() &&
+                    34 + gameplay.cameraOffsetY() == reference.mainCameraRenderViewY(),
+                    "both regenerated rooms publish identical camera views");
+            }
+            if (completedLevel == 1) {
+                // Reuse the same runtime and world, not fresh stage-two fixtures:
+                // exercise retiring and rebinding a second generated room.
+                const int nextExitY = 176 + gameplay.player().offsetY();
+                gameplay.registerLevelExit(nextExitY);
+                reference.registerLevelExit(nextExitY);
+                for (unsigned tick = 0; tick < 96; ++tick) {
+                    gameplay.step(0); reference.step({}, false);
+                }
+                require(gameplay.levelResultRequested() && reference.levelResultRequested(),
+                    "second live room reaches its own clear request");
+            }
         }
         return;
     }

@@ -2450,6 +2450,7 @@ int main(void) {
                     newRunWorldPending = true; sceneResetRequested = true;
 #ifdef DOWNWELL_CLEAR_VERIFY
                     ++gDownwellClearReentries;
+                    gDownwellClearGameplayUpdates = 0;
 #endif
                     continue;
                 }
@@ -2524,8 +2525,7 @@ int main(void) {
                 ++gDownwellClearFrames;
                 if (snapshot.choices) ++gDownwellClearChoices;
                 gDownwellClearPhase = 4;
-                if (gDownwellClearFrames == 1 || gDownwellClearFrames == 60 ||
-                    gDownwellClearFrames == 100 || gDownwellClearFrames == 160 || gDownwellClearFrames == 220)
+                if (gDownwellClearFrames == 1 || gDownwellClearFrames % 60 == 0)
                     downwellClearProbe();
 #endif
                 gameListReady[back] = true;
@@ -2541,13 +2541,18 @@ int main(void) {
             if (port.tick() == 180) port.registerLevelExit(176 + port.player().offsetY());
 #endif
 #ifdef DOWNWELL_CLEAR_VERIFY
-            if (port.tick() == 180 && !gDownwellClearReentries) port.registerLevelExit(176 + port.player().offsetY());
+            if ((port.tick() == 180 && !gDownwellClearReentries) ||
+                (gDownwellClearReentries == 1 && gDownwellClearGameplayUpdates == 60))
+                port.registerLevelExit(176 + port.player().offsetY());
 #endif
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
                 oldShopArt[i] = port.shops().instances[i].artRevision;
             const AmigaPortFrame result = port.step(packedInput);
 #ifdef DOWNWELL_CLEAR_VERIFY
-            if (gDownwellClearReentries && ++gDownwellClearGameplayUpdates == 60) downwellClearReady();
+            if (gDownwellClearReentries) {
+                ++gDownwellClearGameplayUpdates;
+                if (gDownwellClearReentries == 2 && gDownwellClearGameplayUpdates == 60) downwellClearReady();
+            }
 #endif
             if (!port.generationSucceeded()) break;
 #ifndef DOWNWELL_REPLAY_VERIFY

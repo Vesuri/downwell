@@ -2299,17 +2299,31 @@ scratch belongs to persistent Fast RAM rather than the small AmigaDOS stack.
 `make verify-amiga-clear-scene` builds with `SKIP_TO_GAME=1 CLEAR_VERIFY=1`.
 The fixture injects a level exit, selects right, confirms an upgrade, compares
 both complete planar buffers against scalar rendering on every clear frame,
-then requires next-level reentry and 60 gameplay updates. It checks the first
-256 stack bytes on the unchanged 4 KiB stack. Its deadline is 90 seconds
+then repeats the clear after 60 updates of level 1-2. It requires two reentries
+and 60 updates of level 1-3. It checks the first
+256 stack bytes on the unchanged 4 KiB stack. Its deadline is 150 seconds
 because the scalar oracle and full-buffer comparisons run on the emulated
 68000; this is not a production frame-time measurement. Success restores the
 ordinary build. On failure, the instrumented build remains for diagnosis.
 
-Validation: the bounded A500 run passed all 221 clear-frame comparisons,
+Initial single-transition validation: the bounded A500 run passed all 221 clear-frame comparisons,
 40 choice frames, one reentry and 60 subsequent gameplay updates with the
 stack guard intact. Host clear-controller/session/selection/presentation,
 retained-overlay, circular-border, selected-bank/storage and paired
 scene-runtime tests also passed; the native 68000 audits remained clean.
+
+The paired host scene fixture also reuses the same runtime and world through
+both transitions. Each clear compares all 16 RNG words, offers, input effects,
+carousel/camera motion and departure timing; each subsequent room checks
+preserved health, currency, upgrades, ammo capacity, retirement of old actors,
+builder RNG initialization and 90 updates of generated-terrain movement.
+Neither fixture substitutes a fresh stage-two runtime for the second clear.
+The expanded native gate passes 432 complete planar-frame comparisons,
+70 choice frames, two reentries and 60 level-1-3 updates with the stack guard
+intact. The host fixture additionally checks every owned upgrade level and
+exact integer camera publication in both regenerated rooms. These are injected
+exit fixtures: they do not prove reaching either exit through an unassisted
+full-level playthrough, nor do they measure production frame time.
 
 This closes a presentation/transition gap, not original-game completion.
 Later areas remain pending, as in the implemented SDL path. Heart-goal/bonus
