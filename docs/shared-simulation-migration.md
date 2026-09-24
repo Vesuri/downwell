@@ -359,3 +359,28 @@ verification work does not consume the playable build's frame budget.
 Validation: bounded host/68000 replay agrees on `64 9f0d3943 e7900d2b`;
 target instruction and helper audits pass, and the verifier restores the
 normal Amiga build. No input tape or gameplay behavior changed in this slice.
+
+## Shared frog preparation decision
+
+`FrogBehavior.h` implements the enmFrog Alarm 1 decision shared by both
+adapters. The VM requires grounded AND scrInView(0,0,0); the latter uses strict
+inequalities at all four view edges. It then compares global.plx to rounded
+instance x with GT, so equality chooses left. The adapters now supply the
+pre-movement player snapshot and the camera before its ordinary Step update.
+The former implementations omitted the visibility gate and used the newly
+integrated player position; native also incorrectly chose right at equality.
+
+Fixtures cover all four edges, fractional camera/player positions, airborne
+retry, translation between coordinate systems, and the native alarm path
+where player movement crosses the frog's X within the same tick. A frog on
+the exact right view edge retries alarm 1 at 60 rather than starting alarm 0.
+
+This does not finish frog consolidation. Horizontal/vertical collision order,
+full source-mask probes, gravity integration, hit-stun and water handling still
+differ or are incomplete. Camera state itself also remains independently
+implemented; sharing the visibility predicate does not fix camera differences.
+
+The corrected alarm changes the finite combat tape's outcome on both ports:
+health remains 3/3, kills become 1/1 and currency 12/12 (previously 2/2 and
+16/16). All per-update comparison checks still pass and the tape still
+exercises kills and collection. No test tolerance or coverage was reduced.

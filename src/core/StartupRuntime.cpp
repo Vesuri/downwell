@@ -3,6 +3,7 @@
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
 #include "EnemyContact.h"
+#include "FrogBehavior.h"
 #include "BatMotion.h"
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
@@ -1635,10 +1636,18 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1206: // gml_Object_enmFrog_Alarm_1
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            if (instance->grounded) {
+            const int direction = frogPreparationDirection(instance->grounded,
+                static_cast<long>(instance->x) * 256L,
+                static_cast<long>(instance->y) * 256L,
+                mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
+                static_cast<long>(std::round(mainCameraViewX() * 256.0F)),
+                static_cast<long>(std::round(mainCameraViewY() * 256.0F)),
+                static_cast<long>(std::round((mainCameraViewX() + surfaceWidth) * 256.0F)),
+                static_cast<long>(std::round((mainCameraViewY() + surfaceHeight) * 256.0F)));
+            if (direction != 0) {
                 instance->auxiliaryState = 1;
-                instance->velocityX = mainPlayerX_ > instance->preciseX ? 1.0F : -1.0F;
-                instance->motionState = mainPlayerX_ > instance->preciseX ? 2 : -2;
+                instance->velocityX = static_cast<float>(direction);
+                instance->motionState = direction * 2;
                 instance->alarms.set(0, 60);
                 ++soundPlayRequests_;
             } else {

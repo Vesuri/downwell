@@ -46,8 +46,9 @@ of each ten frames. Both targets must exercise kills and currency collection.
 The default suite enables the strict continuation. It checks player sprite/frame
 and health/kill/currency equality on every update. Its existing movement guard
 still permits up to three pixels of vertical difference; it is not an exact
-whole-world comparison. Current final counters are health 3/3, kills 2/2 and
-currency 16/16. See [shared simulation migration](shared-simulation-migration.md)
+whole-world comparison. After source-backed frog preparation corrections,
+current final counters are health 3/3, kills 1/1 and currency 12/12.
+See [shared simulation migration](shared-simulation-migration.md)
 for the source-backed corrections and outstanding fidelity work.
 
 Historical diagnostic before those migrations: first player discrepancy was

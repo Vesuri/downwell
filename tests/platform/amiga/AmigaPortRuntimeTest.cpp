@@ -327,6 +327,24 @@ int main() {
             "ground turtle walks and reschedules its recovered animation alarm");
 
     AmigaPortRuntime frog(300);
+    AmigaPortRuntime aimingFrog(300);
+    aimingFrog.configureSolidResolver(flatGround, nullptr);
+    require(aimingFrog.configureEnemy(0, 113, 166, 0, 1, 0, 0, 35, 20,
+                0, 0, -1, 1, 0, 0, true, true, true),
+            "configure grounded frog at player's pre-movement X");
+    aimingFrog.step(2); // right: current player X becomes positive this tick
+    require(aimingFrog.player().offsetXFixed() > 0 &&
+                aimingFrog.enemyAt(0).motionState == -2,
+            "frog alarm targets pre-movement equality to the left, not current player X");
+    AmigaPortRuntime edgeFrog(300);
+    edgeFrog.configureSolidResolver(flatGround, nullptr);
+    require(edgeFrog.configureEnemy(0, 113, 166, 80, 1, 0, 0, 35, 20,
+                0, 0, -1, 1, 0, 0, true, true, true),
+            "configure grounded frog exactly at camera right edge");
+    edgeFrog.step(0);
+    require(edgeFrog.enemyAt(0).auxiliaryState == 0 &&
+                edgeFrog.enemyAt(0).alarm1 == 60 && edgeFrog.enemyAt(0).alarm0 == -1,
+            "out-of-view frog retries preparation instead of starting its jump countdown");
     frog.configureSolidResolver(flatGround, 0);
     require(frog.configureEnemy(0, 113, 171, 40, 1,
                                 0, 0, 35, 20,

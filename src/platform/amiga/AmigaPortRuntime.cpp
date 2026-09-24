@@ -5,6 +5,7 @@
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
 #include "core/EnemyContact.h"
+#include "core/FrogBehavior.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
@@ -318,11 +319,15 @@ void AmigaPortRuntime::advanceEnemyAlarms()
             enemy.alarm1 = 120 + (int)enemyRandom_.irandomSmall(180);
         } else if (enemy.objectId == 113) {
             if (alarm1Fired) {
-                if (enemy.grounded) {
+                const int direction = downwell::frogPreparationDirection(
+                    enemy.grounded, enemy.x * 256L, enemy.y * 256L,
+                    player_.frameStartXFixed(), (cameraPixelX_ - 80) * 256L,
+                    cameraY_ - 142 * 256L, (cameraPixelX_ + 80) * 256L,
+                    cameraY_ + 142 * 256L);
+                if (direction != 0) {
                     enemy.auxiliaryState = 1;
-                    enemy.speedX =
-                        player_.offsetX() < enemy.x ? -256 : 256;
-                    enemy.motionState = enemy.speedX < 0 ? -2 : 2;
+                    enemy.speedX = direction * 256;
+                    enemy.motionState = direction * 2;
                     enemy.alarm0 = 60;
                 } else {
                     enemy.alarm1 = 60;
