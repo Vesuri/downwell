@@ -5,6 +5,7 @@
 #include "EnemyContact.h"
 #include "FrogBehavior.h"
 #include "FrogMotion.h"
+#include "StandardBulletStep.h"
 #include "BatMotion.h"
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
@@ -456,19 +457,20 @@ bool StartupRuntime::mainSolidAt(float x, float y) const {
     return false;
 }
 
-InstanceRecord* StartupRuntime::mainBulletCollision(float x, float y) {
+InstanceRecord* StartupRuntime::mainBulletCollision(int x, int fromY, int toY) {
+    const StandardBulletPath path{x, fromY, toY};
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         InstanceRecord& wall = instances_.at(index);
         if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
             continue;
-        if (x >= wall.x - 8.0F && x <= wall.x + 7.0F &&
-            y >= wall.y - 8.0F && y <= wall.y + 7.0F)
+        if (path.intersects(wall.x - 8, wall.x + 8, wall.y - 8, wall.y + 8))
             return &wall;
     }
     return nullptr;
 }
 
-InstanceRecord* StartupRuntime::mainBulletEnemyCollision(float x, float y) {
+InstanceRecord* StartupRuntime::mainBulletEnemyCollision(int x, int fromY, int toY) {
+    const StandardBulletPath path{x, fromY, toY};
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         InstanceRecord& enemy = instances_.at(index);
         const bool enemyObject = enemy.objectId == 111 ||
@@ -479,8 +481,7 @@ InstanceRecord* StartupRuntime::mainBulletEnemyCollision(float x, float y) {
                                  enemy.objectId == 119;
         if (!enemy.active || !enemyObject || enemy.health <= 0)
             continue;
-        if (x >= enemy.x - 8.0F && x <= enemy.x + 7.0F &&
-            y >= enemy.y - 8.0F && y <= enemy.y + 7.0F)
+        if (path.intersects(enemy.x - 8, enemy.x + 8, enemy.y - 8, enemy.y + 8))
             return &enemy;
     }
     return nullptr;
@@ -518,10 +519,10 @@ void StartupRuntime::updateMainBullets() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
-        bool alive = true;
-        for (int pixel = 0; pixel < 8; ++pixel) {
-            bullet.y += 1.0F;
-            InstanceRecord* enemy = mainBulletEnemyCollision(bullet.x, bullet.y);
+        int nextY = static_cast<int>(bullet.y);
+        bool alive = stepStandardBullet(static_cast<int>(bullet.x), nextY,
+          [this](const StandardBulletPath& path) {
+            InstanceRecord* enemy = mainBulletEnemyCollision(path.x, path.fromY, path.toY);
             if (enemy != nullptr) {
                 // Ground turtles are bulletImmune in their recovered Create
                 // event. Other area-one enemies take the usual gun's 10 dmg.
@@ -537,10 +538,11 @@ void StartupRuntime::updateMainBullets() {
                     }
                 }
                 ++soundPlayRequests_;
-                alive = false;
-                break;
+                return true;
             }
-            InstanceRecord* wall = mainBulletCollision(bullet.x, bullet.y);
+            return false;
+          }, [this](const StandardBulletPath& path) {
+            InstanceRecord* wall = mainBulletCollision(path.x, path.fromY, path.toY);
             if (wall != nullptr) {
                 if (wall->objectId == 92) {
                     // objBox_n starts with wallHp = 1. The usual gun's bdmg
@@ -549,10 +551,11 @@ void StartupRuntime::updateMainBullets() {
                     ++mainBlocksDestroyed_;
                     ++soundPlayRequests_;
                 }
-                alive = false;
-                break;
+                return true;
             }
-        }
+            return false;
+          });
+        bullet.y = static_cast<float>(nextY);
         if (bullet.y > mainCameraViewY() + surfaceHeight + 32.0F ||
             bullet.y < mainCameraViewY() - 100.0F)
             alive = false;

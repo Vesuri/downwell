@@ -116,6 +116,11 @@ $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) 
 
 test: build/gem-homing-test
 test: build/main-camera-test
+test: build/standard-bullet-test
+
+build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp src/core/StandardBulletStep.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/StandardBulletStepTest.cpp
 
 build/main-camera-test: tests/core/MainCameraMotionTest.cpp src/core/MainCameraMotion.h
 	@mkdir -p build
@@ -287,6 +292,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/bat-motion-test
 	./build/gem-homing-test
 	./build/main-camera-test
+	./build/standard-bullet-test
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)

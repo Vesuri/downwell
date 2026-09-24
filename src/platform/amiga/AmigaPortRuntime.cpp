@@ -7,6 +7,7 @@
 #include "core/EnemyContact.h"
 #include "core/FrogBehavior.h"
 #include "core/FrogMotion.h"
+#include "core/StandardBulletStep.h"
 #include "core/FrogVerticalMotion.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
@@ -477,67 +478,62 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             BulletState& bullet = bullets_[bulletIndex];
             if (!bullet.active)
                 continue;
-            const int priorBulletY = bullet.y;
-            unsigned blockIndex;
-            bullet.y += 8;
             bulletChanged = true;
-            for (unsigned enemyIndex = 0;
-                 enemyIndex < enemyCount_ && bullet.active; ++enemyIndex) {
-                EnemyState& enemy = enemies_[enemyIndex];
-                if (!enemy.active || !enemy.awake || enemy.health <= 0 ||
-                    bullet.x < enemy.x - 8 || bullet.x > enemy.x + 7 ||
-                    priorBulletY > enemy.y + 7 || bullet.y < enemy.y - 8)
-                    continue;
-                if (enemy.objectId != 112) {
-                    if (enemy.objectId == 113) enemy.frogHit.pending = true;
-                    enemy.health -= 10;
-                    if (enemy.health <= 0) {
-                        spawnReward(enemy, false);
-                        enemy.active = false;
-                        ++enemiesDefeated_;
+            bullet.active = downwell::stepStandardBullet(bullet.x, bullet.y,
+                [this](const downwell::StandardBulletPath& path) {
+                    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+                        EnemyState& enemy = enemies_[enemyIndex];
+                        if (!enemy.active || !enemy.awake || enemy.health <= 0 ||
+                            !path.intersects(enemy.x - 8, enemy.x + 8,
+                                             enemy.y - 8, enemy.y + 8))
+                            continue;
+                        if (enemy.objectId != 112) {
+                            if (enemy.objectId == 113) enemy.frogHit.pending = true;
+                            enemy.health -= 10;
+                            if (enemy.health <= 0) {
+                                spawnReward(enemy, false);
+                                enemy.active = false;
+                                ++enemiesDefeated_;
+                            }
+                        }
+                        return true;
                     }
-                }
-                bullet.active = false;
-            }
-            unsigned firstBlock = 0, endBlock = breakableCount_;
-            if (breakableIndexReady_) {
-                int candidate = indexedBreakable(bullet.x, priorBulletY);
-                int next = indexedBreakable(bullet.x, bullet.y);
-                if (candidate >= 0 && !breakables_[candidate].active) candidate = -1;
-                if (next >= 0 && !breakables_[next].active) next = -1;
-                if (candidate < 0 || (next >= 0 && next < candidate)) candidate = next;
-                firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
-                endBlock = candidate < 0 ? 0 : firstBlock + 1;
-            }
-            for (blockIndex = firstBlock;
-                 blockIndex < endBlock && bullet.active;
-                 ++blockIndex) {
-                Breakable& block = breakables_[blockIndex];
-                if (block.active && bullet.x >= block.x - 8 &&
-                    bullet.x <= block.x + 7 &&
-                    priorBulletY <= block.y + 7 &&
-                    bullet.y >= block.y - 8) {
-                    block.active = false;
-                    bullet.active = false;
-                    if (destroyedBlockCount < destroyedCapacity) {
-                        destroyedBlockX[destroyedBlockCount] = block.x;
-                        destroyedBlockY[destroyedBlockCount] = block.y;
-                        ++destroyedBlockCount;
+                    return false;
+                }, [this, &destroyedBlockCount, &destroyedBlockX, &destroyedBlockY]
+                   (const downwell::StandardBulletPath& path) {
+                    unsigned firstBlock = 0, endBlock = breakableCount_;
+                    if (breakableIndexReady_) {
+                        int candidate = indexedBreakable(path.x, path.fromY);
+                        int next = indexedBreakable(path.x, path.toY);
+                        if (candidate >= 0 && !breakables_[candidate].active) candidate = -1;
+                        if (next >= 0 && !breakables_[next].active) next = -1;
+                        if (candidate < 0 || (next >= 0 && next < candidate)) candidate = next;
+                        firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
+                        endBlock = candidate < 0 ? 0 : firstBlock + 1;
                     }
-                    ++blocksDestroyed_;
-                }
-            }
-            // scrBulCheckSolid also destroys an ordinary, non-wave bullet
-            // on an unbreakable solid wall. Keep its enemy-line precedence:
-            // an enemy hit above has already consumed the shot.
-            if (bullet.active && solidResolver_ != 0) {
-                for (int y = priorBulletY; y <= bullet.y; ++y) {
-                    if (solidResolver_(solidResolverContext_, bullet.x, y)) {
-                        bullet.active = false;
-                        break;
+                    for (unsigned blockIndex = firstBlock; blockIndex < endBlock; ++blockIndex) {
+                        Breakable& block = breakables_[blockIndex];
+                        if (block.active && path.intersects(block.x - 8, block.x + 8,
+                                                           block.y - 8, block.y + 8)) {
+                            block.active = false;
+                            if (destroyedBlockCount < destroyedCapacity) {
+                                destroyedBlockX[destroyedBlockCount] = block.x;
+                                destroyedBlockY[destroyedBlockCount] = block.y;
+                                ++destroyedBlockCount;
+                            }
+                            ++blocksDestroyed_;
+                            return true;
+                        }
                     }
-                }
-            }
+                    // An ordinary, non-wave bullet also stops at unbreakable walls.
+                    if (solidResolver_ != 0) {
+                        for (int y = path.fromY; y <= path.toY; ++y) {
+                            if (solidResolver_(solidResolverContext_, path.x, y))
+                                return true;
+                        }
+                    }
+                    return false;
+                });
             if (bullet.y >= cameraPixelY_ + bulletBottom)
                 bullet.active = false;
         }

@@ -232,8 +232,8 @@ private:
     void updateMainLifecycle();
     void updateMainEnemies();
     void updateMainEnemyInteractions();
-    InstanceRecord* mainBulletEnemyCollision(float x, float y);
-    InstanceRecord* mainBulletCollision(float x, float y);
+    InstanceRecord* mainBulletEnemyCollision(int x, int fromY, int toY);
+    InstanceRecord* mainBulletCollision(int x, int fromY, int toY);
     void dispatchInstancePhase(InstanceRecord& instance,
                                RoomInstancePhase phase);
     bool dispatchObjectEvent(InstanceRecord& instance,
