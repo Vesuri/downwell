@@ -35,7 +35,7 @@ if gDownwellResultsBackdropChecks != 1 || gDownwellResultsBackdropFailures != 0
     printf "Results backdrop blitter/scalar mismatch: checks=%lu bytes=%lu\n", gDownwellResultsBackdropChecks, gDownwellResultsBackdropFailures
     quit 1
 end
-printf "Results backdrop matches scalar composition\n"
+printf "Results backdrop and gem/kill rows match scalar composition\n"
 printf "Overflow actors: %lu scalar-oracle comparisons, %lu mismatched bytes\n", gDownwellGameplayBobChecks, gDownwellGameplayBobFailures
 printf "Gameplay cache verified through 600 simulation ticks: %lu fresh-composition comparisons\n", gDownwellTerrainRasterChecks
 printf "Task stack retained its 256-byte safety margin\n"

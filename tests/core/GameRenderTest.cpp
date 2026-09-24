@@ -3,6 +3,7 @@
 #include "core/ObjectPack.h"
 #include "core/BuilderPatternPack.h"
 #include "core/DeathResultsBackdrop.h"
+#include "core/DeathResultsRows.h"
 #include "core/StateDigest.h"
 #include <cstring>
 #include <cstdio>
@@ -83,6 +84,34 @@ public:
 } // namespace
 
 int main() {
+    struct RowProbe {
+        struct Call { int id; unsigned frame; int x, y; };
+        std::vector<Call> calls;
+        void asset(int id, unsigned frame, int x, int y) { calls.push_back({id, frame, x, y}); }
+    } rows;
+    downwell::DeathMenuSequence rowMenu;
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10);
+    require(rows.calls.empty(), "results rows remain hidden until published");
+    rowMenu.visible[1] = rowMenu.visible[2] = true;
+    rowMenu.rowOffset[1] = 3; rowMenu.rowOffset[2] = 2;
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10);
+    require(rows.calls.size() == 8 && rows.calls[0].id == 401 && rows.calls[0].frame == 1 &&
+                rows.calls[0].x == 42 && rows.calls[0].y == 102 && rows.calls[1].frame == 0 &&
+                rows.calls[2].id == 403 && rows.calls[2].frame == 8 && rows.calls[2].x == 72 &&
+                rows.calls[2].y == 105 && rows.calls[3].frame == 4 && rows.calls[3].x == 78 &&
+                rows.calls[4].frame == 4 && rows.calls[6].frame == 1 && rows.calls[7].frame == 0 &&
+                rows.calls[7].y == 114,
+            "source row icons, colon, digit order and separate numeric bounce");
+    rows.calls.clear();
+    downwell::drawResultNumber(rows, 0, 72, 98);
+    require(rows.calls.size() == 1 && rows.calls[0].frame == 0, "zero is one visible digit");
+    rows.calls.clear();
+    downwell::drawResultNumber(rows, 0xffffffffu, 72, 98);
+    const unsigned maximumDigits[] = {4,2,9,4,9,6,7,2,9,5};
+    require(rows.calls.size() == 10, "maximum run counter does not overflow digit divisor");
+    for (unsigned i = 0; i < 10; ++i)
+        require(rows.calls[i].frame == maximumDigits[i] && rows.calls[i].x == 72 + static_cast<int>(i)*6,
+                "all decimal digits use the source six-pixel spacing");
     struct BackdropProbe {
         unsigned tiles = 0, titles = 0;
         bool panel = false;

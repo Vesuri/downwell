@@ -9,6 +9,26 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared gem and kill result rows
+
+Both renderers now consume `DeathResultsRows` for DeathMenu's gameGem and
+killCount rows. It uses recovered result icons/colon frames and sprNumbers,
+including source six-pixel digit spacing, leading-zero suppression (zero itself
+remains visible), and numeric bounce separate from the icon anchor. Counts come
+from the live run, not the lifetime total or a placeholder. Native rendering
+clears/repaints only the rows' opaque panel region when their values, visibility
+or offsets change; backdrop changes force the rows to be restored afterward.
+
+Fixtures check exact source coordinates, hidden rows, zero and the full 32-bit
+decimal range. The native cache verifier's scalar/blitter comparison also draws
+the two rows with unequal bounce offsets and multi-digit counts. Area/level,
+combo and time rows, progress details, unlock notices and menu controls remain
+unfinished; this is not a complete results screen.
+Validation: full host suite and bounded A500 cache/overlay comparison pass,
+including asset-integrity and stack checks. Normal builds are restored and
+68000 audits remain clean. No full results-screen or Windows pixel parity is
+claimed by the synthetic native row fixture.
+
 ### First visible results overlay on both backends
 
 `DeathResultsBackdrop` supplies DeathMenu Draw's tiled frame-5 shading,

@@ -26,6 +26,7 @@
 #include "core/GameMakerRounding.h"
 #include "core/HudNumbers.h"
 #include "core/DeathResultsBackdrop.h"
+#include "core/DeathResultsRows.h"
 #include "framework/AmigaMemory.h"
 #include "framework/AmigaPlatform.h"
 #include "framework/Bitmap.h"
@@ -540,16 +541,48 @@ static void composeResultsBackdrop(AmigaRenderer* renderer,
     renderer->target = saved;
 }
 
-static void redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntime& port) {
+static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntime& port) {
     const int viewX = mainViewX + port.cameraOffsetX();
     const int viewY = mainInitialViewY + port.cameraOffsetY();
     const int offset = port.deathResults().menu.titleOffset;
     static int lastX = -1, lastY = -1, lastOffset = -1;
     const int phaseX = ((viewX % 8) + 8) % 8;
     const int phaseY = ((viewY % 8) + 8) % 8;
-    if (lastX == phaseX && lastY == phaseY && lastOffset == offset) return;
+    if (lastX == phaseX && lastY == phaseY && lastOffset == offset) return false;
     lastX = phaseX; lastY = phaseY; lastOffset = offset;
     composeResultsBackdrop(renderer, offset, viewX, viewY);
+    return true;
+}
+
+static void composeResultsRows(AmigaRenderer* renderer,
+        const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills) {
+    UBYTE* saved = renderer->target;
+    renderer->target = renderer->hud;
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    // Both current rows lie wholly inside the original opaque black panel.
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 88, 160, 40, 3);
+    struct Sink {
+        AmigaRenderer* renderer;
+        void asset(int id, unsigned frame, int x, int y) {
+            amigaRendererDrawAsset(renderer, gDownwellResultsPack,
+                gDownwellResultsPack + gDownwellResultsAssetBytes, id, frame,
+                downwellPlayfieldX + x, y, 0);
+        }
+    } sink{renderer};
+    downwell::drawDeathResultsRows(sink, menu, gems, kills);
+    amigaRendererClearClipRect(renderer);
+    renderer->target = saved;
+}
+
+static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force) {
+    static unsigned lastGems = ~0u, lastKills = ~0u, lastPhase = ~0u;
+    const auto& menu = port.deathResults().menu;
+    const unsigned phase = menu.titleOffset | (menu.rowOffset[1] << 3) |
+        (menu.rowOffset[2] << 6) | (menu.visible[1] << 9) | (menu.visible[2] << 10);
+    const unsigned gems = port.gameGemTotal(), kills = port.enemiesDefeated();
+    if (!force && lastGems == gems && lastKills == kills && lastPhase == phase) return;
+    lastGems = gems; lastKills = kills; lastPhase = phase;
+    composeResultsRows(renderer, menu, gems, kills);
 }
 
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -2019,8 +2052,10 @@ int main(void) {
                 redrawCurrency(&renderer, port.currency());
             if ((result.streakChanged || wasDead != port.dead()) && !port.deathResults().active)
                 redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
-            if (port.deathResults().active)
-                redrawResultsBackdrop(&renderer, port);
+            if (port.deathResults().active) {
+                const bool backdropChanged = redrawResultsBackdrop(&renderer, port);
+                redrawResultsRows(&renderer, port, backdropChanged);
+            }
         }
         {
             const unsigned back = front ^ 1u;
@@ -2392,6 +2427,12 @@ int main(void) {
                 resultsOracle.blitterEnabled = 0;
                 composeResultsBackdrop(&resultsOracle, 4, 160, 34);
                 composeResultsBackdrop(&renderer, 4, 160, 34);
+                downwell::DeathMenuSequence rowFixture;
+                rowFixture.visible[1] = rowFixture.visible[2] = true;
+                rowFixture.rowOffset[1] = 3;
+                rowFixture.rowOffset[2] = 2;
+                composeResultsRows(&resultsOracle, rowFixture, 84, 10);
+                composeResultsRows(&renderer, rowFixture, 84, 10);
                 AmigaHardware::blitterDrain();
                 for (unsigned byte = 0; byte < downwellLayerBytes; ++byte) {
                     if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsBackdropFailures;
