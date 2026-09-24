@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Projectile artwork follows the current firing direction
+
+Both renderers previously drew machine-gun frame zero without rotation. The
+VM `scrPlayerShootN` sets `shotAngle = 270 + aimAngle`, and
+`bulletStandard` Step sets `image_angle = bDir` after its one-time spread draw.
+The current straight-down movement adaptation therefore needs 270-degree art,
+not zero-degree art. SDL now submits that transform, and Amiga selects a
+host-generated quarter-turn variant (frame high byte 3), including prebuilt
+hardware-sprite DMA words. Original frame IDs remain available. No per-frame
+asset conversion or additional terrain redraw is introduced.
+
+The powered-shot native capture at update 180 again matches all 99,968 SDL
+pixels. The pack grows by 848 bytes to 314,412 bytes, SHA-256
+`7c49ea32dc288ccbe1cf17c96b0795bd1f8bc7e7b8bd8107e01a195f0a412c21`.
+The VM verifier checks both firing-angle construction and assignment of the
+bullet image angle; the live host render test requires transformed shots.
+The ordinary active-gameplay capture at update 383 also matches all pixels;
+20,874 offline sprite comparisons pass. Both bounded native runs restore the
+normal executable, and the 68000 instruction/helper audits remain clean.
+
+This corrects orientation for the currently implemented motion, not the whole
+original projectile: first-Step random spread, fractional vector movement,
+rotated collision behavior, six-frame animation at image speed 0.3 and muzzle
+effects remain to be integrated. Those must share birth/state semantics across
+both adapters rather than adding separate native weapon logic.
+
 ### Gem-high cross-CPU transition fixture
 
 The bounded native replay now also runs `verifyMachineGun`, a 64-update

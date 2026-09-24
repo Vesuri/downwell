@@ -450,14 +450,15 @@ def build_pack(manifest, extracted, profile, language_path=None):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
-            if profile == "shop" and sprite_id == 484:
-                # Leave uses draw_sprite_ext(...,270,...). As with crawler
+            if ((profile == "shop" and sprite_id == 484) or
+                    (profile == "game" and sprite_id in (458, 459))):
+                # Leave and downward bullets draw at 270 degrees. As with crawler
                 # art, encode quarter turns in the high byte of the frame ID.
                 rotated = canvas.transpose(Image.Transpose.ROTATE_270)
                 pixels = [pixel_to_pen(pixel) for pixel in rotated.get_flattened_data()]
                 stride, data = encode_planar(pixels, rotated.width, rotated.height)
                 require(decode_planar(data, rotated.width, rotated.height, stride) == pixels,
-                        "shop cursor rotated planar round trip failed")
+                        "quarter-turn planar round trip failed")
                 metadata = dict(sprite, width=rotated.width, height=rotated.height,
                                 originX=canvas.height - sprite["originY"],
                                 originY=sprite["originX"])

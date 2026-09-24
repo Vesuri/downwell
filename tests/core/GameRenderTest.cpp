@@ -44,6 +44,7 @@ public:
     }
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
     void drawSprite(std::int32_t id, std::uint32_t, int x, int y) override {
+        require(id != 458 && id != 459, "projectiles must use their firing angle, not unrotated artwork");
         if (id == 489 && x == 110 && y == 57) ++shopPanels;
         if (id == 128) {
             ++exitDitherDraws; exitDitherX = x; exitDitherY = y;
@@ -52,10 +53,16 @@ public:
         }
     }
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
-                               float, float, float) override {
+                               float sx, float sy, float angle) override {
+        if (sprite == 458 || sprite == 459) {
+            require(sx == 1 && sy == 1 && angle == 270,
+                    "current downward bullets draw at the source firing angle");
+            ++bulletDraws;
+        }
         if (sprite == targetPlayer) ++playerDraws;
         if (sprite == 127) ++triggerDraws;
     }
+    unsigned bulletDraws = 0;
     void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
                   downwell::TextAlign align) override {
@@ -380,6 +387,7 @@ int main() {
     }
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
+    require(renderer.bulletDraws > 0, "live render tape exercises projectile transforms");
     // Renderer fixture only: natural death entry is exercised by the long
     // paired simulation replay. This tape deliberately ends after recovery.
     auto& resultsFixture = const_cast<downwell::DeathResults&>(damagedGame.startup().deathResults());

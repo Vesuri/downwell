@@ -38,3 +38,13 @@ for row in rows:
     expected = [table[("bStat" + field, level)] for field in fields]
     assert actual == expected, (level, dict(zip(fields, actual)), dict(zip(fields, expected)))
 print("Both machine-gun profiles match 34 selected VM table assignments")
+
+# Rendering must follow the firing direction even before the remaining spread
+# and fractional-motion work is connected. Do not mistake frame-zero artwork
+# (authored pointing right) for an already downward-facing projectile.
+shoot = (export / "Assembly/gml_GlobalScript_scrPlayerShootN.asm").read_text()
+step = (export / "Assembly/gml_Object_bulletStandard_Step_0.asm").read_text()
+assert "pushi.e 270\npush.v self.aimAngle\nadd.v.i\npop.v.v self.shotAngle" in shoot
+assert "push.v self.bDir\npop.v.v self.image_angle" in step
+assert step.index("call.i random_range(argc=2)") < step.index("pop.v.v self.image_angle")
+print("VM projectile image angle follows firing direction plus first-Step spread")
