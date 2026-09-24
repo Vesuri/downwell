@@ -432,3 +432,24 @@ Layout tests cover exact pass order, affordability colour, zero, full unsigned
 price range and all six description IDs. This compositor uses only integer
 operations and fixed scratch storage; adapters still need to call it while
 the shop bank is loaded. No on-screen shop verification is claimed yet.
+
+## Native overlay bank lifetime
+
+The native executable now embeds the shop bank in ordinary executable data and
+loads it into the existing retired-garden middle gap when a shop menu becomes
+active. Results select their own bank before composing their overlay. No extra
+Chip allocation is added: staging-ring and HUD-art partitions remain unchanged.
+The loader validates capacity and planar-only payload size, drains pending
+blits before replacing bytes, invalidates the other bank's pointer, and avoids
+copies when the requested bank is already resident. Failure returns code 20.
+
+The gameplay-cache verifier explicitly swaps to the shop bank, checks every
+byte and repeated selection, restores results, then checks results and HUD art
+after terrain staging/side-cache probes. This exercises bank ownership without
+inserting a non-original shop into level 1-1. Visible menu drawing is still not
+connected; bank integrity does not establish original-game presentation parity.
+
+Validation: bounded SKIP_TO_GAME cache run passed 600 ticks/101 fresh terrain
+comparisons with bank checks enabled. Resident art remained 274764 bytes and
+startup Chip headroom 19344 bytes; task stack retained its 256-byte margin.
+Both native 68000 audits passed. Normal build restored after instrumentation.

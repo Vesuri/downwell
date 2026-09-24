@@ -57,6 +57,8 @@ extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_game_pack_end[];
 extern const UBYTE amiga_results_pack[];
 extern const UBYTE amiga_results_pack_end[];
+extern const UBYTE amiga_shop_pack[];
+extern const UBYTE amiga_shop_pack_end[];
 extern const UBYTE amiga_room_pack[];
 extern const UBYTE amiga_room_pack_end[];
 extern const UBYTE amiga_object_pack[];
@@ -185,6 +187,29 @@ volatile ULONG gDownwellStartupAssetBytes;
 volatile ULONG gDownwellStartupChipRemaining;
 const UBYTE* gDownwellResultsPack;
 volatile ULONG gDownwellResultsAssetBytes;
+const UBYTE* gDownwellShopPack;
+volatile ULONG gDownwellShopAssetBytes;
+static UBYTE* overlayAssetStorage;
+static unsigned overlayAssetCapacity;
+
+// Results and shop are mutually exclusive users of the retired-garden gap.
+// Drain the blitter before replacing a bank it may still be reading. Hardware
+// sprites and display bitplanes never point into this immutable artwork region.
+static bool selectOverlayAssetBank(bool shop) {
+    if ((shop && gDownwellShopPack) || (!shop && gDownwellResultsPack)) return true;
+    const UBYTE* source = shop ? amiga_shop_pack : amiga_results_pack;
+    const UBYTE* end = shop ? amiga_shop_pack_end : amiga_results_pack_end;
+    const unsigned bytes = end - source;
+    if (!overlayAssetStorage || bytes > overlayAssetCapacity ||
+        amigaRendererChipPackBytes(source, end) != bytes) return false;
+    AmigaHardware::blitterDrain();
+    for (unsigned i = 0; i < bytes; ++i) overlayAssetStorage[i] = source[i];
+    gDownwellShopPack = shop ? overlayAssetStorage : nullptr;
+    gDownwellShopAssetBytes = shop ? bytes : 0;
+    gDownwellResultsPack = shop ? nullptr : overlayAssetStorage;
+    gDownwellResultsAssetBytes = shop ? 0 : bytes;
+    return true;
+}
 volatile ULONG gDownwellResultsAssetFailures;
 volatile ULONG gDownwellResultsBackdropFailures;
 volatile ULONG gDownwellResultsBackdropChecks;
@@ -1975,13 +2000,16 @@ int main(void) {
                         hudStorage[byte] = amiga_hud_pack[byte];
                     activeHudPack = hudStorage;
                     activeHudPackEnd = activeHudPack + hudBytes;
-                    UBYTE* resultsStorage = memory.menuForeground() + storage.resultsOffset;
+                    overlayAssetStorage = memory.menuForeground() + storage.resultsOffset;
+                    overlayAssetCapacity = storage.resultsCapacity;
                     // Retired intro DMA is blank. Copy immutable, already planar
                     // assets once; never convert or copy them per results frame.
-                    for (unsigned byte = 0; byte < resultsBytes; ++byte)
-                        resultsStorage[byte] = amiga_results_pack[byte];
-                    gDownwellResultsPack = resultsStorage;
-                    gDownwellResultsAssetBytes = resultsBytes;
+                    gDownwellResultsPack = gDownwellShopPack = nullptr;
+                    if (!selectOverlayAssetBank(false)) {
+                        ++gDownwellResultsAssetFailures;
+                        exitCode = 20;
+                        break;
+                    }
                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);
                     stageClear.clear();
@@ -2324,7 +2352,15 @@ int main(void) {
                 // backing and both hardware-scrolled world buffers throughout.
                 composeDeathFlash(&renderer, port.deathSequence().flashVisible());
             }
+            bool shopMenuActive = false;
+            for (const auto& shop : port.shops().instances)
+                if (shop.present && shop.menu.active) shopMenuActive = true;
+            if (shopMenuActive && !port.deathResults().active && !selectOverlayAssetBank(true)) {
+                exitCode = 20;
+                break;
+            }
             if (port.deathResults().active) {
+                if (!selectOverlayAssetBank(false)) { exitCode = 20; break; }
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
 #ifndef DOWNWELL_REPLAY_VERIFY
                     !resultsWasActive
@@ -2719,6 +2755,18 @@ int main(void) {
                 exposeGameplayFrame(memory, gameDisplay[back], back, port);
                 // Verify reserved art survived staging, buffer rotations and
                 // the side-room cache probes above. Runs only in this verifier.
+                // Exercise the actual bank replacement even though ordinary
+                // level 1-1 intentionally does not generate a shop.
+                if (!selectOverlayAssetBank(true)) ++gDownwellResultsAssetFailures;
+                else {
+                    for (ULONG byte = 0; byte < gDownwellShopAssetBytes; ++byte)
+                        if (gDownwellShopPack[byte] != amiga_shop_pack[byte])
+                            ++gDownwellResultsAssetFailures;
+                    const UBYTE* retained = gDownwellShopPack;
+                    if (!selectOverlayAssetBank(true) || retained != gDownwellShopPack)
+                        ++gDownwellResultsAssetFailures;
+                }
+                if (!selectOverlayAssetBank(false)) ++gDownwellResultsAssetFailures;
                 if (!gDownwellResultsPack || gDownwellResultsAssetBytes !=
                         (ULONG)(amiga_results_pack_end - amiga_results_pack)) {
                     ++gDownwellResultsAssetFailures;

@@ -21,6 +21,13 @@ amiga_results_pack:
 amiga_results_pack_end:
 
 	.balign 4
+	.globl amiga_shop_pack
+amiga_shop_pack:
+	.incbin "../generated/amiga-shop.dwap"
+	.globl amiga_shop_pack_end
+amiga_shop_pack_end:
+
+	.balign 4
 	.globl amiga_room_pack
 amiga_room_pack:
 	.incbin "../generated/downwell-rooms.dwrm"
