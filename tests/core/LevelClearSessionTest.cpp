@@ -61,6 +61,18 @@ int main() {
     require(!run.advanceAfterLevelClear(), "stage advancement is one-shot");
     require(run.upgrades.levels[0] == 1 && run.upgrades.count == 1 && run.gems.lifetime == 999 &&
         currency.currency >= 123, "level transition preserves run ownership and records");
+    player.increaseAmmoCapacity(4);
+    player.face(-1);
+    Input shooting; shooting.fire = true; shooting.left = true;
+    for (unsigned tick = 0; tick < 40; ++tick) player.step(shooting);
+    const int capacity = player.ammoCapacity();
+    require(player.shots() && player.ammo() < capacity, "room-entry fixture spent charge and moved");
+    player.enterRoom(true);
+    require(player.ammoCapacity() == capacity && player.ammo() == capacity && player.facing() == -1 &&
+        player.offsetXFixed() == 0 && player.offsetYFixed() == 0 && player.speedXFixed() == 0 &&
+        player.speedYFixed() == 0 && !player.grounded() && !player.shots() &&
+        player.jumpShootLocked() && player.shotDelayed(),
+        "room entry resets instance motion but preserves globals and refills charge");
     run.reset();
     require(!run.levelClearActive && !run.nextLevelRequested && run.levelClear.selection.alarm4 == 60 &&
         run.upgrades.count == 0, "new-run reset clears result lifecycle");

@@ -1531,9 +1531,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainPlayerInitialized_ = true;
                 mainPlayerOriginX_ = instance->x;
                 mainPlayerOriginY_ = instance->y;
-                mainPlayerMotion_ = PlayerMotion(false);
-                mainPlayerMotion_.initializeEntryInput(inputFire_);
-                mainPlayerHealth_ = 4;
+                mainPlayerMotion_.enterRoom(inputFire_);
                 mainDeath_ = {};
                 syncMainPlayerState();
                 mainPlayerInvulnerability_ = 0;
@@ -1548,7 +1546,6 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainJumps_ = 0;
                 mainBulletCount_ = 0;
                 mainCurrencyCount_ = 0;
-                currencyAccount_ = {};
                 currencyAccount_.playerCreated();
                 // The shared player now owns the default gun's countdown.
             }

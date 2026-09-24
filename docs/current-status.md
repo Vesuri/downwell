@@ -342,6 +342,18 @@ A freestanding -m68000 compile has only existing renderer API dependencies,
 with no arithmetic helpers. Live scene publication, hardware blitter execution
 and timing remain unverified for this helper.
 
+The host player Create path no longer resets health/currency to first-run
+defaults on every rmMain entry. Shared PlayerMotion::enterRoom resets motion,
+animation/counters and room callbacks while preserving ammo capacity and facing,
+refilling charge and applying entry input delay. This follows scrPlayerInit's
+global.ammo -> global.stammo and global.plxDir -> image_xscale assignments;
+currency playerCreated refreshes its entry grace timer without erasing totals.
+New-run reset still owns default health/currency/capacity initialization. Tests
+cover a moving, shooting player with increased capacity and retained facing,
+plus existing startup/restart rendering regressions. The room loader itself is
+still not connected to the final result request; this removes a reset hazard
+before that integration, not a claim of next-stage playability.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

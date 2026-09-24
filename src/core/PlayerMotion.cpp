@@ -37,6 +37,17 @@ PlayerMotion::PlayerMotion(bool startsGrounded, int landingOffset)
         landingProfile_[index] = landingOffset;
 }
 
+void PlayerMotion::enterRoom(bool fireHeld, int landingOffset)
+{
+    const int capacity = ammoCapacity_;
+    const int facing = facing_;
+    *this = PlayerMotion(false, landingOffset);
+    ammoCapacity_ = capacity;
+    ammo_ = capacity;
+    facing_ = facing;
+    initializeEntryInput(fireHeld);
+}
+
 void PlayerMotion::configureLandingProfile(const int* offsets, unsigned count)
 {
     unsigned index;

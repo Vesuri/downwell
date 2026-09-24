@@ -38,6 +38,10 @@ public:
 
     explicit PlayerMotion(bool startsGrounded = true,
                          int landingOffset = 0);
+    // scrPlayerInit room-local reset, not ResetPlayer/new-run initialization.
+    // Retains global ammo capacity/facing and refills charge. Room-owned
+    // collision callbacks must be rebound after replacing the old world.
+    void enterRoom(bool fireHeld, int landingOffset = 0);
     PlayerMotionDelta step(const downwell::Input& input, bool controlsLocked = false,
                            bool dead = false, bool interactable = false,
                            bool goalStopped = false);
