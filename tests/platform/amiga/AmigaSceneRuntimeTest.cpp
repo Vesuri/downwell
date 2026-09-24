@@ -860,12 +860,28 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
             input.fire = (tick + firePhase) % 10 < 5;
             const bool bothWereDead = gameplay.deathSequence().movementDead() && reference.mainDeathSequence().movementDead();
+            const unsigned gemsBeforeNative = gameplay.gameGemTotal();
+            const unsigned gemsBeforeHost = reference.mainGameGemTotal();
+            const bool nativeWasRecorded = gameplay.runGemStatistics().recorded;
+            const bool hostWasRecorded = reference.runGemStatistics().recorded;
             const unsigned nativeShots = gameplay.player().shots(), hostShots = reference.mainShotsFired();
             const unsigned nativeJumps = gameplay.player().jumps(), hostJumps = reference.mainJumps();
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
+            const auto& nativeStats = gameplay.runGemStatistics();
+            const auto& hostStats = reference.runGemStatistics();
+            if (!nativeWasRecorded && nativeStats.recorded)
+                require(nativeStats.savedRunGems == gemsBeforeNative,
+                        "native stats snapshot precedes this update's gem collection");
+            if (!hostWasRecorded && hostStats.recorded)
+                require(hostStats.savedRunGems == gemsBeforeHost,
+                        "host stats snapshot precedes this update's gem collection");
+            require(nativeStats.recorded == nativeDeath.started && hostStats.recorded == hostDeath.started &&
+                        nativeStats.lifetime == hostStats.lifetime && nativeStats.record == hostStats.record &&
+                        nativeStats.savedRunGems == hostStats.savedRunGems,
+                    "death-entry gem statistics agree across adapters and latch only on movement entry");
             require(gameplay.playerVisible() == reference.mainPlayerVisible(),
                     "both backends expose the same damaged-player visibility on every combat update");
             require(nativeDeath.active == hostDeath.active && nativeDeath.frames == hostDeath.frames &&

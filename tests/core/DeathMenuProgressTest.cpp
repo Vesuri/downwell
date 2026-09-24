@@ -1,10 +1,23 @@
 #include "core/DeathMenuProgress.h"
+#include "core/RunGemStatistics.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    downwell::RunGemStatistics stats;
+    require(!stats.observeDeathMovement(false, 80), "no save at health depletion/publication");
+    require(stats.observeDeathMovement(true, 80) && stats.lifetime == 80 && stats.record == 80,
+            "first death movement saves run once");
+    require(!stats.observeDeathMovement(true, 84) && stats.lifetime == 80 && stats.savedRunGems == 80,
+            "post-death gems do not retroactively change saved statistics");
+    stats.beginRun();
+    require(stats.observeDeathMovement(true, 20) && stats.lifetime == 100 && stats.record == 80,
+            "new run preserves lifetime and best-run record");
+    stats.beginRun();
+    require(stats.observeDeathMovement(true, 90) && stats.lifetime == 190 && stats.record == 90,
+            "new high score replaces record");
     using downwell::DeathMenuProgress;
     using downwell::DeathMenuSequence;
     DeathMenuProgress progress;

@@ -141,6 +141,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainAmmo_ = 8;
     mainPlayerHealth_ = 4;
     mainDeath_ = {};
+    runGemStatistics_ = {};
     mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
@@ -1275,6 +1276,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.right = inputRight_;
     input.fire = inputFire_;
     mainDeath_.beginStep(input.fire);
+    runGemStatistics_.observeDeathMovement(mainDeath_.movementDead(), currencyAccount_.gameGem);
     mainPlayerMotion_.step(input, controlsLocked_, mainDeath_.movementDead());
     mainDeath_.publishHealth(mainPlayerHealth_);
     mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
@@ -2094,6 +2096,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU32(mainDeath_.skipPresses);
         digest.addI32(mainDeath_.animation);
         digest.addI32(mainDeath_.alarm);
+        digest.addU64(runGemStatistics_.lifetime);
+        digest.addU32(runGemStatistics_.record);
+        digest.addU32(runGemStatistics_.savedRunGems);
+        digest.addBool(runGemStatistics_.recorded);
     }
     digest.addI32(mainPlayerInvulnerability_);
     digest.addI32(mainShootLeg_);

@@ -388,6 +388,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     currencyAccount_.beginStep();
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     death_.beginStep(input.fire);
+    runGemStatistics_.observeDeathMovement(death_.movementDead(), currencyAccount_.gameGem);
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
     downwell::advanceMainRoomActivation(activationY_,

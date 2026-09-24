@@ -9,6 +9,27 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Live runtimes latch run-gem statistics at death entry
+
+Both runtimes now use `RunGemStatistics` at the first death-movement Begin
+Step, before that update's currency collection. This follows scrPlMovement VM
+block 147's saveStats call and saveStats blocks 1--3, rather than calculating
+lifetime gems when DeathMenu eventually opens. The record and lifetime total
+are latched once; later collected gems do not retroactively change them. The
+results phase must receive this saved lifetime total and the then-current
+gameGem separately, matching the original Create subtraction.
+
+Unit tests cover the one-shot boundary, late collection and successive runs;
+paired combat checks both adapters' live statistics and the pre-collection
+snapshot. This implements only the gem subset of saveStats in memory. File
+persistence, other records, loading prior saves and retry integration remain
+open. The existing startup reset still starts a fresh session, and neither
+platform has a playable results screen yet.
+Validation: full host suite and 6,000-update paired combat/death replay pass
+(health 0/0, kills 10/10, currency 84/84). The bounded cross-CPU regression also
+passes, with clean 68000 audits; it does not hash these new live-world stats.
+Normal target builds are restored by the verifier.
+
 ### Shared results currency phase
 
 `DeathMenuProgress` recovers the default gem-filling/unlock progression from
