@@ -10,11 +10,7 @@
 #include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
-#include "RunGemStatistics.h"
-#include "RunClock.h"
-#include "RunCombo.h"
-#include "RunStage.h"
-#include "DeathResults.h"
+#include "RunSession.h"
 #include "PlayerLifeRules.h"
 #include "Input.h"
 #include "PlayerMotion.h"
@@ -157,12 +153,12 @@ public:
     int mainAmmoCapacity() const { return mainPlayerMotion_.ammoCapacity(); }
     int mainPlayerHealth() const { return mainPlayerHealth_; }
     const PlayerDeathSequence& mainDeathSequence() const { return mainDeath_; }
-    const RunGemStatistics& runGemStatistics() const { return runGemStatistics_; }
-    std::uint32_t runTimeTicks() const { return runClock_.ticks; }
-    const RunCombo& runCombo() const { return runCombo_; }
-    const RunStage& runStage() const { return runStage_; }
-    int mainPlayerHealthMaximum() const { return runCombo_.healthReserve.maximum; }
-    const DeathResults& deathResults() const { return deathResults_; }
+    const RunGemStatistics& runGemStatistics() const { return run_.gems; }
+    std::uint32_t runTimeTicks() const { return run_.clock.ticks; }
+    const RunCombo& runCombo() const { return run_.combo; }
+    const RunStage& runStage() const { return run_.stage; }
+    int mainPlayerHealthMaximum() const { return run_.combo.healthReserve.maximum; }
+    const DeathResults& deathResults() const { return run_.results; }
     int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }
     bool mainPlayerVisible() const { return playerDamageVisible(mainPlayerInvulnerability_); }
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
@@ -369,11 +365,7 @@ private:
     int mainAmmo_ = 8;
     int mainPlayerHealth_ = 4;
     PlayerDeathSequence mainDeath_;
-    RunGemStatistics runGemStatistics_;
-    RunClock runClock_;
-    RunCombo runCombo_;
-    RunStage runStage_;
-    DeathResults deathResults_;
+    RunSession run_;
     int mainPlayerInvulnerability_ = 0;
     int mainShootLeg_ = -1;
     std::uint32_t mainShotsFired_ = 0;

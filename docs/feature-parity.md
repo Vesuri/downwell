@@ -9,6 +9,37 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared run-state ownership and restart boundary
+
+Both live runtimes now own the same `RunSession` aggregate for gem statistics,
+clock, combo/reserve, stage and results controller, instead of declaring and
+resetting those systems independently. Existing event scheduling and digest
+order are unchanged. Cold initialization calls the shared reset.
+
+The reset accepts an explicit saved-record snapshot: lifetime gems, best run
+gems and record combo survive; current-run gems/death latch, time, combo/best,
+reserve upgrades, pending effects, stage and results/input state reset. This
+models only the currently implemented subset of ResetPlayer/scrInitialize:
+scrGlobalStuff and scrPlayerRecord set defaults, scrLoadSave reloads records,
+and scrPlayerGlobalStat restores player globals. It is not a whole-world reset,
+a save-file implementation or an executed results-menu action.
+
+Source audit: DeathMenu Begin Step calls ResetPlayer before every destination.
+Retry calls scrNextLevel(1); style selection goes to room 8; BackToSurface goes
+to room 20 (its rRand is literally zero, not a random draw). scrInitialize also
+calls randomize and audio reset, and ResetPlayer sets controller alarms 0..6
+to zero. Those effects must be handled by the transition orchestrator rather
+than silently reconstructing a cold runtime with its initial RNG seed.
+Room/world recreation and native graphics-cache/resource reentry are still
+needed before the actions can execute safely.
+
+Focused tests cover record reload, per-run/default resets, clearing results
+input and reward effects, and exactly-once death accounting in the next run.
+Validation: full host suite and bounded cross-target replay pass with unchanged
+player/currency/death digests, clean 68000 audits and the stack guard intact.
+The target verifier restores the normal Amiga build. This validates the
+ownership refactor, not execution of restart actions or save-file I/O.
+
 ### Shared results-menu choice presentation
 
 Both backends draw RETRY, STYLE SELECT and SURFACE from a shared layout based

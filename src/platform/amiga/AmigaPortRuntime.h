@@ -9,11 +9,7 @@
 #include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
-#include "core/RunGemStatistics.h"
-#include "core/RunClock.h"
-#include "core/RunCombo.h"
-#include "core/RunStage.h"
-#include "core/DeathResults.h"
+#include "core/RunSession.h"
 #include "core/PlayerLifeRules.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
@@ -192,12 +188,12 @@ public:
     unsigned deathFrames() const { return death_.frames; }
     bool deathMenuReady() const { return death_.menuReady; }
     const downwell::PlayerDeathSequence& deathSequence() const { return death_; }
-    const downwell::RunGemStatistics& runGemStatistics() const { return runGemStatistics_; }
-    std::uint32_t runTimeTicks() const { return runClock_.ticks; }
-    const downwell::RunCombo& runCombo() const { return runCombo_; }
-    const downwell::RunStage& runStage() const { return runStage_; }
-    int healthMaximum() const { return runCombo_.healthReserve.maximum; }
-    const downwell::DeathResults& deathResults() const { return deathResults_; }
+    const downwell::RunGemStatistics& runGemStatistics() const { return run_.gems; }
+    std::uint32_t runTimeTicks() const { return run_.clock.ticks; }
+    const downwell::RunCombo& runCombo() const { return run_.combo; }
+    const downwell::RunStage& runStage() const { return run_.stage; }
+    int healthMaximum() const { return run_.combo.healthReserve.maximum; }
+    const downwell::DeathResults& deathResults() const { return run_.results; }
     bool playerVisible() const { return downwell::playerDamageVisible(invulnerability_); }
     bool bulletActive() const { return bulletCount() != 0; }
     int bulletX() const;
@@ -244,11 +240,7 @@ private:
     int health_;
     unsigned invulnerability_;
     downwell::PlayerDeathSequence death_;
-    downwell::RunGemStatistics runGemStatistics_;
-    downwell::RunClock runClock_;
-    downwell::RunCombo runCombo_;
-    downwell::RunStage runStage_;
-    downwell::DeathResults deathResults_;
+    downwell::RunSession run_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;

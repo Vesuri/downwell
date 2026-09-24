@@ -5,6 +5,7 @@
 #include "core/DeathResultsBackdrop.h"
 #include "core/DeathResultsRows.h"
 #include "core/DeathResultsChoices.h"
+#include "core/RunSession.h"
 #include "core/StateDigest.h"
 #include <cstring>
 #include <cstdio>
@@ -85,6 +86,37 @@ public:
 } // namespace
 
 int main() {
+    downwell::RunSession session;
+    session.gems.observeDeathMovement(true, 123);
+    session.clock.ticks = 999;
+    session.combo.state.count = 30;
+    session.combo.state.best = 40;
+    session.combo.state.record = 50;
+    session.combo.healthReserve.maximum = 8;
+    session.combo.healthReserve.pieces = 3;
+    session.combo.reward.combo = 30;
+    session.combo.completion.saveRecord = true;
+    session.stage = {3, 2};
+    session.results.open(true, 123, 123);
+    session.results.previous.fire = true;
+    const auto saved = session.records();
+    session.reset(saved);
+    require(session.gems.lifetime == 123 && session.gems.record == 123 &&
+        session.combo.state.record == 50, "new run reloads persistent record snapshot");
+    require(!session.gems.recorded && session.gems.savedRunGems == 0 &&
+        session.clock.ticks == 0 && session.combo.state.count == 0 &&
+        session.combo.state.best == 0 && session.stage.area == 0 && session.stage.level == 0,
+        "new run clears per-run statistics and stage");
+    require(session.combo.healthReserve.maximum == 4 && session.combo.healthReserve.pieces == 0 &&
+        session.combo.reward.combo == 0 && !session.combo.completion.saveRecord &&
+        !session.results.active && !session.results.previous.fire,
+        "new run clears upgrades, pending effects and results input history");
+    require(session.gems.observeDeathMovement(true, 7) &&
+        !session.gems.observeDeathMovement(true, 7) && session.gems.lifetime == 130,
+        "next run death adds its own gems exactly once");
+    session.reset();
+    require(session.records().lifetimeGems == 0 && session.records().bestCombo == 0,
+        "cold boot without saved data uses source defaults");
     struct ChoiceProbe {
         struct Call { unsigned index; int x, y; unsigned pen; };
         std::vector<Call> calls;

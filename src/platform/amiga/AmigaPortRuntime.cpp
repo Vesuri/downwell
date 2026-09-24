@@ -38,7 +38,8 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
     unsigned index;
-    runStage_.advance(1); // This runtime starts at the confirmed scrNextLevel(1) entry.
+    run_.reset();
+    run_.stage.advance(1); // This runtime starts at the confirmed scrNextLevel(1) entry.
     currencyAccount_.playerCreated();
     if (followCamera_) {
         /*
@@ -390,9 +391,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     ++tick_;
     currencyAccount_.beginStep();
     downwell::Input input = downwell::unpackReplayInput(packedInput);
-    deathResults_.beginStep(input);
+    run_.results.beginStep(input);
     death_.beginStep(input.fire);
-    runCombo_.beginStep();
+    run_.combo.beginStep();
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
     downwell::advanceMainRoomActivation(activationY_,
@@ -430,21 +431,21 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }, &headBreak);
     player_.configureComboCompletion([](void* context) {
         auto& runtime = *static_cast<AmigaPortRuntime*>(context);
-        runtime.runCombo_.finish(runtime.player_, runtime.currencyAccount_, runtime.health_);
+        runtime.run_.combo.finish(runtime.player_, runtime.currencyAccount_, runtime.health_);
     }, this);
     player_.configureMovementBoundary([](void* context) {
         auto& runtime = *static_cast<AmigaPortRuntime*>(context);
-        runtime.runGemStatistics_.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
+        runtime.run_.gems.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
     AmigaPlayerMotion motion = player_.step(input, false, death_.movementDead());
     player_.configureComboCompletion(nullptr, nullptr);
     player_.configureMovementBoundary(nullptr, nullptr);
     // Normal rmMain subset, with the same unsupported ending/time-field guards
     // as StartupRuntime. This is deliberately independent of video refresh Hz.
-    runClock_.advance(true, death_.active);
+    run_.clock.advance(true, death_.active);
     death_.publishHealth(health_);
     death_.advanceAlarms(player_.grounded());
-    deathResults_.open(death_.menuReady, runGemStatistics_.lifetime, currencyAccount_.gameGem);
+    run_.results.open(death_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if (headBreak.index >= 0) {
         const Breakable& box = breakables_[headBreak.index];
@@ -526,7 +527,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                             continue;
                         const auto impact = downwell::applyStandardBulletImpact(
                             enemy, enemiesDefeated_, enemyRandom_,
-                            [this, &enemy] { runCombo_.state.enemyDefeated(); spawnReward(enemy, false); });
+                            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); });
                         return impact.kind != downwell::BulletImpactKind::ignored;
                     }
                     return false;
@@ -729,7 +730,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
         downwell::applyEnemyContact(enemy.objectId, enemyContact,
             enemy.x, enemy.y, enemy.active, enemy.health, player_, health_, invulnerability_, enemiesDefeated_,
-            [this, &enemy] { runCombo_.state.enemyDefeated(); spawnReward(enemy, true); });
+            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, true); });
     }
 
     DW_PROFILE_PHASE(profileGems);
@@ -783,7 +784,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 #endif
 
     AmigaPortFrame frame = {};
-    deathResults_.presentationStep();
+    run_.results.presentationStep();
     frame.playerMotion = motion;
     frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity;
     frame.healthChanged = health_ != oldHealth || healthMaximum() != oldHealthMaximum;

@@ -141,11 +141,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainAmmo_ = 8;
     mainPlayerHealth_ = 4;
     mainDeath_ = {};
-    runGemStatistics_ = {};
-    runClock_ = {};
-    runCombo_ = {};
-    runStage_ = {};
-    deathResults_ = {};
+    run_.reset();
     mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
@@ -280,7 +276,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         resultsInput.left = left;
         resultsInput.right = right;
         resultsInput.fire = fire;
-        deathResults_.beginStep(resultsInput);
+        run_.results.beginStep(resultsInput);
     }
 
     for (std::size_t i = 0; i < instances_.size(); ++i) {
@@ -343,7 +339,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         updateMainEnemyInteractions();
         updateMainCurrency();
         updateMainLifecycle();
-        deathResults_.presentationStep();
+        run_.results.presentationStep();
     }
 }
 
@@ -550,7 +546,7 @@ void StartupRuntime::updateMainBullets() {
             if (enemy != nullptr) {
                 const auto impact = applyStandardBulletImpact(*enemy, mainEnemiesDefeated_, random_,
                     [this, enemy] {
-                        runCombo_.state.enemyDefeated();
+                        run_.combo.state.enemyDefeated();
                         spawnMainCurrency(static_cast<float>(enemy->x),
                                           static_cast<float>(enemy->y),
                                           enemy->reward);
@@ -824,7 +820,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
             enemy.x - mainPlayerOriginX_, enemy.y - mainPlayerOriginY_,
             enemy.active, enemy.health, mainPlayerMotion_, mainPlayerHealth_,
             mainPlayerInvulnerability_, mainEnemiesDefeated_, [this, &enemy] {
-                runCombo_.state.enemyDefeated();
+                run_.combo.state.enemyDefeated();
                 spawnMainCurrency(static_cast<float>(enemy.x), static_cast<float>(enemy.y),
                                   enemy.reward, true);
             });
@@ -1290,24 +1286,24 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.right = inputRight_;
     input.fire = inputFire_;
     mainDeath_.beginStep(input.fire);
-    runCombo_.beginStep();
+    run_.combo.beginStep();
     mainPlayerMotion_.configureComboCompletion([](void* context) {
         auto& runtime = *static_cast<StartupRuntime*>(context);
-        runtime.runCombo_.finish(runtime.mainPlayerMotion_, runtime.currencyAccount_, runtime.mainPlayerHealth_);
+        runtime.run_.combo.finish(runtime.mainPlayerMotion_, runtime.currencyAccount_, runtime.mainPlayerHealth_);
     }, this);
     mainPlayerMotion_.configureMovementBoundary([](void* context) {
         auto& runtime = *static_cast<StartupRuntime*>(context);
-        runtime.runGemStatistics_.observeDeathMovement(runtime.mainDeath_.movementDead(), runtime.currencyAccount_.gameGem);
+        runtime.run_.gems.observeDeathMovement(runtime.mainDeath_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
     mainPlayerMotion_.step(input, controlsLocked_, mainDeath_.movementDead());
     mainPlayerMotion_.configureComboCompletion(nullptr, nullptr);
     mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
     // Default rmMain subset: boss endings/goal stops and goalTimeField creation
     // are not implemented yet. Feed their source guards when those land.
-    runClock_.advance(true, mainDeath_.active);
+    run_.clock.advance(true, mainDeath_.active);
     mainDeath_.publishHealth(mainPlayerHealth_);
     mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
-    deathResults_.open(mainDeath_.menuReady, runGemStatistics_.lifetime, currencyAccount_.gameGem);
+    run_.results.open(mainDeath_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);
@@ -1761,7 +1757,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             if (playMenuVerticalDitherY_ < 320.0F) {
                 playMenuVerticalDitherY_ += 10.0F;
             } else {
-                runStage_.advance(1); // PlayMenu Draw calls scrNextLevel(1).
+                run_.stage.advance(1); // PlayMenu Draw calls scrNextLevel(1).
                 gotoRoom(mainRoomId);
             }
         }
@@ -2117,9 +2113,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainAirborneShot_);
     digest.addI32(mainAmmo_);
     digest.addI32(mainPlayerHealth_);
-    if (roomId_ == mainRoomId) digest.addU32(runClock_.ticks);
-    if (roomId_ == mainRoomId) runCombo_.appendState(digest);
-    if (roomId_ == mainRoomId) { digest.addI32(runStage_.area); digest.addI32(runStage_.level); }
+    if (roomId_ == mainRoomId) digest.addU32(run_.clock.ticks);
+    if (roomId_ == mainRoomId) run_.combo.appendState(digest);
+    if (roomId_ == mainRoomId) { digest.addI32(run_.stage.area); digest.addI32(run_.stage.level); }
     if (mainDeath_.active) {
         digest.addBool(mainDeath_.started);
         digest.addBool(mainDeath_.priorFire);
@@ -2128,11 +2124,11 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU32(mainDeath_.skipPresses);
         digest.addI32(mainDeath_.animation);
         digest.addI32(mainDeath_.alarm);
-        digest.addU64(runGemStatistics_.lifetime);
-        digest.addU32(runGemStatistics_.record);
-        digest.addU32(runGemStatistics_.savedRunGems);
-        digest.addBool(runGemStatistics_.recorded);
-        deathResults_.appendState(digest);
+        digest.addU64(run_.gems.lifetime);
+        digest.addU32(run_.gems.record);
+        digest.addU32(run_.gems.savedRunGems);
+        digest.addBool(run_.gems.recorded);
+        run_.results.appendState(digest);
     }
     digest.addI32(mainPlayerInvulnerability_);
     digest.addI32(mainShootLeg_);
