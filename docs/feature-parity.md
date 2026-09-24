@@ -9,6 +9,42 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Full-path presentation recheck (2026-09-24)
+
+After the shared combat/depleted-health changes, `verify-amiga-scenes` passes
+on the bounded A500 configuration (512 KiB Chip, 8 MiB Fast, 4 KiB task stack).
+It traverses startup, garden, well entry, style selection, landing and scrolling
+gameplay with an activated enemy. Splash publication was checked for all 180
+publisher, 180 credits, 240 controls, 60 fade-out and 60 fade-in frames; the
+garden copper patch oracle reported no failures. This closes the outstanding
+full-path regression check for these changes, not Windows visual equivalence.
+
+`verify-amiga-controls-frame` also passes the static DMA-window assertions and
+the recorded planar-frame checksum. Its decoded 160x284 image was inspected:
+the leftmost player illustration is intact. This is a captured bitmap plus
+copper-configuration check, not a new recording of the monitor output.
+
+The first-grounded-gameplay capture reaches its breakpoint and passes its
+terrain/backing-buffer assertions, **but its recorded frame checksum fails**.
+Expected `89d8eaead3edbf99b5738020aed05948218659069e6c5682b2476936a1197ba8`;
+captured `be204c3e9423423263047d6b745aeb19853dcf160e83770476d557a9a08f18a7`.
+The old checksum was introduced in `ef26d11`, before live emitted terrain
+rendering (`f6daa65`) and subsequent actor behavior corrections. The retained
+old PNG and current decoded image visibly differ in terrain edge selection
+and enemy presentation. This history explains why an old baseline is suspect,
+but does not prove every current pixel correct. Do not refresh the checksum
+until a matching-state source/SDL comparison explains the differences. Normal
+target build restoration was run explicitly after this failed check.
+
+Scope inventory: `PlatformSDL` exposes rendering, input, frame timing and PNG
+capture, but no sound playback operation; startup records sound requests.
+`Game::renderMain` draws terrain, actors, player, bullets and currency, and
+`AreaOneBuilder` has shop-related geometry. These are not an implemented audio
+backend or complete shop/purchase/upgrade UI. Neither those original-game
+features nor the original death/restart flow can be declared complete merely
+by matching the currently implemented SDL subset. They remain in the broader
+original-game fidelity scope.
+
 ### Depleted-health control/contact gate
 
 Both runtimes use `PlayerLifeRules.h` to suppress movement/fire input once
