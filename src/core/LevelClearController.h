@@ -5,6 +5,7 @@
 #include "UpgradeInventory.h"
 #include "LevelClearMotion.h"
 #include "LevelClearCarousel.h"
+#include "LevelClearPresentation.h"
 namespace downwell {
 // Shared non-rendering Result-room controller. Room loading, presentation and
 // audio playback stay outside; nextLevel is a request, not a direct stage jump.
@@ -13,6 +14,7 @@ struct LevelClearController {
     LevelUpgradeOffers offers;
     LevelClearMotion motion;
     LevelClearCarousel carousel;
+    LevelClearPresentation presentation;
     unsigned upgradesRemaining = 1;
     int healthAtEntry = 0;
     bool wasHeartGoal = false, heartReceived = true;
@@ -52,7 +54,11 @@ struct LevelClearController {
         const bool carouselBranch = selection.next == 4 && upgradesRemaining != 0;
         selection.step(confirm, leftPressed, rightPressed, upgradesRemaining,
             [&](LevelClearSelection::Effect effect, unsigned value) {
-                if (effect == LevelClearSelection::Effect::showChoices) motion.showChoices();
+                if (effect == LevelClearSelection::Effect::showChoices) {
+                    motion.showChoices();
+                    presentation.circle = 0;
+                }
+                if (effect == LevelClearSelection::Effect::moveSound) presentation.time = 0;
                 if (effect == LevelClearSelection::Effect::rollOffers)
                     ok = offers.randomize(selection.lastIndex, UpgradeInventory::highestId, random,
                         [&](unsigned id) { return inventory.eligible(id); }) && ok;

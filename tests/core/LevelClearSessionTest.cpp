@@ -43,6 +43,10 @@ int main() {
         require(run.stepLevelClear(confirm, false, false, heart, currency, player, health, random, emit),
             "active result room advances shared controller");
         require(run.stage.area == 1 && run.stage.level == 3, "request does not construct next stage prematurely");
+        if (tick == 60) require(run.levelClearFrame.circle == 3 && run.levelClearFrame.time == 1 &&
+            run.levelClearFrame.choices, "choice reveal resets shadow phase before presentation");
+        if (tick == 90) require(!run.levelClearFrame.choices && run.levelClearFrame.time == 30,
+            "confirmation hides choices before the Draw clock can advance");
         if (tick == 121) require(run.exitDither.active && run.exitDither.x == 80,
             "result departure anchors its new wipe in the narrow room");
         if (tick == 136) require(run.exitDither.soundRequested, "departure wipe advances its own alarm");

@@ -46,6 +46,7 @@ struct RunSession {
     bool exitDitherRequested = false, levelResultRequested = false;
     ExitDither exitDither;
     LevelClearController levelClear;
+    LevelClearPresentation::Frame levelClearFrame;
     bool levelClearActive = false, nextLevelRequested = false;
 
     // Called only after the backend retires the old room's display/DMA.
@@ -55,6 +56,7 @@ struct RunSession {
         if (!levelResultRequested || levelClearActive) return false;
         if (!levelClear.create(style, heartGoal, health, upgrades, player, random)) return false;
         levelClearActive = true;
+        levelClearFrame = {};
         levelResultRequested = exitDitherRequested = false;
         levelExitPresent = false;
         exitDither = {};
@@ -79,6 +81,8 @@ struct RunSession {
         const bool ok = levelClear.step(confirm, leftPressed, rightPressed, heartGoal,
             upgrades, consumables, currency, player, health, combo.healthReserve, random, effect);
         exitDither.step(levelClear.motion.viewY(), 284);
+        levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
+            levelClear.selection.next, levelClear.selection.visible);
         return ok;
     }
     // The loader consumes this once before constructing rmMain, matching
@@ -145,6 +149,7 @@ struct RunSession {
         exitDitherRequested = levelResultRequested = false;
         exitDither = {};
         levelClear = {};
+        levelClearFrame = {};
         levelClearActive = nextLevelRequested = false;
     }
     ResultsDestination restart(DeathMenuSequence::Action action, const RunRecords& saved) {

@@ -253,6 +253,16 @@ are not yet invoked by either live room loader: backends must first retire old
 DMA/artwork ownership and implement the result-room presentation. Wind audio
 and its conditional RNG consumption remain unimplemented.
 
+LevelClearPresentation now snapshots the stateful border portion of Result Draw:
+both inclusive boundary rows, incoming-area inset, six-pixel scrolling (three
+in area 3), and level-three border replacement after next>2. Shadow and choice
+animation clocks preserve reveal/navigation resets and hidden-choice behavior.
+RunSession advances this once per result update and retains a replayable frame;
+rendering the same snapshot never advances clocks or scrolling. Tests cover
+500 frames for every area/level combination and repeated command emission.
+This supplies border commands and clocks, not completed backend rendering,
+trigonometric text shadows/icon bobbing, or player animation.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
