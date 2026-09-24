@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Published view used by gameplay queries
+
+Normal gameplay now uses camMain's rounded published view for bullet expiry,
+out-of-view retirement, crawler/walker/frog visibility, frog alarm targeting,
+instance activation and live builder thresholds on both platforms. These
+scripts query `__view_get`, not camMain's private xx/yy easing accumulators.
+The shared camera exposes Q12 view edges, while its smoothing state remains
+fractional. Builder evaluation still observes the previous camera within the
+current port phase ordering; this does not claim to recover the entire runner
+event schedule. The synthetic non-following replay camera remains explicit.
+
+Tests cover all four edges across positive/negative half ties and bullet expiry
+at the rounded top/bottom equality boundaries. Earlier notes describing the
+fractional camera accumulator as authoritative for these view queries are
+superseded: Q12 is the helper representation, not permission to bypass the
+published source view. Arbitrary fractional helper fixtures remain useful for
+testing strict comparisons independently of the normal camera producer.
+
+Verification: full host suite and explicit camera boundary tests pass. Fresh
+SDL/native landing and scrolling captures each match all 99,968 pixels without
+changing either baseline. The bounded A500 600-tick terrain-cache check and
+cross-target replay pass; the latter retains digest
+`64 9f0d3943 e7900d2b 400 8d8e8642 25e003ee 7f`. Normal builds are restored,
+with clean 68000 instruction/helper audits. These checks do not establish full
+original-runner event ordering or whole-game fidelity.
+
 ### Source-rounded camera/player and scrolling parity
 
 The scrolling mismatch described below is resolved for the tick-383 fixture:
@@ -37,9 +63,9 @@ Corrections were derived from original evidence, not just image alignment:
   covers the passes.
 
 Camera tests include positive/negative Q12 half ties and preserving precise
-state. Fractional visibility/lifetime queries elsewhere still require their
-own source-phase audit; this change fixes published presentation, not every
-use of view state. Streak positioning/animation and full original HUD effects
+state. Visibility/lifetime publication was subsequently corrected as described
+above; complete event-phase scheduling remains open. Streak positioning/animation
+and full original HUD effects
 also remain beyond this five-pass text correction.
 The full host suite, fresh landing and scrolling pixel gates, bounded A500
 600-tick terrain check (101 compositions, intact stack margin), and canonical
@@ -188,7 +214,7 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Publisher, credits, controls, garden, well, style select | Native implementations and decoded scene comparison tests | Full-sequence display regression after gameplay changes |
 | Player, camera, landing, jumping, gunboots | Shared player and default main-room camera; SDL/native comparison through entrance and scrolling | Special camera modes and original event timing; longer combat tapes; position checks still allow tolerances |
 | Area-one geometry and endings | Shared live builder, emitted-object collision/rendering, terrain cache oracle | Live SDL replay comparison; side-room reversals and offscreen destruction coverage |
-| Bullets and gems | Shared usual-bullet segment arbitration, recovered enemy rectangles and fractional-camera expiry, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet collision-event scheduling, spread and wall selection; source bounce/terrain semantics and dense encounters |
+| Bullets and gems | Shared usual-bullet segment arbitration, recovered enemy rectangles and published-view expiry, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet collision-event scheduling, spread and wall selection; source bounce/terrain semantics and dense encounters |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
 | Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency, ordered gem motion and player presentation | Longer routes, dense reward bursts and broader actor states remain unverified |
 | HUD | Health, ammo, currency and streak implementations; exact landing/full-ammo and scrolling/empty-ammo images including currency/streak 2 | More damage, refill and streak-expiry image coverage; complete source HUD effects |

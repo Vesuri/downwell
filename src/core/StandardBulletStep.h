@@ -4,8 +4,9 @@
 #include "EnemyContact.h"
 
 namespace downwell {
-// scrBulletOov uses strict comparisons to the fractional view position.
-// Keep this independent of the renderer's rounded bitplane/camera offset.
+// scrBulletOov uses strict comparisons to the published view position.
+// Default camMain publishes rounded pixels; callers must not substitute its
+// private easing accumulator. Q12 also supports explicit synthetic fixtures.
 inline bool standardBulletOutsideView(long yQ12, long viewTopQ12,
                                      int viewHeight = 284) {
     return yQ12 > viewTopQ12 + (viewHeight + 32L) * 4096L ||

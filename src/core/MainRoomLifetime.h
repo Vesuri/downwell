@@ -20,8 +20,9 @@ inline bool usesMainRoomOutOfView(int objectId, int area) {
 }
 
 // scrOutofview assembly: strict LT/GT bounds, followed by room == rmMain.
-// Q12 retains camera subpixels and fits the serialized 300000-pixel room
-// using 32-bit longs on 68000. Inactive instances do not receive End Step.
+// Q12 fits the serialized 300000-pixel room using 32-bit longs on 68000;
+// default gameplay supplies camMain's rounded, published view, not its easing
+// accumulator. Inactive instances do not receive End Step.
 // Storage adapters only expose records and apply the resulting retirement.
 template<class Read, class Retire>
 void retireMainRoomObjects(unsigned count, int roomId, int area, long viewTopQ12,

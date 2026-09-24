@@ -560,7 +560,7 @@ void StartupRuntime::updateMainBullets() {
           });
         bullet.y = static_cast<float>(nextY);
         if (standardBulletOutsideView(static_cast<long>(nextY) * 4096,
-                                      mainCameraMotion_.y - surfaceHeight / 2L * 4096,
+                                      mainCameraMotion_.viewTopQ12(),
                                       surfaceHeight))
             alive = false;
         if (alive)
@@ -616,8 +616,8 @@ void StartupRuntime::updateMainCurrency() {
 void StartupRuntime::updateCrawler(InstanceRecord& enemy, bool alarm) {
     if (!enemy.crawler.initialized) enemy.crawler.initialize(enemy.x, enemy.y);
     const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
-        mainCameraMotion_.x - 80L * 4096, mainCameraMotion_.y - 142L * 4096,
-        mainCameraMotion_.x + 80L * 4096, mainCameraMotion_.y + 142L * 4096,
+        mainCameraMotion_.viewLeftQ12(), mainCameraMotion_.viewTopQ12(),
+        mainCameraMotion_.viewRightQ12(), mainCameraMotion_.viewBottomQ12(),
         alarm ? 0 : 64);
     const auto meeting = [this](long x, long y) {
         return CrawlerMotion::meetsTiles(x, y, [this](int px, int py) {
@@ -661,8 +661,8 @@ void StartupRuntime::updateMainEnemies() {
                     static_cast<long>(std::round(enemy.velocityY * 1280)), enemy.grounded);
             const bool turtle = enemy.objectId == 112;
             const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
-                mainCameraMotion_.x - 80L * 4096, mainCameraMotion_.y - 142L * 4096,
-                mainCameraMotion_.x + 80L * 4096, mainCameraMotion_.y + 142L * 4096,
+                mainCameraMotion_.viewLeftQ12(), mainCameraMotion_.viewTopQ12(),
+                mainCameraMotion_.viewRightQ12(), mainCameraMotion_.viewBottomQ12(),
                 turtle ? 64 : 32);
             enemy.walker.step(turtle, groundTurtleWalking(enemy.auxiliaryState), visible,
                 [this, &enemy, turtle](long x, long y) {
@@ -820,7 +820,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
 
 void StartupRuntime::updateMainLifecycle() {
     retireMainRoomObjects(static_cast<unsigned>(instances_.size()), roomId_, 1,
-        mainCameraMotion_.y - surfaceHeight / 2L * 4096,
+        mainCameraMotion_.viewTopQ12(),
         [this](unsigned i) {
             const auto& instance = instances_.at(i);
             return LifetimeInstance{instance.objectId, instance.y, instance.active};

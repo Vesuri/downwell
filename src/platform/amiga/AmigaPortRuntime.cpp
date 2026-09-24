@@ -333,8 +333,8 @@ void AmigaPortRuntime::advanceEnemyAlarms()
                 const int direction = downwell::frogPreparationDirection(
                     enemy.grounded, enemy.x * 256L, enemy.y * 256L,
                     player_.frameStartXFixed(), (cameraPixelX_ - 80) * 256L,
-                    cameraY_ - 142 * 256L, (cameraPixelX_ + 80) * 256L,
-                    cameraY_ + 142 * 256L);
+                    viewCameraYQ8() - 142 * 256L, (cameraPixelX_ + 80) * 256L,
+                    viewCameraYQ8() + 142 * 256L);
                 applyFrogAlarm(enemy, downwell::frogPreparationAlarm(direction));
             }
         } else if (enemy.objectId == 116 && alarm0Fired) {
@@ -348,8 +348,8 @@ void AmigaPortRuntime::advanceEnemyAlarms()
 
 void AmigaPortRuntime::updateCrawler(EnemyState& enemy, bool alarm)
 {
-    const long cx = followCamera_ ? cameraMotion_.x - 240L * 4096 : 0;
-    const long cy = followCamera_ ? cameraMotion_.y - 176L * 4096 : cameraY_ * 16;
+    const long cx = cameraPixelX_ * 4096L;
+    const long cy = viewCameraYQ8() * 16;
     const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
         cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
         alarm ? 0 : 64);
@@ -373,7 +373,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     // The reference dispatches the builder before the camera in rmMain's
     // ordinary Step instance order. Generation observes the previous camera,
     // not the camera position being prepared for this frame's display.
-    const long generationCameraY = cameraY_;
+    const long generationCameraY = viewCameraYQ8();
     const int oldAmmo = player_.ammo();
     const int oldHealth = health_;
     const unsigned oldCurrency = currencyAccount_.currency;
@@ -391,7 +391,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
-    if (318L * 256L + cameraY_ > (long)(activationY_ - 112) * 256L) {
+    if (318L * 256L + viewCameraYQ8() > (long)(activationY_ - 112) * 256L) {
         activationY_ += 16;
         for (unsigned i = 0; i < enemyCount_; ++i) {
             EnemyState& enemy = enemies_[i];
@@ -546,8 +546,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     }
                     return false;
                 });
-            const long cameraCentreQ12 = followCamera_ ? cameraMotion_.y
-                : 176L * 4096 + cameraY_ * 16;
+            const long cameraCentreQ12 = 176L * 4096 + viewCameraYQ8() * 16;
             if (downwell::standardBulletOutsideView((bullet.y + 176L) * 4096,
                                                     cameraCentreQ12 - 142L * 4096))
                 bullet.active = false;
@@ -570,8 +569,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             continue;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const bool turtle = enemy.objectId == 112;
-            const long cx = followCamera_ ? cameraMotion_.x - 240L * 4096 : 0;
-            const long cy = followCamera_ ? cameraMotion_.y - 176L * 4096 : cameraY_ * 16;
+            const long cx = cameraPixelX_ * 4096L;
+            const long cy = viewCameraYQ8() * 16;
             const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
                 cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
                 turtle ? 64 : 32);
@@ -611,8 +610,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         } else if (enemy.objectId == 113) {
             const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
-                (cameraPixelX_ - 80) * 256L, cameraY_ - 142 * 256L,
-                (cameraPixelX_ + 80) * 256L, cameraY_ + 142 * 256L);
+                (cameraPixelX_ - 80) * 256L, viewCameraYQ8() - 142 * 256L,
+                (cameraPixelX_ + 80) * 256L, viewCameraYQ8() + 142 * 256L);
             downwell::FrogVerticalMotion vertical{
                 enemy.preciseY * 5 + enemy.gravityPositionRemainder,
                 enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
@@ -741,8 +740,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.y = downwell::GemMotion::rounded(gem.motion.y);
     }
 
-    const long viewTop = followCamera_ ? cameraMotion_.y - 142L * 4096
-        : 34L * 4096 + cameraY_ * 16;
+    const long viewTop = 34L * 4096 + viewCameraYQ8() * 16;
     downwell::retireMainRoomObjects(enemyCount_, 11, 1, viewTop,
         [this](unsigned i) {
             const auto& enemy = enemies_[i];

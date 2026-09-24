@@ -142,8 +142,8 @@ public:
     int mainPlayerFacing() const { return mainPlayerFacing_; }
     int mainPlayerSpriteId() const { return mainPlayerSpriteId_; }
     float mainPlayerImageIndex() const { return mainPlayerImageIndex_; }
-    float mainCameraViewX() const { return mainCameraX_ - surfaceWidth / 2.0F; }
-    float mainCameraViewY() const { return mainCameraY_ - surfaceHeight / 2.0F; }
+    float mainCameraViewX() const { return static_cast<float>(mainCameraRenderViewX()); }
+    float mainCameraViewY() const { return static_cast<float>(mainCameraRenderViewY()); }
     int mainCameraRenderViewX() const { return mainCameraMotion_.pixelX() - surfaceWidth / 2; }
     int mainCameraRenderViewY() const { return mainCameraMotion_.pixelY() - surfaceHeight / 2; }
     int mainAmmo() const { return mainAmmo_; }

@@ -12,6 +12,10 @@ struct MainCameraMotion {
     // rmMain's serialized view follows camMain's rounded instance x/y.
     int pixelX() const { return static_cast<int>(roundGameMakerQ12(x)); }
     int pixelY() const { return static_cast<int>(roundGameMakerQ12(y)); }
+    long viewLeftQ12() const { return (pixelX() - 80L) * 4096; }
+    long viewRightQ12() const { return (pixelX() + 80L) * 4096; }
+    long viewTopQ12() const { return (pixelY() - 142L) * 4096; }
+    long viewBottomQ12() const { return (pixelY() + 142L) * 4096; }
     void reset(int px, int py) {
         x = targetX = px * 4096L; y = targetY = py * 4096L;
         slowdownX = 1; slowdownY = 5;

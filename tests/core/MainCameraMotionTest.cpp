@@ -1,4 +1,5 @@
 #include "core/MainCameraMotion.h"
+#include "core/StandardBulletStep.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -15,9 +16,22 @@ int main() {
                     "published camera coordinates use exact Q12 nearest-even rounding");
             require(pixel.x == whole * 4096 + fraction,
                     "publication does not discard fractional camera easing state");
+            require(pixel.viewLeftQ12() == (expected - 80) * 4096 &&
+                        pixel.viewRightQ12() == (expected + 80) * 4096 &&
+                        pixel.viewTopQ12() == (expected - 142) * 4096 &&
+                        pixel.viewBottomQ12() == (expected + 142) * 4096,
+                    "all view edges derive from the published camera instance");
         }
     }
     downwell::MainCameraMotion camera;
+    camera.y = 200L * 4096 + 2047;
+    require(!downwell::standardBulletOutsideView(-42L * 4096, camera.viewTopQ12()),
+            "bullet at rounded top minus 100 survives instead of using fractional easing");
+    camera.y = 200L * 4096 + 2049;
+    require(!downwell::standardBulletOutsideView(375L * 4096, camera.viewTopQ12()) &&
+                downwell::standardBulletOutsideView(376L * 4096, camera.viewTopQ12()),
+            "bullet bottom expiry uses the published view with strict boundary comparison");
+    camera.reset(240, 176);
     camera.step(240 * 256L, 176 * 256L);
     require(camera.targetX == 240L * 4096 && camera.targetY == 200L * 4096 &&
             camera.slowdownX == 10 && camera.slowdownY == 5,
