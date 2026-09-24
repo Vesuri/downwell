@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
             int viewY;
             int coordinate(downwell::LevelClearCoordinate value) {
                 const double n = std::ldexp(double(value.magnitude.mantissa), value.magnitude.exponent - 52);
-                return int(std::floor(value.negative ? -n : n));
+                return int(std::floor(float(value.negative ? -n : n)));
             }
             void sprite(unsigned id, unsigned image, downwell::LevelClearCoordinate x, downwell::LevelClearCoordinate y) {
                 if (image) return; // borders belong to their hardware-scrolled playfield
@@ -76,12 +76,10 @@ int main(int argc, char** argv) {
             sample(std::fabs(std::sin(frame.time / 20.0))));
         AmigaClearDrawList native;
         require(native.build(room, frame, inventory,
-            sample(std::fabs(std::cos(frame.circle * (3.14159265358979323846 / 180.0)))),
-            sample(std::fabs(std::sin(frame.time / 20.0))),
             [&](downwell::LevelClearCoordinate value) { return sink.coordinate(value); }),
             "production draw-list adapter accepts shared source layout");
         require(native.count == sink.count, "native layout retains every overlay command");
-        require(native.playerX == 190 && native.playerY == int(room.motion.playerY.floor()) - room.motion.viewY(),
+        require(native.playerX == 190 && native.playerY == sink.coordinate({room.motion.playerY, false}) - room.motion.viewY(),
             "player sprite position remains separate from planar overlay commands");
         for (unsigned i = 0; i < sink.count; ++i)
             require(native.commands[i] == sink.commands[i], "native draw commands match independent source-order sink");

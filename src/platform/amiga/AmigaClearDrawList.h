@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_CLEAR_DRAW_LIST_H
 #include "AmigaClearOverlay.h"
 #include "core/LevelClearLayout.h"
+#include "core/LevelClearTrig.h"
 
 // Convert the shared source-order layout to offline planar draw commands.
 // Border DMA and the player hardware sprite are separate presenter outputs.
@@ -12,6 +13,14 @@ struct AmigaClearDrawList {
     unsigned count = 0;
     int playerX = 0, playerY = 0;
     bool valid = false;
+    template<class Rasterize>
+    bool build(const downwell::LevelClearController& room,
+               const downwell::LevelClearPresentation::Frame& frame,
+               const downwell::UpgradeInventory& inventory, Rasterize pixel) {
+        return build(room, frame, inventory,
+            downwell::LevelClearTrig::absoluteCosine(frame.circle),
+            downwell::LevelClearTrig::absoluteSine(frame.time), pixel);
+    }
     template<class Rasterize>
     bool build(const downwell::LevelClearController& room,
                const downwell::LevelClearPresentation::Frame& frame,

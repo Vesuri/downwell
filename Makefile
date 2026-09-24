@@ -600,6 +600,13 @@ test-amiga-clear-bank: generate-amiga-clear build/amiga-clear-bank-test
 test: test-amiga-clear-bank
 test: test-amiga-clear-border-cache
 test: test-amiga-clear-overlay
+test: test-level-clear-trig
+.PHONY: test-level-clear-trig
+build/level-clear-trig-test: tests/core/LevelClearTrigTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-level-clear-trig: build/level-clear-trig-test
+	./build/level-clear-trig-test
 test: test-amiga-clear-scene-assets
 .PHONY: test-amiga-clear-scene-assets
 build/amiga-clear-scene-assets-test: tests/platform/amiga/AmigaClearSceneAssetsTest.cpp $(HOST_CHECK_HEADERS)

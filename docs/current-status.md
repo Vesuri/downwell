@@ -486,6 +486,22 @@ pixels against full rendering, including alternating owned-name variants
 (1,310,223 pixels cleared). The adapter compiles for 68000 without unresolved
 runtime helpers; this is not a proof of original Windows rasterization or timing.
 
+The clear draw-list adapter can now obtain integer-only animation samples from
+LevelClearTrig. Q32 turn reduction and Q30 CORDIC preserve the source's separate
+degree-based cosine and radian-based `sin(time/20)` clocks without cumulative
+phase-step drift. This is explicitly an approximation, not libm identity: one
+million sequential/random 32-bit clock samples measured maximum absolute errors
+of 2.905e-8 (sine) and 1.507e-8 (cosine). Eight million sampled heading/bob
+float-coordinate floor comparisons found no pixel differences, and the 360-frame
+native overlay fixture now uses the integer sampler against the independent
+host-libm layout. Undefined-behavior instrumentation passes. A 68000 compile
+uses only ordinary 32-bit multiply/modulo helpers, no floating-point or 64-bit
+arithmetic helpers. This is not an exhaustive proof of all raster outcomes or
+the Windows GPU's rounding. Native coordinate narrowing remains to implement:
+the fixture demonstrated that truncating the original binary64 player position
+can differ from first narrowing to float, as the SDL adapter does. Live scene
+publication and actual target frame-time measurement remain outstanding.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
