@@ -158,6 +158,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.crawler.latched = grounded;
     enemy.snail.initialize(x, y, speedY >= 0);
     enemy.snailHit = {};
+    enemy.batHit = {};
     enemy.walker.initialize(x, y, speedX * 5L, speedY * 5L, grounded);
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
@@ -310,6 +311,7 @@ void AmigaPortRuntime::advanceEnemyAlarms()
             continue;
         if (enemy.objectId == 113) enemy.frogHit.advanceFrame();
         if (enemy.objectId == 117) enemy.snailHit.advanceFrame();
+        if (enemy.objectId == 116) enemy.batHit.advanceFrame();
         const unsigned events = downwell::enemyAlarmEvents(enemy.objectId);
         const bool alarm0Fired = downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
         const bool alarm1Fired = downwell::AlarmBank::advanceValue(enemy.alarm1, (events & 2) != 0);
@@ -328,6 +330,8 @@ void AmigaPortRuntime::advanceEnemyAlarms()
                     cameraY_ + 142 * 256L);
                 applyFrogAlarm(enemy, downwell::frogPreparationAlarm(direction));
             }
+        } else if (enemy.objectId == 116 && alarm0Fired) {
+            enemy.batHit.alarm();
         } else if (enemy.objectId == 119 && alarm0Fired) {
             updateCrawler(enemy, true);
             enemy.alarm0 = 2;
@@ -502,6 +506,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                         if (enemy.objectId != 112) {
                             if (enemy.objectId == 113) enemy.frogHit.pending = true;
                             if (enemy.objectId == 117) enemy.snailHit.pending = true;
+                            if (enemy.objectId == 116) enemy.batHit.queue(270);
                             enemy.health -= 10;
                             if (enemy.health <= 0) {
                                 spawnReward(enemy, false);
@@ -588,13 +593,18 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.gravityRemainder = enemy.walker.vy - enemy.speedY * 5;
             enemy.grounded = enemy.walker.grounded;
         } else if (enemy.objectId == 116) {
-            downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, 0, 0,
+            downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
                 enemy.direction, (enemy.moveSpeed * 40 + 128) / 256};
-            downwell::stepBatMotion(bat, player_.frameStartXFixed(),
-                player_.frameStartYFixed(), enemyRandom_.nextU32(),
+            const bool hit = downwell::stepActiveBat(bat, enemy.batHit, player_.frameStartXFixed(),
+                player_.frameStartYFixed(), enemyRandom_,
                 [this](int x, int y) {
                     return solidResolver_(solidResolverContext_, x, y);
                 });
+            if (hit) {
+                enemy.alarm0 = 3;
+                enemy.imagePhase = 0;
+                enemy.imageRemainder = 0;
+            }
             enemy.preciseX = bat.x;
             enemy.preciseY = bat.y;
             enemy.speedX = bat.speedX;
@@ -670,6 +680,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         enemy.spriteId = downwell::enemyPresentationSprite(enemy.objectId,
                                             enemy.grounded, enemy.auxiliaryState);
         if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
+        if (enemy.objectId == 116 && enemy.batHit.stunned) enemy.spriteId = 154;
         if (enemy.objectId == 113) {
             if (enemy.frogHit.remaining != 0) {
                 enemy.spriteId = 173;

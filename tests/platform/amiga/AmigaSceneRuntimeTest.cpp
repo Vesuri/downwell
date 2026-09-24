@@ -220,6 +220,12 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (enemy.active && native.active)
             require(native.alarm0 == enemy.alarms.get(0) && native.alarm1 == enemy.alarms.get(1),
                     "live enemy alarm slots match exactly across compact and full stores");
+        if (enemy.objectId == 116 && enemy.active && native.active)
+            require(native.batHit.pending == enemy.batHit.pending &&
+                    native.batHit.ready == enemy.batHit.ready &&
+                    native.batHit.stunned == enemy.batHit.stunned &&
+                    native.batHit.direction == enemy.batHit.direction,
+                    "surviving bat hit state matches across both adapters");
         if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.active && native.active) {
             const auto& a = native.walker;
             const auto& b = enemy.walker;

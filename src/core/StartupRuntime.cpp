@@ -269,6 +269,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         auto& instance = instances_.at(i);
         if (instance.active && instance.objectId == 113) instance.frogHit.advanceFrame();
         if (instance.active && instance.objectId == 117) instance.snailHit.advanceFrame();
+        if (instance.active && instance.objectId == 116) instance.batHit.advanceFrame();
     }
 
     if (showSplash_ == 3 || showSplash_ == 4)
@@ -533,6 +534,7 @@ void StartupRuntime::updateMainBullets() {
                 if (enemy->objectId != 112) {
                     if (enemy->objectId == 113) enemy->frogHit.pending = true;
                     if (enemy->objectId == 117) enemy->snailHit.pending = true;
+                    if (enemy->objectId == 116) enemy->batHit.queue(270);
                     enemy->health -= 10;
                     if (enemy->health <= 0) {
                         spawnMainCurrency(static_cast<float>(enemy->x),
@@ -721,15 +723,22 @@ void StartupRuntime::updateMainEnemies() {
         } else if (enemy.objectId == 116) {
             BatMotion bat{
                 static_cast<long>(std::round(enemy.preciseX * 256.0F)),
-                static_cast<long>(std::round(enemy.preciseY * 256.0F)), 0, 0,
+                static_cast<long>(std::round(enemy.preciseY * 256.0F)),
+                static_cast<long>(std::round(enemy.velocityX * 256.0F)),
+                static_cast<long>(std::round(enemy.velocityY * 256.0F)),
                 static_cast<int>(enemy.direction),
                 static_cast<int>(std::round(enemy.moveSpeed * 40.0F))
             };
-            stepBatMotion(bat,
+            const bool hit = stepActiveBat(bat, enemy.batHit,
                 mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
                 mainPlayerOriginY_ * 256L + mainPlayerMotion_.frameStartYFixed(),
-                random_.nextU32(),
+                random_,
                 [this](int x, int y) { return mainSolidAt(x, y); });
+            if (hit) {
+                enemy.alarms.set(0, 3);
+                enemy.imageIndex = 0;
+                ++soundPlayRequests_;
+            }
             enemy.preciseX = bat.x / 256.0F;
             enemy.preciseY = bat.y / 256.0F;
             enemy.velocityX = bat.speedX / 256.0F;
@@ -771,6 +780,7 @@ void StartupRuntime::updateMainEnemies() {
         enemy.spriteId = enemyPresentationSprite(enemy.objectId, enemy.grounded,
                                                   enemy.auxiliaryState);
         if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
+        if (enemy.objectId == 116 && enemy.batHit.stunned) enemy.spriteId = 154;
         if (enemy.objectId == 113) {
             if (enemy.frogHit.remaining != 0) {
                 enemy.spriteId = 173;
@@ -1629,6 +1639,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             }
         }
         return;
+    case 1231: // gml_Object_enmBat_Alarm_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr) instance->batHit.alarm();
+        return;
     case 1199: // gml_Object_enmGroundTurtle_Alarm_1
         ++implementedCodeCalls_;
         if (instance != nullptr) {
@@ -2027,7 +2041,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(36); // Includes authoritative walking-enemy state.
+    digest.addU32(37); // Includes surviving-bat hit response.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2208,6 +2222,13 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(instance.moveSpeed);
         digest.addI32(instance.motionState);
         digest.addI32(instance.auxiliaryState);
+        if (instance.objectId == 116) {
+            digest.addBool(instance.batHit.pending);
+            digest.addBool(instance.batHit.ready);
+            digest.addBool(instance.batHit.stunned);
+            digest.addI32(instance.batHit.pendingDirection);
+            digest.addI32(instance.batHit.direction);
+        }
         if (instance.objectId == 111 || instance.objectId == 112) {
             digest.addI32(instance.walker.x);
             digest.addI32(instance.walker.y);

@@ -244,6 +244,40 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared surviving-bat hit response
+
+The active-bat movement adapter now uses shared `BatHitState` and
+`stepActiveBat`. Recovered enmBat Step assembly block 15 sets hit-stun,
+Alarm 0 to three, direction to hitDir, speed to three and image_index to
+zero. Pursuit (including its random jitter draw) is skipped while stunned;
+the new speed is not immediately integrated as knockback. Alarm 0 (code
+1231, verified from the object pack) clears stun, enabling pursuit again.
+Both adapters select sprBatHit 154 during this interval and normal 153 after.
+
+The usual downward-bullet adapter supplies direction 270. This is not a
+complete implementation of aim/spread or other weapons. Delivery retains
+the existing next-Step queued-hit approximation used for frog and snail;
+collision-event timing and fatal-hit side effects remain separate work.
+Hanging-bat activation, the source's wake/support checks and their sound
+requests, world time-stop, and precise bat wall collision are still missing.
+The shared helper specifically covers already-active flying bats, not that
+full state machine. Amiga audio output remains unimplemented.
+
+Hit art, mirrored planar variants and DMA sprite records are generated on
+the host; no runtime sprite conversion is introduced. Tests cover no movement
+or RNG while stunned, resumed pursuit, a surviving usual-bullet hit across
+three native ticks, and paired live bat hit/alarm state. Startup digest schema
+37 includes the bat hit state; its menu baseline is `e2675f511dd56e7d`.
+
+Bat frame padding is cropped offline with original-anchor pixel reconstruction
+checks, preserving the resident-art budget of 278,000 bytes. Full host tests
+and SDL build pass, including 15,778 DMA/scalar sprite comparisons and explicit
+three-tick hit fixtures in both adapters. The bounded A500 600-tick cache
+oracle and player/gem CPU replay pass, followed by a normal target rebuild.
+Those emulator fixtures do not specifically force a surviving bat encounter;
+the dedicated host integration fixtures cover that behavior. Both 68000
+instruction and 64-bit-helper audits remain clean.
+
 #### Shared alarm countdown across runtime stores
 
 Both the SDL twelve-slot alarm bank and compact native enemy slots now call

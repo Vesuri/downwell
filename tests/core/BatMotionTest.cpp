@@ -11,6 +11,26 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    struct RandomProbe {
+        unsigned calls = 0;
+        std::uint32_t nextU32() { ++calls; return 0x80000000u; }
+    } random;
+    BatMotion injured{256, 512, 20, 30, 90, 50};
+    BatHitState hit;
+    hit.queue(270);
+    hit.advanceFrame();
+    require(stepActiveBat(injured, hit, 1000, 2000, random, [](int, int) { return false; }) &&
+            hit.stunned && injured.direction == 270 && injured.speedFortieths == 120 &&
+            injured.x == 256 && injured.y == 512 && random.calls == 0,
+            "bat hit resets direction/speed but neither moves nor consumes pursuit RNG");
+    hit.advanceFrame();
+    require(!stepActiveBat(injured, hit, 1000, 2000, random, [](int, int) { return false; }) &&
+            injured.x == 256 && injured.y == 512 && random.calls == 0,
+            "stunned bat remains stationary without re-consuming the hit");
+    hit.alarm();
+    stepActiveBat(injured, hit, 1000, 2000, random, [](int, int) { return false; });
+    require(!hit.stunned && random.calls == 1 && (injured.x != 256 || injured.y != 512),
+            "Alarm 0 enables pursuit and its one RNG draw again");
     constexpr double pi = 3.14159265358979323846;
     double maximumAngleError = 0;
     for (int radius : {1, 3, 127, 4096, 262144}) {

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_BAT_MOTION_H
 
 #include "GameMakerRounding.h"
+#include "BatHitState.h"
 #include <cstdint>
 
 namespace downwell {
@@ -69,8 +70,8 @@ struct BatMotion {
 
 // Active/non-stunned enmBat Step subset. Caller supplies exactly one nextU32
 // draw for random_range(-20,20); no extra or integer-rounded jitter draws.
-// Query remains the current point-solid adapter. Hanging, hit-stun and full
-// sprite-mask scrCheckCollisionWith remain separate fidelity work.
+// Query remains the current point-solid adapter. Hanging and full sprite-mask
+// scrCheckCollisionWith remain separate fidelity work; stepActiveBat gates stun.
 template<class Solid>
 void stepBatMotion(BatMotion& bat, long targetX, long targetY,
                    std::uint32_t random, Solid solid) {
@@ -98,6 +99,17 @@ void stepBatMotion(BatMotion& bat, long targetX, long targetY,
         bat.x = nextX;
     if (!solid((int)floorQ8Coordinate(bat.x), (int)floorQ8Coordinate(nextY)))
         bat.y = nextY;
+}
+
+// Recovered active-bat hit branch precedes pursuit. Stun skips both movement
+// and its random jitter draw; it does not integrate the new speed immediately.
+template<class Random, class Solid>
+bool stepActiveBat(BatMotion& bat, BatHitState& hit, long targetX, long targetY,
+                   Random& random, Solid solid) {
+    const bool consumed = hit.consume();
+    if (consumed) { bat.direction = hit.direction; bat.speedFortieths = 120; }
+    if (!hit.stunned) stepBatMotion(bat, targetX, targetY, random.nextU32(), solid);
+    return consumed;
 }
 
 } // namespace downwell

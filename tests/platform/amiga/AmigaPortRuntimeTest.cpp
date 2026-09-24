@@ -547,6 +547,25 @@ int main() {
             "ascending wall snail restores unflipped artwork");
 
     AmigaPortRuntime detachedSnail(300);
+    AmigaPortRuntime hitBat(300, false, 1000);
+    hitBat.configureSolidResolver(noSolid, nullptr);
+    require(hitBat.configureEnemy(0, 116, 153, 0, 12, 0, 0, 15, 12,
+                0, 0, -1, -1, 270, 256, true, false, true),
+            "configure bat that survives one usual-gun bullet");
+    hitBat.step(4);
+    require(hitBat.enemyAt(0).health == 5 && hitBat.enemyAt(0).batHit.pending,
+            "surviving bat hit queues its recovered response");
+    const long batX = hitBat.enemyAt(0).preciseX, batY = hitBat.enemyAt(0).preciseY;
+    for (int frame = 0; frame < 3; ++frame) {
+        hitBat.step(0);
+        require(hitBat.enemyAt(0).spriteId == 154 && hitBat.enemyAt(0).alarm0 == 3 - frame &&
+                hitBat.enemyAt(0).preciseX == batX && hitBat.enemyAt(0).preciseY == batY,
+                "bat hit artwork remains stationary for three ticks");
+    }
+    hitBat.step(0);
+    require(hitBat.enemyAt(0).spriteId == 153 && !hitBat.enemyAt(0).batHit.stunned &&
+                (hitBat.enemyAt(0).preciseX != batX || hitBat.enemyAt(0).preciseY != batY),
+            "bat resumes flying when its recovered alarm fires");
     AmigaPortRuntime hitSnail(300, false, 1000);
     hitSnail.configureSolidResolver(shortRightWall, nullptr);
     require(hitSnail.configureEnemy(0, 117, 177, -1, 12, 0, -26, 20, 24,

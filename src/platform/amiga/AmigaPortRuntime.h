@@ -14,6 +14,7 @@
 #include "core/SnailMotion.h"
 #include "core/SnailHitState.h"
 #include "core/WalkingEnemyMotion.h"
+#include "core/BatHitState.h"
 
 #include <cstdint>
 
@@ -84,6 +85,7 @@ public:
         downwell::CrawlerMotion crawler;
         downwell::SnailMotion snail;
         downwell::SnailHitState snailHit;
+        downwell::BatHitState batHit;
         downwell::WalkingEnemyMotion walker;
         int motionState;
         int auxiliaryState;

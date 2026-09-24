@@ -46,6 +46,7 @@ SELECTIONS = {
         134: None,   # sprGemLarge
         139: None,   # sprModBtry
         153: None,   # sprBat
+        154: None,   # sprBatHit
         163: None,   # sprEnmSnake
         164: None,   # sprSnakeAir
         166: None,   # sprFrogIdle
@@ -289,11 +290,12 @@ def build_pack(manifest, extracted, profile):
             if selected_frames is not None and frame_index not in selected_frames:
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
-            if profile == "game" and sprite_id in (177, 178, 278):
+            if profile == "game" and sprite_id in (153, 154, 177, 178, 278):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
-                for turn in range(2 if snail else 4):
+                turns = 2 if snail else 4 if sprite_id == 278 else 1
+                for turn in range(turns):
                     if turn == 0:
                         variant = canvas
                     elif snail:
@@ -309,7 +311,15 @@ def build_pack(manifest, extracted, profile):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
                     require(bounds is not None, "empty oriented actor frame")
+                    original = variant
                     variant = variant.crop(bounds)
+                    for y in range(original.height):
+                        for x in range(original.width):
+                            restored = variant.getpixel((x - bounds[0], y - bounds[1])) \
+                                if bounds[0] <= x < bounds[2] and bounds[1] <= y < bounds[3] \
+                                else (0, 0, 0, 0)
+                            require(pixel_to_pen(restored) == pixel_to_pen(original.getpixel((x, y))),
+                                    "actor crop changes source pixels at their original anchor")
                     ox -= bounds[0]
                     oy -= bounds[1]
                     if variant.width < 16:
@@ -334,7 +344,7 @@ def build_pack(manifest, extracted, profile):
             encoded.append((sprite, frame_index, dma_width, planar))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
-                    153, 163, 164, 166, 168, 170, 173, 177, 186, 187, 188, 278):
+                    153, 154, 163, 164, 166, 168, 170, 173, 177, 186, 187, 188, 278):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
                 stride, data = encode_planar(pixels, mirrored.width, mirrored.height)
@@ -501,7 +511,7 @@ def build_pack(manifest, extracted, profile):
     # Gameplay DMA words, including mirrored multi-channel actors, are host work.
     if profile == "game":
         hardware = []
-        actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 163, 164,
+        actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 163, 164,
                   166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 459)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:

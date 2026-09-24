@@ -605,6 +605,34 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             target->velocityX = target->velocityY = 0;
             target->grounded = false;
             target->walker.initialize(target->x, target->y, 0, 0, false);
+            // Reuse the same isolated bullet path for a surviving-hit fixture.
+            auto batCombat = combat;
+            auto& bat = const_cast<downwell::InstanceRecord&>(batCombat.instanceAt(targetIndex));
+            bat.objectId = 116;
+            bat.spriteId = 153;
+            bat.health = 15;
+            bat.reward = 12;
+            bat.direction = 270;
+            bat.moveSpeed = 1.25F;
+            bat.imageSpeed = 0.2F;
+            bat.alarms.reset();
+            batCombat.step(releasedMain, false);
+            require(batCombat.instanceAt(targetIndex).health == 5 &&
+                        batCombat.instanceAt(targetIndex).batHit.pending,
+                    "SDL usual bullet queues a surviving bat hit");
+            const float batX = batCombat.instanceAt(targetIndex).preciseX;
+            const float batY = batCombat.instanceAt(targetIndex).preciseY;
+            for (int frame = 0; frame < 3; ++frame) {
+                batCombat.step(releasedMain, false);
+                const auto& state = batCombat.instanceAt(targetIndex);
+                require(state.spriteId == 154 && state.alarms.get(0) == 3 - frame &&
+                            state.preciseX == batX && state.preciseY == batY,
+                        "SDL bat hit pauses movement with damage art for three ticks");
+            }
+            batCombat.step(releasedMain, false);
+            require(!batCombat.instanceAt(targetIndex).batHit.stunned &&
+                        batCombat.instanceAt(targetIndex).spriteId == 153,
+                    "decoded bat Alarm 0 restores normal SDL presentation");
             const auto kills = combat.mainEnemiesDefeated();
             combat.step(releasedMain, false);
             require(combat.mainEnemiesDefeated() == kills + 1 && !combat.instanceAt(targetIndex).active &&
