@@ -23,12 +23,19 @@ int main(int argc, char** argv) {
             const unsigned id = (sample * (i + 1) + i * 7) % 24;
             offers[i] = id == 23 ? 100 : id;
         }
-        const unsigned bytes = AmigaClearBank::build(source.data(), source.size(), offers, 4, target, 32140);
-        require(bytes && bytes <= 11564, "selected offers fit conservative verified bank bound");
+        const unsigned area = 1 + sample % 4;
+        const unsigned bytes = AmigaClearBank::build(source.data(), source.size(), offers, 4, target, 32140, area);
+        require(bytes && bytes <= 12620, "selected offers and borders fit source-verified conservative bound");
         if (bytes > maximum) maximum = bytes;
         require(std::memcmp(target + 12, source.data() + 12, 8) == 0, "input provenance prefix preserved");
         const unsigned count = AmigaClearBank::longword(target + 8);
-        require(count >= 5 && count <= 14, "duplicates deduplicated by resource ID");
+        require(count >= 9 && count <= 18, "duplicates deduplicated by resource ID/frame");
+        for (unsigned i = 2; i < 6; ++i) {
+            const auto* record = target + 20 + i * 24;
+            require(AmigaClearBank::word(record) == downwell::levelBorderSprite(area + (i - 2) / 2) &&
+                AmigaClearBank::word(record + 2) == (i % 2 ? 13 : 7),
+                "only current/incoming area border frames are selected");
+        }
         for (unsigned i = 0; i < count; ++i) {
             const auto* copied = target + 20 + i * 24;
             const std::uint8_t* originalRecord = nullptr;
@@ -53,10 +60,12 @@ int main(int argc, char** argv) {
     require(!AmigaClearBank::build(source.data(), source.size(), bad, 1, target, 32140) &&
         !AmigaClearBank::build(source.data(), 19, fallback, 4, target, 32140) &&
         !AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 1) &&
+        !AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140, 0) &&
+        !AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140, 5) &&
         !AmigaClearBank::build(source.data(), source.size(), fallback, 5, target, 32140) && storage == before,
         "rejected requests leave existing bank untouched");
     require(AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140) &&
-        AmigaClearBank::longword(target + 8) == 5, "four fallback offers share one icon/name/description bundle");
+        AmigaClearBank::longword(target + 8) == 9, "four fallback offers share one bundle alongside four borders");
     require(source == original, "source pack untouched by bank construction");
     const auto validBank = storage;
     for (unsigned j = 0; j < AmigaClearBank::longword(source.data() + 8); ++j) {

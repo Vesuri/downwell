@@ -15,30 +15,35 @@ struct AmigaClearBank {
     }
     static unsigned build(const std::uint8_t* source, unsigned size,
             const unsigned* offers, unsigned offerCount,
-            std::uint8_t* target, unsigned capacity) {
+            std::uint8_t* target, unsigned capacity, unsigned area = 1) {
         if (!source || !target || (offerCount && !offers) || offerCount > 4 || size < 20 ||
             longword(source) != 0x44574150u || word(source + 4) != 2 || word(source + 6) != 20)
             return 0;
+        if (area < 1 || area > 4) return 0;
         const unsigned sourceCount = longword(source + 8);
         if (sourceCount > (size - 20) / 24) return 0;
-        unsigned ids[14] = {64000, 64001}, count = 2;
+        unsigned ids[18] = {64000, 64001}, frames[18] = {}, count = 2;
+        for (unsigned selectedArea = area; selectedArea <= area + 1; ++selectedArea) {
+            ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 7;
+            ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 13;
+        }
         for (unsigned i = 0; i < offerCount; ++i) {
             const unsigned sprite = downwell::levelUpgradeSprite(offers[i]);
             if (!sprite) return 0;
             const unsigned bundle[] = {sprite, 64100 + offers[i], 64300 + offers[i]};
             for (unsigned id : bundle) {
                 bool found = false;
-                for (unsigned j = 0; j < count; ++j) found |= ids[j] == id;
+                for (unsigned j = 0; j < count; ++j) found |= ids[j] == id && frames[j] == 0;
                 if (!found) ids[count++] = id;
             }
         }
-        const std::uint8_t* records[14] = {};
+        const std::uint8_t* records[18] = {};
         unsigned bytes = 20 + count * 24;
         if (bytes > capacity) return 0;
         for (unsigned i = 0; i < count; ++i) {
             for (unsigned j = 0; j < sourceCount; ++j) {
                 const auto* record = source + 20 + j * 24;
-                if (word(record) == ids[i] && word(record + 2) == 0) {
+                if (word(record) == ids[i] && word(record + 2) == frames[i]) {
                     if (records[i]) return 0; // ambiguous duplicate resource/frame
                     records[i] = record;
                 }

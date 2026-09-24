@@ -1,6 +1,11 @@
 #ifndef DOWNWELL_CORE_LEVEL_UPGRADE_ART_H
 #define DOWNWELL_CORE_LEVEL_UPGRADE_ART_H
 namespace downwell {
+// scrInitialize's levelTile resource table (including the incoming final area).
+inline unsigned levelBorderSprite(unsigned area) {
+    static const unsigned short sprites[] = {76, 51, 74, 72, 70, 55};
+    return area < 6 ? sprites[area] : 0;
+}
 // scrUpgrades sprite column. IDs remain original resource IDs, not bank slots.
 inline unsigned levelUpgradeSprite(unsigned id) {
     static const unsigned short sprites[] = {524,528,512,520,518,521,522,

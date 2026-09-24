@@ -263,6 +263,19 @@ rendering the same snapshot never advances clocks or scrolling. Tests cover
 This supplies border commands and clocks, not completed backend rendering,
 trigonometric text shadows/icon bobbing, or player animation.
 
+The clear art profile now also exports frames 7/13 of all five current/incoming
+area border resources from scrInitialize's levelTile table. This expands the
+ignored pack to 84 records / 44,828 bytes (SHA-256
+`a4a5b3266eb7c319d269dfbc75689bbfa9cdb94c6f87c501f30dc403e7970411`).
+AmigaClearBank selects only the requested area's and its successor's four
+border records, preserving frame IDs as well as resource IDs. The revised
+four-offer-plus-borders upper bound is 12,620 bytes within the existing
+32,140-byte bank; the largest of 256 sampled banks is 10,520 bytes. Every
+exported border pixel is compared with the extracted texture, and bank tests
+check all four area pairs, payload equality, invalid areas and untouched guards.
+This supersedes the earlier 74-record and 11,564-byte bounds above. The bank
+still awaits live scene/DMA ownership integration.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

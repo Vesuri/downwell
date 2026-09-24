@@ -17,8 +17,8 @@ records = {}
 for i in range(pack.HEADER.unpack_from(data)[3]):
     record = pack.RECORD.unpack_from(data, pack.HEADER.size + i * pack.RECORD.size)
     ident, frame, ox, oy, width, height, stride, flags, offset, length = record
-    assert frame == 0 and flags == 3 and ident not in records
-    records[ident] = record
+    assert flags == 3 and (ident, frame) not in records
+    records[ident, frame] = record
     if ident in texts:
         assert (ox, oy) == (width // 2, 0), "Result text is center/top anchored"
         lines = [pack.render_text(manifest, pages, line) for line in texts[ident].split("\n")]
@@ -27,18 +27,21 @@ for i in range(pack.HEADER.unpack_from(data)[3]):
             expected.alpha_composite(line, ((width - line.width) // 2, row * 12))
     else:
         sprite = manifest["resources"]["sprites"][ident]
-        expected = pack.frame_canvas(sprite, sprite["frames"][0],
+        expected = pack.frame_canvas(sprite, sprite["frames"][frame],
             manifest["resources"]["texturePageItems"], pages)
         assert (ox, oy) == (sprite["originX"], sprite["originY"])
     assert pack.decode_planar(data[offset:offset + length], width, height, stride) == [
         pack.pixel_to_pen(pixel) for pixel in expected.get_flattened_data()]
-assert len(records) == 74 and set(texts) <= records.keys()
+assert len(records) == 84 and {(ident, 0) for ident in texts} <= records.keys()
 sprites = [524, 528, 512, 520, 518, 521, 522, 506, 507, 508, 509, 510,
            511, 516, 523, 525, 529, 530, 531, 532, 533, 534, 535]
-bundles = [records[sprite][-1] + records[64100 + i][-1] + records[64300 + i][-1]
+bundles = [records[sprite, 0][-1] + records[64100 + i, 0][-1] + records[64300 + i, 0][-1]
            for i, sprite in [*enumerate(sprites), (100, 152)]]
 # Conservative bound: ignore deduplication and reserve four distinct bundles.
-bound = (sum(sorted(bundles, reverse=True)[:4]) + records[64000][-1] + records[64001][-1]
-         + pack.HEADER.size + 14 * pack.RECORD.size)
+area_sprites = [51, 74, 72, 70, 55]
+borders = max(sum(records[sprite, frame][-1] for sprite in area_sprites[area:area + 2]
+                  for frame in (7, 13)) for area in range(4))
+bound = (sum(sorted(bundles, reverse=True)[:4]) + records[64000, 0][-1] + records[64001, 0][-1]
+         + borders + pack.HEADER.size + 18 * pack.RECORD.size)
 assert bound <= 32140, "four offered upgrade bundles must fit the existing retired-art bank"
 print(f"Clear pack: {len(records)} source-verified records; selected-offer bank bound {bound} bytes")

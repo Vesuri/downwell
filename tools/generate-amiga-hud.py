@@ -22,6 +22,8 @@ RECORD = struct.Struct(">HHhhHHHHII")
 # Exact resources needed by the first native HUD and gameplay milestones.
 SELECTIONS = {
     "clear": {
+        # Result Draw uses the current and incoming area border columns.
+        **{ident: [7, 13] for ident in (51, 74, 72, 70, 55)},
         # scrUpgrades' resource IDs, frame 0 as drawn by Result Draw.
         **{ident: [0] for ident in (524, 528, 512, 520, 518, 521, 522,
             506, 507, 508, 509, 510, 511, 516, 523, 525, 529, 530,
