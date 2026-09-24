@@ -1740,6 +1740,36 @@ int main(void) {
                 presentedScene = scenes.scene();
                 presentedSplash = scenes.splashStage();
                 presentedSplashDither = scenes.splashDitherFrame();
+                if (presentationChanged && priorPresentedScene == AmigaScene::gameplay &&
+                    presentedScene != AmigaScene::gameplay) {
+                    // Gameplay reused the intro storage. Retire all DMA before
+                    // rebuilding either destination; never draw over a live ring.
+                    splashBlankList.reset();
+                    splashBlankList.move(bplcon0, 0);
+                    for (unsigned channel = 0; channel < 8; ++channel)
+                        splashBlankList.showSprite(channel, nullSprite);
+                    splashBlankList.finish();
+                    platform.publish(splashBlankList);
+                    platform.waitVblank();
+                    AmigaHardware::blitterDrain();
+                    if (presentedScene == AmigaScene::menu &&
+                        !amigaRenderMenuCache(menuDrawList, activeGamePack, activeGamePackEnd,
+                            memory.menuForeground(), memory.menuBackground(), memory.menuEntry()))
+                        break;
+                    renderedMenuTitleFrame = -1;
+                    menuCopperMode[0] = menuCopperMode[1] = -1;
+                    gameListReady[0] = gameListReady[1] = false;
+                }
+                if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
+                    // These framebuffers and copper slots may contain gameplay,
+                    // even when the new selection matches the last visit exactly.
+                    styleFrameState[0] = {};
+                    styleFrameState[1] = {};
+                    styleListBuilt[0] = styleListBuilt[1] = false;
+                    if (!amigaBuildStyleBorder(activeGamePack, activeGamePackEnd,
+                            memory.sceneCache() + amigaStyleFrameBytes * 2))
+                        break;
+                }
                 if (presentedScene == AmigaScene::splash) {
                     if (presentationChanged || splashDitherChanged) {
                         CopperList* splashProgram =

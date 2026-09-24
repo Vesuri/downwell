@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_SCENE_RUNTIME_H
 
 #include "core/Input.h"
+#include "core/ResultsDestination.h"
 #include <cstdint>
 
 enum class AmigaScene {
@@ -15,6 +16,9 @@ class AmigaSceneRuntime {
 public:
     AmigaSceneRuntime();
     void step(const downwell::Input& input);
+    // Scene-local state only; caller must retire DMA and restore resources,
+    // reset the gameplay world and apply the shared RunSession restart.
+    bool enterResultsDestination(downwell::ResultsDestination destination);
 
     AmigaScene scene() const { return scene_; }
     unsigned tick() const { return tick_; }

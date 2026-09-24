@@ -167,11 +167,58 @@ void AmigaSceneRuntime::enterMenu()
 {
     scene_ = AmigaScene::menu;
     menuTicks_ = 0;
+    menuNapping_ = true;
+    menuGrounded_ = true;
+    menuFallTicks_ = 0;
+    menuTeleport_ = false;
+    menuTitleDelay_ = -1;
+    menuTitleImage_ = 0;
+    menuTitleRevealTicks_ = 0;
+    menuTitleReadyTimer_ = -1;
+    menuTitleReady_ = false;
+    menuSequenceDelay_ = -1;
+    menuEnterActive_ = false;
+    menuEnterBlackDelay_ = -1;
+    menuFacing_ = 1;
+    menuSprite_ = 12;
+    menuImage_ = 0;
+    menuImageSpeed_ = 0x3e19999aUL;
+    menuTitleFrame_ = 0;
+    menuX_ = 112 * fixedOne;
+    menuY_ = menuGroundY;
+    menuSpeedX_ = menuSpeedY_ = 0;
+    menuCameraX_ = 112 * fixedOne;
+    menuCameraY_ = 512 * fixedOne;
+    menuCameraLockerY_ = 448 * fixedOne;
+    menuEnterSpeedY_ = 0;
 }
 
 void AmigaSceneRuntime::enterStyleSelect()
 {
     scene_ = AmigaScene::styleSelect;
+    styleYOffset_ = -128 * fixedOne;
+    styleTileY_ = 0;
+    styleDitherY_ = 80 * fixedOne;
+    styleRunFrame_ = 0;
+    styleSmoothX_ = 0;
+    styleCursor_ = 0;
+    styleSelected_ = false;
+    stylePlayerDescent_ = stylePlayerSpeedY_ = 0;
+    styleVerticalDitherY_ = -320 * fixedOne;
+}
+
+bool AmigaSceneRuntime::enterResultsDestination(downwell::ResultsDestination destination)
+{
+    switch (destination) {
+    case downwell::ResultsDestination::surface: enterMenu(); break;
+    case downwell::ResultsDestination::styleSelect: enterStyleSelect(); break;
+    case downwell::ResultsDestination::gameplay: scene_ = AmigaScene::gameplay; break;
+    default: return false;
+    }
+    // Preserve physical key history: holding the confirmation key across a
+    // room change is not a new press in the destination room.
+    splashStage_ = 0;
+    return true;
 }
 
 void AmigaSceneRuntime::stepSplash(bool firePressed)

@@ -5,6 +5,7 @@
 #include "RunCombo.h"
 #include "RunStage.h"
 #include "DeathResults.h"
+#include "ResultsDestination.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -37,6 +38,13 @@ struct RunSession {
         combo.state.record = saved.bestCombo;
         stage = {};
         results = {};
+    }
+    ResultsDestination restart(DeathMenuSequence::Action action, const RunRecords& saved) {
+        const auto destination = resultsDestination(action);
+        if (destination == ResultsDestination::none) return destination;
+        reset(saved);
+        if (destination == ResultsDestination::gameplay) stage.advance(1);
+        return destination;
     }
 };
 } // namespace downwell

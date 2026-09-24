@@ -1125,6 +1125,44 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
 
 int main(int argc, char** argv) {
     {
+        AmigaSceneRuntime revisited;
+        require(!revisited.enterResultsDestination(downwell::ResultsDestination::none),
+                "no results destination leaves scene unchanged");
+        for (int visit = 0; visit < 3; ++visit) {
+            require(revisited.enterResultsDestination(downwell::ResultsDestination::styleSelect),
+                    "results can reenter style selection");
+            require(revisited.styleYOffset() == -128 && revisited.styleDitherY() == 80 &&
+                    revisited.styleTileY() == 0 && revisited.styleCursor() == 0 &&
+                    revisited.styleSmoothX() == 0 && !revisited.styleSelected() &&
+                    revisited.stylePlayerDescent() == 0 && revisited.styleVerticalDitherY() == -320,
+                    "style reentry resets all presentation and confirmation state");
+            for (int frame = 0; frame < 150; ++frame) revisited.step({});
+            downwell::Input confirm;
+            confirm.fire = true;
+            revisited.step(confirm);
+            require(revisited.styleSelected(), "reentered default style accepts confirmation");
+            for (int frame = 0; frame < 150; ++frame) revisited.step(confirm);
+            require(revisited.scene() == AmigaScene::gameplay, "reentered style reaches gameplay");
+            revisited.enterResultsDestination(downwell::ResultsDestination::styleSelect);
+            for (int frame = 0; frame < 150; ++frame) revisited.step(confirm);
+            require(!revisited.styleSelected(), "held confirmation is not a new press after room change");
+            revisited.enterResultsDestination(downwell::ResultsDestination::surface);
+            require(revisited.scene() == AmigaScene::menu && revisited.menuPlayerNapping() &&
+                    revisited.menuPlayerVisible() && revisited.menuPlayerX() == 112 &&
+                    revisited.menuPlayerY() == 512 && revisited.menuCameraX() == 112 &&
+                    revisited.menuCameraY() == 512 && !revisited.menuEnterSequenceActive() &&
+                    !revisited.menuTeleportActive() && revisited.menuTitleFrame() == 0,
+                    "surface reentry resets garden state");
+            downwell::Input walk;
+            walk.right = true;
+            for (int frame = 0; frame < 100; ++frame) revisited.step(walk);
+            require(!revisited.menuPlayerNapping(), "reentered garden wakes and moves");
+            require(revisited.enterResultsDestination(downwell::ResultsDestination::gameplay) &&
+                    revisited.scene() == AmigaScene::gameplay && revisited.splashStage() == 0,
+                    "retry bypasses publishers and style selection");
+        }
+    }
+    {
         AmigaSceneRuntime fade;
         for (int stage = 2; stage <= 5; ++stage)
             pressFire(fade);

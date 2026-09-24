@@ -9,6 +9,36 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Results destinations and repeatable scene entry
+
+`ResultsDestination` shares the recovered room mapping (Retry=11,
+Style Select=8, Surface=20). `RunSession::restart` applies the common record
+reload/reset before advancing Retry to 1-1; the other destinations remain at
+stage zero. No action is a no-op, not a reset.
+
+The native scene controller can now reenter those destinations without the
+publisher sequence. Garden and style entry explicitly reset their scene-local
+state rather than relying on a constructor that runs only once. Physical key
+history survives room changes so held confirmation cannot select a second time.
+The garden still uses the existing fixed sleeping-pose subset; this does not
+recover the original randomized pose selection.
+
+The native presentation transition retires gameplay DMA before restoring reused
+garden storage. Style entry invalidates both cached frame states and copper
+wrappers and restores its border; garden title/copper caches are invalidated
+on gameplay exit. This prepares actual return paths, but results action dispatch
+is still not connected: gameplay world/player recreation, RNG reseeding,
+controller alarms and persistent records must be handled at that boundary.
+The executable therefore still does not execute the three menu choices.
+
+Host tests exercise three successive visits, style confirmation through game
+entry, fresh entrance/wipe/camera state, held-key behavior, and shared reset and
+stage routing. Hardware regression coverage remains the ordinary full startup
+path, not an end-to-end death/restart cycle.
+Validation: full host suite and the bounded A500 startup-through-scrolling
+gameplay scene gate pass; instruction/helper audits remain 68000-clean.
+Normal Amiga and SDL builds are restored.
+
 ### Shared run-state ownership and restart boundary
 
 Both live runtimes now own the same `RunSession` aggregate for gem statistics,

@@ -117,6 +117,19 @@ int main() {
     session.reset();
     require(session.records().lifetimeGems == 0 && session.records().bestCombo == 0,
         "cold boot without saved data uses source defaults");
+    session.clock.ticks = 42;
+    require(session.restart(downwell::DeathMenuSequence::Action::None, saved) ==
+        downwell::ResultsDestination::none && session.clock.ticks == 42,
+        "absent results action does not reset a live run");
+    require(session.restart(downwell::DeathMenuSequence::Action::Retry, saved) ==
+        downwell::ResultsDestination::gameplay && session.stage.area == 1 && session.stage.level == 1 &&
+        session.gems.lifetime == 123, "retry resets then executes scrNextLevel(1)");
+    require(session.restart(downwell::DeathMenuSequence::Action::StyleSelect, saved) ==
+        downwell::ResultsDestination::styleSelect && session.stage.area == 0 && session.stage.level == 0,
+        "style selection stays at zero stage until confirmation");
+    require(session.restart(downwell::DeathMenuSequence::Action::Surface, saved) ==
+        downwell::ResultsDestination::surface && session.stage.area == 0,
+        "surface uses room 20 without advancing a level");
     struct ChoiceProbe {
         struct Call { unsigned index; int x, y; unsigned pen; };
         std::vector<Call> calls;
