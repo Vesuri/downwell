@@ -10,6 +10,8 @@
 #include "AmmoGaugeRows.h"
 #include "Consumables.h"
 #include "ShopWorld.h"
+#include "LevelExit.h"
+#include "GoalTimeField.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -33,6 +35,18 @@ struct RunSession {
     AmmoGaugeRows ammoGauge;
     Consumables consumables;
     ShopWorld shops;
+    LevelExit levelExit;
+    GoalTimeField goalField;
+    bool levelExitPresent = false;
+
+    template<class Camera>
+    void createLevelExit(int roomWidth, int y, GameMakerRandom& random, Camera& camera) {
+        levelExit.create(roomWidth, y, [&](LevelExit::Effect effect, int x, int childY) {
+            if (effect == LevelExit::Effect::roomEndSetter) camera.setLevelExit(childY);
+            else if (effect == LevelExit::Effect::goalTimeField) goalField.create(x, childY, random);
+        });
+        levelExitPresent = true;
+    }
 
     RunRecords records() const {
         return {gems.lifetime, gems.record, combo.state.record};
@@ -50,6 +64,9 @@ struct RunSession {
         ammoGauge = {};
         consumables = {};
         shops = {};
+        levelExit = {};
+        goalField = {};
+        levelExitPresent = false;
     }
     ResultsDestination restart(DeathMenuSequence::Action action, const RunRecords& saved) {
         const auto destination = resultsDestination(action);

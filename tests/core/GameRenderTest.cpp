@@ -99,6 +99,16 @@ public:
 
 int main() {
     downwell::RunSession session;
+    downwell::MainCameraMotion exitCamera;
+    downwell::GameMakerRandom exitRandom(42), exitOracle(42);
+    session.createLevelExit(480, 4000, exitRandom, exitCamera);
+    require(session.levelExitPresent && session.levelExit.x == 240 &&
+        session.levelExit.y == 4000 && exitCamera.roomEnd == 3824 &&
+        session.goalField.x == 240 && session.goalField.y == 4032 &&
+        session.goalField.radius.equal(downwell::GoalTimeField::nextRadius(exitOracle)),
+        "exit Create applies inherited camera boundary then creates the random-radius field");
+    session.levelExit.active = true;
+    session.levelExit.alarm0 = 5;
     session.gems.observeDeathMovement(true, 123);
     session.clock.ticks = 999;
     session.combo.state.count = 30;
@@ -114,6 +124,10 @@ int main() {
     session.consumables.pending[0] = 2;
     const auto saved = session.records();
     session.reset(saved);
+    require(!session.levelExitPresent && !session.levelExit.active &&
+        session.levelExit.alarm0 == -1 && session.levelExit.alarm1 == -1 &&
+        session.goalField.radius.mantissa == 0,
+        "new run discards exit alarms and goal-field state");
     require(session.gems.lifetime == 123 && session.gems.record == 123 &&
         session.combo.state.record == 50, "new run reloads persistent record snapshot");
     require(!session.gems.recorded && session.gems.savedRunGems == 0 &&

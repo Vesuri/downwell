@@ -927,7 +927,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             if (command.objectId == 277)
                 return runtime->registerShop(command.x, command.y) != nullptr;
             if (command.objectId == 306)
-                runtime->mainCameraMotion_.setLevelExit(command.y);
+                runtime->registerLevelExit(command.y);
             return runtime->deferredInstances_.enqueueCreate(command);
         },
         this, result);

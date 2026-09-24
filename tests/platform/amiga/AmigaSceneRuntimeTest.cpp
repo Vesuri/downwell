@@ -765,6 +765,22 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     require(gameplay.player().grounded() && reference.mainPlayerGrounded(),
             "both gameplay runtimes land on the recovered entrance floor");
     if (shopFixture) {
+        const auto nativeDraws = gameplay.randomDrawCount();
+        const auto hostDraws = reference.randomDrawCount();
+        require(!gameplay.levelExitPresent() && !reference.levelExitPresent(),
+            "entrance does not already contain a level exit");
+        gameplay.registerLevelExit(4000);
+        reference.registerLevelExit(4000);
+        require(gameplay.levelExitPresent() && reference.levelExitPresent() &&
+            gameplay.levelExit().x == 240 && reference.levelExit().x == 240 &&
+            gameplay.levelExit().y == 4000 && reference.levelExit().y == 4000 &&
+            gameplay.goalField().x == 240 && reference.goalField().x == 240 &&
+            gameplay.goalField().y == 4032 && reference.goalField().y == 4032,
+            "both adapters synchronously create the centered exit and offset goal field");
+        require(gameplay.randomDrawCount() == nativeDraws + 1 &&
+            reference.randomDrawCount() == hostDraws + 1 &&
+            gameplay.goalField().radius.equal(reference.goalField().radius),
+            "goal-field Create consumes one matching RNG draw before shop stock creation");
         // Isolated fixture, not a modification of ordinary 1-1 generation.
         // Approach from outside the invisible wall, while overlapping counter mask.
         const int x = 240 + gameplay.player().offsetX() + 12;

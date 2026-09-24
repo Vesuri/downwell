@@ -170,6 +170,10 @@ public:
         }, mainPlayerHealth_, run_.stage.area > 0 ? run_.stage.area : 1);
     }
     const ShopWorld& shops() const { return run_.shops; }
+    void registerLevelExit(int y) { run_.createLevelExit(480, y, random_, mainCameraMotion_); }
+    bool levelExitPresent() const { return run_.levelExitPresent; }
+    const LevelExit& levelExit() const { return run_.levelExit; }
+    const GoalTimeField& goalField() const { return run_.goalField; }
     const RunStage& runStage() const { return run_.stage; }
     int mainPlayerHealthMaximum() const { return run_.combo.healthReserve.maximum; }
     const HealthReserve& mainHealthReserve() const { return run_.combo.healthReserve; }

@@ -73,8 +73,8 @@ Stage advancement alone would skip visible behavior and RNG-consuming events.
 collision latch and both alarm events. Its focused test checks trigger anchors,
 dead-player exclusion, repeated collisions, fifth-tick dither creation and
 result-room request ninety further alarm phases later. It is not connected to
-live collision/room loading yet; child Create behavior and the playable result
-room remain prerequisites. Alarm requests alone are not a completed level exit.
+live collision/room loading yet; the playable result room remains a prerequisite.
+Alarm requests alone are not a completed level exit.
 
 The resource audit also found objLineToResult (306) and its parent marked
 Visible=false. Both drawing adapters now omit its sprite 127: the Amiga terrain
@@ -90,18 +90,27 @@ on both live creation paths, reproducing roomEndSetter Create. camMain's cap
 is applied to the target before easing, and to current Y only inside that same
 target-exceeded branch. Reset clears the limit to its original -1 sentinel.
 Focused tests cover easing, overshoot, retained death targets and reset; the
-paired runtime regression passes. This does not yet create the goal field,
-consume its random radius/audio choices, stop the player or enter rmResult.
+paired runtime regression passes. This does not yet stop the player or enter
+rmResult.
 
 `GoalTimeField.h` now models the child's Create radius and Draw outline requests
 from VM assembly. Radius is exactly 128 + uint32/2^31, represented without target
 floating point. Draw consumes RNG before the strict camera-bound check, except
 while pTimeStop is active. The focused test compares 10,000 Draw events against
 runner binary64 arithmetic, including all three outline radii/order and complete
-RNG state. This remains a shared component awaiting live event dispatch and
-backend circle rendering; it does not yet implement field collision, wind audio,
+RNG state. Its Draw event awaits live dispatch and backend circle rendering;
+it does not yet implement field collision, wind audio,
 time-stop effects or the result room. Repainting cached artwork must not repeat
 the original Draw event's random consumption.
+
+Both live builder adapters now call shared RunSession exit creation instead of
+only setting the camera limit. This retains the trigger, applies its inherited
+camera child first, then creates the goal field at y+32 and consumes one RNG
+draw synchronously. New-run reset clears the trigger/alarms/field. A paired
+runtime fixture verifies anchors, matching radius and draw counts before shop
+creation; a host regression checks the camera limit and reset. SDL and native
+68000 builds pass. This proves the Create path, not live exit collision, Draw
+dispatch, or level progression.
 
 ## Still open beyond that milestone
 
