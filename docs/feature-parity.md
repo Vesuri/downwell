@@ -9,6 +9,38 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Extended combat: remove the artificial Y4096 floor
+
+Extending the paired combat continuation beyond 600 updates exposed a landing
+divergence at simulation tick 2387: native stopped at world Y4096, while SDL
+continued to Y4099.2 (both health 1). `amigaResolveTerrainLanding` initialized
+its nearest hit to `4096 - 176`, inventing a floor whenever no closer tile was
+found. That fallback was not recovered room geometry or a source collision.
+
+Both adapters now use a shared no-landing sentinel beyond rmMain's serialized
+300000-pixel height, within signed 32-bit Q8 range. Indexed native search also
+checks its row bound before accessing next-landing links; the old floor had
+incidentally limited those accesses. Tests cover empty fragment/index queries,
+queries beyond the index, and real terrain below the former artificial floor.
+
+`make verify-gameplay-death-state` runs a strict bounded 6000-update combat
+continuation, retaining the existing movement tolerances, ordered bullet/gem
+checks, player-pose and health/reward comparisons. It additionally requires at
+least 120 paired depleted-health updates and checks that continued input cannot
+fire or jump after death. The diagnostic after the fix finishes at health 0/0,
+kills 10/10 and currency 82/82 without reported movement/accounting divergence.
+
+This is simulation-state coverage, NOT death-menu or death-rendering parity.
+Native rendering overrides the player with sprite 0 on death while SDL still
+uses the shared motion pose; source death physics, animation/alarm publication,
+effects and complete restart flow remain unfinished.
+
+Validation: strict death-state target passes, as do the full host suite, the
+additional deep-terrain/index-boundary tests, bounded A500 cache verification,
+and cross-target replay with unchanged digest. Normal SDL/Amiga builds are
+restored and the 68000 instruction/helper audits pass. The 600-tick target cache
+fixture does not reach Y4096; the extended paired host run covers that fix.
+
 ### Shared Begin Step activation phase
 
 `MainRoomActivation.h` now owns frontier advancement, traversal, eligibility
@@ -240,7 +272,7 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
 | Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency, ordered gem motion and player presentation | Longer routes, dense reward bursts and broader actor states remain unverified |
 | HUD | Health, ammo, currency and streak implementations; exact landing/full-ammo and scrolling/empty-ammo images including currency/streak 2 | More damage, refill and streak-expiry image coverage; complete source HUD effects |
-| Death | Native control lock and death timer | End-to-end SDL/native death-state comparison |
+| Death | 6000-update paired combat reaches depleted health; at least 120 subsequent updates cannot fire/jump | Source death physics, rendered pose/effects, alarm timing and restart/menu flow |
 
 Sound playback, complete shops/upgrades, later areas and a complete death/restart
 UI must not be described as Amiga parity omissions merely because the Windows

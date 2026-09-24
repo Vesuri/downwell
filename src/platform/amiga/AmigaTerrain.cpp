@@ -4,6 +4,7 @@
 #include "AmigaPortRuntime.h"
 #include "core/AreaOneBuilder.h"
 #include "core/GameMakerRandom.h"
+#include "core/GameplayLimits.h"
 
 void AmigaTerrainTiles::clear() {
     for (unsigned row = 0; row < rows; ++row) heads_[row] = tails_[row] = 0;
@@ -357,7 +358,7 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
     const AmigaTerrainCollisionContext& context =
         *static_cast<const AmigaTerrainCollisionContext*>(opaque);
     const int worldX = 240 + offsetX;
-    int landing = 4096 - 176;
+    int landing = downwell::gameplayNoLanding;
     if (context.index) {
         int row = (minimumOffsetY + 192 + 15) / 16;
         if (row < 0) row = 0;
@@ -366,7 +367,7 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
         for (int column = firstColumn; column <= lastColumn; ++column) {
             if (column < 0 || column >= AmigaTerrainIndex::columns) continue;
             int candidate = row;
-            while (candidate * 16 - 192 < landing) {
+            while (candidate < AmigaTerrainIndex::rows && candidate * 16 - 192 < landing) {
                 candidate = context.index->nextLanding[candidate * AmigaTerrainIndex::columns + column] - 1;
                 if (candidate < 0 || candidate * 16 - 192 >= landing) break;
                 const int y = candidate * 16;

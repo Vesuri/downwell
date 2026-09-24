@@ -1242,7 +1242,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     mainPlayerMotion_.configureLandingResolver([](void* context, int x, int minimumY) {
         const auto& runtime = *static_cast<StartupRuntime*>(context);
         const int worldX = x + runtime.mainPlayerOriginX_;
-        int nearest = 100000;
+        int nearest = gameplayNoLanding;
         for (std::size_t i = 0; i < runtime.instances_.size(); ++i) {
             const auto& tile = runtime.instances_.at(i);
             if (!tile.active || (tile.objectId != 60 && tile.objectId != 92 &&

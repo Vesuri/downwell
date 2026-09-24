@@ -108,6 +108,10 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 
 all: $(TARGET)
 
+.PHONY: verify-gameplay-death-state
+verify-gameplay-death-state: generate-room-pack generate-object-pack generate-builder-pattern-pack $(AMIGA_SCENE_TEST_TARGET)
+	DOWNWELL_COMBAT_TICKS=6000 DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_DEATH=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+
 # These executables compile multiple translation units in one command. The
 # compiler's single .d file only describes the final input, so explicitly
 # invalidate them on shared header changes rather than trusting stale tools.

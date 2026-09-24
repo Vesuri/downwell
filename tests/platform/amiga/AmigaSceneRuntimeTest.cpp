@@ -832,7 +832,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
         bool reported = false;
         bool playerReported = false;
-        for (unsigned tick = 0; tick < 600; ++tick) {
+        unsigned pairedDeadFrames = 0;
+        const unsigned combatTicks = std::getenv("DOWNWELL_COMBAT_TICKS")
+            ? static_cast<unsigned>(std::atoi(std::getenv("DOWNWELL_COMBAT_TICKS"))) : 600;
+        require(combatTicks >= 600 && combatTicks <= 6000,
+                "combat continuation is bounded to 600..6000 updates");
+        for (unsigned tick = 0; tick < combatTicks; ++tick) {
             if (tick == 0) {
                 std::cout << "COMBAT START tick=" << gameplay.tick()
                           << " native=" << 240 + gameplay.player().offsetX() << ',' << 176 + gameplay.player().offsetYFixed() / 256.0F
@@ -854,8 +859,18 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const int firePhase = std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")
                 ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
             input.fire = (tick + firePhase) % 10 < 5;
+            const bool bothWereDead = gameplay.health() == 0 && reference.mainPlayerHealth() == 0;
+            const unsigned nativeShots = gameplay.player().shots(), hostShots = reference.mainShotsFired();
+            const unsigned nativeJumps = gameplay.player().jumps(), hostJumps = reference.mainJumps();
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
+            if (bothWereDead) {
+                ++pairedDeadFrames;
+                require(gameplay.dead() && gameplay.health() == 0 && reference.mainPlayerHealth() == 0 &&
+                            gameplay.player().shots() == nativeShots && reference.mainShotsFired() == hostShots &&
+                            gameplay.player().jumps() == nativeJumps && reference.mainJumps() == hostJumps,
+                        "depleted-health players cannot fire or jump during continued input");
+            }
             if (std::getenv("DOWNWELL_TRACE_SNAKE") && gameplay.enemyCount() > 4 && gameplay.tick() >= 585 && gameplay.tick() <= 601) {
                 const auto& native = gameplay.enemyAt(4);
                 unsigned ordinal = 0;
@@ -961,6 +976,14 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(nativeGems == referenceGems,
                     "live currency birth order, motion and animation agree exactly across adapters");
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
+            if (gameplay.player().spriteId() != reference.mainPlayerSpriteId() ||
+                    gameplay.player().spriteFrame() != static_cast<unsigned>(reference.mainPlayerImageIndex()))
+                std::cerr << "PRESENTATION tick=" << gameplay.tick()
+                          << " health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
+                          << " sprite=" << gameplay.player().spriteId() << ',' << reference.mainPlayerSpriteId()
+                          << " frame=" << gameplay.player().spriteFrame() << ',' << reference.mainPlayerImageIndex()
+                          << " y=" << 176 + gameplay.player().offsetYFixed() / 256.0F << ',' << reference.mainPlayerY()
+                          << '\n';
             require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
                     gameplay.player().spriteFrame() ==
                         static_cast<unsigned>(reference.mainPlayerImageIndex()),
@@ -1015,6 +1038,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     "extended combat tape must match movement, health, kills and currency");
         if (std::getenv("DOWNWELL_VERIFY_FROG_MOTION"))
             require(sawPairedFrogHit, "strict combat tape exercises a surviving frog hit on both adapters");
+        if (std::getenv("DOWNWELL_VERIFY_DEATH"))
+            require(pairedDeadFrames >= 120,
+                    "death-state regression includes at least 120 paired depleted-health updates");
     }
     if (std::getenv("DOWNWELL_COMPARE_ACTORS")) {
         for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {

@@ -264,6 +264,17 @@ int main(int argc, char** argv) {
     LiveCollision boundary;
     AmigaTerrainCollisionContext empty{nullptr, nullptr, &patterns, nullptr, 0, nullptr};
     require(amigaBuildTerrainIndex(empty, boundary.index), "boundary map initializes");
+    require(amigaResolveTerrainLanding(&empty, 0, 4096 - 176) == downwell::gameplayNoLanding,
+            "empty fragment store does not manufacture a floor at world Y4096");
+    auto indexedEmpty = empty;
+    indexedEmpty.index = &boundary.index;
+    require(amigaResolveTerrainLanding(&indexedEmpty, 0, 4096 - 176) == downwell::gameplayNoLanding &&
+                amigaResolveTerrainLanding(&indexedEmpty, 0, 8192) == downwell::gameplayNoLanding &&
+                amigaResolveTerrainLanding(&indexedEmpty, 0, 300000) == downwell::gameplayNoLanding,
+            "empty indexed queries including beyond the last row return no landing safely");
+    require(amigaAddTerrainObject(boundary.index, 60, 240, 5008) &&
+                amigaResolveTerrainLanding(&indexedEmpty, 0, 4096 - 176) == 5008 - 192,
+            "real terrain below world Y4096 remains eligible for landing");
     require(!amigaAddTerrainObject(boundary.index, 60, -528, 0) &&
                 !amigaAddTerrainObject(boundary.index, 60, 1536, 0) &&
                 !amigaAddTerrainObject(boundary.index, 60, 160, -16) &&
