@@ -36,6 +36,11 @@ struct AmmoGaugeRows {
     std::uint8_t state[184];
     unsigned filled = 184;
     std::uint32_t lastAmmo = 8, lastCapacity = 8;
+private:
+    // Derived cache, copied/reset with the animation. Production row state is
+    // advanced only by step(); renderers observe it without mutation.
+    bool settled_ = false;
+public:
     AmmoGaugeRows() { for (auto& row : state) row = 3; }
     bool step(std::uint32_t ammo, std::uint32_t capacity) {
         bool changed = false;
@@ -46,6 +51,7 @@ struct AmmoGaugeRows {
             lastAmmo = ammo;
             lastCapacity = capacity;
         }
+        if (settled_ && !changed) return false;
         // Exhaustive reachable binary64 values from the original initial 3:
         // .6000000000000001, 1.4000000000000001, 2.2, 3, 3.8.
         // Adding/subtracting .8 walks this finite chain; integer frames are 0..3,3.
@@ -55,6 +61,7 @@ struct AmmoGaugeRows {
             else if (state[i]) --state[i];
             changed |= old != state[i];
         }
+        settled_ = !changed;
         return changed;
     }
     template<class Draw>

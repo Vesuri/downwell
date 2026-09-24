@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 32.33 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 33.19 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)

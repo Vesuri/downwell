@@ -101,6 +101,33 @@ int main() {
     }
     for (unsigned i = 0; i < 5; ++i) rows.step(8, 8);
     require(!rows.step(8, 8), "settled row animation stops requesting redraws");
+    {
+        downwell::AmmoGaugeRows cached;
+        double source[184];
+        for (auto& value : source) value = 3;
+        unsigned sourceFilled = 184;
+        for (unsigned tick = 0; tick < 20000; ++tick) {
+            const unsigned cap = (tick / 521) % 3 == 0 ? 8 : (tick / 521) % 3 == 1 ? 15 : 64;
+            // Long idle periods, single-frame reversals, empty/full and
+            // capacity changes after settling must all retain every VM step.
+            const unsigned ammo = tick % 97 < 80 ? cap : (tick * 17u) % (cap+1);
+            const unsigned filled = static_cast<unsigned>(std::ceil(184.0*(double(ammo)/cap)));
+            bool changed = filled != sourceFilled;
+            sourceFilled = filled;
+            for (unsigned i = 0; i < 184; ++i) {
+                const double old = source[i];
+                if (i < filled) { if (source[i] <= 3) source[i] += .8; }
+                else if (source[i] >= 1) source[i] -= .8;
+                changed |= source[i] != old;
+            }
+            require(cached.step(ammo, cap) == changed, "settled cache retains original changed flag");
+            require(cached.filled == filled, "settled cache retains fractional fill boundary");
+            for (unsigned i = 0; i < 184; ++i)
+                require((cached.state[i] < 4 ? cached.state[i] : 3) == static_cast<unsigned>(source[i]),
+                    "settled cache retains every original animation frame");
+            if (tick % 211 == 0) { auto copy = cached; cached = copy; }
+        }
+    }
     unsigned visibleRows = 0;
     rows.draw(288, 241, [&](unsigned, unsigned, int, int y) {
         require(y < 232, "recharge motion retains the source bottom clipping condition");

@@ -207,3 +207,26 @@ maximum gap six fields), versus 940 fields before this change.
 Native firing and recharge captures remain pixel-identical (0/99,968
 differences against SDL). Both 68000 audits pass, and the ordinary non-skip
 executable is restored. Shared game logic and deterministic state are unchanged.
+
+## Skip settled animation scans
+
+The shared `AmmoGaugeRows` now remembers when a scan found no state changes.
+Until the filled-row boundary changes, all rows are already at their targets
+and the next call can return false without revisiting 184 bytes. A changed
+boundary resumes the original per-row stepping immediately. Initial state,
+3-to-3.8 invisible animation steps, change notifications, and copy/reset
+behavior are retained; this is not a lower animation update rate. Production
+code advances row state only through `step()`; renderers only observe it.
+
+20,000 updates compare frames and change flags with the original binary64
+animation over long idle intervals, rapid reversals and capacity changes.
+On the 600-update native probe tape, HUD state/frame-flag time falls from
+791.261 to 334.860 ms (1.319 to 0.558 ms per update). With the newly separated
+runtime probes enabled, fields fall from 1,166 to 1,134. These instrumented
+figures are not shipping FPS. Logs use `/tmp/downwell-hud-idle-`.
+The separate FPSCOUNT-only tape uses 904 PAL fields for 600 updates:
+**33.19 FPS**, maximum gap six fields (previously 928 fields / 32.33 FPS).
+The full host suite and bounded native cross-target replay pass, with weapon
+digest `0db388a5b1c2a40a` / coverage `3fff` unchanged. Both 68000 audits pass;
+the replay workflow restores the normal non-skip executable. This does not
+resolve the separately measured generation spike or the 20 ms frame gate.
