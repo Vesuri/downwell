@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_SHOP_WORLD_H
 #define DOWNWELL_CORE_SHOP_WORLD_H
 #include "ShopInteraction.h"
+#include "ShopFeedback.h"
 #include "Input.h"
 namespace downwell {
 // Bounded world ownership, separate from shop art/child collision instances.
@@ -13,6 +14,7 @@ struct ShopWorld {
         bool present = false, maskEnabled = true, interactOk = true;
         ShopInventory stock;
         ShopInteraction menu;
+        ShopFeedback feedback;
     };
     Instance instances[capacity];
     bool noControl = false, interactable = false;
@@ -52,12 +54,14 @@ struct ShopWorld {
             held.left && !previous.left, held.fire && !previous.fire, false};
         previous = held; // Always track raw edges, including while locked.
         for (auto& shop : instances) if (shop.present) {
+            shop.feedback.beginStep();
             const ShopInteraction::Context context{meets(shop, x, y),
                 interactable, x > shop.x, criminal, dead};
             shop.menu.step(edges, context, noControl, facing, shop.stock,
                 currency, choose, grant, [&](ShopInteraction::Effect effect) {
                     if (effect == ShopInteraction::Effect::disableMask)
                         shop.maskEnabled = false;
+                    shop.feedback.apply(effect, shop.menu.cursor, shop.stock);
                     emit(shop, effect);
                 });
         }

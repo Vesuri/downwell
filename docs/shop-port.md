@@ -149,10 +149,24 @@ eligibility, capacity exhaustion, retirement and run reset.
 Remaining integration: production creation and children, source-wide ordinary
 Step dispatch (including multiple shops), fractional mask queries, cancellation
 input mapping, merchant/case/audio feedback and rendering. Current runtime hooks
-run the menu immediately after player movement and discard presentation requests;
+run the menu immediately after player movement and retain presentation requests;
 they are not a claim that the full original Shop event has been implemented.
 
 Validation: the full host suite (including both runtime fixtures) and normal SDL
 build pass. The bounded SKIP_TO_GAME A500 600-update cache verifier passes with
 clean 68000 instruction/helper audits. That emulator tape contains no shop;
 registered-shop lifecycle evidence is currently from the host paired fixture.
+
+`ShopFeedback` now consumes the ordered interaction effects in shared world
+state. Buying exhausted stock clears that case's stored-item flag and removes
+its item child, not the glass case. Keeper thankful/confused/goodbye mutations
+and image-reset requests follow Shop Step; opening clears only thankful/goodbye.
+Per-update rising-text identifiers and ordered sound requests retain original
+resource IDs, volume and merchant/UI channels. Purchases request merchant 104
+at volume 90 before UI 105 at volume 50. Held input produces no repeated requests.
+The bounded sound queue reports overflow explicitly.
+
+These requests are not audio playback, localized text rendering, or the keeper's
+own alarm/animation controller. Focused tests cover all reply IDs, sound ordering,
+stock disappearance, transient request reset and opening flag preservation. The
+paired runtime purchase fixture compares both targets' child and feedback state.

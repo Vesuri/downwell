@@ -785,6 +785,19 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 nativeShop->menu.active == hostShop->menu.active &&
                 gameplay.player().grounded() && reference.mainPlayerGrounded(),
                 "world interaction and grounded input suppression agree across adapters");
+            const auto& a = nativeShop->feedback;
+            const auto& b = hostShop->feedback;
+            require(a.message == b.message && a.thankful == b.thankful && a.goodbye == b.goodbye &&
+                a.confused == b.confused && a.resetKeeperImage == b.resetKeeperImage &&
+                a.soundCount == b.soundCount && !a.overflow && !b.overflow,
+                "both runtimes retain identical merchant feedback");
+            for (unsigned i = 0; i < a.soundCount; ++i)
+                require(a.sounds[i].resource == b.sounds[i].resource &&
+                    a.sounds[i].volume == b.sounds[i].volume && a.sounds[i].channel == b.sounds[i].channel,
+                    "merchant/UI sound requests preserve source order across adapters");
+            for (unsigned i = 0; i < 3; ++i)
+                require(a.itemPresent[i] == b.itemPresent[i] && a.storedItem[i] == b.storedItem[i],
+                    "purchased child disappearance agrees across adapters");
         };
         tickShop(false); tickShop(true);
         require(nativeShop->menu.active && gameplay.shops().noControl,

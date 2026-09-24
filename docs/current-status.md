@@ -25,6 +25,8 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
 - [x] Shared shop interaction and feedback requests (callable, not yet live).
 - [x] Shared shop world ownership and registered-shop input/purchase hooks in
   both runtimes, verified with an isolated paired fixture.
+- [x] Retained shared merchant feedback and purchased-item disappearance state
+  (rendering/audio consumers still pending).
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.
