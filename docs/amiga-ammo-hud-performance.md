@@ -117,3 +117,25 @@ normal non-skip executable is restored after verification. The retained HUD
 object now occupies 41,178 bytes, 68 bytes more than the previous checkpoint.
 Verification logs use the `/tmp/downwell-hud-integer-` prefix with
 `suite.log`, `sanitized.log`, `ammo.log`, `recharge.log` and `replay.log`.
+
+## Single-pass interior background
+
+Interior damage no longer clears the entire strip to black before painting
+its white fill. It writes final background words in at most three spans:
+black, white interior with black side pixels, black. The palette is unchanged
+(white `01`, black `11`), so the low plane has the same value in all three
+spans. Each row of each plane is written once before animated overlays, and
+the red rim remains outside this path. This removes redundant Fast-RAM work
+as well as retaining changed-only publication to Chip RAM.
+
+The same 600-update probe tape drops from 1,188 to 1,179 fields. Base/fill
+time falls from 1,653.688 to 1,513.069 ms; total HUD phases become 3,719.592 ms
+(6.20 ms per game update). This is incremental progress, not a 20 ms pass.
+The portable masked-column helper is tested for padding/adjacent-plane
+preservation and invalid bounds. The full retained-HUD reconstruction oracle
+and sanitized renderer pass. Logs use `/tmp/downwell-hud-fused-`.
+The separate FPSCOUNT run takes 980 fields for 600 updates (**30.61 FPS**,
+maximum gap six fields), versus 989 fields before this change.
+Native firing and recharge captures again have zero differing pixels out of
+99,968 against SDL. Both 68000 audits pass, and the capture workflow restores
+the ordinary non-skip executable. No shared simulation code changed.

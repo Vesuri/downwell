@@ -108,7 +108,18 @@ public:
                 }
                 amigaRendererDrawAsset(renderer, pack, end, sprite, frame, x, y, 0);
             };
-            if (interior) amigaRendererFillRect(renderer, 288, top, 12, bottom-top, 3);
+            if (interior) {
+                // Black is 11, white is 01. Compose the final background once:
+                // never clear the white span to black only to fill it again.
+                int begin = fillTop_ > static_cast<unsigned>(top) ? fillTop_ : top;
+                int end = fillTop_ + fillHeight_ < static_cast<unsigned>(bottom)
+                    ? fillTop_ + fillHeight_ : bottom;
+                if (begin < end) {
+                    amigaRendererFillHudWordColumn(working_, 18, top, begin, 0xfff0, 0xfff0, 0xfff0);
+                    amigaRendererFillHudWordColumn(working_, 18, begin, end, 0xfff0, 0xfff0, 0x8010);
+                    amigaRendererFillHudWordColumn(working_, 18, end, bottom, 0xfff0, 0xfff0, 0xfff0);
+                } else amigaRendererFillHudWordColumn(working_, 18, top, bottom, 0xfff0, 0xfff0, 0xfff0);
+            }
             else if (clearDigits == 1 && !forceFull) {
                 renderer->clipX = 282; renderer->clipWidth = 24;
                 amigaRendererApplyHudColumns(renderer, background_, 17, 3, meter, 40, 256, 0);
@@ -120,7 +131,7 @@ public:
                     231, 34 + (clearDigits-1)*8, 26 + clearDigits-1, 0);
                 asset(416, 0, 284, 43 + meter);
             }
-            if (fillHeight_) amigaRendererFillRect(renderer, 289, fillTop_, 10, fillHeight_, 1);
+            if (!interior && fillHeight_) amigaRendererFillRect(renderer, 289, fillTop_, 10, fillHeight_, 1);
             DW_PROFILE_PHASE(profileAmmoRows);
             if (rows) {
                 const int base = 229 + 4 * meter;

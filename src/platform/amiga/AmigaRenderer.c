@@ -545,6 +545,20 @@ void amigaRendererApplyHudColumns(AmigaRenderer* renderer, const UWORD* cache,
     }
 }
 
+void amigaRendererFillHudWordColumn(UBYTE* hud, unsigned word, unsigned top,
+                                    unsigned bottom, UWORD mask, UWORD low, UWORD high) {
+    UBYTE* target;
+    if (word >= downwellBytesPerPlaneLine/2 || top >= bottom || bottom > downwellDisplayHeight) return;
+    target = hud + top*downwellBytesPerPlaneLine + word*2;
+    low &= mask; high &= mask;
+    for (; top < bottom; ++top) {
+        writeWord(target, (readWord(target) & (UWORD)~mask) | low);
+        writeWord(target+downwellPlaneBytes,
+                  (readWord(target+downwellPlaneBytes) & (UWORD)~mask) | high);
+        target += downwellBytesPerPlaneLine;
+    }
+}
+
 unsigned amigaRendererCopyHudWords(UBYTE* destination, const UBYTE* source,
                                     int left, int top, int right, int bottom, int changedOnly) {
     unsigned writes = 0, plane;

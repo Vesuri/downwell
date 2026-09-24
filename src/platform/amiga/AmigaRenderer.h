@@ -63,6 +63,8 @@ int amigaRendererPrepareWordStamp(AmigaWordStamp*, const UBYTE*, const UBYTE*, U
 int amigaRendererDrawWordStamp(AmigaRenderer*, const AmigaWordStamp*, int, int);
 int amigaRendererDrawWordStampRun(AmigaRenderer*, const AmigaWordStamp*, int, int, unsigned);
 unsigned amigaRendererCopyHudWords(UBYTE*, const UBYTE*, int, int, int, int, int);
+/* One aligned HUD column, already clipped by caller; masked planar words. */
+void amigaRendererFillHudWordColumn(UBYTE*, unsigned, unsigned, unsigned, UWORD, UWORD, UWORD);
 void amigaRendererCacheHudColumns(UWORD*, const UBYTE*, unsigned, unsigned);
 void amigaRendererApplyHudColumns(AmigaRenderer*, const UWORD*, unsigned, unsigned, int, int, int, int);
 int amigaRendererAssetBounds(const UBYTE* pack, const UBYTE* packEnd,

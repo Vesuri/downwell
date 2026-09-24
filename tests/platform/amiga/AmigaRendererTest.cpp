@@ -80,6 +80,20 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 } // namespace
 
 int main(int argc, char** argv) {
+    {
+        std::vector<UBYTE> actual(downwellLayerBytes, 0x5a), expected = actual;
+        for (unsigned plane = 0; plane < 2; ++plane)
+            for (unsigned y = 3; y < 281; ++y) {
+                const unsigned offset = plane*downwellPlaneBytes + y*downwellBytesPerPlaneLine + 36;
+                putWord(expected.data(), offset, (0x5a5a & ~0xfff0) | (plane ? 0x8010 : 0xfff0));
+            }
+        amigaRendererFillHudWordColumn(actual.data(), 18, 3, 281, 0xfff0, 0xffff, 0x801f);
+        require(actual == expected, "word column preserves adjacent pixels, rows and planes");
+        amigaRendererFillHudWordColumn(actual.data(), 24, 0, 284, 0xffff, 0, 0);
+        amigaRendererFillHudWordColumn(actual.data(), 0, 0, 285, 0xffff, 0, 0);
+        amigaRendererFillHudWordColumn(actual.data(), 0, 12, 12, 0xffff, 0, 0);
+        require(actual == expected, "invalid or empty word columns do not write");
+    }
     const auto storage = GameplaySceneStorage::partition(76800, 30720, 13940);
     require(storage.valid && storage.resultsOffset == 30720 &&
                 storage.resultsCapacity == 32140 && storage.hudOffset == 62860,
