@@ -79,7 +79,6 @@ GDB_PID=$!
 
 while (( SECONDS < VERIFY_DEADLINE )); do
   if [ -f "$RUN/gdb-ready.marker" ]; then
-    fsuae_stop
     break
   fi
   if ! kill -0 "$GDB_PID" 2>/dev/null; then
@@ -87,13 +86,22 @@ while (( SECONDS < VERIFY_DEADLINE )); do
   fi
   sleep 0.1
 done
-if kill -0 "$GDB_PID" 2>/dev/null; then
+if [ -f "$RUN/gdb-ready.marker" ]; then
+  # The marker follows the stack guard and result print. GDB detach may
+  # remain blocked in the stub; that is not a replay timeout. Stop the
+  # debugger before the emulator and still validate the exact result below.
+  kill "$GDB_PID" 2>/dev/null || true
+  wait "$GDB_PID" 2>/dev/null || true
+  GDB_PID=""
+  fsuae_stop
+elif kill -0 "$GDB_PID" 2>/dev/null; then
   kill "$GDB_PID" 2>/dev/null || true
   wait "$GDB_PID" 2>/dev/null || true
   echo "debugger did not complete replay within ${VERIFY_TIMEOUT_SECONDS}s"
   exit 1
+else
+  wait "$GDB_PID" 2>/dev/null || true
 fi
-wait "$GDB_PID" 2>/dev/null || true
 
 ACTUAL="$(sed -n 's/^DOWNWELL_REPLAY_RESULT //p' "$RUN/gdb-out.log" | tail -1)"
 if [ -z "$ACTUAL" ]; then
