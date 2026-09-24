@@ -18,6 +18,7 @@
 #include "AmigaPortRuntime.h"
 #include "AmigaRenderer.h"
 #include "AmigaSceneRuntime.h"
+#include "GameplaySceneStorage.h"
 #include "AmigaSplashCache.h"
 #include "AmigaStyleRenderer.h"
 #include "AmigaTerrain.h"
@@ -1639,10 +1640,14 @@ int main(void) {
                     platform.publish(splashBlankList);
                     platform.waitVblank();
                     const unsigned hudBytes = amiga_hud_pack_end - amiga_hud_pack;
-                    if (hudBytes > amigaMenuEntryPlaneBytes) break;
+                    const auto storage = GameplaySceneStorage::partition(
+                        menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
+                        downwellGameRingBytes, hudBytes);
+                    if (!storage.valid) break;
+                    UBYTE* hudStorage = memory.menuForeground() + storage.hudOffset;
                     for (unsigned byte = 0; byte < hudBytes; ++byte)
-                        memory.menuEntry()[byte] = amiga_hud_pack[byte];
-                    activeHudPack = memory.menuEntry();
+                        hudStorage[byte] = amiga_hud_pack[byte];
+                    activeHudPack = hudStorage;
                     activeHudPackEnd = activeHudPack + hudBytes;
                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);

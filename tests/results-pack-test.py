@@ -20,6 +20,7 @@ resources = manifest["resources"]
 pages = [pack.Image.open(extracted / "TexturePages" / f"{i}.png").convert("RGBA")
          for i in range(manifest["counts"]["embeddedTextures"])]
 data = (root / "generated/amiga-results.dwap").read_bytes()
+assert len(data) <= 32140, "results assets exceed the audited retired-garden gap"
 magic, version, header_size, count, source_hash = pack.HEADER.unpack_from(data)
 assert magic == pack.MAGIC and version == pack.VERSION and header_size == pack.HEADER.size
 assert source_hash == bytes.fromhex(pack.SOURCE_SHA256)[:8]

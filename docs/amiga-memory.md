@@ -26,6 +26,27 @@ garden memory for side-view staging and the HUD pack. These are not additional
 allocations. Scrolling changes copper bitplane pointers; the private terrain
 backing restores moving-object damage and supplies newly revealed rows.
 
+### Results-pack space without another Chip allocation
+
+During gameplay the 76,800-byte garden allocation is partitioned by
+`GameplaySceneStorage`: bytes 0..30,719 remain the full staging ring (which
+can rotate into a displayed slot); bytes 62,860..76,799 hold the 13,940-byte
+HUD pack, relocated from the entry-shaft base. This leaves a contiguous
+32,140-byte middle gap, enough for the separate 25,820-byte results pack.
+The HUD start is rounded down to a four-byte boundary for future odd sizes;
+overlapping/oversized partitions fail validation. Results packing tests enforce
+the current gap budget, and renderer tests cover the arithmetic boundaries.
+
+The results pack is not copied into that gap or drawn yet. This change reserves
+safe space; it does not increase resident allocation or destroy an unused-looking
+intro cache that is actually serving as live gameplay memory. The splash/style
+allocation remains the two display rings and cannot be reused for results art.
+
+Validation: host suite, bounded A500 600-tick cache oracle and active gameplay
+frame comparison pass after relocation. The native capture retains its existing
+checksum; no presentation baseline was changed. Normal target build restored,
+with clean 68000 instruction and software-helper audits.
+
 ## September 23 startup failure and correction
 
 Additional offline actor variants increased asset residency to 302,664 bytes,

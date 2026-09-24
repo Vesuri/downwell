@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaRenderer.h"
+#include "platform/amiga/GameplaySceneStorage.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -75,6 +76,17 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 } // namespace
 
 int main(int argc, char** argv) {
+    const auto storage = GameplaySceneStorage::partition(76800, 30720, 13940);
+    require(storage.valid && storage.resultsOffset == 30720 &&
+                storage.resultsCapacity == 32140 && storage.hudOffset == 62860,
+            "results pack fits between live staging ring and relocated HUD");
+    require(storage.resultsCapacity >= 25820, "current offline results pack fits without allocation");
+    require(!GameplaySceneStorage::partition(100, 101, 0).valid &&
+                !GameplaySceneStorage::partition(100, 80, 21).valid &&
+                !GameplaySceneStorage::partition(100, 99, 1).valid,
+            "invalid and alignment-overlapping partitions rejected");
+    require(GameplaySceneStorage::partition(100, 80, 17).hudOffset == 80,
+            "unaligned asset sizes reserve padding without touching staging");
     UBYTE pack[48];
     UWORD sprite[6] = {};
     buildOpaqueSpritePack(pack, sizeof(pack));
