@@ -221,6 +221,13 @@ test: test-ammo-dividers test-ammo-fill
 test: test-shop-inventory
 test: test-shop-interaction test-shop-menu-layout
 test: test-level-exit
+test: test-goal-time-field
+.PHONY: test-goal-time-field
+build/goal-time-field-test: tests/core/GoalTimeFieldTest.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/GoalTimeFieldTest.cpp src/core/GameMakerRandom.cpp
+test-goal-time-field: build/goal-time-field-test
+	./build/goal-time-field-test
 .PHONY: test-level-exit
 build/level-exit-test: tests/core/LevelExitTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
