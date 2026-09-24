@@ -199,6 +199,17 @@ This controller still awaits live room integration; presentation/easing, sound
 playback and its conditional wind-sample RNG, achievement/loading effects and
 next-room construction remain outside this tested subset.
 
+The offline `clear` asset profile now exports frame-zero icons for IDs 0..22
+and the rice-ball fallback, localized names/descriptions and the clear/choose
+labels. Centered multiline text retains top anchors and langString's single-
+space fallback for absent keys. Its 43,052-byte pack has 74 records, generated
+host-label lookup and input/tool/output provenance; all generated content stays
+ignored. Every icon/text raster is compared to extracted source pixels/glyphs.
+The full pack is too large for the existing artwork bank, but four distinct
+offer bundles plus shared labels have a conservative 11,564-byte bound inside
+the 32,140-byte bank. Selected-resource copying and room rendering are still
+pending; no additional resident Chip assets have been introduced.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.

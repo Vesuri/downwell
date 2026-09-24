@@ -559,6 +559,13 @@ verify-amiga-hud: generate-amiga-hud
 generate-amiga-game:
 	tools/generate-amiga-hud.py --profile game
 
+.PHONY: generate-amiga-clear verify-amiga-clear
+generate-amiga-clear:
+	tools/generate-amiga-hud.py --profile clear
+verify-amiga-clear: generate-amiga-clear
+	tools/generate-amiga-hud.py --profile clear --check
+	python3 tests/clear-pack-test.py
+
 verify-amiga-game: generate-amiga-game
 	python3 tools/verify-amiga-menu-sprites.py
 	tools/generate-amiga-hud.py --profile game --check
