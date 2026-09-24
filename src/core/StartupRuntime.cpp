@@ -292,6 +292,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool right,
                                   bool fire,
                                   bool anyInput) {
+    if (run_.levelClearActive) return; // Result owner uses stepLevelClear.
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;

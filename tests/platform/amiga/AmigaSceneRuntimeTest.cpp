@@ -896,6 +896,52 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 gameplay.consumables().pending[0] == reference.consumables().pending[0],
                 "both runtime adapters apply identical grants, refunds and deferred consumables");
         }
+        require(gameplay.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
+            "both adapters consume the exit request at an explicit scene boundary");
+        const auto nativeTick = gameplay.tick();
+        const auto hostTick = reference.tick();
+        gameplay.step(0); reference.step({}, false);
+        require(gameplay.tick() == nativeTick && reference.tick() == hostTick,
+            "old gameplay dispatcher cannot advance while the clear room owns the runtime");
+        bool nativeHeart = false, hostHeart = false;
+        for (unsigned tick = 1; tick <= 211; ++tick) {
+            bool nativeConfirm = true, hostConfirm = true;
+            std::vector<unsigned> nativeEvents, hostEvents;
+            const bool right = tick == 61 || tick == 62;
+            const bool left = tick == 75;
+            require(gameplay.stepLevelClear(nativeConfirm, left, right, nativeHeart,
+                [&](downwell::LevelClearSelection::Effect event, unsigned value) {
+                    nativeEvents.push_back(unsigned(event)); nativeEvents.push_back(value);
+                }) && reference.stepLevelClear(hostConfirm, left, right, hostHeart,
+                [&](downwell::LevelClearSelection::Effect event, unsigned value) {
+                    hostEvents.push_back(unsigned(event)); hostEvents.push_back(value);
+                }), "both result adapters update successfully");
+            const auto& a = gameplay.levelClear();
+            const auto& b = reference.levelClear();
+            require(nativeEvents == hostEvents && nativeConfirm == hostConfirm && nativeHeart == hostHeart &&
+                a.selection.cursor == b.selection.cursor && a.selection.next == b.selection.next &&
+                a.selection.visible == b.selection.visible && a.motion.playerY.equal(b.motion.playerY) &&
+                a.motion.cameraY.equal(b.motion.cameraY) &&
+                a.carousel.position.magnitude.equal(b.carousel.position.magnitude) &&
+                a.carousel.position.negative == b.carousel.position.negative,
+                "result event order, input, camera, player and signed carousel match");
+            for (unsigned i = 0; i < 4; ++i)
+                require(a.offers.ids[i] == b.offers.ids[i], "actual runtime RNG produces matching upgrade offers");
+            require(gameplay.randomState().stateIndex() == reference.randomState().stateIndex() &&
+                gameplay.randomDrawCount() == reference.randomDrawCount(), "result RNG cursor/count match");
+            for (unsigned i = 0; i < 16; ++i)
+                require(gameplay.randomState().stateWord(i) == reference.randomState().stateWord(i),
+                    "result full RNG state matches");
+            require(gameplay.health() == reference.mainPlayerHealth() &&
+                gameplay.player().ammo() == reference.mainAmmo() &&
+                gameplay.currency() == reference.mainCurrencyTotal() &&
+                gameplay.levelClearFrame().tileY == reference.levelClearFrame().tileY &&
+                gameplay.levelClearFrame().time == reference.levelClearFrame().time &&
+                gameplay.exitDither().y == reference.exitDither().y &&
+                gameplay.nextLevelRequested() == (tick == 211) &&
+                reference.nextLevelRequested() == (tick == 211),
+                "result grants, presentation and departure requests match across adapters");
+        }
         return;
     }
     require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&

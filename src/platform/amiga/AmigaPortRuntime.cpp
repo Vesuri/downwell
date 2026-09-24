@@ -388,6 +388,7 @@ void AmigaPortRuntime::updateCrawler(EnemyState& enemy, bool alarm)
 
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
+    if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
     if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_);

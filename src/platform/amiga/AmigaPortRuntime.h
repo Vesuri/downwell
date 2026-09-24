@@ -182,6 +182,7 @@ public:
         enemyRandom_ = random;
     }
     std::uint64_t randomDrawCount() const { return enemyRandom_.drawCount(); }
+    const downwell::GameMakerRandom& randomState() const { return enemyRandom_; }
 
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
@@ -230,6 +231,22 @@ public:
     bool exitDitherRequested() const { return run_.exitDitherRequested; }
     const downwell::ExitDither& exitDither() const { return run_.exitDither; }
     bool levelResultRequested() const { return run_.levelResultRequested; }
+    // Scene owner must retire old DMA before entry; use this update path
+    // instead of gameplay step until the next-room request is consumed.
+    bool enterLevelClear(unsigned style, bool heartGoal) {
+        return run_.enterLevelClear(style, heartGoal, health_, player_, enemyRandom_);
+    }
+    template<class Emit>
+    bool stepLevelClear(bool& confirm, bool leftPressed, bool rightPressed, bool& heartGoal, Emit emit) {
+        if (!run_.levelClearActive || run_.nextLevelRequested) return false;
+        ++tick_;
+        return run_.stepLevelClear(confirm, leftPressed, rightPressed, heartGoal,
+            currencyAccount_, player_, health_, enemyRandom_, emit);
+    }
+    bool levelClearActive() const { return run_.levelClearActive; }
+    bool nextLevelRequested() const { return run_.nextLevelRequested; }
+    const downwell::LevelClearController& levelClear() const { return run_.levelClear; }
+    const downwell::LevelClearPresentation::Frame& levelClearFrame() const { return run_.levelClearFrame; }
     const downwell::RunStage& runStage() const { return run_.stage; }
     int healthMaximum() const { return run_.combo.healthReserve.maximum; }
     const downwell::HealthReserve& healthReserve() const { return run_.combo.healthReserve; }

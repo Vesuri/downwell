@@ -276,6 +276,17 @@ check all four area pairs, payload equality, invalid areas and untouched guards.
 This supersedes the earlier 74-record and 11,564-byte bounds above. The bank
 still awaits live scene/DMA ownership integration.
 
+Both runtime adapters now expose the same explicit result entry/update path,
+using their actual player, health, inventory, currency and RNG state. Entry
+refreshes the SDL ammo mirror after Result Create's refill. Their ordinary
+gameplay dispatchers refuse to advance while result ownership is active;
+the result update advances the runtime tick without running enemies/builders.
+The paired scene replay now continues from its exit fixture through 211 result
+updates with navigation and confirmation, comparing effects, offers, all RNG
+words, motion, grants and departure requests. This is adapter integration,
+not an automatic live scene switch: the application presenters still need to
+invoke entry after retiring the old display and then render these snapshots.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
