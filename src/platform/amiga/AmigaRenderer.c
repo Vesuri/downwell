@@ -648,6 +648,18 @@ int amigaRendererDrawWordStampRun(AmigaRenderer* renderer, const AmigaWordStamp*
     clip = (UWORD)((0xffffu >> (left-x)) & (0xffffu << (16-(right-x))));
     target = renderer->hud + first*downwellBytesPerPlaneLine + (x >> 3);
     for (row = first-y; row < last-y; ++row) {
+        /* Long repeated runs have a constant fully-overlapped middle. Use
+           its already-composed words once, not three table lookups and two
+           source-row clamps for every scanline. Only the ends vary. */
+        if (row <= 0 && row + (int)count - 1 >= 7) {
+            const int end = last-y < 1 ? last-y : 1;
+            const UWORD mask = stamp->runMask[7] & clip;
+            if (mask) amigaRendererFillHudWordColumn(renderer->hud, x >> 4,
+                row+y, end+y, mask, stamp->runLow[7], stamp->runHigh[7]);
+            target += (end-row)*downwellBytesPerPlaneLine;
+            row = end-1;
+            continue;
+        }
         const unsigned startRow = row < 0 ? 0 : row;
         const unsigned endRow = row + (int)count - 1 > 7 ? 7 : row + count - 1;
         const unsigned index = startRow*8 + endRow;

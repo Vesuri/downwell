@@ -436,6 +436,30 @@ int main(int argc, char** argv) {
         }
     expectedRenderer.hud = expectedHud.data();
     {
+        for (unsigned sprite : {418u, 419u, 421u})
+            for (unsigned frame = 0; frame < (sprite == 421 ? 2u : 4u); ++frame) {
+                AmigaWordStamp stamp;
+                require(amigaRendererPrepareWordStamp(&stamp, hudPack.data(), hudPack.data()+hudPack.size(), sprite, frame),
+                    "prepare repeated row artwork");
+                for (unsigned count : {0u, 1u, 7u, 8u, 9u, 17u, 184u})
+                    for (int y : {0, 100, 283}) for (int inset : {0, 3}) {
+                        std::fill(actualHud.begin(), actualHud.end(), 0x5a);
+                        std::fill(expectedHud.begin(), expectedHud.end(), 0x5a);
+                        for (auto* renderer : {&actualRenderer, &expectedRenderer}) {
+                            amigaRendererClearClipRect(renderer);
+                            renderer->clipX = 288+inset; renderer->clipWidth = 12-inset;
+                            renderer->clipY = inset; renderer->clipHeight = 284-2*inset;
+                        }
+                        require(amigaRendererDrawWordStampRun(&actualRenderer, &stamp, 288, y, count),
+                            "repeated word column draw supported");
+                        for (unsigned i = 0; i < count; ++i)
+                            amigaRendererDrawAsset(&expectedRenderer, hudPack.data(), hudPack.data()+hudPack.size(),
+                                sprite, frame, 288, y-static_cast<int>(i), 0);
+                        require(actualHud == expectedHud, "constant run middle and clipped ends match ordered sprite draws");
+                    }
+            }
+    }
+    {
         AmigaAmmoHud retained;
         downwell::AmmoGaugeRows rows;
         unsigned previousDigits = 1;

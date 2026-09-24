@@ -183,3 +183,27 @@ The separate FPSCOUNT-only measurement is 600 updates in 940 fields:
 Native shot and recharge captures both remain pixel-identical to SDL
 (0/99,968 differences), and both 68000 audits pass. The verification workflow
 restores the ordinary non-skip build after the bounded emulator runs.
+
+## Constant middle of repeated row stamps
+
+Once a descending run overlaps all eight source rows, its composed middle is
+the same pair of masked words on every scanline. The CPU renderer now writes
+that span directly from the existing overlap cache rather than repeating
+source-row clamps and three table lookups per line. Only the two varying ends
+use the general run compositor. Original source-over order is unchanged; no
+new asset conversion, cache allocation, blit or assembly path is introduced.
+
+On the same 600-update probe tape, the row phase falls from 689.702 to
+489.309 ms (29%). Total HUD phases are 1,165.461 + 489.309 + 480.537 +
+698.932 = 2,834.239 ms, or 4.72 ms per game update. Instrumented fields fall
+from 1,147 to 1,137; this still is not a 20 ms frame-budget pass.
+
+Tests compare runs of 0, 1, 7, 8, 9, 17 and 184 stamps for every row-art frame,
+at top/middle/bottom positions and horizontal/vertical clipping, against
+individual ordered asset draws. The retained-HUD suite and renderer
+sanitizers also pass. Logs use `/tmp/downwell-hud-run-`.
+FPSCOUNT-only measurement: 600 updates in 928 PAL fields (**32.33 FPS**,
+maximum gap six fields), versus 940 fields before this change.
+Native firing and recharge captures remain pixel-identical (0/99,968
+differences against SDL). Both 68000 audits pass, and the ordinary non-skip
+executable is restored. Shared game logic and deterministic state are unchanged.
