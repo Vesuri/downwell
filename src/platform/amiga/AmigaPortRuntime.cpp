@@ -804,7 +804,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     AmigaPortFrame frame = {};
     run_.results.presentationStep();
     frame.playerMotion = motion;
-    frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity;
+    const bool ammoMotionChanged = run_.ammoHud.step(player_.shots());
+    frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity || ammoMotionChanged;
     frame.healthChanged = health_ != oldHealth || healthMaximum() != oldHealthMaximum ||
                           healthReserve().pieces != oldHeartPieces;
     frame.currencyChanged = currencyAccount_.currency != oldCurrency;

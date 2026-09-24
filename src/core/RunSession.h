@@ -6,6 +6,7 @@
 #include "RunStage.h"
 #include "DeathResults.h"
 #include "ResultsDestination.h"
+#include "AmmoHudMotion.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -25,6 +26,7 @@ struct RunSession {
     RunCombo combo;
     RunStage stage;
     DeathResults results;
+    AmmoHudMotion ammoHud;
 
     RunRecords records() const {
         return {gems.lifetime, gems.record, combo.state.record};
@@ -38,6 +40,7 @@ struct RunSession {
         combo.state.record = saved.bestCombo;
         stage = {};
         results = {};
+        ammoHud = {};
     }
     ResultsDestination restart(DeathMenuSequence::Action action, const RunRecords& saved) {
         const auto destination = resultsDestination(action);

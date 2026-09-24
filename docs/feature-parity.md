@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Ammo firing feedback and remaining gauge work
+
+`AmmoHudMotion` is shared by both run sessions. It follows the 4:3 HUD VM's
+blocks 72–77: decrement a positive label offset, then set it to two when a shot
+was fired. Both coordinates use that offset. It advances once per simulation
+update (not per render call), resets with the run, and keeps native ammo redraws
+active during the return to rest. The native clear area includes displaced
+glyph pixels. Shot-counter changes supply the currently implemented gun's firing
+signal; future firing modes must preserve the original `pFired` semantics.
+The full host suite passes; the 6,000-update combat/death comparison checks both
+live HUD offsets each update and requires offset two on actual shots. The bounded
+A500 active-frame check retains its expected hash and matches SDL exactly at
+rest. This is not yet a pixel-by-pixel emulator capture of every moving-label frame.
+
+The remaining gauge is not just a capacity-scaled white rectangle. The original
+`scrDrawHudInitStuff` initializes 185 `chargeFrame` entries, with the 4:3 path
+setting them to three. `scrDrawHud4x3` draws 184 animated row sprites (418/419,
+with 421 for the bottom filled row), changes row frames by 0.8, and draws sprite
+421 dividers at both single-ammo and shot-consumption intervals. Recharge also
+drives `meterJiggle`, consumed before the vertical gauge coordinates are built.
+These row animations, dividers and recharge motion are still missing in both
+ports. Their eventual shared presentation state must keep redraws active until
+settled; ammo-value changes alone are insufficient. Fractional divider positions
+must be checked against the VM's floating-point loop before replacing them with
+integer spacing, especially for upgraded capacities.
+
 ### Heart-piece HUD reserve
 
 SDL and Amiga now share the reserve fill and divider placement from

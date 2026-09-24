@@ -188,6 +188,7 @@ public:
     unsigned gemStreak() const { return currencyAccount_.streak; }
     unsigned gemStreakTimer() const { return currencyAccount_.timer; }
     int health() const { return health_; }
+    unsigned ammoHudOffset() const { return run_.ammoHud.offset; }
     unsigned invulnerability() const { return invulnerability_; }
     bool dead() const { return death_.active; }
     unsigned deathFrames() const { return death_.frames; }

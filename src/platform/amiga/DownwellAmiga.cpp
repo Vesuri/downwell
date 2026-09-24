@@ -442,7 +442,7 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
     }
 }
 
-static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo) {
+static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0) {
     enum {
         gaugeX = 289,
         gaugeTop = 49,
@@ -461,10 +461,10 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
     const unsigned clearDigits = digits > oldDigits ? digits : oldDigits;
     oldDigits = digits;
     if (clearDigits == 1) {
-        amigaRendererFillRect(renderer, 282, 232, 20, 20, 3);
+        amigaRendererFillRect(renderer, 282, 232, 24, 24, 3);
     } else {
         amigaRendererFillRect(renderer, 282 - (static_cast<int>(clearDigits) - 1) * 4,
-            231, 32 + (clearDigits - 1) * 8, 24 + clearDigits - 1, 0);
+            231, 34 + (clearDigits - 1) * 8, 26 + clearDigits - 1, 0);
     }
     drawAsset(renderer, 416, 0, 284, 43, 0);
     /*
@@ -479,7 +479,7 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
                               gaugeTop + gaugeLength - filled,
                               gaugeWidth, filled, 1);
     drawAsset(renderer, 416, 1, 284, 43, 0);
-    drawAmmoDigit(renderer, 290, 239, ammo);
+    drawAmmoDigit(renderer, 290 + offset, 239 + offset, ammo);
 }
 
 static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maximum,
@@ -2273,7 +2273,7 @@ int main(void) {
                 destroyedBlockY[block] = result.blockY[block];
             }
             if (result.ammoChanged)
-                redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity());
+                redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset());
             if (result.healthChanged)
                 redrawHealth(&renderer, (unsigned)port.health(), (unsigned)port.healthMaximum(),
                              port.healthReserve().pieces, port.healthReserve().piecesPerHeart);

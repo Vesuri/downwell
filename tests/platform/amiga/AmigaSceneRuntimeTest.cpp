@@ -911,6 +911,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
+            require(gameplay.ammoHudOffset() == reference.mainAmmoHudOffset(),
+                    "both live HUDs share firing offset and decay on every combat update");
+            if (gameplay.player().shots() != nativeShots)
+                require(gameplay.ammoHudOffset() == 2,
+                        "an actual shot reaches the HUD presentation state immediately");
             require(gameplay.runStage().area == 1 && gameplay.runStage().level == 1 &&
                     reference.runStage().area == 1 && reference.runStage().level == 1,
                     "both live paths enter and retain the supported first stage");

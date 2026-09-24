@@ -1,4 +1,5 @@
 #include "core/HudNumbers.h"
+#include "core/AmmoHudMotion.h"
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -42,6 +43,15 @@ public:
 } // namespace
 
 int main() {
+    downwell::AmmoHudMotion ammoMotion;
+    require(!ammoMotion.step(0) && ammoMotion.offset == 0, "settled ammo label stays clean");
+    require(ammoMotion.step(1) && ammoMotion.offset == 2, "shot immediately offsets ammo label");
+    require(ammoMotion.step(1) && ammoMotion.offset == 1, "ammo label returns one pixel per update");
+    require(ammoMotion.step(2) && ammoMotion.offset == 2, "new shot overrides decay");
+    require(!ammoMotion.step(3) && ammoMotion.offset == 2, "consecutive shots retain the two pixel offset");
+    require(ammoMotion.step(3) && ammoMotion.offset == 1, "held input without a shot decays");
+    require(ammoMotion.step(3) && ammoMotion.offset == 0 && !ammoMotion.step(3),
+            "ammo motion stops requesting redraws after settling");
     for (unsigned pieces = 0; pieces < 4; ++pieces) {
         unsigned phase = 0;
         downwell::drawHeartPieceMeter(8, 6, pieces, 4,
