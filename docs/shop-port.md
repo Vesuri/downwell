@@ -422,3 +422,13 @@ multiline alignment, anchors and the source font's absence of kerning for
 these strings. Existing game/results pack checks remain unchanged. Runtime
 loading, price spacing and original-game vertical alignment validation are
 still required; the generated bank is not yet presented by either backend.
+
+`ShopMenuText.h` now resolves semantic layout requests to those offline masks.
+It emits the four complete black text passes before the white/red foreground,
+including for multi-glyph prices. Prices retain the original eight-pixel space
+between digits and G and are centered as a whole string, not as just digits.
+The source-font test explicitly checks all ten digits, space and G advances.
+Layout tests cover exact pass order, affordability colour, zero, full unsigned
+price range and all six description IDs. This compositor uses only integer
+operations and fixed scratch storage; adapters still need to call it while
+the shop bank is loaded. No on-screen shop verification is claimed yet.

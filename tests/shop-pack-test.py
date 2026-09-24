@@ -12,6 +12,8 @@ manifest = json.loads((extracted / "manifest.json").read_text())
 resources = manifest["resources"]
 texts = pack.shop_texts(root / "data/language.ini")
 glyphs = {g["character"]: g for g in resources["fonts"][2]["glyphs"]}
+for character in "0123456789 G":
+    assert glyphs[ord(character)]["shift"] == 8, "shared price compositor requires original eight-pixel advances"
 for text in texts.values():
     for character in text.replace("\n", ""):
         assert not glyphs[ord(character)]["kernings"], "shop rasterizer requires unkerned source font"

@@ -1,4 +1,5 @@
 #include "core/ShopMenuLayout.h"
+#include "core/ShopMenuText.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -18,10 +19,39 @@ struct Sink {
         commands.push_back({2,int(id),int(value),x,y,red});
     }
 };
+struct TextSink {
+    std::vector<Command> commands;
+    void mask(int id, int x, int y, unsigned pen) {
+        commands.push_back({3,id,0,x,y,int(pen)});
+    }
+};
 static void require(bool ok, const char* why) {
     if (!ok) { std::fprintf(stderr, "%s\n", why); std::abort(); }
 }
 int main() {
+    TextSink text;
+    downwell::drawShopMenuText(text, Text::price, 300, 80, 111, true);
+    require(text.commands.size() == 20, "three digits and G in five complete text passes");
+    const int ids[] = {65443,65440,65440,65450};
+    const int xs[] = {64,72,80,96};
+    const int dx[] = {1,-1,0,0,0}, dy[] = {0,0,1,-1,0};
+    for (unsigned pass = 0; pass < 5; ++pass)
+        for (unsigned i = 0; i < 4; ++i)
+            require(text.commands[pass * 4 + i] == Command{3,ids[i],0,xs[i]+dx[pass],111+dy[pass],pass == 4 ? 2 : 3},
+                "price retains space advance, center anchor and whole-string outline ordering");
+    text.commands.clear();
+    downwell::drawShopMenuText(text, Text::price, 0, 80, 111, false);
+    require(text.commands.size() == 10 && text.commands[8] == Command{3,65440,0,72,111,1} &&
+        text.commands[9] == Command{3,65450,0,88,111,1}, "zero price has one digit and white foreground");
+    text.commands.clear();
+    downwell::drawShopMenuText(text, Text::price, 0xffffffffu, 80, 111, false);
+    require(text.commands.size() == 55, "maximum unsigned price fits scratch storage");
+    for (unsigned item = 100; item <= 105; ++item) {
+        text.commands.clear();
+        downwell::drawShopMenuText(text, Text::itemDescription, item, 85, 137, false);
+        require(text.commands.size() == 5 && text.commands.back() == Command{3,65430+int(item)-100,0,85,137,1},
+            "description resolves original upgrade ID to offline centered mask");
+    }
     downwell::ShopWorld::Instance shop;
     shop.present = true; shop.x = 300; shop.y = 500;
     shop.menu.active = true; shop.menu.menuState = 1;
