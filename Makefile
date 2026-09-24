@@ -124,6 +124,7 @@ test: build/main-room-activation-test
 test: build/player-death-sequence-test
 test: build/death-menu-sequence-test
 test: build/death-menu-progress-test
+test: verify-amiga-results
 test: build/player-death-verification-test
 test: build/standard-bullet-test
 test: build/crawler-motion-test
@@ -423,6 +424,14 @@ verify-builder-pattern-pack: $(BUILDER_PATTERN_PACK_TEST_TARGET)
 
 generate-amiga-hud:
 	tools/generate-amiga-hud.py
+
+.PHONY: generate-amiga-results verify-amiga-results
+generate-amiga-results:
+	tools/generate-amiga-hud.py --profile results
+
+verify-amiga-results: generate-amiga-results
+	tools/generate-amiga-hud.py --profile results --check
+	python3 tests/results-pack-test.py
 
 verify-amiga-hud: generate-amiga-hud
 	tools/generate-amiga-hud.py --check

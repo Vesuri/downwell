@@ -9,6 +9,22 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Results artwork is converted offline in a separate pack
+
+`make verify-amiga-results` builds the results-only planar/mask pack, verifies
+reproducibility and compares every decoded pixel and origin against recovered
+resources. It includes result icons, small digits, progress/pop art, description
+panel, dither tiles, four unlock portraits, menu labels and font-2 numeric masks.
+English labels are checked directly against the untouched language.ini. The
+92-record pack is 25,820 bytes and the oracle covers 60,872 source pixels plus
+opacity masks. No hardware sprites are rebuilt or stored for these overlays.
+
+This pack is deliberately separate from resident gameplay assets and is not
+yet loaded or displayed by the native executable. It is an asset prerequisite,
+not proof of results-screen rendering or a claim that Chip RAM is sufficient
+to keep it resident alongside gameplay. Load/ownership and renderer integration
+remain to be implemented. The verification is included in the host test target.
+
 ### Results controller now runs on both gameplay paths
 
 Both live runtimes now own the same `DeathResults` controller. The player's

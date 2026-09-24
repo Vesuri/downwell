@@ -20,6 +20,18 @@ RECORD = struct.Struct(">HHhhHHHHII")
 
 # Exact resources needed by the first native HUD and gameplay milestones.
 SELECTIONS = {
+    # Separate scene pack: do not make results-only art resident throughout
+    # gameplay. All conversion remains host-side, including unlock portraits.
+    "results": {
+        25: None, 26: None, 28: None, 29: None,
+        401: None,  # sprResultStuff
+        402: None,  # sprProgress
+        403: None,  # sprNumbers
+        407: None,  # sprProgPop
+        422: None,  # sprPixel
+        489: None,  # sprShopDesc
+        733: None,  # sprDitherFade
+    },
     "hud": {
         376: None,   # sprHudCurrency
         408: None,   # sprTabletBorder
@@ -83,6 +95,19 @@ SELECTIONS = {
 }
 
 TEXT_SELECTIONS = {
+    # English DeathMenu labels from language.ini. Uncoloured font masks allow
+    # the backend to reproduce black outlines and selected red/white layers.
+    "results": {
+        65300: "GAME OVER",
+        65301: "RETRY",
+        65302: "STYLE SELECT",
+        65303: "SURFACE",
+        65304: "MAXED!",
+        65305: "STYLE UNLOCKED",
+        65306: "PALETTE UNLOCKED",
+        **{65320 + digit: str(digit) for digit in range(10)},
+        65330: "/",
+    },
     "game": {
         65000: "STYLE SELECT",
         65001: "USUAL STYLE",
