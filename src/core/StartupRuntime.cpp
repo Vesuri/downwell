@@ -1,5 +1,6 @@
 #include "StartupRuntime.h"
 #include "MainRoomLifetime.h"
+#include "MainRoomActivation.h"
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
@@ -1212,21 +1213,20 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         return;
 
     // The first operation in recovered objPlayer_n Begin Step, before motion.
-    if (mainCameraViewY() + surfaceHeight > mainActivationY_ - 112) {
-        mainActivationY_ += 16;
-        for (std::size_t index = 0; index < instances_.size(); ++index) {
-            InstanceRecord& enemy = instances_.at(index);
-            const bool enemyObject = enemy.objectId == 111 || enemy.objectId == 112 ||
-                enemy.objectId == 113 || enemy.objectId == 116 || enemy.objectId == 117 ||
-                enemy.objectId == 119;
-            if (!enemy.active && enemy.activationPending && enemyObject &&
-                enemy.y <= mainActivationY_) {
-                enemy.active = true;
-                enemy.activationPending = false;
-                ++mainEnemiesActivated_;
-            }
-        }
-    }
+    mainEnemiesActivated_ += advanceMainRoomActivation(mainActivationY_,
+        mainCameraMotion_.viewBottomQ12() / 16, instances_.size(),
+        [this](unsigned index) {
+            const auto& enemy = instances_.at(index);
+            // Round upward so fractional centres just below the frontier do
+            // not become eligible through fixed-point truncation.
+            return ActivationInstance{enemy.objectId, static_cast<long>(std::ceil(enemy.y * 256.0)),
+                                      enemy.active, enemy.activationPending};
+        },
+        [this](unsigned index) {
+            auto& enemy = instances_.at(index);
+            enemy.active = true;
+            enemy.activationPending = false;
+        });
 
     const bool wasGrounded = mainPlayerMotion_.grounded();
     const unsigned priorShots = mainPlayerMotion_.shots();

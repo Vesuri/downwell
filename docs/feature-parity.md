@@ -9,6 +9,28 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared Begin Step activation phase
+
+`MainRoomActivation.h` now owns frontier advancement, traversal, eligibility
+and activation counting for both runtime stores. Platform/storage adapters only
+provide world coordinates and apply the active/pending flag changes. The native
+adapter converts its local origin; the host adapter rounds its Q8 conversion
+upward so a fractional centre below the frontier is not activated by truncation.
+
+The source assembly's strict view-bottom comparison and single 16-pixel advance
+are preserved. Tests cover threshold equality, fractional-centre exclusion,
+storage-order callbacks, active/retired/non-enemy exclusions, repeated updates,
+empty stores and full serialized room coordinates. This removes one duplicated
+simulation phase, not the two runtime orchestrators as a whole. Region inclusion
+still uses the existing enemy-centre approximation; full GameMaker region/mask
+semantics remain unproven and must not be inferred from these tests.
+
+Validation: full host suite (including both combat continuations and the new
+activation test), normal SDL build, bounded A500 600-tick terrain-cache check,
+and cross-target replay pass. Replay retains
+`64 9f0d3943 e7900d2b 400 8d8e8642 25e003ee 7f`; normal target build is restored
+and 68000 helper/instruction audits remain clean.
+
 ### Published view used by gameplay queries
 
 Normal gameplay now uses camMain's rounded published view for bullet expiry,

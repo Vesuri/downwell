@@ -1,5 +1,6 @@
 #include "AmigaPortRuntime.h"
 #include "core/MainRoomLifetime.h"
+#include "core/MainRoomActivation.h"
 #include "AmigaProfile.h"
 
 #include "core/PortCheckpoint.h"
@@ -391,17 +392,17 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
-    if (318L * 256L + viewCameraYQ8() > (long)(activationY_ - 112) * 256L) {
-        activationY_ += 16;
-        for (unsigned i = 0; i < enemyCount_; ++i) {
-            EnemyState& enemy = enemies_[i];
-            if (!enemy.active && enemy.activationPending &&
-                enemy.y + 176 <= activationY_) {
-                enemy.active = true;
-                enemy.activationPending = false;
-            }
-        }
-    }
+    downwell::advanceMainRoomActivation(activationY_,
+        318L * 256L + viewCameraYQ8(), enemyCount_,
+        [this](unsigned i) {
+            const auto& enemy = enemies_[i];
+            return downwell::ActivationInstance{enemy.objectId, (enemy.y + 176L) * 256,
+                                               enemy.active, enemy.activationPending};
+        },
+        [this](unsigned i) {
+            enemies_[i].active = true;
+            enemies_[i].activationPending = false;
+        });
     input = downwell::playerGameplayInput(input, health_);
     // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
     const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
