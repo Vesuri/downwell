@@ -9,6 +9,46 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Death rules now participate in actual cross-CPU replay
+
+`verify-cross-replay` now appends a separate 480-update death fixture to the
+existing player/currency results. Two deterministic scenarios inject fatal
+damage after player movement, publish it on the next Begin Step and exercise
+natural menu-alarm completion versus a three-press skip. The digest includes
+player motion and effective pose plus death publication, animation, alarms,
+input edges and menu request. Coverage must include all nine transitions;
+the host fixture also checks repeatability across two fresh runs.
+
+The bounded A500/68000 run matches the host:
+`64 9f0d3943 e7900d2b 400 8d8e8642 25e003ee 7f 480 46113810 5d86e500 1ff`.
+The original player/currency prefix remains unchanged; `1ff` is the new death
+coverage mask. The verification helper is kept out of line so its local player
+storage does not enlarge the platform main function's stack frame. It is only
+compiled into the target verification build, not normal gameplay.
+
+Replay verification also installs the existing CPU-written task-stack canary
+and checks all 64 words before accepting the result, requiring an intact
+256-byte safety margin. A result with a matching digest but a damaged stack
+guard is rejected.
+
+The guard caught the first implementation despite matching digests: GCC/LTO
+expanded volatile hash temporaries into a 3416-byte fixture stack frame.
+Keeping per-value and player-state hashing in separate non-inlined calls
+reduced that frame to 720 bytes without changing the hashed byte stream.
+The same guard also exposed a 2616-byte frame in the older currency fixture;
+`VerificationDigest` supplies identical hash operations behind call boundaries,
+reducing that frame to 372 bytes. The final bounded replay passes with its stack
+margin intact and all three digests unchanged from the unguarded comparison.
+
+This proves CPU equivalence for isolated shared death rules, including movement,
+not a recorded Windows death sequence, complete world collision scheduling,
+death-screen pixels or the unimplemented menu/effects. The long host-world
+comparison remains a separate test with different coverage.
+
+Final validation: full host suite, fixture repeatability/coverage and guarded
+bounded A500 cross-target replay pass. Normal SDL/Amiga builds are restored;
+68000 instruction and helper audits remain clean.
+
 ### Shared damage flashing reaches the SDL draw path
 
 SDL previously always submitted the player sprite, while the native actor list

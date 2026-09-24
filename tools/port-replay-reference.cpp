@@ -1,6 +1,7 @@
 #include "core/PortReplay.h"
 #include "core/Replay.h"
 #include "core/GemVerification.h"
+#include "core/PlayerDeathVerification.h"
 #include "platform/amiga/AmigaPortRuntime.h"
 
 #include <cinttypes>
@@ -23,9 +24,12 @@ int main() {
     const std::uint64_t digest = runtime.trajectoryDigest();
     const auto gems = downwell::verifyGemSimulation();
     if (gems.coverage != 127) return 3;
-    std::printf("%" PRIu32 " %08" PRIx32 " %08" PRIx32 " 400 %08" PRIx32 " %08" PRIx32 " %02x\n",
+    const auto death = downwell::verifyPlayerDeath();
+    if (death.coverage != downwell::playerDeathVerificationCoverage) return 4;
+    std::printf("%" PRIu32 " %08" PRIx32 " %08" PRIx32 " 400 %08" PRIx32 " %08" PRIx32 " %02x 480 %08" PRIx32 " %08" PRIx32 " %03x\n",
                 replay.frameCount(), (std::uint32_t)(digest >> 32),
                 (std::uint32_t)digest, (std::uint32_t)(gems.digest >> 32),
-                (std::uint32_t)gems.digest, gems.coverage);
+                (std::uint32_t)gems.digest, gems.coverage,
+                (std::uint32_t)(death.digest >> 32), (std::uint32_t)death.digest, death.coverage);
     return 0;
 }

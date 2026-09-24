@@ -174,8 +174,13 @@ volatile ULONG gDownwellStartupAssetBytes;
 volatile ULONG gDownwellStartupChipRemaining;
 }
 
+#if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_REPLAY_VERIFY)
+extern "C" { volatile ULONG gDownwellStackGuardReady; }
+#endif
+
 #ifdef DOWNWELL_REPLAY_VERIFY
 #include "core/GemVerification.h"
+#include "core/PlayerDeathVerification.h"
 extern "C" {
 volatile ULONG gReplayComplete;
 volatile ULONG gReplayFrames;
@@ -184,6 +189,9 @@ volatile ULONG gReplayDigestLow;
 volatile ULONG gGemReplayDigestHigh;
 volatile ULONG gGemReplayDigestLow;
 volatile ULONG gGemReplayCoverage;
+volatile ULONG gDeathReplayDigestHigh;
+volatile ULONG gDeathReplayDigestLow;
+volatile ULONG gDeathReplayCoverage;
 
 __attribute__((noinline, used)) void downwellReplayComplete(void) {
     __asm__ volatile("" ::: "memory");
@@ -230,7 +238,6 @@ volatile ULONG gDownwellGameBufferFailures;
 volatile ULONG gDownwellGameplayBobChecks;
 volatile ULONG gDownwellGameplayBobFailures;
 volatile ULONG gDownwellTerrainRasterFailures;
-volatile ULONG gDownwellStackGuardReady;
 volatile ULONG gDownwellTerrainRasterChecks;
 volatile const UBYTE* gDownwellSplashFrame;
 volatile const UBYTE* gDownwellControlsFrame;
@@ -1049,7 +1056,7 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
 #endif
 
 int main(void) {
-#ifdef DOWNWELL_SCENE_VERIFY
+#if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_REPLAY_VERIFY)
     // The emulator debugger cannot reliably write target memory. Initialize
     // the canary on the CPU, below this frame with room for this loop itself.
     ULONG currentStack;
@@ -2327,6 +2334,10 @@ int main(void) {
             gGemReplayDigestHigh = (ULONG)(gems.digest >> 32);
             gGemReplayDigestLow = (ULONG)gems.digest;
             gGemReplayCoverage = gems.coverage;
+            const auto death = downwell::verifyPlayerDeath();
+            gDeathReplayDigestHigh = (ULONG)(death.digest >> 32);
+            gDeathReplayDigestLow = (ULONG)death.digest;
+            gDeathReplayCoverage = death.coverage;
             gReplayComplete = 1;
             downwellReplayComplete();
             for (;;) platform.waitVblank();

@@ -3,7 +3,7 @@
 #include "GemMotion.h"
 #include "CurrencyStep.h"
 #include "GameMakerRandom.h"
-#include "StateDigest.h"
+#include "VerificationDigest.h"
 namespace downwell {
 struct GemVerificationResult {
     std::uint64_t digest;
@@ -19,7 +19,7 @@ inline GemVerificationResult verifyGemSimulation() {
     gems[1].initialize(30, 0, false, random);
     gems[2].initialize(-40, -20, true, random);
     bool alive[3] = {true, true, true};
-    StateDigest digest;
+    VerificationDigest digest;
     unsigned coverage = 0;
     digest.addU32(3); // Also exercises shared collection/account transitions.
     for (unsigned tick = 0; tick < 400; ++tick) {

@@ -3,7 +3,21 @@ set confirm off
 set remotetimeout 30
 tbreak downwellReplayComplete
 continue
-printf "DOWNWELL_REPLAY_RESULT %u %08x %08x 400 %08x %08x %02x\n", gReplayFrames, gReplayDigestHigh, gReplayDigestLow, gGemReplayDigestHigh, gGemReplayDigestLow, gGemReplayCoverage
+if gDownwellStackGuardReady != 1
+    printf "Target could not install the replay task-stack guard\n"
+    quit 1
+end
+set $stack_guard = (unsigned long *)SysBase->ThisTask->tc_SPLower
+set $guard_word = 0
+while $guard_word < 64
+    if $stack_guard[$guard_word] != 0x57ac6a4d
+        printf "Replay exhausted the 256-byte task-stack safety margin\n"
+        quit 1
+    end
+    set $guard_word = $guard_word + 1
+end
+printf "Replay task stack retained its 256-byte safety margin\n"
+printf "DOWNWELL_REPLAY_RESULT %u %08x %08x 400 %08x %08x %02x 480 %08x %08x %03x\n", gReplayFrames, gReplayDigestHigh, gReplayDigestLow, gGemReplayDigestHigh, gGemReplayDigestLow, gGemReplayCoverage, gDeathReplayDigestHigh, gDeathReplayDigestLow, gDeathReplayCoverage
 shell touch .run/gdb-ready.marker
 detach
 quit
