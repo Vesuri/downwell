@@ -35,6 +35,13 @@ amiga_shop_pack:
 amiga_shop_pack_end:
 
 	.balign 4
+	.globl amiga_clear_pack
+amiga_clear_pack:
+	.incbin "../generated/amiga-clear.dwap"
+	.globl amiga_clear_pack_end
+amiga_clear_pack_end:
+
+	.balign 4
 	.globl amiga_room_pack
 amiga_room_pack:
 	.incbin "../generated/downwell-rooms.dwrm"

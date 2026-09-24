@@ -442,6 +442,17 @@ Its emulator is stopped and the normal build restored. That gate checks scene
 reentry/state and existing failure counters, not pixel-exact recolored output
 or timing; those hardware-specific checks remain outstanding.
 
+Clear-scene assets now have an explicit simultaneous-residency partition of the
+retired 76,800-byte garden storage: departure mask at 0..31,103, selected artwork
+at 31,104..62,859 (31,756 bytes available), and preserved HUD artwork starting at
+62,860. This requires no new Chip allocation. Preparation and offer changes are
+transactional on validation failure. A 256-selection regression checks selected
+bank bytes, immutable mask, HUD region and allocation guards; native builds now
+embed the 51,452-byte offline clear pack in read-only storage and pass the 68000
+audits. This helper is not yet invoked by the application. Crucially, entry must
+retire ALL gameplay DMA, not merely the exit-mask pointers: camera staging can
+rotate a world display into the garden region that the clear mask will reuse.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

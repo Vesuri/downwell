@@ -78,6 +78,7 @@ AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
 AMIGA_RESULTS := $(REPO)/generated/amiga-results.dwap
 AMIGA_SHOP := $(REPO)/generated/amiga-shop.dwap
+AMIGA_CLEAR := $(REPO)/generated/amiga-clear.dwap
 ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
@@ -282,6 +283,9 @@ $(AMIGA_RESULTS): $(REPO)/tools/generate-amiga-hud.py
 $(AMIGA_SHOP): $(REPO)/tools/generate-amiga-hud.py $(REPO)/data/language.ini
 	$(MAKE) -C $(REPO) generate-amiga-shop
 
+$(AMIGA_CLEAR): $(REPO)/tools/generate-amiga-hud.py $(REPO)/data/language.ini
+	$(MAKE) -C $(REPO) generate-amiga-clear
+
 $(ROOM_PACK):
 	$(MAKE) -C $(REPO) generate-room-pack
 
@@ -295,7 +299,7 @@ $(AMIGA_EXIT_MASK): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
 obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) \
-		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(ROOM_PACK) $(OBJECT_PACK) $(BUILDER_PACK)
+		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 
