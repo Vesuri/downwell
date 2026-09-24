@@ -21,6 +21,8 @@
 #include "AmigaSceneRuntime.h"
 #include "GameplaySceneStorage.h"
 #include "AmigaExitMask.h"
+#include "AmigaClearPresenter.h"
+#include "AmigaClearSceneAssets.h"
 #include "AmigaSplashCache.h"
 #include "AmigaStyleRenderer.h"
 #include "AmigaShopMenu.h"
@@ -63,6 +65,8 @@ extern const UBYTE amiga_exit_mask_end[];
 extern const UBYTE amiga_results_pack_end[];
 extern const UBYTE amiga_shop_pack[];
 extern const UBYTE amiga_shop_pack_end[];
+extern const UBYTE amiga_clear_pack[];
+extern const UBYTE amiga_clear_pack_end[];
 extern const UBYTE amiga_room_pack[];
 extern const UBYTE amiga_room_pack_end[];
 extern const UBYTE amiga_object_pack[];
@@ -207,6 +211,17 @@ volatile ULONG gDownwellExitWipeFrames, gDownwellExitWipeFailures;
 __attribute__((noinline, used)) void downwellExitWipeReady() { __asm__ volatile("" ::: "memory"); }
 #endif
 static AmigaShopMenu shopMenuOverlay;
+#ifdef DOWNWELL_CLEAR_VERIFY
+volatile ULONG gDownwellClearFrames, gDownwellClearChoices, gDownwellClearFailures;
+volatile ULONG gDownwellClearReentries, gDownwellClearGameplayUpdates;
+volatile ULONG gDownwellClearPhase;
+const UBYTE* gDownwellClearActualHud;
+const UBYTE* gDownwellClearExpectedHud;
+const UBYTE* gDownwellClearActualGame;
+const UBYTE* gDownwellClearExpectedGame;
+__attribute__((noinline, used)) void downwellClearProbe() { __asm__ volatile("" ::: "memory"); }
+__attribute__((noinline, used)) void downwellClearReady() { __asm__ volatile("" ::: "memory"); }
+#endif
 
 // Results and shop are mutually exclusive users of the retired-garden gap.
 // Drain the blitter before replacing a bank it may still be reading. Hardware
@@ -1403,6 +1418,15 @@ int main(void) {
     // Construct at entry (not before the framework startup), as for port.
     alignas(AmigaSceneRuntime) static UBYTE sceneStorage[sizeof(AmigaSceneRuntime)];
     AmigaSceneRuntime& scenes = *new (sceneStorage) AmigaSceneRuntime;
+    struct ClearState {
+        AmigaClearPresenter presenter;
+        AmigaClearSceneAssets assets;
+        unsigned offerCount = 0, offers[4] = {};
+        unsigned char owned[23] = {};
+        bool presented = false, left = false, right = false, heartGoal = false;
+    };
+    alignas(ClearState) static UBYTE clearStorage[sizeof(ClearState)];
+    auto& clear = *new (clearStorage) ClearState;
     AmigaScene presentedScene = scenes.scene();
 #ifdef DOWNWELL_SKIP_TO_GAME
     // Force the normal main-room presentation setup on the first frame.
@@ -1839,6 +1863,13 @@ int main(void) {
                 scenes, sceneStyleFrameReported,
                 sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
+#ifdef DOWNWELL_CLEAR_VERIFY
+            if (port.levelClearActive()) {
+                liveInput = {};
+                liveInput.right = gDownwellClearFrames == 80;
+                liveInput.fire = gDownwellClearFrames >= 100;
+            }
+#endif
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
             // Inject only results readiness. Confirmation, reset, room changes,
             // resource reuse and subsequent gameplay take the production path.
@@ -2371,6 +2402,136 @@ int main(void) {
             }
             if (scenes.scene() != AmigaScene::gameplay)
                 continue;
+            if (port.levelResultRequested() || port.levelClearActive()) {
+                const bool entering = !clear.presented;
+                if (entering) {
+#ifdef DOWNWELL_CLEAR_VERIFY
+                    gDownwellClearPhase = 1; downwellClearProbe();
+#endif
+                    // A staging ring can itself be displayed from garden RAM.
+                    // Retire every DMA consumer before repartitioning it.
+                    splashBlankList.reset();
+                    splashBlankList.move(bplcon0, 0);
+                    for (unsigned channel = 0; channel < 8; ++channel)
+                        splashBlankList.showSprite(channel, nullSprite);
+                    splashBlankList.finish();
+                    platform.publish(splashBlankList);
+                    platform.waitVblank();
+                    AmigaHardware::blitterDrain();
+                    if (!port.enterLevelClear(scenes.styleCursor(), clear.heartGoal) ||
+                        !clear.assets.prepare(memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
+                            amiga_hud_pack_end - amiga_hud_pack, amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack,
+                            amiga_exit_mask, amiga_exit_mask_end - amiga_exit_mask, nullptr, 0,
+                            port.runStage().area, port.runStage().level)) { exitCode = 20; break; }
+                    clear.presenter.reset(); clear.offerCount = 0;
+                    clear.left = liveInput.left; clear.right = liveInput.right;
+                    clear.presented = true;
+#ifdef DOWNWELL_CLEAR_VERIFY
+                    gDownwellClearPhase = 2;
+#endif
+                    for (unsigned i = 0; i < 23; ++i) clear.owned[i] = port.upgrades().levels[i];
+                    for (unsigned buffer = 0; buffer < 2; ++buffer) {
+                        gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
+                        gameListReady[buffer] = false;
+                    }
+                } else if (!port.nextLevelRequested()) {
+                    bool confirm = liveInput.fire;
+                    if (!port.stepLevelClear(confirm, liveInput.left && !clear.left, liveInput.right && !clear.right,
+                        clear.heartGoal, [](downwell::LevelClearSelection::Effect, unsigned) {})) { exitCode = 20; break; }
+                    clear.left = liveInput.left; clear.right = liveInput.right;
+                }
+                if (port.nextLevelRequested() && port.runStage().area == 1 && port.runStage().level < 3) {
+                    splashBlankList.reset(); splashBlankList.move(bplcon0, 0);
+                    for (unsigned channel = 0; channel < 8; ++channel) splashBlankList.showSprite(channel, nullSprite);
+                    splashBlankList.finish(); platform.publish(splashBlankList); platform.waitVblank();
+                    AmigaHardware::blitterDrain();
+                    if (!port.prepareNextAreaOneLevel(liveInput, initialRingOrigin)) { exitCode = 20; break; }
+                    clear.presented = false;
+                    newRunWorldPending = true; sceneResetRequested = true;
+#ifdef DOWNWELL_CLEAR_VERIFY
+                    ++gDownwellClearReentries;
+#endif
+                    continue;
+                }
+                const auto& room = port.levelClear();
+                const auto& snapshot = port.levelClearFrame();
+                const unsigned count = snapshot.choices ? room.selection.lastIndex + 1 : 0;
+                bool bankChanged = count != clear.offerCount;
+                for (unsigned i = 0; i < count; ++i) bankChanged |= clear.offers[i] != room.offers.ids[i];
+                for (unsigned i = 0; i < 23; ++i) bankChanged |= clear.owned[i] != port.upgrades().levels[i];
+                if (bankChanged) {
+                    AmigaHardware::blitterDrain();
+                    if (!clear.assets.changeOffers(memory.menuForeground(), amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack,
+                        room.offers.ids, count, port.runStage().area, port.runStage().level, port.upgrades().levels)) {
+                        exitCode = 20; break;
+                    }
+                    clear.offerCount = count;
+                    for (unsigned i = 0; i < count; ++i) clear.offers[i] = room.offers.ids[i];
+                    for (unsigned i = 0; i < 23; ++i) clear.owned[i] = port.upgrades().levels[i];
+                    clear.presenter.artworkChanged();
+                }
+                const unsigned back = front ^ 1u;
+                AmigaRenderer target = renderer;
+#ifdef DOWNWELL_CLEAR_VERIFY
+                gDownwellClearPhase = 3;
+#endif
+                target.game = (UBYTE*)gameDisplay[back].data;
+                target.hud = back ? memory.game() : memory.hud();
+                const UBYTE* bank = memory.menuForeground() + clear.assets.layout.resultsOffset;
+                AmigaClearPresenter::Frame frame;
+                if (!clear.presenter.render(back, target, bank, bank + clear.assets.bankBytes,
+                        room, snapshot, port.upgrades(), frame)) { exitCode = 20; break; }
+                for (unsigned channel = 0; channel < 8; ++channel) {
+                    Sprite& sprite = channel == 0 ? playerSprites[back] :
+                        actorSpriteAt(bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back], channel - 1);
+                    sprite.hide();
+                }
+                const unsigned playerId = port.player().spriteId(), playerFrame = port.player().spriteFrame();
+                const unsigned parts = amigaRendererHardwareSpritePartCount(amiga_game_pack, amiga_game_pack_end, playerId, playerFrame);
+                bool ready = parts > 0 && parts <= 8;
+                for (unsigned part = 0; ready && part < parts; ++part) {
+                    Sprite& sprite = part == 0 ? playerSprites[back] :
+                        actorSpriteAt(bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back], part - 1);
+                    ready = amigaRendererBuildHardwareSpritePart(amiga_game_pack, amiga_game_pack_end, playerId, playerFrame, part,
+                        frame.playerX, frame.playerY, port.player().facing() < 0, sprite.data(), playerSpriteHeight) != 0;
+                }
+                Bitmap overlay(target.hud, downwellVisibleWidth, downwellDisplayHeight, 2, false, false, downwellDmaWidth);
+                if (!ready || !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], frame.origin) :
+                    gameplayCopperLists[back].build(gameDisplay[back], overlay, playerSprites[back],
+                        bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette, frame.origin)) ||
+                    !gameplayCopperLists[back].updateOverlay(overlay) ||
+                    !gameplayCopperLists[back].updateExitMask(port.exitDither().active ?
+                        memory.menuForeground() + AmigaExitMask::offset(port.exitDither().y - room.motion.viewY()) : nullptr)) {
+                    exitCode = 20; break;
+                }
+                AmigaHardware::blitterDrain();
+#ifdef DOWNWELL_CLEAR_VERIFY
+                static UBYTE expectedGame[2][downwellGameRingBytes], expectedHud[2][downwellLayerBytes];
+                static AmigaClearPresenter oracle;
+                if (entering) oracle.reset();
+                if (bankChanged) oracle.artworkChanged();
+                AmigaRenderer reference;
+                amigaRendererInit(&reference, expectedGame[back], expectedHud[back]);
+                AmigaClearPresenter::Frame expected;
+                gDownwellClearActualHud = target.hud; gDownwellClearExpectedHud = expectedHud[back];
+                gDownwellClearActualGame = target.game; gDownwellClearExpectedGame = expectedGame[back];
+                if (!oracle.render(back, reference, bank, bank + clear.assets.bankBytes, room, snapshot, port.upgrades(), expected) ||
+                    expected.origin != frame.origin) ++gDownwellClearFailures;
+                for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
+                    if (target.game[byte] != expectedGame[back][byte]) ++gDownwellClearFailures;
+                for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
+                    if (target.hud[byte] != expectedHud[back][byte]) ++gDownwellClearFailures;
+                ++gDownwellClearFrames;
+                if (snapshot.choices) ++gDownwellClearChoices;
+                gDownwellClearPhase = 4;
+                if (gDownwellClearFrames == 1 || gDownwellClearFrames == 60 ||
+                    gDownwellClearFrames == 100 || gDownwellClearFrames == 160 || gDownwellClearFrames == 220)
+                    downwellClearProbe();
+#endif
+                gameListReady[back] = true;
+                platform.publish(gameplayCopperLists[back]); front = back;
+                continue;
+            }
 #endif
             DW_PROFILE_PHASE(profileSimulation);
             const bool wasDead = port.dead();
@@ -2379,9 +2540,15 @@ int main(void) {
             // Isolated collision fixture, not a change to production generation.
             if (port.tick() == 180) port.registerLevelExit(176 + port.player().offsetY());
 #endif
+#ifdef DOWNWELL_CLEAR_VERIFY
+            if (port.tick() == 180 && !gDownwellClearReentries) port.registerLevelExit(176 + port.player().offsetY());
+#endif
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
                 oldShopArt[i] = port.shops().instances[i].artRevision;
             const AmigaPortFrame result = port.step(packedInput);
+#ifdef DOWNWELL_CLEAR_VERIFY
+            if (gDownwellClearReentries && ++gDownwellClearGameplayUpdates == 60) downwellClearReady();
+#endif
             if (!port.generationSucceeded()) break;
 #ifndef DOWNWELL_REPLAY_VERIFY
             // Invalidate before selecting a precomposed side-room ring.
@@ -3097,5 +3264,8 @@ int main(void) {
 
     platform.restore();
     memory.release();
+#ifdef DOWNWELL_CLEAR_VERIFY
+    gDownwellClearPhase = 100 + exitCode; downwellClearProbe();
+#endif
     return exitCode;
 }

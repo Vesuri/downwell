@@ -23,6 +23,10 @@ struct AmigaClearOverlay {
     };
     Command previous[capacity];
     Rect bounds[capacity];
+    // Persistent scratch, not 1344 bytes on the 4 KiB AmigaDOS stack.
+    // Each retained buffer owns its renderer state; render is not reentrant.
+    Rect next[capacity];
+    Rect dirty[capacity * 2];
     unsigned count = 0;
     bool initialized = false;
     void invalidate() { initialized = false; }
@@ -33,7 +37,6 @@ struct AmigaClearOverlay {
                 const Command* commands, unsigned size, unsigned& paintedPixels) {
         paintedPixels = 0;
         if (size > capacity || (size && !commands)) return false;
-        Rect next[capacity];
         for (unsigned i = 0; i < size; ++i) {
             const auto& c = commands[i];
             auto& r = next[i];
@@ -47,7 +50,6 @@ struct AmigaClearOverlay {
             r.width = right > r.x ? right - r.x : 0;
             r.height = bottom > r.y ? bottom - r.y : 0;
         }
-        Rect dirty[capacity * 2];
         unsigned dirtyCount = 0;
         const auto add = [&](Rect r) {
             if (!r.width || !r.height) return;

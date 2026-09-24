@@ -2282,3 +2282,37 @@ requirements (additional tapes, combat states, shops, later scenes and visual
 coverage). Full feature parity is still unproven.
 The full host suite, canonical cross-target replay (`64 95d0aaea 1be7256f`)
 and bounded 600-tick Amiga terrain cache check pass after this ordering change.
+
+### Native level-clear presentation and next-level ownership
+
+The live Amiga loop now enters the shared level-clear controller, presents its
+stage heading, scrolling borders, upgrade carousel and departure wipe, then
+rebuilds the next area-one level through the existing world-generation path.
+Input goes to `stepLevelClear`, not a separate native menu state machine.
+Offers and owned-name labels select offline planar assets; the player uses
+offline hardware-sprite frames. Borders retain circular buffers, overlays
+retain dirty regions, and copper pointer updates publish retired back buffers.
+Before reusing garden/world storage, the loop retires all display DMA and
+drains the blitter. No extra Chip allocation is introduced. Overlay rectangle
+scratch belongs to persistent Fast RAM rather than the small AmigaDOS stack.
+
+`make verify-amiga-clear-scene` builds with `SKIP_TO_GAME=1 CLEAR_VERIFY=1`.
+The fixture injects a level exit, selects right, confirms an upgrade, compares
+both complete planar buffers against scalar rendering on every clear frame,
+then requires next-level reentry and 60 gameplay updates. It checks the first
+256 stack bytes on the unchanged 4 KiB stack. Its deadline is 90 seconds
+because the scalar oracle and full-buffer comparisons run on the emulated
+68000; this is not a production frame-time measurement. Success restores the
+ordinary build. On failure, the instrumented build remains for diagnosis.
+
+Validation: the bounded A500 run passed all 221 clear-frame comparisons,
+40 choice frames, one reentry and 60 subsequent gameplay updates with the
+stack guard intact. Host clear-controller/session/selection/presentation,
+retained-overlay, circular-border, selected-bank/storage and paired
+scene-runtime tests also passed; the native 68000 audits remained clean.
+
+This closes a presentation/transition gap, not original-game completion.
+Later areas remain pending, as in the implemented SDL path. Heart-goal/bonus
+paths and omitted effects still need source-backed integration. The scalar
+comparison checks backend agreement; it does not independently establish
+Windows GPU rounding or exact scene-transition timing.
