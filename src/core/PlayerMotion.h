@@ -39,7 +39,7 @@ public:
     explicit PlayerMotion(bool startsGrounded = true,
                          int landingOffset = 0);
     PlayerMotionDelta step(const downwell::Input& input, bool controlsLocked = false,
-                           bool dead = false);
+                           bool dead = false, bool interactable = false);
     void initializeEntryInput(bool fireHeld) {
         priorFire_ = fireHeld;
         jumpShootLocked_ = fireHeld;

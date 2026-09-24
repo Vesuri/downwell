@@ -88,3 +88,35 @@ RNG, direction order/wrap, thanked exit, reentry, cancel, state-zero fall-throug
 and death/criminal ordering. It passes alongside inventory and consumable tests.
 The callable template compiles for 68000 without floating-point/64-bit helpers.
 No emulator or playable-shop coverage is claimed for this unconnected controller.
+
+## World-hook audit and player input prerequisite
+
+The builder's `$` marker emits object 277 (Shop). Its resource sprite 480 uses
+an axis-aligned mask at x-10..x-1, y-1..y+8, not the whole 24x24 image. Shop Create
+adds the table at x+64, three cases at tableX-19/0/+19 and y-9, an invisible wall
+at x,y+8, keeper at x+18,y, and item/text children. Registering only a counter
+and menu would omit collision and presentation objects. Child/inherited event
+dispatch and RNG order still need integration review.
+
+`scrLevelPat1` suppresses shops in ordinary area 1/level 1 but NOT style 4. The
+current generator only implements the ordinary first-level setup; its default
+must stay unchanged. Later levels or the special style need their source setup,
+not an arbitrary shop inserted into normal 1-1.
+
+`objPlayer_n` Begin Step computes interactable from a parentInteractable overlap,
+zero horizontal speed, grounded state and the instance's interactOk. The existing
+shared player lacked that up-button gate. It now accepts the retained interactable
+state and suppresses the grounded press/jump branch only, as in
+`scrUpButtonFunctions`; airborne held fire is a separate branch. World adapters
+do not yet supply this state because live shop instances are not registered.
+
+The same audit found `controlsLocked` suppressed jumping/horizontal input but
+not firing, empty-charge braking or release handling. `scrPlMovement` skips the
+whole up-button handler under noControl. The shared player now does too, while
+continuing gravity, alarm countdown and raw edge tracking. A release that occurs
+while locked must neither shorten a jump nor be replayed after unlocking.
+Focused player tests cover those cases, held-fire resumption, the interaction
+press guard and the independently allowed airborne held-fire branch.
+The full host suite and bounded direct-entry A500 600-update cache check pass;
+68000 instruction/helper audits remain clean. That target tape is a regression
+check, not a visit to a shop; focused shared-player tests exercise the new guards.

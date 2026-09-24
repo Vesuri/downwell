@@ -67,6 +67,35 @@ int main() {
     locked.step(lockedInput, true);
     require(locked.offsetXFixed() == 0 && locked.jumps() == 0,
             "source noControl suppresses horizontal control and jumping");
+    PlayerMotion lockedAir(false, 10000);
+    for (unsigned i = 0; i < 40; ++i) lockedAir.step(heldFire, true);
+    require(lockedAir.shots() == 0 && lockedAir.ammo() == 8 && lockedAir.speedYFixed() > 3 * 256,
+            "noControl also suppresses airborne firing without stopping gravity");
+    lockedAir.step(heldFire);
+    require(lockedAir.shots() == 1, "held airborne fire resumes when noControl is released");
+    PlayerMotion lockedRelease;
+    lockedRelease.step(heldFire);
+    lockedRelease.step(downwell::Input{}, true);
+    require(lockedRelease.jumpShootLocked() && lockedRelease.speedYFixed() < -4 * 256,
+            "release while locked neither shortens jump nor unlocks shooting");
+    lockedRelease.step(downwell::Input{});
+    require(lockedRelease.jumpShootLocked(), "ignored release is not replayed on unlocking controls");
+    lockedRelease.step(heldFire);
+    lockedRelease.step(downwell::Input{});
+    require(!lockedRelease.jumpShootLocked(), "a new unlocked release still clears jump lock");
+    PlayerMotion interacting;
+    interacting.step(heldFire, false, false, true);
+    require(interacting.grounded() && interacting.jumps() == 0,
+            "source interactable guard reserves grounded confirmation for interaction");
+    interacting.step(heldFire);
+    require(interacting.jumps() == 0, "leaving interaction does not replay the consumed press edge");
+    interacting.step(downwell::Input{});
+    interacting.step(heldFire);
+    require(interacting.jumps() == 1, "a new press away from interaction jumps normally");
+    PlayerMotion staleInteraction(false, 10000);
+    staleInteraction.step(heldFire, false, false, true);
+    require(staleInteraction.shots() == 1,
+            "interactable gates the press/jump branch, not source airborne held-fire handling");
 
     PlayerMotion ceilingPlayer(true);
     ceilingPlayer.configureSolidResolver([](void*, int, int y) {
@@ -108,6 +137,10 @@ int main() {
     require(emptyGun.ammo() == 0 && emptyGun.shots() == 8,
             "empty-charge fixture consumes all eight rounds in midair");
     for (unsigned frame = 0; frame < 40; ++frame) emptyGun.step(downwell::Input{});
+    PlayerMotion lockedEmpty = emptyGun;
+    lockedEmpty.step(trigger, true);
+    require(lockedEmpty.speedYFixed() > 3 * 256 && !lockedEmpty.shotDelayed(),
+            "noControl suppresses empty-charge braking and its delay too");
     long previousY = emptyGun.offsetYFixed();
     emptyGun.step(trigger);
     require(emptyGun.offsetYFixed() - previousY == 3 * 256 &&

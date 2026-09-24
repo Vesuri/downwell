@@ -122,7 +122,8 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
     grounded_ = false;
 }
 
-PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool controlsLocked, bool dead)
+PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool controlsLocked, bool dead,
+                                   bool interactable)
 {
     const auto input = downwell::playerGameplayInput(rawInput, dead ? 0 : 1);
     frameStartX_ = x_;
@@ -147,7 +148,10 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         speedY_ = fallMaximum;
         gravityRemainder_ = 0;
     }
-    if (fireReleased && !dead) {
+    // scrPlMovement calls scrUpButtonFunctions only when noControl is false.
+    // Input edges still advance globally while locked; do not replay a release
+    // later or manufacture one by replacing held input with neutral input.
+    if (fireReleased && !dead && !controlsLocked) {
         if (speedY_ < 0) {
             const long halved = (speedY_ * 5 + gravityRemainder_) / 2;
             speedY_ = halved / 5;
@@ -229,7 +233,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             grounded_ = false;
     }
 
-    if (!controlsLocked && firePressed && grounded_) {
+    if (!controlsLocked && !interactable && firePressed && grounded_) {
         grounded_ = false;
         speedY_ = jumpSpeed;
         gravityRemainder_ = -2; // -4.4 * 256 = -1126 - 2/5
@@ -240,8 +244,8 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     }
     // scrUpButtonFunctions clears spin when held fire is no longer jump-locked,
     // even if a shot is still delayed or ammunition is empty.
-    if (input.fire && !jumpShootLocked_) spinJumping_ = false;
-    if (input.fire && !grounded_ && shotDelay_ == 0 &&
+    if (!controlsLocked && input.fire && !jumpShootLocked_) spinJumping_ = false;
+    if (!controlsLocked && input.fire && !grounded_ && shotDelay_ == 0 &&
         !jumpShootLocked_ && ammo_ == 0) {
         // scrPlayerShootN's empty-charge branch still brakes a fast fall.
         // It consumes no charge and creates no bullet or shooting animation.
@@ -251,7 +255,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             gravityRemainder_ = 0;
         }
         shotDelay_ = 16;
-    } else if (input.fire && !grounded_ && shotDelay_ == 0 &&
+    } else if (!controlsLocked && input.fire && !grounded_ && shotDelay_ == 0 &&
                !jumpShootLocked_ && ammo_ > 0) {
         if (speedY_ > 0 || (speedY_ == 0 && gravityRemainder_ > 0)) {
             speedY_ = 0;
