@@ -771,9 +771,13 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             downwell::Input input;
             input.left = (tick / 90) % 2 == 0;
             input.right = !input.left;
-            input.fire = tick % 10 < 5;
+            // Offset the firing cycle to retain a surviving-frog hit after
+            // replacing oversized provisional boxes with recovered masks.
+            const int firePhase = std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")
+                ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
+            input.fire = (tick + firePhase) % 10 < 5;
             gameplay.step(downwell::packReplayInput(input));
-            reference.step(input, input.fire && tick % 10 == 0);
+            reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             if (std::getenv("DOWNWELL_TRACE_SNAKE") && gameplay.enemyCount() > 4 && gameplay.tick() >= 585 && gameplay.tick() <= 601) {
                 const auto& native = gameplay.enemyAt(4);
                 unsigned ordinal = 0;
@@ -820,6 +824,13 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             }
             std::sort(nativeGems.begin(), nativeGems.end());
             std::sort(referenceGems.begin(), referenceGems.end());
+            if (nativeGems != referenceGems)
+                std::cerr << "COMBAT GEM DIFFERENCE tick=" << gameplay.tick()
+                          << " firePhase=" << firePhase
+                          << " count=" << nativeGems.size() << ',' << referenceGems.size()
+                          << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()
+                          << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
+                          << '\n';
             require(nativeGems == referenceGems, "live currency animation choices and phases agree across adapters");
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
             require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&

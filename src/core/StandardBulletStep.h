@@ -1,6 +1,8 @@
 #ifndef DOWNWELL_CORE_STANDARD_BULLET_STEP_H
 #define DOWNWELL_CORE_STANDARD_BULLET_STEP_H
 
+#include "EnemyContact.h"
+
 namespace downwell {
 // scrBulletOov uses strict comparisons to the fractional view position.
 // Keep this independent of the renderer's rounded bitplane/camera offset.
@@ -18,7 +20,12 @@ inline bool standardBulletOutsideView(long yQ12, long viewTopQ12,
 struct StandardBulletPath {
     int x, fromY, toY;
     bool intersects(int left, int right, int top, int bottom) const {
-        return x >= left && x < right && fromY < bottom && toY >= top;
+        return left < right && top < bottom &&
+               x >= left && x < right && fromY < bottom && toY >= top;
+    }
+    bool intersects(const ContactActor& actor) const {
+        const ContactBounds bounds = contactWorldBounds(actor);
+        return intersects(bounds.left, bounds.right, bounds.top, bounds.bottom);
     }
 };
 

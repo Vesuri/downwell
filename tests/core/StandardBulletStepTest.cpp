@@ -49,6 +49,19 @@ int main() {
         "unobstructed usual bullet advances eight pixels");
 
     const StandardBulletPath path{20, 10, 18};
+    const downwell::ContactActor snake{20 * 256L, 20 * 256L, 1, 1, 163};
+    require(path.intersects(snake), "line intersects recovered snake rectangle");
+    require(!StandardBulletPath{27, 12, 20}.intersects(snake),
+            "snake right edge is excluded despite lying inside old 16-pixel box");
+    require(!StandardBulletPath{20, 8, 15}.intersects(snake) &&
+            StandardBulletPath{20, 8, 16}.intersects(snake),
+            "snake upper margin, not provisional eight-pixel radius, controls hit");
+    const downwell::ContactActor flippedSnake{20 * 256L, 20 * 256L, -1, 1, 163};
+    require(StandardBulletPath{13, 16, 20}.intersects(flippedSnake) &&
+            !StandardBulletPath{13, 16, 20}.intersects(snake),
+            "asymmetric source masks follow horizontal sprite flipping");
+    require(!path.intersects(downwell::ContactActor{20 * 256L, 14 * 256L, 1, 1, -1}),
+            "missing masks are empty and cannot absorb bullets");
     require(path.intersects(20, 21, 10, 11) && path.intersects(20, 21, 18, 19),
             "both segment endpoints are included");
     require(!path.intersects(19, 20, 10, 19) &&

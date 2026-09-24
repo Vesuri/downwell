@@ -481,7 +481,10 @@ InstanceRecord* StartupRuntime::mainBulletEnemyCollision(int x, int fromY, int t
                                  enemy.objectId == 119;
         if (!enemy.active || !enemyObject || enemy.health <= 0)
             continue;
-        if (path.intersects(enemy.x - 8, enemy.x + 8, enemy.y - 8, enemy.y + 8))
+        const ContactActor contact{enemy.x * 256L, enemy.y * 256L,
+            enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
+            enemyContactMask(enemy.objectId, enemy.spriteId)};
+        if (path.intersects(contact))
             return &enemy;
     }
     return nullptr;

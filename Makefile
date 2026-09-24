@@ -118,7 +118,7 @@ test: build/gem-homing-test
 test: build/main-camera-test
 test: build/standard-bullet-test
 
-build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp src/core/StandardBulletStep.h
+build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp src/core/StandardBulletStep.h src/core/EnemyContact.h src/core/GameMakerRounding.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/StandardBulletStepTest.cpp
 

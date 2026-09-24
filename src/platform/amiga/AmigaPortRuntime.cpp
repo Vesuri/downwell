@@ -483,9 +483,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 [this](const downwell::StandardBulletPath& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
                         EnemyState& enemy = enemies_[enemyIndex];
+                        const downwell::ContactActor contact{
+                            enemy.x * 256L, enemy.y * 256L,
+                            enemy.objectId == 117 ? enemy.motionState : enemy.facing,
+                            enemy.objectId == 117 && enemy.speedY > 0 ? -1 : 1,
+                            downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
                         if (!enemy.active || !enemy.awake || enemy.health <= 0 ||
-                            !path.intersects(enemy.x - 8, enemy.x + 8,
-                                             enemy.y - 8, enemy.y + 8))
+                            !path.intersects(contact))
                             continue;
                         if (enemy.objectId != 112) {
                             if (enemy.objectId == 113) enemy.frogHit.pending = true;

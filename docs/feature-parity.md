@@ -23,7 +23,7 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Publisher, credits, controls, garden, well, style select | Native implementations and decoded scene comparison tests | Full-sequence display regression after gameplay changes |
 | Player, camera, landing, jumping, gunboots | Shared player and default main-room camera; SDL/native comparison through entrance and scrolling | Special camera modes and original event timing; longer combat tapes; position checks still allow tolerances |
 | Area-one geometry and endings | Shared live builder, emitted-object collision/rendering, terrain cache oracle | Live SDL replay comparison; side-room reversals and offscreen destruction coverage |
-| Bullets and gems | Shared usual-bullet segment arbitration and fractional-camera expiry, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet masks, spread and collision-event scheduling; source bounce/terrain semantics and dense encounters |
+| Bullets and gems | Shared usual-bullet segment arbitration, recovered enemy rectangles and fractional-camera expiry, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet collision-event scheduling, spread and wall selection; source bounce/terrain semantics and dense encounters |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
 | Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency and player presentation | Gem trajectories, ordering and broader actor states remain unverified |
 | HUD | Health, ammo, currency and streak implementations | State-driven image comparisons for damage, depletion and streak expiry |
@@ -49,7 +49,7 @@ both segment endpoints.
 
 This does not recover the entire bullet system. Both adapters still apply
 enemy damage directly during the sweep rather than reproducing the original
-collision-event phase. Their provisional enemy boxes, wall selection/storage,
+collision-event phase. Their wall selection/storage,
 impact-position handling remain to be consolidated and
 validated; angled spread, other guns and piercing are outside this helper.
 
@@ -68,6 +68,29 @@ use the authoritative fractional camera state, independent of DMA scrolling.
 Tests cover equality, one fractional unit outside, and a subpixel camera
 change across an integer bullet coordinate. End Step scheduling remains part
 of the wider event-order consolidation, not proven by this helper.
+
+Bullet enemy-line queries now use the same recovered rectangular masks and
+unit flips as player/enemy contact, instead of a universal 16×16 box. Resource
+IDs and bounds are checked by `verify-enemy-contact.py` against the pinned
+export. Tests cover snake margins, its asymmetric flipped mask, exact line
+endpoints and empty masks. Queries use each actor's published integer x/y,
+not its next movement position. This improves the line query; it still does
+not reproduce the separate original bullet/enemy collision-event dispatch.
+The combat tape's firing cycle is offset by one update to retain the existing
+mandatory surviving-frog-hit coverage with these smaller source masks; no
+state tolerances or coverage assertions were relaxed.
+The test retains `DOWNWELL_COMBAT_FIRE_PHASE` for reproducing alternate tapes:
+phases 1–4 pass this strict comparison, while 5–9 currently fail the live
+currency animation/state comparison. Phase 0 no longer covers a surviving frog
+hit. These are explicit remaining coverage/fidelity issues, not evidence of
+completed combat parity; investigate event/reward ordering and RNG consumption
+before attributing them to rendering.
+For phase 5 the first reported gem difference is tick 890: two native versus
+one SDL live gems, currency 2 versus 4, with one kill on each. Thus this failure
+includes collection/lifetime state, not merely animation. The default phase-1
+tape ends health 3/3, kills 3/3, currency 38/38. Full host tests, the bounded
+600-tick A500 cache check and the unchanged cross-CPU replay pass; normal
+builds were restored and the 68000 audits are clean.
 
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
