@@ -919,21 +919,21 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                         << gem.motion.vx << ',' << gem.motion.vy << ' ' << gem.attracted << '\n';
                 }
             }
-            // Slot reuse differs between adapters; compare the multiset of
-            // live gem birth ages, values and authoritative animation state.
-            std::vector<std::array<long, 4>> nativeGems, referenceGems;
+            // Both adapters retain live gems in birth order. Compare that
+            // order and authoritative movement, not a sorted multiset.
+            std::vector<std::array<long, 9>> nativeGems, referenceGems;
             for (unsigned i = 0; i < gameplay.gemCapacity; ++i) {
                 const auto& gem = gameplay.gemAt(i);
                 if (gem.active) nativeGems.push_back({static_cast<long>(gem.age), gem.amount,
-                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths)});
+                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
+                    gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted});
             }
             for (unsigned i = 0; i < reference.mainCurrencyCount(); ++i) {
                 const auto& gem = reference.mainCurrencyAt(i);
                 referenceGems.push_back({static_cast<long>(gem.age), gem.amount,
-                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths)});
+                    gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
+                    gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted});
             }
-            std::sort(nativeGems.begin(), nativeGems.end());
-            std::sort(referenceGems.begin(), referenceGems.end());
             if (nativeGems != referenceGems)
                 std::cerr << "COMBAT GEM DIFFERENCE tick=" << gameplay.tick()
                           << " firePhase=" << firePhase
@@ -941,7 +941,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()
                           << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
                           << '\n';
-            require(nativeGems == referenceGems, "live currency animation choices and phases agree across adapters");
+            require(nativeGems == referenceGems,
+                    "live currency birth order, motion and animation agree exactly across adapters");
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
             require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
                     gameplay.player().spriteFrame() ==

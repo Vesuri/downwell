@@ -5,6 +5,7 @@
 #include "EnemyPresentation.h"
 #include "EnemyContact.h"
 #include "EnemyContactResponse.h"
+#include "CurrencyReward.h"
 #include "FrogBehavior.h"
 #include "FrogMotion.h"
 #include "StandardBulletStep.h"
@@ -577,20 +578,22 @@ void StartupRuntime::updateMainBullets() {
 
 void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
                                        bool attracted) {
-    while (amount > 0 && mainCurrencyCount_ < mainCurrencyCapacity) {
+    spawnCurrencyReward(amount,
+        static_cast<int>(roundGameMakerCoordinate(x)) - mainPlayerOriginX_,
+        static_cast<int>(roundGameMakerCoordinate(y)) - mainPlayerOriginY_,
+        attracted, static_cast<unsigned>(mainCurrencyCapacity - mainCurrencyCount_), random_,
+        [this, x, y, attracted](const CurrencyBirth& birth) {
         MainCurrencyState& gem = mainCurrencyItems_[mainCurrencyCount_++];
         gem = MainCurrencyState{};
         gem.x = x;
         gem.y = y;
-        gem.large = amount >= 10;
-        gem.amount = gem.large ? 10 : 2;
+        gem.large = birth.large;
+        gem.amount = birth.amount;
         gem.attracted = attracted;
-        gem.motion.initialize(static_cast<int>(roundGameMakerCoordinate(x)) - mainPlayerOriginX_,
-                              static_cast<int>(roundGameMakerCoordinate(y)) - mainPlayerOriginY_, attracted, random_);
+        gem.motion = birth.motion;
         gem.speedX = gem.motion.vx / 12800.0F;
         gem.speedY = gem.motion.vy / 12800.0F;
-        amount -= gem.amount;
-    }
+    });
 }
 
 void StartupRuntime::updateMainCurrency() {
@@ -820,7 +823,8 @@ void StartupRuntime::updateMainEnemyInteractions() {
             enemy.x - mainPlayerOriginX_, enemy.y - mainPlayerOriginY_,
             enemy.active, enemy.health, mainPlayerMotion_, mainPlayerHealth_,
             mainPlayerInvulnerability_, mainEnemiesDefeated_, [this, &enemy] {
-                spawnMainCurrency(enemy.preciseX, enemy.preciseY, enemy.reward, true);
+                spawnMainCurrency(static_cast<float>(enemy.x), static_cast<float>(enemy.y),
+                                  enemy.reward, true);
             });
         if (contact != EnemyContact::none) {
             syncMainPlayerState();

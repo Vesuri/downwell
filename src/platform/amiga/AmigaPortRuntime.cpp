@@ -7,6 +7,7 @@
 #include "core/EnemyPresentation.h"
 #include "core/EnemyContact.h"
 #include "core/EnemyContactResponse.h"
+#include "core/CurrencyReward.h"
 #include "core/EnemyAlarmEvents.h"
 #include "core/AlarmBank.h"
 #include "core/FrogBehavior.h"
@@ -97,25 +98,23 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
 
 void AmigaPortRuntime::spawnReward(const EnemyState& enemy, bool attracted)
 {
-    int remaining = enemy.reward;
-    for (unsigned index = 0; index < gemCapacity && remaining > 0; ++index) {
-        GemState& gem = gems_[index];
-        if (gem.active)
-            continue;
-        gem.large = remaining >= 10;
-        gem.amount = gem.large ? 10 : 2;
+    unsigned next = downwell::compactCurrencySlots(gems_, gemCapacity);
+    downwell::spawnCurrencyReward(enemy.reward, enemy.x, enemy.y, attracted,
+        gemCapacity - next, enemyRandom_, [this, &enemy, attracted, &next](const downwell::CurrencyBirth& birth) {
+        GemState& gem = gems_[next++];
+        gem.large = birth.large;
+        gem.amount = birth.amount;
         gem.age = 0;
         gem.x = enemy.x;
         gem.y = enemy.y;
         gem.preciseX = (long)enemy.x * 256L;
         gem.preciseY = (long)enemy.y * 256L;
-        gem.motion.initialize(enemy.x, enemy.y, attracted, enemyRandom_);
+        gem.motion = birth.motion;
         gem.speedX = downwell::GemMotion::q8(gem.motion.vx);
         gem.speedY = downwell::GemMotion::q8(gem.motion.vy);
         gem.attracted = attracted;
         gem.active = true;
-        remaining -= gem.amount;
-    }
+    });
 }
 
 unsigned AmigaPortRuntime::gemCount() const

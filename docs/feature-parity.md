@@ -25,7 +25,7 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Area-one geometry and endings | Shared live builder, emitted-object collision/rendering, terrain cache oracle | Live SDL replay comparison; side-room reversals and offscreen destruction coverage |
 | Bullets and gems | Shared usual-bullet segment arbitration, recovered enemy rectangles and fractional-camera expiry, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet collision-event scheduling, spread and wall selection; source bounce/terrain semantics and dense encounters |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
-| Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency and player presentation | Gem trajectories, ordering and broader actor states remain unverified |
+| Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency, ordered gem motion and player presentation | Longer routes, dense reward bursts and broader actor states remain unverified |
 | HUD | Health, ammo, currency and streak implementations | State-driven image comparisons for damage, depletion and streak expiry |
 | Death | Native control lock and death timer | End-to-end SDL/native death-state comparison |
 
@@ -243,6 +243,38 @@ uses idle art, then advances through the next recovered alarm and requires
 movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
+
+#### Shared reward creation and stable gem traversal
+
+`CurrencyReward` owns the implemented area-one gem creation sequence for both
+ports. `scrCurrencySpawn` assembly blocks 4–15 emit tens first, then twos until
+the remainder is nonpositive (an odd reward therefore rounds upward). Each
+accepted birth initializes shared GemMotion once, preserving its Create RNG
+sequence. The caller supplies storage and the explicit remaining capacity.
+The existing port overflow policy still drops excess births without consuming
+RNG; this is not a claim about original runner allocation failure.
+
+Native rewards previously reused the first inactive array slot, inserting new
+gems ahead of surviving older ones. Stable compaction before appending births
+now preserves their traversal order like the dense host store. This matters
+when a later gem bounce consumes RNG, not just for display ordering. Native
+fixtures retire the first of fourteen gems, emit another reward, and assert
+that the older survivors remain first. Split/odd-remainder, empty capacity,
+nonpositive rewards and per-birth RNG tests cover the shared creator.
+
+SDL stomp rewards now use published enemy x/y, matching the script's
+instance_create arguments and native adapter, rather than precise xx/yy.
+Paired combat checks compare gems in order and include exact position,
+velocity, attraction and animation, replacing the sorted age/value/animation
+multiset that could conceal reordering. Original global instance-event order,
+Create's embedded-wall relocation and non-area-one gem modifiers remain open.
+
+Validation: full host suite, both combat tapes with unsorted exact-motion gem
+checks, 16,562 offline rendering comparisons, bounded A500 600-tick cache
+verification (101 comparisons and intact stack guard), and cross-CPU
+player/gem replay pass. The replay digest remains unchanged; both 68000 audits
+are clean. Normal builds were restored. These are finite replay checks, not
+proof of complete original reward/currency semantics.
 
 #### Shared implemented enemy-contact response
 

@@ -6,6 +6,7 @@
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
 #include "core/MainRoomLifetime.h"
+#include "core/CurrencyReward.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -201,6 +202,47 @@ int main() {
         if (crowdedRewards.gemAt(i).active)
             rewardTotal += crowdedRewards.gemAt(i).amount;
     require(rewardTotal == 140, "crowded rewards do not silently lose currency");
+    // Retire the oldest slot and mark its successor. A second birth must not
+    // jump ahead of that surviving gem in the next simulation traversal.
+    const_cast<AmigaPortRuntime::GemState&>(crowdedRewards.gemAt(0)).active = false;
+    const_cast<AmigaPortRuntime::GemState&>(crowdedRewards.gemAt(1)).amount = 42;
+    require(crowdedRewards.configureEnemy(1, 111, 163, 0, 5, 0, 0, 5, 2),
+            "configure a second reward after an earlier gem slot becomes free");
+    crowdedRewards.step(0);
+    require(crowdedRewards.gemCount() == 14 && crowdedRewards.gemAt(0).amount == 42 &&
+                crowdedRewards.gemAt(13).amount == 2,
+            "new native reward gems follow all surviving older gems");
+    {
+        downwell::GameMakerRandom random(47), expected(47);
+        int amounts[4] = {}, count = 0;
+        const unsigned births = downwell::spawnCurrencyReward(23, 4, 8, true, 4, random,
+            [&](const downwell::CurrencyBirth& birth) {
+                amounts[count++] = birth.amount;
+                require(birth.large == (birth.amount == 10) && birth.motion.attracted &&
+                            birth.motion.x == 4 * 12800 && birth.motion.y == 8 * 12800,
+                        "shared birth initializes source size, position and attraction");
+            });
+        for (unsigned i = 0; i < 4; ++i) {
+            downwell::GemMotion motion;
+            motion.initialize(4, 8, true, expected);
+        }
+        require(births == 4 && count == 4 && amounts[0] == 10 && amounts[1] == 10 &&
+                    amounts[2] == 2 && amounts[3] == 2 && random.nextU32() == expected.nextU32(),
+                "source reward split preserves odd remainder and exactly one Create RNG sequence per gem");
+        const auto before = random.drawCount();
+        require(downwell::spawnCurrencyReward(20, 0, 0, false, 0, random,
+                    [&](const downwell::CurrencyBirth&) { ++count; }) == 0 &&
+                    random.drawCount() == before && count == 4,
+                "a full port pool emits nothing and consumes no phantom-birth RNG");
+        require(downwell::spawnCurrencyReward(-1, 0, 0, false, 4, random,
+                    [&](const downwell::CurrencyBirth&) { ++count; }) == 0 &&
+                    random.drawCount() == before,
+                "nonpositive rewards create no gems");
+        struct Slot { bool active; int id; } slots[] = {{false, 0}, {true, 1}, {false, 2}, {true, 3}};
+        require(downwell::compactCurrencySlots(slots, 4) == 2 && slots[0].id == 1 &&
+                    slots[1].id == 3 && !slots[2].active && !slots[3].active,
+                "sparse compaction is stable and clears the vacated tail");
+    }
     AmigaPortRuntime runtime(300);
     const AmigaPortFrame jump = runtime.step(4);
     require(!jump.scrolled && !runtime.player().grounded() &&
