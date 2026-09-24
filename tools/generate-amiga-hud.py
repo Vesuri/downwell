@@ -61,6 +61,12 @@ SELECTIONS = {
         133: None,   # sprGemSmall
         134: None,   # sprGemLarge
         139: None,   # sprModBtry
+        143: [1],    # cased battery
+        147: [1],    # cased car battery
+        149: [1],    # cased curry
+        150: [1],    # cased energy drink
+        151: [1],    # cased sushi
+        152: [1],    # cased rice ball
         153: None,   # sprBat
         154: None,   # sprBatHit
         157: None,   # sprBatHang

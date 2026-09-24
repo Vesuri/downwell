@@ -4,13 +4,23 @@
 namespace downwell {
 // Static, depth-zero Shop Create fixtures. Emit original sprite IDs and world
 // positions; backends own clipping and, on Amiga, cached planar composition.
-// Merchant, item children and the active menu are separate drawing passes.
+// Merchant and active menu are separate drawing passes.
+inline int shopItemSprite(unsigned upgrade) {
+    constexpr int sprites[] = {152, 143, 151, 147, 150, 149};
+    return upgrade >= 100 && upgrade <= 105 ? sprites[upgrade - 100] : -1;
+}
 template<class Emit>
 void drawShopFixtures(const ShopWorld& world, Emit emit) {
     for (const auto& shop : world.instances) if (shop.allocated) {
         if (shop.present) emit(480, 0, shop.x, shop.y);
         emit(481, 0, shop.x + 64, shop.y);
         for (int i = 0; i < 3; ++i) emit(482, 0, shop.x + 45 + i * 19, shop.y - 9);
+        for (int i = 0; i < 3; ++i) if (shop.feedback.itemPresent[i]) {
+            const int sprite = shopItemSprite(shop.stock.items[i].upgrade);
+            // objObtainableUg Create selects frame 1 and image_speed=0;
+            // Step changes only sprite_index. Shop places items at case.y+1.
+            if (sprite >= 0) emit(sprite, 1, shop.x + 45 + i * 19, shop.y - 8);
+        }
     }
 }
 }

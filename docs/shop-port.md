@@ -228,9 +228,39 @@ Normal 1-1 still contains no shop. Focused tests verify the static command strea
 resource IDs, coordinates and revision behavior; existing planar renderer tests
 exercise the generated pack. No complete shop screenshot is claimed yet.
 
-The generated game pack is 294020 bytes, SHA-256
+At the fixture-only milestone the generated game pack was 294020 bytes, SHA-256
 `cf990f9f640477e3b14b6fb43d434634a1f3882b5cce1ec2ba092b95d3d912b8`;
 copyrighted payload remains ignored. Full host tests, SDL build, offline pack
 verification and the bounded direct-entry A500 600-update cache regression pass.
 The resident Chip-art budget assertion and 68000 helper/instruction audits pass.
 This target tape still exercises ordinary gameplay, not an on-screen shop.
+
+## Cased items and purchase refresh
+
+The shared drawing stream now includes surviving item children at case.x,
+case.y+1. `objObtainableUg` Create explicitly selects image_index=1 with speed
+zero; its Step assigns only sprite_index. All six consumable sprites have two
+frames in the resource metadata. Their mappings are 100..105 ->
+152,143,151,147,150,149; frame 1 is converted offline, not substituted with the
+frame-0 icon used in the active menu. Buying the last unit removes that item's
+draw command while retaining the case.
+
+Each shop now has a cached-art revision separate from its furniture revision.
+Only creation, removal of contents and counter retirement change it. On Amiga,
+changed shops invalidate their intersecting rows in the terrain raster before
+side-room staging can reuse them. Visible rows are recomposed once and copied
+through the existing double-buffer dirty-row mechanism. Changed offscreen rows
+are excluded from the ring's retained interval. This supersedes the earlier
+fixture-only limitation where visible changes waited for another composition.
+The refresh is a bounded 33-row shop-art span, not a whole-frame redraw.
+
+A host test using the native planar renderer compares this partial-row purchase
+refresh against fresh composition with the ring wrapping at row 320. It requires
+an actual pixel change and checks that only the sold icon's 24x24 footprint
+changes. Shared tests check command removal and the one-time revision increment.
+The larger game pack is 295892 bytes, SHA-256
+`16bf038f9c0a0caa7a345cff01ea735cfce37cea3827690d53c4a991ba40c530`.
+Target-side on-screen purchase verification remains pending; the ordinary A500
+regression tape does not visit a shop. Item collision/pickup outside a case,
+case theft/destruction, child birth-phase ordering and final equal-depth overlap
+validation also remain open.

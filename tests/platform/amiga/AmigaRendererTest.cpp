@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/GameplaySceneStorage.h"
+#include "core/ShopFixtures.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -134,6 +135,12 @@ int main(int argc, char** argv) {
             sprite, 0, 197, 93, 0, &left, &top, &width, &height) && width > 0 && height > 0,
             "offline game pack contains every static shop fixture");
     }
+    for (unsigned sprite : {143u, 147u, 149u, 150u, 151u, 152u}) {
+        int left, top, width, height;
+        require(amigaRendererAssetBounds(gamePack.data(), gamePack.data() + gamePack.size(),
+            sprite, 1, 197, 93, 0, &left, &top, &width, &height) && width > 0 && height > 0,
+            "offline pack contains frame one of all six cased consumables");
+    }
 
     require(amigaRendererHardwareSpritePartCount(
                 gamePack.data(), gamePack.data() + gamePack.size(),
@@ -250,6 +257,34 @@ int main(int argc, char** argv) {
         }
         return pen;
     };
+    {
+        downwell::ShopWorld shopWorld;
+        unsigned rolls = 0;
+        auto* shop = shopWorld.create(0, 20, [&](unsigned lo, unsigned) {
+            return lo + (++rolls == 2 ? 1 : 0);
+        }, 4, 1);
+        const auto draw = [&](AmigaRenderer& target) {
+            downwell::drawShopFixtures(shopWorld, [&](int sprite, int frame, int x, int y) {
+                amigaRendererDrawAsset(&target, gamePack.data(), gamePack.data() + gamePack.size(),
+                    sprite, frame, x + 120, y, 0);
+            });
+        };
+        draw(actualRenderer);
+        const auto before = actualGame;
+        shop->stock.items[0].remaining = 0;
+        shop->feedback.apply(downwell::ShopInteraction::Effect::purchased, 1, shop->stock);
+        draw(expectedRenderer); // Fresh post-purchase composition.
+        amigaRendererClearGameRows(&actualRenderer, 0, 32, 0);
+        amigaRendererSetClipRect(&actualRenderer, 110, 0, 160, 32);
+        draw(actualRenderer); // Only the intersecting cached shop rows.
+        require(actualGame == expectedGame && actualGame != before,
+            "purchase row refresh matches fresh planar composition across ring wrap");
+        for (int y = 0; y < 284; ++y) for (int x = 110; x < 270; ++x)
+            if (x < 153 || x >= 177 || y >= 24)
+                require(ringPixel(actualGame, x, y) == ringPixel(before, x, y),
+                    "purchase changes only sold item pixels, retaining other cases and contents");
+        amigaRendererSetClipRect(&actualRenderer, 110, 0, 160, 284);
+    }
     for (unsigned frame = 0; frame < 2; ++frame) for (unsigned turn = 1; turn < 4; ++turn) {
         std::fill(actualGame.begin(), actualGame.end(), 0);
         std::fill(expectedGame.begin(), expectedGame.end(), 0);

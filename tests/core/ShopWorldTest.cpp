@@ -48,14 +48,14 @@ int main() {
     require(shop && draws == 4, "registration consumes stock RNG once");
     unsigned fixtures = 0;
     downwell::drawShopFixtures(run.shops, [&](int sprite, int frame, int x, int y) {
-        const int expectedSprite[] = {480, 481, 482, 482, 482};
-        const int expectedX[] = {5, 69, 50, 69, 88};
-        require(fixtures < 5 && sprite == expectedSprite[fixtures] && frame == 0 &&
-            x == expectedX[fixtures] && y == (fixtures < 2 ? 0 : -9),
+        const int expectedSprite[] = {480, 481, 482, 482, 482, 152, 143, 151};
+        const int expectedX[] = {5, 69, 50, 69, 88, 50, 69, 88};
+        require(fixtures < 8 && sprite == expectedSprite[fixtures] && frame == (fixtures < 5 ? 0 : 1) &&
+            x == expectedX[fixtures] && y == (fixtures < 2 ? 0 : fixtures < 5 ? -9 : -8),
             "fixture draw stream preserves original IDs, positions and creation order");
         ++fixtures;
     });
-    require(fixtures == 5 && run.shops.fixtureRevision == 1, "registration invalidates fixture rows once");
+    require(fixtures == 8 && run.shops.fixtureRevision == 1, "registration invalidates fixture rows once");
     require(run.shops.playerSolidAt(39, 0) && run.shops.playerSolidAt(98, 7) &&
         !run.shops.playerSolidAt(38, 0) && !run.shops.playerSolidAt(99, 7),
         "table uses cropped solid mask, not full artwork bounds");
@@ -110,6 +110,13 @@ int main() {
         shop->feedback.sounds[1].volume == 50,
         "purchase removes only purchased contents and retains ordered merchant/UI feedback");
     require(run.shops.fixtureRevision == 1, "purchase must not dirty unchanged furniture");
+    require(shop->artRevision == 2, "purchase invalidates cached contents once");
+    fixtures = 0;
+    downwell::drawShopFixtures(run.shops, [&](int sprite, int, int, int) {
+        require(sprite != 152, "purchased item disappears from shared drawing stream");
+        ++fixtures;
+    });
+    require(fixtures == 7, "only purchased item disappears, not its case");
     require(run.shops.playerSolidAt(50, -10), "sold case remains physically solid");
     tick(false, true); // First item -> Leave; locked player stays still.
     require(shop->menu.cursor == 0 && player.offsetX() == 0, "menu navigation does not move player");

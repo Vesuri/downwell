@@ -12,6 +12,7 @@ struct ShopWorld {
     struct Instance {
         int x = 0, y = 0;
         bool allocated = false, wallPresent = false;
+        unsigned artRevision = 0;
         bool present = false, maskEnabled = true, interactOk = true;
         ShopInventory stock;
         ShopInteraction menu;
@@ -30,6 +31,7 @@ struct ShopWorld {
             shop = {};
             shop.x = x; shop.y = y; shop.present = true;
             shop.allocated = shop.wallPresent = true;
+            shop.artRevision = 1;
             ++allocatedCount;
             ++fixtureRevision;
             shop.stock.create(random, health, area, hard, style, member);
@@ -101,7 +103,10 @@ struct ShopWorld {
                 currency, choose, grant, [&](ShopInteraction::Effect effect) {
                     if (effect == ShopInteraction::Effect::disableMask)
                         shop.maskEnabled = false;
-                    shop.feedback.apply(effect, shop.menu.cursor, shop.stock);
+                    const unsigned cursor = shop.menu.cursor;
+                    const bool hadItem = cursor >= 1 && cursor <= 3 && shop.feedback.itemPresent[cursor - 1];
+                    shop.feedback.apply(effect, cursor, shop.stock);
+                    if (hadItem && !shop.feedback.itemPresent[cursor - 1]) ++shop.artRevision;
                     emit(shop, effect);
                 });
         }
@@ -111,6 +116,7 @@ struct ShopWorld {
             if (shop.present && (shop.y < viewY - 320 || shop.y > viewY + 3000)) {
                 shop.present = false;
                 ++fixtureRevision;
+                ++shop.artRevision;
             }
             if (shop.wallPresent && (shop.y + 8 < viewY - 160 || shop.y + 8 > viewY + 3000))
                 shop.wallPresent = false;

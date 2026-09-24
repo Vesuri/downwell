@@ -747,7 +747,20 @@ enum { terrainRasterRows = 8192, terrainRasterWords = 11, terrainRasterX = 96 };
 static UWORD terrainRaster[3][terrainRasterRows][2][terrainRasterWords];
 static bool terrainRasterDirty[3][terrainRasterRows];
 static bool terrainRasterReady;
-static unsigned terrainShopFixtureRevision;
+static unsigned terrainShopArtRevision[downwell::ShopWorld::capacity];
+static void invalidateShopRaster(const downwell::ShopWorld& shops) {
+    for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
+        const auto& shop = shops.instances[i];
+        if (shop.artRevision == terrainShopArtRevision[i]) continue;
+        terrainShopArtRevision[i] = shop.artRevision;
+        if (!shop.allocated) continue;
+        int first = shop.y - 21, end = shop.y + 12;
+        if (first < 0) first = 0;
+        if (end > terrainRasterRows) end = terrainRasterRows;
+        for (unsigned column = 0; column < 3; ++column)
+            for (int y = first; y < end; ++y) terrainRasterDirty[column][y] = true;
+    }
+}
 
 static bool generateLiveTerrain(void* opaque, AmigaPortRuntime& runtime,
     downwell::GameMakerRandom& random, int bottom) {
@@ -912,18 +925,7 @@ static void drawMainWorldSpan(
     unsigned index;
     const int firstWorldY = viewY + clipY;
     const int finalWorldY = firstWorldY + clipHeight;
-    if (runtime && runtime->shops().fixtureRevision != terrainShopFixtureRevision) {
-        terrainShopFixtureRevision = runtime->shops().fixtureRevision;
-        // Registration/retirement invalidates only the fixture art's rows.
-        // Ordinary frames and purchases do not repaint static shop furniture.
-        for (const auto& shop : runtime->shops().instances) if (shop.allocated) {
-            int first = shop.y - 21, end = shop.y + 12;
-            if (first < 0) first = 0;
-            if (end > terrainRasterRows) end = terrainRasterRows;
-            for (unsigned column = 0; column < 3; ++column)
-                for (int y = first; y < end; ++y) terrainRasterDirty[column][y] = true;
-        }
-    }
+    if (runtime) invalidateShopRaster(runtime->shops());
     dirtyGameRows(renderer->gameOrigin, clipY, clipHeight);
     const bool cacheable = viewX >= mainViewX - 160 && viewX <= mainViewX + 160 &&
         (viewX - mainViewX) % 160 == 0 && firstWorldY >= 0 &&
@@ -1284,6 +1286,7 @@ int main(void) {
     int cachedWorldFirst = worldViewY;
     int cachedWorldEnd = worldViewY + downwellDisplayHeight;
     int stagedViewX = -10000, stagedFirst = 0, stagedEnd = 0;
+    unsigned oldShopArt[downwell::ShopWorld::capacity] = {};
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin);
@@ -2268,9 +2271,15 @@ int main(void) {
             DW_PROFILE_PHASE(profileSimulation);
             const bool wasDead = port.dead();
             const bool wasDeathFlash = port.deathSequence().flashVisible();
+            for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
+                oldShopArt[i] = port.shops().instances[i].artRevision;
             const AmigaPortFrame result = port.step(packedInput);
             if (!port.generationSucceeded()) break;
 #ifndef DOWNWELL_REPLAY_VERIFY
+            // Invalidate before selecting a precomposed side-room ring.
+            invalidateShopRaster(port.shops());
+            for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
+                if (oldShopArt[i] != port.shops().instances[i].artRevision) stagedViewX = -10000;
             const auto resultsAction = port.deathResults().inputEffects.action;
             if (resultsAction != downwell::DeathMenuSequence::Action::None) {
                 // An entropy boundary, separate from the gameplay RNG stream.
@@ -2464,6 +2473,27 @@ int main(void) {
                         liveBuilder.decorationCount(), &port, worldViewX, worldViewY,
                         top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true);
                 }
+            }
+            for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
+                const auto& shop = port.shops().instances[i];
+                if (!shop.allocated || shop.artRevision == oldShopArt[i]) continue;
+                if (backingCopyPending) AmigaHardware::blitterDrain();
+                stagedViewX = -10000;
+                const int first = shop.y - 21, end = shop.y + 12;
+                int below = first > worldViewY + downwellDisplayHeight ? first : worldViewY + downwellDisplayHeight;
+                if (end > below && cachedWorldEnd > below) cachedWorldEnd = below;
+                int above = end < worldViewY ? end : worldViewY;
+                if (first < above && cachedWorldFirst < above) cachedWorldFirst = above;
+                int top = first - worldViewY, bottom = end - worldViewY;
+                if (top < 0) top = 0;
+                if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
+                if (top >= bottom) continue;
+                amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
+                amigaRendererClearGameRows(&renderer, top, bottom - top, 0);
+                drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
+                    fragments, liveBuilder.fragmentCount(), generatedDecorations,
+                    liveBuilder.decorationCount(), &port, worldViewX, worldViewY,
+                    top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true);
             }
             if (destroyedBlockCount != 0) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();

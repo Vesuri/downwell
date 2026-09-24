@@ -31,6 +31,8 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
   both adapters, including separate retirement rules.
 - [x] Shared static counter/table/case drawing and offline planar fixtures;
   Amiga composition uses the terrain cache, not recurring furniture redraws.
+- [x] Cased consumable icons (original frame 1), purchase disappearance and
+  changed-row cache refresh; merchant/menu rendering remains pending.
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.
