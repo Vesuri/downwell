@@ -9,6 +9,9 @@ selected 68000 assembly.
 This repository does not distribute the original game. A locally owned Steam
 build lives under `data/`, which is ignored by Git and treated as immutable.
 
+See the [current completion checklist](docs/current-status.md) for implemented
+coverage, the next playable-system milestone and outstanding original-game work.
+
 ## Startup shortcut
 
 In the SDL window, press **F12** (Fn+F12 if required by the keyboard) to save
