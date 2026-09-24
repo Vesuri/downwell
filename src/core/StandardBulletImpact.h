@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_STANDARD_BULLET_IMPACT_H
 #define DOWNWELL_CORE_STANDARD_BULLET_IMPACT_H
+#include "MachineGunProfile.h"
 namespace downwell {
 enum class BulletImpactKind { ignored, immune, damaged, defeated };
 struct BulletImpact { BulletImpactKind kind; int sound; };
@@ -22,7 +23,7 @@ BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
     if (enemy.objectId == 113) enemy.frogHit.pending = true;
     if (enemy.objectId == 117) enemy.snailHit.pending = true;
     if (enemy.objectId == 116) enemy.batHit.queue(270);
-    enemy.health -= 9;
+    enemy.health -= machineGunProfile(false).damage;
     if (enemy.health > 0) return {BulletImpactKind::damaged, 29};
     reward();
     enemy.active = false;

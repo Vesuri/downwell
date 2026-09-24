@@ -9,6 +9,25 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared machine-gun profile foundation
+
+`MachineGunProfile` records the selected level-zero/level-one table fields for
+object, sprite, sound, muzzle, damage, speed, accuracy, consumption, firing
+interval, recoil, shake, range parameters and collision flags. Values come
+from `bStatInitLevel1`; the selected damage already supplies the live ordinary
+impact path. The streak selector changes at 100, from
+`scrControlBeginstepCheck`. The profile is returned by value so a future
+projectile snapshot will not mutate when the player's weapon level changes.
+
+Focused tests pin both profiles, the 99/100 threshold and value-copy behavior.
+This is not live gem-high support: the ordinary impact path explicitly selects
+level zero, and bullets still need birth-time property storage, source-ordered
+level publication, rendering, rate changes, random spread and effect wiring.
+Do not enable only the 15-damage field and call that the complete transition.
+Room entry already resets the native shot counter and SDL `mainShootLeg_`,
+so no muzzle-reset fix was needed in this pass. No gameplay state layout,
+asset pack or native memory allocation changes here.
+
 ### Ordinary machine-gun damage comes from the selected weapon table
 
 The shared impact path now subtracts nine, not ten. `bStatInitialize` assigns

@@ -16,6 +16,29 @@ void require(bool ok, const char* message) {
 int main() {
     using namespace downwell;
     {
+        constexpr auto normal = machineGunProfileForStreak(99);
+        constexpr auto high = machineGunProfileForStreak(100);
+        static_assert(normal.damage == 9 && high.damage == 15, "selected source damage table");
+        require(normal.object == 261 && normal.sprite == 459 && normal.sound == 18 &&
+                normal.muzzle == 603 && normal.interval == 7 && normal.shake == 2 &&
+                normal.shakeDuration == 3 && normal.rangeTimer == 12,
+                "ordinary machine gun uses selected level-zero resources and timing");
+        require(high.object == 261 && high.sprite == 458 && high.sound == 19 &&
+                high.muzzle == 602 && high.interval == 6 && high.shake == 3 &&
+                high.shakeDuration == 4 && high.rangeTimer == 13,
+                "gem-high machine gun uses selected level-one resources and timing");
+        for (const auto profile : {normal, high})
+            require(profile.speed == 8 && profile.accuracy == 3 && profile.consumption == 1 &&
+                    profile.recoil == 0 && profile.rangeRandom == 2 &&
+                    !profile.consistent && !profile.wave && !profile.explode,
+                    "both machine gun levels retain common source properties");
+        auto selected = machineGunProfileForStreak(100);
+        const auto born = selected;
+        selected = machineGunProfileForStreak(0);
+        require(born.level == 1 && born.damage == 15 && selected.level == 0 && selected.damage == 9,
+                "value snapshots can survive a later weapon-level change");
+    }
+    {
         struct Enemy {
             bool active = true;
             int objectId = 116, health = 15;
