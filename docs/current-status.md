@@ -410,6 +410,22 @@ bound is 12,908 bytes within the existing 32,140-byte allocation. This prepares
 native title presentation without runtime glyph composition; it does not yet
 connect the native clear-screen scene.
 
+The native clear overlay now has a retained, per-buffer planar command cache.
+It validates artwork before modifying pixels, merges overlapping dirty regions,
+and replays intersecting commands in source order, retaining disjoint static
+regions. Borders and the player remain separate from this overlay. A 360-frame
+alternating-buffer fixture follows shared Result layout through camera movement,
+carousel changes and departure, comparing both planar buffers byte-for-byte
+against full command rasterization. It clears 1,305,599 pixels versus 16,358,400
+for full-frame clears; repeated frames clear none. Invalid assets and command
+lists fail without changing pixels, and disappearing commands are erased.
+The helper compiles for -m68000; its reported local stack requirement is 1,488
+bytes, not a complete runtime stack measurement. It still needs live scene
+publication and the production layout adapter (including target trigonometry
+and owned-name suffix handling). Forced-pen text still uses the existing scalar
+renderer path and needs framework mask-blit acceleration before timing claims.
+No emulator performance claim follows from these host raster comparisons.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

@@ -599,6 +599,13 @@ test-amiga-clear-bank: generate-amiga-clear build/amiga-clear-bank-test
 	./build/amiga-clear-bank-test generated/amiga-clear.dwap
 test: test-amiga-clear-bank
 test: test-amiga-clear-border-cache
+test: test-amiga-clear-overlay
+.PHONY: test-amiga-clear-overlay
+build/amiga-clear-overlay-test: tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c
+test-amiga-clear-overlay: generate-amiga-clear build/amiga-clear-overlay-test
+	./build/amiga-clear-overlay-test generated/amiga-clear.dwap
 .PHONY: test-amiga-clear-border-cache
 build/amiga-clear-border-cache-test: tests/platform/amiga/AmigaClearBorderCacheTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
