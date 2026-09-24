@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
+#include "AmmoDividers.h"
 #include "DeathResultsBackdrop.h"
 #include "DeathResultsRows.h"
 #include "DeathResultsChoices.h"
@@ -280,6 +281,9 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
                           10, filled, {255, 255, 255, 255});
     startup_.mainAmmoGauge().draw(gaugeX + 4, 229 + 4 * meterOffset,
         [&](unsigned sprite, unsigned frame, int x, int y) { renderer.drawSprite(sprite, frame, x, y); });
+    drawAmmoDividers(startup_.mainAmmo(), startup_.mainAmmoCapacity(), 1,
+        gaugeX + 4, 229 + 4 * meterOffset,
+        [&](unsigned sprite, unsigned frame, int x, unsigned y) { renderer.drawSprite(sprite, frame, x, y); });
     renderer.drawSprite(416, 1, gaugeX, gaugeTop);
     const int ammoOffset = static_cast<int>(startup_.mainAmmoHudOffset());
     drawHudAmmoNumber(renderer, gaugeX + 6 + ammoOffset, 239 + ammoOffset, startup_.mainAmmo());

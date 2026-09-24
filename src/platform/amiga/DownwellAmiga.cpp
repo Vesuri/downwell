@@ -25,6 +25,7 @@
 #include "framework/AmigaHardware.h"
 #include "core/GameMakerRounding.h"
 #include "core/HudNumbers.h"
+#include "core/AmmoDividers.h"
 #include "core/DeathResultsBackdrop.h"
 #include "core/DeathResultsRows.h"
 #include "core/DeathResultsChoices.h"
@@ -481,6 +482,10 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
         [renderer](unsigned sprite, unsigned frame, int x, int y) {
             // GameMaker wraps subimages; the bottom divider has only two frames.
             drawAsset(renderer, sprite, sprite == 421 ? frame % 2 : frame, x, y, 0);
+        });
+    downwell::drawAmmoDividers(ammo, maximumAmmo, 1, 288, 229 + 4 * meterOffset,
+        [renderer](unsigned sprite, unsigned frame, int x, unsigned y) {
+            drawAsset(renderer, sprite, frame, x, y, 0);
         });
     drawAsset(renderer, 416, 1, 284, 43 + meterOffset, 0);
     drawAmmoDigit(renderer, 290 + offset, 239 + offset, ammo);

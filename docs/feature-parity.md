@@ -9,6 +9,31 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Source ammo dividers
+
+Both renderers now use the two divider loops from `scrDrawHud4x3`: the optional
+single-ammo subdivisions below capacity 20, followed by the shot-cost divisions
+and their two surrounding strokes. The current gun consumes one round per shot;
+the shared layout takes consumption explicitly for future weapon integration.
+`HudReal` implements only the positive normal binary64 operations this HUD needs,
+including rounding after division, multiplication and each loop subtraction.
+Nonpositive loop remainders terminate; no platform floating-point runtime or
+64-bit divide/multiply helper is introduced. Simply rounding rational spacing
+once would lose the original loop's accumulated rounding at some capacities.
+
+The host oracle compares every emitted sprite/frame/coordinate against direct
+binary64 source-style loops across capacities 1–64, every ammo value, four shot
+costs and all recharge offsets, plus larger-capacity fixtures. The existing
+offline sprite 421 supplies the art. The original's `consIndic`/`hla` assignments
+do not affect these `draw_sprite` arguments, so they are not invented as extra
+colour or alpha effects. Native drawing remains event-driven via HUD invalidation.
+Full host tests and 68000 instruction/helper audits pass. Bounded direct-entry
+captures match SDL while firing, while recharging, at first landing and at the
+later settled checkpoint. The landing baseline changes at 100 visible pixels,
+all inside the ammo gauge (DMA-window x=273–282, y=48–211); it was updated only
+after comparison. The settled capture retains its hash. No 20 ms timing claim
+is made by these verification builds.
+
 ### Recharge gauge motion
 
 `PlayerMotion` now counts successful `scrRecharge` operations: depleted landing,
@@ -74,7 +99,7 @@ Tests compare row selection against binary64 for capacities 1–512 and 100,000
 full-width random cases, and animation/draw order against 1,000 source-style
 updates. Native HUD invalidation stays active while row state changes and stops
 when it settles. This is not a completed reproduction of the entire gauge:
-shot-cost dividers and precise underlay geometry remain to be
+precise underlay geometry remains to be
 finished. The existing white underlay is retained beneath the source row sprites.
 The 6,000-update live combat/death comparison checks every row in both runtimes.
 Both the settled active-frame gate and the new
@@ -102,8 +127,8 @@ setting them to three. `scrDrawHud4x3` draws 184 animated row sprites (418/419,
 with 421 for the bottom filled row), changes row frames by 0.8, and draws sprite
 421 dividers at both single-ammo and shot-consumption intervals. Recharge also
 drives `meterJiggle`, consumed before the vertical gauge coordinates are built.
-The row animation and recharge motion are now implemented above; dividers remain
-missing in both ports. Presentation state must keep redraws active until
+The row animation, recharge motion and dividers are now implemented above.
+Presentation state must keep redraws active until
 settled; ammo-value changes alone are insufficient. Fractional divider positions
 must be checked against the VM's floating-point loop before replacing them with
 integer spacing, especially for upgraded capacities.

@@ -98,7 +98,7 @@ AMIGA_CREDITS_FRAME_SHA256 := 9e7137cae00e1925f0a61c045f23ed1571358e9e02451b2acf
 AMIGA_MENU_WAKE_FRAME_SHA256 := 5f84cd99630daab845d51ecda5709970caa5bb265364bee92b0be7cd229c45fa
 AMIGA_MENU_TITLE_FRAME_SHA256 := d9fcc0c40f37e61e239593aa8520a47415c054439283d7992264c40b63b39f2a
 AMIGA_MENU_ENTRY_FRAME_SHA256 := f734aa6e16f4014ddbba20d84a4ba871aa8eaa339f4bdf383bb0a25f33e20d2b
-AMIGA_GAMEPLAY_FRAME_SHA256 := 0e5b3d0a2f7c1442cc03e5e7dc03bea36cfe93555f2d2b1e4abaf31cd59609f9
+AMIGA_GAMEPLAY_FRAME_SHA256 := 8a94f47718ac0e5685d37da5c9413921a3d1f7e708f1c7ec506e36ee60a9d78b
 AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256 := aa029994a648d40bb5283e90bcd2d98011e8df0c678727fce8c1dc4422f56c38
 AREA_ONE_TRACE_TARGET := build/trace-area-one
 AREA_ONE_TRACE_SOURCES := tools/trace-area-one.cpp src/core/StartupRuntime.cpp src/core/PlayerMotion.cpp src/core/AreaOneBuilder.cpp src/core/GameMakerRandom.cpp src/core/RoomPack.cpp src/core/ObjectPack.cpp src/core/BuilderPatternPack.cpp
@@ -213,6 +213,15 @@ build/skip-to-game-test: tests/core/SkipToGameTest.cpp $(filter-out tests/core/G
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -DDOWNWELL_SKIP_TO_GAME -o $@ $^
 
 .PHONY: FORCE_STARTUP_OPTIONS
+build/ammo-dividers-test: tests/core/AmmoDividersTest.cpp src/core/AmmoDividers.h src/core/HudReal.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/AmmoDividersTest.cpp
+
+test: test-ammo-dividers
+.PHONY: test-ammo-dividers
+test-ammo-dividers: build/ammo-dividers-test
+	./build/ammo-dividers-test
+
 build/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p build
 	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' > $@.tmp
