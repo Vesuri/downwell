@@ -534,8 +534,8 @@ static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
 static void composeResultsBackdrop(AmigaRenderer* renderer,
                                     int offset, int viewX, int viewY) {
     UBYTE* saved = renderer->target;
-    renderer->target = renderer->hud;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    renderer->target = renderer->hud;
     amigaRendererFillRect(renderer, downwellPlayfieldX, 0, 160, 284, 0);
     struct Sink {
         AmigaRenderer* renderer;
@@ -574,8 +574,8 @@ static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntim
 static void composeResultsRows(AmigaRenderer* renderer,
         const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills, unsigned ticks) {
     UBYTE* saved = renderer->target;
-    renderer->target = renderer->hud;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    renderer->target = renderer->hud;
     // Include the time row's maximum bounce; progress starts at y=148.
     amigaRendererFillRect(renderer, downwellPlayfieldX, 88, 160, 60, 3);
     struct Sink {
@@ -609,8 +609,8 @@ static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& p
 static void composeResultsProgress(AmigaRenderer* renderer,
         const downwell::DeathResultsProgressBar& bar, const downwell::DeathResults& results) {
     UBYTE* saved = renderer->target;
-    renderer->target = renderer->hud;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    renderer->target = renderer->hud;
     amigaRendererFillRect(renderer, downwellPlayfieldX, 148, 160, 38, 3);
     struct Sink {
         AmigaRenderer* renderer;
@@ -2486,6 +2486,11 @@ int main(void) {
                     savedHud[byte] = expectedHud[byte] = renderer.hud[byte];
                 AmigaRenderer resultsOracle = renderer;
                 resultsOracle.hud = resultsOracle.target = expectedHud;
+                // An accidental clip/target switch must not write real terrain
+                // in either renderer. Also require observable HUD mutations.
+                ULONG gameHashBefore = 2166136261UL;
+                for (unsigned byte = 0; byte < downwellGameRingPlaneBytes * 2; ++byte)
+                    gameHashBefore = (gameHashBefore ^ renderer.game[byte]) * 16777619UL;
                 resultsOracle.blitterEnabled = 0;
                 composeResultsBackdrop(&resultsOracle, 4, 160, 34);
                 composeResultsBackdrop(&renderer, 4, 160, 34);
@@ -2503,11 +2508,20 @@ int main(void) {
                 labelFixture.frame.displayedTotal = 500;
                 composeResultsProgress(&resultsOracle, barFixture, labelFixture);
                 composeResultsProgress(&renderer, barFixture, labelFixture);
+                redrawAmmo(&resultsOracle, 12, 15);
+                redrawAmmo(&renderer, 12, 15);
                 AmigaHardware::blitterDrain();
+                unsigned changedHudBytes = 0;
+                ULONG gameHashAfter = 2166136261UL;
+                for (unsigned byte = 0; byte < downwellGameRingPlaneBytes * 2; ++byte)
+                    gameHashAfter = (gameHashAfter ^ renderer.game[byte]) * 16777619UL;
+                if (gameHashAfter != gameHashBefore) ++gDownwellResultsBackdropFailures;
                 for (unsigned byte = 0; byte < downwellLayerBytes; ++byte) {
+                    if (renderer.hud[byte] != savedHud[byte]) ++changedHudBytes;
                     if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsBackdropFailures;
                     renderer.hud[byte] = savedHud[byte];
                 }
+                if (changedHudBytes < 100) ++gDownwellResultsBackdropFailures;
                 ++gDownwellResultsBackdropChecks;
                 downwellGameplayLongRunReady();
             }

@@ -9,6 +9,37 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Overlay target correction and capacity-aware ammo HUD
+
+Audit found a blind spot in the previous results fixture: SetClipRect selects
+the game target, so assigning target=hud *before* calling it sent results draws
+to terrain. Comparing HUD buffers could then accept unchanged buffers. The
+three results composers now select HUD after setting their clip. The target
+fixture requires at least 100 changed HUD bytes and an unchanged gameplay-ring
+hash in addition to comparing all HUD bytes. Earlier overlay-pass claims alone
+must not be treated as proof of visible results rendering.
+
+Both HUD gauges now divide charge by the shared player's actual capacity.
+Native invalidation includes capacity changes even if charge is unchanged.
+Ammo labels share the source digit-layer layout: fourteen outline layers for
+each digit, then all foreground digits, centered with an eight-pixel horizontal
+advance and one-pixel vertical advance. Single native digits keep their offline
+composite fast path; larger counts use existing planar glyph assets, without
+runtime asset conversion. Label clearing covers both old and new digit extents
+and restores the gauge afterward. The overlay fixture also draws 12/15 ammo.
+
+This does not implement the original gauge's remaining highlights/dividers or
+enable live combo grants. It removes fixed-eight display assumptions and the
+incorrect results target; complete Windows visual parity remains unproven.
+Validation: full host suite and strengthened bounded A500 overlay/cache gate
+pass, including observable HUD changes, zero scalar/blitter differences,
+unchanged gameplay-ring hash, 101 terrain comparisons and an intact stack
+margin. The 68000 instruction/helper audits remain clean.
+The active-gameplay capture also passes its unchanged raw framebuffer checksum
+and SDL/native comparison (0 differing pixels of 99,968). Its first run caught
+a changed single-digit clear representation; that path was restored exactly,
+not accepted by changing the expected checksum. Normal builds are restored.
+
 ### Shared combo grants and variable ammo capacity
 
 `applyComboGrants` applies the recovered reward mutations to shared currency,
