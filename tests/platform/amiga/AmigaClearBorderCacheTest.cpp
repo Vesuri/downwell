@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaClearBorderCache.h"
+#include "platform/amiga/AmigaClearBorderRenderer.h"
 #include "platform/amiga/AmigaRenderer.h"
 #include "core/LevelClearMotion.h"
 #include "core/LevelUpgradeArt.h"
@@ -35,25 +36,13 @@ int main(int argc, char** argv) {
             motion.step(false);
             const int viewY = motion.viewY();
             const auto frame = presentation.advance(area, level, tick < 60 ? 0 : 4, tick >= 60);
-            auto paint = [&](int y, int anchorY, unsigned current, unsigned incoming) {
-                amigaRendererSetGameOrigin(&cached, cache.origin);
-                amigaRendererClearGameRows(&cached, y, 1, 0);
-                amigaRendererSetClipRect(&cached, 110, y, 160, 1);
-                for (unsigned pass = 0; pass < 2; ++pass) {
-                    const unsigned id = downwell::levelBorderSprite(area + pass);
-                    for (unsigned slot = 0; slot < 2; ++slot) {
-                        if (!((pass ? incoming : current) & (1u << slot))) continue;
-                        amigaRendererDrawAsset(&cached, pack.data(), pack.data() + pack.size(), id, 13,
-                            pass ? 118 : 110, anchorY + 16 * slot, 0);
-                        amigaRendererDrawAsset(&cached, pack.data(), pack.data() + pack.size(), id, 7,
-                            pass ? 262 : 270, anchorY + 16 * slot, 0);
-                    }
-                }
-            };
-            const unsigned changed = cache.update(frame, viewY, paint);
+            unsigned changed = 0;
+            require(amigaRenderClearBorder(cached, cache, pack.data(), pack.data() + pack.size(), frame, viewY, changed),
+                "production border renderer accepts recovered assets");
             painted += changed;
             require(tick == 0 || changed < 40, "scroll update never repaints the visible border playfield");
-            require(cache.update(frame, viewY, paint) == 0, "repeated presentation does not redraw or scroll");
+            require(amigaRenderClearBorder(cached, cache, pack.data(), pack.data() + pack.size(), frame, viewY, changed) &&
+                changed == 0, "repeated presentation does not redraw or scroll");
             std::memset(fresh.data(), 0, fresh.size());
             amigaRendererSetClipRect(&reference, 110, 0, 160, 284);
             frame.borders([&](int selectedArea, int subimage, int x, int y) {
@@ -69,6 +58,15 @@ int main(int argc, char** argv) {
             ++comparisons;
         }
         require(painted < 240 * 284 / 10, "border cache avoids over ninety percent of full-frame row repaints");
+        const auto pixelsBefore = retained;
+        const auto cacheBefore = cache;
+        unsigned changed = 99;
+        const auto invalidFrame = presentation.advance(area, level, 4, true);
+        require(!amigaRenderClearBorder(cached, cache, pack.data(), pack.data() + 20,
+            invalidFrame, motion.viewY(), changed) && changed == 0 && pixelsBefore == retained &&
+            cache.origin == cacheBefore.origin && cache.previousTileY == cacheBefore.previousTileY &&
+            std::memcmp(cache.rows, cacheBefore.rows, sizeof cache.rows) == 0,
+            "missing border assets fail before touching the retained buffer or cache");
     }
     std::printf("%u circular clear-border frames match full rendering\n", comparisons);
 }

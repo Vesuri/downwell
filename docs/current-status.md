@@ -331,6 +331,17 @@ also enforce the recovered 16x16/origin(8,8) geometry and Limbo's overlapping
 This cache is not yet published by the application's copper or measured on the
 68000; the comparison establishes pixel retention, not a 20ms frame budget.
 
+AmigaClearBorderRenderer now connects that planner to the production planar
+renderer, grouping adjacent dirty scanlines with matching source anchors/masks
+into clipped spans. It uses the existing row clear and masked asset drawing
+paths (including their hardware-blitter path when enabled), validates all four
+border frames before changing state, and returns the painted-row count. The
+2,880-frame comparison now invokes this production helper instead of a test-only
+scanline painter; truncated packs are rejected without changing pixels/cache.
+A freestanding -m68000 compile has only existing renderer API dependencies,
+with no arithmetic helpers. Live scene publication, hardware blitter execution
+and timing remain unverified for this helper.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
