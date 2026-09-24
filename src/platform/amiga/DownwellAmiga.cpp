@@ -336,6 +336,7 @@ __attribute__((noinline, used)) void downwellGameplayFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
 
+__attribute__((noinline, used)) void downwellGameplayAmmoFrameReady(void) { __asm__ volatile ("nop"); }
 __attribute__((noinline, used)) void downwellGameplayActiveFrameReady(void) {
     __asm__ volatile("" ::: "memory");
 }
@@ -442,7 +443,8 @@ static void drawAmmoDigit(AmigaRenderer* renderer, int x, int y,
     }
 }
 
-static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0) {
+static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumAmmo, unsigned offset = 0,
+                       const downwell::AmmoGaugeRows* rows = nullptr) {
     enum {
         gaugeX = 289,
         gaugeTop = 49,
@@ -478,6 +480,11 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
         amigaRendererFillRect(renderer, gaugeX,
                               gaugeTop + gaugeLength - filled,
                               gaugeWidth, filled, 1);
+    if (rows) rows->draw(288, 229,
+        [renderer](unsigned sprite, unsigned frame, int x, int y) {
+            // GameMaker wraps subimages; the bottom divider has only two frames.
+            drawAsset(renderer, sprite, sprite == 421 ? frame % 2 : frame, x, y, 0);
+        });
     drawAsset(renderer, 416, 1, 284, 43, 0);
     drawAmmoDigit(renderer, 290 + offset, 239 + offset, ammo);
 }
@@ -2273,7 +2280,7 @@ int main(void) {
                 destroyedBlockY[block] = result.blockY[block];
             }
             if (result.ammoChanged)
-                redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset());
+                redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity(), port.ammoHudOffset(), &port.ammoGauge());
             if (result.healthChanged)
                 redrawHealth(&renderer, (unsigned)port.health(), (unsigned)port.healthMaximum(),
                              port.healthReserve().pieces, port.healthReserve().piecesPerHeart);
@@ -2725,6 +2732,12 @@ int main(void) {
                 if (changedHudBytes < 100) ++gDownwellResultsBackdropFailures;
                 ++gDownwellResultsBackdropChecks;
                 downwellGameplayLongRunReady();
+            }
+            static bool ammoFrameReported = false;
+            if (!ammoFrameReported && port.player().ammo() < port.player().ammoCapacity() && port.ammoHudOffset() == 2) {
+                ammoFrameReported = true;
+                exposeGameplayFrame(memory, gameDisplay[back], back, port);
+                downwellGameplayAmmoFrameReady();
             }
             if (!sceneGameplayLandedReported && port.player().grounded()) {
                 sceneGameplayLandedReported = true;

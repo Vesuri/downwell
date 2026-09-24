@@ -277,6 +277,8 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     if (filled > 0)
         renderer.fillRect(gaugeX + 5, gaugeBottom - filled,
                           10, filled, {255, 255, 255, 255});
+    startup_.mainAmmoGauge().draw(gaugeX + 4, 229,
+        [&](unsigned sprite, unsigned frame, int x, int y) { renderer.drawSprite(sprite, frame, x, y); });
     renderer.drawSprite(416, 1, gaugeX, gaugeTop);
     const int ammoOffset = static_cast<int>(startup_.mainAmmoHudOffset());
     drawHudAmmoNumber(renderer, gaugeX + 6 + ammoOffset, 239 + ammoOffset, startup_.mainAmmo());

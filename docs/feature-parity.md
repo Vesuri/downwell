@@ -9,6 +9,28 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared animated ammo rows
+
+Both renderers now draw the original 184 row sprites using `AmmoGaugeRows`.
+Starting from 3, the VM's binary64 +/-0.8 transitions have exactly five reachable
+values, represented as a five-state integer chain. Threshold calculation also
+preserves the nine exact-rational boundaries where binary64 rounding includes
+an additional row. No floating-point or 64-bit division is needed on the Amiga.
+The native adapter wraps the two-frame bottom divider just as SDL/GameMaker do.
+Assets 418, 419 and 421 are converted offline; HUD pack size is 14,636 bytes.
+
+Tests compare row selection against binary64 for capacities 1–512 and 100,000
+full-width random cases, and animation/draw order against 1,000 source-style
+updates. Native HUD invalidation stays active while row state changes and stops
+when it settles. This is not a completed reproduction of the entire gauge:
+shot-cost dividers, recharge jiggle and precise underlay geometry remain to be
+finished. The existing white underlay is retained beneath the source row sprites.
+The 6,000-update live combat/death comparison checks every row in both runtimes.
+Both the settled active-frame gate and the new
+`verify-amiga-gameplay-ammo-frame` gate pass with zero differing pixels against
+SDL. The latter captures simulation update 180, with seven rounds and the firing
+offset active. Normal target builds and 68000 instruction/helper audits pass.
+
 ### Ammo firing feedback and remaining gauge work
 
 `AmmoHudMotion` is shared by both run sessions. It follows the 4:3 HUD VM's
@@ -29,8 +51,8 @@ setting them to three. `scrDrawHud4x3` draws 184 animated row sprites (418/419,
 with 421 for the bottom filled row), changes row frames by 0.8, and draws sprite
 421 dividers at both single-ammo and shot-consumption intervals. Recharge also
 drives `meterJiggle`, consumed before the vertical gauge coordinates are built.
-These row animations, dividers and recharge motion are still missing in both
-ports. Their eventual shared presentation state must keep redraws active until
+The row animation is now implemented above; dividers and recharge motion remain
+missing in both ports. Presentation state must keep redraws active until
 settled; ammo-value changes alone are insufficient. Fractional divider positions
 must be checked against the VM's floating-point loop before replacing them with
 integer spacing, especially for upgraded capacities.

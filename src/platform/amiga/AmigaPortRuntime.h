@@ -189,6 +189,7 @@ public:
     unsigned gemStreakTimer() const { return currencyAccount_.timer; }
     int health() const { return health_; }
     unsigned ammoHudOffset() const { return run_.ammoHud.offset; }
+    const downwell::AmmoGaugeRows& ammoGauge() const { return run_.ammoGauge; }
     unsigned invulnerability() const { return invulnerability_; }
     bool dead() const { return death_.active; }
     unsigned deathFrames() const { return death_.frames; }

@@ -154,6 +154,7 @@ public:
     int mainCameraRenderViewY() const { return mainCameraMotion_.pixelY() - surfaceHeight / 2; }
     int mainAmmo() const { return mainAmmo_; }
     unsigned mainAmmoHudOffset() const { return run_.ammoHud.offset; }
+    const AmmoGaugeRows& mainAmmoGauge() const { return run_.ammoGauge; }
     int mainAmmoCapacity() const { return mainPlayerMotion_.ammoCapacity(); }
     int mainPlayerHealth() const { return mainPlayerHealth_; }
     const PlayerDeathSequence& mainDeathSequence() const { return mainDeath_; }

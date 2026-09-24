@@ -1,8 +1,10 @@
 #include "core/HudNumbers.h"
 #include "core/AmmoHudMotion.h"
+#include "core/AmmoGaugeRows.h"
 #include <array>
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 
 namespace {
 
@@ -43,6 +45,42 @@ public:
 } // namespace
 
 int main() {
+    for (unsigned cap = 1; cap <= 512; ++cap)
+        for (unsigned ammo = 0; ammo <= cap; ++ammo)
+            require(downwell::ammoGaugeFilledRows(ammo, cap) ==
+                    static_cast<unsigned>(std::ceil(184.0 * (static_cast<double>(ammo) / cap))),
+                    "integer row threshold preserves VM binary64 boundary behavior");
+    std::uint32_t random = 2;
+    for (unsigned i = 0; i < 100000; ++i) {
+        random = random * 1664525u + 1013904223u;
+        const auto cap = random | 1u;
+        random = random * 1664525u + 1013904223u;
+        const auto ammo = random % cap;
+        require(downwell::ammoGaugeFilledRows(ammo, cap) ==
+                static_cast<unsigned>(std::ceil(184.0 * (static_cast<double>(ammo) / cap))),
+                "row threshold handles full-width capacities without overflow");
+    }
+    downwell::AmmoGaugeRows rows;
+    double original[184];
+    for (auto& row : original) row = 3;
+    for (unsigned tick = 0; tick < 1000; ++tick) {
+        const unsigned ammo = (tick / 3) % 9;
+        rows.step(ammo, 8);
+        for (unsigned i = 0; i < 184; ++i) {
+            if (i < 184.0 * (ammo / 8.0)) { if (original[i] <= 3) original[i] += .8; }
+            else if (original[i] >= 1) original[i] -= .8;
+        }
+        unsigned count = 0;
+        rows.draw(288, 229, [&](unsigned sprite, unsigned frame, int x, int y) {
+            require(sprite == (count < 23 * ammo ? (count ? 419u : 421u) : 418u) &&
+                    frame == static_cast<unsigned>(original[count]) && x == 288 &&
+                    y == 229 - static_cast<int>(count), "row draws match original fractional animation");
+            ++count;
+        });
+        require(count == 184, "all source gauge rows are emitted");
+    }
+    for (unsigned i = 0; i < 5; ++i) rows.step(8, 8);
+    require(!rows.step(8, 8), "settled row animation stops requesting redraws");
     downwell::AmmoHudMotion ammoMotion;
     require(!ammoMotion.step(0) && ammoMotion.offset == 0, "settled ammo label stays clean");
     require(ammoMotion.step(1) && ammoMotion.offset == 2, "shot immediately offsets ammo label");

@@ -40,6 +40,9 @@ SELECTIONS = {
         414: None,   # sprSpriteSlash
         415: None,   # sprPcHudHpGauge
         416: None,   # sprPcHudStammoGauge
+        418: None,   # sprPcHudStammoPop
+        419: None,   # sprPcHudStammoCharge
+        421: None,   # sprPcHudStammoDivide (also first filled row)
     },
     "game": {
         0: None,     # sprPlDead
