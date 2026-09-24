@@ -164,9 +164,9 @@ build/death-menu-sequence-test: tests/core/DeathMenuSequenceTest.cpp src/core/De
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DeathMenuSequenceTest.cpp
 
-build/combo-state-test: tests/core/ComboStateTest.cpp src/core/ComboState.h
+build/combo-state-test: tests/core/ComboStateTest.cpp src/core/ComboState.h src/core/ComboGrants.h src/core/CurrencyAccount.h src/core/PlayerMotion.cpp src/core/PlayerMotion.h
 	@mkdir -p build
-	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/ComboStateTest.cpp
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/ComboStateTest.cpp src/core/PlayerMotion.cpp
 
 build/death-menu-progress-test: tests/core/DeathMenuProgressTest.cpp src/core/DeathMenuProgress.h src/core/DeathMenuSequence.h src/core/RunGemStatistics.h src/core/DeathResults.h src/core/DeathResultsProgressBar.h src/core/DeathResultsProgressLabels.h src/core/Input.h src/core/AlarmBank.h
 	@mkdir -p build

@@ -42,6 +42,7 @@ constexpr unsigned playerDeathVerificationCoverage = 511;
     }
     for (unsigned scenario = 0; scenario < 2; ++scenario) {
         PlayerMotion player(false, 32);
+        if (scenario == 1) player.increaseAmmoCapacity(1);
         PlayerDeathSequence death;
         RunClock clock;
         int health = 4;

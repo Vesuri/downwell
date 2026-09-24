@@ -65,6 +65,12 @@ public:
     bool airborneShot() const { return airborneShot_; }
     bool spinJumping() const { return spinJumping_; }
     int ammo() const { return ammo_; }
+    int ammoCapacity() const { return ammoCapacity_; }
+    // comboRewardText Create increases global.ammo and refills global.stammo.
+    void increaseAmmoCapacity(unsigned amount) {
+        ammoCapacity_ += static_cast<int>(amount);
+        ammo_ = ammoCapacity_;
+    }
     bool grounded() const { return grounded_; }
     int facing() const { return facing_; }
     int spriteId(bool dead = false) const;
@@ -102,6 +108,7 @@ private:
     int pixelX_;
     int pixelY_;
     int ammo_;
+    int ammoCapacity_ = 8;
     bool grounded_;
     bool priorFire_;
     bool jumpShootLocked_;

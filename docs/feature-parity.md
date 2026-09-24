@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared combo grants and variable ammo capacity
+
+`applyComboGrants` applies the recovered reward mutations to shared currency,
+player and health-reserve state. Non-gem rewards add to currency, run gems and
+streak and reset its timer (including less-resist's extra 180 updates). Ammo
+rewards increase capacity and refill charge. `PlayerMotion` now retains that
+capacity through landing, stomp and damage recharges instead of restoring eight.
+Nondefault capacity is included in its authoritative digest extension.
+
+`HealthReserve` follows gainHp VM blocks 1--6: heal existing damage first,
+convert only surplus healing to pieces, and for each four pieces increase
+maximum health and refill it. Effects report the non-gem pickup effects,
+ammo effect, healing sound and each maximum-health message for the caller;
+they do not invoke platform rendering or audio.
+
+Focused tests exercise cumulative grants, spent-charge refill, all three
+recharge paths, surplus health and multi-heart overflow. The cross-CPU death
+fixture's second scenario now has upgraded ammo capacity. This still does not
+enable live combos: completion scheduling, grant calls in the world loop,
+dynamic-capacity HUD presentation and persistence remain to be connected.
+Validation: full host suite passes. The bounded 68000 replay passes with
+death/capacity digest `107e3ea0f56b657a`, unchanged default player/currency
+digests, all nine death transitions and an intact 256-byte stack margin.
+Instruction/helper audits are clean. The grant/heart-piece tests are host-side;
+only upgraded player capacity participates in this target fixture.
+
 ### Combo completion rules recovered, not yet integrated
 
 `ComboState` models scrEnemyDeath's count increment and comboDone VM blocks

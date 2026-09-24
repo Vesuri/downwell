@@ -1,4 +1,5 @@
 #include "core/ComboState.h"
+#include "core/ComboGrants.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
@@ -6,6 +7,39 @@ static void require(bool value, const char* message) {
 }
 int main() {
     using downwell::ComboState;
+    PlayerMotion player(false, 1000);
+    downwell::Input fire; fire.fire = true;
+    player.step(fire);
+    require(player.ammo() == 7, "reward fixture starts with spent charge");
+    downwell::CurrencyAccount currency;
+    currency.collect(3);
+    downwell::HealthReserve reserve;
+    int health = 3;
+    ComboState::Reward grants;
+    grants.gems = 100; grants.ammo = 1; grants.health = 1;
+    const auto effects = downwell::applyComboGrants(grants, currency, player, health, reserve, 300, true);
+    require(currency.currency == 103 && currency.gameGem == 103 && currency.streak == 103 &&
+                currency.timer == 480, "bonus gems update all balances and the source streak timer");
+    require(player.ammoCapacity() == 9 && player.ammo() == 9 && health == 4 && reserve.pieces == 0,
+            "ammo reward raises capacity and refills while health first heals damage");
+    require(effects.nonGemGain && effects.ammoEffect && effects.healSound &&
+                effects.maximumHealthMessages == 0, "grant effects remain separate from platform rendering");
+    player.step({}); player.step(fire);
+    require(player.ammo() == 8, "upgraded charge is consumed normally");
+    player.stompBounce();
+    require(player.ammo() == 9, "stomping refills upgraded capacity");
+    player.step({}); player.step(fire);
+    player.contactKnockback(0, 0);
+    require(player.ammo() == 9, "damage knockback refills upgraded capacity");
+    for (unsigned i = 0; i < 400; ++i) player.step({});
+    require(player.grounded() && player.ammo() == 9, "landing retains upgraded capacity");
+    for (unsigned i = 0; i < 3; ++i)
+        require(reserve.gain(health, 1) == 0 && health == 4, "full-health gains accumulate pieces");
+    require(reserve.gain(health, 1) == 1 && health == 5 && reserve.maximum == 5 && reserve.pieces == 0,
+            "four surplus health points increase maximum health and refill it");
+    health = 3;
+    require(reserve.gain(health, 11) == 2 && health == 7 && reserve.maximum == 7 && reserve.pieces == 1,
+            "large heal first fills damage, then processes every complete piece group");
     for (unsigned count = 0; count <= 101; ++count) {
         ComboState state;
         for (unsigned i = 0; i < count; ++i) state.enemyDefeated();

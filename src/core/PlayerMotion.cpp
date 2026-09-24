@@ -89,7 +89,7 @@ void PlayerMotion::stompBounce()
     speedY_ = -640;
     gravityRemainder_ = 0;
     grounded_ = false;
-    ammo_ = maximumAmmo;
+    ammo_ = ammoCapacity_;
 }
 
 void PlayerMotion::contactKnockback(int enemyX, int enemyY)
@@ -108,7 +108,7 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
     // scrRecharge even for damage knockback (not only enemy stomps).
     if (impulseX != 0)
         speedX_ = impulseX;
-    ammo_ = maximumAmmo;
+    ammo_ = ammoCapacity_;
     speedY_ = -2 * fixedOne;
     gravityRemainder_ = 0;
     grounded_ = false;
@@ -290,7 +290,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             gravityRemainder_ = 0;
             verticalPositionRemainder_ = 0;
             grounded_ = true;
-            ammo_ = maximumAmmo;
+            ammo_ = ammoCapacity_;
             airborneShot_ = false;
             spinJumping_ = false;
         }
@@ -387,6 +387,11 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
     digest.addU32(balancePhaseQuarters_); digest.addU32(shotPhaseQuarters_);
     digest.addU32(shotDelay_); digest.addI32(facing_);
     digest.addU32(jumps_); digest.addU32(shots_);
+    // Preserve the default-state replay stream; nondefault capacity is an
+    // explicit extension and must differ even when current charge is equal.
+    if (ammoCapacity_ != maximumAmmo) {
+        digest.addU32(0x414d4d4f); digest.addI32(ammoCapacity_);
+    }
 }
 
 int PlayerMotion::spriteId(bool dead) const
