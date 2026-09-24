@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/GameplaySceneStorage.h"
+#include "platform/amiga/AmigaExitMask.h"
 #include "core/ShopFixtures.h"
 #include "platform/amiga/AmigaShopMenu.h"
 
@@ -83,6 +84,15 @@ int main(int argc, char** argv) {
                 storage.resultsCapacity == 32140 && storage.hudOffset == 62860,
             "results pack fits between live staging ring and relocated HUD");
     require(storage.resultsCapacity >= 25820, "current offline results pack fits without allocation");
+    require(AmigaExitMask::bytes == 31104 && storage.resultsCapacity >= AmigaExitMask::bytes,
+        "offline exit mask fits retired intro bank without touching staging or HUD");
+    for (int top = -100; top <= 300; ++top) {
+        const unsigned offset = AmigaExitMask::offset(top);
+        require(offset % 48 == 0 && offset + 284 * 48 <= AmigaExitMask::bytes,
+            "every exit wipe DMA window stays within immutable mask bank");
+    }
+    require(AmigaExitMask::offset(-100) == 364 * 48 && AmigaExitMask::offset(284) == 0,
+        "exit DMA endpoints select transparent and solid shaft coverage");
     require(!GameplaySceneStorage::partition(100, 101, 0).valid &&
                 !GameplaySceneStorage::partition(100, 80, 21).valid &&
                 !GameplaySceneStorage::partition(100, 99, 1).valid,

@@ -719,6 +719,31 @@ def build_pack(manifest, extracted, profile, language_path=None):
         b"".join(records), bytes(payload)))
 
 
+def build_exit_mask(pack):
+    """Gameplay-stride exit cover: solid / original edge / transparent.
+
+    Position the 160-pixel shaft at x=110 in a 384-pixel DMA row offline.
+    284+80+284 rows permit every visible wipe position by pointer alone.
+    """
+    count = HEADER.unpack_from(pack)[3]
+    records = [RECORD.unpack_from(pack, HEADER.size + i * RECORD.size)
+               for i in range(count)]
+    record = next(r for r in records if r[0] == 65005 and r[1] == 0)
+    _, _, _, _, width, height, dma_width, _, offset, length = record
+    require(width == 160 and height == 80 and dma_width == 160 and length >= 1600,
+            "unexpected exit-edge planar layout")
+    stride, rows, left = 48, 648, 110
+    output = bytearray(stride * rows)
+    for y in range(364):
+        for x in range(160):
+            covered = y < 284 or bool(pack[offset + (y - 284) * 20 + x // 8]
+                                      & (0x80 >> (x & 7)))
+            if covered:
+                px = left + x
+                output[y * stride + px // 8] |= 0x80 >> (px & 7)
+    return bytes(output)
+
+
 def atomic_write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
@@ -756,6 +781,24 @@ def main():
     else:
         atomic_write(args.output, data)
         print(f"Amiga {args.profile} pack written: {len(data)} bytes sha256 {digest}")
+    if args.profile == "game":
+        mask = build_exit_mask(data)
+        mask_path = args.output.with_suffix(".exit-mask")
+        provenance_path = args.output.with_suffix(".exit-mask.json")
+        provenance = json.dumps({
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/exit-mask-v1",
+            "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
+            "packSha256": digest, "sourceSpriteId": 128, "sourceFrame": 0,
+            "derivedStripId": 65005, "width": 384, "height": 648,
+            "playfieldX": 110, "playfieldWidth": 160, "bytesPerRow": 48,
+            "maskSha256": hashlib.sha256(mask).hexdigest(),
+        }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
+        if args.check:
+            require(mask_path.read_bytes() == mask, "exit mask is not reproducible")
+            require(provenance_path.read_bytes() == provenance, "exit mask provenance differs")
+        else:
+            atomic_write(mask_path, mask)
+            atomic_write(provenance_path, provenance)
     if args.profile == "shop":
         provenance = json.dumps({
             "schemaVersion": 1, "generator": "generate-amiga-hud.py/shop-v1",
