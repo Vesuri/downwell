@@ -270,6 +270,17 @@ int main() {
             "held gunboots retain simultaneous seven-tick shots");
     require(burst.bulletAt(0).x == -1 && burst.bulletAt(1).x == 1,
             "original default gun alternates left and right boot emission offsets");
+    burst.configureSolidResolver([](void*, int, int y) { return y == 70; }, nullptr);
+    burst.step(4);
+    require(!burst.bulletAt(0).active && burst.bulletAt(1).active,
+            "retiring the oldest bullet leaves a hole before a surviving shot");
+    burst.configureSolidResolver(nullptr, nullptr);
+    for (unsigned frame = 9; frame <= 14; ++frame) burst.step(4);
+    require(burst.player().shots() == 3 && burst.bulletCount() == 2 &&
+                burst.bulletAt(0).active && burst.bulletAt(0).x == 1 &&
+                burst.bulletAt(1).active && burst.bulletAt(1).x == -1 &&
+                burst.bulletAt(0).y > burst.bulletAt(1).y,
+            "new shots append after older survivors rather than reusing earlier holes");
     AmigaPortRuntime movingShot(300, false, 1000);
     for (unsigned frame = 0; frame < 12; ++frame) movingShot.step(2);
     const int muzzleX = downwell::roundGameMakerQ8(movingShot.player().offsetXFixed());

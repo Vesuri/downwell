@@ -15,6 +15,7 @@
 #include "core/FrogMotion.h"
 #include "core/StandardBulletStep.h"
 #include "core/StandardBulletImpact.h"
+#include "core/StableInstanceSlots.h"
 #include "core/FrogVerticalMotion.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
@@ -432,18 +433,15 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         destroyedBlockY[destroyedBlockCount++] = box.y;
     }
     if (player_.shots() != oldShots) {
-        unsigned index;
-        for (index = 0; index < bulletCapacity; ++index) {
+        const unsigned index = downwell::compactInstanceSlots(bullets_, bulletCapacity);
+        if (index < bulletCapacity) {
             BulletState& bullet = bullets_[index];
-            if (!bullet.active) {
-                bullet.active = true;
-                // Default scrPlayerInit starts shootLeg at -1;
-                // scrPlayerEmitBullet negates it after every actual shot.
-                bullet.x = muzzleX + ((oldShots & 1u) ? 1 : -1);
-                bullet.y = muzzleY;
-                bulletChanged = true;
-                break;
-            }
+            bullet.active = true;
+            // Default scrPlayerInit starts shootLeg at -1;
+            // scrPlayerEmitBullet negates it after every actual shot.
+            bullet.x = muzzleX + ((oldShots & 1u) ? 1 : -1);
+            bullet.y = muzzleY;
+            bulletChanged = true;
         }
     }
 

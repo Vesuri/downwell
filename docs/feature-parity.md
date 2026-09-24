@@ -9,6 +9,21 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+Native bullet storage now stably compacts surviving shots before appending a
+new shot, using the same core slot-compaction policy as currency storage.
+Previously its first-free-slot allocation could place a newborn ahead of an
+older survivor, unlike the host's dense creation-ordered traversal. A focused
+test retires the oldest of two shots and checks that the third is appended
+after the survivor. Both combat tapes additionally compare every live bullet
+in creation order (the existing one-pixel X / three-pixel Y tolerances remain).
+This removes a storage-induced ordering divergence; it does not establish
+the original runner's complete collision-event ordering or allocation-failure
+behavior. The fixed sixteen-shot capacity is unchanged.
+The full host suite, 600-tick A500 terrain-cache check and canonical cross-CPU
+replay pass with this ordering fix. The replay digest is unchanged; the new
+hole-reuse regression and ordered combat comparisons provide the direct
+coverage for this change.
+
 The playable executable now generates terrain and enemies incrementally from
 the live RNG stream. The forecast/integration-foundation notes below describe
 the migration history, not the current executable. Native/SDL actor-by-actor

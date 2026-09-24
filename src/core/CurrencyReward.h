@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_CURRENCY_REWARD_H
 #define DOWNWELL_CORE_CURRENCY_REWARD_H
 #include "GemMotion.h"
+#include "StableInstanceSlots.h"
 namespace downwell {
 struct CurrencyBirth {
     GemMotion motion;
@@ -32,14 +33,7 @@ unsigned spawnCurrencyReward(int amount, int x, int y, bool attracted,
 // order, matching the dense host store instead of reusing its first hole.
 template<class Record>
 unsigned compactCurrencySlots(Record* records, unsigned capacity) {
-    unsigned write = 0;
-    for (unsigned read = 0; read < capacity; ++read) {
-        if (!records[read].active) continue;
-        if (write != read) records[write] = records[read];
-        ++write;
-    }
-    for (unsigned i = write; i < capacity; ++i) records[i].active = false;
-    return write;
+    return compactInstanceSlots(records, capacity);
 }
 } // namespace downwell
 #endif

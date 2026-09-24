@@ -886,6 +886,18 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << " ground=" << gameplay.player().grounded() << ',' << reference.mainPlayerGrounded()
                           << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired() << '\n';
             require(gameplay.generationSucceeded(), "combat continuation retains successful live generation");
+            require(gameplay.bulletCount() == reference.mainBulletCount(),
+                    "combat continuation retains the same live bullet count");
+            unsigned bulletOrdinal = 0;
+            for (unsigned i = 0; i < gameplay.bulletCapacity; ++i) {
+                const auto& bullet = gameplay.bulletAt(i);
+                if (!bullet.active) continue;
+                const auto& hostBullet = reference.mainBulletAt(bulletOrdinal++);
+                requireNear(bullet.x + 240, hostBullet.x, 1.0F,
+                            "combat bullet X matches in creation order");
+                requireNear(bullet.y + 176, hostBullet.y, 3.0F,
+                            "combat bullet Y matches in creation order");
+            }
             verifyFrogMotion(gameplay, reference);
             if (std::getenv("DOWNWELL_TRACE_GEM_MOTION")) {
                 {
