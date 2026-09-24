@@ -4,9 +4,32 @@
 
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
-and reduces its measured work roughly tenfold, but the current 600-update
-firing tape runs at 28.85 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+and reduces its measured work substantially, but the current 600-update
+firing tape runs at 32.33 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
+
+### Separate runtime costs (2026-09-25)
+
+The old `player` phase also covered camera and procedural generation, while
+`gems` covered retirement and HUD state after the gem loop. Four additional
+probe-only phases now separate these costs; existing phase IDs are stable.
+The GDB report derives its loop bound from the actual counter-array size.
+
+| Phase | Work | Total / 600 updates | Mean / update | Maximum bracket |
+| --- | --- | ---: | ---: | ---: |
+| 31 | Camera update | 288.107 ms | 0.480 ms | 0.717 ms |
+| 32 | Generation callback | 484.155 ms | 0.807 ms | 102.096 ms |
+| 33 | Exit/retirement/results lifecycle | 308.130 ms | 0.514 ms | 0.941 ms |
+| 34 | HUD animation and frame flags | 791.261 ms | 1.319 ms | 2.096 ms |
+
+Evidence: `/tmp/downwell-runtime-phases-profile.log`, bounded 45-second
+`SKIP_TO_GAME=1` probe run with the same 600-update tape. These are
+instrumented timings, not a new shipping-FPS measurement. The generation
+spike and recurring HUD-state cost deserve separate investigation. In
+particular, phase 34 includes the 184-row animation loop even when settled;
+the measurement does not yet isolate that loop from the other frame flags.
+All new probes compile out of ordinary and FPSCOUNT-only builds. Host runtime
+fixture digests remain unchanged (`7e82f060aa3fcbf9`, `0db388a5b1c2a40a`).
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 

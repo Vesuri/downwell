@@ -542,6 +542,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     int cameraXDelta = 0;
     if (followCamera_) {
         const int oldCameraPixelX = cameraPixelX_;
+        DW_PROFILE_SCOPE(profileCamera);
         const int oldCameraPixelY = cameraPixelY_;
         cameraMotion_.step(240L * 256 + player_.offsetXFixed(),
                            176L * 256 + player_.offsetYFixed(), dead());
@@ -562,6 +563,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }
 
     if (generationStep_ && generationSucceeded_) {
+        DW_PROFILE_SCOPE(profileGeneration);
         // Camera centre is 176 + cameraY_/256; view bottom is 142 below it.
         const long bottom = generationCameraY + 318L * 256L;
         const int bottomCeiling = bottom >= 0 ? (int)((bottom + 255) / 256)
@@ -844,6 +846,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.y = downwell::GemMotion::rounded(gem.motion.y);
     }
 
+    DW_PROFILE_PHASE(profileLifecycle);
     run_.exitDither.step(cameraMotion_.pixelY() - 142, 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
@@ -878,6 +881,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     AmigaPortFrame frame = {};
     run_.results.presentationStep();
     frame.playerMotion = motion;
+    DW_PROFILE_PHASE(profileHudState);
     const bool ammoMotionChanged = run_.ammoHud.step(player_.shots(), player_.recharges());
     const bool ammoRowsChanged = run_.ammoGauge.step(player_.ammo(), player_.ammoCapacity());
     frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity || ammoMotionChanged || ammoRowsChanged;
