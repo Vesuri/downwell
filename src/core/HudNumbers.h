@@ -5,6 +5,16 @@
 
 namespace downwell {
 
+// scrDrawHud4x3: reserve fill, then dividers, before the gauge foreground.
+template<class Fill, class Draw>
+void drawHeartPieceMeter(int x, int y, unsigned pieces, unsigned perHeart,
+                         Fill fill, Draw draw) {
+    if (!perHeart) return;
+    fill(x + 4, y + 14, static_cast<int>(80 * pieces / perHeart), 2);
+    for (unsigned i = 1; i < perHeart; ++i)
+        draw(378, 2, x + 2 + static_cast<int>(80 * i / perHeart), y + 12);
+}
+
 // drawSpriteHP: each digit's three shadow passes precede its foreground.
 // Keep the slash fixed; current health grows left and maximum grows right.
 template<class Draw>

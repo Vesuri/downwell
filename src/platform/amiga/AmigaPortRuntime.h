@@ -198,6 +198,7 @@ public:
     const downwell::RunCombo& runCombo() const { return run_.combo; }
     const downwell::RunStage& runStage() const { return run_.stage; }
     int healthMaximum() const { return run_.combo.healthReserve.maximum; }
+    const downwell::HealthReserve& healthReserve() const { return run_.combo.healthReserve; }
     const downwell::DeathResults& deathResults() const { return run_.results; }
     bool playerVisible() const { return downwell::playerDamageVisible(invulnerability_); }
     bool bulletActive() const { return bulletCount() != 0; }

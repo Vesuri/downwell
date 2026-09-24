@@ -259,6 +259,10 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     renderer.fillRect(origin - 98, 11,
                       80 * startup_.mainPlayerHealth() / startup_.mainPlayerHealthMaximum(), 6,
                       {255, 0, 0, 255});
+    const auto& reserve = startup_.mainHealthReserve();
+    drawHeartPieceMeter(origin - 102, 6, reserve.pieces, reserve.piecesPerHeart,
+        [&](int x, int y, int w, int h) { renderer.fillRect(x, y, w, h, {255, 255, 255, 255}); },
+        [&](unsigned sprite, unsigned frame, int x, int y) { renderer.drawSprite(sprite, frame, x, y); });
     renderer.drawSprite(415, 0, origin - 102, 6);
     drawHudHealthNumber(renderer, origin - 58, 15,
                         startup_.mainPlayerHealth(), startup_.mainPlayerHealthMaximum());

@@ -161,6 +161,7 @@ public:
     const RunCombo& runCombo() const { return run_.combo; }
     const RunStage& runStage() const { return run_.stage; }
     int mainPlayerHealthMaximum() const { return run_.combo.healthReserve.maximum; }
+    const HealthReserve& mainHealthReserve() const { return run_.combo.healthReserve; }
     const DeathResults& deathResults() const { return run_.results; }
     int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }
     bool mainPlayerVisible() const { return playerDamageVisible(mainPlayerInvulnerability_); }

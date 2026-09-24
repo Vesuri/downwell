@@ -9,6 +9,18 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Heart-piece HUD reserve
+
+SDL and Amiga now share the reserve fill and divider placement from
+`gml_Script_scrDrawHud4x3` VM assembly: an 80-pixel, two-pixel-high white fill,
+followed by sprite 378 frame 2 dividers, beneath the gauge foreground. The
+divider is converted offline into the native HUD pack. Native health invalidation
+also detects reserve changes without a change to current/maximum health, so a
+combo health reward at full health is visible without repainting every frame.
+Unit tests cover all four reserve states and the live grounded combo grant
+notification. The active gameplay capture matches SDL exactly; its six changed
+pixels relative to the previous baseline are the source-required dividers.
+
 ### Shared health-number layout
 
 Both renderers now use `drawHealthNumberLayers`, following the digit placement
@@ -17,8 +29,7 @@ the native single-digit assumption: a health value of 12 is rendered as two
 digits, not as sprite frame 12. The slash stays fixed, with health growing left
 and capacity growing right. The layout uses a bounded stack digit buffer and
 does not allocate. Tests cover 12/105, zero, the unsigned counter range and the
-unchanged 4/4 anchors. Heart-piece HUD indicators remain unimplemented; this
-change only addresses the numeric health label.
+unchanged 4/4 anchors. The subsequent heart-piece HUD change is described above.
 
 Both builds and the 68000 instruction/helper audits pass. The bounded active
 gameplay capture retains its expected hash and matches SDL at all 99,968

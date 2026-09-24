@@ -42,6 +42,22 @@ public:
 } // namespace
 
 int main() {
+    for (unsigned pieces = 0; pieces < 4; ++pieces) {
+        unsigned phase = 0;
+        downwell::drawHeartPieceMeter(8, 6, pieces, 4,
+            [&](int x, int y, int w, int h) {
+                require(phase++ == 0 && x == 12 && y == 20 &&
+                        w == static_cast<int>(pieces * 20) && h == 2,
+                        "heart-piece fill follows source gauge dimensions");
+            },
+            [&](unsigned sprite, unsigned frame, int x, int y) {
+                require(sprite == 378 && frame == 2 && y == 18 &&
+                        x == 10 + static_cast<int>(phase) * 20,
+                        "heart-piece dividers follow fill in source order");
+                ++phase;
+            });
+        require(phase == 4, "four-piece reserve has three dividers");
+    }
     unsigned layer = 0;
     const int expectedX[] = {9, 10, 11, 10, 10};
     const int expectedY[] = {20, 19, 20, 21, 20};

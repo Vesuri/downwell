@@ -33,6 +33,7 @@ SELECTIONS = {
         733: None,  # sprDitherFade
     },
     "hud": {
+        378: [2],    # sprHudHpGaugeBar heart-piece dividers
         376: None,   # sprHudCurrency
         408: None,   # sprTabletBorder
         413: None,   # sprSpriteNumber (white/red/black digit banks)

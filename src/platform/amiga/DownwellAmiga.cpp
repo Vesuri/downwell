@@ -482,11 +482,15 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
     drawAmmoDigit(renderer, 290, 239, ammo);
 }
 
-static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maximum) {
+static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maximum,
+                          unsigned pieces = 0, unsigned perHeart = 4) {
     amigaRendererClearClipRect(renderer);
     amigaRendererFillRect(renderer, 8, 6, 92, 28, 3);
     drawAsset(renderer, 415, 1, 8, 6, 0);
     amigaRendererFillRect(renderer, 12, 11, maximum ? (int)(health * 80 / maximum) : 0, 6, 2);
+    downwell::drawHeartPieceMeter(8, 6, pieces, perHeart,
+        [renderer](int x, int y, int w, int h) { amigaRendererFillRect(renderer, x, y, w, h, 1); },
+        [renderer](unsigned sprite, unsigned frame, int x, int y) { drawAsset(renderer, sprite, frame, x, y, 0); });
     drawAsset(renderer, 415, 0, 8, 6, 0);
     drawHealthNumber(renderer, 52, 15, health, maximum);
 }
@@ -1075,10 +1079,7 @@ static void buildReferencePicture(
     drawAsset(renderer, 408, 0, 108, 0, 0);
     drawAsset(renderer, 408, 0, 272, 0, 1);
 
-    drawAsset(renderer, 415, 1, 8, 6, 0);
-    amigaRendererFillRect(renderer, 12, 11, 80, 6, 2);
-    drawAsset(renderer, 415, 0, 8, 6, 0);
-    drawHealthNumber(renderer, 52, 15, 4, 4);
+    redrawHealth(renderer, 4, 4);
 
     drawAsset(renderer, 416, 0, 284, 43, 0);
     amigaRendererFillRect(renderer, 289, 49, 10, 184, 1);
@@ -2274,7 +2275,8 @@ int main(void) {
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity());
             if (result.healthChanged)
-                redrawHealth(&renderer, (unsigned)port.health(), (unsigned)port.healthMaximum());
+                redrawHealth(&renderer, (unsigned)port.health(), (unsigned)port.healthMaximum(),
+                             port.healthReserve().pieces, port.healthReserve().piecesPerHeart);
             if (result.currencyChanged)
                 redrawCurrency(&renderer, port.currency());
             if ((result.streakChanged || wasDead != port.dead()) && !port.deathResults().active)

@@ -243,6 +243,18 @@ int main() {
                     slots[1].id == 3 && !slots[2].active && !slots[3].active,
                 "sparse compaction is stable and clears the vacated tail");
     }
+    {
+        AmigaPortRuntime reserveHud(300);
+        // Inject the earned combo, then exercise the actual grounded grant path.
+        auto& combo = const_cast<downwell::RunCombo&>(reserveHud.runCombo());
+        combo.state.count = 25;
+        const auto grant = reserveHud.step(0);
+        require(reserveHud.health() == 4 && reserveHud.healthMaximum() == 4 &&
+                reserveHud.healthReserve().pieces == 1 && grant.healthChanged,
+                "heart-piece-only combo grant invalidates the native health HUD");
+        require(!reserveHud.step(0).healthChanged,
+                "unchanged reserve does not redraw the native health HUD");
+    }
     AmigaPortRuntime runtime(300);
     const AmigaPortFrame jump = runtime.step(4);
     require(!jump.scrolled && !runtime.player().grounded() &&
