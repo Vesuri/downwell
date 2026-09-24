@@ -516,8 +516,8 @@ void StartupRuntime::syncMainPlayerState() {
     mainPlayerSpeedY_ = mainPlayerMotion_.speedYFixed() / 256.0F;
     mainPlayerGrounded_ = mainPlayerMotion_.grounded();
     mainPlayerFacing_ = mainPlayerMotion_.facing();
-    mainPlayerSpriteId_ = mainPlayerMotion_.spriteId(mainPlayerHealth_ == 0);
-    mainPlayerImageIndex_ = static_cast<float>(mainPlayerMotion_.spriteFrame(mainPlayerHealth_ == 0));
+    mainPlayerSpriteId_ = mainPlayerMotion_.spriteId(mainDeath_.movementDead());
+    mainPlayerImageIndex_ = static_cast<float>(mainPlayerMotion_.spriteFrame(mainDeath_.movementDead(), mainDeath_.animation));
     mainJumpShootLocked_ = mainPlayerMotion_.jumpShootLocked();
     mainShotDelayed_ = mainPlayerMotion_.shotDelayed();
     mainAirborneShot_ = mainPlayerMotion_.airborneShot();
@@ -814,7 +814,6 @@ void StartupRuntime::updateMainEnemyInteractions() {
                                   enemy.reward, true);
             });
         if (contact != EnemyContact::none) {
-            if (mainPlayerHealth_ == 0) mainDeath_.enter();
             syncMainPlayerState();
             ++soundPlayRequests_;
         }
@@ -1276,7 +1275,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.right = inputRight_;
     input.fire = inputFire_;
     mainDeath_.beginStep(input.fire);
-    mainPlayerMotion_.step(input, controlsLocked_, mainPlayerHealth_ == 0);
+    mainPlayerMotion_.step(input, controlsLocked_, mainDeath_.movementDead());
+    mainDeath_.publishHealth(mainPlayerHealth_);
     mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
@@ -1298,7 +1298,7 @@ void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     if (!mainCameraInitialized_ || !mainPlayerInitialized_)
         return;
     mainCameraMotion_.step(static_cast<long>(std::round(mainPlayerX_ * 256.0F)),
-                           static_cast<long>(std::round(mainPlayerY_ * 256.0F)), mainPlayerHealth_ == 0);
+                           static_cast<long>(std::round(mainPlayerY_ * 256.0F)), mainDeath_.active);
     mainCameraX_ = mainCameraMotion_.x / 4096.0F;
     mainCameraY_ = mainCameraMotion_.y / 4096.0F;
     mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;

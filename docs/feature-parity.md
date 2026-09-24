@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Death publication follows player Begin Step
+
+Fatal contact now changes health only. The next player Begin Step still performs
+movement and `playerSpriteControl` with the previous death flag, then publishes
+depletion at its end, as `objPlayer_n_Step_1` does after `scrPlMovement` and
+position integration. The following Begin Step enters the death movement branch
+and starts its flash-derived alarm. Shared `PlayerDeathSequence` exposes both
+published death (for camera/sequence state) and whether death movement has run
+(for the already-selected pose). Neither renderer retroactively changes the
+publication frame's living pose. These changes supersede the immediate-entry
+limitations in the historical sections below.
+
+Focused sequence and fatal-contact tests cover all three boundaries; the long
+paired replay uses the movement phase, rather than zero health alone, when
+asserting suppression of shooting/jumping. This does not establish the whole
+original runner schedule: same-frame multi-contact health guards, animation
+advancement, death effects/slowdown and DeathMenu/restart still remain open.
+
+Validation: full host suite, focused fatal-contact/publication tests and the
+6000-update paired replay pass. The longer replay now ends at health 0/0,
+kills 10/10 and currency 84/84 (previously 82/82); the phase correction permits
+the source-ordered final living update and changes subsequent collection, not
+the comparison tolerance. Bounded A500 cache and cross-CPU replay pass, normal
+builds are restored and 68000 audits remain clean. The canonical short replay
+digest is unchanged and does not itself cover death publication.
+
 ### Shared death alarm/skip sequence
 
 `PlayerDeathSequence` replaces the native-only 100-update menu gate. The original

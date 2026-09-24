@@ -2,10 +2,10 @@
 #define DOWNWELL_CORE_PLAYER_LIFE_RULES_H
 #include "Input.h"
 namespace downwell {
-// Current simulation uses depleted health as its death boundary. The runner
-// publishes global.death in player Begin Step; recovering that phase and its
-// death animation is separate work. Do not let either backend keep controlling
-// or stomping with a player that this simulation has already declared dead.
+// Contact response retains a depleted-health guard. Movement now receives its
+// death flag from PlayerDeathSequence's Begin Step publication; it uses this
+// input filter with that explicit state, not directly with collision-time HP.
+// Full original same-frame multi-contact scheduling remains separate work.
 inline bool playerCanAct(int health) { return health > 0; }
 inline Input playerGameplayInput(Input input, int health) {
     if (!playerCanAct(health)) input.left = input.right = input.fire = false;

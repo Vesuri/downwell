@@ -853,11 +853,14 @@ int main() {
     require(contact.invulnerability() == 88 && contact.playerVisible(),
             "recovered dFlash alternates player visibility every damaged Step");
 
-    while (!contact.dead() && contact.tick() < 400)
+    while (contact.health() > 0 && contact.tick() < 400)
         contact.step(0);
+    require(contact.health() == 0 && !contact.dead() && !contact.deathSequence().movementDead(),
+            "fatal contact depletes health without publishing death in the collision phase");
+    contact.step(0);
     require(contact.dead() && contact.health() == 0 &&
-                contact.deathFrames() == 0,
-            "four recovered contacts enter death with clamped zero health");
+                contact.deathFrames() == 0 && !contact.deathSequence().movementDead(),
+            "next Begin Step publishes death after its living movement/pose selection");
     const unsigned deathShots = contact.player().shots();
     const int deathCameraY = contact.cameraOffsetY();
     for (unsigned frame = 0; frame < 149; ++frame)

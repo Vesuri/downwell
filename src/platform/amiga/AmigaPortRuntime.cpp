@@ -423,7 +423,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
         return false;
     }, &headBreak);
-    AmigaPlayerMotion motion = player_.step(input, false, dead());
+    AmigaPlayerMotion motion = player_.step(input, false, death_.movementDead());
+    death_.publishHealth(health_);
     death_.advanceAlarms(player_.grounded());
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if (headBreak.index >= 0) {
@@ -707,12 +708,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.objectId == 117 ? enemy.motionState : enemy.facing,
             enemy.objectId == 117 && enemy.speedY > 0 ? -1 : 1,
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
-        const auto contact = downwell::applyEnemyContact(enemy.objectId, enemyContact,
+        downwell::applyEnemyContact(enemy.objectId, enemyContact,
             enemy.x, enemy.y, enemy.active, enemy.health, player_, health_, invulnerability_, enemiesDefeated_,
             [this, &enemy] { spawnReward(enemy, true); });
-        if (contact == downwell::EnemyContact::damage && health_ == 0) {
-            death_.enter();
-        }
     }
 
     DW_PROFILE_PHASE(profileGems);

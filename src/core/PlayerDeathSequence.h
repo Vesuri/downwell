@@ -4,8 +4,8 @@
 
 namespace downwell {
 // scrPlMovement + objPlayer_n Alarm 0. Call Begin Step before movement and
-// alarms after it. Entry is explicit: adapters currently publish depletion at
-// contact time, not the original runner's later player Begin Step boundary.
+// alarms after it. Publish health only after movement at the end of player
+// Begin Step. Contact damage changes health, not global.death directly.
 struct PlayerDeathSequence {
     bool active = false;
     bool started = false;
@@ -21,6 +21,10 @@ struct PlayerDeathSequence {
         active = true;
         animation = 1;
     }
+    void publishHealth(int health) { if (health <= 0) enter(); }
+    // playerSpriteControl runs inside movement, before health publication.
+    // started corresponds to the first execution of the death movement branch.
+    bool movementDead() const { return started; }
     // DeathFlashFx Create runs synchronously before scrPlMovement reads
     // room_speed for alarm[0], and sets it to 20 (not the usual 60).
     void beginStep(bool fireHeld, int roomSpeedAfterFlash = 20) {

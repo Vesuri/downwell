@@ -5,6 +5,22 @@ static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    downwell::PlayerDeathSequence publication;
+    publication.beginStep(false);
+    publication.publishHealth(4);
+    require(!publication.active, "healthy Begin Step does not publish death");
+    // Fatal contact occurs later in the update, without calling publishHealth.
+    publication.beginStep(false);
+    require(!publication.movementDead(), "next movement still observes the old death flag");
+    publication.publishHealth(0);
+    publication.advanceAlarms(false);
+    require(publication.active && !publication.movementDead() && publication.alarm == -1,
+            "end of Begin Step publishes death without retroactively changing movement or starting alarm");
+    publication.beginStep(false);
+    publication.publishHealth(0);
+    publication.advanceAlarms(false);
+    require(publication.movementDead() && publication.alarm == 29 && publication.frames == 1,
+            "following Begin Step enters death movement and starts flash-derived alarm");
     downwell::PlayerDeathSequence death;
     death.beginStep(true);
     require(!death.advanceAlarms(true) && !death.active && death.frames == 0,

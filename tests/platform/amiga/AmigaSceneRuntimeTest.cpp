@@ -727,8 +727,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     }
     require(gameplay.player().grounded() && reference.mainPlayerGrounded(),
             "both gameplay runtimes land on the recovered entrance floor");
-    require(gameplay.player().spriteId(gameplay.dead()) == reference.mainPlayerSpriteId() &&
-                gameplay.player().spriteFrame(gameplay.dead()) ==
+    require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&
+                gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) ==
                     static_cast<unsigned>(reference.mainPlayerImageIndex()),
             "landed gameplay pose follows decoded runtime");
 
@@ -859,7 +859,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const int firePhase = std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")
                 ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
             input.fire = (tick + firePhase) % 10 < 5;
-            const bool bothWereDead = gameplay.health() == 0 && reference.mainPlayerHealth() == 0;
+            const bool bothWereDead = gameplay.deathSequence().movementDead() && reference.mainDeathSequence().movementDead();
             const unsigned nativeShots = gameplay.player().shots(), hostShots = reference.mainShotsFired();
             const unsigned nativeJumps = gameplay.player().jumps(), hostJumps = reference.mainJumps();
             gameplay.step(downwell::packReplayInput(input));
@@ -982,16 +982,16 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(nativeGems == referenceGems,
                     "live currency birth order, motion and animation agree exactly across adapters");
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
-            if (gameplay.player().spriteId(gameplay.dead()) != reference.mainPlayerSpriteId() ||
-                    gameplay.player().spriteFrame(gameplay.dead()) != static_cast<unsigned>(reference.mainPlayerImageIndex()))
+            if (gameplay.player().spriteId(gameplay.deathSequence().movementDead()) != reference.mainPlayerSpriteId() ||
+                    gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) != static_cast<unsigned>(reference.mainPlayerImageIndex()))
                 std::cerr << "PRESENTATION tick=" << gameplay.tick()
                           << " health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
-                          << " sprite=" << gameplay.player().spriteId(gameplay.dead()) << ',' << reference.mainPlayerSpriteId()
-                          << " frame=" << gameplay.player().spriteFrame(gameplay.dead()) << ',' << reference.mainPlayerImageIndex()
+                          << " sprite=" << gameplay.player().spriteId(gameplay.deathSequence().movementDead()) << ',' << reference.mainPlayerSpriteId()
+                          << " frame=" << gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) << ',' << reference.mainPlayerImageIndex()
                           << " y=" << 176 + gameplay.player().offsetYFixed() / 256.0F << ',' << reference.mainPlayerY()
                           << '\n';
-            require(gameplay.player().spriteId(gameplay.dead()) == reference.mainPlayerSpriteId() &&
-                    gameplay.player().spriteFrame(gameplay.dead()) ==
+            require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&
+                    gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) ==
                         static_cast<unsigned>(reference.mainPlayerImageIndex()),
                     "combat player presentation agrees across adapters, including forced spins");
             if (!playerReported && std::fabs(176 + gameplay.player().offsetYFixed() / 256.0F - reference.mainPlayerY()) > 3.0F) {
