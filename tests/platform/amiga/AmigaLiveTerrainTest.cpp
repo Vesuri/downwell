@@ -176,7 +176,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
                         "native enemy retains exact integer Create state and alarms");
             }
             if (command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
-                command.objectId == 109 || command.objectId == 306) {
+                command.objectId == 109) {
                 require(decorationCount < native.decorationCount(), "decoration exists on creation tick");
                 const auto& decoration = decorations[decorationCount++];
                 require(decoration.objectId == command.objectId && decoration.x == command.x &&

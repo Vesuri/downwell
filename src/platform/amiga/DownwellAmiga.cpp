@@ -134,7 +134,7 @@ static bool appendGeneratedTerrain(void* opaque,
         !terrainTiles.append(command)) return false;
     if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||
         command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
-        command.objectId == 109 || command.objectId == 306) {
+        command.objectId == 109) {
         if (command.y - 24 < live.dirtyFirst) live.dirtyFirst = command.y - 24;
         if (command.y + 24 > live.dirtyEnd) live.dirtyEnd = command.y + 24;
     }

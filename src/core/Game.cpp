@@ -216,7 +216,7 @@ void Game::renderMain(Renderer& renderer) const {
         if (instance.objectId == 293) sprite = 569;
         if (instance.objectId == 296) sprite = 568;
         if (instance.objectId == 109) sprite = 139;
-        if (instance.objectId == 306) sprite = 127;
+        // objLineToResult (306) is an invisible collision trigger, not art.
         const int enemySprite = enemyPresentationSprite(instance.objectId,
                                       instance.grounded, instance.auxiliaryState);
         if (enemySprite >= 0) sprite = enemySprite;

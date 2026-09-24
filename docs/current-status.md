@@ -77,8 +77,13 @@ live collision/room loading yet; child Create behavior and the playable result
 room remain prerequisites. Alarm requests alone are not a completed level exit.
 
 The resource audit also found objLineToResult (306) and its parent marked
-Visible=false. Current generated-decoration drawing still maps 306 to sprite
-127; remove that debug-like presentation when integrating the actual trigger.
+Visible=false. Both drawing adapters now omit its sprite 127: the Amiga terrain
+collector no longer adds it as decoration or invalidates artwork rows for it.
+Generated Create commands are retained for collision/transition integration.
+Host rendering tests verify the original resource flag and omit drawing an
+active trigger; native generation tests retain command-order checks while
+excluding the trigger from the decoration stream. This fixes presentation,
+not the still-unimplemented end-of-level collision dispatch.
 
 ## Still open beyond that milestone
 

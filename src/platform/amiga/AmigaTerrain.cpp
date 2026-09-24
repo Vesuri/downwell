@@ -52,7 +52,7 @@ int decorationSprite(int objectId) {
     if (objectId == 293) return 569;
     if (objectId == 296) return 568;
     if (objectId == 109) return 139;
-    if (objectId == 306) return 127;
+    // objLineToResult's sprite supplies a mask, but Visible is false.
     return -1;
 }
 }

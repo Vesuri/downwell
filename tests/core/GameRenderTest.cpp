@@ -49,6 +49,7 @@ public:
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
                                float, float, float) override {
         if (sprite == targetPlayer) ++playerDraws;
+        if (sprite == 127) ++triggerDraws;
     }
     void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
@@ -78,6 +79,7 @@ public:
     int clearCount = 0;
     unsigned deathFlashCount = 0;
     unsigned shopPanels = 0, shopNameCenters = 0;
+    unsigned triggerDraws = 0;
     int setClipCount = 0;
     int clearClipCount = 0;
     int clipX = 0;
@@ -458,6 +460,19 @@ int main() {
     downwell::Game shopGame(&rooms, &objects, &builders);
     auto& shopRuntime = const_cast<downwell::StartupRuntime&>(shopGame.startup());
     shopRuntime.skipToGameForTesting();
+    downwell::PackedObject exitObject;
+    require(objects.findObject(306, exitObject) && !exitObject.visible() && exitObject.spriteId == 127,
+        "original exit trigger has a collision sprite but is invisible");
+    bool insertedTrigger = false;
+    for (unsigned i = 0; i < shopRuntime.activeInstanceCount(); ++i) {
+        auto& instance = const_cast<downwell::InstanceRecord&>(shopRuntime.instanceAt(i));
+        if (instance.active && instance.objectId == 60) {
+            instance.objectId = 306;
+            insertedTrigger = true;
+            break;
+        }
+    }
+    require(insertedTrigger, "render fixture contains an active generated exit trigger");
     auto* shop = shopRuntime.registerShop(250, 240);
     require(shop != nullptr, "shop renderer fixture registration");
     shop->menu.active = true;
@@ -469,6 +484,7 @@ int main() {
     shopGame.render(shopRenderer);
     require(shopRenderer.shopPanels == 2 && shopRenderer.shopNameCenters == 2,
         "Game renders shared shop panel and middle-centered item text at landscape offset");
+    require(shopRenderer.triggerDraws == 0, "active level-exit collision sprite is never drawn");
     require(shop->menu.cursorPhaseQuarters == phaseBefore,
         "extra rendering cannot advance shop cursor presentation state");
     shop->menu.active = false;
