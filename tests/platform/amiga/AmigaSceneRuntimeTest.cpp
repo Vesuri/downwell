@@ -874,6 +874,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
+            require(gameplay.runStage().area == 1 && gameplay.runStage().level == 1 &&
+                    reference.runStage().area == 1 && reference.runStage().level == 1,
+                    "both live paths enter and retain the supported first stage");
             require(gameplay.runCombo().state.count == reference.runCombo().state.count &&
                     gameplay.runCombo().state.best == reference.runCombo().state.best &&
                     gameplay.runCombo().state.record == reference.runCombo().state.record &&

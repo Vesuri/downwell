@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared stage state and area/level result row
+
+`RunStage` models the source zero reset and scrNextLevel's increment,
+three-level rollover and positive explicit-area override. The live entry paths
+publish 1-1; the supported builder remains the first-stage builder, with no
+new room progression or later-area generation claimed. Stage state is exposed
+by both runtimes and included in the host's main-room digest.
+
+The final metric row now consumes that state. DeathMenu Draw's row-0 icon
+401:3/colon use the 88+wholePowan baseline; smallNumberArea draws area, frame-10
+separator and level at x=72/79/84 with the row bounce. Native clearing extends
+up to the black panel's y=80 edge to restore the top half of the first icon.
+Stage, visibility and bounce participate in cache invalidation.
+
+Fixtures cover reset, rollover, override, exact row anchors and frame IDs;
+paired combat checks actual first-stage entry on both paths. The native HUD
+fixture uses 2-3 to detect accidentally hard-coded 1-1 output. All five metric
+rows now have live inputs, but menu actions, unlock UI and complete progression
+remain unfinished.
+
+Validation: final full host suite and bounded 600-update A500 HUD/cache check
+pass with the explicit scrNextLevel(1) entry. The overlay matches scalar
+composition, changes HUD pixels without modifying terrain, preserves assets
+and passes stack/68000 audits. Normal builds are restored. This verifies the
+implemented first-stage path and row rendering, not later-stage transitions.
+
 ### Best-combo result row
 
 Both renderers now display `RunCombo.state.best` in results row 3, rather than

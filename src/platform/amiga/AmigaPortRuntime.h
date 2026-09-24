@@ -12,6 +12,7 @@
 #include "core/RunGemStatistics.h"
 #include "core/RunClock.h"
 #include "core/RunCombo.h"
+#include "core/RunStage.h"
 #include "core/DeathResults.h"
 #include "core/PlayerLifeRules.h"
 #include "core/FrogHorizontalMotion.h"
@@ -194,6 +195,7 @@ public:
     const downwell::RunGemStatistics& runGemStatistics() const { return runGemStatistics_; }
     std::uint32_t runTimeTicks() const { return runClock_.ticks; }
     const downwell::RunCombo& runCombo() const { return runCombo_; }
+    const downwell::RunStage& runStage() const { return runStage_; }
     int healthMaximum() const { return runCombo_.healthReserve.maximum; }
     const downwell::DeathResults& deathResults() const { return deathResults_; }
     bool playerVisible() const { return downwell::playerDamageVisible(invulnerability_); }
@@ -245,6 +247,7 @@ private:
     downwell::RunGemStatistics runGemStatistics_;
     downwell::RunClock runClock_;
     downwell::RunCombo runCombo_;
+    downwell::RunStage runStage_;
     downwell::DeathResults deathResults_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;

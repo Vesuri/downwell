@@ -144,6 +144,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     runGemStatistics_ = {};
     runClock_ = {};
     runCombo_ = {};
+    runStage_ = {};
     deathResults_ = {};
     mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
@@ -1760,6 +1761,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             if (playMenuVerticalDitherY_ < 320.0F) {
                 playMenuVerticalDitherY_ += 10.0F;
             } else {
+                runStage_.advance(1); // PlayMenu Draw calls scrNextLevel(1).
                 gotoRoom(mainRoomId);
             }
         }
@@ -2117,6 +2119,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainPlayerHealth_);
     if (roomId_ == mainRoomId) digest.addU32(runClock_.ticks);
     if (roomId_ == mainRoomId) runCombo_.appendState(digest);
+    if (roomId_ == mainRoomId) { digest.addI32(runStage_.area); digest.addI32(runStage_.level); }
     if (mainDeath_.active) {
         digest.addBool(mainDeath_.started);
         digest.addBool(mainDeath_.priorFire);

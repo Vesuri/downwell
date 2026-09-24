@@ -84,17 +84,29 @@ public:
 } // namespace
 
 int main() {
+    downwell::RunStage stage;
+    require(stage.area == 0 && stage.level == 0, "new run has source zero stage before confirmation");
+    stage.advance();
+    require(stage.area == 1 && stage.level == 1, "first confirmation advances to area one, level one");
+    stage.advance(); stage.advance();
+    require(stage.area == 1 && stage.level == 3, "three levels per area");
+    stage.advance();
+    require(stage.area == 2 && stage.level == 1, "fourth advance rolls area and resets level");
+    stage.advance(4);
+    require(stage.area == 4 && stage.level == 1, "explicit area override follows the ordinary increment");
+    stage.advance(-1);
+    require(stage.area == 4 && stage.level == 2, "nonpositive override does not replace normal progression");
     struct RowProbe {
         struct Call { int id; unsigned frame; int x, y; };
         std::vector<Call> calls;
         void asset(int id, unsigned frame, int x, int y) { calls.push_back({id, frame, x, y}); }
     } rows;
     downwell::DeathMenuSequence rowMenu;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25, stage);
     require(rows.calls.empty(), "results rows remain hidden until published");
     rowMenu.visible[1] = rowMenu.visible[2] = true;
     rowMenu.rowOffset[1] = 3; rowMenu.rowOffset[2] = 2;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25, stage);
     require(rows.calls.size() == 8 && rows.calls[0].id == 401 && rows.calls[0].frame == 1 &&
                 rows.calls[0].x == 42 && rows.calls[0].y == 102 && rows.calls[1].frame == 0 &&
                 rows.calls[2].id == 403 && rows.calls[2].frame == 8 && rows.calls[2].x == 72 &&
@@ -105,7 +117,7 @@ int main() {
     rows.calls.clear();
     rowMenu.visible[1] = rowMenu.visible[2] = false;
     rowMenu.visible[4] = true;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25, stage);
     const unsigned timeFrames[] = {6,0,6,4,11,0,1,11,0,1};
     const int timeX[] = {42,62,108,114,102,90,96,84,72,78};
     require(rows.calls.size() == 10, "time row has icon, colon and eight timer glyphs");
@@ -117,7 +129,7 @@ int main() {
     rowMenu.visible[4] = false;
     rowMenu.visible[3] = true;
     rowMenu.rowOffset[3] = 2;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25, stage);
     require(rows.calls.size() == 4 && rows.calls[0].id == 401 && rows.calls[0].frame == 5 &&
                 rows.calls[0].x == 42 && rows.calls[0].y == 126 &&
                 rows.calls[1].frame == 0 && rows.calls[1].x == 62 && rows.calls[1].y == 126 &&
@@ -125,9 +137,19 @@ int main() {
                 rows.calls[2].y == 128 && rows.calls[3].frame == 5 && rows.calls[3].x == 78,
             "best-combo row uses source icon and separate digit bounce after fourteen-pixel gap");
     rows.calls.clear();
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 0);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 0, stage);
     require(rows.calls.size() == 3 && rows.calls[2].frame == 0,
             "a run without a completed combo displays zero, not a blank row");
+    rows.calls.clear();
+    rowMenu.visible[3] = false;
+    rowMenu.visible[0] = true;
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 0, stage);
+    require(rows.calls.size() == 5 && rows.calls[0].id == 401 && rows.calls[0].frame == 3 &&
+                rows.calls[0].x == 42 && rows.calls[0].y == 92 && rows.calls[1].frame == 0 &&
+                rows.calls[2].frame == 4 && rows.calls[2].x == 72 && rows.calls[2].y == 96 &&
+                rows.calls[3].frame == 10 && rows.calls[3].x == 79 &&
+                rows.calls[4].frame == 2 && rows.calls[4].x == 84,
+            "area-level row uses source frame IDs and asymmetric separator spacing");
     rows.calls.clear();
     downwell::drawResultNumber(rows, 0, 72, 98);
     require(rows.calls.size() == 1 && rows.calls[0].frame == 0, "zero is one visible digit");

@@ -38,6 +38,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
     unsigned index;
+    runStage_.advance(1); // This runtime starts at the confirmed scrNextLevel(1) entry.
     currencyAccount_.playerCreated();
     if (followCamera_) {
         /*

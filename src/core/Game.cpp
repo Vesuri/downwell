@@ -147,7 +147,7 @@ void Game::render(Renderer& renderer) const {
             startup_.mainCameraRenderViewX(), startup_.mainCameraRenderViewY());
         drawDeathResultsRows(sink, startup_.deathResults().menu,
             startup_.mainGameGemTotal(), startup_.mainEnemiesDefeated(), startup_.runTimeTicks(),
-            startup_.runCombo().state.best);
+            startup_.runCombo().state.best, startup_.runStage());
         drawDeathResultsProgressLabels(sink, startup_.deathResults());
         DeathResultsProgressBar::from(startup_.deathResults()).draw(sink);
         renderer.clearClipRect();

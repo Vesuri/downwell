@@ -13,6 +13,7 @@
 #include "RunGemStatistics.h"
 #include "RunClock.h"
 #include "RunCombo.h"
+#include "RunStage.h"
 #include "DeathResults.h"
 #include "PlayerLifeRules.h"
 #include "Input.h"
@@ -159,6 +160,7 @@ public:
     const RunGemStatistics& runGemStatistics() const { return runGemStatistics_; }
     std::uint32_t runTimeTicks() const { return runClock_.ticks; }
     const RunCombo& runCombo() const { return runCombo_; }
+    const RunStage& runStage() const { return runStage_; }
     int mainPlayerHealthMaximum() const { return runCombo_.healthReserve.maximum; }
     const DeathResults& deathResults() const { return deathResults_; }
     int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }
@@ -370,6 +372,7 @@ private:
     RunGemStatistics runGemStatistics_;
     RunClock runClock_;
     RunCombo runCombo_;
+    RunStage runStage_;
     DeathResults deathResults_;
     int mainPlayerInvulnerability_ = 0;
     int mainShootLeg_ = -1;

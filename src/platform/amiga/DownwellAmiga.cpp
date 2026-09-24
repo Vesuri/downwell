@@ -572,12 +572,13 @@ static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntim
 }
 
 static void composeResultsRows(AmigaRenderer* renderer,
-        const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills, unsigned ticks, unsigned bestCombo) {
+        const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills, unsigned ticks, unsigned bestCombo,
+        const downwell::RunStage& stage) {
     UBYTE* saved = renderer->target;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
     renderer->target = renderer->hud;
-    // Include the time row's maximum bounce; progress starts at y=148.
-    amigaRendererFillRect(renderer, downwellPlayfieldX, 88, 160, 60, 3);
+    // Include the first icon's upper half and time bounce; progress starts at 148.
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 80, 160, 68, 3);
     struct Sink {
         AmigaRenderer* renderer;
         void asset(int id, unsigned frame, int x, int y) {
@@ -586,7 +587,7 @@ static void composeResultsRows(AmigaRenderer* renderer,
                 downwellPlayfieldX + x, y, 0);
         }
     } sink{renderer};
-    downwell::drawDeathResultsRows(sink, menu, gems, kills, ticks, bestCombo);
+    downwell::drawDeathResultsRows(sink, menu, gems, kills, ticks, bestCombo, stage);
     amigaRendererClearClipRect(renderer);
     renderer->target = saved;
 }
@@ -595,20 +596,23 @@ static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& p
     static unsigned lastGems = ~0u, lastKills = ~0u, lastPhase = ~0u;
     static unsigned lastTime = ~0u;
     static unsigned lastCombo = ~0u;
+    static int lastArea = -1, lastLevel = -1;
     const auto& menu = port.deathResults().menu;
     const unsigned phase = menu.titleOffset | (menu.rowOffset[1] << 3) |
         (menu.rowOffset[2] << 6) | (menu.visible[1] << 9) | (menu.visible[2] << 10) |
         (menu.rowOffset[4] << 11) | (menu.visible[4] << 14) |
-        (menu.rowOffset[3] << 15) | (menu.visible[3] << 18);
+        (menu.rowOffset[3] << 15) | (menu.visible[3] << 18) |
+        (menu.rowOffset[0] << 19) | (menu.visible[0] << 22);
     const unsigned gems = port.gameGemTotal(), kills = port.enemiesDefeated();
     const unsigned ticks = port.runTimeTicks();
     const unsigned bestCombo = port.runCombo().state.best;
     if (!force && lastGems == gems && lastKills == kills && lastPhase == phase && lastTime == ticks &&
-        lastCombo == bestCombo) return;
+        lastCombo == bestCombo && lastArea == port.runStage().area && lastLevel == port.runStage().level) return;
     lastGems = gems; lastKills = kills; lastPhase = phase;
     lastTime = ticks;
     lastCombo = bestCombo;
-    composeResultsRows(renderer, menu, gems, kills, ticks, bestCombo);
+    lastArea = port.runStage().area; lastLevel = port.runStage().level;
+    composeResultsRows(renderer, menu, gems, kills, ticks, bestCombo, port.runStage());
 }
 
 static void composeResultsProgress(AmigaRenderer* renderer,
@@ -2500,11 +2504,11 @@ int main(void) {
                 composeResultsBackdrop(&resultsOracle, 4, 160, 34);
                 composeResultsBackdrop(&renderer, 4, 160, 34);
                 downwell::DeathMenuSequence rowFixture;
-                rowFixture.visible[1] = rowFixture.visible[2] = rowFixture.visible[3] = rowFixture.visible[4] = true;
+                for (unsigned row = 0; row < 5; ++row) rowFixture.visible[row] = true;
                 rowFixture.rowOffset[1] = 3;
                 rowFixture.rowOffset[2] = 2;
-                composeResultsRows(&resultsOracle, rowFixture, 84, 10, 3699, 25);
-                composeResultsRows(&renderer, rowFixture, 84, 10, 3699, 25);
+                composeResultsRows(&resultsOracle, rowFixture, 84, 10, 3699, 25, {2,3});
+                composeResultsRows(&renderer, rowFixture, 84, 10, 3699, 25, {2,3});
                 downwell::DeathResultsProgressBar barFixture;
                 barFixture.visible = true; barFixture.length = 47; barFixture.separator = 24;
                 downwell::DeathResults labelFixture;
