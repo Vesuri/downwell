@@ -6,6 +6,7 @@
 #include "EnemyContact.h"
 #include "EnemyContactResponse.h"
 #include "CurrencyReward.h"
+#include "CurrencyStep.h"
 #include "FrogBehavior.h"
 #include "FrogMotion.h"
 #include "StandardBulletStep.h"
@@ -598,22 +599,22 @@ void StartupRuntime::updateMainCurrency() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
         MainCurrencyState gem = mainCurrencyItems_[index];
-        if (!gem.motion.step(mainPlayerMotion_.frameStartXFixed(), mainPlayerMotion_.frameStartYFixed(),
-            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_)) continue;
+        const auto result = stepCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
+            mainPlayerMotion_.frameStartXFixed(), mainPlayerMotion_.frameStartYFixed(),
+            mainPlayerMotion_.offsetXFixed(), mainPlayerMotion_.offsetYFixed(), currencyAccount_,
+            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_);
+        if (result == CurrencyStepResult::expired) continue;
+        if (result == CurrencyStepResult::collected) {
+            ++soundPlayRequests_;
+            continue;
+        }
         gem.age = gem.motion.lifetime.age;
         gem.x = mainPlayerOriginX_ + gem.motion.x / 12800.0F;
         gem.y = mainPlayerOriginY_ + gem.motion.y / 12800.0F;
         gem.speedX = gem.motion.vx / 12800.0F;
         gem.speedY = gem.motion.vy / 12800.0F;
         gem.attracted = gem.motion.attracted;
-        const bool collected = gem.motion.collectible(mainPlayerMotion_.offsetXFixed(),
-                                                      mainPlayerMotion_.offsetYFixed(), gem.large);
-        if (collected) {
-            currencyAccount_.collect(static_cast<std::uint32_t>(gem.amount));
-            ++soundPlayRequests_;
-        } else {
-            mainCurrencyItems_[write++] = gem;
-        }
+        mainCurrencyItems_[write++] = gem;
     }
     mainCurrencyCount_ = write;
 }

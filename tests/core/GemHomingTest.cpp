@@ -1,5 +1,6 @@
 #include "core/GemHoming.h"
 #include "core/GemMotion.h"
+#include "core/CurrencyStep.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -7,6 +8,52 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    {
+        using namespace downwell;
+        struct RandomProbe {
+            unsigned calls = 0;
+            unsigned randomIntegerSmall(unsigned) { ++calls; return 0; }
+        } random;
+        CurrencyAccount account;
+        GemMotion gem;
+        gem.lifetime.age = 8;
+        unsigned terrainQueries = 0;
+        const auto solid = [&](int, int) { ++terrainQueries; return false; };
+        auto result = stepCurrency(gem, false, 2, 1000 * 256L, 0, 0, 0, account, solid, random);
+        require(result == CurrencyStepResult::alive && gem.lifetime.age == 9 && account.currency == 0,
+                "shared currency phase cannot collect before the obtainable alarm");
+        result = stepCurrency(gem, false, 2, 1000 * 256L, 0, 0, 0, account, solid, random);
+        require(result == CurrencyStepResult::collected && account.currency == 2 &&
+                    account.gameGem == 2 && account.streak == 2 && account.timer == 300,
+                "collection uses the current player position, not the distant homing target");
+        GemMotion expired;
+        expired.lifetime.age = 309;
+        const auto oldQueries = terrainQueries, oldRandom = random.calls;
+        result = stepCurrency(expired, true, 10, 0, 0, 0, 0, account, solid, random);
+        require(result == CurrencyStepResult::expired && account.currency == 2 &&
+                    terrainQueries == oldQueries && random.calls == oldRandom,
+                "expiry prevents both collision collection and terrain/RNG side effects");
+        GemMotion large;
+        large.lifetime.age = 9;
+        result = stepCurrency(large, true, 10, 1000 * 256L, 0, 9 * 256L, 0, account, solid, random);
+        require(result == CurrencyStepResult::collected && account.currency == 12,
+                "shared phase preserves the large gem's wider collection mask");
+        GemMotion small;
+        small.lifetime.age = 9;
+        result = stepCurrency(small, false, 2, 1000 * 256L, 0, 9 * 256L, 0, account, solid, random);
+        require(result == CurrencyStepResult::alive && account.currency == 12,
+                "small gem cannot collect through the large-only fringe");
+        GemMotion homing;
+        homing.attracted = true;
+        homing.lifetime.age = 309;
+        const auto before = homing;
+        GemMotion expected = before;
+        expected.step(30 * 256L, 0, solid, random);
+        result = stepCurrency(homing, false, 2, 30 * 256L, 0, -1000 * 256L, 0, account, solid, random);
+        require(result == CurrencyStepResult::alive && homing.x == expected.x && homing.y == expected.y &&
+                    homing.vx == expected.vx && homing.vy == expected.vy && account.currency == 12,
+                "attracted gems survive expiry and home using the captured pre-movement position");
+    }
     downwell::GemMotion contact;
     contact.lifetime.age = 10;
     require(contact.collectible(7 * 256, 0) && !contact.collectible(8 * 256, 0) &&

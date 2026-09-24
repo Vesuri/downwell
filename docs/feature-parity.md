@@ -244,6 +244,35 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared currency motion/collection phase and expanded CPU fixture
+
+`CurrencyStep` now owns the implemented per-gem phase on both platforms:
+advance motion/lifetime, return immediately on expiry, check the recovered
+collection mask, and apply shared accounting only on collection. It explicitly
+distinguishes the player's frame-start homing target from the current
+collection position. Adapters retain only storage retirement, survivor
+presentation conversion and collected notifications.
+
+Focused tests cover the obtainable boundary, expiry without terrain/RNG or
+collection side effects, small versus large masks, distinct homing/collection
+positions, and attracted survival at the expiry alarm. The long cross-CPU
+fixture still exercises 400 motion updates without applying collection; an
+additional fixture now applies small/large collection, 300 account timer
+updates, and expiry-before-collection. Digest schema 3 has expected gem digest
+`8d8e864225e003ee` and coverage `7f` (the new bit is collection/account checks).
+The 64-update player digest remains unchanged.
+
+Validation: full host suite, both combat tapes with exact ordered gem state,
+16,562 offline sprite comparisons, and bounded A500 600-tick cache verification
+pass (101 comparisons and intact stack guard). Expanded cross-CPU output is
+`64 9f0d3943 e7900d2b 400 8d8e8642 25e003ee 7f`; the new collection/account
+coverage bit is required by the host reference. Both 68000 audits are clean.
+
+This consolidates existing phase semantics. It does not establish complete
+Windows collision-event order, upgrade effects, exact terrain bounce or
+Create's embedded-wall relocation. No asset or hardware-scroll changes are
+required for this migration.
+
 #### Shared currency account and source timer boundaries
 
 Both runtime stores now embed the same `CurrencyAccount`: spendable currency,

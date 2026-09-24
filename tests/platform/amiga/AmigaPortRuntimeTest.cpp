@@ -894,8 +894,8 @@ int main() {
     require(replayRuntime.trajectoryDigest() == 0x9f0d3943e7900d2bULL,
             "cross-target trajectory digest remains pinned");
     const auto gems = downwell::verifyGemSimulation();
-    require(gems.coverage == 63 && gems.digest == 0x9543220ed0d8e596ULL,
-            "400-update gem cross-CPU fixture retains all branches and pinned full-state digest");
+    require(gems.coverage == 127 && gems.digest == 0x8d8e864225e003eeULL,
+            "gem cross-CPU fixture covers motion plus collection/account expiry with a pinned digest");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;
 }

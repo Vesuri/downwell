@@ -8,6 +8,7 @@
 #include "core/EnemyContact.h"
 #include "core/EnemyContactResponse.h"
 #include "core/CurrencyReward.h"
+#include "core/CurrencyStep.h"
 #include "core/EnemyAlarmEvents.h"
 #include "core/AlarmBank.h"
 #include "core/FrogBehavior.h"
@@ -733,8 +734,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         GemState& gem = gems_[gemIndex];
         if (!gem.active)
             continue;
-        if (!gem.motion.step(player_.frameStartXFixed(), player_.frameStartYFixed(),
-            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_)) {
+        const auto result = downwell::stepCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
+            player_.frameStartXFixed(), player_.frameStartYFixed(),
+            player_.offsetXFixed(), player_.offsetYFixed(), currencyAccount_,
+            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
+        if (result != downwell::CurrencyStepResult::alive) {
             gem.active = false;
             continue;
         }
@@ -746,10 +750,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.attracted = gem.motion.attracted;
         gem.x = downwell::GemMotion::rounded(gem.motion.x);
         gem.y = downwell::GemMotion::rounded(gem.motion.y);
-        if (gem.motion.collectible(player_.offsetXFixed(), player_.offsetYFixed(), gem.large)) {
-            currencyAccount_.collect(static_cast<unsigned>(gem.amount));
-            gem.active = false;
-        }
     }
 
     const long viewTop = followCamera_ ? cameraMotion_.y - 142L * 4096

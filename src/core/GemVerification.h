@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_GEM_VERIFICATION_H
 #define DOWNWELL_CORE_GEM_VERIFICATION_H
 #include "GemMotion.h"
+#include "CurrencyStep.h"
 #include "GameMakerRandom.h"
 #include "StateDigest.h"
 namespace downwell {
@@ -9,7 +10,8 @@ struct GemVerificationResult {
     unsigned coverage;
 };
 // Isolated deterministic CPU-equivalence fixture, not a Windows gameplay
-// oracle. Collection is observed but not applied, to exercise long lifetimes.
+// oracle. The long trajectory observes collection without applying it; a
+// separate shared-phase fixture below applies collection and account expiry.
 inline GemVerificationResult verifyGemSimulation() {
     GameMakerRandom random(2);
     GemMotion gems[3];
@@ -19,7 +21,7 @@ inline GemVerificationResult verifyGemSimulation() {
     bool alive[3] = {true, true, true};
     StateDigest digest;
     unsigned coverage = 0;
-    digest.addU32(2); // Source gem masks replace the provisional collection box.
+    digest.addU32(3); // Also exercises shared collection/account transitions.
     for (unsigned tick = 0; tick < 400; ++tick) {
         digest.addU32(tick);
         for (unsigned i = 0; i < 3; ++i) {
@@ -53,6 +55,36 @@ inline GemVerificationResult verifyGemSimulation() {
         digest.addU64(random.drawCount());
         digest.addU32(static_cast<std::uint32_t>(random.stateIndex()));
     }
+    CurrencyAccount account;
+    GemMotion pickup;
+    pickup.lifetime.age = 9;
+    const auto solid = [](int, int) { return false; };
+    const auto collected = stepCurrency(pickup, false, 2, 1000 * 256L, 0,
+                                       0, 0, account, solid, random);
+    digest.addU32(static_cast<unsigned>(collected));
+    digest.addI32(pickup.x); digest.addI32(pickup.y);
+    const bool firstCollected = collected == CurrencyStepResult::collected && account.currency == 2;
+    for (unsigned tick = 0; tick < 300; ++tick) {
+        account.beginStep();
+        digest.addU32(account.streak); digest.addU32(account.timer);
+    }
+    const bool streakExpired = account.timer == 0 && account.streak == 0;
+    GemMotion expired;
+    expired.lifetime.age = 309;
+    const auto retired = stepCurrency(expired, true, 10, 0, 0, 0, 0, account, solid, random);
+    digest.addU32(static_cast<unsigned>(retired));
+    const bool noPostExpiryCredit = retired == CurrencyStepResult::expired && account.currency == 2;
+    GemMotion large;
+    large.lifetime.age = 9;
+    const auto fringe = stepCurrency(large, true, 10, 1000 * 256L, 0,
+                                    9 * 256L, 0, account, solid, random);
+    digest.addU32(static_cast<unsigned>(fringe));
+    digest.addU32(account.currency); digest.addU32(account.gameGem);
+    digest.addU32(account.streak); digest.addU32(account.timer);
+    if (firstCollected && streakExpired && noPostExpiryCredit &&
+        fringe == CurrencyStepResult::collected && account.currency == 12 &&
+        account.gameGem == 12 && account.streak == 10 && account.timer == 300)
+        coverage |= 64;
     for (unsigned i = 0; i < 16; ++i) digest.addU32(random.stateWord(i));
     digest.addU32(coverage);
     return {digest.value(), coverage};
