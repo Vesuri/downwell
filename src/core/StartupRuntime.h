@@ -39,6 +39,7 @@ public:
     struct MainBulletState {
         float x = 0.0F;
         float y = 0.0F;
+        bool gemHigh = false;
     };
     struct MainCurrencyState {
         GemMotion motion;

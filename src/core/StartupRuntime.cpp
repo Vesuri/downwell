@@ -302,7 +302,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
     inputRight_ = right;
     inputFire_ = fire;
     anyInput_ = anyInput;
-    if (roomId_ == mainRoomId) currencyAccount_.beginStep();
+    if (roomId_ == mainRoomId) {
+        currencyAccount_.beginStep();
+        run_.selectWeaponLevel(currencyAccount_);
+    }
     if (roomId_ == mainRoomId) {
         run_.consumables.beginStep(mainPlayerMotion_, mainPlayerHealth_, run_.combo.healthReserve);
         Input resultsInput;
@@ -550,7 +553,7 @@ void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
     if (mainBulletCount_ < mainBulletCapacity) {
         mainBullets_[mainBulletCount_++] = {
             static_cast<float>(instance.x + mainShootLeg_),
-            static_cast<float>(instance.y + 4)
+            static_cast<float>(instance.y + 4), run_.gemHigh
         };
     }
     mainShootLeg_ *= -1;
@@ -580,7 +583,7 @@ void StartupRuntime::updateMainBullets() {
         MainBulletState bullet = mainBullets_[index];
         int nextY = static_cast<int>(bullet.y);
         bool alive = stepStandardBullet(static_cast<int>(bullet.x), nextY,
-          [this](const StandardBulletPath& path) {
+          [this, &bullet](const StandardBulletPath& path) {
             InstanceRecord* enemy = mainBulletEnemyCollision(path.x, path.fromY, path.toY);
             if (enemy != nullptr) {
                 const auto impact = applyStandardBulletImpact(*enemy, mainEnemiesDefeated_, random_,
@@ -589,7 +592,7 @@ void StartupRuntime::updateMainBullets() {
                         spawnMainCurrency(static_cast<float>(enemy->x),
                                           static_cast<float>(enemy->y),
                                           enemy->reward);
-                    });
+                    }, bullet.gemHigh);
                 if (impact.kind == BulletImpactKind::ignored) return false;
                 ++soundPlayRequests_;
                 return true;
@@ -1345,7 +1348,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         runtime.run_.gems.observeDeathMovement(runtime.mainDeath_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
     mainPlayerMotion_.step(input, controlsLocked_ || run_.shops.noControl || run_.exitControlsLocked,
-        mainDeath_.movementDead(), run_.shops.interactable, run_.goalStopped);
+        mainDeath_.movementDead(), run_.shops.interactable, run_.goalStopped, run_.gemHigh);
     const int shopPlayerX = mainPlayerOriginX_ + roundGameMakerQ8(mainPlayerMotion_.offsetXFixed());
     const int shopPlayerY = mainPlayerOriginY_ + roundGameMakerQ8(mainPlayerMotion_.offsetYFixed());
     run_.shops.observePlayer(shopPlayerX, shopPlayerY, mainPlayerMotion_.grounded(),
@@ -2120,7 +2123,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(40); // Includes each gem's creation-time Attractor configuration.
+    digest.addU32(41); // Includes weapon level and each projectile's birth level.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2198,7 +2201,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainAirborneShot_);
     digest.addI32(mainAmmo_);
     digest.addI32(mainPlayerHealth_);
-    if (roomId_ == mainRoomId) digest.addU32(run_.clock.ticks);
+    if (roomId_ == mainRoomId) { digest.addU32(run_.clock.ticks); digest.addBool(run_.gemHigh); }
     if (roomId_ == mainRoomId) run_.combo.appendState(digest);
     if (roomId_ == mainRoomId) { digest.addI32(run_.stage.area); digest.addI32(run_.stage.level); }
     if (mainDeath_.active) {
@@ -2229,6 +2232,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         digest.addF32(mainBullets_[index].x);
         digest.addF32(mainBullets_[index].y);
+        digest.addBool(mainBullets_[index].gemHigh);
     }
     digest.addU32(static_cast<std::uint32_t>(mainCurrencyCount_));
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {

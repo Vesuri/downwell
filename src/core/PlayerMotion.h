@@ -44,7 +44,7 @@ public:
     void enterRoom(bool fireHeld, int landingOffset = 0);
     PlayerMotionDelta step(const downwell::Input& input, bool controlsLocked = false,
                            bool dead = false, bool interactable = false,
-                           bool goalStopped = false);
+                           bool goalStopped = false, bool gemHigh = false);
     void initializeEntryInput(bool fireHeld) {
         priorFire_ = fireHeld;
         jumpShootLocked_ = fireHeld;

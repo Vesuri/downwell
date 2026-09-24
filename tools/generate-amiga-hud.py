@@ -101,6 +101,7 @@ SELECTIONS = {
         188: None,   # sprGroundedTurtleWalk
         278: None,   # sprCrawler
         369: None,   # bgNightsky
+        458: [0],    # sprBulScatter2 (gem-high machine gun projectile)
         459: [0],    # sprBulScatter1 (usual gunboot projectile)
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
@@ -632,7 +633,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
     if profile == "game":
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 157, 162, 163, 164,
-                  166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 459,
+                  166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 458, 459,
                   485, 486, 487, 496, 497, 707)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:

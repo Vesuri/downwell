@@ -2915,7 +2915,8 @@ int main(void) {
                     port.player().facing() < 0)) frameReady = false;
             for (unsigned index = 0; index < AmigaPortRuntime::bulletCapacity; ++index) {
                 const auto& bullet = port.bulletAt(index);
-                if (bullet.active && !appendGameplayActor(actors, actorCount, 459, 0,
+                if (bullet.active && !appendGameplayActor(actors, actorCount,
+                        downwell::machineGunProfile(bullet.gemHigh).sprite, 0,
                         downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
                         gameplayPlayerStartY + bullet.y - port.cameraOffsetY(), 0))
                     frameReady = false;

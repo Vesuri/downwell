@@ -35,6 +35,23 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    for (bool high : {false, true}) {
+        PlayerMotion firing(false, 10000);
+        downwell::Input fire; fire.fire = true;
+        unsigned previous = 0, lastTick = 0, gaps = 0;
+        for (unsigned tick = 0; tick < 40; ++tick) {
+            firing.step(fire, false, false, false, false, high);
+            if (firing.shots() != previous) {
+                if (previous) {
+                    require(tick - lastTick == (high ? 6u : 7u),
+                            "source weapon level selects six/seven update firing interval");
+                    ++gaps;
+                }
+                previous = firing.shots(); lastTick = tick;
+            }
+        }
+        require(gaps >= 4, "firing interval fixture exercises repeated shots");
+    }
     PlayerMotion goalStopped(false, 10000);
     downwell::Input goalInput;
     goalInput.right = true;

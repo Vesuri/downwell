@@ -82,6 +82,11 @@ int main() {
         enemy.active = false;
         require(applyStandardBulletImpact(enemy, defeated, random, reward).kind == BulletImpactKind::ignored &&
                     random.calls == 2, "inactive targets consume no ricochet RNG");
+        enemy = Enemy{};
+        const bool bornHigh = true;
+        const auto highImpact = applyStandardBulletImpact(enemy, defeated, random, reward, bornHigh);
+        require(highImpact.kind == BulletImpactKind::defeated && enemy.health == 0,
+                "powered-up birth profile applies fifteen damage at impact");
     }
     {
         struct PlayerProbe {

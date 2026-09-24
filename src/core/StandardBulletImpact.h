@@ -5,15 +5,15 @@ namespace downwell {
 enum class BulletImpactKind { ignored, immune, damaged, defeated };
 struct BulletImpact { BulletImpactKind kind; int sound; };
 
-// Implemented usual gun: non-piercing, nine damage, downward direction 270.
+// Implemented machine gun: non-piercing, nine/fifteen damage, direction 270.
 // bStatInitialize's temporary 10 is overwritten by bStatUpdate(0, 0), which
-// reads bStatInitLevel1's MACHINEGUN entry. Gem-high level 1 remains separate.
+// reads bStatInitLevel1's MACHINEGUN entry. Level is captured at bullet birth.
 // Enemy storage exposes the same hit-state fields on both platforms. Queued
 // hit delivery and immediate fatal retirement remain phase approximations;
 // original hitAngle/hitDmg, damageStun, momentDelay and effects are not modeled.
 template<class Enemy, class Count, class Random, class Reward>
 BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
-                                      Random& random, Reward reward) {
+                                      Random& random, Reward reward, bool gemHigh = false) {
     if (!enemy.active || enemy.health <= 0) return {BulletImpactKind::ignored, -1};
     if (enemy.objectId == 112) {
         // scrTypicalBulletDamage's immune branch: choose(30,31) before
@@ -23,7 +23,7 @@ BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
     if (enemy.objectId == 113) enemy.frogHit.pending = true;
     if (enemy.objectId == 117) enemy.snailHit.pending = true;
     if (enemy.objectId == 116) enemy.batHit.queue(270);
-    enemy.health -= machineGunProfile(false).damage;
+    enemy.health -= machineGunProfile(gemHigh).damage;
     if (enemy.health > 0) return {BulletImpactKind::damaged, 29};
     reward();
     enemy.active = false;

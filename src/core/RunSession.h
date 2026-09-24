@@ -15,6 +15,7 @@
 #include "ExitDither.h"
 #include "UpgradeInventory.h"
 #include "CurrencyStep.h"
+#include "MachineGunProfile.h"
 #include "LevelClearController.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
@@ -40,6 +41,10 @@ struct RunSession {
     Consumables consumables;
     UpgradeInventory upgrades;
     ShopWorld shops;
+    bool gemHigh = false;
+    void selectWeaponLevel(const CurrencyAccount& currency) {
+        gemHigh = machineGunProfileForStreak(currency.streak).level != 0;
+    }
     // Pickup-only upgrade effects: nonGemGainGem (combo rewards) does not
     // invoke scrRechargeGem. Ownership is sampled at collection, not birth.
     template<class Solid, class Random>
@@ -166,6 +171,7 @@ struct RunSession {
         consumables = {};
         upgrades = {};
         shops = {};
+        gemHigh = false;
         levelExit = {};
         goalField = {};
         levelExitPresent = false;

@@ -9,6 +9,35 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Live machine-gun gem-high selection and shot snapshots
+
+Both controller adapters now select the shared machine-gun level after the
+streak timer update, before player movement. Pickups/landing rewards earned
+later in the update affect the following selection. At streak 100 the live
+firing interval becomes six rather than seven; each bullet captures that level
+at birth. Impact consumes its captured damage (15 versus 9), and both renderers
+select its captured sprite (458 versus 459), independently of later streak
+expiry. The stronger sprite's planar and DMA representations are built offline.
+
+Tests cover the 99/100 and expiry boundaries, delayed publication after a
+reward, both firing intervals, powered impact and matching per-bullet levels.
+A paired live fixture injects an eight-defeat combo; real landing/reward code
+must grant its gems and produce powered shots. This is a synthetic encounter
+setup, not a recording of the original game. Startup digest schema 41 includes
+the published level and bullet birth levels; startup baseline is now
+`cbab746ebc87d041` (state-layout change, not a Windows reference capture).
+
+This supersedes the level-zero-only limitation in the profile notes below.
+Original spread/random draws, bullet animation/angle, transition effects,
+weapon-specific audio/shake and full runner collision ordering remain open.
+The live machine-gun transition is not full support for other weapons.
+Validation: full host suite passes, including the live gem-high fixture and
+20,678 offline sprite comparisons. The bounded native default replay and both
+68000 audits pass; the ordinary build is restored. The game pack is 313,564
+bytes (SHA-256 `76e0c7bf73053edcdc522cefde840897411253b2d36682ffa07b470ec3ae699b`).
+Native upgraded encounter/capture coverage and its frame-cost measurement
+remain open; the default native replay does not establish those.
+
 ### Shared machine-gun profile foundation
 
 `MachineGunProfile` records the selected level-zero/level-one table fields for

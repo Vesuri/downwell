@@ -135,7 +135,7 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
 }
 
 PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool controlsLocked, bool dead,
-                                   bool interactable, bool goalStopped)
+                                   bool interactable, bool goalStopped, bool gemHigh)
 {
     const auto input = downwell::playerGameplayInput(rawInput, dead ? 0 : 1);
     frameStartX_ = x_;
@@ -276,11 +276,11 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             speedY_ = 0;
             gravityRemainder_ = 0;
         }
-        ammo_ -= downwell::machineGunProfile(false).consumption;
+        ammo_ -= downwell::machineGunProfile(gemHigh).consumption;
         ++shots_;
         airborneShot_ = true;
         shotFired = true;
-        shotDelay_ = downwell::machineGunProfile(false).interval;
+        shotDelay_ = downwell::machineGunProfile(gemHigh).interval;
     }
 
     // scrPlMovement's grounded branch runs after input/jump decisions.

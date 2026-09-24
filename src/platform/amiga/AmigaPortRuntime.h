@@ -77,6 +77,7 @@ public:
         int x;
         int y;
         bool active;
+        bool gemHigh = false;
     };
     struct EnemyState {
         int objectId;

@@ -440,6 +440,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     ++tick_;
     currencyAccount_.beginStep();
+    run_.selectWeaponLevel(currencyAccount_);
     run_.consumables.beginStep(player_, health_, run_.combo.healthReserve);
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     run_.results.beginStep(input);
@@ -490,7 +491,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         runtime.run_.gems.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
     AmigaPlayerMotion motion = player_.step(input, run_.shops.noControl || run_.exitControlsLocked,
-        death_.movementDead(), run_.shops.interactable, run_.goalStopped);
+        death_.movementDead(), run_.shops.interactable, run_.goalStopped, run_.gemHigh);
     const int shopPlayerX = 240 + downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int shopPlayerY = 176 + downwell::roundGameMakerQ8(player_.offsetYFixed());
     run_.shops.observePlayer(shopPlayerX, shopPlayerY, player_.grounded(), player_.speedXFixed());
@@ -526,6 +527,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             // scrPlayerEmitBullet negates it after every actual shot.
             bullet.x = muzzleX + ((oldShots & 1u) ? 1 : -1);
             bullet.y = muzzleY;
+            bullet.gemHigh = run_.gemHigh;
             bulletChanged = true;
         }
     }
@@ -579,7 +581,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 continue;
             bulletChanged = true;
             bullet.active = downwell::stepStandardBullet(bullet.x, bullet.y,
-                [this](const downwell::StandardBulletPath& path) {
+                [this, &bullet](const downwell::StandardBulletPath& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
                         EnemyState& enemy = enemies_[enemyIndex];
                         const downwell::ContactActor contact{
@@ -592,7 +594,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                             continue;
                         const auto impact = downwell::applyStandardBulletImpact(
                             enemy, enemiesDefeated_, enemyRandom_,
-                            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); });
+                            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); },
+                            bullet.gemHigh);
                         return impact.kind != downwell::BulletImpactKind::ignored;
                     }
                     return false;

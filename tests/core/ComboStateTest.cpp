@@ -8,6 +8,20 @@ static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    {
+        downwell::RunSession run;
+        downwell::CurrencyAccount currency;
+        currency.streak = 99; currency.timer = 1;
+        run.selectWeaponLevel(currency);
+        require(!run.gemHigh, "99 gems do not select powered-up weapon");
+        currency.collect(1);
+        require(!run.gemHigh, "collection does not change an already-published weapon level");
+        run.selectWeaponLevel(currency);
+        require(run.gemHigh, "next controller publication selects level one at 100");
+        currency.timer = 1;
+        currency.beginStep(); run.selectWeaponLevel(currency);
+        require(!run.gemHigh, "timer expiry clears streak before weapon-level selection");
+    }
     for (unsigned amount = 0; amount <= 15; ++amount) {
         PlayerMotion player(false, 10000);
         downwell::Input fire; fire.fire = true;

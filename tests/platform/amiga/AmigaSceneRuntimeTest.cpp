@@ -1151,6 +1151,15 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 live.builder.fragmentCount() < amigaInitialTerrainFragmentCount,
             "comparison exercises incremental terrain rather than a complete forecast");
     if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
+        const bool gemHighFixture = std::getenv("DOWNWELL_VERIFY_GEM_HIGH") != nullptr;
+        bool sawHighBullet = false;
+        if (gemHighFixture) {
+            // Inject only an accumulated combo; real movement/landing must
+            // award its gems and the next controller phase must select level 1.
+            auto& nativeCombo = const_cast<downwell::RunCombo&>(gameplay.runCombo());
+            auto& hostCombo = const_cast<downwell::RunCombo&>(reference.runCombo());
+            nativeCombo.state.count = hostCombo.state.count = 8;
+        }
         const bool candleFixture = std::getenv("DOWNWELL_VERIFY_CANDLE") != nullptr;
         const bool poweredFixture = std::getenv("DOWNWELL_VERIFY_GEM_POWERED") != nullptr;
         if (poweredFixture)
@@ -1331,6 +1340,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 const auto& bullet = gameplay.bulletAt(i);
                 if (!bullet.active) continue;
                 const auto& hostBullet = reference.mainBulletAt(bulletOrdinal++);
+                require(bullet.gemHigh == hostBullet.gemHigh,
+                        "live bullets retain matching birth-time weapon levels");
+                sawHighBullet |= bullet.gemHigh;
                 requireNear(bullet.x + 240, hostBullet.x, 1.0F,
                             "combat bullet X matches in creation order");
                 requireNear(bullet.y + 176, hostBullet.y, 3.0F,
@@ -1469,6 +1481,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "streak fixture actually earns gems and publishes the extended interval");
         require(!poweredFixture || gameplay.currency() > 0,
                 "Gem Powered combat fixture earns gems during the firing tape");
+        require(!gemHighFixture || sawHighBullet,
+                "live combo fixture actually emits powered-up projectiles");
         std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
                   << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
                   << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()
