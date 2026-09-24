@@ -8,8 +8,10 @@
 #include "BatHitState.h"
 #include "FrogHitState.h"
 #include "SnailHitState.h"
+#include "MachineGunTrajectory.h"
+#include "GameMakerRandom.h"
 namespace downwell {
-constexpr unsigned machineGunVerificationCoverage = 127;
+constexpr unsigned machineGunVerificationCoverage = 1023;
 struct MachineGunVerificationResult { std::uint64_t digest; unsigned coverage; };
 
 // Focused CPU-equivalence fixture, not a Windows recording or rendering test.
@@ -19,12 +21,16 @@ inline MachineGunVerificationResult verifyMachineGun() {
     CurrencyAccount currency;
     currency.streak = 100; currency.timer = 12;
     PlayerMotion player(false, 10000);
-    struct Shot { unsigned born = 0; bool high = false, hit = false; } shots[8];
+    struct Shot {
+        unsigned born = 0; bool high = false, hit = false;
+        MachineGunTrajectory trajectory;
+    } shots[8];
     unsigned count = 0, coverage = 0, hits = 0, defeated = 0;
     bool correct = true;
     struct Random { unsigned irandomSmall(unsigned) { return 0; } } random;
+    GameMakerRandom trajectoryRandom(2);
     VerificationDigest digest;
-    digest.addU32(1);
+    digest.addU32(2);
     Input fire; fire.fire = true;
     for (unsigned tick = 0; tick < 64; ++tick) {
         currency.beginStep();
@@ -40,11 +46,20 @@ inline MachineGunVerificationResult verifyMachineGun() {
                 if (gap == 6) coverage |= 4;
                 if (gap == 7) coverage |= 8;
             }
-            shots[count++] = {tick, high, false};
+            auto& shot = shots[count++];
+            shot.born = tick; shot.high = high;
+            shot.trajectory.reset(240, 176);
+            shot.trajectory.initialize(trajectoryRandom);
+            if (shot.trajectory.velocityX < 0) coverage |= 128;
+            if (shot.trajectory.velocityX > 0) coverage |= 256;
             coverage |= high ? 2 : 1;
         }
         for (unsigned i = 0; i < count; ++i) {
             auto& shot = shots[i];
+            if (!shot.hit) {
+                shot.trajectory.advance();
+                if (shot.trajectory.x.fraction && shot.trajectory.y.fraction) coverage |= 512;
+            }
             if (!shot.hit && tick - shot.born == 10) {
                 struct Enemy {
                     bool active = true;
@@ -62,13 +77,17 @@ inline MachineGunVerificationResult verifyMachineGun() {
             }
             digest.addU32(shot.born); digest.addBool(shot.high); digest.addBool(shot.hit);
             digest.addI32(machineGunProfile(shot.high).sprite);
+            digest.addU32(shot.trajectory.direction);
+            digest.addI32(shot.trajectory.velocityX); digest.addI32(shot.trajectory.velocityY);
+            digest.addI32(shot.trajectory.x.pixel); digest.addU32(shot.trajectory.x.fraction);
+            digest.addI32(shot.trajectory.y.pixel); digest.addU32(shot.trajectory.y.fraction);
         }
         digest.addU32(tick); digest.addBool(high);
         digest.addU32(currency.timer); digest.addU32(currency.streak);
         digest.addU32(player.shots()); digest.addI32(player.ammo());
         digest.addBool(player.shotDelayed());
     }
-    if (correct && count == 8 && hits == 8 && defeated == 0) coverage |= 64;
+    if (correct && count == 8 && hits == 8 && defeated == 0 && trajectoryRandom.drawCount() == count) coverage |= 64;
     digest.addU32(coverage);
     return {digest.value(), coverage};
 }

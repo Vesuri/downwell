@@ -9,6 +9,40 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Fractional machine-gun trajectory foundation (not yet live)
+
+`MachineGunTrajectory` implements the normal/high machine-gun kinematic
+constants (speed 8, accuracy 3), guarded against profile changes. Initialization
+consumes one Windows-runner RNG word, maps `random_range(-3,3)` to a Q32 turn
+around 270 degrees, and retains a Q20 velocity from the integer trig sampler.
+Position uses separate signed pixels and normalized fractional remainders,
+so precision does not restrict room coordinates to a small packed-Q20 range.
+Initialization and movement are separate: the source checks the upcoming
+segment against solids before committing movement.
+
+This is a bounded numerical approximation, not bit-identical Windows libm.
+Across 65,537 uniformly spaced RNG samples including both endpoints, the
+largest sampled velocity error versus the double source formula is
+`5.85315016e-7` pixels/update. Tests cover negative/large world coordinates,
+1,000-update fractional accumulation, reset/reuse, and exactly one RNG draw.
+The VM verifier checks first-Step initialization and solid-check/movement
+ordering. These checks do not establish full runner collision semantics.
+
+The cross-CPU weapon fixture now advances these trajectories and hashes
+direction, velocity and fractional positions along with its prior shot and
+damage state. Schema 2 digest `23bd5e8b431efffc`, coverage `3ff`, passes on the
+host and bounded A500 replay; the 4 KiB task-stack guard and CPU/helper audits
+pass, and the ordinary build is restored. Coverage adds both spread directions
+and nonzero fractional coordinates. Synthetic impacts remain age-based.
+
+The live adapters intentionally still use the existing vertical path. The next
+integration must replace their vertical-only enemy/terrain queries with shared
+sloped-segment geometry, retain fractional positions across updates, and publish
+the captured direction for impact/rendering. Connecting only the RNG draw or
+only the visible X drift would leave collision behavior inconsistent. Once
+connected, rerun the paired combat tapes: extra source RNG consumption changes
+later randomized events, so old encounter totals cannot be assumed unchanged.
+
 ### Shared six-frame projectile animation
 
 `ProjectileAnimation` now supplies both runtime adapters and both renderers.

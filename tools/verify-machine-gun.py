@@ -53,3 +53,11 @@ assert "push.d 0.3\npop.v.d self.image_speed" in create
 assert "pushi.e 0\npop.v.i self.image_index" in create
 assert all(len(manifest["resources"]["sprites"][i]["frames"]) == 6 for i in (458, 459))
 print("VM projectile animation starts at zero, advances by 0.3, and uses six-frame sprites")
+assert "push.v self.allSet\nconv.v.b\nnot.b\nbf [2]" in step
+assert "push.v self.bDir\npush.v self.bSpeed\ncall.i lengthdir_x(argc=2)\npop.v.v self.xsp" in step
+assert "push.v self.bDir\npush.v self.bSpeed\ncall.i lengthdir_y(argc=2)\npop.v.v self.ysp" in step
+assert step.index("pop.v.i self.allSet") < step.index("call.i gml_Script_scrBulCheckSolid(argc=0)")
+assert step.index("call.i gml_Script_scrBulCheckSolid(argc=0)") < step.index("pop.v.v self.x\n")
+assert "push.v self.x\npush.v self.xsp\nadd.v.v\npop.v.v self.x" in step
+assert "push.v self.y\npush.v self.ysp\nadd.v.v\npop.v.v self.y" in step
+print("VM spread/velocity initialization precedes solid checks and retained vector movement")

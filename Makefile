@@ -153,6 +153,15 @@ build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp src/core/Stand
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/StandardBulletStepTest.cpp
 
+.PHONY: test-machine-gun-trajectory
+test: test-machine-gun-trajectory
+test-machine-gun-trajectory: build/machine-gun-trajectory-test
+	./build/machine-gun-trajectory-test
+
+build/machine-gun-trajectory-test: tests/core/MachineGunTrajectoryTest.cpp src/core/MachineGunTrajectory.h src/core/MachineGunProfile.h src/core/LevelClearTrig.h src/core/HudReal.h src/core/GameMakerRandom.h src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MachineGunTrajectoryTest.cpp src/core/GameMakerRandom.cpp
+
 build/main-camera-test: tests/core/MainCameraMotionTest.cpp src/core/MainCameraMotion.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MainCameraMotionTest.cpp
