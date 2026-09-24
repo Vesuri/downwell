@@ -926,6 +926,8 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             // builder visits its next cell. Do not defer it with plain tiles.
             if (command.objectId == 277)
                 return runtime->registerShop(command.x, command.y) != nullptr;
+            if (command.objectId == 306)
+                runtime->mainCameraMotion_.setLevelExit(command.y);
             return runtime->deferredInstances_.enqueueCreate(command);
         },
         this, result);

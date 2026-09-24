@@ -9,6 +9,8 @@ struct MainCameraMotion {
     long x = 240L * 4096, y = 176L * 4096;
     long targetX = x, targetY = y;
     int slowdownX = 1, slowdownY = 5;
+    int roomEnd = -1;
+    void setLevelExit(int triggerY) { roomEnd = triggerY - 176; }
     // rmMain's serialized view follows camMain's rounded instance x/y.
     int pixelX() const { return static_cast<int>(roundGameMakerQ12(x)); }
     int pixelY() const { return static_cast<int>(roundGameMakerQ12(y)); }
@@ -19,6 +21,7 @@ struct MainCameraMotion {
     void reset(int px, int py) {
         x = targetX = px * 4096L; y = targetY = py * 4096L;
         slowdownX = 1; slowdownY = 5;
+        roomEnd = -1;
     }
     void step(long playerXQ8, long playerYQ8, bool dead = false) {
         if (!dead) {
@@ -35,6 +38,12 @@ struct MainCameraMotion {
                 // Exact boundary equality preserves the old target.
                 // Side rooms preserve targetY and slowdownY.
             }
+        }
+        // camMain clamps its target and (only in that branch) its current yy
+        // before easing. The source's negative sentinel is not a true bool.
+        if (roomEnd > 0 && targetY > roomEnd * 4096L) {
+            targetY = roomEnd * 4096L;
+            if (y > targetY) y = targetY;
         }
         x += (targetX - x) / slowdownX;
         y += (targetY - y) / slowdownY;

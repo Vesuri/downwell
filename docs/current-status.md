@@ -85,6 +85,14 @@ active trigger; native generation tests retain command-order checks while
 excluding the trigger from the decoration stream. This fixes presentation,
 not the still-unimplemented end-of-level collision dispatch.
 
+The generated exit now also sets the shared camera's roomEnd to triggerY-176
+on both live creation paths, reproducing roomEndSetter Create. camMain's cap
+is applied to the target before easing, and to current Y only inside that same
+target-exceeded branch. Reset clears the limit to its original -1 sentinel.
+Focused tests cover easing, overshoot, retained death targets and reset; the
+paired runtime regression passes. This does not yet create the goal field,
+consume its random radius/audio choices, stop the player or enter rmResult.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.

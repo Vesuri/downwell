@@ -217,6 +217,7 @@ public:
         }, health_, run_.stage.area > 0 ? run_.stage.area : 1);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
+    void setLevelExitCamera(int triggerY) { cameraMotion_.setLevelExit(triggerY); }
     const downwell::RunStage& runStage() const { return run_.stage; }
     int healthMaximum() const { return run_.combo.healthReserve.maximum; }
     const downwell::HealthReserve& healthReserve() const { return run_.combo.healthReserve; }

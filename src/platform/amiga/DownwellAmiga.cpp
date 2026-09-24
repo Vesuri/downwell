@@ -130,6 +130,7 @@ static bool appendGeneratedTerrain(void* opaque,
     // synchronously so stock/farewell draws precede the next pattern cell.
     if (command.objectId == 277)
         return live.runtime->registerShop(command.x, command.y) != nullptr;
+    if (command.objectId == 306) live.runtime->setLevelExitCamera(command.y);
     if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
         !terrainTiles.append(command)) return false;
     if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||

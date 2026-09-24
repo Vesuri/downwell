@@ -7,6 +7,23 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    {
+        downwell::MainCameraMotion capped;
+        capped.reset(240, 1000);
+        capped.setLevelExit(1376);
+        capped.step(240*256L, 2000*256L);
+        require(capped.roomEnd == 1200 && capped.targetY == 1200*4096L &&
+            capped.y == 1040*4096L, "exit camera cap constrains target before normal easing");
+        capped.y = 1500*4096L;
+        capped.step(240*256L, 2000*256L);
+        require(capped.y == 1200*4096L, "overshot camera snaps to exit cap before easing");
+        capped.y = 1500*4096L; capped.targetY = 1100*4096L;
+        capped.step(0,0,true);
+        require(capped.y == 1420*4096L,
+            "current y is not independently clamped when source target is below cap");
+        capped.reset(240,176);
+        require(capped.roomEnd == -1, "new room resets source limit sentinel");
+    }
     for (long whole : {-3L, -2L, 0L, 1L, 2L, 1456L}) {
         for (long fraction : {-2049L, -2048L, -2047L, 0L, 2047L, 2048L, 2049L}) {
             downwell::MainCameraMotion pixel;
