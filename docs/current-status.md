@@ -22,34 +22,52 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
 - [x] Recover consumable stock selection and purchase order from VM assembly.
 - [x] Shared stock/pricing/transaction core and focused regression tests.
 - [x] Apply queued consumables in the original controller phase on both runtimes.
-- [x] Shared shop interaction and feedback requests (callable, not yet live).
+- [x] Shared shop interaction and feedback requests for registered shops.
 - [x] Shared shop world ownership and registered-shop input/purchase hooks in
   both runtimes, verified with an isolated paired fixture.
 - [x] Retained shared merchant feedback and purchased-item disappearance state
-  (rendering/audio consumers still pending).
+  (merchant audio/speech consumers still pending).
 - [x] Table, glass-case and invisible-wall player collision masks shared by
   both adapters, including separate retirement rules.
 - [x] Shared static counter/table/case drawing and offline planar fixtures;
   Amiga composition uses the terrain cache, not recurring furniture redraws.
 - [x] Cased consumable icons (original frame 1), purchase disappearance and
-  changed-row cache refresh; active menu rendering remains pending.
+  changed-row cache refresh.
 - [x] Shared merchant Step/alarm controller and animation phase in both
   runtimes; enemy replacement remains pending.
 - [x] Merchant moving-object drawing on SDL and Amiga, offline planar/DMA
   frames, and existing sprite allocation/BOB fallback (not terrain redraw).
+- [x] Shared shop menu layout, extracted text and both rendering adapters;
+  native dirty-region composition and banked offline art.
+- [x] Shared interaction prompt state and drawing, including offline DMA art.
+- [x] Configurable cavern stage/style shop generation and synchronous Shop
+  creation dispatch; seeded cross-adapter generation tests include stock RNG.
+- [x] Seven target retained-blitter/fresh-scalar shop/streak comparisons inside
+  the bounded 600-tick terrain gate. This is a renderer fixture, not gameplay.
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
-- [ ] Offline shop art and native rendering without recurring terrain redraw.
 - [ ] Deterministic purchases: insufficient funds, sold out, each item, exit/reentry.
 - [ ] Bounded target capture/replay and original-game validation.
 
-`ShopInventory` is currently a callable core, not a playable shop. Ordinary 1-1
+Ordinary 1-1
 marks its shop as already made; reaching shops naturally also needs subsequent
 level progression. Do not silently change the original first-level generator
 to make a shop appear for testing.
-Explicit registration now drives interaction in both runtimes, but production
-generation, shop children and rendering are not connected yet. The fixture is
-not proof of a complete shop or Windows event-order equivalence.
+Explicit registration drives interaction, child state and rendering in both
+runtimes. Builder callbacks register emitted shops synchronously, but normal
+gameplay still uses ordinary 1-1 setup: it cannot yet progress to later stages
+or select an implemented alternative style that naturally generates a shop.
+Fixtures are not proof of a complete shop or Windows event-order equivalence.
+
+### Next integration path (source audited)
+
+Implement the original level-end/result flow rather than calling RunStage.advance
+directly on a depth threshold. objLineToResult collision, when alive and not
+already active, sets alarm 0 to five, goalStop and noControl. Alarm 0 creates
+objTransDither and sets alarm 1 to 90. Alarm 1 enters rmResult; Result alarm 1
+later calls scrNextLevel(0). The trigger's Create also creates goalTimeField at
+y+32. These events and their required result/upgrade behavior remain unported.
+Stage advancement alone would skip visible behavior and RNG-consuming events.
 
 ## Still open beyond that milestone
 
