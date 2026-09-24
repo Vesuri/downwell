@@ -161,6 +161,7 @@ bool DownwellGameplayCopperList::build(
     exitMaskData_ = nullptr;
 
     planeOffset_ = moveOffset(bpl1pth);
+    overlayOffset_ = moveOffset(bpl2pth);
     wrapWaitOffset_ = size();
     // Fixed shape, including the PAL line-255 bridge, permits word patches.
     if (!wait(255, 0xdf) || !wait(301, 0xdf) ||
@@ -182,6 +183,7 @@ bool DownwellGameplayCopperList::updateExitMask(const UBYTE* mask)
 
 bool DownwellGameplayCopperList::update(const Bitmap& game, unsigned ringOrigin)
 {
+    if (ringOrigin >= downwellGameRingHeight) return false;
     if (gameData_ != game.data) {
         const UBYTE* base = (const UBYTE*)game.data + downwellFetchCropBytes;
         if (!patchPointer(wrapWaitOffset_ + 4, base) ||
@@ -197,6 +199,16 @@ bool DownwellGameplayCopperList::update(const Bitmap& game, unsigned ringOrigin)
            patchPointer(planeOffset_ + 4, data + downwellGameRingPlaneBytes) &&
            patchWait(wrapWaitOffset_, line < 255 ? line : 255, 0xdf) &&
            patchWait(wrapWaitOffset_ + 2, line, 0xdf);
+}
+
+bool DownwellGameplayCopperList::updateOverlay(const Bitmap& hud)
+{
+    if (!valid() || !overlayOffset_ || !hud.data || hud.interleaved ||
+        hud.dataWidth != downwellDmaWidth || hud.height != downwellDisplayHeight ||
+        hud.bitplanes != 2) return false;
+    const UBYTE* base = (const UBYTE*)hud.data + downwellFetchCropBytes;
+    return patchPointer(overlayOffset_, base) &&
+           patchPointer(overlayOffset_ + 4, base + downwellPlaneBytes);
 }
 
 DownwellMenuCopperList::DownwellMenuCopperList(

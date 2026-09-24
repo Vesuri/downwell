@@ -453,6 +453,21 @@ audits. This helper is not yet invoked by the application. Crucially, entry must
 retire ALL gameplay DMA, not merely the exit-mask pointers: camera staging can
 rotate a world display into the garden region that the clear mask will reuse.
 
+The gameplay copper class now supports swapping a retained PF2 overlay by
+patching only the four pointer value words for BPL2/BPL4. This lets the clear
+presenter reuse the existing independent PF1 circular-buffer wrap and departure
+mask machinery. Invalid overlay geometry and out-of-range ring origins are
+rejected. The native scene verifier exercises an isolated, never-published
+copper list across both overlay buffers and all 320 ring positions, checking
+pointer addresses and every other list word. The production clear-scene handoff
+has not yet called this API; callers must patch only a retired list and publish
+it through the existing platform boundary.
+The 45-second-bounded SKIP_TO_GAME gate passed all 640 pointer swaps, all three
+results destinations and 200 gameplay updates, including its stack-guard check.
+The emulator was stopped and the ordinary build restored with clean 68000
+instruction/helper audits. This verifies actual target-side copper words, not
+yet a visible clear-screen scene.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

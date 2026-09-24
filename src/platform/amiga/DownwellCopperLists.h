@@ -43,9 +43,11 @@ public:
                const Sprite& overflowSprite,
                const Palette& palette, unsigned ringOrigin);
     bool update(const Bitmap& game, unsigned ringOrigin);
+    // Patch only the inactive list's PF2 pointers for a retained overlay swap.
+    bool updateOverlay(const Bitmap& hud);
     bool updateExitMask(const UBYTE* mask);
 private:
-    unsigned planeOffset_, wrapWaitOffset_;
+    unsigned planeOffset_ = 0, wrapWaitOffset_ = 0, overlayOffset_ = 0;
     unsigned exitModeOffset_, exitMaskOffset_;
     const UBYTE* exitMaskData_ = nullptr;
     const void* gameData_ = nullptr;

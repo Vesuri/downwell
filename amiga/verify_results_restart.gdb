@@ -10,6 +10,10 @@ end
 if gDownwellStackGuardReady != 1
     quit 1
 end
+if gDownwellOverlayCopperChecks != 640 || gDownwellOverlayCopperFailures != 0
+    printf "Retained overlay copper patch verification failed\n"
+    quit 1
+end
 set $stack_guard = (unsigned long *)SysBase->ThisTask->tc_SPLower
 set $word = 0
 while $word < 64

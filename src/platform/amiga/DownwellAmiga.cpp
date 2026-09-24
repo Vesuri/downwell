@@ -1296,6 +1296,43 @@ static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
 }
 
 #ifdef DOWNWELL_SCENE_VERIFY
+extern "C" { volatile ULONG gDownwellOverlayCopperChecks, gDownwellOverlayCopperFailures; }
+static bool verifyOverlayCopper(const Bitmap& game, const Bitmap& hud,
+                                const Sprite& nullSprite, const Palette& palette) {
+    // Isolated, never-published list: exercise real framework word patches on
+    // the 68000 without redirecting active DMA or repainting a display buffer.
+    static UWORD words[downwellCopperWords], before[downwellCopperWords];
+    DownwellGameplayCopperList list(words, downwellCopperWords);
+    Bitmap alternate(game.data, downwellVisibleWidth, downwellDisplayHeight, 2, false, false, downwellDmaWidth);
+    if (!list.build(game, hud, nullSprite, nullptr, 0, nullSprite, palette, 0)) return false;
+    const unsigned offset = list.moveOffset(bpl2pth);
+    const unsigned length = list.size();
+    for (unsigned origin = 0; origin < downwellGameRingHeight; ++origin) {
+        if (!list.update(game, origin)) return false;
+        for (unsigned buffer = 0; buffer < 2; ++buffer) {
+            for (unsigned i = 0; i < length; ++i) before[i] = words[i];
+            const Bitmap& target = buffer ? hud : alternate;
+            if (!list.updateOverlay(target) || list.size() != length) return false;
+            for (unsigned plane = 0; plane < 2; ++plane) {
+                const unsigned at = offset + plane * 4;
+                const ULONG wanted = (ULONG)target.data + downwellFetchCropBytes + plane * downwellPlaneBytes;
+                if (words[at] != bpl2pth + plane * 8 || words[at + 2] != words[at] + 2 ||
+                    (((ULONG)words[at + 1] << 16) | words[at + 3]) != wanted) return false;
+            }
+            for (unsigned i = 0; i < length; ++i) {
+                if (i == offset + 1 || i == offset + 3 || i == offset + 5 || i == offset + 7) continue;
+                if (words[i] != before[i]) return false;
+            }
+            ++gDownwellOverlayCopperChecks;
+        }
+    }
+    for (unsigned i = 0; i < length; ++i) before[i] = words[i];
+    Bitmap invalid(game.data, downwellVisibleWidth, downwellGameRingHeight, 2, false, false, downwellDmaWidth);
+    if (list.updateOverlay(invalid) || list.update(game, downwellGameRingHeight)) return false;
+    for (unsigned i = 0; i < length; ++i) if (words[i] != before[i]) return false;
+    return true;
+}
+
 static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display, unsigned buffer,
                                 const AmigaPortRuntime& port) {
     gDownwellCaptureTick = port.tick();
@@ -1625,6 +1662,13 @@ int main(void) {
     amigaRendererInit(&renderer, memory.game(), memory.hud());
     amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
     amigaRendererEnableBlitter(&renderer);
+#ifdef DOWNWELL_SCENE_VERIFY
+    {
+        Sprite empty(memory.nullSprite(), 0);
+        if (!verifyOverlayCopper(gameBitmap, hudBitmap, empty, palette))
+            ++gDownwellOverlayCopperFailures;
+    }
+#endif
     if (!amigaRendererBuildHardwareSprite(
             amiga_game_pack, amiga_game_pack_end, 31, 0,
             downwellPlayfieldX + 80,
