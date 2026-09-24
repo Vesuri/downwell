@@ -462,6 +462,14 @@ int main(int argc, char** argv) {
                 retained.draw(&actualRenderer, hudPack.data(), hudPack.data() + hudPack.size(),
                     ammo, cap, tick % 3, &rows, meter);
                 fullRedraw(ammo, cap, tick%3, meter);
+                if (actualHud != expectedHud) {
+                    std::cerr << "HUD mismatch cap=" << cap << " ammo=" << ammo << " tick=" << tick
+                              << " meter=" << meter << '\n';
+                    for (unsigned byte = 0; byte < actualHud.size(); ++byte) if (actualHud[byte] != expectedHud[byte]) {
+                        std::cerr << "first byte=" << byte << " actual=" << unsigned(actualHud[byte])
+                                  << " expected=" << unsigned(expectedHud[byte]) << '\n'; break;
+                    }
+                }
                 require(actualHud == expectedHud, "retained ammo strips match complete reconstruction");
                 retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(),
                     ammo, cap, tick%3, &rows, meter);

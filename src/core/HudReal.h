@@ -39,6 +39,20 @@ struct HudReal {
     }
     static HudReal ratio(unsigned numerator, unsigned denominator) {
         if (!numerator || !denominator) return {};
+        if (numerator == denominator) return integer(1);
+        // Every uint32/power-of-two ratio is exactly representable in
+        // binary64. The usual eight-charge gauge needs no 52-bit long divide.
+        if (!(denominator & (denominator-1))) {
+            auto result = integer(numerator);
+            unsigned power = 0;
+            if (denominator >= 0x10000u) { denominator >>= 16; power += 16; }
+            if (denominator >= 0x100u) { denominator >>= 8; power += 8; }
+            if (denominator >= 0x10u) { denominator >>= 4; power += 4; }
+            if (denominator >= 4) { denominator >>= 2; power += 2; }
+            if (denominator >= 2) ++power;
+            result.exponent -= static_cast<int>(power);
+            return result;
+        }
         std::uint64_t n = numerator, d = denominator;
         int exponent = 0;
         while (n < d) { n <<= 1; --exponent; }

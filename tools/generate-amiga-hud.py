@@ -593,8 +593,17 @@ def build_pack(manifest, extracted, profile, language_path=None):
                         if pen:
                             require(0 <= px < 32 and 0 <= py < 24, "ammo digit bounds")
                             pens[py * 32 + px] = pen
-            stride, data = encode_planar(pens, 32, 24)
-            encoded.append((dict(id=65010, width=32, height=24, originX=8, originY=8),
+            occupied = [(x, y) for y in range(24) for x in range(32) if pens[y * 32 + x]]
+            left = min(x for x, y in occupied)
+            top = min(y for x, y in occupied)
+            width = max(x for x, y in occupied) + 1 - left
+            height = max(y for x, y in occupied) + 1 - top
+            cropped = [pens[y * 32 + x] for y in range(top, top + height)
+                       for x in range(left, left + width)]
+            stride, data = encode_planar(cropped, width, height)
+            require(decode_planar(data, width, height, stride) == cropped,
+                    "cropped ammo digit round trip")
+            encoded.append((dict(id=65010, width=width, height=height, originX=8-left, originY=8-top),
                             digit, stride, data))
 
     style_text = {}
@@ -885,6 +894,17 @@ def main():
             require(provenance_path.read_bytes() == provenance, "exit mask provenance differs")
         else:
             atomic_write(mask_path, mask)
+            atomic_write(provenance_path, provenance)
+    if args.profile == "hud":
+        provenance = json.dumps({
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/hud-v2",
+            "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
+            "packSha256": digest, "derivedAmmoDigitId": 65010,
+        }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
+        provenance_path = args.output.with_suffix(".manifest.json")
+        if args.check:
+            require(provenance_path.read_bytes() == provenance, "HUD provenance differs")
+        else:
             atomic_write(provenance_path, provenance)
     if args.profile in ("shop", "clear"):
         labels = shop_texts(args.language) if args.profile == "shop" else clear_texts(args.language)

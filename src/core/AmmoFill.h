@@ -10,6 +10,13 @@ struct AmmoFill {
     static AmmoFill geometry(unsigned ammo, unsigned capacity) {
         const auto anchor = HudReal::integer(232);
         if (!ammo || !capacity) return {anchor, {}};
+        // No rounding occurs in the original divide/multiply sequence here:
+        // powers of two through eight divide 184 exactly. Avoid reconstructing
+        // binary64 arithmetic for the usual gun's integral rectangle.
+        if (capacity <= 8 && !(capacity & (capacity-1)) && ammo <= capacity) {
+            const unsigned length = ammo * (184 / capacity);
+            return {HudReal::integer(237-length), HudReal::integer(length-5)};
+        }
         const auto meter = HudReal::ratio(ammo, capacity).times184();
         const auto five = HudReal::integer(5);
         if (meter.less(five)) return {anchor, five.subtract(meter)};

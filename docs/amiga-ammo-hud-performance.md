@@ -82,3 +82,38 @@ Evidence logs for this checkpoint are `/tmp/downwell-hud-final-profile.log`,
 `/tmp/downwell-hud-ammo-native.log`, `/tmp/downwell-hud-recharge-native.log`,
 and `/tmp/downwell-hud-complete-suite.log`. The phase report now separates
 base/fill, row artwork, divider geometry/draws and rim/label/publication.
+
+## Follow-up: less label and divider work
+
+The next increment crops offline-composed ammo digits to their actual ink,
+preserving their anchors and resource ID. The HUD pack shrinks by 2,280 bytes
+to 12,356 bytes and records `hud-v2` provenance. Label damage uses the union
+of old/new ink bounds, except when a previous wide transparent backing needs
+restoring. Repeated unchanged requests must not discard that pending repair.
+
+Divider visibility is now classified once per ammo/capacity change, not once
+per damaged strip. Exact power-of-two ratios and integral fill rectangles
+avoid emulated binary64 arithmetic without changing its results. General
+capacities retain the original rounding path. Tests include 100,000 exact
+power-of-two ratio comparisons as well as the existing exhaustive geometry
+and retained-pixel comparisons.
+
+The same bounded 600-update tape reports HUD phases totaling
+1,653.688 + 667.598 + 468.339 + 1,070.559 = 3,860.184 ms:
+**6.43 ms per game update**, approximately **27.77 ms per actual HUD update**.
+That is another 17% reduction, still not within the 20 ms frame budget.
+The instrumented run uses 1,188 fields; the separate FPSCOUNT run uses
+989 fields (**30.33 FPS**, maximum gap six fields). No copper/scroll changes
+or new Chip-RAM allocation are involved.
+
+Logs: `/tmp/downwell-hud-integer-profile.log` and
+`/tmp/downwell-hud-integer-fps.log`. Clearing/compositing changed regions in
+the retained working image is still a cost to reduce; unchanged visible
+words and stationary red sides are not cleared and redrawn.
+
+The complete host suite, sanitized renderer, both native pixel captures
+(zero differences), cross-target replay and 68000 audits pass again. The
+normal non-skip executable is restored after verification. The retained HUD
+object now occupies 41,178 bytes, 68 bytes more than the previous checkpoint.
+Verification logs use the `/tmp/downwell-hud-integer-` prefix with
+`suite.log`, `sanitized.log`, `ammo.log`, `recharge.log` and `replay.log`.

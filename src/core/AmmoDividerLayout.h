@@ -10,6 +10,7 @@ struct AmmoDividerLayout {
     unsigned capacity = 0, count = 0;
     unsigned cachedAmmo = ~0u;
     HudReal filled;
+    unsigned char visible[65]; // 0=absent, 1=boundary, 2=filled three-layer mark.
     void prepare(unsigned cap) {
         if (capacity == cap) return;
         capacity = cap; count = 0; cachedAmmo = ~0u;
@@ -34,18 +35,33 @@ struct AmmoDividerLayout {
         }
         prepare(cap);
         if (!cap) return;
-        if (ammo != cachedAmmo) { filled = HudReal::ratio(ammo, cap).times184(); cachedAmmo = ammo; }
+        if (ammo != cachedAmmo) {
+            if (cap <= 8 && !(cap & (cap-1)) && ammo <= cap) {
+                // 184/cap is an integer for these power-of-two capacities.
+                // Source levels are exactly (cap-i)*(184/cap), with no
+                // rounded tail iteration and no level equal to one.
+                for (unsigned i = 0; i < count; ++i)
+                    visible[i] = ammo > cap-i ? 2 : ammo == cap-i ? 1 : 0;
+            } else {
+                filled = HudReal::ratio(ammo, cap).times184();
+                for (unsigned i = 0; i < count; ++i) {
+                    const auto& level = entries[i].level;
+                    visible[i] = level.less(filled) ? 2 : level.equal(filled) ||
+                        (level.exponent == 0 && level.mantissa == (std::uint64_t{1} << 52)) ? 1 : 0;
+                }
+            }
+            cachedAmmo = ammo;
+        }
         const unsigned offset = (bottom - 229) / 4;
         if (cap < 20) for (unsigned i = 0; i < count; ++i)
-            if (entries[i].level.less(filled)) drawSprite(421, 1, x, entries[i].y[offset][0]);
+            if (visible[i] == 2) drawSprite(421, 1, x, entries[i].y[offset][0]);
         for (unsigned i = 0; i < count; ++i) {
             const auto& entry = entries[i];
-            if (entry.level.less(filled)) {
+            if (visible[i] == 2) {
                 drawSprite(421, 0, x, entry.y[offset][0]);
                 drawSprite(421, 1, x, entry.y[offset][1]);
                 drawSprite(421, 1, x, entry.y[offset][2]);
-            } else if (entry.level.equal(filled) ||
-                       (entry.level.exponent == 0 && entry.level.mantissa == (std::uint64_t{1} << 52)))
+            } else if (visible[i] == 1)
                 drawSprite(421, 1, x, entry.y[offset][1]);
         }
     }

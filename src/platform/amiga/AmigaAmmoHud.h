@@ -11,6 +11,7 @@ class AmigaAmmoHud {
     downwell::AmmoDividerLayout layout_;
     UBYTE* destination_ = nullptr;
     unsigned oldDigits_ = 1, fillAmmo_ = ~0u, fillCapacity_ = ~0u;
+    bool previousWideClear_ = false;
     unsigned fillTop_ = 0, fillHeight_ = 0;
     AmigaWordStamp stamps_[10];
     bool stampsReady_ = false;
@@ -36,6 +37,7 @@ public:
         lastWordWrites = 0;
         const bool retainEdges = damage_.valid && damage_.meter == meter && !forceFull;
         const bool initialize = !damage_.valid;
+        const unsigned previousAmmo = damage_.ammo, previousOffset = damage_.offset;
         damage_.update(ammo, capacity, offset, meter, rows);
         if (stampPack_ != pack) {
             stampsReady_ = true;
@@ -74,12 +76,27 @@ public:
         oldDigits_ = digits;
         const int left = clearDigits == 1 ? 282 : 282 - (static_cast<int>(clearDigits)-1)*4;
         const int right = clearDigits == 1 ? 320 : 320 + (clearDigits-1)*4;
+        int labelTop = 231, labelBottom = clearDigits == 1 ? 256 : 256 + clearDigits;
+        if (!initialize && !previousWideClear_ && damage_.label && clearDigits == 1) {
+            int oldX, oldY, oldWidth, oldHeight, newX, newY, newWidth, newHeight;
+            if (amigaRendererAssetBounds(pack, end, 65010, previousAmmo,
+                    290 + previousOffset, 239 + previousOffset, 0, &oldX, &oldY, &oldWidth, &oldHeight) &&
+                amigaRendererAssetBounds(pack, end, 65010, ammo,
+                    290 + offset, 239 + offset, 0, &newX, &newY, &newWidth, &newHeight)) {
+                labelTop = oldY < newY ? oldY : newY;
+                labelBottom = oldY+oldHeight > newY+newHeight ? oldY+oldHeight : newY+newHeight;
+            }
+        }
         if (ammo != fillAmmo_ || capacity != fillCapacity_) {
             const auto fill = downwell::AmmoFill::geometry(ammo, capacity);
             fillTop_ = fill.top.floor(); fillHeight_ = fill.height.floor();
             fillAmmo_ = ammo; fillCapacity_ = capacity;
         }
         auto paint = [&](int top, int bottom, bool interior) {
+            // Record the backing actually painted, not merely a draw request:
+            // repeated unchanged requests must not lose a pending wide clear.
+            if (!interior && top <= 231 && bottom >= 256)
+                previousWideClear_ = clearDigits > 1;
             const int stripLeft = interior ? 288 : left, stripRight = interior ? 300 : right;
             amigaRendererClearClipRect(renderer);
             renderer->clipX = stripLeft; renderer->clipWidth = stripRight-stripLeft;
@@ -157,9 +174,8 @@ public:
         if (forceFull) paint(0, downwellDisplayHeight, false);
         else {
             if (damage_.top < damage_.bottom) strip(damage_.top, damage_.bottom);
-            const int labelBottom = clearDigits == 1 ? 256 : 256 + clearDigits;
-            if (damage_.label && !(damage_.top <= 231 && damage_.bottom >= labelBottom))
-                strip(231, labelBottom);
+            if (damage_.label && !(damage_.top <= labelTop && damage_.bottom >= labelBottom))
+                strip(labelTop, labelBottom);
         }
         amigaRendererClearClipRect(display);
     }

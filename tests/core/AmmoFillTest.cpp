@@ -34,6 +34,9 @@ int main() {
         random = random * 1664525u + 1013904223u;
         const auto integer = downwell::HudReal::integer(random);
         if (real(integer) != double(random) || integer.floor() != random) std::abort();
+        const unsigned denominator = 1u << (i%32);
+        if (real(downwell::HudReal::ratio(random, denominator)) != double(random)/denominator)
+            std::abort();
     }
     check(0, 0);
     for (unsigned cap = 1; cap <= 512; ++cap)
