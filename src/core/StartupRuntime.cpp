@@ -4,6 +4,7 @@
 #include "EnemyPresentation.h"
 #include "EnemyContact.h"
 #include "FrogBehavior.h"
+#include "FrogMotion.h"
 #include "BatMotion.h"
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
@@ -246,6 +247,11 @@ void StartupRuntime::stepInternal(bool advancePressed,
     inputRight_ = right;
     inputFire_ = fire;
     anyInput_ = anyInput;
+
+    for (std::size_t i = 0; i < instances_.size(); ++i) {
+        auto& instance = instances_.at(i);
+        if (instance.active && instance.objectId == 113) instance.frogHit.advanceFrame();
+    }
 
     if (showSplash_ == 3 || showSplash_ == 4)
         splashDitherTenths_ = 110;
@@ -504,6 +510,7 @@ void StartupRuntime::updateMainBullets() {
                 // Ground turtles are bulletImmune in their recovered Create
                 // event. Other area-one enemies take the usual gun's 10 dmg.
                 if (enemy->objectId != 112) {
+                    if (enemy->objectId == 113) enemy->frogHit.pending = true;
                     enemy->health -= 10;
                     if (enemy->health <= 0) {
                         spawnMainCurrency(static_cast<float>(enemy->x),
@@ -684,16 +691,22 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.frogMotionInitialized = true;
             }
             enemy.frogVertical.grounded = enemy.grounded;
-            enemy.frogVertical.step([this, &enemy](int y) {
-                return mainSolidAt(mainPlayerOriginX_ + enemy.frogHorizontal.pixel(), mainPlayerOriginY_ + y);
-            }, integrate);
+            const bool hit = stepFrogMotion(enemy.frogHorizontal, enemy.frogVertical,
+                enemy.frogHit, integrate, [this](int x, int y) {
+                    return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y);
+                });
+            if (hit) {
+                enemy.auxiliaryState = 0;
+                enemy.alarms.set(0, 0);
+                enemy.alarms.set(1, 60);
+                enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
+                enemy.imageIndex = 0;
+                ++soundPlayRequests_;
+            }
             enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
             enemy.velocityY = enemy.frogVertical.velocity / 1280.0F;
             enemy.grounded = enemy.frogVertical.grounded;
             if (!enemy.grounded) {
-                enemy.frogHorizontal.step([this, &enemy](int edge) {
-                    return mainSolidAt(mainPlayerOriginX_ + edge, mainPlayerOriginY_ + enemy.frogVertical.pixel());
-                }, integrate);
                 enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
                 enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
             }
@@ -761,7 +774,9 @@ void StartupRuntime::updateMainEnemies() {
         enemy.spriteId = enemyPresentationSprite(enemy.objectId, enemy.grounded,
                                                   enemy.auxiliaryState);
         if (enemy.objectId == 113) {
-            if (!enemy.grounded) {
+            if (enemy.frogHit.remaining != 0) {
+                enemy.spriteId = 173;
+            } else if (!enemy.grounded) {
                 enemy.imageSpeed = 0.0F;
                 enemy.imageIndex = enemy.velocityY < 0.0F ? 0.0F : 1.0F;
             } else {
@@ -2234,6 +2249,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
             digest.addI32(instance.frogVertical.position);
             digest.addI32(instance.frogVertical.velocity);
             digest.addBool(instance.frogVertical.grounded);
+            digest.addBool(instance.frogHit.pending);
+            digest.addBool(instance.frogHit.ready);
+            digest.addU32(instance.frogHit.remaining);
         }
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm)
             digest.addI32(instance.alarms.get(alarm));

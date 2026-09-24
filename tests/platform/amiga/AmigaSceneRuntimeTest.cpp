@@ -17,6 +17,7 @@ namespace {
 int parityFrame = 0;
 bool sawExtendedEnemyAnimation = false;
 bool sawPairedFrogAir = false, sawPairedFrogGround = false;
+bool sawPairedFrogHit = false;
 
 void require(bool condition, const char* message) {
     if (!condition) {
@@ -234,12 +235,20 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
             native.frogHorizontal.velocity == enemy.frogHorizontal.velocity &&
             native.preciseY * 5 + native.gravityPositionRemainder == enemy.frogVertical.position &&
             native.speedY * 5 + native.gravityRemainder == enemy.frogVertical.velocity &&
-            native.grounded == enemy.frogVertical.grounded;
+            native.grounded == enemy.frogVertical.grounded &&
+            native.frogHit.pending == enemy.frogHit.pending &&
+            native.frogHit.ready == enemy.frogHit.ready &&
+            native.frogHit.remaining == enemy.frogHit.remaining;
         if (!matching)
             std::cerr << "FROG MOTION tick=" << amiga.tick() << " actor=" << ordinal - 1
                       << " Q8 native=" << native.preciseX << ',' << nativeY << ',' << native.speedX << ',' << nativeVY
                       << " SDL=" << referenceX << ',' << referenceY << ',' << referenceVX << ',' << referenceVY << '\n';
         require(matching, "frog adapters must agree at Q8 precision, not within a one-pixel allowance");
+        if (enemy.frogHit.remaining != 0) {
+            sawPairedFrogHit = true;
+            require(native.spriteId == 173 && enemy.spriteId == 173,
+                    "both adapters select the source damage sprite during hit stun");
+        }
     }
 }
 
@@ -320,7 +329,9 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                         "paired actor horizontal trajectory agrees across targets");
             requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F,
                         "paired actor vertical trajectory agrees within Q8 integration error");
-            if (enemy.objectId == 113 && enemy.active && !enemy.grounded)
+            if (enemy.objectId == 113 && enemy.active && enemy.frogHit.remaining != 0)
+                require(enemy.spriteId == 173, "frog hit stun takes priority over flight presentation");
+            else if (enemy.objectId == 113 && enemy.active && !enemy.grounded)
                 require(enemy.spriteId == 168 &&
                             enemy.imageIndex == (enemy.velocityY < 0 ? 0.0F : 1.0F),
                         "SDL airborne frog uses the recovered rise/fall pose");
@@ -842,6 +853,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         if (std::getenv("DOWNWELL_VERIFY_COMBAT"))
             require(!reported && !playerReported,
                     "extended combat tape must match movement, health, kills and currency");
+        if (std::getenv("DOWNWELL_VERIFY_FROG_MOTION"))
+            require(sawPairedFrogHit, "strict combat tape exercises a surviving frog hit on both adapters");
     }
     if (std::getenv("DOWNWELL_COMPARE_ACTORS")) {
         for (unsigned i = 0; i < gameplay.enemyCount(); ++i) {

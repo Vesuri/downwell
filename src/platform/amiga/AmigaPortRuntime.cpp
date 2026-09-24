@@ -6,6 +6,7 @@
 #include "core/EnemyPresentation.h"
 #include "core/EnemyContact.h"
 #include "core/FrogBehavior.h"
+#include "core/FrogMotion.h"
 #include "core/FrogVerticalMotion.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
@@ -179,6 +180,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.preciseX = (long)x * 256L;
     enemy.frogHorizontal.position = (long)x * 65536L;
     enemy.frogHorizontal.velocity = (long)speedX * 256L;
+    enemy.frogHit = {};
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
     enemy.speedY = speedY;
@@ -311,6 +313,7 @@ void AmigaPortRuntime::advanceEnemyAlarms()
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
             continue;
+        if (enemy.objectId == 113) enemy.frogHit.advanceFrame();
         bool alarm0Fired = false, alarm1Fired = false;
         if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
             alarm0Fired = true;
@@ -517,6 +520,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     priorBulletY > enemy.y + 7 || bullet.y < enemy.y - 8)
                     continue;
                 if (enemy.objectId != 112) {
+                    if (enemy.objectId == 113) enemy.frogHit.pending = true;
                     enemy.health -= 10;
                     if (enemy.health <= 0) {
                         spawnReward(enemy, false);
@@ -656,18 +660,24 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             downwell::FrogVerticalMotion vertical{
                 enemy.preciseY * 5 + enemy.gravityPositionRemainder,
                 enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
-            vertical.step([this, &enemy](int y) {
-                return solidResolver_(solidResolverContext_, enemy.frogHorizontal.pixel(), y);
-            }, integrate);
+            const bool hit = downwell::stepFrogMotion(enemy.frogHorizontal, vertical,
+                enemy.frogHit, integrate, [this](int x, int y) {
+                    return solidResolver_(solidResolverContext_, x, y);
+                });
+            if (hit) {
+                enemy.auxiliaryState = 0;
+                enemy.alarm0 = 0;
+                enemy.alarm1 = 60;
+                enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
+                enemy.imagePhase = 0;
+                enemy.imageRemainder = 0;
+            }
             enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(vertical.position, 5);
             enemy.gravityPositionRemainder = static_cast<unsigned char>(vertical.position - enemy.preciseY * 5);
             enemy.speedY = downwell::FrogVerticalMotion::floorDivide(vertical.velocity, 5);
             enemy.gravityRemainder = static_cast<unsigned char>(vertical.velocity - enemy.speedY * 5);
             enemy.grounded = vertical.grounded;
             if (!enemy.grounded) {
-                enemy.frogHorizontal.step([this, &vertical](int edge) {
-                    return solidResolver_(solidResolverContext_, edge, vertical.pixel());
-                }, integrate);
                 enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
                 enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
             }
@@ -731,7 +741,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         enemy.spriteId = downwell::enemyPresentationSprite(enemy.objectId,
                                             enemy.grounded, enemy.auxiliaryState);
         if (enemy.objectId == 113) {
-            if (enemy.spriteId == 168) {
+            if (enemy.frogHit.remaining != 0) {
+                enemy.spriteId = 173;
+            } else if (enemy.spriteId == 168) {
                 enemy.imageSpeed = 0;
                 enemy.imagePhase = enemy.speedY < 0 ? 0u : 256u;
                 enemy.imageRemainder = 0;

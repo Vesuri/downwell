@@ -15,9 +15,10 @@ struct FrogVerticalMotion {
     }
     int pixel() const { return static_cast<int>(floorDivide(position, 1280)); }
     template<class SolidAtY>
-    void step(SolidAtY solid, bool integrate = true) {
+    void step(SolidAtY solid, bool integrate = true, bool hit = false) {
         velocity += 192;
         if (velocity >= 7 * 1280) velocity = 7 * 1280;
+        if (hit) velocity = 0; // enmFrog hit response follows gravity
         const long next = position + velocity;
         const bool supported = grounded && solid(pixel() + 9);
         if (velocity > 0 && (supported || solid(static_cast<int>(floorDivide(next, 1280)) + 8))) {

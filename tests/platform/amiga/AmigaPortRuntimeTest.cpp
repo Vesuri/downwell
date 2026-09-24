@@ -388,6 +388,24 @@ int main() {
     }
 
     AmigaPortRuntime fallingFrog(300);
+    AmigaPortRuntime hitFrog(300, false, 10000);
+    hitFrog.configureSolidResolver(noSolid, nullptr);
+    require(hitFrog.configureEnemy(0, 113, 166, -1, 16, 512, 0, 35, 20,
+                2, 1, 30, -1, 0, 0, true, false, true), "configure live bullet-hit frog");
+    hitFrog.step(4);
+    require(hitFrog.enemyAt(0).health == 25 && hitFrog.enemyAt(0).frogHit.pending &&
+                hitFrog.enemyAt(0).frogHit.remaining == 0,
+            "bullet damage queues a surviving frog's reaction for its next Step");
+    hitFrog.step(0);
+    require(hitFrog.enemyAt(0).frogHit.remaining == 5 && hitFrog.enemyAt(0).spriteId == 173 &&
+                hitFrog.enemyAt(0).imageFrame == 0 && hitFrog.enemyAt(0).speedY == 0 &&
+                hitFrog.enemyAt(0).frogHorizontal.velocity == 104858 &&
+                hitFrog.enemyAt(0).auxiliaryState == 0 && hitFrog.enemyAt(0).alarm0 == 0 &&
+                hitFrog.enemyAt(0).alarm1 == 60,
+            "frog hit selects damage art, resets frame/vertical speed and cancels preparation");
+    for (unsigned i = 0; i < 5; ++i) hitFrog.step(0);
+    require(hitFrog.enemyAt(0).frogHit.remaining == 0 && hitFrog.enemyAt(0).spriteId == 168,
+            "frog returns to airborne art when the stun alarm expires");
     AmigaPortRuntime offscreenFrog(300);
     offscreenFrog.configureSolidResolver(noSolid, nullptr);
     require(offscreenFrog.configureEnemy(0, 113, 166, 40, 400,

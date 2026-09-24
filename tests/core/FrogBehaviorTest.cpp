@@ -2,6 +2,8 @@
 #include "core/FractionalMotion.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogVerticalMotion.h"
+#include "core/FrogHitState.h"
+#include "core/FrogMotion.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -11,7 +13,35 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    downwell::FrogHorizontalMotion sharedX{0, 2 * 65536L};
+    downwell::FrogVerticalMotion sharedY{1000, 3 * 1280L, false};
+    downwell::FrogHitState sharedHit;
+    sharedHit.pending = true;
+    sharedHit.advanceFrame();
+    require(downwell::stepFrogMotion(sharedX, sharedY, sharedHit, true,
+                [](int, int) { return false; }) &&
+            sharedX.position == 104858 && sharedX.velocity == 104858 &&
+            sharedY.position == 1000 && sharedY.velocity == 0,
+            "shared step consumes hit, damps X and clears Y before movement");
+    downwell::FrogHitState hit;
+    hit.pending = true;
+    require(!hit.consume(), "queued bullet hit is not consumed before the next frame");
+    hit.advanceFrame();
+    require(hit.consume() && hit.remaining == 5 && !hit.consume(),
+            "hit is consumed once and starts the recovered five-tick stun");
+    for (unsigned tick = 1; tick <= 5; ++tick) {
+        hit.advanceFrame();
+        require(hit.remaining == 5 - tick, "hit alarm expires after five following alarm phases");
+    }
+    require(downwell::FrogHitState::dampHorizontal(2 * 65536L) == 104858 &&
+            downwell::FrogHitState::dampHorizontal(-2 * 65536L) == -104858,
+            "hit damps horizontal speed by source .8 in either direction");
     downwell::FrogVerticalMotion vertical;
+    vertical = {1000, 3 * 1280, false};
+    vertical.step([](int) { return false; }, true, true);
+    require(vertical.velocity == 0 && vertical.position == 1000,
+            "hit resets vertical velocity after gravity and before integration");
+    vertical = {};
     for (long tick = 1; tick <= 40; ++tick) {
         vertical.step([](int) { return false; });
         require(vertical.velocity == 192 * tick && vertical.position == 96 * tick * (tick + 1),

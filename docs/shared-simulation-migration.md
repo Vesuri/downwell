@@ -520,3 +520,36 @@ offscreen gravity, re-entry movement and offscreen rebound.
 The full strict frog/combat tape remains passing with unchanged final counters.
 This does not complete source collision fidelity: masks/thin platforms, exact
 collision-event ordering, time-stop, water and hit-stun remain open.
+
+## Shared frog hit response and motion orchestration
+
+The recovered enmFrog Step VM block 9 clears hit/preparation, resets image_index
+and ysp, multiplies xsp by 0.8, and sets alarms 2/0/1 to 5/0/60. Alarm 2 clears
+hitStun. Both adapters now use the shared FrogHitState and stepFrogMotion:
+hit consumption/damping, vertical motion and conditional horizontal motion have
+one implementation in src/core. Adapters still translate coordinates, mirror
+state, and apply alarm/image/audio requests; complete runtime consolidation is
+not yet done. This is not a second Amiga-specific enemy implementation.
+
+Sprite 173's four damage frames, mirrors and hardware-sprite words are generated
+offline. The damage pose takes priority over flight, retaining the previous
+animation speed as in the source. A native bullet fixture verifies survival,
+next-update response, preparation cancellation and five-tick expiry. The strict
+600-update paired combat continuation now compares pending/ready/stun state
+and requires an actual surviving frog hit with sprite 173 in both adapters.
+Final counters are health 3/3, kills 2/2 and currency 16/16. Shared unit tests
+also exercise the combined hit/movement ordering rather than just its pieces.
+
+The queue models an existing enemy updated before a newly created bullet.
+General source instance ordering (including an older bullet and newer enemy)
+is still unresolved. The five-tick countdown does not yet implement arbitrary
+Alarm 2 dispatch or time-stop semantics. Source full-mask collision, water,
+impact effects and complete audio behavior are also not claimed. Q16 damping
+is rounded fixed point, not exact GameMaker double arithmetic.
+
+The complete host suite passes with 14,700 offline sprite oracle comparisons.
+The bounded A500 allocation check reports 277,320 resident asset bytes and
+16,792 Chip bytes remaining. This headroom is not an audio memory budget.
+The bounded 68000 replay passes (`64 9f0d3943 e7900d2b`), as does the
+600-tick target terrain-cache oracle. The narrow replay does not cover full
+enemy state; the longer host paired tape provides the frog-state coverage.

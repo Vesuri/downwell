@@ -6,6 +6,7 @@
 #include "core/StateDigest.h"
 #include "core/GameplayLimits.h"
 #include "core/FrogHorizontalMotion.h"
+#include "core/FrogHitState.h"
 
 #include <cstdint>
 
@@ -74,6 +75,7 @@ public:
         unsigned char gravityRemainder; // fifths of one Q8 velocity unit
         unsigned char gravityPositionRemainder; // fifth-Q8 integration residual
         downwell::FrogHorizontalMotion frogHorizontal;
+        downwell::FrogHitState frogHit;
         int motionState;
         int auxiliaryState;
         int alarm0;
