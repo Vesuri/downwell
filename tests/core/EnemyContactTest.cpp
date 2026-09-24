@@ -1,4 +1,5 @@
 #include "core/EnemyContact.h"
+#include "core/EnemyContactResponse.h"
 #include <cstdlib>
 #include <iostream>
 
@@ -10,6 +11,43 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    {
+        struct PlayerProbe {
+            int bounces = 0, knocks = 0, knockX = 0, knockY = 0;
+            long offsetXFixed() const { return 0; }
+            long offsetYFixed() const { return 0; }
+            long frameStartYFixed() const { return 0; }
+            int facing() const { return 1; }
+            void stompBounce() { ++bounces; }
+            void contactKnockback(int x, int y) { ++knocks; knockX = x; knockY = y; }
+        } motion;
+        bool active = true;
+        int enemyHealth = 15, health = 4;
+        unsigned immunity = 0, defeated = 0, rewards = 0;
+        ContactActor contactActor{128, 0, 1, 1, 153};
+        const auto apply = [&] {
+            return applyEnemyContact(116, contactActor, 7, 9, active, enemyHealth,
+                motion, health, immunity, defeated, [&] { ++rewards; });
+        };
+        require(apply() == EnemyContact::damage && health == 3 && immunity == 90 &&
+                    motion.knocks == 1 && motion.knockX == 7 && motion.knockY == 9 &&
+                    active && enemyHealth == 15 && rewards == 0,
+                "shared damage applies immunity and uses published instance coordinates for knockback");
+        require(apply() == EnemyContact::none && health == 3 && motion.knocks == 1,
+                "later contacts in the same immunity interval do not repeat damage or impulse");
+        contactActor.y = 3 * 256;
+        require(apply() == EnemyContact::stomp && !active && enemyHealth == 0 &&
+                    defeated == 1 && rewards == 1 && motion.bounces == 1 && health == 3,
+                "immunity does not prevent the implemented stomp/reward/bounce response");
+        require(apply() == EnemyContact::none && rewards == 1 && defeated == 1,
+                "retired enemies cannot issue a second reward");
+        active = true; enemyHealth = 15; health = 1; immunity = 0; contactActor.y = 0;
+        require(apply() == EnemyContact::damage && health == 0 && motion.knocks == 2,
+                "fatal contact still applies the source damage impulse");
+        immunity = 0;
+        require(apply() == EnemyContact::none && health == 0 && motion.knocks == 2,
+                "the implemented zero-health state cannot lose health repeatedly");
+    }
     ContactActor player{0, 0, 1, 1, 31};
     ContactActor bat{0, -11 * 256, 1, 1, 153};
     require(classifyEnemyContact(player, bat, 116, 0) == EnemyContact::none,

@@ -244,6 +244,37 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared implemented enemy-contact response
+
+`EnemyContactResponse` now applies the implemented contact response for both
+ports: classification, reward callback, enemy retirement/defeat accounting,
+stomp bounce, health loss, default 90-tick immunity and damage knockback.
+Adapters supply storage, reward emission and presentation notifications;
+native death-screen state is still updated by its adapter. The renderer's
+`awake` flag no longer suppresses active-instance contact handling.
+
+`scrTypicalDamage` assembly block 2 uses instance x/y for its direction, not
+precise xx/yy. Both adapters now explicitly supply published coordinates for
+knockback; SDL previously re-rounded precise coordinates. The contact-mask
+classification still uses the existing shared rectangle approximation. Core
+response fixtures assert a single damage/impulse during immunity, stomp during
+immunity, single reward/defeat accounting, fatal knockback, and published
+coordinate use. Existing runtime tests exercise actual player movement.
+
+Validation: full host suite (including both combat tapes and 16,562 offline
+sprite comparisons), bounded A500 600-tick terrain/cache verification with
+intact stack guard, and cross-CPU player/gem replay pass. Replay digests remain
+unchanged and the 68000 instruction/helper audits are clean. These fixtures
+cover the implemented contact path, not all original combat features.
+
+This is consolidation of the currently implemented default-style combat, not
+completion of original collision/death semantics. Immediate stomp retirement
+and reward remain approximations: the original subtracts 100 health and sets
+hit/stomped flags for subsequent enemy death handling. Original global.death
+timing, immunity upgrades, alternate styles, slow-motion, effects and audio
+still require recovery. They should be implemented once in this shared path,
+not patched independently in SDL and Amiga.
+
 #### Shared frog presentation and delayed animation-rate state
 
 `FrogPresentation` now owns frog sprite selection, forced rising/falling poses,

@@ -4,6 +4,7 @@
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
 #include "EnemyContact.h"
+#include "EnemyContactResponse.h"
 #include "FrogBehavior.h"
 #include "FrogMotion.h"
 #include "StandardBulletStep.h"
@@ -810,34 +811,18 @@ void StartupRuntime::updateMainEnemyInteractions() {
         const bool contactOnly = enemy.objectId == 117 || enemy.objectId == 119;
         if (!enemy.active || enemy.health <= 0 || (!stompable && !contactOnly))
             continue;
-        const ContactActor playerContact{
-            mainPlayerMotion_.offsetXFixed(), mainPlayerMotion_.offsetYFixed(),
-            mainPlayerMotion_.facing(), 1, 31};
         const ContactActor enemyContact{
             static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 256.0F)),
             static_cast<long>(std::round((enemy.preciseY - mainPlayerOriginY_) * 256.0F)),
             enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
             enemyContactMask(enemy.objectId, enemy.spriteId)};
-        const auto contact = classifyEnemyContact(playerContact, enemyContact,
-            enemy.objectId, mainPlayerMotion_.frameStartYFixed());
-        if (contact == EnemyContact::none) continue;
-        if (contact == EnemyContact::stomp) {
-            spawnMainCurrency(enemy.preciseX, enemy.preciseY,
-                              enemy.reward, true);
-            enemy.health = 0;
-            enemy.active = false;
-            ++mainEnemiesDefeated_;
-            mainPlayerMotion_.stompBounce();
-            syncMainPlayerState();
-            ++soundPlayRequests_;
-            continue;
-        }
-        if (mainPlayerInvulnerability_ == 0 && mainPlayerHealth_ > 0) {
-            --mainPlayerHealth_;
-            mainPlayerInvulnerability_ = 90;
-            mainPlayerMotion_.contactKnockback(
-                static_cast<int>(roundGameMakerCoordinate(enemy.preciseX)) - mainPlayerOriginX_,
-                static_cast<int>(roundGameMakerCoordinate(enemy.preciseY)) - mainPlayerOriginY_);
+        const auto contact = applyEnemyContact(enemy.objectId, enemyContact,
+            enemy.x - mainPlayerOriginX_, enemy.y - mainPlayerOriginY_,
+            enemy.active, enemy.health, mainPlayerMotion_, mainPlayerHealth_,
+            mainPlayerInvulnerability_, mainEnemiesDefeated_, [this, &enemy] {
+                spawnMainCurrency(enemy.preciseX, enemy.preciseY, enemy.reward, true);
+            });
+        if (contact != EnemyContact::none) {
             syncMainPlayerState();
             ++soundPlayRequests_;
         }
