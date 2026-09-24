@@ -3,6 +3,10 @@
 
 namespace downwell {
 
+// Ground turtle Create/Alarm 1 alternate walking between +1 and -1.
+// GML's numeric boolean conversion is not C++'s nonzero conversion.
+inline bool groundTurtleWalking(int walking) { return walking > 0; }
+
 // Rates are exact twentieths of a frame (0.1, 0.15, 0.2, 0.25).
 // Preserve fifths of one Q8 phase unit instead of rounding each increment.
 inline void advanceEnemyImageQ8(unsigned& phase, unsigned char& remainder,
@@ -16,7 +20,7 @@ inline void advanceEnemyImageQ8(unsigned& phase, unsigned char& remainder,
 inline int enemyPresentationSprite(int object, bool grounded, int auxiliary) {
     switch (object) {
         case 111: return grounded ? 163 : 164;
-        case 112: return !grounded ? 187 : auxiliary != 0 ? 188 : 186;
+        case 112: return !grounded ? 187 : groundTurtleWalking(auxiliary) ? 188 : 186;
         case 113: return !grounded ? 168 : auxiliary != 0 ? 170 : 166;
         case 116: return 153;
         case 117: return 177;

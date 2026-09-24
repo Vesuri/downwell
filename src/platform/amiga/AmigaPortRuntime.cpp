@@ -598,7 +598,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 (enemy.speedX < 0 ? -halfWidth : halfWidth);
             if (solidResolver_(solidResolverContext_, edge, probeY))
                 enemy.speedX = -enemy.speedX;
-            else
+            else if (enemy.objectId != 112 || downwell::groundTurtleWalking(enemy.auxiliaryState))
                 enemy.preciseX += enemy.speedX;
             if (!grounded) {
                 const unsigned residual = enemy.gravityPositionRemainder + enemy.gravityRemainder;

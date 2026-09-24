@@ -679,7 +679,7 @@ void StartupRuntime::updateMainEnemies() {
                                              ? -halfWidth : halfWidth);
             if (mainSolidAt(edge, enemy.preciseY))
                 enemy.velocityX *= -1.0F;
-            else
+            else if (enemy.objectId != 112 || groundTurtleWalking(enemy.auxiliaryState))
                 enemy.preciseX = nextX;
             if (!enemy.grounded) {
                 const float nextY = enemy.preciseY + enemy.velocityY;

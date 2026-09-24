@@ -227,6 +227,25 @@ projection of the source random range; fractional alarm setter semantics
 still need Windows-runner confirmation. Fatal-hit sequencing, world time-stop
 and actual Amiga sound output remain incomplete.
 
+#### Ground-turtle walking flag correction
+
+Recovered GroundTurtle Create chooses `walking` from +1/-1, and Alarm 1
+negates it. Its Step bytecode uses `conv.v.b` both to choose idle/walking art
+(blocks 33–35) and to guard horizontal integration (blocks 41–42). Both ports
+previously moved during either phase and selected walking art for any nonzero
+value. A shared `groundTurtleWalking` predicate now gates movement and selects
+sprite 186 for the negative phase, 188 for the positive phase; airborne sprite
+187 is unchanged. This follows GameMaker's numeric boolean conversion, not
+C++ nonzero truthiness ([official bool documentation](https://manual.gamemaker.io/lts/en/GameMaker_Language/GML_Reference/Variable_Functions/bool.htm)).
+
+The native fixture now checks that a negative phase leaves X unchanged and
+uses idle art, then advances through the next recovered alarm and requires
+movement and walking art to resume together. Zero and airborne presentation
+are tested separately. Snake/turtle collision and integration branches still
+need full shared-core extraction and comparison with the source rectangle
+queries, edge distances, visibility gates and event order; this correction
+does not claim that broader migration is complete.
+
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
 steps, alternates horizontal direction every 90 frames and holds fire for five

@@ -319,13 +319,22 @@ int main() {
             "generated ground turtle can enter native actor storage");
     for (unsigned frame = 0; frame < 4; ++frame)
         turtle.step(0);
-    require(turtle.enemyAt(0).preciseX > 40L * 256L &&
+    require(turtle.enemyAt(0).preciseX == 40L * 256L &&
                 turtle.enemyAt(0).active &&
                 turtle.enemyAt(0).auxiliaryState == -1 &&
                 turtle.enemyAt(0).alarm1 >= 117 &&
                 turtle.enemyAt(0).alarm1 <= 297 &&
-                turtle.enemyAt(0).spriteId == 188,
-            "ground turtle walks and reschedules its recovered animation alarm");
+                turtle.enemyAt(0).spriteId == 186,
+            "negative walking flag pauses turtle motion and selects idle art");
+    for (unsigned frame = 0; frame < 300 && turtle.enemyAt(0).auxiliaryState < 0; ++frame)
+        turtle.step(0);
+    require(turtle.enemyAt(0).auxiliaryState == 1 &&
+            turtle.enemyAt(0).preciseX > 40L * 256L && turtle.enemyAt(0).spriteId == 188,
+            "next source alarm restores walking motion and art together");
+    require(!downwell::groundTurtleWalking(-1) && !downwell::groundTurtleWalking(0) &&
+            downwell::groundTurtleWalking(1) &&
+            downwell::enemyPresentationSprite(112, false, -1) == 187,
+            "shared walking predicate preserves GML truth values and airborne art");
 
     AmigaPortRuntime frog(300);
     AmigaPortRuntime simultaneousFrog(300);
