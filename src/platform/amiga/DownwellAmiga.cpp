@@ -192,6 +192,7 @@ volatile ULONG gDownwellStartupAssetBytes;
 volatile ULONG gDownwellStartupChipRemaining;
 const UBYTE* gDownwellResultsPack;
 volatile ULONG gDownwellResultsAssetBytes;
+volatile ULONG gDownwellShopOverlayChecks;
 const UBYTE* gDownwellShopPack;
 volatile ULONG gDownwellShopAssetBytes;
 static UBYTE* overlayAssetStorage;
@@ -2827,21 +2828,33 @@ int main(void) {
                     fixture.menu.menuState = 1;
                     fixture.x = 240; fixture.y = 240;
                     fixture.stock.items[0] = {100,1,300};
-                    for (unsigned phase = 0; phase < 5; ++phase) {
-                        fixture.menu.cursorPhaseQuarters = phase * 4;
+                    composeDeathFlash(&renderer, false);
+                    for (unsigned phase = 0; phase < 7; ++phase) {
+                        fixture.menu.cursorPhaseQuarters = phase < 4 ? phase * 4 : 0;
                         if (phase == 1) fixture.menu.cursorWobbleX = 5;
                         if (phase == 2) fixture.stock.items[0].remaining = 0;
                         if (phase == 3) fixture.menu.cursor = 0;
-                        if (phase == 4) fixture.menu.active = false;
-                        // Phase 4 is closed; active phases stay in valid source range.
+                        if (phase == 6) fixture.menu.active = false;
+                        unsigned streak = phase == 4 ? 12 : phase == 5 ? 0 : 3;
+                        // Actual retained overlay experiences real external HUD
+                        // clears; the scalar oracle starts fresh every phase.
+                        redrawStreak(&renderer, streak);
+                        shopActual.invalidateStreak();
+                        composeDeathFlash(&resultsOracle, false);
+                        shopOracle.reset();
+                        shopOracle.invalidateStreak();
+                        const auto foreground = [](AmigaRenderer* target, void* context) {
+                            composeStreak(target, *static_cast<unsigned*>(context));
+                        };
                         if (!shopActual.draw(&renderer, gDownwellShopPack,
-                                gDownwellShopPack + gDownwellShopAssetBytes, &fixture, 160, 34, 200) ||
+                                gDownwellShopPack + gDownwellShopAssetBytes, &fixture, 160, 34, 200, foreground, &streak) ||
                             !shopOracle.draw(&resultsOracle, gDownwellShopPack,
-                                gDownwellShopPack + gDownwellShopAssetBytes, &fixture, 160, 34, 200))
+                                gDownwellShopPack + gDownwellShopAssetBytes, &fixture, 160, 34, 200, foreground, &streak))
                             ++gDownwellResultsAssetFailures;
                         AmigaHardware::blitterDrain();
                         for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
                             if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsAssetFailures;
+                        ++gDownwellShopOverlayChecks;
                     }
                     for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
                         renderer.hud[byte] = expectedHud[byte] = savedHud[byte];

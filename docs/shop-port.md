@@ -611,3 +611,11 @@ unchanged/open/closed shop results against fresh composition with a foreground
 overlay. Renderer tests (including 20580 sprite comparisons) and the native
 build/68000 audits pass. This particular overlap case has not yet been exercised
 in the emulator with a live shop and a real changing streak.
+
+The target cache fixture now tests the actual streak assets rather than the
+host test's stand-in rectangle. Seven phases compare retained Chip/blitter
+composition against a freshly reset scalar overlay, including external HUD
+clears, multi-digit streak changes, removal, sold-out stock and shop closure.
+The GDB gate requires exactly seven executed comparisons in addition to zero
+asset/pixel failures. This is still a controlled renderer fixture: it does not
+claim a naturally encountered shop or original Windows screenshot equivalence.

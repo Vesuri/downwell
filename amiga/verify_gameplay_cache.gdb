@@ -7,6 +7,11 @@ if gDownwellStackGuardReady != 1
     printf "Target could not install the task-stack guard\n"
     quit 1
 end
+if gDownwellShopOverlayChecks != 7
+    printf "Shop/streak overlay coverage missing: %lu checks\n", gDownwellShopOverlayChecks
+    quit 1
+end
+printf "Shop/streak overlay: seven retained-blitter versus fresh-scalar frames checked\n"
 # The CPU initialized these words before platform/scene initialization.
 set $stack_guard = (unsigned long *)SysBase->ThisTask->tc_SPLower
 set $guard_word = 0
