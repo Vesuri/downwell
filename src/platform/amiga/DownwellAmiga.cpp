@@ -47,6 +47,8 @@ extern const UBYTE amiga_hud_pack[];
 extern const UBYTE amiga_hud_pack_end[];
 extern const UBYTE amiga_game_pack[];
 extern const UBYTE amiga_game_pack_end[];
+extern const UBYTE amiga_results_pack[];
+extern const UBYTE amiga_results_pack_end[];
 extern const UBYTE amiga_room_pack[];
 extern const UBYTE amiga_room_pack_end[];
 extern const UBYTE amiga_object_pack[];
@@ -173,6 +175,9 @@ volatile ULONG gDownwellStartupChipFree;
 volatile ULONG gDownwellStartupChipLargest;
 volatile ULONG gDownwellStartupAssetBytes;
 volatile ULONG gDownwellStartupChipRemaining;
+const UBYTE* gDownwellResultsPack;
+volatile ULONG gDownwellResultsAssetBytes;
+volatile ULONG gDownwellResultsAssetFailures;
 }
 
 #if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_REPLAY_VERIFY)
@@ -1643,12 +1648,25 @@ int main(void) {
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                         downwellGameRingBytes, hudBytes);
-                    if (!storage.valid) break;
+                    const unsigned resultsBytes = amiga_results_pack_end - amiga_results_pack;
+                    if (!storage.valid || resultsBytes > storage.resultsCapacity ||
+                        amigaRendererChipPackBytes(amiga_results_pack, amiga_results_pack_end) != resultsBytes) {
+                        ++gDownwellResultsAssetFailures;
+                        exitCode = 20;
+                        break;
+                    }
                     UBYTE* hudStorage = memory.menuForeground() + storage.hudOffset;
                     for (unsigned byte = 0; byte < hudBytes; ++byte)
                         hudStorage[byte] = amiga_hud_pack[byte];
                     activeHudPack = hudStorage;
                     activeHudPackEnd = activeHudPack + hudBytes;
+                    UBYTE* resultsStorage = memory.menuForeground() + storage.resultsOffset;
+                    // Retired intro DMA is blank. Copy immutable, already planar
+                    // assets once; never convert or copy them per results frame.
+                    for (unsigned byte = 0; byte < resultsBytes; ++byte)
+                        resultsStorage[byte] = amiga_results_pack[byte];
+                    gDownwellResultsPack = resultsStorage;
+                    gDownwellResultsAssetBytes = resultsBytes;
                     Bitmap stageClear(stagedBuffer, downwellVisibleWidth,
                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);
                     stageClear.clear();
@@ -2305,6 +2323,19 @@ int main(void) {
                             liveBuilder.decorationCount(), &port, x, worldViewY + strip, 0, count);
                     }
                 exposeGameplayFrame(memory, gameDisplay[back], back, port);
+                // Verify reserved art survived staging, buffer rotations and
+                // the side-room cache probes above. Runs only in this verifier.
+                if (!gDownwellResultsPack || gDownwellResultsAssetBytes !=
+                        (ULONG)(amiga_results_pack_end - amiga_results_pack)) {
+                    ++gDownwellResultsAssetFailures;
+                } else {
+                    for (ULONG byte = 0; byte < gDownwellResultsAssetBytes; ++byte)
+                        if (gDownwellResultsPack[byte] != amiga_results_pack[byte])
+                            ++gDownwellResultsAssetFailures;
+                    for (ULONG byte = 0; byte < (ULONG)(amiga_hud_pack_end - amiga_hud_pack); ++byte)
+                        if (activeHudPack[byte] != amiga_hud_pack[byte])
+                            ++gDownwellResultsAssetFailures;
+                }
                 downwellGameplayLongRunReady();
             }
             if (!sceneGameplayLandedReported && port.player().grounded()) {

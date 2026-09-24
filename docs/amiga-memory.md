@@ -37,10 +37,19 @@ The HUD start is rounded down to a four-byte boundary for future odd sizes;
 overlapping/oversized partitions fail validation. Results packing tests enforce
 the current gap budget, and renderer tests cover the arithmetic boundaries.
 
-The results pack is not copied into that gap or drawn yet. This change reserves
-safe space; it does not increase resident allocation or destroy an unused-looking
+The results pack is now linked as ordinary read-only executable data and copied
+once into that gap during gameplay entry, after intro DMA is retired. The loader
+checks the planar pack's span against the reserved capacity and returns failure
+code 20 if it does not fit or validate. It is not drawn yet. This does not
+increase Chip allocation or destroy an unused-looking
 intro cache that is actually serving as live gameplay memory. The splash/style
 allocation remains the two display rings and cannot be reused for results art.
+
+The 600-tick cache verifier also compares every loaded results byte and every
+relocated HUD byte against the linked immutable sources after buffer rotations
+and side-room staging probes. It rejects absent, incomplete or corrupted art.
+The executable grows by the packed results payload in ordinary memory; this is
+not a claim of zero additional total memory use.
 
 Validation: host suite, bounded A500 600-tick cache oracle and active gameplay
 frame comparison pass after relocation. The native capture retains its existing

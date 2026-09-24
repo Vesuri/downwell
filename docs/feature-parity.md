@@ -9,6 +9,17 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Native results pack is loaded and survives gameplay reuse
+
+The native executable now embeds the results pack and copies its already planar
+bytes into the checked retired-garden gap on gameplay entry, while intro DMA is
+blank. Capacity/pack-span failure returns 20; no extra Chip allocation is made.
+The 600-tick target cache gate now verifies every results and HUD byte against
+the immutable source packs after display-buffer rotations and side-room probes.
+The bounded A500 run passes with 25,820 results bytes intact, 101 terrain
+comparisons, an intact stack margin and clean 68000 audits. Rendering is still
+not wired; this establishes live asset availability, not a visible results UI.
+
 ### Results artwork is converted offline in a separate pack
 
 `make verify-amiga-results` builds the results-only planar/mask pack, verifies

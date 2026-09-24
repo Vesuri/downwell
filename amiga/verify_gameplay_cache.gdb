@@ -26,6 +26,11 @@ if gDownwellLiveGenerationFailed != 0 || gDownwellLiveFragments == 0 || gDownwel
     quit 1
 end
 printf "Live generated prefix: %lu fragments, %lu enemies, %lu RNG draws at last builder step\n", gDownwellLiveFragments, gDownwellLiveEnemies, gDownwellLiveRandomDraws
+if gDownwellResultsAssetFailures != 0 || gDownwellResultsAssetBytes == 0
+    printf "Results/HUD reserved asset corruption: failures=%lu bytes=%lu\n", gDownwellResultsAssetFailures, gDownwellResultsAssetBytes
+    quit 1
+end
+printf "Results and HUD packs intact after gameplay staging: %lu results bytes\n", gDownwellResultsAssetBytes
 printf "Overflow actors: %lu scalar-oracle comparisons, %lu mismatched bytes\n", gDownwellGameplayBobChecks, gDownwellGameplayBobFailures
 printf "Gameplay cache verified through 600 simulation ticks: %lu fresh-composition comparisons\n", gDownwellTerrainRasterChecks
 printf "Task stack retained its 256-byte safety margin\n"

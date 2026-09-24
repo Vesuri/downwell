@@ -14,6 +14,13 @@ amiga_game_pack:
 amiga_game_pack_end:
 
 	.balign 4
+	.globl amiga_results_pack
+amiga_results_pack:
+	.incbin "../generated/amiga-results.dwap"
+	.globl amiga_results_pack_end
+amiga_results_pack_end:
+
+	.balign 4
 	.globl amiga_room_pack
 amiga_room_pack:
 	.incbin "../generated/downwell-rooms.dwrm"
