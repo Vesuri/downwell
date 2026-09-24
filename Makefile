@@ -226,6 +226,13 @@ test: test-level-clear-selection
 test: test-upgrade-inventory
 test: test-level-clear-controller
 test: test-level-clear-motion
+test: test-level-clear-session
+.PHONY: test-level-clear-session
+build/level-clear-session-test: tests/core/LevelClearSessionTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/LevelClearSessionTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp
+test-level-clear-session: build/level-clear-session-test
+	./build/level-clear-session-test
 .PHONY: test-level-clear-motion
 build/level-clear-motion-test: tests/core/LevelClearMotionTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

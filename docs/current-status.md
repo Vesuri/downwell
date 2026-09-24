@@ -242,6 +242,17 @@ all four option X coordinates against binary64, plus controller ordering.
 A freestanding 68000 compile probe has no external arithmetic helpers. This
 does not yet render the options or implement their Draw-event vertical bobbing.
 
+RunSession now owns the level-clear controller and exposes explicit entry,
+Step and next-room consumption boundaries. Entry requires the live exit request,
+consumes Result Create once and retires old exit state without resetting run
+ownership. Its departure alarm starts a room-local dither; the final request is
+consumed once to apply scrNextLevel(0), including area rollover. A 211-update
+session test checks timing, guards, preserved upgrades/records and new-run reset.
+The native build passes its 68000 instruction/helper audits. These boundaries
+are not yet invoked by either live room loader: backends must first retire old
+DMA/artwork ownership and implement the result-room presentation. Wind audio
+and its conditional RNG consumption remain unimplemented.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
