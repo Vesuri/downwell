@@ -170,9 +170,9 @@ public:
     const UpgradeInventory& upgrades() const { return run_.upgrades; }
     const Consumables& consumables() const { return run_.consumables; }
     ShopWorld::Instance* registerShop(int x, int y) {
-        return run_.shops.create(x, y, [this](unsigned lo, unsigned hi) {
+        return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
             return lo + random_.irandomSmall(hi - lo);
-        }, mainPlayerHealth_, run_.stage.area > 0 ? run_.stage.area : 1);
+        }, mainPlayerHealth_);
     }
     const ShopWorld& shops() const { return run_.shops; }
     void registerLevelExit(int y) { run_.createLevelExit(480, y, random_, mainCameraMotion_); }

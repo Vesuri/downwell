@@ -9,6 +9,27 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Member's Card reaches live shop creation
+
+Both runtime adapters now create shops through `RunSession::createShop`,
+which supplies owned upgrade 14 to the existing shared stock/pricing code.
+Previously they silently used its default `member=false`. `scrIncrementPug`
+maps ID 14 to `pugMember`; `Shop_Create_0` VM blocks 25–26 subtract
+`round(itemPrice/10)` from each item's already-computed price. Prices are
+creation snapshots, not recomputed when inventory changes later.
+
+The live paired fixture creates an ordinary shop, acquires the card, then
+creates a second shop. It requires unchanged old prices and explicit discounted
+prices for new stock on both runtimes, then continues normal interaction and
+two clear/next-room transitions while retaining the card. Core pricing tests
+cover the original sequential discounts and ties-to-even rounding. This wires
+Member's Card for the current usual-style/normal-difficulty runtime; other
+style/difficulty routing is not implied by the helper's wider price support.
+Validation: paired scene/transition, shop inventory and shop-world tests pass.
+The bounded 68000 replay and both CPU audits pass, and the normal build is
+restored. The replay is a platform regression, not native visual coverage of
+the discounted shop fixture.
+
 ### Gem Attractor creation settings
 
 Owned upgrade 10 now reaches both live reward-spawn adapters and snapshots

@@ -809,6 +809,25 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(nativeShop->stock.items[i].upgrade == hostShop->stock.items[i].upgrade &&
                 nativeShop->stock.items[i].price == hostShop->stock.items[i].price,
                 "registered stock uses identical shared RNG state");
+        const unsigned basePrices[] = {300, 150, 500, 250, 400, 1000};
+        const unsigned memberPrices[] = {270, 135, 450, 225, 360, 900};
+        for (const auto& item : nativeShop->stock.items)
+            require(item.price == basePrices[item.upgrade - 100],
+                    "unowned Member's Card does not discount live stock");
+        require(gameplay.grantUpgrade(14) && reference.grantUpgrade(14),
+                "both adapters acquire Member's Card after the first shop exists");
+        auto* nativeMemberShop = gameplay.registerShop(x + 1000, y);
+        auto* hostMemberShop = reference.registerShop(x + 1000, y);
+        require(nativeMemberShop && hostMemberShop, "subsequent live shops can be created with the card");
+        for (unsigned i = 0; i < 3; ++i) {
+            const auto& a = nativeMemberShop->stock.items[i];
+            const auto& b = hostMemberShop->stock.items[i];
+            require(a.upgrade == b.upgrade && a.price == memberPrices[a.upgrade - 100] && b.price == a.price,
+                    "new shops snapshot the source ten-percent member discount on both adapters");
+            require(nativeShop->stock.items[i].price == basePrices[nativeShop->stock.items[i].upgrade - 100] &&
+                hostShop->stock.items[i].price == basePrices[hostShop->stock.items[i].upgrade - 100],
+                "acquisition does not reprice existing shop stock");
+        }
         auto tickShop = [&](bool pressed, bool goLeft = false, bool goRight = false) {
             downwell::Input input; input.fire = pressed; input.left = goLeft; input.right = goRight;
             gameplay.step(downwell::packReplayInput(input));

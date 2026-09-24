@@ -221,9 +221,9 @@ public:
     const downwell::UpgradeInventory& upgrades() const { return run_.upgrades; }
     const downwell::Consumables& consumables() const { return run_.consumables; }
     downwell::ShopWorld::Instance* registerShop(int x, int y) {
-        return run_.shops.create(x, y, [this](unsigned lo, unsigned hi) {
+        return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
             return lo + enemyRandom_.irandomSmall(hi - lo);
-        }, health_, run_.stage.area > 0 ? run_.stage.area : 1);
+        }, health_);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
     void registerLevelExit(int y) { run_.createLevelExit(480, y, enemyRandom_, cameraMotion_); }
