@@ -53,6 +53,7 @@ SELECTIONS = {
         170: None,   # sprFrogPrepare
         173: None,   # sprFrogDamage
         177: None,   # sprEnmSnail
+        178: None,   # sprEnmSnailHit
         186: None,   # sprGroundedTurtle
         187: None,   # sprGroundedTurtleFall
         188: None,   # sprGroundedTurtleWalk
@@ -288,18 +289,26 @@ def build_pack(manifest, extracted, profile):
             if selected_frames is not None and frame_index not in selected_frames:
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
-            if profile == "game" and sprite_id == 278:
-                # Crawler quarter turns are prepared on the host. Crop the
-                # transparent 32x32 padding to keep all variants Chip-RAM cheap.
-                for turn in range(4):
-                    variant = canvas if turn == 0 else canvas.transpose((
-                        Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180,
-                        Image.Transpose.ROTATE_270)[turn - 1])
+            if profile == "game" and sprite_id in (177, 178, 278):
+                # Prepare snail Y flips and crawler quarter turns on the host.
+                # Crop transparent padding to keep variants Chip-RAM cheap.
+                snail = sprite_id in (177, 178)
+                for turn in range(2 if snail else 4):
+                    if turn == 0:
+                        variant = canvas
+                    elif snail:
+                        variant = canvas.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                    else:
+                        variant = canvas.transpose((Image.Transpose.ROTATE_90,
+                            Image.Transpose.ROTATE_180, Image.Transpose.ROTATE_270)[turn - 1])
                     ox, oy = sprite["originX"], sprite["originY"]
-                    for _ in range(turn):
-                        ox, oy = oy, canvas.width - ox
+                    if snail:
+                        if turn: oy = canvas.height - oy
+                    else:
+                        for _ in range(turn):
+                            ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
-                    require(bounds is not None, "empty crawler frame")
+                    require(bounds is not None, "empty oriented actor frame")
                     variant = variant.crop(bounds)
                     ox -= bounds[0]
                     oy -= bounds[1]
@@ -312,7 +321,7 @@ def build_pack(manifest, extracted, profile):
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]
                         stride, data = encode_planar(pixels, image.width, image.height)
                         require(decode_planar(data, image.width, image.height, stride) == pixels,
-                                "crawler rotation planar round trip failed")
+                                "oriented actor planar round trip failed")
                         metadata = dict(sprite, id=62000 + sprite_id if flip_x else sprite_id,
                                         width=image.width, height=image.height,
                                         originX=image.width - ox if flip_x else ox, originY=oy)
@@ -323,18 +332,6 @@ def build_pack(manifest, extracted, profile):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
-            if profile == "game" and sprite_id == 177:
-                # enmSnail Step sets image_yscale=-sign(ysp). Keep the real
-                # resource ID; synthetic frame 256+n is the offline Y flip.
-                vertical = canvas.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-                for flip_x in (False, True):
-                    variant = vertical.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else vertical
-                    pixels = [pixel_to_pen(pixel) for pixel in variant.get_flattened_data()]
-                    stride, data = encode_planar(pixels, variant.width, variant.height)
-                    metadata = dict(sprite, id=62000 + sprite_id if flip_x else sprite_id,
-                                    originY=sprite["height"] - sprite["originY"],
-                                    originX=sprite["width"] - sprite["originX"] if flip_x else sprite["originX"])
-                    encoded.append((metadata, 256 + frame_index, stride, data))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
                     153, 163, 164, 166, 168, 170, 173, 177, 186, 187, 188, 278):
@@ -505,7 +502,7 @@ def build_pack(manifest, extracted, profile):
     if profile == "game":
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 163, 164,
-                  166, 168, 170, 173, 177, 186, 187, 188, 278, 459)
+                  166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 459)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:
                 continue

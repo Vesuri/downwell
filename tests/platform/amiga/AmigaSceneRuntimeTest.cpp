@@ -223,6 +223,11 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
                     a.vy == b.vy && a.facing == b.facing && a.verticalFlip == b.verticalFlip &&
                     a.attached == b.attached,
                     "shared snail motion and orientation match exactly across adapters");
+            require(native.snailHit.pending == enemy.snailHit.pending &&
+                    native.snailHit.ready == enemy.snailHit.ready &&
+                    native.snailHit.stunned == enemy.snailHit.stunned &&
+                    native.snailHit.alarm2 == enemy.snailHit.alarm2,
+                    "shared snail hit response agrees across adapters");
         }
         if (enemy.objectId == 119 && enemy.active && native.active) {
             const auto& a = native.crawler;

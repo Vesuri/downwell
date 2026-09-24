@@ -200,6 +200,33 @@ Normal builds are restored; both 68000 audits are clean. The cross-CPU fixture
 does not itself exercise every snail branch; those are covered by the shared
 motion unit tests and native adapter fixture.
 
+#### Shared surviving-snail hit response
+
+`SnailHitState` now queues surviving bullet hits for both runtimes, resets
+animation, sets hit-stun, extends Alarm 2 by five, clears Alarm 0 and makes
+one RNG draw for the 50–80 Alarm 1 interval. The first extension starts at
+the disabled value -1 (four updates); later hits extend the remaining timer.
+The alarm remains zero on its firing frame before becoming inactive next
+frame, matching the existing shared alarm-bank convention. Alarm 2 clears
+hit-stun; the following Step selects normal snail art again.
+
+Source sprite 178 is now exported with both Y orientations and X facings for
+masked planar and DMA drawing. Transparent padding in both normal and damaged
+snail frames is cropped offline, preserving anchors and the existing resident
+art budget. Independent flip checks and 15,680 DMA/scalar comparisons pass.
+The native integration fixture fires a usual bullet into an awake snail,
+requires health 10 and a queued hit, then checks damage art, alarms and recovery.
+Unit tests additionally cover repeated-hit timer extension and RNG draw count.
+Startup digest schema 35 includes this state; its menu replay pin is
+`9a7db713c820e867`.
+
+This supersedes the missing surviving-hit presentation above, but not the
+broader timing caveat: hit flags use the existing next-enemy-update queue,
+not a fully recovered collision-event scheduler. Alarm 1 uses an integer
+projection of the source random range; fractional alarm setter semantics
+still need Windows-runner confirmation. Fatal-hit sequencing, world time-stop
+and actual Amiga sound output remain incomplete.
+
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
 steps, alternates horizontal direction every 90 frames and holds fire for five

@@ -531,6 +531,21 @@ int main() {
             "ascending wall snail restores unflipped artwork");
 
     AmigaPortRuntime detachedSnail(300);
+    AmigaPortRuntime hitSnail(300, false, 1000);
+    hitSnail.configureSolidResolver(shortRightWall, nullptr);
+    require(hitSnail.configureEnemy(0, 117, 177, -1, 12, 0, -26, 20, 24,
+                                    0, 0, -1, -1, 0, 0, true, false, true),
+            "configure snail that survives a usual-gun bullet");
+    hitSnail.step(4);
+    require(hitSnail.enemyAt(0).health == 10 && hitSnail.enemyAt(0).snailHit.pending &&
+            hitSnail.enemyAt(0).spriteId == 177, "surviving hit queues the snail reaction");
+    hitSnail.step(0);
+    require(hitSnail.enemyAt(0).spriteId == 178 && hitSnail.enemyAt(0).snailHit.alarm2 == 4 &&
+            hitSnail.enemyAt(0).alarm0 == 0 && hitSnail.enemyAt(0).alarm1 >= 50 &&
+            hitSnail.enemyAt(0).alarm1 < 80, "snail hit selects damage art and source alarm changes");
+    for (unsigned i = 0; i < 4; ++i) hitSnail.step(0);
+    require(hitSnail.enemyAt(0).spriteId == 177 && !hitSnail.enemyAt(0).snailHit.stunned,
+            "snail returns to normal artwork after the hit alarm");
     detachedSnail.configureSolidResolver(noSolid, 0);
     require(detachedSnail.configureEnemy(0, 117, 177, 0, 0,
                                          0, 26, 20, 24),

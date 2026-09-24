@@ -120,7 +120,7 @@ test: build/standard-bullet-test
 test: build/crawler-motion-test
 test: build/snail-motion-test
 
-build/snail-motion-test: tests/core/SnailMotionTest.cpp src/core/SnailMotion.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
+build/snail-motion-test: tests/core/SnailMotionTest.cpp src/core/SnailMotion.h src/core/SnailHitState.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/SnailMotionTest.cpp
 

@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
         {0, 2}, {1, 8}, {3, 4}, {12, 8}, {27, 8}, {31, 4}, {37, 5},
         {127, 1}, {133, 4}, {134, 4}, {139, 2}, {153, 4},
         {163, 4}, {164, 1}, {166, 4}, {168, 2}, {170, 4}, {173, 4},
-        {177, 4}, {186, 4}, {187, 1}, {188, 6}, {278, 2},
+        {177, 4}, {178, 1}, {186, 4}, {187, 1}, {188, 6}, {278, 2},
         {459, 1}, {550, 17}, {568, 3}, {569, 4},
         {631, 2}, {635, 4}, {636, 4}, {637, 4}, {638, 4},
         {646, 4}
@@ -250,13 +250,14 @@ int main(int argc, char** argv) {
                     "offline crawler quarter turn preserves source anchor through ring wrapping");
         }
     }
-    for (unsigned frame = 0; frame < 4; ++frame) for (int flipX : {0, 1}) {
+    for (unsigned sprite : {177u, 178u})
+      for (unsigned frame = 0; frame < (sprite == 177 ? 4u : 1u); ++frame) for (int flipX : {0, 1}) {
         std::fill(actualGame.begin(), actualGame.end(), 0);
         std::fill(expectedGame.begin(), expectedGame.end(), 0);
         amigaRendererDrawAsset(&actualRenderer, gamePack.data(), gamePack.data() + gamePack.size(),
-            177, 256 + frame, 190, 100, flipX);
+            sprite, 256 + frame, 190, 100, flipX);
         amigaRendererDrawAsset(&expectedRenderer, gamePack.data(), gamePack.data() + gamePack.size(),
-            177, frame, 190, 100, flipX);
+            sprite, frame, 190, 100, flipX);
         for (unsigned plane = 0; plane < 2; ++plane)
             for (unsigned y = 0; y < downwellDisplayHeight; ++y)
                 for (unsigned x = 0; x < downwellBytesPerPlaneLine; ++x) {

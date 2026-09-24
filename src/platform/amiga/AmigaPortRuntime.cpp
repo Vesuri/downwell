@@ -155,6 +155,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.crawler.initialize(x, y);
     enemy.crawler.latched = grounded;
     enemy.snail.initialize(x, y, speedY >= 0);
+    enemy.snailHit = {};
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
     enemy.speedY = speedY;
@@ -305,6 +306,7 @@ void AmigaPortRuntime::advanceEnemyAlarms()
         if (!enemy.active)
             continue;
         if (enemy.objectId == 113) enemy.frogHit.advanceFrame();
+        if (enemy.objectId == 117) enemy.snailHit.advanceFrame();
         bool alarm0Fired = false, alarm1Fired = false;
         if (enemy.alarm0 > 0 && --enemy.alarm0 == 0)
             alarm0Fired = true;
@@ -498,6 +500,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                             continue;
                         if (enemy.objectId != 112) {
                             if (enemy.objectId == 113) enemy.frogHit.pending = true;
+                            if (enemy.objectId == 117) enemy.snailHit.pending = true;
                             enemy.health -= 10;
                             if (enemy.health <= 0) {
                                 spawnReward(enemy, false);
@@ -661,6 +664,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             // enmFrog Step: restart preparation only on a landing edge.
             if (downwell::frogLandingEdge(enemy.grounded, enemy.frogLanded)) enemy.alarm1 = 60;
         } else if (enemy.objectId == 117) {
+            const int hitAlarm = enemy.snailHit.consume(enemyRandom_);
+            if (hitAlarm >= 0) {
+                enemy.imagePhase = 0; enemy.imageRemainder = 0;
+                enemy.alarm0 = 0; enemy.alarm1 = hitAlarm;
+            }
             enemy.active = enemy.snail.step([this](int x, int y) {
                 return solidResolver_(solidResolverContext_, x, y);
             });
@@ -689,6 +697,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
         enemy.spriteId = downwell::enemyPresentationSprite(enemy.objectId,
                                             enemy.grounded, enemy.auxiliaryState);
+        if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
         if (enemy.objectId == 113) {
             if (enemy.frogHit.remaining != 0) {
                 enemy.spriteId = 173;

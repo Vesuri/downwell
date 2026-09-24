@@ -268,6 +268,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     for (std::size_t i = 0; i < instances_.size(); ++i) {
         auto& instance = instances_.at(i);
         if (instance.active && instance.objectId == 113) instance.frogHit.advanceFrame();
+        if (instance.active && instance.objectId == 117) instance.snailHit.advanceFrame();
     }
 
     if (showSplash_ == 3 || showSplash_ == 4)
@@ -531,6 +532,7 @@ void StartupRuntime::updateMainBullets() {
                 // event. Other area-one enemies take the usual gun's 10 dmg.
                 if (enemy->objectId != 112) {
                     if (enemy->objectId == 113) enemy->frogHit.pending = true;
+                    if (enemy->objectId == 117) enemy->snailHit.pending = true;
                     enemy->health -= 10;
                     if (enemy->health <= 0) {
                         spawnMainCurrency(static_cast<float>(enemy->x),
@@ -750,6 +752,12 @@ void StartupRuntime::updateMainEnemies() {
             enemy.moveSpeed = bat.speedFortieths / 40.0F;
             enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
         } else if (enemy.objectId == 117) {
+            const int hitAlarm = enemy.snailHit.consume(random_);
+            if (hitAlarm >= 0) {
+                enemy.imageIndex = 0;
+                enemy.alarms.set(0, 0); enemy.alarms.set(1, hitAlarm);
+                ++soundPlayRequests_;
+            }
             if (!enemy.snail.initialized)
                 enemy.snail.initialize(enemy.x, enemy.y, enemy.velocityY >= 0);
             enemy.active = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); });
@@ -772,6 +780,7 @@ void StartupRuntime::updateMainEnemies() {
         }
         enemy.spriteId = enemyPresentationSprite(enemy.objectId, enemy.grounded,
                                                   enemy.auxiliaryState);
+        if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
         if (enemy.objectId == 113) {
             if (enemy.frogHit.remaining != 0) {
                 enemy.spriteId = 173;
@@ -2028,7 +2037,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(34); // Includes authoritative snail motion.
+    digest.addU32(35); // Includes authoritative snail hit response.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2217,6 +2226,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
             digest.addI32(instance.snail.verticalFlip);
             digest.addBool(instance.snail.initialized);
             digest.addBool(instance.snail.attached);
+            digest.addBool(instance.snailHit.pending);
+            digest.addBool(instance.snailHit.ready);
+            digest.addBool(instance.snailHit.stunned);
+            digest.addI32(instance.snailHit.alarm2);
         }
         if (instance.objectId == 119) {
             digest.addI32(instance.crawler.x);

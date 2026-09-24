@@ -7,6 +7,7 @@
 #include "FrogHitState.h"
 #include "CrawlerMotion.h"
 #include "SnailMotion.h"
+#include "SnailHitState.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -50,6 +51,7 @@ struct InstanceRecord {
     FrogHitState frogHit;
     CrawlerMotion crawler;
     SnailMotion snail;
+    SnailHitState snailHit;
     bool frogMotionInitialized = false;
     AlarmBank alarms;
 };

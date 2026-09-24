@@ -1,10 +1,32 @@
 #include "core/SnailMotion.h"
+#include "core/SnailHitState.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool ok, const char* message) {
     if (!ok) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    struct Random {
+        unsigned calls = 0;
+        unsigned randomIntegerSmall(unsigned upper) {
+            require(upper == 30, "snail hit uses source random-range width");
+            ++calls; return 17;
+        }
+    } random;
+    downwell::SnailHitState hit;
+    hit.pending = true;
+    require(hit.consume(random) == -1 && random.calls == 0, "collision waits for next enemy Step");
+    hit.advanceFrame();
+    require(hit.consume(random) == 67 && hit.alarm2 == 4 && hit.stunned,
+            "first hit adds five to the disabled minus-one alarm");
+    hit.pending = true;
+    hit.advanceFrame();
+    require(hit.consume(random) == 67 && hit.alarm2 == 8 && random.calls == 2,
+            "repeated hits extend the remaining alarm, rather than resetting it");
+    for (int i = 0; i < 8; ++i) hit.advanceFrame();
+    require(!hit.stunned && hit.alarm2 == 0, "Alarm 2 clears hit-stun on its zero frame");
+    hit.advanceFrame();
+    require(hit.alarm2 == -1, "zero alarm disables on the following frame");
     using downwell::SnailMotion;
     const auto rightWall = [](int x, int) { return x >= 8; };
     SnailMotion snail;
