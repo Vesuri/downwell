@@ -280,6 +280,8 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
                     "shared snail motion and orientation match exactly across adapters");
             require(native.drawFrame() / 256 == (enemy.scaleY < 0 ? 1u : 0u),
                     "native offline snail frame uses the same stored vertical orientation as SDL");
+            require(native.imageScaleY() == enemy.scaleY,
+                    "native bullet/player contacts use SDL's stored snail image scale");
             require(native.snailHit.pending == enemy.snailHit.pending &&
                     native.snailHit.ready == enemy.snailHit.ready &&
                     native.snailHit.stunned == enemy.snailHit.stunned &&

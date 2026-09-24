@@ -584,7 +584,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                         const downwell::ContactActor contact{
                             enemy.x * 256L, enemy.y * 256L,
                             enemy.objectId == 117 ? enemy.motionState : enemy.facing,
-                            enemy.objectId == 117 && enemy.speedY > 0 ? -1 : 1,
+                            enemy.imageScaleY(),
                             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
                         if (!enemy.active || enemy.health <= 0 ||
                             !path.intersects(contact))
@@ -790,7 +790,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         const downwell::ContactActor enemyContact{
             enemy.preciseX, enemy.preciseY,
             enemy.objectId == 117 ? enemy.motionState : enemy.facing,
-            enemy.objectId == 117 && enemy.speedY > 0 ? -1 : 1,
+            enemy.imageScaleY(),
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
         downwell::applyEnemyContact(enemy.objectId, enemyContact,
             enemy.x, enemy.y, enemy.active, enemy.health, player_, health_, invulnerability_, enemiesDefeated_,

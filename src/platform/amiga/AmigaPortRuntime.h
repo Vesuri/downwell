@@ -116,13 +116,14 @@ public:
         bool grounded;
         bool frogLanded;
         bool activationPending;
+        int imageScaleY() const { return objectId == 117 ? snail.verticalFlip : 1; }
         unsigned drawFrame() const {
             if (objectId == 119)
                 return imageFrame + (crawler.imageDirection % 4u) * 256u;
             // Source enmSnail Step updates image_yscale only after nonzero
             // movement. Creation/time-stop/zero speed retain the stored flip.
             // Frame 256+n is host-generated, for both planar and DMA assets.
-            return imageFrame + (objectId == 117 && snail.verticalFlip < 0 ? 256u : 0u);
+            return imageFrame + (imageScaleY() < 0 ? 256u : 0u);
         }
     };
     struct GemState {

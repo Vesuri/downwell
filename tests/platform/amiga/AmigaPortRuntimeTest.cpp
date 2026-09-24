@@ -7,6 +7,7 @@
 #include "core/EnemyPresentation.h"
 #include "core/MainRoomLifetime.h"
 #include "core/CurrencyReward.h"
+#include "core/StandardBulletStep.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -647,6 +648,11 @@ int main() {
             "generated wall snail can enter native actor storage");
     require(snail.enemyAt(0).drawFrame() == snail.enemyAt(0).imageFrame,
             "new descending snail retains default image orientation before its first Step");
+    const int initialSnailScaleY = snail.enemyAt(0).imageScaleY();
+    const auto initialSnailBounds = downwell::contactWorldBounds({0, 0, 1,
+        initialSnailScaleY, 177});
+    require(initialSnailBounds.top == -6 && initialSnailBounds.bottom == 7,
+            "pre-Step collision uses the unflipped asymmetric snail mask, not velocity");
     snail.step(0);
     require(snail.enemyAt(0).active &&
                 snail.enemyAt(0).motionState == 1 &&
@@ -659,6 +665,21 @@ int main() {
     stationarySnail.snail.vy = 0;
     require(stationarySnail.drawFrame() == stationarySnail.imageFrame + 256,
             "zero velocity must not discard the stored snail image orientation");
+    const auto stationarySnailBounds = downwell::contactWorldBounds({0, 0, 1,
+        stationarySnail.imageScaleY(), 177});
+    require(stationarySnailBounds.top == -7 && stationarySnailBounds.bottom == 6,
+            "stationary collision retains the same flipped mask as the rendered snail");
+    const downwell::ContactActor createdSnailContact{0, 0, 1, initialSnailScaleY, 177};
+    const downwell::ContactActor stoppedSnailContact{0, 0, 1, stationarySnail.imageScaleY(), 177};
+    const downwell::StandardBulletPath edgeBullet{0, -15, -7};
+    require(!edgeBullet.intersects(createdSnailContact) && edgeBullet.intersects(stoppedSnailContact),
+            "one-row mask difference changes the bullet segment at the source boundary");
+    const downwell::ContactActor edgePlayer{0, -14 * 256L, 1, 1, 31};
+    require(downwell::classifyEnemyContact(edgePlayer, createdSnailContact, 117, edgePlayer.y) ==
+                downwell::EnemyContact::none &&
+            downwell::classifyEnemyContact(edgePlayer, stoppedSnailContact, 117, edgePlayer.y) ==
+                downwell::EnemyContact::damage,
+            "player contact observes the same retained one-row orientation boundary");
     for (unsigned frame = 0;
          frame < 120 && snail.enemyAt(0).speedY > 0; ++frame)
         snail.step(0);

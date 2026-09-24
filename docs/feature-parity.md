@@ -52,6 +52,15 @@ hash and matches SDL at all 99,968 visible pixels; this checkpoint is a broad
 rendering regression, not coverage of the new pre-Step/zero-speed fixtures.
 The normal executable was restored and both 68000 audits pass.
 
+Native bullet and player-contact adapters now use the same stored snail
+orientation through `EnemyState::imageScaleY()`, rather than inferring it from
+velocity. Mask 177 is vertically asymmetric: [-6,7) versus [-7,6) after a
+flip. Source-metadata verification confirms those bounds. Tests pin the
+creation and stationary orientations and demonstrate the different bullet
+segment/player overlap at the single-row edge. Live combat comparison and
+the bounded 68000 replay pass; the ordinary build is restored. The short
+CPU replay is not coverage of the synthetic zero-speed edge fixture.
+
 ### Shared death flash presentation
 
 `PlayerDeathSequence::flashVisible()` now exposes `objDeathFlashFx`'s visual
