@@ -492,6 +492,12 @@ generate-amiga-hud:
 	tools/generate-amiga-hud.py
 
 .PHONY: generate-amiga-results verify-amiga-results
+.PHONY: generate-amiga-shop verify-amiga-shop
+generate-amiga-shop:
+	tools/generate-amiga-hud.py --profile shop
+verify-amiga-shop: generate-amiga-shop
+	tools/generate-amiga-hud.py --profile shop --check
+test: verify-amiga-shop
 generate-amiga-results:
 	tools/generate-amiga-hud.py --profile results
 

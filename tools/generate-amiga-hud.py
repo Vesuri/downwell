@@ -20,6 +20,14 @@ RECORD = struct.Struct(">HHhhHHHHII")
 
 # Exact resources needed by the first native HUD and gameplay milestones.
 SELECTIONS = {
+    # Bank separately: gameplay's resident Chip allocation has little headroom.
+    # Full-size menu icons are frame 0; the cased world objects use frame 1.
+    "shop": {
+        143: [0], 147: [0], 149: [0], 150: [0], 151: [0], 152: [0],
+        484: None,  # animated shop cursor, plus offline 270-degree variants
+        489: [0],  # description panel
+        498: [1, 2, 3],  # case-number cursor overlay
+    },
     # Separate scene pack: do not make results-only art resident throughout
     # gameplay. All conversion remains host-side, including unlock portraits.
     "results": {
@@ -393,6 +401,18 @@ def build_pack(manifest, extracted, profile):
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,
                     f"planar round trip failed for sprite {sprite_id}:{frame_index}")
             encoded.append((sprite, frame_index, dma_width, planar))
+            if profile == "shop" and sprite_id == 484:
+                # Leave uses draw_sprite_ext(...,270,...). As with crawler
+                # art, encode quarter turns in the high byte of the frame ID.
+                rotated = canvas.transpose(Image.Transpose.ROTATE_270)
+                pixels = [pixel_to_pen(pixel) for pixel in rotated.get_flattened_data()]
+                stride, data = encode_planar(pixels, rotated.width, rotated.height)
+                require(decode_planar(data, rotated.width, rotated.height, stride) == pixels,
+                        "shop cursor rotated planar round trip failed")
+                metadata = dict(sprite, width=rotated.width, height=rotated.height,
+                                originX=canvas.height - sprite["originY"],
+                                originY=sprite["originX"])
+                encoded.append((metadata, 768 + frame_index, stride, data))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
                     153, 154, 163, 164, 166, 168, 170, 173, 177, 186, 187, 188, 278):

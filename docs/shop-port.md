@@ -385,3 +385,21 @@ coordinates, camera-height changes, affordability, sold-out/Leave, inactive and
 retired counters. This is a layout contract, not connected rendering yet;
 offline menu assets, negative-subimage resolution and on-target composition
 remain the next integration work.
+
+## Offline menu artwork bank
+
+`make verify-amiga-shop` creates/reproduces generated/amiga-shop.dwap with the
+existing pinned Steam-source hash and DWAP v2 format. Its 18 records contain
+the six full-size item icons (frame 0), all four cursor frames, their four
+offline 270-degree rotations (frame IDs 768..771), description panel 489:0,
+and numbered overlays 498:1..3. Every plane/mask pixel is decoded and checked
+against the source image during conversion; rotated variants use transformed
+origins, matching the existing quarter-turn asset convention.
+
+The pack is 9092 bytes, SHA-256
+2688e9d781e61c29a25d182098c6a7b5f08aeee64571df6c56c32b9a1a702117.
+It is deliberately not appended to the resident gameplay pack: the latter
+remains byte-for-byte unchanged, with its existing Chip-RAM budget. This bank
+is not loaded by the executable yet. Localized text extraction/rasterization,
+bank lifetime management and backend composition remain required before any
+claim of visible shop-menu support. Generated artwork stays ignored by Git.
