@@ -661,40 +661,26 @@ void StartupRuntime::updateMainEnemies() {
 
         enemy.imageIndex += enemy.imageSpeed;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
-            const float halfWidth = enemy.objectId == 112 ? 8.0F : 6.0F;
-            const float foot = enemy.objectId == 112 ? 8.0F : 5.0F;
-            enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.2F);
-            enemy.grounded = mainSolidAt(enemy.preciseX,
-                                         enemy.preciseY + foot + 1.0F);
-            if (enemy.grounded) {
-                enemy.velocityY = 0.0F;
-                const float ahead = enemy.preciseX +
-                    (enemy.velocityX < 0.0F ? -halfWidth - 1.0F
-                                             : halfWidth + 1.0F);
-                if (!mainSolidAt(ahead, enemy.preciseY + foot + 1.0F))
-                    enemy.velocityX *= -1.0F;
-            }
-            const float nextX = enemy.preciseX + enemy.velocityX;
-            const float edge = nextX + (enemy.velocityX < 0.0F
-                                             ? -halfWidth : halfWidth);
-            if (mainSolidAt(edge, enemy.preciseY))
-                enemy.velocityX *= -1.0F;
-            else if (enemy.objectId != 112 || groundTurtleWalking(enemy.auxiliaryState))
-                enemy.preciseX = nextX;
-            if (!enemy.grounded) {
-                const float nextY = enemy.preciseY + enemy.velocityY;
-                if (enemy.velocityY > 0.0F &&
-                    mainSolidAt(enemy.preciseX, nextY + foot)) {
-                    while (!mainSolidAt(enemy.preciseX,
-                                        enemy.preciseY + foot + 1.0F))
-                        enemy.preciseY += 1.0F;
-                    enemy.velocityY = 0.0F;
-                    enemy.grounded = true;
-                } else {
-                    enemy.preciseY = nextY;
-                }
-            }
-            enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
+            if (!enemy.walker.initialized)
+                enemy.walker.initialize(enemy.x, enemy.y,
+                    static_cast<long>(std::round(enemy.velocityX * 1280)),
+                    static_cast<long>(std::round(enemy.velocityY * 1280)), enemy.grounded);
+            const bool turtle = enemy.objectId == 112;
+            const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
+                mainCameraMotion_.x - 80L * 4096, mainCameraMotion_.y - 142L * 4096,
+                mainCameraMotion_.x + 80L * 4096, mainCameraMotion_.y + 142L * 4096,
+                turtle ? 64 : 32);
+            enemy.walker.step(turtle, groundTurtleWalking(enemy.auxiliaryState), visible,
+                [this, &enemy, turtle](long x, long y) {
+                    return enemy.walker.meetsTiles(x, y, turtle,
+                        [this](int px, int py) { return mainSolidAt(px, py); });
+                });
+            enemy.preciseX = enemy.walker.x / 1280.0F;
+            enemy.preciseY = enemy.walker.y / 1280.0F;
+            enemy.velocityX = enemy.walker.vx / 1280.0F;
+            enemy.velocityY = enemy.walker.vy / 1280.0F;
+            enemy.grounded = enemy.walker.grounded;
+            enemy.scaleX = static_cast<float>(enemy.walker.facing);
         } else if (enemy.objectId == 113) {
             const bool integrate = frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
                 static_cast<long>(std::round(mainCameraViewX() * 256.0F)),
@@ -774,6 +760,10 @@ void StartupRuntime::updateMainEnemies() {
         }
         enemy.x = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
         enemy.y = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
+        if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.walker.initialized) {
+            enemy.x = enemy.walker.publishedX;
+            enemy.y = enemy.walker.publishedY;
+        }
         if (enemy.objectId == 117 && enemy.snail.initialized) {
             enemy.x = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.x) / 1280);
             enemy.y = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.y) / 1280);
@@ -2037,7 +2027,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(35); // Includes authoritative snail hit response.
+    digest.addU32(36); // Includes authoritative walking-enemy state.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2218,6 +2208,17 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(instance.moveSpeed);
         digest.addI32(instance.motionState);
         digest.addI32(instance.auxiliaryState);
+        if (instance.objectId == 111 || instance.objectId == 112) {
+            digest.addI32(instance.walker.x);
+            digest.addI32(instance.walker.y);
+            digest.addI32(instance.walker.vx);
+            digest.addI32(instance.walker.vy);
+            digest.addI32(instance.walker.facing);
+            digest.addI32(instance.walker.publishedX);
+            digest.addI32(instance.walker.publishedY);
+            digest.addBool(instance.walker.grounded);
+            digest.addBool(instance.walker.initialized);
+        }
         if (instance.objectId == 117) {
             digest.addI32(instance.snail.x);
             digest.addI32(instance.snail.y);

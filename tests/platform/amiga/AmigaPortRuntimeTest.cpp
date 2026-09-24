@@ -51,7 +51,7 @@ struct GenerationOrderProbe {
                     "existing enemy alarm RNG precedes generation");
             require(random.nextU32() == probe.expected.nextU32(),
                     "generation shares the actual enemy RNG stream");
-            require(runtime.configureEnemy(1, 112, 169, 80, 0, 256, 0,
+            require(runtime.configureEnemy(1, 112, 169, 60, 0, 256, 0,
                         5, 14, 0, 1, -1, 1, 0, 0, true, true, true),
                     "generation creates a live grounded turtle");
             require(runtime.enemyAt(1).grounded && runtime.enemyAt(1).awake,
@@ -110,7 +110,7 @@ int main() {
     eventOrder.step(0);
     require(eventOrder.generationSucceeded() && generation.calls == 1 &&
                 eventOrder.enemyAt(0).alarm1 >= 120 &&
-                eventOrder.enemyAt(1).alarm1 == 1 && eventOrder.enemyAt(1).x == 81 &&
+                eventOrder.enemyAt(1).alarm1 == 1 && eventOrder.enemyAt(1).x == 59 &&
                 eventOrder.enemyAt(1).imagePhase == 38,
             "new enemy moves and animates immediately without aging its Create alarm");
     eventOrder.step(0);

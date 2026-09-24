@@ -241,10 +241,51 @@ C++ nonzero truthiness ([official bool documentation](https://manual.gamemaker.i
 The native fixture now checks that a negative phase leaves X unchanged and
 uses idle art, then advances through the next recovered alarm and requires
 movement and walking art to resume together. Zero and airborne presentation
-are tested separately. Snake/turtle collision and integration branches still
-need full shared-core extraction and comparison with the source rectangle
-queries, edge distances, visibility gates and event order; this correction
-does not claim that broader migration is complete.
+are tested separately. The following shared-motion migration replaces the
+previous separate snake/turtle collision and integration branches.
+
+#### Shared snake and ground-turtle movement
+
+`WalkingEnemyMotion` now owns the dry-world movement algorithm for both
+adapters. It follows the recovered enmSnake/enmGroundTurtle Step order:
+gravity, eight/twelve-pixel ledge probes, horizontal collision walk and
+reversal, vertical collision distance, grounded/facing updates, then
+visibility-gated integration and coordinate publication. A paused turtle
+retains its horizontal velocity and still falls. A collision reversal still
+integrates the reversed velocity in the same Step. Approaching a floor does
+not prematurely mark an airborne actor grounded.
+
+Authoritative position and velocity use 1/1280-pixel units, preserving .2
+gravity exactly on both CPUs. Native Q8 and host float members are mirrors,
+not independent simulations. Offscreen motion probes run while integration
+and published coordinates remain gated by the source view margins (32 for
+snake, 64 for turtle). Tests compare the complete live walker state exactly
+across both adapters, alongside focused landing/wall/ledge/pause fixtures.
+
+The longer startup tape now selects source right-room pattern 6 rather than
+3, retaining 95 generated rows and four generations. Pattern 6 contains the
+additional J torch marker (seven special markers total). Its incidental
+combat walk no longer encounters an enemy; a controlled generated-snake
+fixture now verifies bullet death and physical rewards independently of
+that route. Mandatory natural-combat scene tapes are unchanged: the default
+finishes at health 3/3, kills 4/4, currency 50/50, and phase 5 at 4/4, 2/2,
+2/2. Startup digest schema 36 includes walker state; the menu replay pin is
+`235dc06eb7314970`.
+
+This does not establish full original-game equivalence. Water/time-stop
+integration, collision-event scheduling, and exact Windows-runner fractional
+`place_meeting` conversion remain unaudited. The terrain adapter retains the
+existing rounded rectangular-mask convention and aligned 16x16-cell queries;
+it is not an implementation of arbitrary thin or precise collision shapes.
+The original Step assembly is the algorithm source; agreement between the
+two ports alone is not evidence for those remaining runtime semantics.
+
+Validation: full host suite and SDL build pass; the bounded A500 600-tick
+terrain-cache oracle and cross-CPU player/gem replay pass, followed by a
+normal target rebuild. The replay remains
+`64 9f0d3943 e7900d2b 400 9543220e d0d8e596 3f`. That narrow CPU fixture does
+not hash walking enemies; exact walker comparisons are host-side adapter
+tests. Both target 68000 instruction and 64-bit-helper audits are clean.
 
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600

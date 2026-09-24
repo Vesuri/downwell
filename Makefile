@@ -119,6 +119,11 @@ test: build/main-camera-test
 test: build/standard-bullet-test
 test: build/crawler-motion-test
 test: build/snail-motion-test
+test: build/walking-enemy-test
+
+build/walking-enemy-test: tests/core/WalkingEnemyMotionTest.cpp src/core/WalkingEnemyMotion.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/WalkingEnemyMotionTest.cpp
 
 build/snail-motion-test: tests/core/SnailMotionTest.cpp src/core/SnailMotion.h src/core/SnailHitState.h src/core/SolidCollision.h src/core/EnemyContact.h src/core/GameMakerRounding.h
 	@mkdir -p build
@@ -305,6 +310,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/standard-bullet-test
 	./build/crawler-motion-test
 	./build/snail-motion-test
+	./build/walking-enemy-test
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)

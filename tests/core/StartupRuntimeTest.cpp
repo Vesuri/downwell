@@ -583,6 +583,34 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainShotsFired() == shotsBeforeJump + 1 &&
                     runtime.mainAmmo() == 7 && runtime.mainBulletCount() == 1,
                 "releasing after the jump unlocks an airborne gunboot shot");
+        {
+            // A controlled encounter, independent of the later side-room route.
+            // Natural combat and collection remain mandatory in the paired scene tapes.
+            auto combat = runtime;
+            downwell::InstanceRecord* target = nullptr;
+            std::size_t targetIndex = 0;
+            for (std::size_t i = 0; i < combat.activeInstanceCount(); ++i) {
+                auto& candidate = const_cast<downwell::InstanceRecord&>(combat.instanceAt(i));
+                if (candidate.objectId == 111) { target = &candidate; targetIndex = i; break; }
+            }
+            require(target != nullptr, "controlled encounter reuses a generated snake");
+            const auto bullet = combat.mainBulletAt(0);
+            target->active = true;
+            target->activationPending = false;
+            target->health = 5;
+            target->x = static_cast<int>(bullet.x);
+            target->y = static_cast<int>(bullet.y) + 8;
+            target->preciseX = target->x;
+            target->preciseY = target->y;
+            target->velocityX = target->velocityY = 0;
+            target->grounded = false;
+            target->walker.initialize(target->x, target->y, 0, 0, false);
+            const auto kills = combat.mainEnemiesDefeated();
+            combat.step(releasedMain, false);
+            require(combat.mainEnemiesDefeated() == kills + 1 && !combat.instanceAt(targetIndex).active &&
+                        combat.mainCurrencyCount() > 0,
+                    "a usual bullet defeats a five-health snake and spawns physical gems");
+        }
         runtime.step(releasedMain, false);
         for (int tick = 0;
              tick < 3000 && runtime.mainBuilderSideRoomsGenerated() == 0;
@@ -595,18 +623,25 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 runtime.step(releasedMain, false);
             }
         }
+        std::cout << "Side-room tape: rooms=" << runtime.mainBuilderSideRoomsGenerated()
+                  << " shops=" << runtime.mainBuilderShopsGenerated()
+                  << " suppressed=" << runtime.mainBuilderShopSuppressed()
+                  << " right=" << runtime.mainBuilderLastRightPattern()
+                  << " generations=" << runtime.mainBuilderGenerationCount()
+                  << " rows=" << runtime.mainBuilderRowsGenerated()
+                  << " specials=" << runtime.mainBuilderSpecialObjectsGenerated() << '\n';
         // This is a tape-specific regression, not a Windows trajectory oracle.
         // Shared fixed-point motion changes the route feeding enemy/RNG timing.
-        // The migrated tape selects scrRightPat1 pattern 3, containing exactly
-        // v,O,_,@,{,}: six special markers, with unchanged generated row count.
+        // The shared walker tape selects scrRightPat1 pattern 6, containing
+        // v,O,_,@,{,},J: seven special markers, with unchanged generated rows.
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 3 &&
+                    runtime.mainBuilderLastRightPattern() == 6 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
                     runtime.mainBuilderRowsGenerated() == 95,
                 "the first scheduled side room preserves deterministic selection and rows");
-        require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
+        require(runtime.mainBuilderSpecialObjectsGenerated() == 7,
                 "every special marker in deterministic right-room pattern is interpreted");
         bool foundTorch = false;
         bool foundAmbience = false;
@@ -622,32 +657,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             foundRoomReward = foundRoomReward || instance.objectId == 293 ||
                               instance.objectId == 109;
         }
-        require(!foundTorch && foundAmbience && foundTimeField &&
+        require(foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
-                "pattern 3 emits its utility/reward IDs but no I/J torch marker");
-        // Side-room generation does not itself guarantee an enemy encounter.
-        // Exercise combat explicitly instead of relying on the former route
-        // through a subpixel floor gap to happen to produce a kill.
-        for (unsigned tick = 0; tick < 1800 && runtime.mainEnemiesDefeated() == 0; ++tick) {
-            downwell::Input combat;
-            combat.left = (tick / 90) % 2 == 0;
-            combat.right = !combat.left;
-            combat.fire = tick % 10 < 5;
-            runtime.step(combat, tick % 10 == 0);
-        }
-        std::cout << "Combat coverage: kills=" << runtime.mainEnemiesDefeated()
-                  << " health=" << runtime.mainPlayerHealth()
-                  << " gems=" << runtime.mainCurrencyCount()
-                  << " total=" << runtime.mainCurrencyTotal()
-                  << " position=" << runtime.mainPlayerX() << ',' << runtime.mainPlayerY() << '\n';
-        require(runtime.mainEnemiesDefeated() > 0 &&
-                    runtime.mainCurrencyCount() +
-                        static_cast<std::size_t>(runtime.mainCurrencyTotal()) > 0,
-                "defeated enemies produce physical or already-collected gems");
-        if (runtime.mainCurrencyTotal() > 0)
-            require(runtime.mainGemStreak() > 0 &&
-                        runtime.mainGemStreakTimer() > 0,
-                    "collected physical gems feed the recovered streak timer");
+                "pattern 6 emits its utility/reward IDs and its J torch marker");
     }
 }
 

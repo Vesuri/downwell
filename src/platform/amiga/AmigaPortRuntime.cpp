@@ -156,6 +156,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.crawler.latched = grounded;
     enemy.snail.initialize(x, y, speedY >= 0);
     enemy.snailHit = {};
+    enemy.walker.initialize(x, y, speedX * 5L, speedY * 5L, grounded);
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
     enemy.speedY = speedY;
@@ -564,61 +565,28 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                                      enemy.imageSpeed);
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
-        if ((!enemy.awake && enemy.objectId != 113) || solidResolver_ == 0)
+        if ((!enemy.awake && enemy.objectId != 113 && enemy.objectId != 111 && enemy.objectId != 112) || solidResolver_ == 0)
             continue;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
-            const int halfWidth = enemy.objectId == 112 ? 8 : 6;
-            const int foot = enemy.objectId == 112 ? 8 : 5;
-            const int direction = enemy.speedX < 0 ? -1 : 1;
-            const int probeX = (int)downwell::floorQ8Coordinate(enemy.preciseX);
-            const int probeY = (int)downwell::floorQ8Coordinate(enemy.preciseY);
-            const bool grounded = solidResolver_(
-                solidResolverContext_, probeX, probeY + foot + 1);
-            enemy.grounded = grounded;
-            if (grounded) {
-                enemy.speedY = 0;
-                enemy.gravityRemainder = 0;
-                if (!solidResolver_(solidResolverContext_,
-                                    probeX + direction * (halfWidth + 1),
-                                    probeY + foot + 1))
-                    enemy.speedX = -enemy.speedX;
-            } else {
-                enemy.speedY += 51;
-                if (++enemy.gravityRemainder == 5) {
-                    ++enemy.speedY;
-                    enemy.gravityRemainder = 0;
-                }
-                if (enemy.speedY >= 7 * 256) {
-                    enemy.speedY = 7 * 256;
-                    enemy.gravityRemainder = 0;
-                }
-            }
-            const int nextX = (int)downwell::floorQ8Coordinate(enemy.preciseX + enemy.speedX);
-            const int edge = nextX +
-                (enemy.speedX < 0 ? -halfWidth : halfWidth);
-            if (solidResolver_(solidResolverContext_, edge, probeY))
-                enemy.speedX = -enemy.speedX;
-            else if (enemy.objectId != 112 || downwell::groundTurtleWalking(enemy.auxiliaryState))
-                enemy.preciseX += enemy.speedX;
-            if (!grounded) {
-                const unsigned residual = enemy.gravityPositionRemainder + enemy.gravityRemainder;
-                const long nextPreciseY = enemy.preciseY + enemy.speedY + residual / 5u;
-                const int nextY = (int)downwell::floorQ8Coordinate(nextPreciseY);
-                const int movedX = (int)downwell::floorQ8Coordinate(enemy.preciseX);
-                if (enemy.speedY > 0 && solidResolver_(
-                        solidResolverContext_, movedX, nextY + foot)) {
-                    while (!solidResolver_(solidResolverContext_, movedX,
-                                (int)downwell::floorQ8Coordinate(enemy.preciseY) + foot + 1)) {
-                        enemy.preciseY += 256L;
-                    }
-                    enemy.speedY = 0;
-                    enemy.gravityRemainder = 0;
-                    enemy.grounded = true;
-                } else {
-                    enemy.preciseY = nextPreciseY;
-                    enemy.gravityPositionRemainder = static_cast<unsigned char>(residual % 5u);
-                }
-            }
+            const bool turtle = enemy.objectId == 112;
+            const long cx = followCamera_ ? cameraMotion_.x - 240L * 4096 : 0;
+            const long cy = followCamera_ ? cameraMotion_.y - 176L * 4096 : cameraY_ * 16;
+            const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
+                cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
+                turtle ? 64 : 32);
+            enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
+                [this, &enemy, turtle](long x, long y) {
+                    return enemy.walker.meetsTiles(x, y, turtle, [this](int px, int py) {
+                        return solidResolver_(solidResolverContext_, px, py);
+                    });
+                });
+            enemy.preciseX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.x, 5);
+            enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.y, 5);
+            enemy.speedX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vx, 5);
+            enemy.speedY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vy, 5);
+            enemy.gravityPositionRemainder = enemy.walker.y - enemy.preciseY * 5;
+            enemy.gravityRemainder = enemy.walker.vy - enemy.speedY * 5;
+            enemy.grounded = enemy.walker.grounded;
         } else if (enemy.objectId == 116) {
             downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, 0, 0,
                 enemy.direction, (enemy.moveSpeed * 40 + 128) / 256};
@@ -685,6 +653,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         // unchanged by storing these positions relative to the origin.
         enemy.x = (int)downwell::roundGameMakerQ8(enemy.preciseX);
         enemy.y = (int)downwell::roundGameMakerQ8(enemy.preciseY);
+        if (enemy.objectId == 111 || enemy.objectId == 112) {
+            enemy.x = enemy.walker.publishedX;
+            enemy.y = enemy.walker.publishedY;
+        }
         if (enemy.objectId == 119) {
             enemy.x = enemy.crawler.pixelX();
             enemy.y = enemy.crawler.pixelY();
