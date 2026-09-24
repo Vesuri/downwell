@@ -1284,7 +1284,9 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     mainPlayerMotion_.configureSolidResolver([](void* context, int x, int y) {
         const auto& runtime = *static_cast<StartupRuntime*>(context);
         return runtime.mainSolidAt(x + runtime.mainPlayerOriginX_,
-                                   y + runtime.mainPlayerOriginY_);
+                                   y + runtime.mainPlayerOriginY_) ||
+            runtime.run_.shops.playerSolidAt(x + runtime.mainPlayerOriginX_,
+                                            y + runtime.mainPlayerOriginY_);
     }, this, 4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver([](void* context, int x, int minimumY) {
         const auto& runtime = *static_cast<StartupRuntime*>(context);
@@ -1299,7 +1301,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
                 worldX + 3 >= tile.x - 8 && worldX - 4 <= tile.x + 7)
                 nearest = landing;
         }
-        return nearest;
+        return runtime.run_.shops.playerLanding(worldX, minimumY + runtime.mainPlayerOriginY_,
+            nearest + runtime.mainPlayerOriginY_) - runtime.mainPlayerOriginY_;
     }, this);
     mainPlayerMotion_.configureBreakBoxResolver([](void* context, long x, long y) {
         auto& runtime = *static_cast<StartupRuntime*>(context);

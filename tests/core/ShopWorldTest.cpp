@@ -45,6 +45,28 @@ int main() {
     auto range = [&](unsigned lo, unsigned) { ++draws; return lo + (draws % 4 == 2 ? 1 : 0); };
     auto* shop = run.shops.create(5, 0, range, 4, 1);
     require(shop && draws == 4, "registration consumes stock RNG once");
+    require(run.shops.playerSolidAt(39, 0) && run.shops.playerSolidAt(98, 7) &&
+        !run.shops.playerSolidAt(38, 0) && !run.shops.playerSolidAt(99, 7),
+        "table uses cropped solid mask, not full artwork bounds");
+    require(run.shops.playerSolidAt(41, -18) && run.shops.playerSolidAt(58, -1) &&
+        !run.shops.playerSolidAt(40, -18) && !run.shops.playerSolidAt(59, -1),
+        "glass case uses 18x18 mask and leaves one-pixel gaps between cases");
+    require(run.shops.playerSolidAt(-3, 0) && run.shops.playerSolidAt(12, 15) &&
+        !run.shops.playerSolidAt(-4, 0), "counter child uses full invisible-wall mask");
+    require(run.shops.playerLanding(50, -100, 1000) == -26 &&
+        run.shops.playerLanding(50, -25, 1000) == -8,
+        "landing chooses case top before table, skipping tops already above the player");
+    for (int shopX : {0, -45}) {
+        downwell::ShopWorld fallingWorld;
+        fallingWorld.create(shopX, 100, range, 4, 1);
+        PlayerMotion falling(false, 1000);
+        falling.configureLandingResolver([](void* opaque, int x, int minimumY) {
+            return static_cast<downwell::ShopWorld*>(opaque)->playerLanding(x, minimumY, 1000);
+        }, &fallingWorld);
+        for (unsigned i = 0; i < 120 && !falling.grounded(); ++i) falling.step({});
+        require(falling.grounded() && falling.offsetY() == (shopX == 0 ? 92 : 74),
+            "shared player lands on invisible wall or case at recovered top");
+    }
     PlayerMotion player;
     unsigned greetings = 0;
     auto tick = [&](bool fire, bool left = false, bool right = false) {
@@ -76,6 +98,7 @@ int main() {
         shop->feedback.sounds[0].resource == 104 && shop->feedback.sounds[1].resource == 105 &&
         shop->feedback.sounds[1].volume == 50,
         "purchase removes only purchased contents and retains ordered merchant/UI feedback");
+    require(run.shops.playerSolidAt(50, -10), "sold case remains physically solid");
     tick(false, true); // First item -> Leave; locked player stays still.
     require(shop->menu.cursor == 0 && player.offsetX() == 0, "menu navigation does not move player");
     tick(true);
@@ -101,6 +124,8 @@ int main() {
     require(shop->present, "retirement boundary is strict");
     run.shops.endStep(321);
     require(!shop->present, "offscreen shop retires at source threshold");
+    require(!shop->wallPresent && run.shops.playerSolidAt(50, -10) && shop->allocated,
+        "invisible wall retires separately; tables/cases survive counter retirement");
     run.reset();
     require(!run.shops.noControl && !run.shops.interactable &&
         !run.shops.previous.fire && !run.shops.instances[0].present &&

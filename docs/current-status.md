@@ -27,6 +27,8 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
   both runtimes, verified with an isolated paired fixture.
 - [x] Retained shared merchant feedback and purchased-item disappearance state
   (rendering/audio consumers still pending).
+- [x] Table, glass-case and invisible-wall player collision masks shared by
+  both adapters, including separate retirement rules.
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.

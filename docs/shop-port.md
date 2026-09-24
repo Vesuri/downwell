@@ -170,3 +170,38 @@ These requests are not audio playback, localized text rendering, or the keeper's
 own alarm/animation controller. Focused tests cover all reply IDs, sound ordering,
 stock disappearance, transient request reset and opening flag preservation. The
 paired runtime purchase fixture compares both targets' child and feedback state.
+
+## Static child geometry and player collision
+
+Registered shops now contribute their original child rectangles to both player
+solid queries and nearest-landing queries. These are resource masks, not artwork
+extents: table 278/sprite 481 is x+34..x+93,y..y+7; the three cases 279/sprite 482
+are centered at x+45/64/83,y-9 with offsets -9..8 on each axis; invisible wall
+98/sprite 46 is x-8..x+7,y..y+15. Purchased cases stay solid. The counter itself
+does not become a wall.
+
+The invisible wall's End Step calls `scrOutofview` (strict viewY-160 and
+viewY+3000), independently of the counter's -320 threshold. The table and cases
+have no retirement Step in their parent chain and survive until room teardown.
+Consequently retiring a counter does not recycle its occupied shared slot. The
+eight-slot bound remains explicit; future room-transition integration must clear
+room-owned shops rather than silently discard surviving child objects.
+
+Tests check inclusive cropped mask bounds and gaps, nearest tops, shared-player
+landings on wall/case, sold-case solidity, and separate lifetimes. The paired
+runtime fixture approaches from outside the invisible wall and walks against it
+after leaving the menu. Both retain the same fractional position while remaining
+in the last unblocked integer query cell. This validates the current shared
+integer-cell player adapter, not unresolved Windows fractional-query semantics.
+
+Enemy/projectile queries, case damage/theft, dynamic child state, presentation
+and production generation remain open. The new rectangles are player collision
+hooks, not a complete implementation of those child objects. Empty shop worlds
+return immediately from geometry queries, avoiding an eight-slot scan in normal
+first-level gameplay. Native callback wrappers rebind each update so host-side
+runtime copies cannot retain a pointer to the previous wrapper owner.
+
+Validation: full host tests and SDL build pass, including the paired counter-wall
+fixture. The bounded SKIP_TO_GAME 600-update A500 cache regression passes with
+clean 68000 instruction/helper audits. No target-side visit to a shop is claimed;
+the ordinary first-level emulator tape checks existing gameplay for regressions.

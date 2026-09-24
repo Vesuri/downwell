@@ -389,6 +389,9 @@ void AmigaPortRuntime::updateCrawler(EnemyState& enemy, bool alarm)
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 {
     DW_PROFILE_PHASE(profilePlayer);
+    // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
+    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_);
+    if (landingResolver_) configureLandingResolver(landingResolver_, landingResolverContext_);
     // The reference dispatches the builder before the camera in rmMain's
     // ordinary Step instance order. Generation observes the previous camera,
     // not the camera position being prepared for this frame's display.

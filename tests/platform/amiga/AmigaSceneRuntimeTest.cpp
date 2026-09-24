@@ -766,7 +766,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "both gameplay runtimes land on the recovered entrance floor");
     if (shopFixture) {
         // Isolated fixture, not a modification of ordinary 1-1 generation.
-        const int x = 240 + gameplay.player().offsetX() + 5;
+        // Approach from outside the invisible wall, while overlapping counter mask.
+        const int x = 240 + gameplay.player().offsetX() + 12;
         const int y = 176 + gameplay.player().offsetY();
         auto* nativeShop = gameplay.registerShop(x, y);
         auto* hostShop = reference.registerShop(x, y);
@@ -775,8 +776,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(nativeShop->stock.items[i].upgrade == hostShop->stock.items[i].upgrade &&
                 nativeShop->stock.items[i].price == hostShop->stock.items[i].price,
                 "registered stock uses identical shared RNG state");
-        auto tickShop = [&](bool pressed, bool goLeft = false) {
-            downwell::Input input; input.fire = pressed; input.left = goLeft;
+        auto tickShop = [&](bool pressed, bool goLeft = false, bool goRight = false) {
+            downwell::Input input; input.fire = pressed; input.left = goLeft; input.right = goRight;
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, pressed);
             require(gameplay.shops().noControl == reference.shops().noControl &&
@@ -821,6 +822,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         tickShop(true);
         require(!gameplay.shops().noControl && !nativeShop->menu.active,
             "live Leave releases movement lock");
+        for (int i = 0; i < 20; ++i) tickShop(false, false, true);
+        // Existing player queries use integer cells but retain subpixel position.
+        require(240 + gameplay.player().offsetX() <= x - 12 && reference.mainPlayerX() < x - 11 &&
+            std::fabs(reference.mainPlayerX() - (240 + gameplay.player().offsetXFixed() / 256.0F)) < 0.01F,
+            "invisible counter wall blocks rightward walking equally in both runtimes");
         tickShop(false); tickShop(true);
         require(nativeShop->menu.active && nativeShop->stock.items[0].remaining == 0 &&
             hostShop->stock.items[0].remaining == 0, "live reentry preserves sold stock");

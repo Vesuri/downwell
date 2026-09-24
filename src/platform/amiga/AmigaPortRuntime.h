@@ -149,7 +149,13 @@ public:
     }
     void configureLandingResolver(AmigaPlayer::LandingResolver resolver,
                                   void* context) {
-        player_.configureLandingResolver(resolver, context);
+        landingResolver_ = resolver;
+        landingResolverContext_ = context;
+        player_.configureLandingResolver(resolver ? [](void* opaque, int x, int minimumY) {
+            const auto& runtime = *static_cast<AmigaPortRuntime*>(opaque);
+            const int nearest = runtime.landingResolver_(runtime.landingResolverContext_, x, minimumY);
+            return runtime.run_.shops.playerLanding(x + 240, minimumY + 176, nearest + 176) - 176;
+        } : static_cast<AmigaPlayer::LandingResolver>(nullptr), this);
     }
     void configureBreakables(const int* x, const int* y, unsigned count);
     // Append a newly generated batch without reviving destroyed earlier blocks.
@@ -158,7 +164,11 @@ public:
     void configureSolidResolver(SolidResolver resolver, void* context) {
         solidResolver_ = resolver;
         solidResolverContext_ = context;
-        player_.configureSolidResolver(resolver, context, -236, 236);
+        player_.configureSolidResolver(resolver ? [](void* opaque, int x, int y) {
+            const auto& runtime = *static_cast<AmigaPortRuntime*>(opaque);
+            return (runtime.solidResolver_ && runtime.solidResolver_(runtime.solidResolverContext_, x, y)) ||
+                runtime.run_.shops.playerSolidAt(x + 240, y + 176);
+        } : static_cast<SolidResolver>(nullptr), this, -236, 236);
     }
     bool configureEnemy(unsigned index, int objectId, int spriteId,
                         int x, int y, int speedX, int speedY,
@@ -261,6 +271,8 @@ private:
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;
+    AmigaPlayer::LandingResolver landingResolver_ = nullptr;
+    void* landingResolverContext_ = nullptr;
     Breakable breakables_[breakableCapacity];
     unsigned breakableCount_;
     bool breakableIndexReady_ = false;
