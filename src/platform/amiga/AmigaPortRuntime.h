@@ -11,6 +11,7 @@
 #include "core/FrogHitState.h"
 #include "core/FrogBehavior.h"
 #include "core/CrawlerMotion.h"
+#include "core/SnailMotion.h"
 
 #include <cstdint>
 
@@ -79,6 +80,7 @@ public:
         downwell::FrogHorizontalMotion frogHorizontal;
         downwell::FrogHitState frogHit;
         downwell::CrawlerMotion crawler;
+        downwell::SnailMotion snail;
         int motionState;
         int auxiliaryState;
         int alarm0;

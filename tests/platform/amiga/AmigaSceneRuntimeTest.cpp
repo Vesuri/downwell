@@ -216,6 +216,14 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (!amigaEnemyHealth(enemy.objectId)) continue;
         require(ordinal < amiga.enemyCount(), "frog diagnostic retains creation-order pairing");
         const auto& native = amiga.enemyAt(ordinal++);
+        if (enemy.objectId == 117 && enemy.active && native.active) {
+            const auto& a = native.snail;
+            const auto& b = enemy.snail;
+            require(a.x == b.x - 240L * 1280 && a.y == b.y - 176L * 1280 &&
+                    a.vy == b.vy && a.facing == b.facing && a.verticalFlip == b.verticalFlip &&
+                    a.attached == b.attached,
+                    "shared snail motion and orientation match exactly across adapters");
+        }
         if (enemy.objectId == 119 && enemy.active && native.active) {
             const auto& a = native.crawler;
             const auto& b = enemy.crawler;

@@ -750,29 +750,26 @@ void StartupRuntime::updateMainEnemies() {
             enemy.moveSpeed = bat.speedFortieths / 40.0F;
             enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
         } else if (enemy.objectId == 117) {
-            if (enemy.motionState == 0) {
-                if (mainSolidAt(enemy.preciseX + 8.0F, enemy.preciseY))
-                    enemy.motionState = 1;
-                else if (mainSolidAt(enemy.preciseX - 8.0F, enemy.preciseY))
-                    enemy.motionState = -1;
-                else
-                    enemy.active = false;
-                enemy.scaleX = static_cast<float>(enemy.motionState);
-            }
+            if (!enemy.snail.initialized)
+                enemy.snail.initialize(enemy.x, enemy.y, enemy.velocityY >= 0);
+            enemy.active = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); });
             if (enemy.active) {
-                const float vertical = enemy.velocityY < 0.0F ? -1.0F : 1.0F;
-                if (mainSolidAt(enemy.preciseX, enemy.preciseY + vertical * 8.0F) ||
-                    !mainSolidAt(enemy.preciseX + enemy.motionState * 16.0F,
-                                 enemy.preciseY + vertical * 8.0F))
-                    enemy.velocityY *= -1.0F;
-                enemy.preciseY += enemy.velocityY;
-                enemy.scaleY = enemy.velocityY < 0.0F ? 1.0F : -1.0F;
+                enemy.preciseX = enemy.snail.x / 1280.0F;
+                enemy.preciseY = enemy.snail.y / 1280.0F;
+                enemy.velocityY = enemy.snail.vy / 1280.0F;
+                enemy.motionState = enemy.snail.facing;
+                enemy.scaleX = static_cast<float>(enemy.snail.facing);
+                enemy.scaleY = static_cast<float>(enemy.snail.verticalFlip);
             }
         } else if (enemy.objectId == 119) {
             updateCrawler(enemy, false);
         }
         enemy.x = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
         enemy.y = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
+        if (enemy.objectId == 117 && enemy.snail.initialized) {
+            enemy.x = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.x) / 1280);
+            enemy.y = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.y) / 1280);
+        }
         enemy.spriteId = enemyPresentationSprite(enemy.objectId, enemy.grounded,
                                                   enemy.auxiliaryState);
         if (enemy.objectId == 113) {
@@ -2031,7 +2028,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(33); // Includes authoritative crawler motion.
+    digest.addU32(34); // Includes authoritative snail motion.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2212,6 +2209,15 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(instance.moveSpeed);
         digest.addI32(instance.motionState);
         digest.addI32(instance.auxiliaryState);
+        if (instance.objectId == 117) {
+            digest.addI32(instance.snail.x);
+            digest.addI32(instance.snail.y);
+            digest.addI32(instance.snail.vy);
+            digest.addI32(instance.snail.facing);
+            digest.addI32(instance.snail.verticalFlip);
+            digest.addBool(instance.snail.initialized);
+            digest.addBool(instance.snail.attached);
+        }
         if (instance.objectId == 119) {
             digest.addI32(instance.crawler.x);
             digest.addI32(instance.crawler.y);

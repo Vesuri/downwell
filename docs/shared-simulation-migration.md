@@ -8,7 +8,8 @@ substitute for this architecture or original-game validation.
 Current status: main-room player movement, gun/jump state, animation state and
 knockback now use `PlayerMotion` in both runtimes. Currency motion/lifetime/
 animation and default main-room camera rules are also shared, along with frog
-and bat motion slices, crawler falling/latching/wall-following, and the usual bullet's vertical segment arbitration
+and bat motion slices, crawler falling/latching/wall-following, wall-snail
+attachment/movement/reversal, and the usual bullet's vertical segment arbitration
 and fractional-camera expiry.
 World storage/adapters, broader enemy behavior, complete bullet state/events,
 reward orchestration, special camera modes and menus still need consolidation. Native

@@ -170,6 +170,36 @@ replay digests. Normal SDL/Amiga builds are restored and both 68000 audits
 remain clean. Crawler state is covered by the live scene comparison, not by
 the older narrow player/gem CPU fixture.
 
+#### Shared wall-snail motion
+
+Both runtimes now use `SnailMotion` for source `enmSnail` attachment and
+movement. Its fifth-Q8 state retains exactly 0.1 pixel/update, replacing the
+native 26/256 speed approximation. Initial wall checks use the recovered
+rectangle mask, including rejection of embedded spawns; motion calls the
+shared solid-collision solver and reverses on either a vertical collision or
+loss of the source's wall-support point. Horizontal and vertical flips are
+shared state, and published coordinates come directly from that state rather
+than rounded float mirrors. Both duplicate movement branches were removed.
+
+Focused tests cover 1,000 updates in each direction, attachment on either
+side, embedded/detached retirement, wall-end reversal, and attachment before
+the time-stop movement guard. The scene comparator checks exact shared snail
+state whenever a live pair is present; this is not a guarantee that each tape
+contains one. Startup digest schema 34 includes snail state; the menu replay
+pin is `b81f52fa9040024a`.
+
+Still outstanding: snail hit reactions and associated sound/RNG/alarm changes,
+the damage sprite, and connecting the shared time-stop guard to full world
+time-stop behavior. Rectangle queries use the existing area-one wall adapters,
+not a complete implementation of every original wall subtype. No claim of
+complete snail or world-event fidelity follows from this extraction.
+
+Validation: full host suite (including default and phase-5 combat), bounded
+A500 600-tick cache check and the existing player/gem cross-CPU replay pass.
+Normal builds are restored; both 68000 audits are clean. The cross-CPU fixture
+does not itself exercise every snail branch; those are covered by the shared
+motion unit tests and native adapter fixture.
+
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
 steps, alternates horizontal direction every 90 frames and holds fire for five

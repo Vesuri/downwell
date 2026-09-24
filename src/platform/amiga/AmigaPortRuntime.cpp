@@ -154,6 +154,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.frogHit = {};
     enemy.crawler.initialize(x, y);
     enemy.crawler.latched = grounded;
+    enemy.snail.initialize(x, y, speedY >= 0);
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
     enemy.speedY = speedY;
@@ -660,27 +661,15 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             // enmFrog Step: restart preparation only on a landing edge.
             if (downwell::frogLandingEdge(enemy.grounded, enemy.frogLanded)) enemy.alarm1 = 60;
         } else if (enemy.objectId == 117) {
-            if (enemy.motionState == 0) {
-                if (solidResolver_(solidResolverContext_,
-                                   enemy.x + 8, enemy.y))
-                    enemy.motionState = 1;
-                else if (solidResolver_(solidResolverContext_,
-                                        enemy.x - 8, enemy.y))
-                    enemy.motionState = -1;
-                else
-                    enemy.active = false;
-                enemy.facing = enemy.motionState;
-            }
+            enemy.active = enemy.snail.step([this](int x, int y) {
+                return solidResolver_(solidResolverContext_, x, y);
+            });
             if (!enemy.active)
                 continue;
-            const int vertical = enemy.speedY < 0 ? -1 : 1;
-            if (solidResolver_(solidResolverContext_, enemy.x,
-                               enemy.y + vertical * 8) ||
-                !solidResolver_(solidResolverContext_,
-                                enemy.x + enemy.motionState * 16,
-                                enemy.y + vertical * 8))
-                enemy.speedY = -enemy.speedY;
-            enemy.preciseY += enemy.speedY;
+            enemy.preciseX = enemy.snail.x / 5;
+            enemy.preciseY = enemy.snail.y / 5;
+            enemy.speedY = enemy.snail.vy / 5;
+            enemy.motionState = enemy.facing = enemy.snail.facing;
         } else if (enemy.objectId == 119) {
             updateCrawler(enemy, false);
         }
@@ -691,6 +680,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         if (enemy.objectId == 119) {
             enemy.x = enemy.crawler.pixelX();
             enemy.y = enemy.crawler.pixelY();
+        }
+        if (enemy.objectId == 117) {
+            enemy.x = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.x) / 1280);
+            enemy.y = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.y) / 1280);
         }
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
