@@ -502,6 +502,19 @@ the fixture demonstrated that truncating the original binary64 player position
 can differ from first narrowing to float, as the SDL adapter does. Live scene
 publication and actual target frame-time measurement remain outstanding.
 
+The native draw-list default path now also performs integer-only binary64 to
+binary32 coordinate narrowing (nearest, ties to even) before flooring. Tests
+cover one million signed coordinates, halfway/integer neighbors, subnormal
+underflow and explicit out-of-integer-range saturation; undefined-behavior
+instrumentation passes. The entire native default path, including integer trig
+and coordinate conversion, matches the independent host-libm/float layout in
+the 360-frame planar comparison. A standalone 68000 build uses only ordinary
+32-bit multiply/modulo helpers. No caller-supplied floating-point rasterizer is
+needed anymore. Windows GPU rasterization remains an external fidelity check;
+this establishes the explicit floor-after-float policy used by the comparison
+fixture, not an undocumented claim about the original runner. The remaining
+live handoff must publish these tested components together and be profiled.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

@@ -601,6 +601,13 @@ test: test-amiga-clear-bank
 test: test-amiga-clear-border-cache
 test: test-amiga-clear-overlay
 test: test-level-clear-trig
+test: test-level-clear-raster
+.PHONY: test-level-clear-raster
+build/level-clear-raster-test: tests/core/LevelClearRasterTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-level-clear-raster: build/level-clear-raster-test
+	./build/level-clear-raster-test
 .PHONY: test-level-clear-trig
 build/level-clear-trig-test: tests/core/LevelClearTrigTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

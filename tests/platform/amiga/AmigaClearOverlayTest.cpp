@@ -75,8 +75,7 @@ int main(int argc, char** argv) {
             sample(std::fabs(std::cos(frame.circle * (3.14159265358979323846 / 180.0)))),
             sample(std::fabs(std::sin(frame.time / 20.0))));
         AmigaClearDrawList native;
-        require(native.build(room, frame, inventory,
-            [&](downwell::LevelClearCoordinate value) { return sink.coordinate(value); }),
+        require(native.build(room, frame, inventory),
             "production draw-list adapter accepts shared source layout");
         require(native.count == sink.count, "native layout retains every overlay command");
         require(native.playerX == 190 && native.playerY == sink.coordinate({room.motion.playerY, false}) - room.motion.viewY(),
