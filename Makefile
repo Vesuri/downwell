@@ -122,6 +122,7 @@ test: build/gem-homing-test
 test: build/main-camera-test
 test: build/main-room-activation-test
 test: build/player-death-sequence-test
+test: build/death-menu-sequence-test
 test: build/player-death-verification-test
 test: build/standard-bullet-test
 test: build/crawler-motion-test
@@ -156,6 +157,10 @@ build/main-camera-test: tests/core/MainCameraMotionTest.cpp src/core/MainCameraM
 build/main-room-activation-test: tests/core/MainRoomActivationTest.cpp src/core/MainRoomActivation.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MainRoomActivationTest.cpp
+
+build/death-menu-sequence-test: tests/core/DeathMenuSequenceTest.cpp src/core/DeathMenuSequence.h src/core/AlarmBank.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DeathMenuSequenceTest.cpp
 
 build/player-death-sequence-test: tests/core/PlayerDeathSequenceTest.cpp src/core/PlayerDeathSequence.h src/core/AlarmBank.h
 	@mkdir -p build
@@ -333,6 +338,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/main-camera-test
 	./build/main-room-activation-test
 	./build/player-death-sequence-test
+	./build/death-menu-sequence-test
 	./build/player-death-verification-test
 	./build/standard-bullet-test
 	./build/crawler-motion-test

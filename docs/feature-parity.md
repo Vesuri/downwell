@@ -9,6 +9,26 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Death-menu event sequence recovered, not yet presented
+
+`DeathMenuSequence` is a platform-independent model of DeathMenu Create,
+Begin Step and Alarms 0/1/2, checked against the corresponding recovered VM
+assembly. It preserves row publication on the Begin Step after the reveal
+alarm, the 45/10/12/14/16/30/20 reveal intervals, input lockout after skipping,
+three Windows menu choices, navigation before confirmation, simultaneous
+left/right edges and the unlock notice's 45+15 update staging. Cursor bounce
+settles at 1.2 as in the source rather than being clamped to 1.
+
+The model emits retry/style/surface requests, sound counts and unlock
+acknowledgements; it does not perform platform work. Focused tests exercise
+those boundaries. This is preparatory core work, not a playable results menu:
+neither runtime consumes it yet. Gem filling and unlock progression currently
+live in the original Draw event and must be recovered as a shared explicit
+phase before wiring it into either renderer. Persistence, result rendering,
+reset/room transitions and creation-frame scheduling remain outstanding.
+Validation: the focused sequence test and complete host suite pass. No emulator
+run is claimed for this model, which is not yet linked into native gameplay.
+
 ### Death rules now participate in actual cross-CPU replay
 
 `verify-cross-replay` now appends a separate 480-update death fixture to the
