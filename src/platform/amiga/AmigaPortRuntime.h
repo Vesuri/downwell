@@ -8,6 +8,7 @@
 #include "core/GemMotion.h"
 #include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
+#include "core/PlayerDeathSequence.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogPresentation.h"
@@ -181,9 +182,10 @@ public:
     unsigned gemStreakTimer() const { return currencyAccount_.timer; }
     int health() const { return health_; }
     unsigned invulnerability() const { return invulnerability_; }
-    bool dead() const { return dead_; }
-    unsigned deathFrames() const { return deathFrames_; }
-    bool deathMenuReady() const { return dead_ && deathFrames_ >= 100; }
+    bool dead() const { return death_.active; }
+    unsigned deathFrames() const { return death_.frames; }
+    bool deathMenuReady() const { return death_.menuReady; }
+    const downwell::PlayerDeathSequence& deathSequence() const { return death_; }
     bool playerVisible() const { return (invulnerability_ & 1u) == 0; }
     bool bulletActive() const { return bulletCount() != 0; }
     int bulletX() const;
@@ -229,8 +231,7 @@ private:
     downwell::GameMakerRandom enemyRandom_;
     int health_;
     unsigned invulnerability_;
-    bool dead_;
-    unsigned deathFrames_;
+    downwell::PlayerDeathSequence death_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;

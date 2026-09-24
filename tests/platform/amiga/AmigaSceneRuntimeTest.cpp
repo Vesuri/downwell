@@ -864,6 +864,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const unsigned nativeJumps = gameplay.player().jumps(), hostJumps = reference.mainJumps();
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
+            const auto& nativeDeath = gameplay.deathSequence();
+            const auto& hostDeath = reference.mainDeathSequence();
+            require(nativeDeath.active == hostDeath.active && nativeDeath.frames == hostDeath.frames &&
+                        nativeDeath.animation == hostDeath.animation && nativeDeath.alarm == hostDeath.alarm &&
+                        nativeDeath.skipPresses == hostDeath.skipPresses && nativeDeath.menuReady == hostDeath.menuReady,
+                    "death sequence state agrees across adapters on every combat update");
             if (bothWereDead) {
                 ++pairedDeadFrames;
                 require(gameplay.dead() && gameplay.health() == 0 && reference.mainPlayerHealth() == 0 &&

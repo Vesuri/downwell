@@ -860,15 +860,15 @@ int main() {
             "four recovered contacts enter death with clamped zero health");
     const unsigned deathShots = contact.player().shots();
     const int deathCameraY = contact.cameraOffsetY();
-    for (unsigned frame = 0; frame < 99; ++frame)
+    for (unsigned frame = 0; frame < 149; ++frame)
         contact.step(4);
     require(contact.player().shots() == deathShots &&
                 contact.cameraOffsetY() == deathCameraY &&
                 !contact.deathMenuReady(),
             "death disables control and freezes the camera during animation");
     contact.step(4);
-    require(contact.deathFrames() == 100 && contact.deathMenuReady(),
-            "recovered 90 plus 10 frame death alarms reach the menu gate");
+    require(contact.deathFrames() == 150 && contact.deathMenuReady(),
+            "death-flash room speed yields 30 plus 120 update death alarms");
 
     AmigaPortRuntime sideCamera(300, true, 0, true);
     sideCamera.configureSolidResolver(noSolid, 0);

@@ -140,6 +140,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainAirborneShot_ = false;
     mainAmmo_ = 8;
     mainPlayerHealth_ = 4;
+    mainDeath_ = {};
     mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
@@ -813,6 +814,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
                                   enemy.reward, true);
             });
         if (contact != EnemyContact::none) {
+            if (mainPlayerHealth_ == 0) mainDeath_.enter();
             syncMainPlayerState();
             ++soundPlayRequests_;
         }
@@ -1273,7 +1275,9 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.left = inputLeft_;
     input.right = inputRight_;
     input.fire = inputFire_;
+    mainDeath_.beginStep(input.fire);
     mainPlayerMotion_.step(input, controlsLocked_, mainPlayerHealth_ == 0);
+    mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);
@@ -1442,6 +1446,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainPlayerMotion_ = PlayerMotion(false);
                 mainPlayerMotion_.initializeEntryInput(inputFire_);
                 mainPlayerHealth_ = 4;
+                mainDeath_ = {};
                 syncMainPlayerState();
                 mainPlayerInvulnerability_ = 0;
                 mainShootLeg_ = -1;
@@ -2081,6 +2086,15 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainAirborneShot_);
     digest.addI32(mainAmmo_);
     digest.addI32(mainPlayerHealth_);
+    if (mainDeath_.active) {
+        digest.addBool(mainDeath_.started);
+        digest.addBool(mainDeath_.priorFire);
+        digest.addBool(mainDeath_.menuReady);
+        digest.addU32(mainDeath_.frames);
+        digest.addU32(mainDeath_.skipPresses);
+        digest.addI32(mainDeath_.animation);
+        digest.addI32(mainDeath_.alarm);
+    }
     digest.addI32(mainPlayerInvulnerability_);
     digest.addI32(mainShootLeg_);
     digest.addU32(mainShotsFired_);

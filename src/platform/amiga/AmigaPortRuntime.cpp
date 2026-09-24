@@ -33,7 +33,6 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       cameraPixelX_(0), activationY_(0),
       enemyCount_(0), enemiesDefeated_(0), enemyRandom_(2),
       health_(4), invulnerability_(0),
-      dead_(false), deathFrames_(0),
       solidResolver_(0),
       solidResolverContext_(0),
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
@@ -387,9 +386,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 
     ++tick_;
     currencyAccount_.beginStep();
-    if (dead_)
-        ++deathFrames_;
     downwell::Input input = downwell::unpackReplayInput(packedInput);
+    death_.beginStep(input.fire);
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
     downwell::advanceMainRoomActivation(activationY_,
@@ -425,7 +423,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
         return false;
     }, &headBreak);
-    AmigaPlayerMotion motion = player_.step(input, false, dead_);
+    AmigaPlayerMotion motion = player_.step(input, false, dead());
+    death_.advanceAlarms(player_.grounded());
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if (headBreak.index >= 0) {
         const Breakable& box = breakables_[headBreak.index];
@@ -454,7 +453,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         const int oldCameraPixelX = cameraPixelX_;
         const int oldCameraPixelY = cameraPixelY_;
         cameraMotion_.step(240L * 256 + player_.offsetXFixed(),
-                           176L * 256 + player_.offsetYFixed(), dead_);
+                           176L * 256 + player_.offsetYFixed(), dead());
         cameraPixelX_ = cameraMotion_.pixelX() - 240;
         cameraXDelta = cameraPixelX_ - oldCameraPixelX;
         cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
@@ -712,8 +711,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.x, enemy.y, enemy.active, enemy.health, player_, health_, invulnerability_, enemiesDefeated_,
             [this, &enemy] { spawnReward(enemy, true); });
         if (contact == downwell::EnemyContact::damage && health_ == 0) {
-            dead_ = true;
-            deathFrames_ = 0;
+            death_.enter();
         }
     }
 

@@ -121,6 +121,7 @@ $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) 
 test: build/gem-homing-test
 test: build/main-camera-test
 test: build/main-room-activation-test
+test: build/player-death-sequence-test
 test: build/standard-bullet-test
 test: build/crawler-motion-test
 test: build/snail-motion-test
@@ -154,6 +155,10 @@ build/main-camera-test: tests/core/MainCameraMotionTest.cpp src/core/MainCameraM
 build/main-room-activation-test: tests/core/MainRoomActivationTest.cpp src/core/MainRoomActivation.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MainRoomActivationTest.cpp
+
+build/player-death-sequence-test: tests/core/PlayerDeathSequenceTest.cpp src/core/PlayerDeathSequence.h src/core/AlarmBank.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/PlayerDeathSequenceTest.cpp
 
 build/gem-homing-test: tests/core/GemHomingTest.cpp src/core/GemHoming.h src/core/GemMotion.h src/core/GemLifetime.h src/core/GemAnimation.h src/core/BatMotion.h
 	@mkdir -p build
@@ -322,6 +327,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/gem-homing-test
 	./build/main-camera-test
 	./build/main-room-activation-test
+	./build/player-death-sequence-test
 	./build/standard-bullet-test
 	./build/crawler-motion-test
 	./build/snail-motion-test

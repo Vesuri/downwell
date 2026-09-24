@@ -9,6 +9,38 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared death alarm/skip sequence
+
+`PlayerDeathSequence` replaces the native-only 100-update menu gate. The original
+`scrPlMovement` starts Alarm 0 at room_speed*1.5; `objPlayer_n_Alarm_0.asm` sets
+deathani=-1 and replaces the alarm with 120, then sets deathani=-2 and creates
+DeathMenu on the next firing. Crucially, synchronous DeathFlashFx Create sets
+room_speed=20 BEFORE the first alarm expression is evaluated: the default
+sequence is therefore 30+120 updates, not 90+120. Flash Alarm 1 later restores
+room_speed=60 but does not rescale the already-running player alarm.
+The port does not accelerate PAL. Three fire press edges (source global.dUp,
+not dUpHeld) can publish the menu request early.
+
+Both runtime stores now use the same sequence, observing raw held input to
+derive edges before dead movement suppresses controls. The unit tests cover
+same-update initial countdown, callback replacement, grounded effect requests,
+held-input rejection, three-edge skip and terminal negative state. The long
+paired combat gate compares animation, alarm, frame count, skip count and menu
+request on every update. Host deterministic state includes active death timing.
+
+This removes incorrect alarm durations but does not implement DeathMenu's UI
+or consume the grounded effect request. Entry still uses the existing immediate
+contact-time depletion boundary, not complete recovered Begin Step publication.
+Flash presentation and its temporary slow wall-clock pacing are not yet wired.
+Accordingly, the 150-update check proves the sequence relative to port entry,
+not absolute frame equivalence with a Windows recording. Restart remains open.
+
+Validation: full host suite and 6000-update paired death-state gate pass, ending
+health 0/0, kills 10/10 and currency 82/82. Bounded A500 cache verification and
+cross-target replay pass with the unchanged replay digest. Normal builds are
+restored; 68000 helper/instruction audits are clean. The short CPU fixture does
+not reach death; focused and extended host tests provide sequence coverage.
+
 ### Shared death movement
 
 Both runtime adapters now pass depleted-health state to `PlayerMotion::step`;

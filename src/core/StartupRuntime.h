@@ -9,6 +9,7 @@
 #include "GemMotion.h"
 #include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
+#include "PlayerDeathSequence.h"
 #include "Input.h"
 #include "PlayerMotion.h"
 #include <array>
@@ -148,6 +149,7 @@ public:
     int mainCameraRenderViewY() const { return mainCameraMotion_.pixelY() - surfaceHeight / 2; }
     int mainAmmo() const { return mainAmmo_; }
     int mainPlayerHealth() const { return mainPlayerHealth_; }
+    const PlayerDeathSequence& mainDeathSequence() const { return mainDeath_; }
     int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
     std::uint32_t mainBlocksDestroyed() const { return mainBlocksDestroyed_; }
@@ -352,6 +354,7 @@ private:
     bool mainAirborneShot_ = false;
     int mainAmmo_ = 8;
     int mainPlayerHealth_ = 4;
+    PlayerDeathSequence mainDeath_;
     int mainPlayerInvulnerability_ = 0;
     int mainShootLeg_ = -1;
     std::uint32_t mainShotsFired_ = 0;
