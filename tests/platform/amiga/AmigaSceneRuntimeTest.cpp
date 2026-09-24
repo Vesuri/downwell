@@ -856,6 +856,29 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         tickShop(false); tickShop(true);
         require(nativeShop->menu.active && nativeShop->stock.items[0].remaining == 0 &&
             hostShop->stock.items[0].remaining == 0, "live reentry preserves sold stock");
+        tickShop(false, true); tickShop(true);
+        const int exitY = 176 + gameplay.player().offsetY();
+        gameplay.registerLevelExit(exitY);
+        reference.registerLevelExit(exitY);
+        gameplay.step(0); reference.step({}, false);
+        require(gameplay.goalStopped() && reference.goalStopped() &&
+            gameplay.levelExit().alarm0 == 5 && reference.levelExit().alarm0 == 5,
+            "living exit collision stops both players and arms five full alarm phases");
+        const auto nativeClock = gameplay.runTimeTicks();
+        const auto hostClock = reference.runTimeTicks();
+        const int stoppedY = gameplay.player().offsetY();
+        for (unsigned tick = 1; tick <= 100; ++tick) {
+            downwell::Input locked; locked.fire = true; locked.right = true;
+            gameplay.step(downwell::packReplayInput(locked)); reference.step(locked, false);
+            require(gameplay.player().offsetY() == stoppedY && reference.mainPlayerY() == exitY &&
+                gameplay.runTimeTicks() == nativeClock && reference.runTimeTicks() == hostClock,
+                "exit latch suppresses jump/fall and stops the run clock on both adapters");
+            require(gameplay.exitDitherRequested() == (tick >= 5) &&
+                reference.exitDitherRequested() == (tick >= 5) &&
+                gameplay.levelResultRequested() == (tick >= 95) &&
+                reference.levelResultRequested() == (tick >= 95),
+                "both live adapters request dither at five and results at ninety-five ticks");
+        }
         return;
     }
     require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&

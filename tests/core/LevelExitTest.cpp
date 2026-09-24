@@ -15,6 +15,12 @@ int main() {
         ++creates;
     });
     require(creates == 2, "both children created synchronously");
+    require(exit.meetsPlayer(240, 3977) && !exit.meetsPlayer(240, 3976) &&
+        exit.meetsPlayer(240, 4019) && !exit.meetsPlayer(240, 4020),
+        "trigger collision includes exact top and bottom player-mask contacts");
+    require(exit.meetsPlayer(-163, 4000) && !exit.meetsPlayer(-164, 4000) &&
+        exit.meetsPlayer(643, 4000) && !exit.meetsPlayer(644, 4000),
+        "wide trigger collision includes exact horizontal mask contacts");
     bool stop = false, locked = false;
     require(!exit.collide(true, stop, locked) && !stop && !locked && exit.alarm0 == -1,
         "dead player cannot begin level exit");

@@ -459,8 +459,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         auto& runtime = *static_cast<AmigaPortRuntime*>(context);
         runtime.run_.gems.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
-    AmigaPlayerMotion motion = player_.step(input, run_.shops.noControl,
-        death_.movementDead(), run_.shops.interactable);
+    AmigaPlayerMotion motion = player_.step(input, run_.shops.noControl || run_.exitControlsLocked,
+        death_.movementDead(), run_.shops.interactable, run_.goalStopped);
     const int shopPlayerX = 240 + downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int shopPlayerY = 176 + downwell::roundGameMakerQ8(player_.offsetYFixed());
     run_.shops.observePlayer(shopPlayerX, shopPlayerY, player_.grounded(), player_.speedXFixed());
@@ -475,9 +475,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     run_.shops.advancePresentation();
     player_.configureComboCompletion(nullptr, nullptr);
     player_.configureMovementBoundary(nullptr, nullptr);
-    // Normal rmMain subset, with the same unsupported ending/time-field guards
-    // as StartupRuntime. This is deliberately independent of video refresh Hz.
-    run_.clock.advance(true, death_.active);
+    // Goal-field overlap and boss completion remain separate source guards.
+    run_.clock.advance(true, death_.active, run_.goalStopped);
+    run_.advanceLevelExitAlarms();
     death_.publishHealth(health_);
     death_.advanceAlarms(player_.grounded());
     run_.results.open(death_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);
@@ -791,6 +791,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.y = downwell::GemMotion::rounded(gem.motion.y);
     }
 
+    run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
+        176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
     const long viewTop = 34L * 4096 + viewCameraYQ8() * 16;
     downwell::retireMainRoomObjects(enemyCount_, 11, 1, viewTop,
         [this](unsigned i) {

@@ -9,6 +9,13 @@ struct LevelExit {
     int x = 0, y = 0;
     int alarm0 = -1, alarm1 = -1;
     bool active = false;
+    // sprTouchWide (127): 800x32, origin (400,16), rectangular mask.
+    // Player idle mask: x -4..+3, y -4..+7. Coordinates are already
+    // rounded instance coordinates, as in the existing collision adapters.
+    bool meetsPlayer(int px, int py) const {
+        return px + 3 >= x - 400 && px - 4 <= x + 399 &&
+            py + 7 >= y - 16 && py - 4 <= y + 15;
+    }
     template<class Emit>
     void create(int roomWidth, int positionY, Emit emit) {
         *this = LevelExit{};

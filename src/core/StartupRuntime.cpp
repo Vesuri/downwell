@@ -369,6 +369,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
         updateMainBullets();
         updateMainEnemies();
         updateMainEnemyInteractions();
+        run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
+            roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
         updateMainCurrency();
         updateMainLifecycle();
         run_.shops.endStep(mainCameraRenderViewY());
@@ -1339,8 +1341,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         auto& runtime = *static_cast<StartupRuntime*>(context);
         runtime.run_.gems.observeDeathMovement(runtime.mainDeath_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
-    mainPlayerMotion_.step(input, controlsLocked_ || run_.shops.noControl,
-        mainDeath_.movementDead(), run_.shops.interactable);
+    mainPlayerMotion_.step(input, controlsLocked_ || run_.shops.noControl || run_.exitControlsLocked,
+        mainDeath_.movementDead(), run_.shops.interactable, run_.goalStopped);
     const int shopPlayerX = mainPlayerOriginX_ + roundGameMakerQ8(mainPlayerMotion_.offsetXFixed());
     const int shopPlayerY = mainPlayerOriginY_ + roundGameMakerQ8(mainPlayerMotion_.offsetYFixed());
     run_.shops.observePlayer(shopPlayerX, shopPlayerY, mainPlayerMotion_.grounded(),
@@ -1356,9 +1358,9 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     run_.shops.advancePresentation();
     mainPlayerMotion_.configureComboCompletion(nullptr, nullptr);
     mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
-    // Default rmMain subset: boss endings/goal stops and goalTimeField creation
-    // are not implemented yet. Feed their source guards when those land.
-    run_.clock.advance(true, mainDeath_.active);
+    // Goal-field overlap and boss completion remain separate source guards.
+    run_.clock.advance(true, mainDeath_.active, run_.goalStopped);
+    run_.advanceLevelExitAlarms();
     mainDeath_.publishHealth(mainPlayerHealth_);
     mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
     run_.results.open(mainDeath_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);

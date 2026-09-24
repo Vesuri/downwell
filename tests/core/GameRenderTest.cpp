@@ -109,6 +109,8 @@ int main() {
         "exit Create applies inherited camera boundary then creates the random-radius field");
     session.levelExit.active = true;
     session.levelExit.alarm0 = 5;
+    session.goalStopped = session.exitControlsLocked = true;
+    session.exitDitherRequested = session.levelResultRequested = true;
     session.gems.observeDeathMovement(true, 123);
     session.clock.ticks = 999;
     session.combo.state.count = 30;
@@ -126,7 +128,8 @@ int main() {
     session.reset(saved);
     require(!session.levelExitPresent && !session.levelExit.active &&
         session.levelExit.alarm0 == -1 && session.levelExit.alarm1 == -1 &&
-        session.goalField.radius.mantissa == 0,
+        session.goalField.radius.mantissa == 0 && !session.goalStopped &&
+        !session.exitControlsLocked && !session.exitDitherRequested && !session.levelResultRequested,
         "new run discards exit alarms and goal-field state");
     require(session.gems.lifetime == 123 && session.gems.record == 123 &&
         session.combo.state.record == 50, "new run reloads persistent record snapshot");

@@ -38,9 +38,25 @@ struct RunSession {
     LevelExit levelExit;
     GoalTimeField goalField;
     bool levelExitPresent = false;
+    bool goalStopped = false, exitControlsLocked = false;
+    bool exitDitherRequested = false, levelResultRequested = false;
+
+    void advanceLevelExitAlarms() {
+        if (!levelExitPresent) return;
+        levelExit.advanceAlarms([&](LevelExit::Effect effect, int, int) {
+            if (effect == LevelExit::Effect::ditherTransition) exitDitherRequested = true;
+            if (effect == LevelExit::Effect::resultRoom) levelResultRequested = true;
+        });
+    }
+    void collideLevelExit(int playerX, int playerY, bool dead) {
+        if (levelExitPresent && levelExit.meetsPlayer(playerX, playerY))
+            levelExit.collide(dead, goalStopped, exitControlsLocked);
+    }
 
     template<class Camera>
     void createLevelExit(int roomWidth, int y, GameMakerRandom& random, Camera& camera) {
+        goalStopped = exitControlsLocked = false;
+        exitDitherRequested = levelResultRequested = false;
         levelExit.create(roomWidth, y, [&](LevelExit::Effect effect, int x, int childY) {
             if (effect == LevelExit::Effect::roomEndSetter) camera.setLevelExit(childY);
             else if (effect == LevelExit::Effect::goalTimeField) goalField.create(x, childY, random);
@@ -67,6 +83,8 @@ struct RunSession {
         levelExit = {};
         goalField = {};
         levelExitPresent = false;
+        goalStopped = exitControlsLocked = false;
+        exitDitherRequested = levelResultRequested = false;
     }
     ResultsDestination restart(DeathMenuSequence::Action action, const RunRecords& saved) {
         const auto destination = resultsDestination(action);

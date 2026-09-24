@@ -66,14 +66,14 @@ directly on a depth threshold. objLineToResult collision, when alive and not
 already active, sets alarm 0 to five, goalStop and noControl. Alarm 0 creates
 objTransDither and sets alarm 1 to 90. Alarm 1 enters rmResult; Result alarm 1
 later calls scrNextLevel(0). The trigger's Create also creates goalTimeField at
-y+32. These events and their required result/upgrade behavior remain unported.
+y+32. Transition presentation and result/upgrade behavior remain unported.
 Stage advancement alone would skip visible behavior and RNG-consuming events.
 
 `LevelExit.h` now models inherited/derived child creation order, the guarded
 collision latch and both alarm events. Its focused test checks trigger anchors,
 dead-player exclusion, repeated collisions, fifth-tick dither creation and
-result-room request ninety further alarm phases later. It is not connected to
-live collision/room loading yet; the playable result room remains a prerequisite.
+result-room request ninety further alarm phases later. Live collision is now
+connected; the playable result room remains a prerequisite for advancing levels.
 Alarm requests alone are not a completed level exit.
 
 The resource audit also found objLineToResult (306) and its parent marked
@@ -82,16 +82,14 @@ collector no longer adds it as decoration or invalidates artwork rows for it.
 Generated Create commands are retained for collision/transition integration.
 Host rendering tests verify the original resource flag and omit drawing an
 active trigger; native generation tests retain command-order checks while
-excluding the trigger from the decoration stream. This fixes presentation,
-not the still-unimplemented end-of-level collision dispatch.
+excluding the trigger from the decoration stream.
 
 The generated exit now also sets the shared camera's roomEnd to triggerY-176
 on both live creation paths, reproducing roomEndSetter Create. camMain's cap
 is applied to the target before easing, and to current Y only inside that same
 target-exceeded branch. Reset clears the limit to its original -1 sentinel.
 Focused tests cover easing, overshoot, retained death targets and reset; the
-paired runtime regression passes. This does not yet stop the player or enter
-rmResult.
+paired runtime regression passes.
 
 `GoalTimeField.h` now models the child's Create radius and Draw outline requests
 from VM assembly. Radius is exactly 128 + uint32/2^31, represented without target
@@ -109,17 +107,30 @@ camera child first, then creates the goal field at y+32 and consumes one RNG
 draw synchronously. New-run reset clears the trigger/alarms/field. A paired
 runtime fixture verifies anchors, matching radius and draw counts before shop
 creation; a host regression checks the camera limit and reset. SDL and native
-68000 builds pass. This proves the Create path, not live exit collision, Draw
-dispatch, or level progression.
+68000 builds pass. This proves the Create path, not Draw dispatch or level
+progression.
 
 Shared PlayerMotion now accepts the original goalStop distinction: it skips
 ordinary X/Y integration without skipping gravity, movement processing or
 collision correction. Its existing collision adapter remains an approximation
 of scrWallCol, not a newly completed exact collision port. Focused tests check
 stationary position with advancing velocities/callbacks, resumed motion, and
-predicted landing correction while stopped. Both runtime callers still leave
-this flag false until exit collision/transition dispatch is connected; this
-does not yet stop the live player at the exit.
+predicted landing correction while stopped.
+
+Both runtimes now dispatch collision against the exit's recovered rectangular
+sprTouchWide mask using their current rounded player-mask adapter. A living
+collision latches goalStop/noControl, suppresses subsequent position integration
+and run-clock increments, and arms the shared alarm sequence. Sticky requests
+record dither on tick 5 and the result room on tick 95; the renderer/room loader
+do not consume these yet. Consequently reaching the live exit currently stops
+the player without progressing. A paired fixture covers 100 subsequent updates
+with held movement/fire, unchanged position/time, matching alarm requests and
+new-run reset. Exact trigger-edge contacts have focused tests; full fractional
+collision/event ordering and original Windows captures remain open.
+The bounded SKIP_TO_GAME native cache gate still passes 600 simulation ticks,
+101 fresh-render comparisons and the 256-byte task-stack margin with this
+integration. That gate validates existing gameplay rendering, not reaching the
+level exit on target; exit timing is covered by the paired host runtime fixture.
 
 ## Still open beyond that milestone
 

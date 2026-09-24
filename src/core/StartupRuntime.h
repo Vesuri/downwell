@@ -174,6 +174,9 @@ public:
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const LevelExit& levelExit() const { return run_.levelExit; }
     const GoalTimeField& goalField() const { return run_.goalField; }
+    bool goalStopped() const { return run_.goalStopped; }
+    bool exitDitherRequested() const { return run_.exitDitherRequested; }
+    bool levelResultRequested() const { return run_.levelResultRequested; }
     const RunStage& runStage() const { return run_.stage; }
     int mainPlayerHealthMaximum() const { return run_.combo.healthReserve.maximum; }
     const HealthReserve& mainHealthReserve() const { return run_.combo.healthReserve; }
