@@ -3,6 +3,7 @@
 #include "HudNumbers.h"
 #include "DeathResultsBackdrop.h"
 #include "DeathResultsRows.h"
+#include "DeathResultsProgressBar.h"
 #include "ObjectPack.h"
 #include <array>
 #include <cmath>
@@ -123,6 +124,9 @@ void Game::render(Renderer& renderer) const {
             Renderer& renderer;
             void sprite(int frame, int x, int y) { renderer.drawSprite(733, frame, x, y); }
             void asset(int id, unsigned frame, int x, int y) { renderer.drawSprite(id, frame, x, y); }
+            void barRect(int x, int y, int w, int h, bool red) {
+                renderer.fillRect(x, y, w, h, red ? Color{255,0,0,255} : Color{255,255,255,255});
+            }
             void blackRect(int x, int y, int w, int h) {
                 renderer.fillRect(x, y, w, h, {0, 0, 0, 255});
             }
@@ -135,6 +139,7 @@ void Game::render(Renderer& renderer) const {
             startup_.mainCameraRenderViewX(), startup_.mainCameraRenderViewY());
         drawDeathResultsRows(sink, startup_.deathResults().menu,
             startup_.mainGameGemTotal(), startup_.mainEnemiesDefeated());
+        DeathResultsProgressBar::from(startup_.deathResults()).draw(sink);
         renderer.clearClipRect();
     }
 }

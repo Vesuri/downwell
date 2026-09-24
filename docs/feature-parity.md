@@ -9,6 +9,28 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared results progress-bar rendering
+
+Both backends now draw the 96-pixel results progress bar from the shared
+pre-increment frame snapshot, not the already-advanced total. The original
+three-stroke red background/white fill and six-pixel prior-total marker are
+preserved; the marker's `sep<=3` test happens before integer quantization.
+The bar follows body/row reveal offsets and ordinary fill is hidden when maxed.
+Native updates touch only the bar's opaque panel region when its visible state
+changes, with forced restoration after a backdrop update.
+
+Fraction-to-pixel conversion uses bounded addition rather than a 64-bit divide
+helper on 68000. It floors fractional widths at the shared integer rendering
+boundary; exact Windows GPU fractional coverage is unverified and must not be
+claimed from these tests. Fixtures cover large sentinel intervals, displayed
+versus advanced totals, marker threshold, stroke geometry and maxed mode.
+The target scalar/blitter fixture includes a partially filled bar and marker.
+Numeric progress labels, unlock notices, remaining result rows and actionable
+menu choices remain unfinished.
+Validation: full host suite and bounded native overlay/cache comparison pass;
+normal builds are restored with clean 68000 audits. This is not an original-game
+pixel comparison or a complete results-menu acceptance test.
+
 ### Shared gem and kill result rows
 
 Both renderers now consume `DeathResultsRows` for DeathMenu's gameGem and

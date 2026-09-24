@@ -1,12 +1,44 @@
 #include "core/DeathMenuProgress.h"
 #include "core/RunGemStatistics.h"
 #include "core/DeathResults.h"
+#include "core/DeathResultsProgressBar.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    using Bar = downwell::DeathResultsProgressBar;
+    for (const std::uint64_t span : {1000ULL, 2500ULL, 99999499999ULL})
+        for (unsigned i = 0; i <= 100; ++i) {
+            const auto value = span * i / 100;
+            require(Bar::pixels(value, span) == value * 96 / span,
+                    "native fraction calculation matches wide host arithmetic");
+        }
+    downwell::DeathResults barResults;
+    barResults.open(true, 1500, 1000);
+    barResults.menu.visible[5] = barResults.menu.visible[6] = true;
+    barResults.presentationStep();
+    auto bar = Bar::from(barResults);
+    require(bar.visible && bar.length == 48 && bar.separator == 48 && bar.y == 183,
+            "bar uses pre-increment displayed total, original separator and reveal offset");
+    barResults.progress.separatorTotal = 31;
+    require(Bar::from(barResults).separator == -1, "separator below three pixels hidden");
+    barResults.progress.separatorTotal = 32;
+    require(Bar::from(barResults).separator == 3, "fractional separator above three survives flooring");
+    struct BarSink {
+        unsigned red = 0, white = 0;
+        void barRect(int x, int y, int w, int h, bool isRed) {
+            require(x >= 31 && x <= 129 && y >= 176 && y <= 184 && w > 0 && h == 1,
+                    "bar stroke bounds and positive widths");
+            if (isRed) ++red; else ++white;
+        }
+    } sink;
+    bar.draw(sink);
+    require(sink.red == 6 && sink.white == 3, "source rounded bar and previous-total marker strokes");
+    bar.maxed = true; bar.separator = -1; sink = {};
+    bar.draw(sink);
+    require(sink.red == 0 && sink.white == 0, "maxed mode suppresses ordinary bar");
     downwell::DeathResults results;
     downwell::Input held;
     held.fire = true;

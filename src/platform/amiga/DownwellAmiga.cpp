@@ -27,6 +27,7 @@
 #include "core/HudNumbers.h"
 #include "core/DeathResultsBackdrop.h"
 #include "core/DeathResultsRows.h"
+#include "core/DeathResultsProgressBar.h"
 #include "framework/AmigaMemory.h"
 #include "framework/AmigaPlatform.h"
 #include "framework/Bitmap.h"
@@ -583,6 +584,32 @@ static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& p
     if (!force && lastGems == gems && lastKills == kills && lastPhase == phase) return;
     lastGems = gems; lastKills = kills; lastPhase = phase;
     composeResultsRows(renderer, menu, gems, kills);
+}
+
+static void composeResultsProgress(AmigaRenderer* renderer,
+        const downwell::DeathResultsProgressBar& bar) {
+    UBYTE* saved = renderer->target;
+    renderer->target = renderer->hud;
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    amigaRendererFillRect(renderer, downwellPlayfieldX + 30, 174, 100, 12, 3);
+    struct Sink {
+        AmigaRenderer* renderer;
+        void barRect(int x, int y, int w, int h, bool red) {
+            amigaRendererFillRect(renderer, downwellPlayfieldX + x, y, w, h, red ? 2 : 1);
+        }
+    } sink{renderer};
+    bar.draw(sink);
+    amigaRendererClearClipRect(renderer);
+    renderer->target = saved;
+}
+
+static void redrawResultsProgress(AmigaRenderer* renderer,
+        const downwell::DeathResults& results, bool force) {
+    static downwell::DeathResultsProgressBar previous;
+    const auto bar = downwell::DeathResultsProgressBar::from(results);
+    if (!force && bar == previous) return;
+    previous = bar;
+    composeResultsProgress(renderer, bar);
 }
 
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -2055,6 +2082,7 @@ int main(void) {
             if (port.deathResults().active) {
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port);
                 redrawResultsRows(&renderer, port, backdropChanged);
+                redrawResultsProgress(&renderer, port.deathResults(), backdropChanged);
             }
         }
         {
@@ -2433,6 +2461,10 @@ int main(void) {
                 rowFixture.rowOffset[2] = 2;
                 composeResultsRows(&resultsOracle, rowFixture, 84, 10);
                 composeResultsRows(&renderer, rowFixture, 84, 10);
+                downwell::DeathResultsProgressBar barFixture;
+                barFixture.visible = true; barFixture.length = 47; barFixture.separator = 24;
+                composeResultsProgress(&resultsOracle, barFixture);
+                composeResultsProgress(&renderer, barFixture);
                 AmigaHardware::blitterDrain();
                 for (unsigned byte = 0; byte < downwellLayerBytes; ++byte) {
                     if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsBackdropFailures;
