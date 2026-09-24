@@ -14,13 +14,13 @@ struct CurrencyBirth {
 // allocation failure and Create's embedded-wall relocation remain separate work.
 template<class Random, class Emit>
 unsigned spawnCurrencyReward(int amount, int x, int y, bool attracted,
-                             unsigned available, Random& random, Emit emit) {
+                             unsigned available, Random& random, Emit emit, bool attractor = false) {
     unsigned emitted = 0;
     while (amount > 0 && emitted < available) {
         CurrencyBirth birth;
         birth.large = amount >= 10;
         birth.amount = birth.large ? 10 : 2;
-        birth.motion.initialize(x, y, attracted, random);
+        birth.motion.initialize(x, y, attracted, random, attractor);
         emit(birth);
         amount -= birth.amount;
         ++emitted;

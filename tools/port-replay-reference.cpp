@@ -23,7 +23,7 @@ int main() {
 
     const std::uint64_t digest = runtime.trajectoryDigest();
     const auto gems = downwell::verifyGemSimulation();
-    if (gems.coverage != 127) return 3;
+    if (gems.coverage != downwell::gemVerificationCoverage) return 3;
     const auto death = downwell::verifyPlayerDeath();
     if (death.coverage != downwell::playerDeathVerificationCoverage) return 4;
     std::printf("%" PRIu32 " %08" PRIx32 " %08" PRIx32 " 400 %08" PRIx32 " %08" PRIx32 " %02x 480 %08" PRIx32 " %08" PRIx32 " %03x\n",

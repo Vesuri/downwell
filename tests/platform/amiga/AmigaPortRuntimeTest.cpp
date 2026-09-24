@@ -207,12 +207,19 @@ int main() {
     // jump ahead of that surviving gem in the next simulation traversal.
     const_cast<AmigaPortRuntime::GemState&>(crowdedRewards.gemAt(0)).active = false;
     const_cast<AmigaPortRuntime::GemState&>(crowdedRewards.gemAt(1)).amount = 42;
+    require(crowdedRewards.grantUpgrade(10), "Attractor can be acquired while reward gems already exist");
+    for (unsigned i = 1; i < 14; ++i)
+        require(!crowdedRewards.gemAt(i).motion.attractorAtBirth,
+                "acquiring Attractor does not rewrite existing gems' birth settings");
     require(crowdedRewards.configureEnemy(1, 111, 163, 0, 5, 0, 0, 5, 2),
             "configure a second reward after an earlier gem slot becomes free");
     crowdedRewards.step(0);
     require(crowdedRewards.gemCount() == 14 && crowdedRewards.gemAt(0).amount == 42 &&
                 crowdedRewards.gemAt(13).amount == 2,
             "new native reward gems follow all surviving older gems");
+    require(crowdedRewards.gemAt(13).motion.attractorAtBirth &&
+                !crowdedRewards.gemAt(0).motion.attractorAtBirth,
+            "later reward birth sees Attractor while compacted older gems retain defaults");
     {
         downwell::GameMakerRandom random(47), expected(47);
         int amounts[4] = {}, count = 0;
@@ -230,6 +237,16 @@ int main() {
         require(births == 4 && count == 4 && amounts[0] == 10 && amounts[1] == 10 &&
                     amounts[2] == 2 && amounts[3] == 2 && random.nextU32() == expected.nextU32(),
                 "source reward split preserves odd remainder and exactly one Create RNG sequence per gem");
+        require(downwell::spawnCurrencyReward(12, 4, 8, false, 2, random,
+            [&](const downwell::CurrencyBirth& birth) {
+                require(birth.motion.attractorAtBirth && !birth.motion.attracted,
+                        "reward creation snapshots Gem Attractor without immediately attracting gems");
+            }, true) == 2, "upgraded reward creates both large and small gems");
+        for (unsigned i = 0; i < 2; ++i) {
+            downwell::GemMotion upgraded;
+            upgraded.initialize(4, 8, false, expected, true);
+        }
+        require(random.drawCount() == expected.drawCount(), "Attractor adds no creation RNG draws");
         const auto before = random.drawCount();
         require(downwell::spawnCurrencyReward(20, 0, 0, false, 0, random,
                     [&](const downwell::CurrencyBirth&) { ++count; }) == 0 &&
@@ -975,7 +992,9 @@ int main() {
     require(replayRuntime.trajectoryDigest() == 0x9f0d3943e7900d2bULL,
             "cross-target trajectory digest remains pinned");
     const auto gems = downwell::verifyGemSimulation();
-    require(gems.coverage == 127 && gems.digest == 0x8d8e864225e003eeULL,
+    std::cout << "Gem fixture digest: " << std::hex << gems.digest << std::dec
+              << " coverage=" << gems.coverage << '\n';
+    require(gems.coverage == 255 && gems.digest == 0x7e82f060aa3fcbf9ULL,
             "gem cross-CPU fixture covers motion plus collection/account expiry with a pinned digest");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;

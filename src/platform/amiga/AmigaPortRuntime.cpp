@@ -165,7 +165,7 @@ void AmigaPortRuntime::spawnReward(const EnemyState& enemy, bool attracted)
         gem.speedY = downwell::GemMotion::q8(gem.motion.vy);
         gem.attracted = attracted;
         gem.active = true;
-    });
+    }, run_.upgrades.levels[10] != 0);
 }
 
 unsigned AmigaPortRuntime::gemCount() const

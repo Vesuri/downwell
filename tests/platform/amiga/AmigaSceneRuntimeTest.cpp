@@ -1132,6 +1132,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 live.builder.fragmentCount() < amigaInitialTerrainFragmentCount,
             "comparison exercises incremental terrain rather than a complete forecast");
     if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
+        if (std::getenv("DOWNWELL_VERIFY_ATTRACTOR")) {
+            require(gameplay.gemCount() == 0 && reference.mainCurrencyCount() == 0,
+                    "Attractor combat fixture starts before any reward birth");
+            require(gameplay.grantUpgrade(10) && reference.grantUpgrade(10),
+                    "both live adapters grant the source Gem Attractor upgrade");
+        }
         bool reported = false;
         bool playerReported = false;
         unsigned pairedDeadFrames = 0;
@@ -1337,18 +1343,20 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     "shared currency, run total, streak and timer agree on every combat frame");
             // Both adapters retain live gems in birth order. Compare that
             // order and authoritative movement, not a sorted multiset.
-            std::vector<std::array<long, 9>> nativeGems, referenceGems;
+            std::vector<std::array<long, 10>> nativeGems, referenceGems;
             for (unsigned i = 0; i < gameplay.gemCapacity; ++i) {
                 const auto& gem = gameplay.gemAt(i);
                 if (gem.active) nativeGems.push_back({static_cast<long>(gem.age), gem.amount,
                     gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
-                    gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted});
+                    gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted,
+                    gem.motion.attractorAtBirth});
             }
             for (unsigned i = 0; i < reference.mainCurrencyCount(); ++i) {
                 const auto& gem = reference.mainCurrencyAt(i);
                 referenceGems.push_back({static_cast<long>(gem.age), gem.amount,
                     gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
-                    gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted});
+                    gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted,
+                    gem.motion.attractorAtBirth});
             }
             if (nativeGems != referenceGems)
                 std::cerr << "COMBAT GEM DIFFERENCE tick=" << gameplay.tick()
@@ -1359,6 +1367,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                           << '\n';
             require(nativeGems == referenceGems,
                     "live currency birth order, motion and animation agree exactly across adapters");
+            if (std::getenv("DOWNWELL_VERIFY_ATTRACTOR"))
+                for (const auto& gem : nativeGems)
+                    require(gem[9] == 1, "live reward births receive the owned Attractor configuration");
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
             if (gameplay.player().spriteId(gameplay.deathSequence().movementDead()) != reference.mainPlayerSpriteId() ||
                     gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) != static_cast<unsigned>(reference.mainPlayerImageIndex()))

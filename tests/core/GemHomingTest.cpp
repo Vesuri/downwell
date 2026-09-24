@@ -9,6 +9,31 @@ void require(bool value, const char* text) {
 }
 int main() {
     {
+        struct Random {
+            unsigned randomIntegerSmall(unsigned) { return 0; }
+            unsigned irandomSmall(unsigned) { return 0; }
+        } random;
+        const auto empty = [](int, int) { return false; };
+        for (bool upgraded : {false, true}) {
+            const int radius = upgraded ? 48 : 24;
+            const unsigned delay = upgraded ? 30 : 15;
+            for (int distance : {radius - 1, radius, radius + 1}) {
+                downwell::GemMotion gem;
+                gem.initialize(0, 0, false, random, upgraded);
+                gem.vx = gem.vy = 0;
+                gem.lifetime.age = delay - 2;
+                gem.step(distance * 256L, 0, empty, random);
+                require(!gem.attracted, "Attractor cannot enable homing before its birth-time alarm");
+                gem.x = gem.y = gem.vx = gem.vy = 0;
+                gem.step(distance * 256L, 0, empty, random);
+                require(gem.attracted == (distance < radius),
+                        "default and upgraded acquisition use strict source radius and alarm edges");
+                if (gem.attracted) require(gem.homing.speedEighths == 32,
+                    "source acquisition speed is four even though upgraded Create sets unused atrsp=6");
+            }
+        }
+    }
+    {
         using namespace downwell;
         struct RandomProbe {
             unsigned calls = 0;

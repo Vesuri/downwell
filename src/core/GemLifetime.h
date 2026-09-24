@@ -4,7 +4,7 @@ namespace downwell {
 // Default objCurrency alarms: 10 ticks until obtainable, then 180 until
 // disappearing, then 120 until Alarm 2. Alarm 3 enables attraction at 15.
 // Alarm 2 is one-shot and does not destroy an already attracted gem.
-// Time-stop and upgrades which reschedule alarms are not modeled here yet.
+// Gem Attractor snapshots Alarm 3=30 at creation. Time-stop is separate work.
 struct GemLifetime {
     unsigned age = 0;
     bool advance(bool attracted) {
@@ -12,7 +12,7 @@ struct GemLifetime {
         return age != 310 || attracted;
     }
     bool obtainable() const { return age >= 10; }
-    bool suckable() const { return age >= 15; }
+    bool suckable(bool attractor = false) const { return age >= (attractor ? 30u : 15u); }
     bool disappearing() const { return age >= 190; }
 };
 } // namespace downwell

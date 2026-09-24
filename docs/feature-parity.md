@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Gem Attractor creation settings
+
+Owned upgrade 10 now reaches both live reward-spawn adapters and snapshots
+its configuration in shared `GemMotion`. `objCurrency_Create_0` VM blocks
+8–9 set attraction radius 48 and Alarm 3=30 when owned, versus 24 and 15
+otherwise. Existing gems retain their creation-time settings; inventory is
+not consulted every frame. The configuration consumes no extra RNG and does
+not immediately attract a newly born gem. Strict radius bounds are retained.
+
+Although upgraded Create assigns `atrsp=6`, the recovered acquisition branch
+sets `gemsp=4` explicitly. The port retains four, rather than inventing a
+six-pixel acquisition speed. This adds the upgrade's radius/delay behavior,
+not missing time-stop, water, embedded-wall relocation or general gem
+collision/event fidelity.
+
+Fixtures cover both alarm edges, exact radius boundaries, unchanged RNG draw
+counts and actual upgraded reward births during paired combat. Startup digest
+schema 40 adds the birth-time flag, with startup baseline `a0090f99908b7674`.
+Gem CPU fixture schema 4 adds the upgraded 30-tick acquisition case; expected
+digest `7e82f060aa3fcbf9`, coverage `ff`. These are deliberate state-layout and
+test-coverage changes, not recaptured Windows behavior references.
+The full host suite and the bounded 68000 replay pass, including the new
+Attractor coverage bit. Both CPU audits pass and the normal executable is
+restored. This changes shared simulation only; sprite assets, Chip allocation,
+terrain caching and hardware scrolling are unchanged.
+
 ### Crawler angle publication follows Step
 
 `CrawlerMotion` now retains the image direction separately from movement

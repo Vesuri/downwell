@@ -13,6 +13,7 @@ struct GemMotion {
     GemLifetime lifetime;
     GemAnimation animation;
     bool attracted = false;
+    bool attractorAtBirth = false;
     static long q8(long value) { return value < 0 ? -((-value + 25) / 50) : (value + 25) / 50; }
     static int pixel(long value) { return static_cast<int>(value / 12800 - (value % 12800 < 0)); }
     static long rounded(long value) {
@@ -31,8 +32,9 @@ struct GemMotion {
             player.top < gem.bottom && gem.top < player.bottom;
     }
     template<class Random>
-    void initialize(int px, int py, bool attract, Random& random) {
+    void initialize(int px, int py, bool attract, Random& random, bool attractor = false) {
         lifetime = {};
+        attractorAtBirth = attractor;
         x = px * 12800L; y = py * 12800L; attracted = attract;
         vx = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
         vy = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
@@ -62,8 +64,9 @@ struct GemMotion {
             vx = vx * 7 / 10;
         } else y += vy;
         if (vx > -640 && vx < 640) vx = vx < 0 ? -640 : vx > 0 ? 640 : 0;
-        if (lifetime.suckable() && dx > -24L * 256 && dx < 24L * 256 &&
-            dy > -24L * 256 && dy < 24L * 256) {
+        const long radius = (attractorAtBirth ? 48L : 24L) * 256;
+        if (lifetime.suckable(attractorAtBirth) && dx > -radius && dx < radius &&
+            dy > -radius && dy < radius) {
             attracted = true;
             homing.acquire(dx, dy);
         }

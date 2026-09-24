@@ -5,6 +5,7 @@
 #include "GameMakerRandom.h"
 #include "VerificationDigest.h"
 namespace downwell {
+constexpr unsigned gemVerificationCoverage = 255;
 struct GemVerificationResult {
     std::uint64_t digest;
     unsigned coverage;
@@ -21,7 +22,7 @@ inline GemVerificationResult verifyGemSimulation() {
     bool alive[3] = {true, true, true};
     VerificationDigest digest;
     unsigned coverage = 0;
-    digest.addU32(3); // Also exercises shared collection/account transitions.
+    digest.addU32(4); // Also exercises creation-time Gem Attractor configuration.
     for (unsigned tick = 0; tick < 400; ++tick) {
         digest.addU32(tick);
         for (unsigned i = 0; i < 3; ++i) {
@@ -85,6 +86,20 @@ inline GemVerificationResult verifyGemSimulation() {
         fringe == CurrencyStepResult::collected && account.currency == 12 &&
         account.gameGem == 12 && account.streak == 10 && account.timer == 300)
         coverage |= 64;
+    GemMotion attractor;
+    attractor.initialize(0, 0, false, random, true);
+    bool delayed = true;
+    for (unsigned tick = 1; tick <= 30; ++tick) {
+        // Isolate the source alarm/radius edges without collection or terrain.
+        attractor.x = attractor.y = attractor.vx = attractor.vy = 0;
+        attractor.step(40L * 256, 0, solid, random);
+        if (tick < 30 && attractor.attracted) delayed = false;
+        digest.addU32(attractor.lifetime.age);
+        digest.addU32(attractor.attracted);
+        digest.addU32(attractor.attractorAtBirth);
+        digest.addI32(attractor.homing.speedEighths);
+    }
+    if (delayed && attractor.attracted && attractor.homing.speedEighths == 32) coverage |= 128;
     for (unsigned i = 0; i < 16; ++i) digest.addU32(random.stateWord(i));
     digest.addU32(coverage);
     return {digest.value(), coverage};

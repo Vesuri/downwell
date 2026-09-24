@@ -637,7 +637,7 @@ void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
         gem.motion = birth.motion;
         gem.speedX = gem.motion.vx / 12800.0F;
         gem.speedY = gem.motion.vy / 12800.0F;
-    });
+    }, run_.upgrades.levels[10] != 0);
 }
 
 void StartupRuntime::updateMainCurrency() {
@@ -2119,7 +2119,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(39); // Includes the frog's separate imgSp state.
+    digest.addU32(40); // Includes each gem's creation-time Attractor configuration.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2240,6 +2240,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU32(gem.age);
         digest.addBool(gem.large);
         digest.addBool(gem.attracted);
+        digest.addBool(gem.motion.attractorAtBirth);
         digest.addI32(gem.motion.x);
         digest.addI32(gem.motion.y);
         digest.addI32(gem.motion.vx);
