@@ -31,6 +31,9 @@ template<class Math> void checkControls() {
 }
 
 int main() {
+    for (unsigned remaining = 0; remaining <= 90; ++remaining)
+        require(downwell::playerDamageVisible(remaining) == (remaining % 2 == 0),
+                "default damage flash alternates and both endpoints remain visible");
     downwell::Input input;
     input.left = input.right = input.fire = input.quit = input.pause = true;
     const auto alive = downwell::playerGameplayInput(input, 1);

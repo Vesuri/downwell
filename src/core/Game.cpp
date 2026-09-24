@@ -175,11 +175,12 @@ void Game::renderMain(Renderer& renderer) const {
                 instance.scaleX, instance.scaleY, instance.rotation);
     }
 
-    renderer.drawSpriteTransformed(
-        startup_.mainPlayerSpriteId(),
-        static_cast<std::uint32_t>(startup_.mainPlayerImageIndex()),
-        player->x - viewX, player->y - viewY,
-        static_cast<float>(startup_.mainPlayerFacing()), 1.0F, 0.0F);
+    if (startup_.mainPlayerVisible())
+        renderer.drawSpriteTransformed(
+            startup_.mainPlayerSpriteId(),
+            static_cast<std::uint32_t>(startup_.mainPlayerImageIndex()),
+            player->x - viewX, player->y - viewY,
+            static_cast<float>(startup_.mainPlayerFacing()), 1.0F, 0.0F);
     for (std::size_t index = 0; index < startup_.mainBulletCount(); ++index) {
         const StartupRuntime::MainBulletState& bullet =
             startup_.mainBulletAt(index);

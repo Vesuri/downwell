@@ -10,6 +10,7 @@
 #include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
+#include "PlayerLifeRules.h"
 #include "Input.h"
 #include "PlayerMotion.h"
 #include <array>
@@ -151,6 +152,7 @@ public:
     int mainPlayerHealth() const { return mainPlayerHealth_; }
     const PlayerDeathSequence& mainDeathSequence() const { return mainDeath_; }
     int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }
+    bool mainPlayerVisible() const { return playerDamageVisible(mainPlayerInvulnerability_); }
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
     std::uint32_t mainBlocksDestroyed() const { return mainBlocksDestroyed_; }
     std::uint32_t mainLandings() const { return mainLandings_; }

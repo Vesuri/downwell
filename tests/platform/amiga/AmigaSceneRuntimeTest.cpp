@@ -866,6 +866,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
+            require(gameplay.playerVisible() == reference.mainPlayerVisible(),
+                    "both backends expose the same damaged-player visibility on every combat update");
             require(nativeDeath.active == hostDeath.active && nativeDeath.frames == hostDeath.frames &&
                         nativeDeath.animation == hostDeath.animation && nativeDeath.alarm == hostDeath.alarm &&
                         nativeDeath.skipPresses == hostDeath.skipPresses && nativeDeath.menuReady == hostDeath.menuReady,

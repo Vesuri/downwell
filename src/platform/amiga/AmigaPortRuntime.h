@@ -9,6 +9,7 @@
 #include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
+#include "core/PlayerLifeRules.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogPresentation.h"
@@ -186,7 +187,7 @@ public:
     unsigned deathFrames() const { return death_.frames; }
     bool deathMenuReady() const { return death_.menuReady; }
     const downwell::PlayerDeathSequence& deathSequence() const { return death_; }
-    bool playerVisible() const { return (invulnerability_ & 1u) == 0; }
+    bool playerVisible() const { return downwell::playerDamageVisible(invulnerability_); }
     bool bulletActive() const { return bulletCount() != 0; }
     int bulletX() const;
     int bulletY() const;

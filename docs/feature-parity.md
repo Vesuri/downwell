@@ -9,6 +9,29 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared damage flashing reaches the SDL draw path
+
+SDL previously always submitted the player sprite, while the native actor list
+omitted it on alternating invulnerability updates. Both now use the shared
+default-90-update damage visibility rule. Original player Step negates dFlash
+while damaged and restores -1 otherwise; playerDraw uses !dFlash with GameMaker
+numeric truth, so negative is visible. The current countdown representation
+maps even remaining counts (including 90 and zero) to visible, odd to hidden.
+
+The renderer test now loads the recovered room/object/builder packs, follows
+a bounded live input tape to damage, and checks actual Game render submissions
+through hidden, visible and recovered phases. Shared helper tests cover every
+remaining count 0..90; paired combat also compares both visibility flags.
+This does not implement low-health shader/jitter or other original damage FX,
+nor prove arbitrary invulnerability upgrades or full runner event scheduling.
+
+Validation: full host suite passes, including the live Game draw-submission
+test and both paired combat tapes. The bounded native scrolling capture still
+matches fresh SDL output at all 99,968 pixels, without baseline changes.
+Cross-target replay retains its digest; 68000 audits are clean and normal
+builds are restored. That fixed image is not a damage-frame capture; the new
+live draw-submission and visibility comparisons cover the changed behaviour.
+
 ### Death publication follows player Begin Step
 
 Fatal contact now changes health only. The next player Begin Step still performs

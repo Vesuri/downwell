@@ -1,7 +1,13 @@
 #include "core/Game.h"
+#include "core/RoomPack.h"
+#include "core/ObjectPack.h"
+#include "core/BuilderPatternPack.h"
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <vector>
 
 namespace {
 
@@ -29,8 +35,10 @@ public:
     void fillRect(int, int, int, int, downwell::Color) override {}
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
     void drawSprite(std::int32_t, std::uint32_t, int, int) override {}
-    void drawSpriteTransformed(std::int32_t, std::uint32_t, float, float,
-                               float, float, float) override {}
+    void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
+                               float, float, float) override {
+        if (sprite == targetPlayer) ++playerDraws;
+    }
     void drawText(std::int32_t, const char* text, float x, float,
                   downwell::Color color,
                   downwell::TextAlign align) override {
@@ -57,6 +65,8 @@ public:
     int creditForegroundCount = 0;
     bool sawLeftCredit = false;
     bool sawRightCredit = false;
+    int targetPlayer = -1;
+    unsigned playerDraws = 0;
 };
 
 } // namespace
@@ -95,6 +105,47 @@ int main() {
                 renderer.sawLeftCredit && renderer.sawRightCredit,
             "credits release the playfield clip and use both 4:3 side areas");
 
+    const auto read = [](const char* path) {
+        std::ifstream file(path, std::ios::binary);
+        return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(file), {});
+    };
+    const auto roomBytes = read("generated/downwell-rooms.dwrm");
+    const auto objectBytes = read("generated/downwell-objects.dwob");
+    const auto builderBytes = read("generated/downwell-builder-patterns.dwbp");
+    const downwell::RoomPack rooms(roomBytes.data(), roomBytes.size());
+    const downwell::ObjectPack objects(objectBytes.data(), objectBytes.size());
+    const downwell::BuilderPatternPack builders(builderBytes.data(), builderBytes.size());
+    require(rooms.valid() && objects.valid() && builders.valid(), "damage-render test loads real room/object/builder data");
+    downwell::Game damagedGame(&rooms, &objects, &builders);
+    unsigned mainTicks = 0, hidden = 0, flashingVisible = 0;
+    bool damaged = false, recovered = false;
+    for (unsigned tick = 0; tick < 6000 && !recovered; ++tick) {
+        const auto& state = damagedGame.startup();
+        input = {};
+        if (state.inMenu()) input.right = true;
+        else if (state.inPlayMenu() && state.playMenuYOffset() == 0) input.fire = true;
+        else if (state.inMainRoom()) {
+            input.right = (mainTicks / 90) % 2 == 0;
+            input.left = !input.right;
+            input.fire = mainTicks % 10 < 5;
+        }
+        damagedGame.update(input);
+        if (!state.inMainRoom()) continue;
+        ++mainTicks;
+        const int immunity = state.mainPlayerInvulnerability();
+        if (immunity > 0) damaged = true;
+        if (!damaged) continue;
+        renderer.targetPlayer = state.mainPlayerSpriteId();
+        renderer.playerDraws = 0;
+        damagedGame.render(renderer);
+        require(renderer.playerDraws == (immunity % 2 == 0 ? 1u : 0u),
+                "actual Game render suppresses odd damage phases and draws even phases once");
+        if (immunity == 0) recovered = true;
+        else if (immunity % 2) ++hidden;
+        else ++flashingVisible;
+    }
+    require(hidden > 0 && flashingVisible > 0 && recovered,
+            "live render tape covers hidden, visible and fully recovered player states");
     std::puts("game render tests passed");
     return 0;
 }
