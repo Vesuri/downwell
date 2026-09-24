@@ -1,6 +1,7 @@
 # Upgrade coverage and implementation dependencies
 
-Audit baseline: `218b7f6`. This is a feature inventory, not a percentage of the
+Initial inventory audit: `218b7f6`; implementation status below is maintained
+as behavior is wired. This is a feature inventory, not a percentage of the
 whole game. Both ports must match the original Windows release; agreement
 between ports alone is insufficient. Update this table when adding behavior.
 
@@ -16,8 +17,8 @@ do not commit those payloads. Script/event names below identify audit entry
 points, not proof that every branch of the event is implemented.
 
 All 23 IDs have shared inventory/cap handling and stable IDs. Twenty are
-eligible for ordinary offers. Of those twenty, seven have some implemented
-gameplay effect and thirteen have no wired gameplay effect. None is marked
+eligible for ordinary offers. Of those twenty, eight have some implemented
+gameplay effect and twelve have no wired gameplay effect. None is marked
 fully original-validated here. A displayed icon, accepted grant, test of a
 helper or matching default native replay does not prove upgraded live behavior.
 
@@ -36,7 +37,7 @@ helper or matching default native replay does not prove upgraded live behavior.
 | 9 | Drone | None | Companion lifecycle, movement and firing; `scrPlayerInit`, `objDrone` events. |
 | 10 | Gem Attractor | Birth-time radius/delay | General currency time-stop, water, embedded-wall relocation and collision ordering; `objCurrency` Create/Step. |
 | 11 | Knife and Fork | None | Edible corpse lifecycle, consumption and healing; `objDeadBody`, `uniDead` collision events. |
-| 12 | Laser Sight | None | Firing origin/spread, range and drawing; `scrPlayerInit`, `scrPlayerShootN`, `bulletRanged_Create_0`, `playerDraw`. |
+| 12 | Laser Sight | Centred muzzle on player creation; new machine-gun shots retain zero spread and one RNG draw | Visible ray, aim angles, other weapon emission patterns and ranged-projectile lifetime; see `laser-sight.md`. |
 | 13 | Apple | Immediate healing and overflow reserve | Full grant presentation and native acquisition validation; `scrGainUg`, `gainHp`. |
 | 14 | Member's Card | Area-one generation setup and new-shop discount | Other areas/styles/difficulty routing and native discounted-shop coverage; builder setup, `Shop_Create_0`. |
 | 15 | Heart Balloon | None | Spawn/follow/collision/lifetime; `scrPlayerInit`, `decoyBalloon` events. |

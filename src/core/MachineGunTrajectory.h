@@ -29,11 +29,13 @@ struct MachineGunTrajectory {
     std::int32_t velocityX = 0, velocityY = 0;
     std::uint32_t direction = 0; // Q32 turns, GameMaker's anticlockwise convention.
     bool initialized = false;
+    bool zeroSpread = false; // Birth-time bdirRand override, not live upgrade state.
 
-    void reset(std::int32_t px, std::int32_t py) {
+    void reset(std::int32_t px, std::int32_t py, bool laserSight = false) {
         x = {px, 0}; y = {py, 0};
         velocityX = velocityY = 0;
         direction = 0; initialized = false;
+        zeroSpread = laserSight;
     }
     static std::int32_t sineVelocity(std::uint32_t angle) {
         // abs(sin) Q30 * speed 8 -> Q20; round to nearest, ties upward.
@@ -49,7 +51,9 @@ struct MachineGunTrajectory {
         const std::int32_t spread = sample >= 0x80000000u
             ? static_cast<std::int32_t>((sample - 0x80000000u) / 60u)
             : -static_cast<std::int32_t>((0x80000000u - sample) / 60u);
-        direction = 0xc0000000u + static_cast<std::uint32_t>(spread);
+        // The Windows random_range wrapper draws even when both bounds are
+        // zero. Keep the draw above, then apply the captured bdirRand override.
+        direction = 0xc0000000u + (zeroSpread ? 0u : static_cast<std::uint32_t>(spread));
         velocityX = sineVelocity(direction + 0x40000000u);
         velocityY = -sineVelocity(direction);
         initialized = true;

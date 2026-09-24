@@ -9,6 +9,7 @@
 #include "GemMotion.h"
 #include "ProjectileAnimation.h"
 #include "ProjectileSegment.h"
+#include "MachineGunEmitter.h"
 #include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
@@ -173,6 +174,7 @@ public:
             mainPlayerMotion_, mainPlayerHealth_, run_.combo.healthReserve);
     }
     const UpgradeInventory& upgrades() const { return run_.upgrades; }
+    int mainNextMuzzleOffset() const { return mainEmitter_.leg; }
     const Consumables& consumables() const { return run_.consumables; }
     ShopWorld::Instance* registerShop(int x, int y) {
         return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
@@ -423,7 +425,7 @@ private:
     PlayerDeathSequence mainDeath_;
     RunSession run_;
     int mainPlayerInvulnerability_ = 0;
-    int mainShootLeg_ = -1;
+    MachineGunEmitter mainEmitter_;
     std::uint32_t mainShotsFired_ = 0;
     std::uint32_t mainBlocksDestroyed_ = 0;
     std::uint32_t mainLandings_ = 0;

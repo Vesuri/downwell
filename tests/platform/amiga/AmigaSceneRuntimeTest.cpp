@@ -930,7 +930,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(a.soundRequested == (tick >= 20),
                 "exit dither sound follows fifteen alarm phases after tick-five creation");
         }
-        for (unsigned id : {6u, 6u, 13u, 19u, 21u, 100u}) {
+        for (unsigned id : {6u, 6u, 12u, 13u, 19u, 21u, 100u}) {
             require(gameplay.grantUpgrade(id) && reference.grantUpgrade(id), "shared upgrade grant accepted");
             require(gameplay.health() == reference.mainPlayerHealth() &&
                 gameplay.healthMaximum() == reference.mainPlayerHealthMaximum() &&
@@ -1015,6 +1015,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 gameplay.ringOrigin() == 319 && gameplay.player().jumpShootLocked() &&
                 gameplay.cameraOffsetY() == 0 && gameplay.cameraOffsetX() == 0,
                 "native old actors and camera retire without a large temporary world copy");
+            require(gameplay.nextMuzzleOffset() == 0 && reference.mainNextMuzzleOffset() == 0,
+                    "owned Laser Sight centres both newly created player emitters");
             require(gameplay.randomDrawCount() == carriedRandom.drawCount() &&
                 gameplay.randomState().stateIndex() == carriedRandom.stateIndex(),
                 "native retirement neither reseeds nor consumes generation RNG");
@@ -1171,6 +1173,14 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 live.builder.fragmentCount() < amigaInitialTerrainFragmentCount,
             "comparison exercises incremental terrain rather than a complete forecast");
     if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
+        const bool laserFixture = std::getenv("DOWNWELL_VERIFY_LASER_SIGHT") != nullptr;
+        bool sawLaserBullet = false;
+        if (laserFixture) {
+            const int nativeOffset = gameplay.nextMuzzleOffset(), hostOffset = reference.mainNextMuzzleOffset();
+            require(gameplay.grantUpgrade(12) && reference.grantUpgrade(12), "both adapters grant Laser Sight");
+            require(gameplay.nextMuzzleOffset() == nativeOffset && reference.mainNextMuzzleOffset() == hostOffset,
+                    "granting Laser Sight does not rerun player-instance initialization mid-room");
+        }
         const bool gemHighFixture = std::getenv("DOWNWELL_VERIFY_GEM_HIGH") != nullptr;
         bool sawHighBullet = false;
         if (gemHighFixture) {
@@ -1378,10 +1388,17 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 const auto& b = hostBullet.trajectory;
                 const bool same = a.x.pixel + 240 == b.x.pixel && a.y.pixel + 176 == b.y.pixel &&
                     a.x.fraction == b.x.fraction && a.y.fraction == b.y.fraction &&
-                    a.velocityX == b.velocityX && a.velocityY == b.velocityY && a.direction == b.direction;
+                    a.velocityX == b.velocityX && a.velocityY == b.velocityY && a.direction == b.direction &&
+                    a.zeroSpread == b.zeroSpread;
                 if (!same) std::cerr << "Projectile phase mismatch at " << gameplay.tick()
                     << " directions=" << a.direction << ',' << b.direction << '\n';
                 require(same, "live bullets retain identical fractional positions, spread and velocities");
+                if (a.zeroSpread) {
+                    sawLaserBullet = true;
+                    require(a.direction == 0xc0000000u && a.velocityX == 0 &&
+                            a.velocityY == 8 * downwell::MachineGunTrajectory::unit,
+                            "Laser Sight projectiles retain exact straight-down velocity");
+                }
                 sawHighBullet |= bullet.gemHigh;
                 requireNear(bullet.x + 240, hostBullet.x, 1.0F,
                             "combat bullet X matches in creation order");
@@ -1523,6 +1540,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         }
         require(!candleFixture || sawCandleDamage,
                 "Candle live fixture actually takes damage and publishes the extended interval");
+        require(!laserFixture || sawLaserBullet, "Laser Sight live tape actually emits upgraded shots");
         require(!streakFixture || sawExtendedStreak,
                 "streak fixture actually earns gems and publishes the extended interval");
         require(!poweredFixture || gameplay.currency() > 0,

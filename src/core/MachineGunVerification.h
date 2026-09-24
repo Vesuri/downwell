@@ -9,11 +9,12 @@
 #include "FrogHitState.h"
 #include "SnailHitState.h"
 #include "MachineGunTrajectory.h"
+#include "MachineGunEmitter.h"
 #include "ProjectileSegment.h"
 #include "GameMakerRandom.h"
 #include "BatMotion.h"
 namespace downwell {
-constexpr unsigned machineGunVerificationCoverage = 8191;
+constexpr unsigned machineGunVerificationCoverage = 16383;
 struct MachineGunVerificationResult { std::uint64_t digest; unsigned coverage; };
 
 // Focused CPU-equivalence fixture, not a Windows recording or rendering test.
@@ -35,7 +36,7 @@ inline MachineGunVerificationResult verifyMachineGun() {
     } random;
     GameMakerRandom trajectoryRandom(2);
     VerificationDigest digest;
-    digest.addU32(4);
+    digest.addU32(5);
     Input fire; fire.fire = true;
     for (unsigned tick = 0; tick < 64; ++tick) {
         currency.beginStep();
@@ -110,6 +111,22 @@ inline MachineGunVerificationResult verifyMachineGun() {
         digest.addBool(player.shotDelayed());
     }
     if (correct && count == 8 && hits == 8 && defeated == 0 && trajectoryRandom.drawCount() == count) coverage |= 64;
+    MachineGunEmitter emitter;
+    emitter.reset(true);
+    bool laserCorrect = true;
+    for (unsigned i = 0; i < 4; ++i) {
+        MachineGunTrajectory laser;
+        laser.reset(240 + emitter.nextOffset(), 176, true);
+        const auto draws = trajectoryRandom.drawCount();
+        laser.initialize(trajectoryRandom); laser.initialize(trajectoryRandom);
+        laser.advance(); laser.advance();
+        laserCorrect &= laser.x.pixel == 240 && laser.y.pixel == 192 &&
+            !laser.x.fraction && !laser.y.fraction && laser.direction == 0xc0000000u &&
+            trajectoryRandom.drawCount() == draws + 1;
+        digest.addI32(laser.x.pixel); digest.addI32(laser.y.pixel);
+        digest.addU32(laser.direction); digest.addU32(trajectoryRandom.drawCount());
+    }
+    if (laserCorrect) coverage |= 8192;
     digest.addU32(coverage);
     return {digest.value(), coverage};
 }

@@ -167,7 +167,7 @@ build/projectile-segment-test: tests/core/ProjectileSegmentTest.cpp src/core/Pro
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/ProjectileSegmentTest.cpp
 
-build/machine-gun-trajectory-test: tests/core/MachineGunTrajectoryTest.cpp src/core/MachineGunTrajectory.h src/core/MachineGunProfile.h src/core/LevelClearTrig.h src/core/HudReal.h src/core/GameMakerRandom.h src/core/GameMakerRandom.cpp
+build/machine-gun-trajectory-test: tests/core/MachineGunTrajectoryTest.cpp src/core/MachineGunTrajectory.h src/core/MachineGunEmitter.h src/core/MachineGunProfile.h src/core/LevelClearTrig.h src/core/HudReal.h src/core/GameMakerRandom.h src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MachineGunTrajectoryTest.cpp src/core/GameMakerRandom.cpp
 
@@ -535,6 +535,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	DOWNWELL_COMBAT_FIRE_PHASE=5 DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_FROG_MOTION=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_VERIFY_ATTRACTOR=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_COMBAT_TICKS=1200 DOWNWELL_VERIFY_CANDLE=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+	DOWNWELL_VERIFY_LASER_SIGHT=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_VERIFY_STREAK_UPGRADE=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_VERIFY_GEM_POWERED=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_VERIFY_GEM_HIGH=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp

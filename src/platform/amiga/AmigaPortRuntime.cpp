@@ -48,6 +48,7 @@ bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, uns
     // stack: its run globals remain in place while old world ownership retires.
     run_.shops = {};
     player_.enterRoom(input.fire, 1201 - 176);
+    emitter_.reset(run_.upgrades.levels[12] != 0);
     run_.ammoHud.previousShots = run_.ammoHud.previousRecharges = 0;
     currencyAccount_.playerCreated();
     death_ = {};
@@ -520,17 +521,16 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         destroyedBlockY[destroyedBlockCount++] = box.y;
     }
     if (player_.shots() != oldShots) {
+        const int muzzleOffset = emitter_.nextOffset();
         const unsigned index = downwell::compactInstanceSlots(bullets_, bulletCapacity);
         if (index < bulletCapacity) {
             BulletState& bullet = bullets_[index];
             bullet.active = true;
-            // Default scrPlayerInit starts shootLeg at -1;
-            // scrPlayerEmitBullet negates it after every actual shot.
-            bullet.x = muzzleX + ((oldShots & 1u) ? 1 : -1);
+            bullet.x = muzzleX + muzzleOffset;
             bullet.y = muzzleY;
             bullet.gemHigh = run_.gemHigh;
             bullet.animation = {};
-            bullet.trajectory.reset(bullet.x, bullet.y);
+            bullet.trajectory.reset(bullet.x, bullet.y, run_.upgrades.levels[12] != 0);
             bulletChanged = true;
         }
     }

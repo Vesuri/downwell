@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check the shared selected profiles against the pinned VM table writes."""
 import json
+import hashlib
 from pathlib import Path
 import re
 
@@ -66,3 +67,14 @@ bat = (export / "Assembly/gml_Object_enmBat_Step_0.asm").read_text()
 assert "push.v self.bDir\npop.v.v other.hitDir" in impact
 assert "push.v self.hitDir\npop.v.v self.direction\npushi.e 3\npop.v.i self.movesp" in bat
 print("VM bat hit heading receives the projectile's spread-adjusted bDir")
+init = (export / "Assembly/gml_GlobalScript_scrPlayerInit.asm").read_text()
+assert "pushglb.v global.pugLasersight\nconv.v.b\nbf [7]" in init
+assert "pushi.e 0\npop.v.i self.shootLeg" in init
+assert "pushglb.v global.pugLasersight\nconv.v.b\nbf [8]" in shoot
+assert "pushi.e 0\npush.v self.myBullet\npushi.e -9\npop.v.i [stacktop]self.bdirRand" in shoot
+# Reviewed runner random_range at VA 0x53d840 unconditionally calls 0x438e60
+# at 0x53d8b4, then multiplies by range width, including zero. That helper
+# calls WELL at 0x438dc0 once. Pin the executable underlying that evidence.
+assert hashlib.sha256((root / "data/Downwell.exe").read_bytes()).hexdigest() == \
+    "340b43dae1a18d2861cba9f6a9cdbb92f3754699854e0dc1a1ca367a8cd11085"
+print("Laser Sight VM birth rules and reviewed zero-range RNG runner are pinned")

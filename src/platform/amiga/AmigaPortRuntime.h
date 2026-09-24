@@ -8,6 +8,7 @@
 #include "core/GemMotion.h"
 #include "core/ProjectileAnimation.h"
 #include "core/MachineGunTrajectory.h"
+#include "core/MachineGunEmitter.h"
 #include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
@@ -225,6 +226,7 @@ public:
             player_, health_, run_.combo.healthReserve);
     }
     const downwell::UpgradeInventory& upgrades() const { return run_.upgrades; }
+    int nextMuzzleOffset() const { return emitter_.leg; }
     const downwell::Consumables& consumables() const { return run_.consumables; }
     downwell::ShopWorld::Instance* registerShop(int x, int y) {
         return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
@@ -320,6 +322,7 @@ private:
     unsigned invulnerability_;
     downwell::PlayerDeathSequence death_;
     downwell::RunSession run_;
+    downwell::MachineGunEmitter emitter_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;

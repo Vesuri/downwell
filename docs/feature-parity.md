@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Laser Sight machine-gun firing rules
+
+Upgrade 12 now changes new machine-gun projectiles to zero spread, captured at
+birth, while retaining one first-Step RNG draw. Shared `MachineGunEmitter`
+captures the centred muzzle only when the player is created; a mid-room grant
+does not incorrectly rerun `scrPlayerInit`. Both next-room adapters reset that
+state from retained inventory. See [the source audit](laser-sight.md), including
+the reviewed Windows runner addresses proving that `random_range(0,0)` still
+consumes a WELL word.
+
+The 600-update upgraded live tape passes complete trajectory/RNG comparisons
+and ends at health 4, kills 3, currency 24 and best combo 1 on both adapters.
+The paired level-clear fixture owns the upgrade across both subsequent player
+creations and checks centred emitters. Native weapon fixture schema 5 adds
+four centred, zero-spread shots with exact RNG-count assertions: digest
+`0db388a5b1c2a40a`, coverage `3fff`. The bounded native replay matches, retains
+its stack guard, passes both 68000 audits, and restores the ordinary build.
+Startup digest schema 45 is `30a2c11706f2ba35`.
+The full host suite, focused address/undefined-behavior sanitizer tests and
+normal SDL build pass.
+
+This is partial upgrade support, not completion: the red ray, aim variations,
+other gun emission patterns and ranged-projectile lifetime changes remain
+open. The Q20 trajectory retains its documented numerical approximation and
+does not newly establish original runner collision rounding or a 20 ms budget.
+
 ### Machine-gun artwork follows retained spread without new Amiga assets
 
 `Game` now passes each projectile's retained direction to the renderer rather

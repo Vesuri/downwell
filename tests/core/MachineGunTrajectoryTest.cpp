@@ -1,4 +1,5 @@
 #include "core/MachineGunTrajectory.h"
+#include "core/MachineGunEmitter.h"
 #include "core/GameMakerRandom.h"
 #include <cmath>
 #include <cstdio>
@@ -13,6 +14,14 @@ double position(downwell::MachineGunTrajectory::Coordinate value) {
 }
 int main() {
     using downwell::MachineGunTrajectory;
+    downwell::MachineGunEmitter emitter;
+    require(emitter.nextOffset() == -1 && emitter.nextOffset() == 1,
+            "ordinary player initialization alternates boot origins");
+    emitter.reset(true);
+    require(emitter.nextOffset() == 0 && emitter.nextOffset() == 0,
+            "Laser Sight player initialization retains a centred muzzle");
+    emitter.reset(false);
+    require(emitter.nextOffset() == -1, "new non-laser player resets its first boot");
     struct Sample {
         std::uint32_t value; unsigned draws = 0;
         std::uint32_t nextU32() { ++draws; return value; }
@@ -41,6 +50,16 @@ int main() {
                 "split coordinates preserve fraction without limiting level coordinate range");
     }
     for (std::uint32_t raw : {0u, 0x80000000u, 0xffffffffu}) {
+        sample = {raw};
+        MachineGunTrajectory laser;
+        laser.reset(-3, -8, true);
+        laser.initialize(sample); laser.initialize(sample); laser.advance();
+        require(laser.zeroSpread && sample.draws == 1 && laser.direction == 0xc0000000u &&
+                    laser.velocityX == 0 && laser.velocityY == 8 * MachineGunTrajectory::unit &&
+                    laser.x.pixel == -3 && laser.y.pixel == 0 && !laser.x.fraction && !laser.y.fraction,
+                "zero spread still draws exactly once and retains exact downward motion");
+        laser.reset(0, 0);
+        require(!laser.zeroSpread, "reusing a bullet slot resets its captured spread override");
         sample = {raw};
         MachineGunTrajectory motion; motion.reset(-3, -8); motion.initialize(sample);
         const double dx = motion.velocityX / 1048576.0, dy = motion.velocityY / 1048576.0;

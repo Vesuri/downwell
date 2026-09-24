@@ -174,7 +174,7 @@ void StartupRuntime::resetSceneState() {
     mainDeath_ = {};
     run_.reset();
     mainPlayerInvulnerability_ = 0;
-    mainShootLeg_ = -1;
+    mainEmitter_.reset(false);
     mainShotsFired_ = 0;
     mainBlocksDestroyed_ = 0;
     mainLandings_ = 0;
@@ -548,14 +548,15 @@ InstanceRecord* StartupRuntime::mainBulletEnemyCollision(const ProjectileSegment
 }
 
 void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
+    const int muzzleOffset = mainEmitter_.nextOffset();
     if (mainBulletCount_ < mainBulletCapacity) {
         mainBullets_[mainBulletCount_++] = {
-            static_cast<float>(instance.x + mainShootLeg_),
+            static_cast<float>(instance.x + muzzleOffset),
             static_cast<float>(instance.y + 4), run_.gemHigh, {}, {}
         };
-        mainBullets_[mainBulletCount_ - 1].trajectory.reset(instance.x + mainShootLeg_, instance.y + 4);
+        mainBullets_[mainBulletCount_ - 1].trajectory.reset(instance.x + muzzleOffset, instance.y + 4,
+                                                          run_.upgrades.levels[12] != 0);
     }
-    mainShootLeg_ *= -1;
     ++soundPlayRequests_;
 }
 
@@ -1551,7 +1552,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainDeath_ = {};
                 syncMainPlayerState();
                 mainPlayerInvulnerability_ = 0;
-                mainShootLeg_ = -1;
+                mainEmitter_.reset(run_.upgrades.levels[12] != 0);
                 mainShotsFired_ = 0;
                 // These are adapter event counters, not game globals. Rebase
                 // them so a new instance is not mistaken for a shot/recharge.
@@ -2135,7 +2136,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(44); // Includes fractional bat headings and queued hit directions.
+    digest.addU32(45); // Includes each projectile's birth-time spread override.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2231,7 +2232,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         run_.results.appendState(digest);
     }
     digest.addI32(mainPlayerInvulnerability_);
-    digest.addI32(mainShootLeg_);
+    digest.addI32(mainEmitter_.leg);
     digest.addU32(mainShotsFired_);
     digest.addU32(mainBlocksDestroyed_);
     digest.addU32(mainLandings_);
@@ -2252,6 +2253,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(motion.y.pixel); digest.addU32(motion.y.fraction);
         digest.addI32(motion.velocityX); digest.addI32(motion.velocityY);
         digest.addU32(motion.direction); digest.addBool(motion.initialized);
+        digest.addBool(motion.zeroSpread);
     }
     digest.addU32(static_cast<std::uint32_t>(mainCurrencyCount_));
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
