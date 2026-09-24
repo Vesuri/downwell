@@ -17,6 +17,10 @@ for ident, key in enumerate(("menuGameOver", "menuRetry", "menuStyleSelect",
                              "menuPaletteUnlock"), 65300):
     assert pack.TEXT_SELECTIONS["results"][ident] == language["english"][key].strip()
 resources = manifest["resources"]
+for glyph in resources["fonts"][2]["glyphs"]:
+    if 47 <= glyph["character"] <= 57:
+        assert glyph["shift"] == 8, "progress label layout assumes source eight-pixel advances"
+        assert not glyph["kernings"], "progress glyph composition requires source digits without kerning"
 pages = [pack.Image.open(extracted / "TexturePages" / f"{i}.png").convert("RGBA")
          for i in range(manifest["counts"]["embeddedTextures"])]
 data = (root / "generated/amiga-results.dwap").read_bytes()

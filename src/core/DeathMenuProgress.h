@@ -32,8 +32,7 @@ struct DeathMenuProgress {
 
     // Divide the rare >32-bit saved total in base 65536 using only 32-bit
     // divisions. Avoid a 64-bit compiler division helper on the 68000.
-    static std::uint64_t ceilingStep(std::uint64_t value, unsigned divisor) {
-        value += divisor - 1;
+    static std::uint64_t divideSmall(std::uint64_t value, unsigned divisor) {
         if (value <= 0xffffffffULL)
             return static_cast<std::uint32_t>(value) / divisor;
         std::uint64_t quotient = 0;
@@ -46,6 +45,9 @@ struct DeathMenuProgress {
             remainder = partial % divisor;
         }
         return quotient;
+    }
+    static std::uint64_t ceilingStep(std::uint64_t value, unsigned divisor) {
+        return divideSmall(value + divisor - 1, divisor);
     }
 
     // Create computes the previous total before unlockGoalNum caps totalGems.

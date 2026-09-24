@@ -28,6 +28,7 @@
 #include "core/DeathResultsBackdrop.h"
 #include "core/DeathResultsRows.h"
 #include "core/DeathResultsProgressBar.h"
+#include "core/DeathResultsProgressLabels.h"
 #include "framework/AmigaMemory.h"
 #include "framework/AmigaPlatform.h"
 #include "framework/Bitmap.h"
@@ -587,17 +588,28 @@ static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& p
 }
 
 static void composeResultsProgress(AmigaRenderer* renderer,
-        const downwell::DeathResultsProgressBar& bar) {
+        const downwell::DeathResultsProgressBar& bar, const downwell::DeathResults& results) {
     UBYTE* saved = renderer->target;
     renderer->target = renderer->hud;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
-    amigaRendererFillRect(renderer, downwellPlayfieldX + 30, 174, 100, 12, 3);
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 143, 160, 43, 3);
     struct Sink {
         AmigaRenderer* renderer;
+        void asset(int id, unsigned frame, int x, int y) {
+            amigaRendererDrawAsset(renderer, gDownwellResultsPack,
+                gDownwellResultsPack + gDownwellResultsAssetBytes, id, frame,
+                downwellPlayfieldX + x, y, 0);
+        }
+        void progressGlyph(unsigned code, int x, int y, unsigned pen) {
+            amigaRendererDrawAssetPen(renderer, gDownwellResultsPack,
+                gDownwellResultsPack + gDownwellResultsAssetBytes,
+                code == 11 ? 65304 : 65320 + code, 0, downwellPlayfieldX + x, y, 0, pen);
+        }
         void barRect(int x, int y, int w, int h, bool red) {
             amigaRendererFillRect(renderer, downwellPlayfieldX + x, y, w, h, red ? 2 : 1);
         }
     } sink{renderer};
+    downwell::drawDeathResultsProgressLabels(sink, results);
     bar.draw(sink);
     amigaRendererClearClipRect(renderer);
     renderer->target = saved;
@@ -606,10 +618,13 @@ static void composeResultsProgress(AmigaRenderer* renderer,
 static void redrawResultsProgress(AmigaRenderer* renderer,
         const downwell::DeathResults& results, bool force) {
     static downwell::DeathResultsProgressBar previous;
+    static std::uint64_t previousTotal = 0, previousGoal = 0;
     const auto bar = downwell::DeathResultsProgressBar::from(results);
-    if (!force && bar == previous) return;
+    if (!force && bar == previous && results.frame.displayedTotal == previousTotal &&
+        results.frame.nextGoal == previousGoal) return;
     previous = bar;
-    composeResultsProgress(renderer, bar);
+    previousTotal = results.frame.displayedTotal; previousGoal = results.frame.nextGoal;
+    composeResultsProgress(renderer, bar, results);
 }
 
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -2463,8 +2478,12 @@ int main(void) {
                 composeResultsRows(&renderer, rowFixture, 84, 10);
                 downwell::DeathResultsProgressBar barFixture;
                 barFixture.visible = true; barFixture.length = 47; barFixture.separator = 24;
-                composeResultsProgress(&resultsOracle, barFixture);
-                composeResultsProgress(&renderer, barFixture);
+                downwell::DeathResults labelFixture;
+                labelFixture.open(true, 500, 500);
+                labelFixture.menu.visible[5] = true;
+                labelFixture.frame.displayedTotal = 500;
+                composeResultsProgress(&resultsOracle, barFixture, labelFixture);
+                composeResultsProgress(&renderer, barFixture, labelFixture);
                 AmigaHardware::blitterDrain();
                 for (unsigned byte = 0; byte < downwellLayerBytes; ++byte) {
                     if (renderer.hud[byte] != expectedHud[byte]) ++gDownwellResultsBackdropFailures;

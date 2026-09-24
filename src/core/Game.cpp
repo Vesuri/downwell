@@ -4,6 +4,7 @@
 #include "DeathResultsBackdrop.h"
 #include "DeathResultsRows.h"
 #include "DeathResultsProgressBar.h"
+#include "DeathResultsProgressLabels.h"
 #include "ObjectPack.h"
 #include <array>
 #include <cmath>
@@ -127,6 +128,13 @@ void Game::render(Renderer& renderer) const {
             void barRect(int x, int y, int w, int h, bool red) {
                 renderer.fillRect(x, y, w, h, red ? Color{255,0,0,255} : Color{255,255,255,255});
             }
+            void progressGlyph(unsigned code, int x, int y, unsigned pen) {
+                const char digit[] = {static_cast<char>('0' + code), 0};
+                const char* text = code == 11 ? "MAXED!" : code == 10 ? "/" : digit;
+                const Color color = pen == 3 ? Color{0,0,0,255} :
+                    pen == 2 ? Color{255,0,0,255} : Color{255,255,255,255};
+                renderer.drawText(2, text, x, y, color, TextAlign::center);
+            }
             void blackRect(int x, int y, int w, int h) {
                 renderer.fillRect(x, y, w, h, {0, 0, 0, 255});
             }
@@ -139,6 +147,7 @@ void Game::render(Renderer& renderer) const {
             startup_.mainCameraRenderViewX(), startup_.mainCameraRenderViewY());
         drawDeathResultsRows(sink, startup_.deathResults().menu,
             startup_.mainGameGemTotal(), startup_.mainEnemiesDefeated());
+        drawDeathResultsProgressLabels(sink, startup_.deathResults());
         DeathResultsProgressBar::from(startup_.deathResults()).draw(sink);
         renderer.clearClipRect();
     }

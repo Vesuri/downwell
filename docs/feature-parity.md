@@ -9,6 +9,28 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared numeric progress labels
+
+The current results overlay now includes sprProgress, the right-aligned
+displayed lifetime total, centred slash and left-aligned next goal. Both
+backends consume the same glyph positions and four-pass black outline followed
+by white foreground. MAXED! uses the source red shadow instead. Font-2 numeric
+advances and lack of kerning are checked against the extraction; individual
+glyph bearings remain baked into the offline masks. Native conversion uses
+32-bit division steps even for the eleven-digit sentinel, never runtime asset
+generation or a 64-bit division helper.
+
+Native progress invalidation includes the displayed number and next goal, not
+just bar width, so text updates even when two consecutive totals occupy the
+same integer fill width. Tests cover alignment, zero/large values, outline
+ordering, hidden rows and maxed styling. The target overlay fixture includes
+numeric labels in its blitter/scalar comparison. Unlock notices, area/combo/time
+rows and actionable menu choices remain incomplete.
+Validation: focused label fixtures, complete host suite and bounded A500
+overlay/cache test pass. Normal builds are restored with clean 68000 audits.
+No Windows results capture or complete cross-backend results image comparison
+is claimed by the scalar/native fixture.
+
 ### Shared results progress-bar rendering
 
 Both backends now draw the 96-pixel results progress bar from the shared

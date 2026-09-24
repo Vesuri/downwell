@@ -2,12 +2,51 @@
 #include "core/RunGemStatistics.h"
 #include "core/DeathResults.h"
 #include "core/DeathResultsProgressBar.h"
+#include "core/DeathResultsProgressLabels.h"
+#include <vector>
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    struct Labels {
+        struct Glyph { unsigned code; int x, y; unsigned pen; };
+        std::vector<Glyph> glyphs;
+        unsigned assets = 0;
+        void asset(int id, unsigned frame, int x, int y) {
+            require(id == 402 && frame == 0 && x == 80 && y == 158, "progress label source art anchor");
+            ++assets;
+        }
+        void progressGlyph(unsigned code, int x, int y, unsigned pen) { glyphs.push_back({code,x,y,pen}); }
+    } labels;
+    downwell::drawProgressNumber(labels, 99999999999ULL, 72, 166, true);
+    require(labels.glyphs.size() == 55, "wide lifetime total is eleven digits plus four outline passes");
+    require(labels.glyphs[44].x == -12 && labels.glyphs[54].x == 68,
+            "right aligned total uses string advance, with viewport clipping left to backend");
+    for (unsigned i = 0; i < labels.glyphs.size(); ++i)
+        require(labels.glyphs[i].code == 9 && labels.glyphs[i].pen == (i < 44 ? 3u : 1u),
+                "complete black text outlines precede every foreground glyph");
+    downwell::DeathResults labelResults;
+    labelResults.open(true, 84, 84);
+    labels = {};
+    downwell::drawDeathResultsProgressLabels(labels, labelResults);
+    require(labels.glyphs.empty() && labels.assets == 0, "hidden progress row has no labels");
+    labelResults.menu.visible[5] = true;
+    labelResults.frame.displayedTotal = 84;
+    downwell::drawDeathResultsProgressLabels(labels, labelResults);
+    require(labels.assets == 1 && labels.glyphs.size() == 35 &&
+                labels.glyphs[8].code == 8 && labels.glyphs[8].x == 60 &&
+                labels.glyphs[9].code == 4 && labels.glyphs[9].x == 68 &&
+                labels.glyphs[14].code == 10 && labels.glyphs[14].x == 80 &&
+                labels.glyphs[31].code == 1 && labels.glyphs[31].x == 92,
+            "total is right aligned, slash centered and goal left aligned");
+    labels = {}; labelResults.progress.maxed = true;
+    downwell::drawDeathResultsProgressLabels(labels, labelResults);
+    require(labels.glyphs.size() == 17 && labels.glyphs[15].code == 11 &&
+                labels.glyphs[15].pen == 2 && labels.glyphs[15].y == 167 &&
+                labels.glyphs[16].pen == 1 && labels.glyphs[16].y == 166,
+            "maxed label uses source red drop shadow instead of black outline");
     using Bar = downwell::DeathResultsProgressBar;
     for (const std::uint64_t span : {1000ULL, 2500ULL, 99999499999ULL})
         for (unsigned i = 0; i <= 100; ++i) {
