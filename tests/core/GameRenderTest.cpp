@@ -90,11 +90,11 @@ int main() {
         void asset(int id, unsigned frame, int x, int y) { calls.push_back({id, frame, x, y}); }
     } rows;
     downwell::DeathMenuSequence rowMenu;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
     require(rows.calls.empty(), "results rows remain hidden until published");
     rowMenu.visible[1] = rowMenu.visible[2] = true;
     rowMenu.rowOffset[1] = 3; rowMenu.rowOffset[2] = 2;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
     require(rows.calls.size() == 8 && rows.calls[0].id == 401 && rows.calls[0].frame == 1 &&
                 rows.calls[0].x == 42 && rows.calls[0].y == 102 && rows.calls[1].frame == 0 &&
                 rows.calls[2].id == 403 && rows.calls[2].frame == 8 && rows.calls[2].x == 72 &&
@@ -105,7 +105,7 @@ int main() {
     rows.calls.clear();
     rowMenu.visible[1] = rowMenu.visible[2] = false;
     rowMenu.visible[4] = true;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
     const unsigned timeFrames[] = {6,0,6,4,11,0,1,11,0,1};
     const int timeX[] = {42,62,108,114,102,90,96,84,72,78};
     require(rows.calls.size() == 10, "time row has icon, colon and eight timer glyphs");
@@ -113,6 +113,21 @@ int main() {
         require(rows.calls[i].frame == timeFrames[i] && rows.calls[i].x == timeX[i] &&
                     rows.calls[i].y == (i < 2 ? 140 : 144),
                 "timer preserves source pair order, zero padding, separators and independent bounce");
+    rows.calls.clear();
+    rowMenu.visible[4] = false;
+    rowMenu.visible[3] = true;
+    rowMenu.rowOffset[3] = 2;
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 25);
+    require(rows.calls.size() == 4 && rows.calls[0].id == 401 && rows.calls[0].frame == 5 &&
+                rows.calls[0].x == 42 && rows.calls[0].y == 126 &&
+                rows.calls[1].frame == 0 && rows.calls[1].x == 62 && rows.calls[1].y == 126 &&
+                rows.calls[2].id == 403 && rows.calls[2].frame == 2 && rows.calls[2].x == 72 &&
+                rows.calls[2].y == 128 && rows.calls[3].frame == 5 && rows.calls[3].x == 78,
+            "best-combo row uses source icon and separate digit bounce after fourteen-pixel gap");
+    rows.calls.clear();
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699, 0);
+    require(rows.calls.size() == 3 && rows.calls[2].frame == 0,
+            "a run without a completed combo displays zero, not a blank row");
     rows.calls.clear();
     downwell::drawResultNumber(rows, 0, 72, 98);
     require(rows.calls.size() == 1 && rows.calls[0].frame == 0, "zero is one visible digit");

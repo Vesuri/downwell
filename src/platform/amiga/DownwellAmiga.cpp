@@ -572,7 +572,7 @@ static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntim
 }
 
 static void composeResultsRows(AmigaRenderer* renderer,
-        const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills, unsigned ticks) {
+        const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills, unsigned ticks, unsigned bestCombo) {
     UBYTE* saved = renderer->target;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
     renderer->target = renderer->hud;
@@ -586,7 +586,7 @@ static void composeResultsRows(AmigaRenderer* renderer,
                 downwellPlayfieldX + x, y, 0);
         }
     } sink{renderer};
-    downwell::drawDeathResultsRows(sink, menu, gems, kills, ticks);
+    downwell::drawDeathResultsRows(sink, menu, gems, kills, ticks, bestCombo);
     amigaRendererClearClipRect(renderer);
     renderer->target = saved;
 }
@@ -594,16 +594,21 @@ static void composeResultsRows(AmigaRenderer* renderer,
 static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force) {
     static unsigned lastGems = ~0u, lastKills = ~0u, lastPhase = ~0u;
     static unsigned lastTime = ~0u;
+    static unsigned lastCombo = ~0u;
     const auto& menu = port.deathResults().menu;
     const unsigned phase = menu.titleOffset | (menu.rowOffset[1] << 3) |
         (menu.rowOffset[2] << 6) | (menu.visible[1] << 9) | (menu.visible[2] << 10) |
-        (menu.rowOffset[4] << 11) | (menu.visible[4] << 14);
+        (menu.rowOffset[4] << 11) | (menu.visible[4] << 14) |
+        (menu.rowOffset[3] << 15) | (menu.visible[3] << 18);
     const unsigned gems = port.gameGemTotal(), kills = port.enemiesDefeated();
     const unsigned ticks = port.runTimeTicks();
-    if (!force && lastGems == gems && lastKills == kills && lastPhase == phase && lastTime == ticks) return;
+    const unsigned bestCombo = port.runCombo().state.best;
+    if (!force && lastGems == gems && lastKills == kills && lastPhase == phase && lastTime == ticks &&
+        lastCombo == bestCombo) return;
     lastGems = gems; lastKills = kills; lastPhase = phase;
     lastTime = ticks;
-    composeResultsRows(renderer, menu, gems, kills, ticks);
+    lastCombo = bestCombo;
+    composeResultsRows(renderer, menu, gems, kills, ticks, bestCombo);
 }
 
 static void composeResultsProgress(AmigaRenderer* renderer,
@@ -2495,11 +2500,11 @@ int main(void) {
                 composeResultsBackdrop(&resultsOracle, 4, 160, 34);
                 composeResultsBackdrop(&renderer, 4, 160, 34);
                 downwell::DeathMenuSequence rowFixture;
-                rowFixture.visible[1] = rowFixture.visible[2] = rowFixture.visible[4] = true;
+                rowFixture.visible[1] = rowFixture.visible[2] = rowFixture.visible[3] = rowFixture.visible[4] = true;
                 rowFixture.rowOffset[1] = 3;
                 rowFixture.rowOffset[2] = 2;
-                composeResultsRows(&resultsOracle, rowFixture, 84, 10, 3699);
-                composeResultsRows(&renderer, rowFixture, 84, 10, 3699);
+                composeResultsRows(&resultsOracle, rowFixture, 84, 10, 3699, 25);
+                composeResultsRows(&renderer, rowFixture, 84, 10, 3699, 25);
                 downwell::DeathResultsProgressBar barFixture;
                 barFixture.visible = true; barFixture.length = 47; barFixture.separator = 24;
                 downwell::DeathResults labelFixture;

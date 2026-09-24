@@ -9,6 +9,25 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Best-combo result row
+
+Both renderers now display `RunCombo.state.best` in results row 3, rather than
+the still-active airborne count. DeathMenu Draw VM blocks 12/13 place icon
+401:5 at (42,122+wholePowan), colon at x=62 and smallNumber at x=72 with only
+the numeric baseline receiving row-3 bounce. Zero remains visible. Native
+invalidation includes the best value, reveal flag and bounce, so settled rows
+remain cached. Existing planar result assets suffice; no conversion is added.
+
+Layout fixtures check the 14-pixel gap after kills, icon/colon anchors,
+multi-digit order, bounce and zero. The strengthened native overlay fixture
+now includes a best combo of 25 as well as the existing rows and progress.
+Area/level, menu actions, unlock presentation and combo reward presentation
+remain unfinished; this is not a complete results-screen acceptance claim.
+Validation: full host suite and bounded 600-update A500 HUD/cache test pass,
+including scalar/blitter equality, observable HUD mutation, unchanged terrain
+hash, asset integrity and stack margin. Both 68000 audits are clean. No new
+Windows capture or complete results-screen pixel comparison is claimed.
+
 ### Live shared combo completion and rewards
 
 Both runtimes now own `RunCombo` and increment it at their existing shared
