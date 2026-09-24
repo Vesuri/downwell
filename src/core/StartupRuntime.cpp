@@ -571,12 +571,10 @@ void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
         gem.large = amount >= 10;
         gem.amount = gem.large ? 10 : 2;
         gem.attracted = attracted;
-        gem.speedX = static_cast<float>(random_.random(4.0) - 2.0);
-        gem.speedY = static_cast<float>(random_.random(4.0) - 2.0);
-        random_.irandom(3); // imgSp = choose(-0.5, -0.3, 0.3, 0.5).
-        random_.irandom(70); // First gemdir candidate.
-        random_.irandom(70); // Second gemdir candidate.
-        random_.irandom(1);  // choose(candidate one, candidate two).
+        gem.motion.initialize(static_cast<int>(roundGameMakerCoordinate(x)) - mainPlayerOriginX_,
+                              static_cast<int>(roundGameMakerCoordinate(y)) - mainPlayerOriginY_, attracted, random_);
+        gem.speedX = gem.motion.vx / 12800.0F;
+        gem.speedY = gem.motion.vy / 12800.0F;
         amount -= gem.amount;
     }
 }
@@ -591,41 +589,15 @@ void StartupRuntime::updateMainCurrency() {
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
         MainCurrencyState gem = mainCurrencyItems_[index];
         ++gem.age;
-        const float dx = mainPlayerX_ - gem.x;
-        const float dy = mainPlayerY_ - gem.y;
-        if (!gem.attracted && gem.age >= 15 &&
-            std::abs(dx) < 24.0F && std::abs(dy) < 24.0F)
-            gem.attracted = true;
-        if (gem.attracted) {
-            const float distance = std::sqrt(dx * dx + dy * dy);
-            const float speed = std::min(9.0F, 4.0F +
-                static_cast<float>(gem.age - 15) * 0.125F);
-            if (distance > 0.001F) {
-                gem.speedX = dx / distance * speed;
-                gem.speedY = dy / distance * speed;
-            }
-            gem.x += gem.speedX;
-            gem.y += gem.speedY;
-        } else {
-            gem.speedY = std::min(4.0F, gem.speedY + 0.035F);
-            const float nextX = gem.x + gem.speedX;
-            if (mainSolidAt(nextX, gem.y))
-                gem.speedX *= -0.7F;
-            else
-                gem.x = nextX;
-            const float nextY = gem.y + gem.speedY;
-            if (gem.speedY > 0.0F && mainSolidAt(gem.x, nextY + 4.0F)) {
-                gem.speedY = -0.5F - static_cast<float>(random_.random(0.7));
-                gem.speedX *= 0.7F;
-            } else {
-                gem.y = nextY;
-            }
-            if (std::abs(gem.speedX) < 0.05F)
-                gem.speedX = gem.speedX < 0.0F ? -0.05F : 0.05F;
-        }
-        const bool collected = gem.age >= 10 &&
-            std::abs(mainPlayerX_ - gem.x) <= 6.0F &&
-            std::abs(mainPlayerY_ - gem.y) <= 8.0F;
+        gem.motion.step(gem.age, mainPlayerMotion_.frameStartXFixed(), mainPlayerMotion_.frameStartYFixed(),
+            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_);
+        gem.x = mainPlayerOriginX_ + gem.motion.x / 12800.0F;
+        gem.y = mainPlayerOriginY_ + gem.motion.y / 12800.0F;
+        gem.speedX = gem.motion.vx / 12800.0F;
+        gem.speedY = gem.motion.vy / 12800.0F;
+        gem.attracted = gem.motion.attracted;
+        const bool collected = gem.motion.collectible(gem.age, mainPlayerMotion_.offsetXFixed(),
+                                                      mainPlayerMotion_.offsetYFixed());
         if (collected) {
             mainCurrencyTotal_ += static_cast<std::uint32_t>(gem.amount);
             mainGameGemTotal_ += static_cast<std::uint32_t>(gem.amount);
@@ -2170,6 +2142,13 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU32(gem.age);
         digest.addBool(gem.large);
         digest.addBool(gem.attracted);
+        digest.addI32(gem.motion.x);
+        digest.addI32(gem.motion.y);
+        digest.addI32(gem.motion.vx);
+        digest.addI32(gem.motion.vy);
+        digest.addI32(gem.motion.homing.direction);
+        digest.addI32(gem.motion.homing.turnFifths);
+        digest.addI32(gem.motion.homing.speedEighths);
     }
     digest.addU32(mainCurrencyTotal_);
     digest.addU32(mainGameGemTotal_);

@@ -576,3 +576,45 @@ does not yet consume the shared sound requests. This extraction does not claim
 complete runtime consolidation or full original-game fidelity.
 The full host suite and bounded cross-target replay (`64 9f0d3943 e7900d2b`)
 pass after this extraction; normal SDL and Amiga builds are restored.
+
+## Shared currency motion and source homing
+
+Both currency adapters now own the same authoritative GemMotion state from
+src/core. Initialization, loose-gem gravity/damping, attraction, integration
+and the provisional collection predicate have one implementation. Float/Q8
+fields exposed to renderers are mirrors, not independent simulations.
+
+The recovered objCurrency Create/Step VM and scrCurrencySpawn show that stomp
+gems retain Create's gemsp=1 and rotsp=5, whereas proximity acquisition starts
+at gemsp=4 and rotsp=32. Attracted Step turns toward global.plx/ply by at most
+rotsp, then increases rotsp by .6 (cap 32) and gemsp by .125 (cap 9). The old
+direct-to-player, age-derived speed in both adapters was not that behavior;
+the native comment claiming an original unsigned-age underflow was incorrect.
+Both adapters now target the pre-movement player snapshot. Acquisition still
+completes the free-motion update before the next attracted update.
+
+Create's heading candidates are retained rather than discarded. The assembly
+evaluates choose's second candidate first, contrary to reading GML left to
+right. Shared initialization preserves that evaluation order and draw count.
+The spawn location uses rounded instance coordinates, as scrCurrencySpawn does.
+
+Loose positions use 1/12800-pixel units, representing .035 gravity exactly.
+The source ordered cap can overshoot for one update; zero horizontal speed
+remains zero under sign(xsp)*.05. Shared fixed-point homing uses the existing
+CORDIC direction calculation and interpolated sine table. Against independent
+double-precision source equations, 2,240 homing updates have maximum velocity
+error 1.02203 Q8 units (about .004 pixels/update). It is not bit-identical VM
+double arithmetic. Tests cover Create/proximity differences, wraparound,
+acceleration, gravity and acquisition ordering. Stomp collection now waits for
+all gems, rather than assuming their separate trajectories arrive together.
+
+The strict combat tape retains per-frame currency equality without increasing
+tolerances, ending health 3/3, kills 2/2, currency 16/16. Full host tests pass.
+Original fidelity remains incomplete: full collision masks/thin walls, water,
+time-stop, upgrades, stuck-gem relocation, initial bounce-sound RNG and exact
+runner irandom_range behavior for negative fractional bounce endpoints still
+need recovery. The existing bounce approximation is explicitly identified in
+the shared code. Sharing it removes divergent implementations, not that debt.
+The bounded 68000 replay (`64 9f0d3943 e7900d2b`) and 600-tick target
+terrain-cache check pass. Those target checks are regression evidence, not
+complete gem-trajectory verification against the Windows executable.

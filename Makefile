@@ -108,6 +108,12 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 
 all: $(TARGET)
 
+test: build/gem-homing-test
+
+build/gem-homing-test: tests/core/GemHomingTest.cpp src/core/GemHoming.h src/core/GemMotion.h src/core/BatMotion.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/GemHomingTest.cpp
+
 build/frog-behavior-test: tests/core/FrogBehaviorTest.cpp src/core/FrogBehavior.h src/core/FrogMotion.h src/core/FrogHitState.h src/core/FractionalMotion.h src/core/FrogHorizontalMotion.h src/core/FrogVerticalMotion.h src/core/EnemyContact.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/FrogBehaviorTest.cpp
@@ -268,6 +274,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	python3 tools/verify-enemy-contact.py
 	./build/enemy-contact-test
 	./build/bat-motion-test
+	./build/gem-homing-test
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)

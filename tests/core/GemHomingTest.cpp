@@ -1,0 +1,79 @@
+#include "core/GemHoming.h"
+#include "core/GemMotion.h"
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+void require(bool value, const char* text) {
+    if (!value) { std::cerr << text << '\n'; std::exit(1); }
+}
+int main() {
+    struct Random {
+        unsigned call = 0;
+        unsigned irandomSmall(unsigned) {
+            const unsigned values[] = {0, 10, 60, 1};
+            return values[call++ % 4];
+        }
+        unsigned randomIntegerSmall(unsigned) { return 25600; }
+    } random;
+    downwell::GemMotion motion;
+    motion.initialize(10, 20, true, random);
+    require(motion.homing.direction == 180L * 65536 && random.call == 4 &&
+            motion.vx == 0 && motion.vy == 0 && motion.attracted,
+            "VM evaluates second heading candidate first; stomp preserves Create homing defaults");
+    motion = {};
+    const auto empty = [](int, int) { return false; };
+    for (unsigned tick = 1; tick <= 20; ++tick) {
+        motion.step(tick, 10000 * 256L, 0, empty, random);
+        require(motion.vy == 448L * tick && motion.y == 224L * tick * (tick + 1) && motion.vx == 0,
+                "free gravity is exact .035 and sign(0) does not invent horizontal motion");
+    }
+    motion = {};
+    motion.step(15, 10 * 256L, 0, empty, random);
+    require(motion.attracted && motion.homing.speedEighths == 32 && motion.vy == 448,
+            "acquisition update still performs free motion; homing begins next update");
+    downwell::GemHoming gem;
+    long vx, vy;
+    gem.step(0, -25600, vx, vy);
+    require(gem.direction == 5L * 65536 && gem.turnFifths == 28 &&
+            gem.speedEighths == 9 && vx > 280 && vy < 0,
+            "stomp gem begins at speed 1, turns only five degrees, then accelerates");
+    gem.acquire(25600, 0);
+    require(gem.direction == 0 && gem.speedEighths == 32 && gem.turnFifths == 160,
+            "proximity acquisition aims at the player and starts speed four");
+    gem.step(25600, 0, vx, vy);
+    require(vx == 1056 && vy == 0, "first attracted update accelerates to 4.125");
+    for (int i = 0; i < 100; ++i) gem.step(25600, 0, vx, vy);
+    require(vx == 2304 && gem.speedEighths == 72 && gem.turnFifths == 160,
+            "source speed and turn caps are independent of gem age");
+    gem.direction = 359L * 65536;
+    gem.turnFifths = 25;
+    gem.step(25600, -447, vx, vy);
+    require(gem.direction < 2L * 65536, "turn takes short arc across zero degrees");
+    double maximumError = 0;
+    for (int initial = 0; initial < 360; initial += 13) {
+        gem = {};
+        gem.direction = initial * 65536L;
+        double angle = initial, turn = 5, speed = 1;
+        for (int tick = 0; tick < 80; ++tick) {
+            const long dx = 25600 - tick * 37, dy = -8700 + tick * 91;
+            double target = std::atan2(-double(dy), double(dx)) * 180 / std::acos(-1.0);
+            if (target < 0) target += 360;
+            double delta = angle - target;
+            if (delta > 180) delta -= 360;
+            else if (delta < -180) delta += 360;
+            if (delta > turn) angle -= turn;
+            else if (delta < -turn) angle += turn;
+            else angle = target;
+            angle = std::fmod(angle + 360, 360);
+            turn = std::fmin(32, turn + .6);
+            speed = std::fmin(9, speed + .125);
+            gem.step(dx, dy, vx, vy);
+            const double radians = angle * std::acos(-1.0) / 180;
+            const double error = std::fmax(std::fabs(vx - std::cos(radians) * speed * 256),
+                                          std::fabs(vy + std::sin(radians) * speed * 256));
+            maximumError = std::fmax(maximumError, error);
+        }
+    }
+    require(maximumError < 1.5, "fixed-point homing stays within 1.5 Q8 velocity units of source math");
+    std::cout << "gem homing tests passed; max Q8 velocity error " << maximumError << '\n';
+}

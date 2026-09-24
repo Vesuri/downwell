@@ -628,7 +628,7 @@ int main() {
                 stomp.gemAt(2).amount == 2,
             "six-value snake reward splits into three recovered small gems");
     for (unsigned frame = 0;
-         frame < 120 && stomp.currency() == 0; ++frame)
+         frame < 120 && stomp.gemCount() != 0; ++frame)
         stomp.step(0);
     require(stomp.currency() == 6 && stomp.gemCount() == 0,
             "attracted stomp reward reaches the player and enters currency");

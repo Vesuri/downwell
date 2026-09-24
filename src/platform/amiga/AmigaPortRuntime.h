@@ -5,6 +5,7 @@
 #include "core/GameMakerRandom.h"
 #include "core/StateDigest.h"
 #include "core/GameplayLimits.h"
+#include "core/GemMotion.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogBehavior.h"
@@ -99,6 +100,7 @@ public:
         }
     };
     struct GemState {
+        downwell::GemMotion motion;
         int x;
         int y;
         int amount;
@@ -221,7 +223,6 @@ private:
     downwell::StateDigest trajectory_;
 
     void spawnReward(const EnemyState& enemy, bool attracted);
-    static unsigned integerSquareRoot(unsigned value);
 };
 
 #endif
