@@ -125,3 +125,20 @@ distinguish transparency from black:
 
 That distinction lets the PF2 border and gauges occlude PF1 where the recovered
 art contains black while leaving genuinely transparent atlas pixels open.
+
+## Constant-pen masked blits
+
+`Bitmap::patternWithMask` uses channel A for the fetched opacity mask and
+channel B for the constant pen pattern. The blitter's first/last-word masks
+affect A only; placing opacity on B leaves unaligned text edges unmasked.
+Traversal follows the opacity shift, including descending left-shift copies.
+The edge masks cover the complete fetch span, with a zero mask for an extra
+spill word beyond the source rectangle. Immediate and queued blits use the
+same controls and A-mask/B-pattern assignment.
+
+The native clear-screen verifier exposed this defect as 27 differing HUD
+bytes on its first frame (stray left-edge pixels and missing right-edge bits).
+With the correction, the first 160 consecutive native frames, including the
+upgrade choices, matched both planar buffers byte-for-byte against the scalar
+renderer before the initial 45-second diagnostic deadline. This is rendering
+backend evidence, not proof of original Windows rasterization semantics.

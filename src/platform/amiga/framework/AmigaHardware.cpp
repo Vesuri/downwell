@@ -789,17 +789,23 @@ void AmigaHardware::blitterCombineWithMask(uint16_t* background, uint16_t* sourc
 
 void AmigaHardware::blitterPatternWithMask(uint16_t pattern, uint16_t* destination, uint16_t* mask, uint16_t width, uint16_t height, int16_t sourceModulo, int16_t destinationModulo, int16_t maskModulo, int16_t sourceShift, int16_t maskShift, uint16_t firstWordMask, uint16_t lastWordMask, bool clearMasked)
 {
+    // First/last-word masks apply only to A: fetch opacity through A and
+    // supply the constant pattern through B. Traversal follows the mask.
+    const uint16_t control0 = (uint16_t)(BC0F_SRCA | BC0F_SRCC | BC0F_DEST |
+        (clearMasked ? 0xc0 : 0xca) | ((maskShift < 0 ? -maskShift : maskShift) << 12));
+    const uint16_t control1 = (uint16_t)((maskShift < 0 ? BLITREVERSE : 0) |
+        ((sourceShift < 0 ? -sourceShift : sourceShift) << 12));
     AmigaHardware::setInterrupts(INTF_BLIT, false);
     if (!isBlitterBusy() && !hasQueuedBlits) {
         *bltafwmPointer = firstWordMask;
         *bltalwmPointer = lastWordMask;
-        *bltcon1Pointer = (uint16_t)((sourceShift < 0 ? BLITREVERSE : 0) | ((maskShift < 0 ? -maskShift : maskShift) << 12));
-        *bltcon0Pointer = (uint16_t)(BC0F_SRCB | BC0F_SRCC | BC0F_DEST | ABC | ABNC | (clearMasked ? 0 : (NANBC | ANBC)) | ((sourceShift < 0 ? -sourceShift : sourceShift) << 12));
-        *bltbmodPointer = maskModulo;
+        *bltcon1Pointer = control1;
+        *bltcon0Pointer = control0;
+        *bltamodPointer = maskModulo;
         *bltcmodPointer = destinationModulo;
         *bltdmodPointer = destinationModulo;
-        *bltadatPointer = pattern;
-        *bltbptPointer = mask;
+        *bltbdatPointer = pattern;
+        *bltaptPointer = mask;
         *bltcptPointer = destination;
         *bltdptPointer = destination;
         *bltsizePointer = (uint16_t)((height << 6) | width);
@@ -816,20 +822,20 @@ void AmigaHardware::blitterPatternWithMask(uint16_t pattern, uint16_t* destinati
         *blitterQueueAddPosition++ = bltalwm;
         *blitterQueueAddPosition++ = lastWordMask;
         *blitterQueueAddPosition++ = bltcon1;
-        *blitterQueueAddPosition++ = (uint16_t)((sourceShift < 0 ? BLITREVERSE : 0) | ((maskShift < 0 ? -maskShift : maskShift) << 12));
+        *blitterQueueAddPosition++ = control1;
         *blitterQueueAddPosition++ = bltcon0;
-        *blitterQueueAddPosition++ = (uint16_t)(BC0F_SRCB | BC0F_SRCC | BC0F_DEST | ABC | ABNC | (clearMasked ? 0 : (NANBC | ANBC)) | ((sourceShift < 0 ? -sourceShift : sourceShift) << 12));
-        *blitterQueueAddPosition++ = bltbmod;
+        *blitterQueueAddPosition++ = control0;
+        *blitterQueueAddPosition++ = bltamod;
         *blitterQueueAddPosition++ = maskModulo;
         *blitterQueueAddPosition++ = bltcmod;
         *blitterQueueAddPosition++ = destinationModulo;
         *blitterQueueAddPosition++ = bltdmod;
         *blitterQueueAddPosition++ = destinationModulo;
-        *blitterQueueAddPosition++ = bltadat;
+        *blitterQueueAddPosition++ = bltbdat;
         *blitterQueueAddPosition++ = pattern;
-        *blitterQueueAddPosition++ = bltbpth;
+        *blitterQueueAddPosition++ = bltapth;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(mask) >> 16);
-        *blitterQueueAddPosition++ = bltbptl;
+        *blitterQueueAddPosition++ = bltaptl;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)mask);
         *blitterQueueAddPosition++ = bltcpth;
         *blitterQueueAddPosition++ = (uint16_t)((uint32_t)(destination) >> 16);

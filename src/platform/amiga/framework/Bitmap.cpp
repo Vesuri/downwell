@@ -649,6 +649,8 @@ void Bitmap::patternWithMask(const Bitmap& mask, uint16_t destX, uint16_t destY,
         maskLastWord = (uint16_t)(maskFirstWord + widthWords);
         destLastWord = (uint16_t)(destFirstWord + widthWords);
     }
+    // Mask the entire fetch span, including a spill word at an unaligned X.
+    maskLastWord = (uint16_t)(maskFirstWord + widthWords);
     widthWords++;
 
     // Calculate modulos
@@ -669,13 +671,15 @@ void Bitmap::patternWithMask(const Bitmap& mask, uint16_t destX, uint16_t destY,
         // Shift is to the right: blit forward starting from the first word
         maskData += maskY * mask.rowSizeInWords() + maskFirstWord;
         destData += destY * this->rowSizeInWords() + destFirstWord;
-        lastWordMask <<= ((maskLastWord << 4) + 16 - maskX - width);
+        const unsigned trailing = (maskLastWord << 4) + 16 - maskX - width;
+        lastWordMask = trailing >= 16 ? 0 : (uint16_t)(0xffffu << trailing);
         firstWordMask >>= maskLeftShift;
     } else {
         // Shift is to the left: blit reverse starting from the last word
         maskData += (maskY + height) * mask.rowSizeInWords() - maskWidthWords + maskLastWord;
         destData += (destY + height) * this->rowSizeInWords() - destWidthWords + destLastWord;
-        firstWordMask <<= ((maskLastWord << 4) + 16 - maskX - width);
+        const unsigned trailing = (maskLastWord << 4) + 16 - maskX - width;
+        firstWordMask = trailing >= 16 ? 0 : (uint16_t)(0xffffu << trailing);
         lastWordMask >>= maskLeftShift;
     }
 
