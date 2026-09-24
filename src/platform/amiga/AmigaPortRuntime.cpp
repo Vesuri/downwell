@@ -465,10 +465,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     const int shopPlayerY = 176 + downwell::roundGameMakerQ8(player_.offsetYFixed());
     run_.shops.observePlayer(shopPlayerX, shopPlayerY, player_.grounded(), player_.speedXFixed());
     int shopFacing = player_.facing();
+    const auto shopRandom = [this](unsigned lo, unsigned hi) { return lo + enemyRandom_.irandomSmall(hi - lo); };
+    run_.shops.keeperAlarms(shopRandom);
     run_.shops.step(input, shopPlayerX, shopPlayerY, false, death_.active,
         shopFacing, currencyAccount_, [this] { return 1u + enemyRandom_.irandomSmall(2); },
         [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
     player_.face(shopFacing);
+    run_.shops.advanceKeepers(shopPlayerX, false, run_.stage.area, shopRandom);
     player_.configureComboCompletion(nullptr, nullptr);
     player_.configureMovementBoundary(nullptr, nullptr);
     // Normal rmMain subset, with the same unsupported ending/time-field guards

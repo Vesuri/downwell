@@ -264,3 +264,35 @@ Target-side on-screen purchase verification remains pending; the ordinary A500
 regression tape does not visit a shop. Item collision/pickup outside a case,
 case theft/destruction, child birth-phase ordering and final equal-depth overlap
 validation also remain open.
+
+## Merchant controller
+
+Both registered-shop adapters now update a shared `ShopKeeper`. Its three alarm
+values advance as a snapshot before menu/merchant Step: angry blinking displays
+frame 1 for five updates, then resets frame 0 and draws an inclusive 20..60 wait
+from the existing gameplay RNG. Alarm 2 clears reaction flags. Step preserves
+thankful/goodbye/confused branch precedence, strict player-position comparisons,
+the 60-update reaction holds, 240-update goodbye timer, and area-three half speed.
+Image-reset feedback is consumed by the child state, not left as an unhandled
+request. Merchant state survives counter retirement just like the child instance.
+
+Animation uses the existing positive binary64 integer arithmetic primitive
+(`HudReal`) with exact source constants .09/.4/.2 and no target floating point.
+Focused tests compare 10000 idle updates and 1000 half-speed updates against
+host binary64 arithmetic, as well as alarm boundaries, reactions and RNG draws.
+The paired shop runtime fixture compares the complete animation phase, speed,
+sprite and all three alarms after each input update.
+
+The current adapter order is player movement, keeper alarms, shop interaction,
+keeper Step, animation advancement. Whole-world event ordering, child birth
+timing and engine animation-phase equivalence still need original-runner
+validation. Criminal conversion is exposed as a replacement request, not a
+spawned shopkeeper enemy; the runtime criminal state is still unsupported.
+This milestone does not draw the merchant, consume its audio requests or dirty
+the terrain cache for its animation. Graphics integration remains next.
+
+Validation: full host regressions and the bounded SKIP_TO_GAME A500 600-update
+cache check pass, with clean 68000 helper/instruction audits. The emulator tape
+still contains no merchant; the paired runtime and focused controller fixtures
+are the current evidence for the new behavior, not an original-game visual
+sign-off. Empty shop worlds skip merchant scans.

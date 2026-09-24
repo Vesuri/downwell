@@ -221,6 +221,13 @@ test: test-ammo-dividers test-ammo-fill
 test: test-shop-inventory
 test: test-shop-interaction
 test: test-shop-world
+test: test-shop-keeper
+.PHONY: test-shop-keeper
+build/shop-keeper-test: tests/core/ShopKeeperTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-shop-keeper: build/shop-keeper-test
+	./build/shop-keeper-test
 .PHONY: test-shop-world
 build/shop-world-test: tests/core/ShopWorldTest.cpp src/core/PlayerMotion.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

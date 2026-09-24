@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_SHOP_WORLD_H
 #include "ShopInteraction.h"
 #include "ShopFeedback.h"
+#include "ShopKeeper.h"
 #include "Input.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
@@ -17,6 +18,7 @@ struct ShopWorld {
         ShopInventory stock;
         ShopInteraction menu;
         ShopFeedback feedback;
+        ShopKeeper keeper;
     };
     Instance instances[capacity];
     unsigned allocatedCount = 0;
@@ -88,6 +90,21 @@ struct ShopWorld {
             return;
         }
     }
+    template<class Range>
+    void keeperAlarms(Range random) {
+        if (!allocatedCount) return;
+        for (auto& shop : instances) if (shop.allocated)
+            shop.keeper.alarms(shop.feedback, random);
+    }
+    template<class Range>
+    void advanceKeepers(int playerX, bool criminal, unsigned area, Range random) {
+        if (!allocatedCount) return;
+        for (auto& shop : instances) if (shop.allocated) {
+            shop.keeper.step(shop.feedback, playerX, shop.x + 18, criminal, area, random);
+            shop.feedback.resetKeeperImage = false; // consumed by the actual child state
+            shop.keeper.advanceAnimation();
+        }
+    }
     template<class Choose, class Grant, class Emit>
     void step(const Input& held, int x, int y, bool criminal, bool dead,
               int& facing, CurrencyAccount& currency, Choose choose,
@@ -95,8 +112,9 @@ struct ShopWorld {
         ShopInteraction::Input edges{held.right && !previous.right,
             held.left && !previous.left, held.fire && !previous.fire, false};
         previous = held; // Always track raw edges, including while locked.
-        for (auto& shop : instances) if (shop.present) {
+        for (auto& shop : instances) if (shop.allocated) {
             shop.feedback.beginStep();
+            if (!shop.present) continue;
             const ShopInteraction::Context context{meets(shop, x, y),
                 interactable, x > shop.x, criminal, dead};
             shop.menu.step(edges, context, noControl, facing, shop.stock,

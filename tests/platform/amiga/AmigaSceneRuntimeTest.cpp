@@ -788,6 +788,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "world interaction and grounded input suppression agree across adapters");
             const auto& a = nativeShop->feedback;
             const auto& b = hostShop->feedback;
+            const auto& ka = nativeShop->keeper;
+            const auto& kb = hostShop->keeper;
+            require(ka.sprite == kb.sprite && ka.image.equal(kb.image) && ka.speed.equal(kb.speed) &&
+                ka.alarm0 == kb.alarm0 && ka.alarm1 == kb.alarm1 && ka.alarm2 == kb.alarm2,
+                "merchant animation phase and alarms agree exactly across adapters");
             require(a.message == b.message && a.thankful == b.thankful && a.goodbye == b.goodbye &&
                 a.confused == b.confused && a.resetKeeperImage == b.resetKeeperImage &&
                 a.soundCount == b.soundCount && !a.overflow && !b.overflow,

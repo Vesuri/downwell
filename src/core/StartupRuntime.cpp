@@ -1340,10 +1340,13 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     run_.shops.observePlayer(shopPlayerX, shopPlayerY, mainPlayerMotion_.grounded(),
         mainPlayerMotion_.speedXFixed());
     int shopFacing = mainPlayerMotion_.facing();
+    const auto shopRandom = [this](unsigned lo, unsigned hi) { return lo + random_.irandomSmall(hi - lo); };
+    run_.shops.keeperAlarms(shopRandom);
     run_.shops.step(input, shopPlayerX, shopPlayerY, false, mainDeath_.active,
         shopFacing, currencyAccount_, [this] { return 1u + random_.irandomSmall(2); },
         [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
     mainPlayerMotion_.face(shopFacing);
+    run_.shops.advanceKeepers(shopPlayerX, false, run_.stage.area, shopRandom);
     mainPlayerMotion_.configureComboCompletion(nullptr, nullptr);
     mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
     // Default rmMain subset: boss endings/goal stops and goalTimeField creation

@@ -33,6 +33,8 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
   Amiga composition uses the terrain cache, not recurring furniture redraws.
 - [x] Cased consumable icons (original frame 1), purchase disappearance and
   changed-row cache refresh; merchant/menu rendering remains pending.
+- [x] Shared merchant Step/alarm controller and animation phase in both
+  runtimes; merchant drawing and enemy replacement remain pending.
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.
