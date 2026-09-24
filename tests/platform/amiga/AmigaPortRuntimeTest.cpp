@@ -556,6 +556,8 @@ int main() {
                 crawler.enemyAt(0).preciseY < 2 * 256L &&
                 crawler.enemyAt(0).alarm0 > 0,
             "crawler advances along the floor then turns up the wall");
+    require(crawler.enemyAt(0).drawFrame() == crawler.enemyAt(0).imageFrame + 256,
+            "upward crawler chooses its host-generated ninety-degree frame");
 
     AmigaPortRuntime bat(300);
     bat.configureSolidResolver(noSolid, 0);

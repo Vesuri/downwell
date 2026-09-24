@@ -223,6 +223,33 @@ int main(int argc, char** argv) {
     amigaRendererSetGameOrigin(&expectedRenderer, 311);
     amigaRendererSetClipRect(&actualRenderer, 110, 0, 160, 284);
     amigaRendererSetClipRect(&expectedRenderer, 110, 0, 160, 284);
+    const auto ringPixel = [](const std::vector<UBYTE>& pixels, int x, int y) {
+        unsigned pen = 0;
+        for (unsigned plane = 0; plane < 2; ++plane) {
+            const unsigned offset = plane * downwellGameRingPlaneBytes +
+                ((311 + y) % downwellGameRingHeight) * downwellBytesPerPlaneLine + x / 8;
+            if (pixels[offset] & (0x80 >> (x & 7))) pen |= 1u << plane;
+        }
+        return pen;
+    };
+    for (unsigned frame = 0; frame < 2; ++frame) for (unsigned turn = 1; turn < 4; ++turn) {
+        std::fill(actualGame.begin(), actualGame.end(), 0);
+        std::fill(expectedGame.begin(), expectedGame.end(), 0);
+        amigaRendererDrawAsset(&actualRenderer, gamePack.data(), gamePack.data() + gamePack.size(),
+            278, turn * 256 + frame, 190, 100, 0);
+        amigaRendererDrawAsset(&expectedRenderer, gamePack.data(), gamePack.data() + gamePack.size(),
+            278, frame, 190, 100, 0);
+        for (int y = 40; y < 160; ++y) for (int x = 130; x < 250; ++x) {
+            int sx = x, sy = y;
+            for (unsigned i = 0; i < turn; ++i) {
+                const int nextX = 190 - (sy - 100) - 1;
+                sy = 100 + (sx - 190);
+                sx = nextX;
+            }
+            require(ringPixel(actualGame, x, y) == ringPixel(expectedGame, sx, sy),
+                    "offline crawler quarter turn preserves source anchor through ring wrapping");
+        }
+    }
     for (unsigned frame = 0; frame < 4; ++frame) for (int flipX : {0, 1}) {
         std::fill(actualGame.begin(), actualGame.end(), 0);
         std::fill(expectedGame.begin(), expectedGame.end(), 0);

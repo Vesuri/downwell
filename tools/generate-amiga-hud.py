@@ -288,6 +288,36 @@ def build_pack(manifest, extracted, profile):
             if selected_frames is not None and frame_index not in selected_frames:
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
+            if profile == "game" and sprite_id == 278:
+                # Crawler quarter turns are prepared on the host. Crop the
+                # transparent 32x32 padding to keep all variants Chip-RAM cheap.
+                for turn in range(4):
+                    variant = canvas if turn == 0 else canvas.transpose((
+                        Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180,
+                        Image.Transpose.ROTATE_270)[turn - 1])
+                    ox, oy = sprite["originX"], sprite["originY"]
+                    for _ in range(turn):
+                        ox, oy = oy, canvas.width - ox
+                    bounds = variant.getbbox()
+                    require(bounds is not None, "empty crawler frame")
+                    variant = variant.crop(bounds)
+                    ox -= bounds[0]
+                    oy -= bounds[1]
+                    if variant.width < 16:
+                        padded = Image.new("RGBA", (16, variant.height))
+                        padded.paste(variant, (0, 0))
+                        variant = padded
+                    for flip_x in (False, True):
+                        image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
+                        pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]
+                        stride, data = encode_planar(pixels, image.width, image.height)
+                        require(decode_planar(data, image.width, image.height, stride) == pixels,
+                                "crawler rotation planar round trip failed")
+                        metadata = dict(sprite, id=62000 + sprite_id if flip_x else sprite_id,
+                                        width=image.width, height=image.height,
+                                        originX=image.width - ox if flip_x else ox, originY=oy)
+                        encoded.append((metadata, turn * 256 + frame_index, stride, data))
+                continue
             pens = [pixel_to_pen(pixel) for pixel in canvas.get_flattened_data()]
             dma_width, planar = encode_planar(pens, sprite["width"], sprite["height"])
             require(decode_planar(planar, sprite["width"], sprite["height"], dma_width) == pens,

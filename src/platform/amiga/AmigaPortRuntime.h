@@ -95,6 +95,8 @@ public:
         bool frogLanded;
         bool activationPending;
         unsigned drawFrame() const {
+            if (objectId == 119)
+                return imageFrame + ((crawler.direction + (motionState > 0 ? 0u : 2u)) % 4u) * 256u;
             // Source enmSnail Step: image_yscale = -sign(ysp).
             // Frame 256+n is host-generated, for both planar and DMA assets.
             return imageFrame + (objectId == 117 && speedY > 0 ? 256u : 0u);

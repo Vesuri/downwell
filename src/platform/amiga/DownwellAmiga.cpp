@@ -2147,7 +2147,7 @@ int main(void) {
                         (UWORD)enemy.spriteId, (UWORD)enemy.drawFrame(),
                         downwellPlayfieldX + 80 + enemy.x - port.cameraOffsetX(),
                         gameplayPlayerStartY + enemy.y - port.cameraOffsetY(),
-                        enemy.facing < 0)) frameReady = false;
+                        enemy.objectId != 119 && enemy.facing < 0)) frameReady = false;
             }
 #endif
             if (port.playerVisible() && !appendGameplayActor(actors, actorCount,

@@ -149,6 +149,20 @@ integration and Amiga quarter-turn presentation. SDL receives the source
 movement angle; native sprite orientation remains a backend follow-up. This
 is a shared movement migration, not a claim of full crawler fidelity.
 
+The quarter-turn presentation follow-up is now implemented: the host asset
+generator prepares all four orientations of both crawler frames, using
+synthetic frame indices `turn * 256 + frame` under resource ID 278. Transparent
+padding is cropped offline (with a minimum one-word width), retaining the
+source anchor and existing Chip-RAM budget. Both masked-planar overflow and
+DMA sprite bodies are prepared ahead of time. Amiga selects the orientation
+from shared crawler direction and traversal mode; it does not apply the
+generic horizontal-facing flip to this rotated actor.
+
+Renderer tests independently rotate the baseline pixels around the anchor,
+including circular-buffer wrapping, and compare every quarter-turn variant.
+The prepared DMA streams additionally pass 15,288 scalar-oracle comparisons.
+This closes rotation, not the hit-stun/sprite-transition and time-stop work.
+
 Validation: the full host suite now runs both default and phase-5 combat
 tapes; both pass with exact crawler-state assertions. The bounded A500
 600-tick cache oracle and cross-CPU replay pass, retaining the player/gem
