@@ -9,6 +9,10 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+See [upgrade coverage](upgrade-coverage.md) for the per-ID implementation,
+validation gaps and dependency-led work order. The chronological notes below
+must not be counted as completed whole-game features.
+
 ### Gem Powered pickup charge uses shared run logic
 
 `scrGainGem` invokes `scrRechargeGem` only when `pugGemPowered` (upgrade 4)

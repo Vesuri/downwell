@@ -39,7 +39,7 @@ int main() {
         if (inventory.eligible(id)) require(grant(id), "normal upgrade grant");
     }
     require(inventory.count == 20 && !inventory.eligible(2) && inventory.levels[2] == 0,
-        "all twenty enabled upgrades retain IDs; Gravity Suit stays disabled with the other cap-zero entries");
+        "all twenty enabled upgrades retain IDs; Dumbbell stays disabled with the other cap-zero entries");
     downwell::GameMakerRandom random(5);
     downwell::LevelUpgradeOffers offers;
     require(offers.randomize(2, inventory.highestId, random,
