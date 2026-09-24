@@ -7,6 +7,20 @@ static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    for (bool upgraded : {false, true}) {
+        downwell::RunCombo combo;
+        downwell::CurrencyAccount currency;
+        PlayerMotion player;
+        int health = 4;
+        combo.state.count = 8;
+        combo.finish(player, currency, health, upgraded);
+        require(currency.currency == 100 && currency.timer == (upgraded ? 480u : 300u),
+                "live combo completion forwards ownership to nonGemGainGem's timer extension");
+        currency.beginStep();
+        combo.finish(player, currency, health, upgraded);
+        require(currency.timer == (upgraded ? 479u : 299u),
+                "empty completion must not refresh an existing streak");
+    }
     using downwell::ComboState;
     struct Live {
         downwell::RunCombo combo;

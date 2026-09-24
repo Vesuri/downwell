@@ -14,10 +14,10 @@ enum class CurrencyStepResult { alive, expired, collected };
 template<class Solid, class Random>
 CurrencyStepResult stepCurrency(GemMotion& motion, bool large, unsigned amount,
     long homingX, long homingY, long collectionX, long collectionY,
-    CurrencyAccount& account, Solid solid, Random& random) {
+    CurrencyAccount& account, Solid solid, Random& random, bool lessResist = false) {
     if (!motion.step(homingX, homingY, solid, random)) return CurrencyStepResult::expired;
     if (!motion.collectible(collectionX, collectionY, large)) return CurrencyStepResult::alive;
-    account.collect(amount);
+    account.collect(amount, 300, lessResist);
     return CurrencyStepResult::collected;
 }
 } // namespace downwell

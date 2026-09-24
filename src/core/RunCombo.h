@@ -10,10 +10,10 @@ struct RunCombo {
     ComboState::Completion completion;
     ComboGrantEffects grants;
     void beginStep() { reward = {}; completion = {}; grants = {}; }
-    void finish(PlayerMotion& player, CurrencyAccount& currency, int& health) {
+    void finish(PlayerMotion& player, CurrencyAccount& currency, int& health, bool lessResist = false) {
         const auto result = state.finish({}, [&](const ComboState::Reward& value) {
             reward = value;
-            grants = applyComboGrants(value, currency, player, health, healthReserve);
+            grants = applyComboGrants(value, currency, player, health, healthReserve, 300, lessResist);
         });
         // A second empty grounded call must not discard this update's effects.
         completion.rewardCreated |= result.rewardCreated;

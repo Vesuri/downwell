@@ -516,6 +516,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	DOWNWELL_COMBAT_FIRE_PHASE=5 DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_FROG_MOTION=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_VERIFY_ATTRACTOR=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_VERIFY_CANDLE=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+	DOWNWELL_VERIFY_STREAK_UPGRADE=1 DOWNWELL_VERIFY_COMBAT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(AMIGA_MENU_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 	./$(AMIGA_MENU_SCROLL_TEST_TARGET)
 	./$(AMIGA_RENDERER_TEST_TARGET) generated/amiga-game.dwap generated/amiga-hud.dwap

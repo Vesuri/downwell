@@ -9,6 +9,24 @@ void require(bool value, const char* text) {
 }
 int main() {
     {
+        struct Random { unsigned randomIntegerSmall(unsigned) { return 0; } } random;
+        for (bool upgraded : {false, true}) {
+            downwell::CurrencyAccount account;
+            downwell::GemMotion gem;
+            gem.lifetime.age = 9;
+            const auto result = downwell::stepCurrency(gem, false, 2, 1000 * 256L, 0,
+                0, 0, account, [](int, int) { return false; }, random, upgraded);
+            const unsigned duration = upgraded ? 480 : 300;
+            require(result == downwell::CurrencyStepResult::collected && account.timer == duration,
+                    "live currency phase forwards the owned upgrade's extra 180 updates");
+            for (unsigned tick = 1; tick < duration; ++tick) account.beginStep();
+            require(account.streak == 2 && account.timer == 1, "streak survives its last protected update");
+            account.beginStep();
+            require(account.streak == 0 && account.timer == 0 && account.currency == 2,
+                    "streak expires without spending the collected gems");
+        }
+    }
+    {
         struct Random {
             unsigned randomIntegerSmall(unsigned) { return 0; }
             unsigned irandomSmall(unsigned) { return 0; }

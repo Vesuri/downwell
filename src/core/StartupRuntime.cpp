@@ -647,7 +647,8 @@ void StartupRuntime::updateMainCurrency() {
         const auto result = stepCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
             mainPlayerMotion_.frameStartXFixed(), mainPlayerMotion_.frameStartYFixed(),
             mainPlayerMotion_.offsetXFixed(), mainPlayerMotion_.offsetYFixed(), currencyAccount_,
-            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_);
+            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_,
+            run_.upgrades.levels[20] != 0);
         if (result == CurrencyStepResult::expired) continue;
         if (result == CurrencyStepResult::collected) {
             ++soundPlayRequests_;
@@ -1337,7 +1338,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     run_.combo.beginStep();
     mainPlayerMotion_.configureComboCompletion([](void* context) {
         auto& runtime = *static_cast<StartupRuntime*>(context);
-        runtime.run_.combo.finish(runtime.mainPlayerMotion_, runtime.currencyAccount_, runtime.mainPlayerHealth_);
+        runtime.run_.combo.finish(runtime.mainPlayerMotion_, runtime.currencyAccount_, runtime.mainPlayerHealth_,
+                                  runtime.run_.upgrades.levels[20] != 0);
     }, this);
     mainPlayerMotion_.configureMovementBoundary([](void* context) {
         auto& runtime = *static_cast<StartupRuntime*>(context);

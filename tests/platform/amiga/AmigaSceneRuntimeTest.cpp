@@ -1152,6 +1152,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "comparison exercises incremental terrain rather than a complete forecast");
     if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
         const bool candleFixture = std::getenv("DOWNWELL_VERIFY_CANDLE") != nullptr;
+        const bool streakFixture = std::getenv("DOWNWELL_VERIFY_STREAK_UPGRADE") != nullptr;
+        bool sawExtendedStreak = false;
+        if (streakFixture)
+            require(gameplay.grantUpgrade(20) && reference.grantUpgrade(20),
+                    "both live adapters grant the streak extension upgrade before combat");
         bool sawCandleDamage = false;
         if (candleFixture)
             require(gameplay.grantUpgrade(7) && reference.grantUpgrade(7),
@@ -1396,6 +1401,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     require(gem[9] == 1, "live reward births receive the owned Attractor configuration");
             require(gameplay.invulnerability() == static_cast<unsigned>(reference.mainPlayerInvulnerability()),
                     "live damage immunity agrees every combat update");
+            require(gameplay.gemStreakTimer() == reference.mainGemStreakTimer(),
+                    "live gem streak timers agree every combat update");
+            if (streakFixture && gameplay.gemStreakTimer() == 480) sawExtendedStreak = true;
             if (candleFixture && gameplay.invulnerability() == 240)
                 sawCandleDamage = true;
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
@@ -1451,6 +1459,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         }
         require(!candleFixture || sawCandleDamage,
                 "Candle live fixture actually takes damage and publishes the extended interval");
+        require(!streakFixture || sawExtendedStreak,
+                "streak fixture actually earns gems and publishes the extended interval");
         std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
                   << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
                   << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()

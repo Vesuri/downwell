@@ -9,6 +9,26 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Gem Sick extends live pickup and combo streak timers
+
+Upgrade 20 maps to `pugLessResist` in `scrIncrementPug`. Both `scrGainGem`
+and `nonGemGainGem` VM assembly assign `gemStreakTimerStart`, then add 180
+when this flag is set. The existing account and combo-grant helpers supported
+that addition, but live currency collection and combo completion always used
+their false defaults. Both runtime adapters now forward current ownership
+through the shared currency phase and `RunCombo` controller. With the current
+300-update base, both reward paths grant 480. This is sampled when earning
+gems, not when they are spawned or when the upgrade is acquired.
+
+Tests exercise pickup expiry at 300/480, combo reward timing and empty-combo
+non-refresh. The paired combat fixture grants upgrade 20, requires an actual
+480-update timer and compares the timer every update. The upgrade-specific
+`sprGemsickMotion` HUD artwork and full source gem-high presentation remain
+unimplemented; this change covers reward accounting, not those visual effects.
+The full host suite and bounded native replay pass; both 68000 audits are
+clean and the ordinary executable is restored. The native replay is an
+unchanged default-run regression, not execution coverage of the upgraded tape.
+
 ### Candle damage immunity reaches both live contact passes
 
 `scrPDamage` VM blocks 1–3 select 240 for player Alarm 1 when upgrade

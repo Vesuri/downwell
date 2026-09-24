@@ -482,7 +482,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     }, &headBreak);
     player_.configureComboCompletion([](void* context) {
         auto& runtime = *static_cast<AmigaPortRuntime*>(context);
-        runtime.run_.combo.finish(runtime.player_, runtime.currencyAccount_, runtime.health_);
+        runtime.run_.combo.finish(runtime.player_, runtime.currencyAccount_, runtime.health_,
+                                  runtime.run_.upgrades.levels[20] != 0);
     }, this);
     player_.configureMovementBoundary([](void* context) {
         auto& runtime = *static_cast<AmigaPortRuntime*>(context);
@@ -806,7 +807,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         const auto result = downwell::stepCurrency(gem.motion, gem.large, static_cast<unsigned>(gem.amount),
             player_.frameStartXFixed(), player_.frameStartYFixed(),
             player_.offsetXFixed(), player_.offsetYFixed(), currencyAccount_,
-            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
+            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_,
+            run_.upgrades.levels[20] != 0);
         if (result != downwell::CurrencyStepResult::alive) {
             gem.active = false;
             continue;
