@@ -860,6 +860,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
             input.fire = (tick + firePhase) % 10 < 5;
             const bool bothWereDead = gameplay.deathSequence().movementDead() && reference.mainDeathSequence().movementDead();
+            const auto beforeNativeTime = gameplay.runTimeTicks();
+            const auto beforeHostTime = reference.runTimeTicks();
+            const bool nativePublishedDeath = gameplay.deathSequence().active;
+            const bool hostPublishedDeath = reference.mainDeathSequence().active;
             const unsigned gemsBeforeNative = gameplay.gameGemTotal();
             const unsigned gemsBeforeHost = reference.mainGameGemTotal();
             const bool nativeWasRecorded = gameplay.runGemStatistics().recorded;
@@ -870,6 +874,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
+            require(gameplay.runTimeTicks() == reference.runTimeTicks() &&
+                        gameplay.runTimeTicks() == beforeNativeTime + (nativePublishedDeath ? 0u : 1u) &&
+                        reference.runTimeTicks() == beforeHostTime + (hostPublishedDeath ? 0u : 1u),
+                    "shared run clock agrees and uses pre-publication death on every update");
             const auto& nativeStats = gameplay.runGemStatistics();
             const auto& hostStats = reference.runGemStatistics();
             const auto& nativeResults = gameplay.deathResults();

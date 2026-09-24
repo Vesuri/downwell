@@ -426,6 +426,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         return false;
     }, &headBreak);
     AmigaPlayerMotion motion = player_.step(input, false, death_.movementDead());
+    // Normal rmMain subset, with the same unsupported ending/time-field guards
+    // as StartupRuntime. This is deliberately independent of video refresh Hz.
+    runClock_.advance(true, death_.active);
     death_.publishHealth(health_);
     death_.advanceAlarms(player_.grounded());
     deathResults_.open(death_.menuReady, runGemStatistics_.lifetime, currencyAccount_.gameGem);

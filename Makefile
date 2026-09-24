@@ -168,7 +168,7 @@ build/death-menu-progress-test: tests/core/DeathMenuProgressTest.cpp src/core/De
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DeathMenuProgressTest.cpp
 
-build/player-death-sequence-test: tests/core/PlayerDeathSequenceTest.cpp src/core/PlayerDeathSequence.h src/core/AlarmBank.h
+build/player-death-sequence-test: tests/core/PlayerDeathSequenceTest.cpp src/core/PlayerDeathSequence.h src/core/RunClock.h src/core/AlarmBank.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/PlayerDeathSequenceTest.cpp
 

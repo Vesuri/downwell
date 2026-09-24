@@ -9,6 +9,29 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared run clock
+
+Both gameplay paths now count run time with `RunClock`, once per simulation
+update after player movement and before death publication. This follows
+objPlayer_n Begin Step VM blocks 11--18: goalStop, published death, bossDead=2,
+room other than rmMain, and contact with goalTimeField suppress the increment.
+The final update before death publication still counts. PAL intentionally does
+not receive wall-clock compensation.
+
+The shared helper models all five guards; live adapters currently supply the
+normal rmMain/death subset because ending stops and goalTimeField creation are
+not implemented. This does not establish complete timer behavior for endings.
+The full host suite and 6,000-update paired combat/death replay pass, checking
+the clock at every combat update. The results time row and the original
+floating-point centisecond formatting remain unfinished. Session reset clears
+the clock; retry/room-transition integration remains part of the unfinished
+menu actions.
+
+The bounded host/68000 replay regression also passes and restores the normal
+target build, with clean instruction and 64-bit-helper audits. That existing
+player/currency/death fixture does not hash the new live run clock; the new
+clock's full-world comparison is host-side, not cross-CPU coverage.
+
 ### Shared numeric progress labels
 
 The current results overlay now includes sprProgress, the right-aligned

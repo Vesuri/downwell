@@ -10,6 +10,7 @@
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
 #include "core/RunGemStatistics.h"
+#include "core/RunClock.h"
 #include "core/DeathResults.h"
 #include "core/PlayerLifeRules.h"
 #include "core/FrogHorizontalMotion.h"
@@ -190,6 +191,7 @@ public:
     bool deathMenuReady() const { return death_.menuReady; }
     const downwell::PlayerDeathSequence& deathSequence() const { return death_; }
     const downwell::RunGemStatistics& runGemStatistics() const { return runGemStatistics_; }
+    std::uint32_t runTimeTicks() const { return runClock_.ticks; }
     const downwell::DeathResults& deathResults() const { return deathResults_; }
     bool playerVisible() const { return downwell::playerDamageVisible(invulnerability_); }
     bool bulletActive() const { return bulletCount() != 0; }
@@ -238,6 +240,7 @@ private:
     unsigned invulnerability_;
     downwell::PlayerDeathSequence death_;
     downwell::RunGemStatistics runGemStatistics_;
+    downwell::RunClock runClock_;
     downwell::DeathResults deathResults_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;

@@ -1,10 +1,28 @@
 #include "core/PlayerDeathSequence.h"
+#include "core/RunClock.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    downwell::RunClock clock;
+    clock.advance(false, false);
+    clock.advance(true, true);
+    clock.advance(true, false, true);
+    clock.advance(true, false, false, true);
+    clock.advance(true, false, false, false, true);
+    require(clock.ticks == 0, "each recovered clock guard independently suppresses counting");
+    downwell::PlayerDeathSequence clockDeath;
+    clockDeath.beginStep(false);
+    clock.advance(true, clockDeath.active);
+    clockDeath.publishHealth(0);
+    require(clock.ticks == 1, "health depletion publishes after the final counted update");
+    clockDeath.beginStep(false);
+    clock.advance(true, clockDeath.active);
+    require(clock.ticks == 1, "first death movement and later updates do not count");
+    for (unsigned i = 0; i < 3000; ++i) clock.advance(true, false);
+    require(clock.ticks == 3001, "simulation clock does not compensate for PAL refresh");
     downwell::PlayerDeathSequence publication;
     publication.beginStep(false);
     publication.publishHealth(4);

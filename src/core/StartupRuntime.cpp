@@ -142,6 +142,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainPlayerHealth_ = 4;
     mainDeath_ = {};
     runGemStatistics_ = {};
+    runClock_ = {};
     deathResults_ = {};
     mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
@@ -1287,6 +1288,9 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     mainDeath_.beginStep(input.fire);
     runGemStatistics_.observeDeathMovement(mainDeath_.movementDead(), currencyAccount_.gameGem);
     mainPlayerMotion_.step(input, controlsLocked_, mainDeath_.movementDead());
+    // Default rmMain subset: boss endings/goal stops and goalTimeField creation
+    // are not implemented yet. Feed their source guards when those land.
+    runClock_.advance(true, mainDeath_.active);
     mainDeath_.publishHealth(mainPlayerHealth_);
     mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
     deathResults_.open(mainDeath_.menuReady, runGemStatistics_.lifetime, currencyAccount_.gameGem);
@@ -2098,6 +2102,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addBool(mainAirborneShot_);
     digest.addI32(mainAmmo_);
     digest.addI32(mainPlayerHealth_);
+    if (roomId_ == mainRoomId) digest.addU32(runClock_.ticks);
     if (mainDeath_.active) {
         digest.addBool(mainDeath_.started);
         digest.addBool(mainDeath_.priorFire);
