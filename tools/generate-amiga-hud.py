@@ -47,6 +47,8 @@ SELECTIONS = {
         139: None,   # sprModBtry
         153: None,   # sprBat
         154: None,   # sprBatHit
+        157: None,   # sprBatHang
+        162: None,   # sprBatHangWall
         163: None,   # sprEnmSnake
         164: None,   # sprSnakeAir
         166: None,   # sprFrogIdle
@@ -290,7 +292,8 @@ def build_pack(manifest, extracted, profile):
             if selected_frames is not None and frame_index not in selected_frames:
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
-            if profile == "game" and sprite_id in (153, 154, 177, 178, 278):
+            if profile == "game" and sprite_id in (153, 154, 157, 162, 163, 164,
+                    166, 168, 170, 173, 177, 178, 186, 187, 188, 278):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -511,7 +514,7 @@ def build_pack(manifest, extracted, profile):
     # Gameplay DMA words, including mirrored multi-channel actors, are host work.
     if profile == "game":
         hardware = []
-        actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 163, 164,
+        actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 459)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:

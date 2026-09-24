@@ -221,19 +221,33 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
             require(native.alarm0 == enemy.alarms.get(0) && native.alarm1 == enemy.alarms.get(1),
                     "live enemy alarm slots match exactly across compact and full stores");
         if (enemy.objectId == 116 && enemy.active && native.active)
-            require(native.batHit.pending == enemy.batHit.pending &&
+            require(native.batActivity.initialized == enemy.batActivity.initialized &&
+                    native.batActivity.flying == enemy.batActivity.flying &&
+                    native.batActivity.hang == enemy.batActivity.hang &&
+                    native.batHit.pending == enemy.batHit.pending &&
                     native.batHit.ready == enemy.batHit.ready &&
                     native.batHit.stunned == enemy.batHit.stunned &&
                     native.batHit.direction == enemy.batHit.direction,
                     "surviving bat hit state matches across both adapters");
-        if (enemy.objectId == 116 && enemy.active && native.active && native.awake)
-            require(native.preciseX == std::lround((enemy.preciseX - 240) * 256) &&
+        if (enemy.objectId == 116 && enemy.active && native.active) {
+            const bool equal = native.preciseX == std::lround((enemy.preciseX - 240) * 256) &&
                     native.preciseY == std::lround((enemy.preciseY - 176) * 256) &&
                     native.speedX == std::lround(enemy.velocityX * 256) &&
                     native.speedY == std::lround(enemy.velocityY * 256) &&
                     native.direction == static_cast<int>(enemy.direction) &&
-                    native.facing == (enemy.scaleX < 0 ? -1 : 1),
-                    "awake bat collision and flight state match exactly across adapters");
+                    native.facing == (enemy.scaleX < 0 ? -1 : 1);
+            if (!equal) std::cerr << "BAT ordinal=" << ordinal << " native="
+                << native.preciseX << ',' << native.preciseY << ',' << native.speedX << ',' << native.speedY
+                << ',' << native.direction << ',' << native.facing << " SDL="
+                << std::lround((enemy.preciseX - 240) * 256) << ',' << std::lround((enemy.preciseY - 176) * 256)
+                << ',' << std::lround(enemy.velocityX * 256) << ',' << std::lround(enemy.velocityY * 256)
+                << ',' << enemy.direction << ',' << enemy.scaleX << " flying=" << native.batActivity.flying
+                << " hang=" << native.batActivity.hang << " RNG=" << amiga.randomDrawCount()
+                << ',' << reference.randomDrawCount() << " target="
+                << amiga.player().frameStartXFixed() << ',' << amiga.player().frameStartYFixed()
+                << '/' << reference.mainEnemyTargetX() << ',' << reference.mainEnemyTargetY() << '\n';
+            require(equal, "bat collision and flight state match exactly across adapters");
+        }
         if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.active && native.active) {
             const auto& a = native.walker;
             const auto& b = enemy.walker;

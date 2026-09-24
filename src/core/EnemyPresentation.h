@@ -31,7 +31,7 @@ inline int enemyPresentationSprite(int object, bool grounded, int auxiliary) {
 
 inline unsigned enemySpriteFrameCount(int sprite) {
     switch (sprite) {
-        case 153: case 163: case 166: case 170: case 173: case 177: case 186: return 4;
+        case 153: case 157: case 162: case 163: case 166: case 170: case 173: case 177: case 186: return 4;
         case 168: case 278: return 2;
         case 188: return 6;
         default: return 1;

@@ -200,6 +200,8 @@ public:
     }
     std::uint32_t randomSeed() const { return random_.seed(); }
     std::uint64_t randomDrawCount() const { return random_.drawCount(); }
+    long mainEnemyTargetX() const { return mainPlayerMotion_.frameStartXFixed(); }
+    long mainEnemyTargetY() const { return mainPlayerMotion_.frameStartYFixed(); }
     std::uint64_t stateDigest() const;
 #ifdef DOWNWELL_TRACE_AREA_ONE
     void traceSetMainCameraViewY(float viewY) {

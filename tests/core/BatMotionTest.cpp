@@ -1,4 +1,5 @@
 #include "core/BatMotion.h"
+#include "core/BatBehavior.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -33,6 +34,53 @@ int main() {
         unsigned calls = 0;
         std::uint32_t nextU32() { ++calls; return 0x80000000u; }
     } random;
+    {
+        RandomProbe draws;
+        BatMotion bat{0, 0, 0, 0, 45, 50};
+        BatHitState hit;
+        BatActivity activity;
+        const auto ceiling = [](int, int y) { return y <= -8; };
+        auto effect = stepBatBehavior(bat, hit, activity, 0, 0, 153, 0, -20 * 256, draws, ceiling);
+        require(!activity.flying && activity.hang == -10 && effect.sprite == 157 &&
+                    bat.direction == 270 && bat.speedFortieths == 80 && draws.calls == 0,
+                "ceiling attachment selects hanging art without consuming flight RNG");
+        effect = stepBatBehavior(bat, hit, activity, 0, 0, 157, 0, -4 * 256, draws, ceiling);
+        require(!activity.flying, "player at exact y-minus-four does not wake a hanging bat");
+        effect = stepBatBehavior(bat, hit, activity, 0, 0, 157, 0, -3 * 256, draws, ceiling);
+        require(activity.flying && effect.sprite == 153 && effect.wakeSounds == 1 &&
+                    bat.x == 0 && bat.y == 0 && draws.calls == 0,
+                "player wake changes art immediately but movement starts on the next Step");
+        stepBatBehavior(bat, hit, activity, 0, 0, 153, 0, 100 * 256, draws, ceiling);
+        require(draws.calls == 1 && bat.y > 0, "awakened bat begins shared pursuit");
+        BatMotion hangingHit{0, 0, 0, 0, 270, 80};
+        BatActivity attached{true, false, -10};
+        BatHitState pendingHit;
+        pendingHit.queue(270);
+        pendingHit.advanceFrame();
+        const auto drawsBeforeHit = draws.calls;
+        const auto hitEffect = stepBatBehavior(hangingHit, pendingHit, attached, 0, 0, 157,
+            0, -20 * 256, draws, ceiling);
+        require(attached.flying && hitEffect.hit && hitEffect.sprite == 154 &&
+                    hangingHit.x == 0 && hangingHit.y == 0 && draws.calls == drawsBeforeHit,
+                "a surviving hit wakes an attached bat into stationary stun without pursuit RNG");
+        for (int side : {-1, 1}) {
+            BatMotion wallBat{0, 0, 0, 0, 0, 50};
+            BatActivity wallState;
+            BatHitState wallHit;
+            const auto wall = [side](int x, int) { return side < 0 ? x <= -8 : x >= 8; };
+            auto wallEffect = stepBatBehavior(wallBat, wallHit, wallState, 0, 0, 153,
+                0, -20 * 256, draws, wall);
+            require(!wallState.flying && wallState.hang == side && wallEffect.sprite == 162 &&
+                        wallBat.facing == -side, "left/right support sets wall art and source facing");
+            wallEffect = stepBatBehavior(wallBat, wallHit, wallState, 0, 0, 162,
+                0, -20 * 256, draws, wall);
+            require(!wallState.flying, "negative hang flag queries the left support, not the right");
+            wallEffect = stepBatBehavior(wallBat, wallHit, wallState, 0, 0, 162,
+                0, -20 * 256, draws, [](int, int) { return false; });
+            require(wallState.flying && wallEffect.wakeSounds == 1,
+                    "destroying either supporting wall wakes its bat");
+        }
+    }
     BatMotion injured{256, 512, 20, 30, 90, 50};
     BatHitState hit;
     hit.queue(270);

@@ -730,16 +730,18 @@ void StartupRuntime::updateMainEnemies() {
                 static_cast<int>(std::round(enemy.moveSpeed * 40.0F)),
                 enemy.scaleX < 0 ? -1 : 1
             };
-            const bool hit = stepActiveBat(bat, enemy.batHit,
+            const auto effects = stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
+                enemy.x, enemy.y, enemy.spriteId,
                 mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
                 mainPlayerOriginY_ * 256L + mainPlayerMotion_.frameStartYFixed(),
                 random_,
                 [this](int x, int y) { return mainSolidAt(x, y); });
-            if (hit) {
+            if (effects.hit) {
                 enemy.alarms.set(0, 3);
                 enemy.imageIndex = 0;
                 ++soundPlayRequests_;
             }
+            soundPlayRequests_ += effects.wakeSounds;
             enemy.preciseX = bat.x / 256.0F;
             enemy.preciseY = bat.y / 256.0F;
             enemy.velocityX = bat.speedX / 256.0F;
@@ -781,7 +783,7 @@ void StartupRuntime::updateMainEnemies() {
         enemy.spriteId = enemyPresentationSprite(enemy.objectId, enemy.grounded,
                                                   enemy.auxiliaryState);
         if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
-        if (enemy.objectId == 116 && enemy.batHit.stunned) enemy.spriteId = 154;
+        if (enemy.objectId == 116) enemy.spriteId = batPresentation(enemy.batActivity, enemy.batHit);
         if (enemy.objectId == 113) {
             if (enemy.frogHit.remaining != 0) {
                 enemy.spriteId = 173;
@@ -849,8 +851,9 @@ void StartupRuntime::updateMainLifecycle() {
         InstanceRecord& instance = instances_.at(index);
         if (!instance.active)
             continue;
-        const bool generated = instance.objectId == 60 ||
-                               instance.objectId == 92 ||
+        // objWall_n's scrOutofview call is guarded by global.area == 5.
+        // This area-one implementation must retain its stone walls.
+        const bool generated = instance.objectId == 92 ||
                                instance.objectId == 93 ||
                                instance.objectId == 111 ||
                                instance.objectId == 112 ||
@@ -2042,7 +2045,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(37); // Includes surviving-bat hit response.
+    digest.addU32(38); // Includes bat support/activation state.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2224,6 +2227,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(instance.motionState);
         digest.addI32(instance.auxiliaryState);
         if (instance.objectId == 116) {
+            digest.addBool(instance.batActivity.initialized);
+            digest.addBool(instance.batActivity.flying);
+            digest.addI32(instance.batActivity.hang);
             digest.addBool(instance.batHit.pending);
             digest.addBool(instance.batHit.ready);
             digest.addBool(instance.batHit.stunned);

@@ -159,6 +159,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.snail.initialize(x, y, speedY >= 0);
     enemy.snailHit = {};
     enemy.batHit = {};
+    enemy.batActivity = {};
     enemy.walker.initialize(x, y, speedX * 5L, speedY * 5L, grounded);
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
@@ -570,7 +571,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                                      enemy.imageSpeed);
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
-        if ((!enemy.awake && enemy.objectId != 113 && enemy.objectId != 111 && enemy.objectId != 112) || solidResolver_ == 0)
+        if ((!enemy.awake && enemy.objectId != 113 && enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 116) || solidResolver_ == 0)
             continue;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const bool turtle = enemy.objectId == 112;
@@ -595,12 +596,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         } else if (enemy.objectId == 116) {
             downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
                 enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing};
-            const bool hit = downwell::stepActiveBat(bat, enemy.batHit, player_.frameStartXFixed(),
+            const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
+                enemy.x, enemy.y, enemy.spriteId, player_.frameStartXFixed(),
                 player_.frameStartYFixed(), enemyRandom_,
                 [this](int x, int y) {
                     return solidResolver_(solidResolverContext_, x, y);
                 });
-            if (hit) {
+            if (effects.hit) {
                 enemy.alarm0 = 3;
                 enemy.imagePhase = 0;
                 enemy.imageRemainder = 0;
@@ -681,7 +683,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         enemy.spriteId = downwell::enemyPresentationSprite(enemy.objectId,
                                             enemy.grounded, enemy.auxiliaryState);
         if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
-        if (enemy.objectId == 116 && enemy.batHit.stunned) enemy.spriteId = 154;
+        if (enemy.objectId == 116)
+            enemy.spriteId = downwell::batPresentation(enemy.batActivity, enemy.batHit);
         if (enemy.objectId == 113) {
             if (enemy.frogHit.remaining != 0) {
                 enemy.spriteId = 173;
@@ -779,6 +782,17 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.awake = false;
             enemy.activationPending = false;
         }
+    }
+
+    // objBox_n End Step calls scrOutofview. Stone objWall_n calls it only
+    // in area 5, so area-one stone collision cells must remain present.
+    const long viewTop = followCamera_ ? cameraMotion_.y - 142L * 4096
+        : 34L * 4096 + cameraY_ * 16;
+    for (unsigned i = 0; i < breakableCount_; ++i) {
+        auto& box = breakables_[i];
+        const long y = (box.y + 176L) * 4096;
+        if (box.active && (y < viewTop - 160L * 4096 || y > viewTop + 3000L * 4096))
+            box.active = false;
     }
 
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)

@@ -244,6 +244,52 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared hanging-bat activation and area-one terrain lifetime
+
+`BatBehavior` now owns support discovery, wake decisions, hit/pursuit selection
+and sprite selection for both adapters. The source checks ceiling support
+first, then right and left walls (only hanging on a wall if unsupported below).
+Ceiling hang is -10; left/right hang are -1/+1. The VM's numeric boolean branch
+means -1 tests left support, not the right-support branch that C++ nonzero
+truthiness would select. Hanging art is sprite 157 or 162, with four frames
+and recovered wall-facing direction. Waking changes art immediately but does
+not integrate pursuit until the next Step. Hit handling can wake a hanging
+bat. Player and support-loss wake sound requests remain independent branches.
+
+The native renderer's `awake` flag no longer suppresses live bat simulation:
+the source bat Step has no such visibility guard. Paired tests compare live
+support state and exact flight state, including before render awakening.
+Focused fixtures cover ceiling precedence, strict player Y threshold, both
+wall sides, retained support and removal of supporting geometry. Hanging
+art and mirrored/DMA records are generated offline. Transparent padding in
+area-one enemy frames is cropped with source-anchor pixel reconstruction
+checks rather than increasing the resident-art budget.
+
+This route exposed an existing lifecycle mismatch through an offscreen gem:
+native terrain let it bounce on an old stone cell, while SDL had retired that
+cell and therefore consumed one fewer RNG draw. Original objWall_n End Step
+assembly blocks 0–1 guard `scrOutofview` with `global.area == 5`; the supported
+area-one stone walls must not use that rule. SDL now retains them. Original
+objBox_n End Step calls scrOutofview unconditionally; native breakable boxes
+now retire after simulation outside the same strict viewTop-160/viewTop+3000
+window. Retirement does not count as a bullet-destroyed block or repaint the
+scrolling buffers. Dedicated fixtures distinguish retained stone from retired
+boxes. Interior stone-to-tile conversion remains a separate unimplemented
+source optimization; this correction does not claim all wall lifecycle modes.
+
+Startup digest schema 38 includes bat activity; its menu replay baseline is
+`9401c8d6d642244e`. World time-stop, original collision-event timing, exact
+runner fractional mask conversion, and actual Amiga audio remain incomplete.
+
+Validation: the full host suite passes, including exact live bat-state checks
+on both combat tapes (health/kills/currency 3/3/22 and 3/2/12 on both adapters)
+and 16,562 offline sprite comparisons. The bounded A500 600-tick run passes
+101 terrain-cache comparisons and the new 256-byte task-stack guard. The
+cross-CPU player/gem fixture remains `64 9f0d3943 e7900d2b 400 9543220e
+d0d8e596 3f`; that narrow fixture does not itself exercise hanging bats.
+Both 68000 audits pass. Separate runtime orchestration still needs migration
+into the shared core; these checks do not establish whole-game equivalence.
+
 #### Shared bat rectangle collision response
 
 `resolveBatMotion` replaces the previous center-point displacement rejection.
@@ -265,7 +311,7 @@ follow the same changed route without relaxed comparisons.
 
 The terrain query supports the current aligned 16x16 cells, not arbitrary
 thin or precise masks. Windows-runner fractional place_meeting conversion,
-other wall families, hanging activation and time-stop remain open. This is
+other wall families and time-stop remain open. This is
 source-backed collision control flow, not a claim of complete bat fidelity.
 
 Validation: full host suite and SDL build pass, including both mandatory
@@ -288,10 +334,11 @@ The usual downward-bullet adapter supplies direction 270. This is not a
 complete implementation of aim/spread or other weapons. Delivery retains
 the existing next-Step queued-hit approximation used for frog and snail;
 collision-event timing and fatal-hit side effects remain separate work.
-Hanging-bat activation, the source's wake/support checks and their sound
-requests, world time-stop, and precise bat wall collision are still missing.
-The shared helper specifically covers already-active flying bats, not that
-full state machine. Amiga audio output remains unimplemented.
+Hanging activation and wake/support checks were subsequently added by the
+shared behavior described above. World time-stop and exact runner mask
+semantics remain missing. This earlier helper specifically covers active
+flying bats; BatBehavior now wraps it with support and wake handling.
+Amiga audio output remains unimplemented.
 
 Hit art, mirrored planar variants and DMA sprite records are generated on
 the host; no runtime sprite conversion is introduced. Tests cover no movement

@@ -526,12 +526,28 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainBlocksDestroyed() == 1 &&
                     runtime.mainBulletCount() == 0,
                 "a usual gunboot shot destroys one block and opens its cell");
-        require(runtime.mainInstancesRetired() > 0,
-                "generated objects above the recovered view margin are retired");
+        {
+            auto retirement = runtime;
+            std::size_t boxIndex = retirement.activeInstanceCount();
+            for (std::size_t i = 0; i < retirement.activeInstanceCount(); ++i) {
+                auto& object = const_cast<downwell::InstanceRecord&>(retirement.instanceAt(i));
+                if (object.objectId != 92) continue;
+                object.active = true;
+                object.y = -512;
+                boxIndex = i;
+                break;
+            }
+            require(boxIndex < retirement.activeInstanceCount(), "retirement fixture has a box");
+            retirement.step(releasedMain, false);
+            require(!retirement.instanceAt(boxIndex).active && retirement.mainInstancesRetired() > 0,
+                    "breakable boxes retain the source offscreen retirement rule");
+        }
+        bool retainedOldStone = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);
-            const bool generated = instance.objectId == 60 ||
-                                   instance.objectId == 92 ||
+            retainedOldStone = retainedOldStone || (instance.active && instance.objectId == 60 &&
+                instance.y < runtime.mainCameraViewY() - 160.0F);
+            const bool generated = instance.objectId == 92 ||
                                    instance.objectId == 93 ||
                                    instance.objectId == 111 ||
                                    instance.objectId == 112 ||
@@ -545,6 +561,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                             instance.y <= runtime.mainCameraViewY() + 3000.0F,
                         "active generated objects stay inside the lifecycle window");
         }
+        require(retainedOldStone, "area-one stone walls do not use the area-five retirement rule");
 
         const float groundedY = runtime.mainPlayerY();
         {

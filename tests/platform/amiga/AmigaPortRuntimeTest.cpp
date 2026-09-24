@@ -547,6 +547,13 @@ int main() {
             "ascending wall snail restores unflipped artwork");
 
     AmigaPortRuntime detachedSnail(300);
+    AmigaPortRuntime retiredBox(300);
+    const int retiredX[] = {0}, retiredY[] = {-512};
+    retiredBox.configureBreakables(retiredX, retiredY, 1);
+    require(retiredBox.breakableActiveAt(0, -512), "offscreen box exists until end-of-update retirement");
+    retiredBox.step(0);
+    require(!retiredBox.breakableActiveAt(0, -512) && retiredBox.blocksDestroyed() == 0,
+            "native offscreen box retires without counting as a destroyed block");
     AmigaPortRuntime hitBat(300, false, 1000);
     hitBat.configureSolidResolver(noSolid, nullptr);
     require(hitBat.configureEnemy(0, 116, 153, 0, 12, 0, 0, 15, 12,

@@ -15,6 +15,7 @@
 #include "core/SnailHitState.h"
 #include "core/WalkingEnemyMotion.h"
 #include "core/BatHitState.h"
+#include "core/BatBehavior.h"
 
 #include <cstdint>
 
@@ -86,6 +87,7 @@ public:
         downwell::SnailMotion snail;
         downwell::SnailHitState snailHit;
         downwell::BatHitState batHit;
+        downwell::BatActivity batActivity;
         downwell::WalkingEnemyMotion walker;
         int motionState;
         int auxiliaryState;
@@ -158,6 +160,7 @@ public:
     void configureEnemyRandom(const downwell::GameMakerRandom& random) {
         enemyRandom_ = random;
     }
+    std::uint64_t randomDrawCount() const { return enemyRandom_.drawCount(); }
 
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
