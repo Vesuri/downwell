@@ -224,6 +224,13 @@ test: test-level-exit
 test: test-level-upgrade-offers
 test: test-level-clear-selection
 test: test-upgrade-inventory
+test: test-level-clear-controller
+.PHONY: test-level-clear-controller
+build/level-clear-controller-test: tests/core/LevelClearControllerTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/LevelClearControllerTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp
+test-level-clear-controller: build/level-clear-controller-test
+	./build/level-clear-controller-test
 .PHONY: test-upgrade-inventory
 build/upgrade-inventory-test: tests/core/UpgradeInventoryTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

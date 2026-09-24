@@ -188,6 +188,17 @@ grants and host rendering tests check reset. Persistent combat modifiers,
 effects/sound playback and the live level-clear menu are not implemented by
 inventory ownership alone and remain open.
 
+`LevelClearController.h` now composes the selection, offer sampler and real
+inventory grant path. Its Create refills charge, consumes Result's gemSp random
+draw, snapshots the heart-goal state and fixes the option count from style/Youth.
+Step generates offers from current ownership and applies grants synchronously.
+The source's repeated heart-goal health assignment is preserved even on the
+update after Apple healing. Tests cover that ordering, full Create/offer RNG
+state, style option counts and the complete 211-update request sequence.
+This controller still awaits live room integration; presentation/easing, sound
+playback and its conditional wind-sample RNG, achievement/loading effects and
+next-room construction remain outside this tested subset.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
