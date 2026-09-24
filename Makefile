@@ -219,6 +219,13 @@ build/ammo-dividers-test: tests/core/AmmoDividersTest.cpp src/core/AmmoDividers.
 
 test: test-ammo-dividers test-ammo-fill
 test: test-shop-inventory
+test: test-shop-interaction
+.PHONY: test-shop-interaction
+build/shop-interaction-test: tests/core/ShopInteractionTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-shop-interaction: build/shop-interaction-test
+	./build/shop-interaction-test
 test: test-consumables
 .PHONY: test-consumables
 build/consumables-test: tests/core/ConsumablesTest.cpp src/core/PlayerMotion.cpp $(HOST_CHECK_HEADERS)

@@ -59,3 +59,32 @@ Full host tests and that bounded direct-entry A500 verifier pass: three consumab
 updates, 101 fresh terrain compositions and the task-stack guard. Native 68000
 instruction/helper audits are clean. Notification art/audio are still requests,
 not implemented presentation, and no end-to-end shop purchase is claimed.
+
+## Interaction controller
+
+`ShopInteraction` implements the interaction portion of Shop Step, including the
+state-zero selector and its independent transition into the item-selection branch.
+The caller supplies collision/interactable predicates, input **edges**, the shared
+`choose(1,2,3)` RNG operation, upgrade grant and ordered feedback sink. Input is
+mutable: opening/state-zero confirmation consumes confirm; item confirmation
+suppresses cancel but leaves confirm set, as in the VM. Right then left are
+independent branches, including a second navigation check when state zero enters
+state one in the same update. Cursor zero is Leave; slots one through three use
+the shared purchase transaction. Reentry does not regenerate sold stock.
+
+Feedback signals preserve greeting/sold-out random draws, navigation, purchase,
+poor response, goodbye and mask invalidation. Adapters must translate these into
+merchant/case/text/audio changes; these are not implemented NPC animations.
+The death/criminal tail disables interaction but does not itself clear noControl;
+only the source exit block clears that flag. Do not introduce an early death
+return: original interaction runs before that tail when not criminal. The normal
+controller's interactable predicate still determines whether opening is allowed.
+Draw-time cursor animation/decay, radio/view responses and world instance dispatch
+remain separate integration work.
+
+`make test-shop-interaction` covers eligibility, opening/confirmation consumption,
+queued purchase with simultaneous cancel, sold-out RNG, poor response without
+RNG, direction order/wrap, thanked exit, reentry, cancel, state-zero fall-through
+and death/criminal ordering. It passes alongside inventory and consumable tests.
+The callable template compiles for 68000 without floating-point/64-bit helpers.
+No emulator or playable-shop coverage is claimed for this unconnected controller.
