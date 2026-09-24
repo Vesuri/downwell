@@ -43,6 +43,12 @@ int main(int argc, char** argv) {
     downwell::Game game(&rooms, &objects, &builders);
     bool styleSeen = false, lockedSeen = false, landed = false;
     unsigned mainTicks = 0;
+#ifdef DOWNWELL_SKIP_TO_GAME
+    // The constructor has already completed the room-creation transition,
+    // which counts as the first main-room frame but has no player Step.
+    if (!game.startup().inMainRoom()) return 6;
+    mainTicks = 1;
+#endif
     // Mirrors native sceneVerificationInput through the first landing. No
     // input during splash; walk right; visit locked style and return to usual.
     for (unsigned tick = 0; tick < 6000; ++tick) {

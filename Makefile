@@ -510,35 +510,35 @@ verify-amiga-menu-entry-frame:
 	python3 tools/verify-amiga-entry-continuity.py
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
-verify-amiga-gameplay-frame: build/capture-sdl-landing
+verify-amiga-gameplay-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_FRAME_READY READY_DESCRIPTION="first grounded gameplay raster" amiga/verify_startup.sh'
 	printf '%s  %s\n' '$(AMIGA_GAMEPLAY_FRAME_SHA256)' 'amiga/.run/gameplay-frame.bin' | shasum -a 256 -c -
 	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-frame.bin build/amiga-gameplay-frame.png
 	@capture_dir=$$(mktemp -d build/landing-XXXXXX); \
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-landing "$$capture_dir" && \
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-game "$$capture_dir" && \
 	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-frame.png
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 .PHONY: verify-amiga-gameplay-ammo-frame
-verify-amiga-gameplay-ammo-frame: build/capture-sdl-landing
+verify-amiga-gameplay-ammo-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_ammo_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_AMMO_FRAME_READY READY_DESCRIPTION="gameplay gauge during a shot" amiga/verify_startup.sh'
 	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-ammo-frame.bin build/amiga-gameplay-ammo-frame.png
 	@capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/ammo-XXXXXX); \
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-landing "$$capture_dir" "$$capture_tick" && \
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-game "$$capture_dir" "$$capture_tick" && \
 	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-ammo-frame.png
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
-verify-amiga-gameplay-active-frame: build/capture-sdl-landing
+verify-amiga-gameplay-active-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_active_frame.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE_FRAME_READY READY_DESCRIPTION="scrolled gameplay raster with an awake enemy" amiga/verify_startup.sh'
 	printf '%s  %s\n' '$(AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256)' 'amiga/.run/gameplay-active-frame.bin' | shasum -a 256 -c -
 	python3 tools/decode-amiga-gameplay-frame.py amiga/.run/gameplay-active-frame.bin build/amiga-gameplay-active-frame.png
 	@capture_tick=$$(sed -n 's/^CAPTURE_STATE tick=\([0-9]*\).*/\1/p' amiga/.run/gdb-startup.log); \
 	capture_dir=$$(mktemp -d build/active-XXXXXX); \
-	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-landing "$$capture_dir" "$$capture_tick" && \
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-sdl-game "$$capture_dir" "$$capture_tick" && \
 	python3 tools/compare-gameplay-captures.py "$$capture_dir" build/amiga-gameplay-active-frame.png
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
@@ -606,5 +606,9 @@ clean:
 build/capture-sdl-landing: tools/capture-sdl-landing.cpp $(filter-out src/main.cpp,$(SOURCES)) $(HOST_CHECK_HEADERS) src/platform/sdl/PlatformSDL.h
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
+
+build/capture-sdl-game: tools/capture-sdl-landing.cpp $(filter-out src/main.cpp,$(SOURCES)) $(HOST_CHECK_HEADERS) src/platform/sdl/PlatformSDL.h
+	@mkdir -p build
+	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -DDOWNWELL_SKIP_TO_GAME -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
 
 -include $(DEPS)

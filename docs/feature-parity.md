@@ -12,16 +12,26 @@ AmigaPortRuntime implement identical behavior.
 ### Gameplay-only verification entry
 
 The landing, active-gameplay and firing-frame emulator gates build with
-`SKIP_TO_GAME=1`. Their SDL comparator retains its headless, unpaced startup
-simulation (no startup frames are rendered). This supplies the original full-tape
-gameplay state used by the native checkpoint. Full-startup emulator scene
-verification remains separate. Ordinary SDL builds are not changed.
+`SKIP_TO_GAME=1`. Their separate SDL comparator, `capture-sdl-game`, uses the same
+compile-time shortcut. Full-startup emulator scene verification and the older
+`capture-sdl-landing` comparator remain separate. Ordinary SDL builds are not
+changed by building either capture tool.
 
 Attempting to use SDL's existing shortcut directly exposed a different gameplay
 state: at simulation update 180 it produced player (201.961,1162.7), versus the
 full tape/native checkpoint's (215.945,1189.9), with 4,469 differing capture pixels.
-Shortcut initialization therefore still needs a separate state/RNG audit; its
-output must not replace the established comparator merely to make a test pass.
+The old shortcut consumed only 100 RNG draws at entry, versus 470 for the normal
+garden route. It bypassed garden updates rather than merely hiding them.
+`skipToGameForTesting` now advances the normal garden/rightward-walk and usual-style
+confirmation logic without rendering or waiting. It neither hard-codes 470 RNG
+draws nor copies a captured world. The bounded 4,096-update preparation reports
+failed initialization if it cannot reach gameplay. Tests compare it to a normal
+publisher-to-gameplay run, require equal entry RNG counts and compare RNG,
+player/camera coordinates and generation counts for the following 180 updates.
+After this repair, the shortcut SDL captures at simulation updates 164, 180 and
+383 match the native landing, firing and scrolling captures at all 99,968 pixels.
+The firing comparison was rerun in a bounded emulator session; the other two
+reuse the already validated native direct-entry dumps. The full host suite passes.
 
 `SCENE_VERIFY` contains intentionally expensive independent style rendering and
 byte comparisons. Those checks explain the style-screen slowdown in verification

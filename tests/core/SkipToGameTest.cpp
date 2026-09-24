@@ -30,20 +30,32 @@ int main() {
 
     downwell::StartupRuntime normal(downwell::PlatformProfile::desktop, &rooms,
         &objects, downwell::StartupRuntime::defaultRandomSeed, &builders);
-    normal.skipIntroForTesting();
     downwell::Input input;
-    for (int i = 0; i < 120; ++i) normal.step(input, false);
-    input.fire = true;
-    normal.step(input, true);
-    input.fire = false;
-    for (int i = 0; i < 300 && !normal.inMainRoom(); ++i) normal.step(input, false);
+    for (int i = 0; i < 4096 && !normal.inMainRoom(); ++i) {
+        input = {};
+        if (normal.inMenu()) input.right = true;
+        if (normal.inPlayMenu() && normal.playMenuYOffset() == 0 && !normal.playMenuSelected())
+            input.fire = true;
+        normal.step(input, input.fire);
+    }
     assert(normal.inMainRoom());
+    std::cout << "Entry RNG draws: normal=" << normal.randomDrawCount()
+              << " shortcut=" << host.startup().randomDrawCount() << std::endl;
+    assert(normal.randomDrawCount() == host.startup().randomDrawCount());
     assert(normal.mainPlayerX() == host.startup().mainPlayerX());
     assert(normal.mainPlayerY() == host.startup().mainPlayerY());
     assert(normal.mainPlayerHealth() == host.startup().mainPlayerHealth());
     assert(normal.mainCameraViewY() == host.startup().mainCameraViewY());
     assert(normal.mainBuilderGenerationCount() == host.startup().mainBuilderGenerationCount());
-    for (int i = 0; i < 120; ++i) { host.update(input); amiga.step(input); }
+    input = {};
+    for (int i = 0; i < 180; ++i) {
+        host.update(input); normal.step(input, false); amiga.step(input);
+        assert(normal.randomDrawCount() == host.startup().randomDrawCount());
+        assert(normal.mainPlayerX() == host.startup().mainPlayerX());
+        assert(normal.mainPlayerY() == host.startup().mainPlayerY());
+        assert(normal.mainCameraViewY() == host.startup().mainCameraViewY());
+        assert(normal.mainBuilderGenerationCount() == host.startup().mainBuilderGenerationCount());
+    }
     assert(host.startup().inMainRoom() && amiga.scene() == AmigaScene::gameplay);
     std::cout << "Direct gameplay startup, normal initialization and toggle precedence passed\n";
 }

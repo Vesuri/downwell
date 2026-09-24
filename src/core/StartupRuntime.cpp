@@ -245,15 +245,22 @@ void StartupRuntime::skipIntroForTesting() {
 }
 
 void StartupRuntime::skipToGameForTesting() {
-    skipIntroForTesting();
-    if (roomLoadSucceeded_) {
-        playStyle_ = 0;
-        playMenuSelected_ = true;
-        playMenuVerticalDitherY_ = 320.0F;
-        // Take the normal confirmation transition, including same-frame
-        // camera phases, without presenting or waiting through the menu.
-        step(Input{}, false);
+    // Fast-forward the deterministic usual-style entry without presenting any
+    // skipped frames. Garden updates consume RNG (not just room Create), so
+    // jumping straight to PlayMenu produces a different world from the native
+    // checkpoint. Do not repair this by hard-coding a random-stream offset.
+    showSplash_ = 0;
+    gotoRoom(menuRoomId);
+    for (unsigned frame = 0; frame < 4096 && roomLoadSucceeded_ && !inMainRoom(); ++frame) {
+        Input input;
+        if (inMenu()) input.right = true;
+        if (inPlayMenu() && playMenuYOffset_ == 0 && !playMenuSelected_)
+            input.fire = true;
+        step(input, input.fire);
     }
+    // Treat a malformed/missing transition as failed initialization, not a
+    // successful shortcut that silently leaves the user in a skipped scene.
+    if (!inMainRoom()) roomLoadSucceeded_ = false;
 }
 
 void StartupRuntime::controllerCreate(PlatformProfile profile) {
