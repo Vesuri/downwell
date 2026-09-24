@@ -47,6 +47,8 @@ struct LiveSceneWorld {
 
     static bool create(void* opaque, const downwell::DeferredCreateInstance& command) {
         auto& world = *static_cast<LiveSceneWorld*>(opaque);
+        if (command.objectId == 277) return world.runtime->registerShop(command.x, command.y) != nullptr;
+        if (command.objectId == 306) world.runtime->registerLevelExit(command.y);
         if (!amigaAddTerrainObject(world.index, command.objectId, command.x, command.y)) return false;
         if (command.objectId == 92) {
             const int x = command.x - 240, y = command.y - 176;
@@ -73,8 +75,9 @@ struct LiveSceneWorld {
         return world.builder.stepVisible(world.patterns, random, bottom, result);
     }
     void bind(AmigaPortRuntime& port, const downwell::RoomPack& rooms,
-              const downwell::PackedRoom& room) {
+              const downwell::PackedRoom& room, bool continuing = false) {
         runtime = &port;
+        collision.index = nullptr; collision.runtime = nullptr; collision.fragmentCount = 0;
         require(amigaBuildTerrainIndex(collision, index), "live scene index initializes empty");
         for (unsigned i = 0; i < room.instanceCount; ++i) {
             downwell::PackedRoomInstance instance;
@@ -87,10 +90,14 @@ struct LiveSceneWorld {
         collision.runtime = &port;
         const int emptyBlock = 0;
         port.configureBreakables(&emptyBlock, &emptyBlock, 0);
-        downwell::GameMakerRandom random;
-        builder.resetInitialCheckpoint(random);
+        if (continuing) {
+            require(port.initializeAreaOneBuilder(builder, -16, 704), "native continuation initializes the current level on its owned RNG");
+        } else {
+            downwell::GameMakerRandom random;
+            builder.resetInitialCheckpoint(random);
+            port.configureEnemyRandom(random);
+        }
         builder.setCreateObserver(create, this);
-        port.configureEnemyRandom(random);
         port.configureGenerationStep(generate, this);
         port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
         port.configureSolidResolver(amigaResolveTerrainSolid, &collision);
@@ -972,6 +979,23 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "native next-room builder receives the untouched RNG state");
         require(!gameplay.prepareNextAreaOneLevel(heldEntry, 0) && !reference.loadNextAreaOneLevel(heldEntry),
             "duplicate next-room consumption cannot skip a stage");
+        live.bind(gameplay, rooms, terrainRoom, true);
+        require(gameplay.randomDrawCount() == reference.randomDrawCount() &&
+            gameplay.randomState().stateIndex() == reference.randomState().stateIndex(),
+            "native next-room builder initialization matches SDL room Create RNG");
+        for (unsigned i = 0; i < 16; ++i)
+            require(gameplay.randomState().stateWord(i) == reference.randomState().stateWord(i),
+                "all RNG words match after next-room terrain reset");
+        for (unsigned tick = 0; tick < 90; ++tick) {
+            gameplay.step(0); reference.step({}, false);
+            require(gameplay.generationSucceeded() && reference.deferredCommandsSucceeded(),
+                "next-stage live generation succeeds on both adapters");
+            require(std::fabs(reference.mainPlayerX() - (240 + gameplay.player().offsetXFixed() / 256.0F)) < 0.01F &&
+                std::fabs(reference.mainPlayerY() - (176 + gameplay.player().offsetYFixed() / 256.0F)) < 0.01F &&
+                gameplay.player().grounded() == reference.mainPlayerGrounded() &&
+                gameplay.randomDrawCount() == reference.randomDrawCount(),
+                "next-stage movement, terrain collision and generation RNG remain paired");
+        }
         return;
     }
     require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&

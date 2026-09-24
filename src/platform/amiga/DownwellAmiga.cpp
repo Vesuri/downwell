@@ -1987,16 +1987,14 @@ int main(void) {
                             }
                         }
                         if (!roomReady) break;
-                        enemyRandom.setSeed(newRunSeed);
-                        liveBuilder.resetRoom(-16, 704, enemyRandom);
+                        port.confirmFirstStage();
+                        if (!port.initializeAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
                         liveBuilder.setCreateObserver(appendGeneratedTerrain, &liveGeneration);
                         liveGeneration.dirtyFirst = terrainRasterRows;
                         liveGeneration.dirtyEnd = 0;
-                        port.configureEnemyRandom(enemyRandom);
                         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
                         port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision);
-                        port.confirmFirstStage();
                         terrainRasterReady = false;
                         terrainCopyTarget = nullptr;
                         terrainCopyBacking = nullptr;

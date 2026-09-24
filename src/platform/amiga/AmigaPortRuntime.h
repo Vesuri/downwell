@@ -10,6 +10,7 @@
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
 #include "core/RunSession.h"
+#include "core/AreaOneBuilder.h"
 #include "core/PlayerLifeRules.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
@@ -248,6 +249,16 @@ public:
     // Retire the old display first. This resets only room-local runtime state;
     // the owner must rebuild terrain and rebind generation/collision callbacks.
     bool prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin);
+    template<class Builder>
+    bool initializeAreaOneBuilder(Builder& builder, int x, int y, unsigned style = 0) {
+        if (run_.stage.area != 1 || run_.stage.level < 1 || run_.stage.level > 3 || style > 4) return false;
+        downwell::AreaOneBuilder::Setup setup;
+        setup.level = unsigned(run_.stage.level);
+        setup.style = style;
+        setup.member = run_.upgrades.levels[14] != 0;
+        builder.resetRoom(x, y, enemyRandom_, setup);
+        return true;
+    }
     const downwell::LevelClearController& levelClear() const { return run_.levelClear; }
     const downwell::LevelClearPresentation::Frame& levelClearFrame() const { return run_.levelClearFrame; }
     const downwell::RunStage& runStage() const { return run_.stage; }

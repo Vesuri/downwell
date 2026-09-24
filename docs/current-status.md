@@ -382,6 +382,23 @@ Standalone -O3/-m68000 stack reports give 1,572 bytes for preparation and 672
 for its nested player reset; native instruction/helper audits pass. These
 compiler reports are not a measured complete call-chain stack margin.
 
+The native builder initializer now uses the runtime-owned RNG directly and
+derives level/style/Member's Card setup from the current run. The application
+rebuild path uses this initializer instead of resetting a separate RNG and
+copying it back; first-stage confirmation precedes builder Create. The paired
+scene test rebuilds the native index/collision callbacks after clear departure,
+checks every RNG word against SDL room creation, and follows 90 further updates
+with matching positions, grounding and random draw counts. Its live builder
+observer now dispatches shop/exit creation just as the production observer does.
+This verifies next-room runtime/terrain construction on the host; the native
+application’s clear-screen presenter and handoff still remain to be connected.
+The production rebuild change also passes the 45-second-bounded native results
+reentry gate with SKIP_TO_GAME=1: three destinations, final gameplay at 200
+updates, no checked renderer/generation failures and an intact 256-byte stack
+guard. This uses A500 CPU/512 KiB Chip plus 8 MiB Fast, not stock-memory proof.
+The emulator was stopped and the normal uninstrumented build restored. This
+existing death-results gate does not exercise the new level-clear presenter.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
