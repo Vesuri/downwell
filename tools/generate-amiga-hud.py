@@ -2,6 +2,7 @@
 """Convert selected recovered art to planar Amiga 2bpp data plus a mask."""
 
 import argparse
+import configparser
 import hashlib
 import json
 import os
@@ -248,7 +249,24 @@ def encode_planar(pens, width, height):
     return dma_width, bytes(output)
 
 
-def render_text(manifest, pages, text):
+def shop_texts(language_path):
+    ini = configparser.ConfigParser(interpolation=None)
+    ini.read_string(language_path.read_text(encoding="utf-8-sig"))
+    english = ini["english"]
+    keys = {65410: "shopExit", 65412: "shopPurchased", 65413: "menuBack"}
+    keys.update({65420 + i: f"ugName{100 + i}" for i in range(6)})
+    keys.update({65430 + i: f"ugDesc{100 + i}" for i in range(6)})
+    # langString replaces '*': GameMaker draw_text interprets '#' as newline.
+    result = {ident: english[key].replace("*", "\n").replace("#", "\n")
+              for ident, key in keys.items()}
+    result[65411] = "BUY"  # literal in scrShopAssignText, not a language key
+    # Compose dynamic prices from these original-font masks, never host fonts.
+    result.update({65440 + i: str(i) for i in range(10)})
+    result[65450] = "G"
+    return result
+
+
+def render_text(manifest, pages, text, centered=False):
     font = manifest["resources"]["fonts"][2]
     item = manifest["resources"]["texturePageItems"][font["texturePageItemId"]]
     atlas = pages[item["texturePageId"]]
@@ -260,7 +278,7 @@ def render_text(manifest, pages, text):
     height = 10 + 12 * (len(lines) - 1)
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     for line_index, line in enumerate(lines):
-        draw_x = 0
+        draw_x = (width - widths[line_index]) // 2 if centered else 0
         for character in line:
             glyph = glyphs[ord(character)]
             source = atlas.crop((
@@ -324,7 +342,7 @@ def decode_planar(data, width, height, dma_width):
     return pens
 
 
-def build_pack(manifest, extracted, profile):
+def build_pack(manifest, extracted, profile, language_path=None):
     require(manifest["schemaVersion"] == 3, "unexpected extraction schema")
     require(manifest["source"]["sha256"] == SOURCE_SHA256,
             "manifest does not describe the pinned Steam build")
@@ -498,8 +516,9 @@ def build_pack(manifest, extracted, profile):
                             digit, stride, data))
 
     style_text = {}
-    for text_id, text in TEXT_SELECTIONS.get(profile, {}).items():
-        canvas = render_text(manifest, pages, text)
+    texts = shop_texts(language_path) if profile == "shop" else TEXT_SELECTIONS.get(profile, {})
+    for text_id, text in texts.items():
+        canvas = render_text(manifest, pages, text, centered=profile == "shop")
         if text_id in (65000, 65001, 65003):
             # Same two draws as Game::renderStyleSelect: red at y+1,
             # followed by white at y. Keep the original anchor unchanged.
@@ -515,7 +534,7 @@ def build_pack(manifest, extracted, profile):
         sprite = {
             "id": text_id,
             "originX": canvas.width // 2,
-            "originY": 0,
+            "originY": canvas.height // 2 if profile == "shop" else 0,
             "width": canvas.width,
             "height": canvas.height,
         }
@@ -719,13 +738,14 @@ def main():
                         default=root / "extracted/utmt-0.9.2.0")
     parser.add_argument("--profile", choices=SELECTIONS, default="hud")
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--language", type=Path, default=root / "data/language.ini")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
     manifest = json.loads((args.extracted / "manifest.json").read_text(encoding="utf-8"))
     if args.output is None:
         args.output = root / f"generated/amiga-{args.profile}.dwap"
-    data = build_pack(manifest, args.extracted, args.profile)
+    data = build_pack(manifest, args.extracted, args.profile, args.language)
     digest = hashlib.sha256(data).hexdigest()
     if args.check:
         require(args.output.is_file(), f"missing Amiga asset pack: {args.output}")
@@ -735,6 +755,19 @@ def main():
     else:
         atomic_write(args.output, data)
         print(f"Amiga {args.profile} pack written: {len(data)} bytes sha256 {digest}")
+    if args.profile == "shop":
+        provenance = json.dumps({
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/shop-v1",
+            "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
+            "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
+            "packSha256": digest, "language": "english",
+            "textAssetIds": sorted(shop_texts(args.language)),
+        }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
+        provenance_path = args.output.with_suffix(".manifest.json")
+        if args.check:
+            require(provenance_path.read_bytes() == provenance, "shop provenance differs")
+        else:
+            atomic_write(provenance_path, provenance)
 
 
 if __name__ == "__main__":

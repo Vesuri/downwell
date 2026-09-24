@@ -497,6 +497,7 @@ generate-amiga-shop:
 	tools/generate-amiga-hud.py --profile shop
 verify-amiga-shop: generate-amiga-shop
 	tools/generate-amiga-hud.py --profile shop --check
+	python3 tests/shop-pack-test.py
 test: verify-amiga-shop
 generate-amiga-results:
 	tools/generate-amiga-hud.py --profile results

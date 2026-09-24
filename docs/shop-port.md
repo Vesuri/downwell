@@ -403,3 +403,22 @@ remains byte-for-byte unchanged, with its existing Chip-RAM budget. This bank
 is not loaded by the executable yet. Localized text extraction/rasterization,
 bank lifetime management and backend composition remain required before any
 claim of visible shop-menu support. Generated artwork stays ignored by Git.
+
+The bank now also extracts English shop labels and six item names/descriptions
+from data/language.ini, rather than committing copied localized payloads.
+Text IDs 65410..65413 cover Exit/Buy/Purchased/Back, 65420..65425 names,
+65430..65435 descriptions, and 65440..65450 digits/G for dynamic prices.
+The BUY literal comes from scrShopAssignText. Star/hash breaks are normalized
+to newlines; each line is centered independently. Masks use font 2 and
+center/middle origins; the compositor must apply the source four-direction
+black outline and foreground colour. No runtime font conversion is needed.
+
+Current bank: 45 records, 14840 bytes, SHA-256
+c32dfd9b893ad557470cd962875ca4c8e044a4d2fcc0004785162b36a21aaed5.
+The ignored .manifest.json records both input hashes, extraction tool version
+and commit, generator version and output hash. Reproducibility checks include
+this provenance. tests/shop-pack-test.py verifies original glyph masks,
+multiline alignment, anchors and the source font's absence of kerning for
+these strings. Existing game/results pack checks remain unchanged. Runtime
+loading, price spacing and original-game vertical alignment validation are
+still required; the generated bank is not yet presented by either backend.
