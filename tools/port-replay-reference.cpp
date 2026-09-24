@@ -1,5 +1,6 @@
 #include "core/PortReplay.h"
 #include "core/Replay.h"
+#include "core/GemVerification.h"
 #include "platform/amiga/AmigaPortRuntime.h"
 
 #include <cinttypes>
@@ -20,8 +21,11 @@ int main() {
     }
 
     const std::uint64_t digest = runtime.trajectoryDigest();
-    std::printf("%" PRIu32 " %08" PRIx32 " %08" PRIx32 "\n",
+    const auto gems = downwell::verifyGemSimulation();
+    if (gems.coverage != 63) return 3;
+    std::printf("%" PRIu32 " %08" PRIx32 " %08" PRIx32 " 400 %08" PRIx32 " %08" PRIx32 " %02x\n",
                 replay.frameCount(), (std::uint32_t)(digest >> 32),
-                (std::uint32_t)digest);
+                (std::uint32_t)digest, (std::uint32_t)(gems.digest >> 32),
+                (std::uint32_t)gems.digest, gems.coverage);
     return 0;
 }

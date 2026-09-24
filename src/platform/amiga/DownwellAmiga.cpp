@@ -173,11 +173,15 @@ volatile ULONG gDownwellStartupChipRemaining;
 }
 
 #ifdef DOWNWELL_REPLAY_VERIFY
+#include "core/GemVerification.h"
 extern "C" {
 volatile ULONG gReplayComplete;
 volatile ULONG gReplayFrames;
 volatile ULONG gReplayDigestHigh;
 volatile ULONG gReplayDigestLow;
+volatile ULONG gGemReplayDigestHigh;
+volatile ULONG gGemReplayDigestLow;
+volatile ULONG gGemReplayCoverage;
 
 __attribute__((noinline, used)) void downwellReplayComplete(void) {
     __asm__ volatile("" ::: "memory");
@@ -2286,6 +2290,10 @@ int main(void) {
             gReplayFrames = port.tick();
             gReplayDigestHigh = (ULONG)(lastPortCheckpoint >> 32);
             gReplayDigestLow = (ULONG)lastPortCheckpoint;
+            const auto gems = downwell::verifyGemSimulation();
+            gGemReplayDigestHigh = (ULONG)(gems.digest >> 32);
+            gGemReplayDigestLow = (ULONG)gems.digest;
+            gGemReplayCoverage = gems.coverage;
             gReplayComplete = 1;
             downwellReplayComplete();
             for (;;) platform.waitVblank();

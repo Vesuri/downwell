@@ -1,4 +1,5 @@
 #include "platform/amiga/AmigaPortRuntime.h"
+#include "core/GemVerification.h"
 #include "platform/amiga/AmigaActorChannels.h"
 #include "core/PortReplay.h"
 #include "core/Replay.h"
@@ -723,6 +724,9 @@ int main() {
               << replayRuntime.trajectoryDigest() << std::dec << '\n';
     require(replayRuntime.trajectoryDigest() == 0x9f0d3943e7900d2bULL,
             "cross-target trajectory digest remains pinned");
+    const auto gems = downwell::verifyGemSimulation();
+    require(gems.coverage == 63 && gems.digest == 0x764abdd072bb4bbdULL,
+            "400-update gem cross-CPU fixture retains all branches and pinned full-state digest");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;
 }

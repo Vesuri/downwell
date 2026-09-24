@@ -664,3 +664,20 @@ remain unimplemented; the latter is not silently approximated here.
 The bounded 68000 replay (`64 9f0d3943 e7900d2b`) and 600-tick target
 terrain-cache oracle pass with this frame-selection path. They do not replace
 the outstanding original-Windows creation-phase and flashing checks.
+
+## Target gem-simulation verification
+
+The bounded cross-target gate now also executes a separate 400-update,
+three-gem fixture on the actual 68000. It records full shared motion, homing,
+lifetime and animation state on every update, plus RNG draw count/index and
+final RNG words. Coverage requires free motion, attracted motion, proximity
+acquisition, terrain contact, expiry and survival beyond expiry. Collection
+is observed but not applied in this isolated fixture so long lifetimes are
+exercised. It is deliberately not represented as a real gameplay replay.
+
+Host and emulated A500 agree on gem digest `764abdd072bb4bbd` with coverage
+`3f`, alongside the existing player digest `9f0d3943e7900d2b`. The host test
+pins both digests; the bounded runner compares both and the coverage mask.
+Verification-only code is excluded from normal Amiga builds. This closes the
+previous lack of direct target execution evidence for gem arithmetic without
+claiming the source collision/bounce/creation-order gaps are solved.
