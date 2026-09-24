@@ -121,7 +121,7 @@ $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) 
 test: build/gem-homing-test
 test: build/main-camera-test
 test: build/main-room-activation-test
-test: build/player-death-sequence-test
+test: build/player-death-sequence-test build/run-time-parts-test
 test: build/death-menu-sequence-test
 test: build/death-menu-progress-test
 test: verify-amiga-results
@@ -171,6 +171,10 @@ build/death-menu-progress-test: tests/core/DeathMenuProgressTest.cpp src/core/De
 build/player-death-sequence-test: tests/core/PlayerDeathSequenceTest.cpp src/core/PlayerDeathSequence.h src/core/RunClock.h src/core/AlarmBank.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/PlayerDeathSequenceTest.cpp
+
+build/run-time-parts-test: tests/core/RunTimePartsTest.cpp src/core/RunTimeParts.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/RunTimePartsTest.cpp
 
 build/player-death-verification-test: tests/core/PlayerDeathVerificationTest.cpp src/core/PlayerMotion.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
@@ -344,6 +348,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/main-camera-test
 	./build/main-room-activation-test
 	./build/player-death-sequence-test
+	./build/run-time-parts-test
 	./build/death-menu-sequence-test
 	./build/death-menu-progress-test
 	./build/player-death-verification-test

@@ -3,6 +3,8 @@
 #include "PlayerDeathSequence.h"
 #include "PlayerMotion.h"
 #include "StateDigest.h"
+#include "RunClock.h"
+#include "RunTimeParts.h"
 
 namespace downwell {
 struct PlayerDeathVerificationResult {
@@ -28,10 +30,20 @@ constexpr unsigned playerDeathVerificationCoverage = 511;
 [[gnu::noinline]] inline PlayerDeathVerificationResult verifyPlayerDeath() {
     StateDigest digest;
     unsigned coverage = 0;
-    deathHashWord(digest, 1);
+    deathHashWord(digest, 2);
+    // Arithmetic boundaries exercise the timer on the actual target CPU too.
+    for (std::uint32_t seconds = 1; seconds <= (1u << 26); seconds <<= 1) {
+        for (int offset = -2; offset <= 2; ++offset) {
+            const auto parts = RunTimeParts::fromTicks(seconds * 60 + offset);
+            deathHashWord(digest, parts.minutes);
+            deathHashWord(digest, parts.seconds);
+            deathHashWord(digest, parts.centiseconds);
+        }
+    }
     for (unsigned scenario = 0; scenario < 2; ++scenario) {
         PlayerMotion player(false, 32);
         PlayerDeathSequence death;
+        RunClock clock;
         int health = 4;
         unsigned shotsAtDeath = 0, jumpsAtDeath = 0;
         for (unsigned tick = 0; tick < 240; ++tick) {
@@ -41,6 +53,7 @@ constexpr unsigned playerDeathVerificationCoverage = 511;
                 (scenario == 1 && (tick == 16 || tick == 18 || tick == 20));
             death.beginStep(input.fire);
             player.step(input, false, death.movementDead());
+            clock.advance(true, death.active);
             death.publishHealth(health);
             const bool effect = death.advanceAlarms(player.grounded());
             if (tick == 10) { // Collision phase, after player Begin Step.
@@ -66,6 +79,7 @@ constexpr unsigned playerDeathVerificationCoverage = 511;
             deathHashBool(digest, death.priorFire); deathHashBool(digest, death.menuReady);
             deathHashWord(digest, death.frames); deathHashWord(digest, death.skipPresses);
             deathHashWord(digest, death.animation); deathHashWord(digest, death.alarm);
+            deathHashWord(digest, clock.ticks);
             deathHashPlayer(digest, player);
             deathHashWord(digest, player.spriteId(death.movementDead()));
             deathHashWord(digest, player.spriteFrame(death.movementDead(), death.animation));

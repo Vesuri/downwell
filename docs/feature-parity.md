@@ -9,6 +9,31 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Timer arithmetic recovered; drawing semantics still under audit
+
+`RunTimeParts` models timerNumber VM blocks 2/3 with binary64 rounding after
+division and multiplication. It uses integer long division and shifts, avoiding
+floating-point execution and 64-bit multiplication/division on the target.
+The test compares the first million tick counts, 100,000 full-range samples,
+power-of-two boundaries and UINT32_MAX against separately stored host binary64
+operations. This preserves centisecond results that differ from a simple
+`(ticks % 60) * 100 / 60` conversion. The cross-CPU death fixture now includes
+timer arithmetic boundaries and the live pre-publication death clock.
+
+This is not yet the visible time row. In VM blocks 12/24/36 the single-digit
+branch uses `string_char_at(string(smalnumb), stleng-i)` after the initializing
+loop leaves i=2. For a one-character value that index is -1. The assembly
+confirms this is not just a decompiler artifact, but the Windows runner's
+out-of-range string/real behavior needs checking before copying or correcting
+the displayed digits. The binary64 arithmetic oracle also does not establish
+whether this runner retains extended precision internally.
+
+Validation: full host suite passes; bounded A500 cross-CPU replay passes with
+death/timer digest `183c86efc2808e8e`, unchanged player/currency digests and all
+nine death transitions covered. The target stack retains its 256-byte margin
+and both 68000 audits pass. The fixture samples timer binade boundaries; the
+million-count binary64 comparison runs on the host, not on the Amiga.
+
 ### Shared run clock
 
 Both gameplay paths now count run time with `RunClock`, once per simulation
