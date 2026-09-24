@@ -663,6 +663,8 @@ void StartupRuntime::updateMainEnemies() {
         }
 
         enemy.imageIndex += enemy.imageSpeed;
+        if (enemy.objectId == 113)
+            enemy.imageSpeed = enemy.frogPresentation.beginStepRate() / 20.0F;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             if (!enemy.walker.initialized)
                 enemy.walker.initialize(enemy.x, enemy.y,
@@ -786,14 +788,11 @@ void StartupRuntime::updateMainEnemies() {
         if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
         if (enemy.objectId == 116) enemy.spriteId = batPresentation(enemy.batActivity, enemy.batHit);
         if (enemy.objectId == 113) {
-            if (enemy.frogHit.remaining != 0) {
-                enemy.spriteId = 173;
-            } else if (!enemy.grounded) {
-                enemy.imageSpeed = 0.0F;
-                enemy.imageIndex = enemy.velocityY < 0.0F ? 0.0F : 1.0F;
-            } else {
-                enemy.imageSpeed = 0.2F;
-            }
+            const auto visual = enemy.frogPresentation.finishStep(
+                enemy.frogHit.remaining != 0, enemy.grounded,
+                enemy.auxiliaryState != 0, enemy.velocityY < 0.0F);
+            enemy.spriteId = visual.sprite;
+            if (visual.forcedFrame >= 0) enemy.imageIndex = static_cast<float>(visual.forcedFrame);
         }
         const float frames = static_cast<float>(enemySpriteFrameCount(enemy.spriteId));
         if (enemy.imageIndex >= frames)
@@ -2032,7 +2031,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(38); // Includes bat support/activation state.
+    digest.addU32(39); // Includes the frog's separate imgSp state.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2267,6 +2266,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
             digest.addI32(instance.frogVertical.velocity);
             digest.addBool(instance.frogVertical.grounded);
             digest.addBool(instance.frogHit.pending);
+            digest.addU32(instance.frogPresentation.desiredRate);
             digest.addBool(instance.frogHit.ready);
             digest.addU32(instance.frogHit.remaining);
         }

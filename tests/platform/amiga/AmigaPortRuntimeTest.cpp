@@ -414,6 +414,8 @@ int main() {
                 frog.enemyAt(0).alarm1 == 60 &&
                 frog.enemyAt(0).spriteId == 166,
             "frog alarm observes prior ground state before its Step event");
+    require(frog.enemyAt(0).imageSpeed == 0 && frog.enemyAt(0).frogPresentation.desiredRate == 4,
+            "landing schedules the original imgSp change without immediately changing image_speed");
     for (unsigned frame = 0; frame < 60; ++frame)
         frog.step(0);
     require(frog.enemyAt(0).grounded &&
@@ -422,6 +424,8 @@ int main() {
                 frog.enemyAt(0).alarm0 == 60 &&
                 frog.enemyAt(0).spriteId == 170,
             "frog alarm enters its grounded crouch toward the player");
+    require(frog.enemyAt(0).imageSpeed == 4 && frog.enemyAt(0).frogPresentation.desiredRate == 4,
+            "preparation retains the idle animation rate");
     for (unsigned frame = 0; frame < 60; ++frame)
         frog.step(0);
     require(!frog.enemyAt(0).grounded &&
@@ -431,6 +435,11 @@ int main() {
                 frog.enemyAt(0).spriteId == 168 &&
                 frog.enemyAt(0).imageFrame == 0,
             "frog alarm launches its recovered directional jump");
+    require(frog.enemyAt(0).imageSpeed == 4 && frog.enemyAt(0).frogPresentation.desiredRate == 0,
+            "takeoff forces its pose immediately but defers the applied zero rate");
+    frog.step(0);
+    require(frog.enemyAt(0).imageSpeed == 0 && frog.enemyAt(0).frogPresentation.desiredRate == 0,
+            "the following native Step applies the scheduled airborne rate");
 
     AmigaPortRuntime fallingSnake(300);
     fallingSnake.configureSolidResolver(noSolid, nullptr);

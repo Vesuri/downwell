@@ -9,6 +9,7 @@
 #include "core/MainCameraMotion.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
+#include "core/FrogPresentation.h"
 #include "core/FrogBehavior.h"
 #include "core/CrawlerMotion.h"
 #include "core/SnailMotion.h"
@@ -83,6 +84,7 @@ public:
         unsigned char gravityPositionRemainder; // fifth-Q8 integration residual
         downwell::FrogHorizontalMotion frogHorizontal;
         downwell::FrogHitState frogHit;
+        downwell::FrogPresentation frogPresentation;
         downwell::CrawlerMotion crawler;
         downwell::SnailMotion snail;
         downwell::SnailHitState snailHit;

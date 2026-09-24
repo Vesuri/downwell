@@ -4,6 +4,7 @@
 #include "core/FrogVerticalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogMotion.h"
+#include "core/FrogPresentation.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -13,6 +14,33 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    {
+        downwell::FrogPresentation presentation;
+        unsigned appliedRate = presentation.beginStepRate();
+        auto visual = presentation.finishStep(false, true, false, false);
+        require(visual.sprite == 166 && visual.forcedFrame == -1 &&
+                    appliedRate == 0 && presentation.desiredRate == 4,
+                "first landing chooses idle and schedules imgSp without changing this Step's rate");
+        appliedRate = presentation.beginStepRate();
+        visual = presentation.finishStep(false, false, false, true);
+        require(appliedRate == 4 && presentation.desiredRate == 0 &&
+                    visual.sprite == 168 && visual.forcedFrame == 0,
+                "takeoff forces rising pose but only schedules the animation stop");
+        require(presentation.beginStepRate() == 0, "next Step applies the airborne zero rate");
+        visual = presentation.finishStep(false, false, false, false);
+        require(visual.sprite == 168 && visual.forcedFrame == 1,
+                "zero/downward vertical speed selects the falling pose");
+        visual = presentation.finishStep(false, true, true, false);
+        require(visual.sprite == 170 && visual.forcedFrame == -1 && presentation.desiredRate == 0,
+                "preparation preserves imgSp instead of inventing an idle rate");
+        visual = presentation.finishStep(true, true, false, false);
+        require(visual.sprite == 173 && visual.forcedFrame == -1 && presentation.desiredRate == 0,
+                "damage takes priority over landing and preserves imgSp and pose phase");
+        presentation.finishStep(false, true, false, false);
+        visual = presentation.finishStep(true, false, false, true);
+        require(visual.sprite == 173 && visual.forcedFrame == -1 && presentation.desiredRate == 4,
+                "airborne stun must not execute the flight rate/pose branch");
+    }
     for (int direction : {-1, 1}) {
         const auto prepare = downwell::frogPreparationAlarm(direction);
         require(prepare.preparation == 1 && prepare.setX && !prepare.setY &&

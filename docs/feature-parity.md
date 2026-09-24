@@ -244,6 +244,36 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared frog presentation and delayed animation-rate state
+
+`FrogPresentation` now owns frog sprite selection, forced rising/falling poses,
+and the separate `imgSp` state for both adapters. Frog Step assembly blocks
+1–2 copy imgSp into image_speed before movement. Blocks 49–57 select damage,
+idle, preparation or flight afterward: idle writes imgSp=0.2, flight writes
+imgSp=0 and forces frame 0/1, and damage/preparation preserve imgSp. The old
+adapters assigned image_speed immediately and treated every grounded frog as
+an idle-rate write. Matching ports were therefore not enough to establish
+fidelity to this source control flow.
+
+The shared state returns the rate at Step entry and updates the desired rate
+only in those source branches. Storage adapters convert twentieths to their
+existing float/Q8 animation representations. Fixtures cover landing, takeoff,
+zero/downward velocity, preparation and stun precedence; paired gameplay
+checks compare desired and applied rates independently. Startup digest schema
+39 serializes the added state; the menu baseline is `4df000d8a197a6bb`.
+
+Validation: full host suite and both combat tapes pass. Native-runtime
+fixtures also assert delayed landing/takeoff rate changes directly, without
+using SDL as their oracle. The bounded A500 600-tick cache check passes with
+101 composition comparisons and its stack canary intact. Cross-CPU player/gem
+replay retains its digest; both 68000 audits pass. That replay is not a
+complete frog-animation comparison against the Windows runner.
+
+This preserves the current automatic-animation advancement phase, rather than
+claiming that phase has been established against the Windows runner. Float
+versus rational accumulation and world time-stop remain separate fidelity
+questions. No runtime asset conversion or scrolling change is introduced.
+
 #### Shared main-room lifetime pass
 
 `MainRoomLifetime.h` now owns the retirement iteration, implemented-object

@@ -217,6 +217,10 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (!amigaEnemyHealth(enemy.objectId)) continue;
         require(ordinal < amiga.enemyCount(), "frog diagnostic retains creation-order pairing");
         const auto& native = amiga.enemyAt(ordinal++);
+        if (enemy.objectId == 113 && enemy.active && native.active)
+            require(native.frogPresentation.desiredRate == enemy.frogPresentation.desiredRate &&
+                        native.imageSpeed == static_cast<unsigned>(std::lround(enemy.imageSpeed * 20)),
+                    "frog imgSp and applied image_speed agree independently across adapters");
         require(native.active == enemy.active &&
                     native.activationPending == enemy.activationPending,
                 "enemy activation/retirement agrees, including inactive instances");

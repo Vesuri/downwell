@@ -185,6 +185,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.awake = awake;
     enemy.grounded = grounded;
     enemy.frogLanded = true;
+    enemy.frogPresentation = {};
     enemy.activationPending = !active;
     if (enemyCount_ <= index)
         enemyCount_ = index + 1;
@@ -570,6 +571,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             continue;
         downwell::advanceEnemyImageQ8(enemy.imagePhase, enemy.imageRemainder,
                                      enemy.imageSpeed);
+        if (enemy.objectId == 113)
+            enemy.imageSpeed = enemy.frogPresentation.beginStepRate();
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
         if ((!enemy.awake && enemy.objectId != 113 && enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 116) || solidResolver_ == 0)
@@ -687,14 +690,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         if (enemy.objectId == 116)
             enemy.spriteId = downwell::batPresentation(enemy.batActivity, enemy.batHit);
         if (enemy.objectId == 113) {
-            if (enemy.frogHit.remaining != 0) {
-                enemy.spriteId = 173;
-            } else if (enemy.spriteId == 168) {
-                enemy.imageSpeed = 0;
-                enemy.imagePhase = enemy.speedY < 0 ? 0u : 256u;
+            const auto visual = enemy.frogPresentation.finishStep(
+                enemy.frogHit.remaining != 0, enemy.grounded,
+                enemy.auxiliaryState != 0, enemy.speedY < 0);
+            enemy.spriteId = visual.sprite;
+            if (visual.forcedFrame >= 0) {
+                enemy.imagePhase = static_cast<unsigned>(visual.forcedFrame) * 256u;
                 enemy.imageRemainder = 0;
-            } else {
-                enemy.imageSpeed = 4u;
             }
         }
         const unsigned frameCount = downwell::enemySpriteFrameCount(enemy.spriteId);
