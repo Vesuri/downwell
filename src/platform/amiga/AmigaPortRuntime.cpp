@@ -794,7 +794,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
         downwell::applyEnemyContact(enemy.objectId, enemyContact,
             enemy.x, enemy.y, enemy.active, enemy.health, player_, health_, invulnerability_, enemiesDefeated_,
-            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, true); });
+            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, true); },
+            run_.upgrades.levels[7] != 0);
     }
 
     DW_PROFILE_PHASE(profileGems);

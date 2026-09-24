@@ -73,10 +73,11 @@ int main() {
         bool active = true;
         int enemyHealth = 15, health = 4;
         unsigned immunity = 0, defeated = 0, rewards = 0;
+        bool candle = false;
         ContactActor contactActor{128, 0, 1, 1, 153};
         const auto apply = [&] {
             return applyEnemyContact(116, contactActor, 7, 9, active, enemyHealth,
-                motion, health, immunity, defeated, [&] { ++rewards; });
+                motion, health, immunity, defeated, [&] { ++rewards; }, candle);
         };
         require(apply() == EnemyContact::damage && health == 3 && immunity == 90 &&
                     motion.knocks == 1 && motion.knockX == 7 && motion.knockY == 9 &&
@@ -100,6 +101,18 @@ int main() {
         require(apply() == EnemyContact::none && active && enemyHealth == 15 &&
                     rewards == 1 && defeated == 1 && motion.bounces == 1,
                 "a dead player cannot stomp, bounce, kill or collect a new reward");
+        health = 4; contactActor.y = 0; candle = true;
+        require(apply() == EnemyContact::damage && health == 3 && immunity == 240,
+                "owned Candle selects the source 240-update immunity interval");
+        candle = false;
+        for (unsigned elapsed = 1; elapsed < 240; ++elapsed) {
+            --immunity;
+            require(apply() == EnemyContact::none && health == 3,
+                    "granted immunity is retained until expiry, independent of later ownership");
+        }
+        --immunity;
+        require(apply() == EnemyContact::damage && health == 2 && immunity == 90,
+                "first expired contact damages and samples current ownership again");
     }
     ContactActor player{0, 0, 1, 1, 31};
     ContactActor bat{0, -11 * 256, 1, 1, 153};

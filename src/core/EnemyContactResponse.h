@@ -12,7 +12,7 @@ namespace downwell {
 template<class Player, class Immunity, class Count, class Reward>
 EnemyContact applyEnemyContact(int object, const ContactActor& enemy,
     int publishedX, int publishedY, bool& active, int& enemyHealth, Player& player, int& playerHealth,
-    Immunity& invulnerability, Count& defeated, Reward reward) {
+    Immunity& invulnerability, Count& defeated, Reward reward, bool candle) {
     if (!active || enemyHealth <= 0 || !playerCanAct(playerHealth)) return EnemyContact::none;
     const ContactActor playerContact{player.offsetXFixed(), player.offsetYFixed(),
                                     player.facing(), 1, 31};
@@ -28,7 +28,8 @@ EnemyContact applyEnemyContact(int object, const ContactActor& enemy,
     }
     if (contact == EnemyContact::damage && invulnerability == 0 && playerHealth > 0) {
         --playerHealth;
-        invulnerability = 90; // scrPDamage without the immunity upgrade.
+        // scrPDamage VM blocks 1–3: owned ug[7][1] selects Alarm 1.
+        invulnerability = candle ? 240 : 90;
         // scrTypicalDamage uses instance x/y, not the precise xx/yy state.
         player.contactKnockback(publishedX, publishedY);
         return contact;

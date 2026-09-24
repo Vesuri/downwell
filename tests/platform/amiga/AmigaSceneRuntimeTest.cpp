@@ -1151,6 +1151,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 live.builder.fragmentCount() < amigaInitialTerrainFragmentCount,
             "comparison exercises incremental terrain rather than a complete forecast");
     if (std::getenv("DOWNWELL_TRACE_COMBAT") || std::getenv("DOWNWELL_VERIFY_COMBAT")) {
+        const bool candleFixture = std::getenv("DOWNWELL_VERIFY_CANDLE") != nullptr;
+        bool sawCandleDamage = false;
+        if (candleFixture)
+            require(gameplay.grantUpgrade(7) && reference.grantUpgrade(7),
+                    "both live adapters grant Candle before the combat tape");
         if (std::getenv("DOWNWELL_VERIFY_ATTRACTOR")) {
             require(gameplay.gemCount() == 0 && reference.mainCurrencyCount() == 0,
                     "Attractor combat fixture starts before any reward birth");
@@ -1389,6 +1394,10 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             if (std::getenv("DOWNWELL_VERIFY_ATTRACTOR"))
                 for (const auto& gem : nativeGems)
                     require(gem[9] == 1, "live reward births receive the owned Attractor configuration");
+            require(gameplay.invulnerability() == static_cast<unsigned>(reference.mainPlayerInvulnerability()),
+                    "live damage immunity agrees every combat update");
+            if (candleFixture && gameplay.invulnerability() == 240)
+                sawCandleDamage = true;
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
             if (gameplay.player().spriteId(gameplay.deathSequence().movementDead()) != reference.mainPlayerSpriteId() ||
                     gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) != static_cast<unsigned>(reference.mainPlayerImageIndex()))
@@ -1440,6 +1449,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 }
             }
         }
+        require(!candleFixture || sawCandleDamage,
+                "Candle live fixture actually takes damage and publishes the extended interval");
         std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
                   << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
                   << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()

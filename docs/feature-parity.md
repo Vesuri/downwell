@@ -9,6 +9,26 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Candle damage immunity reaches both live contact passes
+
+`scrPDamage` VM blocks 1–3 select 240 for player Alarm 1 when upgrade
+`ug[7][1]` is owned, otherwise 90. Both runtime adapters now pass ownership
+to the shared contact response instead of always granting 90. The duration is
+sampled on damage, not recomputed during the interval. Player Alarm 1 clears
+`global.playerDamaged` in the recovered game.
+
+Focused tests check both durations, immunity through the last protected update,
+damage on expiry and ownership sampling. The paired 600-update Candle combat
+tape requires an actual 240-update grant and compares immunity on every update;
+both adapters finish with health 3, kills 3 and currency 22. The tape is included
+in `make test`. This does not implement the original damage FX, audio ducking,
+room-speed slowdown, missing damage sources or revise the existing collision
+event-order approximation. It adds the source upgrade interval to the shared
+implemented contact path, not full damage-system fidelity.
+The full host suite and bounded 68000 replay pass, with both CPU audits clean
+and the ordinary executable restored. The native replay is a platform
+regression, not native execution coverage of the Candle combat fixture.
+
 ### Member's Card reaches live shop creation
 
 Both runtime adapters now create shops through `RunSession::createShop`,

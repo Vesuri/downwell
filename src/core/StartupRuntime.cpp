@@ -862,7 +862,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
                 run_.combo.state.enemyDefeated();
                 spawnMainCurrency(static_cast<float>(enemy.x), static_cast<float>(enemy.y),
                                   enemy.reward, true);
-            });
+            }, run_.upgrades.levels[7] != 0);
         if (contact != EnemyContact::none) {
             syncMainPlayerState();
             ++soundPlayRequests_;
