@@ -919,6 +919,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                         << gem.motion.vx << ',' << gem.motion.vy << ' ' << gem.attracted << '\n';
                 }
             }
+            require(gameplay.currency() == reference.mainCurrencyTotal() &&
+                        gameplay.gameGemTotal() == reference.mainGameGemTotal() &&
+                        gameplay.gemStreak() == reference.mainGemStreak() &&
+                        gameplay.gemStreakTimer() == reference.mainGemStreakTimer(),
+                    "shared currency, run total, streak and timer agree on every combat frame");
             // Both adapters retain live gems in birth order. Compare that
             // order and authoritative movement, not a sorted multiset.
             std::vector<std::array<long, 9>> nativeGems, referenceGems;

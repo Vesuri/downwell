@@ -148,10 +148,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainJumps_ = 0;
     mainBulletCount_ = 0;
     mainCurrencyCount_ = 0;
-    mainCurrencyTotal_ = 0;
-    mainGameGemTotal_ = 0;
-    mainGemStreak_ = 0;
-    mainGemStreakTimer_ = 0;
+    currencyAccount_ = {};
     mainBuilderInitialized_ = false;
     mainBuilderY_ = 704;
     mainBuilderGenerationCount_ = -30;
@@ -267,6 +264,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     inputRight_ = right;
     inputFire_ = fire;
     anyInput_ = anyInput;
+    if (roomId_ == mainRoomId) currencyAccount_.beginStep();
 
     for (std::size_t i = 0; i < instances_.size(); ++i) {
         auto& instance = instances_.at(i);
@@ -597,11 +595,6 @@ void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
 }
 
 void StartupRuntime::updateMainCurrency() {
-    if (mainGemStreakTimer_ > 0)
-        --mainGemStreakTimer_;
-    else
-        mainGemStreak_ = 0;
-
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
         MainCurrencyState gem = mainCurrencyItems_[index];
@@ -616,10 +609,7 @@ void StartupRuntime::updateMainCurrency() {
         const bool collected = gem.motion.collectible(mainPlayerMotion_.offsetXFixed(),
                                                       mainPlayerMotion_.offsetYFixed(), gem.large);
         if (collected) {
-            mainCurrencyTotal_ += static_cast<std::uint32_t>(gem.amount);
-            mainGameGemTotal_ += static_cast<std::uint32_t>(gem.amount);
-            mainGemStreak_ += static_cast<std::uint32_t>(gem.amount);
-            mainGemStreakTimer_ = 300;
+            currencyAccount_.collect(static_cast<std::uint32_t>(gem.amount));
             ++soundPlayRequests_;
         } else {
             mainCurrencyItems_[write++] = gem;
@@ -1470,10 +1460,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainJumps_ = 0;
                 mainBulletCount_ = 0;
                 mainCurrencyCount_ = 0;
-                mainCurrencyTotal_ = 0;
-                mainGameGemTotal_ = 0;
-                mainGemStreak_ = 0;
-                mainGemStreakTimer_ = 0;
+                currencyAccount_ = {};
+                currencyAccount_.playerCreated();
                 // The shared player now owns the default gun's countdown.
             }
             // scrPlayerInit's full state comes later. These are the two
@@ -2134,10 +2122,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addI32(gem.motion.animation.rateTenths);
         digest.addU32(gem.motion.animation.phaseTenths);
     }
-    digest.addU32(mainCurrencyTotal_);
-    digest.addU32(mainGameGemTotal_);
-    digest.addU32(mainGemStreak_);
-    digest.addU32(mainGemStreakTimer_);
+    digest.addU32(currencyAccount_.currency);
+    digest.addU32(currencyAccount_.gameGem);
+    digest.addU32(currencyAccount_.streak);
+    digest.addU32(currencyAccount_.timer);
     digest.addBool(mainBuilderInitialized_);
     digest.addI32(mainBuilderY_);
     digest.addI32(mainBuilderGenerationCount_);

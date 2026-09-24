@@ -29,12 +29,12 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
       enemyCount_(0), enemiesDefeated_(0), enemyRandom_(2),
       health_(4), invulnerability_(0),
       dead_(false), deathFrames_(0),
-      currency_(0), gemStreak_(0), gemStreakTimer_(0),
       solidResolver_(0),
       solidResolverContext_(0),
       breakableCount_(0), blocksDestroyed_(0), checkpoint_(0)
 {
     unsigned index;
+    currencyAccount_.playerCreated();
     if (followCamera_) {
         /*
          * camMain receives one Step on rmMain's creation frame, before the
@@ -372,8 +372,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     const long generationCameraY = cameraY_;
     const int oldAmmo = player_.ammo();
     const int oldHealth = health_;
-    const unsigned oldCurrency = currency_;
-    const unsigned oldGemStreak = gemStreak_;
+    const unsigned oldCurrency = currencyAccount_.currency;
+    const unsigned oldGemStreak = currencyAccount_.streak;
     const unsigned oldShots = player_.shots();
     bool bulletChanged = false;
     unsigned destroyedBlockCount = 0;
@@ -381,6 +381,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     int destroyedBlockY[destroyedCapacity] = {0};
 
     ++tick_;
+    currencyAccount_.beginStep();
     if (dead_)
         ++deathFrames_;
     downwell::Input input = downwell::unpackReplayInput(packedInput);
@@ -727,11 +728,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
     }
 
-    if (gemStreakTimer_ > 0)
-        --gemStreakTimer_;
-    else
-        gemStreak_ = 0;
-
     DW_PROFILE_PHASE(profileGems);
     for (unsigned gemIndex = 0; gemIndex < gemCapacity; ++gemIndex) {
         GemState& gem = gems_[gemIndex];
@@ -751,9 +747,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.x = downwell::GemMotion::rounded(gem.motion.x);
         gem.y = downwell::GemMotion::rounded(gem.motion.y);
         if (gem.motion.collectible(player_.offsetXFixed(), player_.offsetYFixed(), gem.large)) {
-            currency_ += (unsigned)gem.amount;
-            gemStreak_ += (unsigned)gem.amount;
-            gemStreakTimer_ = 300;
+            currencyAccount_.collect(static_cast<unsigned>(gem.amount));
             gem.active = false;
         }
     }
@@ -790,8 +784,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     frame.playerMotion = motion;
     frame.ammoChanged = player_.ammo() != oldAmmo;
     frame.healthChanged = health_ != oldHealth;
-    frame.currencyChanged = currency_ != oldCurrency;
-    frame.streakChanged = gemStreak_ != oldGemStreak;
+    frame.currencyChanged = currencyAccount_.currency != oldCurrency;
+    frame.streakChanged = currencyAccount_.streak != oldGemStreak;
     frame.bulletChanged = bulletChanged;
     frame.scrolled = scrollDelta != 0;
     frame.scrollDelta = scrollDelta;

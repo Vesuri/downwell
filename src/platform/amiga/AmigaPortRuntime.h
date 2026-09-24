@@ -6,6 +6,7 @@
 #include "core/StateDigest.h"
 #include "core/GameplayLimits.h"
 #include "core/GemMotion.h"
+#include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
@@ -174,9 +175,10 @@ public:
     unsigned enemiesDefeated() const { return enemiesDefeated_; }
     unsigned gemCount() const;
     const GemState& gemAt(unsigned index) const;
-    unsigned currency() const { return currency_; }
-    unsigned gemStreak() const { return gemStreak_; }
-    unsigned gemStreakTimer() const { return gemStreakTimer_; }
+    unsigned currency() const { return currencyAccount_.currency; }
+    unsigned gameGemTotal() const { return currencyAccount_.gameGem; }
+    unsigned gemStreak() const { return currencyAccount_.streak; }
+    unsigned gemStreakTimer() const { return currencyAccount_.timer; }
     int health() const { return health_; }
     unsigned invulnerability() const { return invulnerability_; }
     bool dead() const { return dead_; }
@@ -226,9 +228,7 @@ private:
     unsigned invulnerability_;
     bool dead_;
     unsigned deathFrames_;
-    unsigned currency_;
-    unsigned gemStreak_;
-    unsigned gemStreakTimer_;
+    downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
     void* solidResolverContext_;
     Breakable breakables_[breakableCapacity];

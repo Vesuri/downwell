@@ -7,6 +7,7 @@
 #include "GameMakerRandom.h"
 #include "GameplayLimits.h"
 #include "GemMotion.h"
+#include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
 #include "Input.h"
 #include "PlayerMotion.h"
@@ -161,9 +162,10 @@ public:
     const MainCurrencyState& mainCurrencyAt(std::size_t index) const {
         return mainCurrencyItems_[index];
     }
-    std::uint32_t mainCurrencyTotal() const { return mainCurrencyTotal_; }
-    std::uint32_t mainGemStreak() const { return mainGemStreak_; }
-    std::uint32_t mainGemStreakTimer() const { return mainGemStreakTimer_; }
+    std::uint32_t mainCurrencyTotal() const { return currencyAccount_.currency; }
+    std::uint32_t mainGameGemTotal() const { return currencyAccount_.gameGem; }
+    std::uint32_t mainGemStreak() const { return currencyAccount_.streak; }
+    std::uint32_t mainGemStreakTimer() const { return currencyAccount_.timer; }
     bool mainBuilderInitialized() const { return mainBuilderInitialized_; }
     int mainBuilderY() const { return mainBuilderY_; }
     int mainBuilderGenerationCount() const { return mainBuilderGenerationCount_; }
@@ -362,10 +364,7 @@ private:
     std::size_t mainBulletCount_ = 0;
     std::array<MainCurrencyState, mainCurrencyCapacity> mainCurrencyItems_{};
     std::size_t mainCurrencyCount_ = 0;
-    std::uint32_t mainCurrencyTotal_ = 0;
-    std::uint32_t mainGameGemTotal_ = 0;
-    std::uint32_t mainGemStreak_ = 0;
-    std::uint32_t mainGemStreakTimer_ = 0;
+    CurrencyAccount currencyAccount_;
     AreaOneBuilder areaOneBuilder_;
     bool mainBuilderInitialized_ = false;
     int mainBuilderY_ = 704;

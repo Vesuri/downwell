@@ -775,15 +775,42 @@ int main() {
         stomp.step(0);
     require(stomp.currency() == 6 && stomp.gemCount() == 0,
             "attracted stomp reward reaches the player and enters currency");
+    require(stomp.gameGemTotal() == 6, "native account retains the source run-wide gem total");
     require(stomp.gemStreak() == 6 && stomp.gemStreakTimer() == 300,
             "collected physical gems feed the recovered streak timer");
     AmigaPortFrame expiredStreak{};
-    for (unsigned frame = 0;
-         frame < 301 && stomp.gemStreak() != 0; ++frame)
+    for (unsigned frame = 0; frame < 299; ++frame)
         expiredStreak = stomp.step(0);
+    require(stomp.gemStreak() == 6 && stomp.gemStreakTimer() == 1,
+            "streak survives through the penultimate timer tick");
+    expiredStreak = stomp.step(0);
     require(stomp.gemStreak() == 0 && stomp.gemStreakTimer() == 0 &&
                 expiredStreak.streakChanged,
             "native streak expires after the recovered 300-frame hold");
+    {
+        downwell::CurrencyAccount account;
+        account.playerCreated();
+        require(account.timer == 420 && account.streak == 0 && account.currency == 0,
+                "player Create starts the original 120-tick entry grace period without awarding gems");
+        account.collect(10);
+        account.beginStep(true, false);
+        account.beginStep(false, true);
+        require(account.timer == 300 && account.streak == 10,
+                "source pause and time-stop independently freeze the account timer");
+        for (unsigned i = 0; i < 299; ++i) account.beginStep();
+        require(account.timer == 1 && account.streak == 10, "shared account retains streak at timer one");
+        account.beginStep();
+        require(account.timer == 0 && account.streak == 0 && account.currency == 10 && account.gameGem == 10,
+                "the independent source zero check expires streak without spending currency");
+        account.collect(2);
+        require(account.streak == 2 && account.currency == 12 && account.gameGem == 12 && account.timer == 300,
+                "collection on the expiry frame starts a new streak instead of extending the old one");
+        account.collect(10, 300, true);
+        require(account.timer == 480 && account.streak == 12,
+                "scrGainGem's less-resistance option extends the configured timer by 180");
+        account.currency -= 4;
+        require(account.gameGem == 22, "run-wide collected gems remain distinct from spendable currency");
+    }
 
     AmigaPortRuntime contact(300);
     require(contact.configureEnemy(0, 117, 177, 0, 0,

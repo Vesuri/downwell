@@ -244,6 +244,37 @@ movement and walking art to resume together. Zero and airborne presentation
 are tested separately. The following shared-motion migration replaces the
 previous separate snake/turtle collision and integration branches.
 
+#### Shared currency account and source timer boundaries
+
+Both runtime stores now embed the same `CurrencyAccount`: spendable currency,
+run-wide gameGem, streak and timer. Collection updates this state once through
+the shared implementation. Amiga previously lacked the separate run-wide
+counter. The SDL digest retains the same four serialized fields/order.
+
+Original scrControlBeginstepCheck assembly blocks 21–24 decrement a positive
+timer and then independently clear the streak if the timer is nonpositive.
+Both old ports used an else branch, clearing one tick late. The shared Begin
+Step update now expires exactly on the transition from one to zero, before
+collection. A gem collected on that frame starts a new streak. scrPlayerInit
+also sets timerStart+120; main-room player creation now establishes that
+420-tick entry grace period instead of zero. Ordinary collection resets it to
+the source default 300 ticks.
+
+Focused fixtures test tick 299/300, collection on expiry, separate run totals,
+entry initialization, paused/time-stopped timer guards and the source +180
+less-resistance option. The latter guards/option are available in the shared
+account but are not yet connected to complete gameplay pause/time-stop or
+upgrade systems. Combat comparisons assert all four account fields each
+frame. Achievement calls, gem-high weapon changes and collection effects are
+not supplied by this accounting migration; global event ordering beyond this
+Begin-Step countdown still needs work.
+
+Validation: full host suite, both combat tapes with per-frame account and
+ordered gem-state checks, 16,562 offline sprite comparisons, bounded A500
+600-tick cache verification (101 comparisons, intact stack guard), and
+cross-CPU player/gem replay pass. The narrow replay digest is unchanged;
+these checks do not prove pause, upgrades or full original event ordering.
+
 #### Shared reward creation and stable gem traversal
 
 `CurrencyReward` owns the implemented area-one gem creation sequence for both
