@@ -9,6 +9,31 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Combo completion rules recovered, not yet integrated
+
+`ComboState` models scrEnemyDeath's count increment and comboDone VM blocks
+1--10. The best run combo changes on completion, not on every airborne kill.
+Completion creates the reward at count >=5, requests momentDelay and checks
+achievement thresholds 10/30/100, then updates highCombo/recordMaxCombo and
+clears the current count. Repeated grounded completion cannot grant twice.
+
+The synchronous reward callback models comboRewardText Create's independent
+milestone branches: defaults 8/15/25 grant 100 gems, one ammo and one health,
+respectively, with cumulative sound requests. Milestones remain caller-supplied
+as in the source table. Rewards happen before record updates/count reset and
+before the reward object's final death check destroys its presentation. The
+helper emits grants, not currency/health mutations or file I/O; adapters must
+apply those through the shared simulation at the source phase.
+
+Tests exercise every count 0..101, callback ordering, separate reward and
+achievement thresholds, repeated completion, record retention across runs and
+custom milestone values. This is not live combo support: the two runtimes do
+not yet call it. Grounded/pTimeStop and wall-contact scheduling, reward effects,
+ammo-capacity integration, record persistence, and combo/result presentation
+remain outstanding. No placeholder best-combo row has been added.
+Validation: focused combo tests and the full host suite pass. No emulator run
+is claimed for this not-yet-linked helper; normal target builds are unchanged.
+
 ### Results time row on both backends
 
 Both renderers now consume the shared time-row layout and live run clock.

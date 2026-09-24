@@ -123,7 +123,7 @@ test: build/main-camera-test
 test: build/main-room-activation-test
 test: build/player-death-sequence-test build/run-time-parts-test
 test: build/death-menu-sequence-test
-test: build/death-menu-progress-test
+test: build/death-menu-progress-test build/combo-state-test
 test: verify-amiga-results
 test: build/player-death-verification-test
 test: build/standard-bullet-test
@@ -163,6 +163,10 @@ build/main-room-activation-test: tests/core/MainRoomActivationTest.cpp src/core/
 build/death-menu-sequence-test: tests/core/DeathMenuSequenceTest.cpp src/core/DeathMenuSequence.h src/core/AlarmBank.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DeathMenuSequenceTest.cpp
+
+build/combo-state-test: tests/core/ComboStateTest.cpp src/core/ComboState.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/ComboStateTest.cpp
 
 build/death-menu-progress-test: tests/core/DeathMenuProgressTest.cpp src/core/DeathMenuProgress.h src/core/DeathMenuSequence.h src/core/RunGemStatistics.h src/core/DeathResults.h src/core/DeathResultsProgressBar.h src/core/DeathResultsProgressLabels.h src/core/Input.h src/core/AlarmBank.h
 	@mkdir -p build
@@ -351,6 +355,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/run-time-parts-test
 	./build/death-menu-sequence-test
 	./build/death-menu-progress-test
+	./build/combo-state-test
 	./build/player-death-verification-test
 	./build/standard-bullet-test
 	./build/crawler-motion-test
