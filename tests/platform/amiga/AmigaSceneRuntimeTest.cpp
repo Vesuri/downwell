@@ -942,6 +942,36 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 reference.nextLevelRequested() == (tick == 211),
                 "result grants, presentation and departure requests match across adapters");
         }
+        const auto carriedRandom = gameplay.randomState();
+        const auto carriedClock = gameplay.runTimeTicks();
+        const int carriedHealth = gameplay.health();
+        const auto carriedCurrency = gameplay.currency();
+        const auto carriedUpgrades = gameplay.upgrades().count;
+        const int carriedCapacity = gameplay.player().ammoCapacity();
+        downwell::Input heldEntry; heldEntry.fire = true;
+        require(gameplay.prepareNextAreaOneLevel(heldEntry, 319) && reference.loadNextAreaOneLevel(heldEntry),
+            "both runtime adapters accept completed departure into the next area-one level");
+        require(gameplay.runStage().level == 2 && reference.runStage().level == 2 &&
+            !gameplay.levelClearActive() && !reference.levelClearActive() &&
+            gameplay.health() == carriedHealth && reference.mainPlayerHealth() == carriedHealth &&
+            gameplay.currency() == carriedCurrency && reference.mainCurrencyTotal() == carriedCurrency &&
+            gameplay.upgrades().count == carriedUpgrades && reference.upgrades().count == carriedUpgrades &&
+            gameplay.player().ammoCapacity() == carriedCapacity && reference.mainAmmoCapacity() == carriedCapacity &&
+            gameplay.player().ammo() == carriedCapacity && reference.mainAmmo() == carriedCapacity &&
+            gameplay.runTimeTicks() == carriedClock,
+            "native room retirement preserves actual grants, currency, health, clock and capacity");
+        require(gameplay.bulletCount() == 0 && gameplay.enemyCount() == 0 && gameplay.gemCount() == 0 &&
+            gameplay.ringOrigin() == 319 && gameplay.player().jumpShootLocked() &&
+            gameplay.cameraOffsetY() == 0 && gameplay.cameraOffsetX() == 0,
+            "native old actors and camera retire without a large temporary world copy");
+        require(gameplay.randomDrawCount() == carriedRandom.drawCount() &&
+            gameplay.randomState().stateIndex() == carriedRandom.stateIndex(),
+            "native retirement neither reseeds nor consumes generation RNG");
+        for (unsigned i = 0; i < 16; ++i)
+            require(gameplay.randomState().stateWord(i) == carriedRandom.stateWord(i),
+                "native next-room builder receives the untouched RNG state");
+        require(!gameplay.prepareNextAreaOneLevel(heldEntry, 0) && !reference.loadNextAreaOneLevel(heldEntry),
+            "duplicate next-room consumption cannot skip a stage");
         return;
     }
     require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&

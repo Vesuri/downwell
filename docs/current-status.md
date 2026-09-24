@@ -368,6 +368,20 @@ mislabel recycled area-one terrain. Native next-room loading and the entrance
 dither/audio/full upgrade effects remain unfinished, so this does not establish
 complete progression or original-game parity.
 
+AmigaPortRuntime now has an explicit prepareNextAreaOneLevel boundary matching
+the SDL area's supported progression. It advances the completed request once,
+keeps run globals/RNG/tick state in place, refills the player, retires actors and
+old shop/camera state, and clears callbacks/index readiness before the owner
+rebuilds terrain. It does not reconstruct/copy the large runtime. The paired
+scene regression follows selection into both entry paths, comparing retained
+health/currency/capacity/inventory and verifying untouched native RNG, empty
+actor sets, reset camera/ring origin and one-shot consumption. Native terrain
+construction is deliberately still the owner's responsibility: the application
+has not yet invoked this boundary or connected its result presenter.
+Standalone -O3/-m68000 stack reports give 1,572 bytes for preparation and 672
+for its nested player reset; native instruction/helper audits pass. These
+compiler reports are not a measured complete call-chain stack margin.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

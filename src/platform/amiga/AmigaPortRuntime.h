@@ -245,6 +245,9 @@ public:
     }
     bool levelClearActive() const { return run_.levelClearActive; }
     bool nextLevelRequested() const { return run_.nextLevelRequested; }
+    // Retire the old display first. This resets only room-local runtime state;
+    // the owner must rebuild terrain and rebind generation/collision callbacks.
+    bool prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin);
     const downwell::LevelClearController& levelClear() const { return run_.levelClear; }
     const downwell::LevelClearPresentation::Frame& levelClearFrame() const { return run_.levelClearFrame; }
     const downwell::RunStage& runStage() const { return run_.stage; }

@@ -40,6 +40,34 @@ downwell::ResultsDestination AmigaPortRuntime::restartFromResults(
     return destination;
 }
 
+bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
+    if (!run_.levelClearActive || !run_.nextLevelRequested ||
+        run_.stage.area != 1 || run_.stage.level >= 3) return false;
+    if (!run_.advanceAfterLevelClear()) return false;
+    // Do not reconstruct this large runtime or copy RunSession onto the task
+    // stack: its run globals remain in place while old world ownership retires.
+    run_.shops = {};
+    player_.enterRoom(input.fire, 1201 - 176);
+    run_.ammoHud.previousShots = run_.ammoHud.previousRecharges = 0;
+    currencyAccount_.playerCreated();
+    death_ = {};
+    invulnerability_ = 0;
+    enemyCount_ = enemiesDefeated_ = breakableCount_ = blocksDestroyed_ = 0;
+    for (unsigned i = 0; i < bulletCapacity; ++i) bullets_[i].active = false;
+    for (unsigned i = 0; i < enemyCapacity; ++i) enemies_[i].active = false;
+    for (unsigned i = 0; i < gemCapacity; ++i) gems_[i].active = false;
+    generationStep_ = nullptr; generationContext_ = nullptr;
+    generationSucceeded_ = true;
+    solidResolver_ = nullptr; solidResolverContext_ = nullptr;
+    landingResolver_ = nullptr; landingResolverContext_ = nullptr;
+    breakableIndexReady_ = false;
+    followCamera_ = true;
+    cameraMotion_.reset(240, 176);
+    cameraY_ = cameraPixelY_ = cameraPixelX_ = activationY_ = 0;
+    ringOrigin_ = initialRingOrigin % ringHeight;
+    return true;
+}
+
 AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
                                    bool startsGrounded,
                                    int landingOffset,
