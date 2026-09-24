@@ -9,6 +9,27 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared results currency phase
+
+`DeathMenuProgress` recovers the default gem-filling/unlock progression from
+DeathMenu Draw VM blocks 16--48 and the unlockGoalNum table. It is an explicit
+once-per-update phase, not a renderer callback: snapshots contain the displayed
+pre-increment total and goal interval, and effects request unlockNotice, the
+every-third-increment sound or completion sound. Threshold crossing is checked
+before incrementing, so an overshoot is clamped on the following update. Each
+notice pauses progress until the shared menu sequence acknowledges it; multiple
+goals in one run resume correctly. Entry skips previously earned thresholds.
+
+Totals retain the source's greater-than-32-bit sentinel and cap ordering. A
+previous total beyond that sentinel is rejected rather than indexing beyond
+the recovered table. Tests cover ordinary filling, delayed completion, multiple
+unlocks, pause/acknowledgement, unchanged prior-total separator and large totals.
+Persistence and the unlockNotice side effects remain external integration work;
+neither runtime has a playable results screen yet. This phase does not implement
+the notice's visual animation or replace the unfinished renderer work.
+Validation: focused tests (including all 41 exact thresholds) and the full host
+suite pass. No target execution or results-screen pixel parity is claimed.
+
 ### Death-menu event sequence recovered, not yet presented
 
 `DeathMenuSequence` is a platform-independent model of DeathMenu Create,
