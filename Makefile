@@ -108,6 +108,12 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 
 all: $(TARGET)
 
+# These executables compile multiple translation units in one command. The
+# compiler's single .d file only describes the final input, so explicitly
+# invalidate them on shared header changes rather than trusting stale tools.
+HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h)
+$(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test: $(HOST_CHECK_HEADERS)
+
 test: build/gem-homing-test
 
 build/gem-homing-test: tests/core/GemHomingTest.cpp src/core/GemHoming.h src/core/GemMotion.h src/core/GemLifetime.h src/core/GemAnimation.h src/core/BatMotion.h
