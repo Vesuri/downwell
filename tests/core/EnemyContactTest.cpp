@@ -96,6 +96,10 @@ int main() {
         immunity = 0;
         require(apply() == EnemyContact::none && health == 0 && motion.knocks == 2,
                 "the implemented zero-health state cannot lose health repeatedly");
+        contactActor.y = 3 * 256;
+        require(apply() == EnemyContact::none && active && enemyHealth == 15 &&
+                    rewards == 1 && defeated == 1 && motion.bounces == 1,
+                "a dead player cannot stomp, bounce, kill or collect a new reward");
     }
     ContactActor player{0, 0, 1, 1, 31};
     ContactActor bat{0, -11 * 256, 1, 1, 153};

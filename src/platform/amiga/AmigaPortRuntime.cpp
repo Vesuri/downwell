@@ -15,6 +15,7 @@
 #include "core/FrogMotion.h"
 #include "core/StandardBulletStep.h"
 #include "core/StandardBulletImpact.h"
+#include "core/PlayerLifeRules.h"
 #include "core/StableInstanceSlots.h"
 #include "core/FrogVerticalMotion.h"
 #include "core/BatMotion.h"
@@ -401,8 +402,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             }
         }
     }
-    if (dead_)
-        input = downwell::Input{};
+    input = downwell::playerGameplayInput(input, health_);
     // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
     const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int muzzleY = (int)downwell::roundGameMakerQ8(player_.offsetYFixed()) + 4;

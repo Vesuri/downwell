@@ -1,4 +1,5 @@
 #include "core/PlayerControls.h"
+#include "core/PlayerLifeRules.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -30,6 +31,16 @@ template<class Math> void checkControls() {
 }
 
 int main() {
+    downwell::Input input;
+    input.left = input.right = input.fire = input.quit = input.pause = true;
+    const auto alive = downwell::playerGameplayInput(input, 1);
+    require(alive.left && alive.right && alive.fire && alive.quit && alive.pause,
+            "living player input remains unchanged");
+    for (int health : {0, -1}) {
+        const auto dead = downwell::playerGameplayInput(input, health);
+        require(!dead.left && !dead.right && !dead.fire && dead.quit && dead.pause,
+                "depleted health disables gameplay input but preserves menu/platform requests");
+    }
     checkControls<downwell::FixedPlayerMath>();
     checkControls<downwell::FloatPlayerMath>();
     std::cout << "shared player control tests passed\n";

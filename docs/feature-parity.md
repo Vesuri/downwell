@@ -9,6 +9,29 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Depleted-health control/contact gate
+
+Both runtimes use `PlayerLifeRules.h` to suppress movement/fire input once
+health is depleted. SDL previously continued accepting those controls while
+Amiga suppressed them locally. The shared contact response now also rejects
+stomps at depleted health, preventing post-death bounce, kills and rewards in
+both ports. Quit/pause requests are not discarded by this gameplay filter.
+Core tests cover living/dead input and a fatal hit followed by a potential
+stomp; the native runtime retains its existing death-control/camera test.
+
+Original evidence: `scrEnemyStomped.asm` starts with a `global.death` guard;
+`scrPlMovement.asm` guards live control with the same state.
+`objPlayer_n_Step_1.asm` sets death and clamps health after its movement calls.
+The current port still equates depleted health with death immediately, rather
+than reproducing that full phase sequence. This is a shared implementation
+of the existing death boundary, not a claim that death animation, momentum,
+alarm/menu timing or the original same-frame collision behavior are complete.
+The full host suite, bounded 600-tick A500 terrain-cache check and canonical
+cross-CPU replay pass. The latter two are regression checks, not death-scene
+coverage; full death presentation and restart parity remain unproven.
+
+### Creation-ordered bullet storage
+
 Native bullet storage now stably compacts surviving shots before appending a
 new shot, using the same core slot-compaction policy as currency storage.
 Previously its first-free-slot allocation could place a newborn ahead of an

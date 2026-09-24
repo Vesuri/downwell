@@ -5,6 +5,7 @@
 #include "EnemyPresentation.h"
 #include "EnemyContact.h"
 #include "EnemyContactResponse.h"
+#include "PlayerLifeRules.h"
 #include "CurrencyReward.h"
 #include "CurrencyStep.h"
 #include "FrogBehavior.h"
@@ -1272,7 +1273,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.left = inputLeft_;
     input.right = inputRight_;
     input.fire = inputFire_;
-    mainPlayerMotion_.step(input, controlsLocked_);
+    mainPlayerMotion_.step(playerGameplayInput(input, mainPlayerHealth_), controlsLocked_);
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);
