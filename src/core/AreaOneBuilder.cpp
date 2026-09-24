@@ -3,9 +3,14 @@
 namespace downwell {
 
 void AreaOneBuilder::reset(int x, int y, GameMakerRandom& random) {
+    reset(x, y, random, Setup{});
+}
+
+void AreaOneBuilder::reset(int x, int y, GameMakerRandom& random, const Setup& setup) {
+    *this = AreaOneBuilder{};
     x_ = x;
     y_ = y;
-    generationCount_ = -30;
+    generationCount_ = setup.level == 1 && setup.firstBoot ? -30 : -10;
     rowsGenerated_ = 0;
     rightRooms_[0] = rightRooms_[1] = -1;
     startPattern_ = -1;
@@ -20,23 +25,31 @@ void AreaOneBuilder::reset(int x, int y, GameMakerRandom& random) {
     lastShopPattern_ = -1;
     shopsGenerated_ = 0;
     rightRoomsMade_ = 0;
-    shopMade_ = true;
+    shopMade_ = setup.level == 1 && setup.style != 4;
+    levelLength_ = 15 + setup.level;
+    style_ = setup.style;
+    member_ = setup.member;
     endReached_ = false;
     endPattern_ = -1;
     chunkOrCrate_ = 0;
     specialObjectsGenerated_ = 0;
 
-    random.irandomSmall(2); // choose(2, 2, 3), then overridden to two.
-    rightRooms_[0] = 3 + static_cast<int>(random.irandomSmall(12));
-    int attempts = 0;
-    do {
-        rightRooms_[1] = 3 + static_cast<int>(random.irandomSmall(12));
-        ++attempts;
-    } while (attempts <= 100 &&
-             (rightRooms_[1] - rightRooms_[0] <= 2) &&
-             (rightRooms_[0] - rightRooms_[1] <= 2));
-    if (attempts > 100)
-        rightRooms_[1] = 9999;
+    rightRoomCount_ = random.irandomSmall(2) == 2 ? 3 : 2;
+    if (shopMade_) rightRoomCount_ = 2;
+    if (member_) ++rightRoomCount_;
+    for (unsigned i = 0; i < rightRoomCount_; ++i) {
+        unsigned rejected = 0;
+        for (;;) {
+            rightRooms_[i] = 3 + static_cast<int>(random.irandomSmall(levelLength_ - 4));
+            if (!i) { if (member_) rightRooms_[i] = 0; break; }
+            bool conflict = false;
+            for (unsigned j = 0; j < i; ++j)
+                if (rightRooms_[i] - rightRooms_[j] <= 2 && rightRooms_[j] - rightRooms_[i] <= 2)
+                    conflict = true;
+            if (!conflict) break;
+            if (++rejected > 100) { rightRooms_[i] = 9999; break; }
+        }
+    }
 }
 
 void AreaOneBuilder::restoreInitialCheckpoint(
@@ -296,7 +309,7 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
         reversed = random.irandomSmall(1) != 0;
         startPattern_ = selected;
         startReversed_ = reversed;
-    } else if (generationCount_ > 16) {
+    } else if (generationCount_ > static_cast<int>(levelLength_)) {
         selected = static_cast<std::uint16_t>(random.irandomSmall(3));
         family = BuilderPatternFamily::areaOneEnd;
         reversed = random.irandomSmall(1) != 0;
@@ -307,21 +320,33 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
                 return false;
             spawnerMade_ = true;
         }
-        sideRoom = generationCount_ == rightRooms_[0] ||
-                   generationCount_ == rightRooms_[1];
+        unsigned sideIndex = 0;
+        for (unsigned i = 0; i < rightRoomCount_; ++i)
+            if (generationCount_ == rightRooms_[i]) { sideRoom = true; sideIndex = i; }
         bool makeShop = false;
         if (sideRoom) {
             ++rightRoomsMade_;
-            if (!shopMade_)
-                makeShop = random.irandomSmall(1) != 0;
+            if (!shopMade_) {
+                if (style_ == 1) makeShop = random.irandomSmall(6) == 6;
+                else if (style_ == 4) makeShop = rightRoomsMade_ >= rightRoomCount_;
+                else makeShop = random.irandomSmall(1) != 0;
+                if (member_) makeShop = true;
+            }
             if (makeShop) {
                 family = BuilderPatternFamily::areaOneShop;
                 selected = static_cast<std::uint16_t>(random.irandomSmall(1));
             } else {
                 family = BuilderPatternFamily::areaOneRight;
+                unsigned attempts = 0;
+                bool repeat;
                 do {
+                    ++attempts;
                     selected = static_cast<std::uint16_t>(random.irandomSmall(9));
-                } while (selected == lastRightPattern_);
+                    repeat = false;
+                    for (unsigned i = 0; i < rightRoomCount_; ++i)
+                        if (sideRoomLog_[i] == selected) repeat = true;
+                } while (repeat && attempts <= 60);
+                sideRoomLog_[sideIndex] = selected;
             }
         } else {
             family = BuilderPatternFamily::areaOneMain;

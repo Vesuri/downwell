@@ -51,6 +51,42 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "builder pack validates");
+    for (unsigned seed = 1; seed <= 32; ++seed) {
+        AreaOneBuilder configured;
+        GameMakerRandom configuredRandom(seed);
+        configured.reset(240, 704, configuredRandom, {2,4,true,false});
+        require(configured.generationCount() == -10 && !configured.shopMade() &&
+            configured.rightRoomCount() >= 3 && configured.rightRoomCount() <= 4 &&
+            configured.rightRoom(0) == 0, "later-stage member setup retains extra first side room");
+        for (unsigned i = 1; i < configured.rightRoomCount(); ++i) {
+            require(configured.rightRoom(i) >= 3 && configured.rightRoom(i) <= 16,
+                "stage-two side room range uses levelLength minus one");
+            for (unsigned j = 0; j < i; ++j)
+                require(std::abs(configured.rightRoom(i) - configured.rightRoom(j)) > 2,
+                    "all side-room indices obey source separation");
+        }
+        Commands emitted;
+        AreaOneBuilderStep configuredStep;
+        for (unsigned step = 0; step < 100 && !configured.endReached(); ++step)
+            require(configured.stepVisible(pack, configuredRandom, 100000, collect, &emitted, configuredStep),
+                "configured shop traversal succeeds");
+        unsigned shops = 0;
+        for (const auto& command : emitted) if (command.objectId == 277) ++shops;
+        require(configured.endReached() && configured.shopsGenerated() == 1 && shops == 1,
+            "member source branch emits exactly one actual Shop object through pattern traversal");
+        configuredRandom.setSeed(seed);
+        configured.reset(240, 704, configuredRandom, {1,4,false,true});
+        emitted.clear();
+        for (unsigned step = 0; step < 100 && !configured.endReached(); ++step) {
+            require(configured.stepVisible(pack, configuredRandom, 100000, collect, &emitted, configuredStep),
+                "style-four nonmember traversal succeeds");
+            if (configured.shopsGenerated())
+                require(configured.rightRoomsMade() == configured.rightRoomCount(),
+                    "style four postpones the shop until the last side room");
+        }
+        require(configured.endReached() && configured.shopsGenerated() == 1,
+            "style four permits exactly one shop even on first level");
+    }
     GameMakerRandom random(2);
     AreaOneBuilder builder;
     builder.reset(240, 704, random);

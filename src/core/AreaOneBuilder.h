@@ -27,6 +27,11 @@ public:
     using EmitFunction = bool (*)(void*, const DeferredCreateInstance&);
 
     void reset(int x, int y, GameMakerRandom& random);
+    struct Setup {
+        unsigned level = 1, style = 0;
+        bool member = false, firstBoot = true;
+    };
+    void reset(int x, int y, GameMakerRandom& random, const Setup& setup);
     void restoreInitialCheckpoint(int x, int y, int generationCount,
                                   int firstRightRoom, int secondRightRoom);
     bool step(const BuilderPatternPack& patterns, GameMakerRandom& random,
@@ -42,8 +47,9 @@ public:
     int generationCount() const { return generationCount_; }
     std::uint32_t rowsGenerated() const { return rowsGenerated_; }
     int rightRoom(unsigned index) const {
-        return index < 2 ? rightRooms_[index] : -1;
+        return index < rightRoomCount_ ? rightRooms_[index] : -1;
     }
+    unsigned rightRoomCount() const { return rightRoomCount_; }
     int startPattern() const { return startPattern_; }
     bool startReversed() const { return startReversed_; }
     std::uint32_t startRowsGenerated() const { return startRowsGenerated_; }
@@ -80,7 +86,10 @@ private:
     int y_ = 704;
     int generationCount_ = -30;
     std::uint32_t rowsGenerated_ = 0;
-    int rightRooms_[2] = {-1, -1};
+    int rightRooms_[4] = {-1, -1, -1, -1};
+    int sideRoomLog_[4] = {-1, -1, -1, -1};
+    unsigned rightRoomCount_ = 2, levelLength_ = 16, style_ = 0;
+    bool member_ = false;
     int startPattern_ = -1;
     bool startReversed_ = false;
     std::uint32_t startRowsGenerated_ = 0;

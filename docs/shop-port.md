@@ -513,3 +513,26 @@ after the style-specific choice. Those rules, later-stage setup and a seeded
 generated-shop replay are still required. Existing paired fixtures exercise
 registration directly; baseline regressions do not cover natural object-277
 emission because the current ordinary 1-1 path deliberately emits none.
+
+## Configurable cavern builder setup
+
+AreaOneBuilder now accepts level/style/member/first-boot setup while its old
+reset overload preserves ordinary 1-1 defaults. It draws choose(2,2,3) before
+the first-level override, applies membership's extra room, retains the draw
+before forcing the member's first room to zero, and spaces up to four rooms
+against all preceding choices with the source 101-rejection sentinel. Level
+length and prelude length follow level/first-boot setup. The source's accepted
+101st candidate is no longer incorrectly discarded by the old simplified loop.
+
+Shop choice now distinguishes styles 1 and 4 and applies membership after the
+style-specific draw. Nonshop pattern selection avoids every previous side-room
+pattern and stops rerolling after the source 61-attempt bound. Seeded tests
+traverse complete generated maps: 32 member configurations emit exactly one
+Shop object, and 32 nonmember style-four first levels defer that shop until the
+last side room. Existing visible-builder/RNG regression checks remain in place.
+
+This is builder configuration support, not full support for those styles or
+later stages. Runtime stage/style selection still uses ordinary 1-1 defaults;
+enemy scaling, stage transitions and complete source Create effects remain
+separate work. The generated-map fixtures collect Shop commands without running
+shop stock creation, so they are not yet full-world RNG parity evidence.
