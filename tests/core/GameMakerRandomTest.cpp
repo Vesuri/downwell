@@ -50,7 +50,7 @@ void testRealRange() {
 
 void testSmallIntegerPath() {
     constexpr std::uint32_t maxima[] = {
-        0, 1, 2, 3, 4, 5, 6, 9, 12, 15, 30, 40, 50, 60,
+        0, 1, 2, 3, 4, 5, 6, 7, 9, 12, 15, 30, 40, 50, 60,
         70, 180, 359, 255, 1023, 65535
     };
     for (std::uint32_t seed = 0; seed < 32; ++seed) {
@@ -66,6 +66,14 @@ void testSmallIntegerPath() {
         require(small.drawCount() == reference.drawCount(),
                 "small-range adapter consumes the same two stream words");
     }
+    downwell::GameMakerRandom reference(0x98765432U), small(0x98765432U);
+    for (std::uint32_t maximum = 0; maximum <= 65535; ++maximum) {
+        require(small.irandomSmall(maximum) == reference.irandom(maximum),
+                "every supported integer bound matches original 63-bit remainder");
+        require(small.nextU32() == reference.nextU32(),
+                "every bound preserves the following RNG stream word");
+    }
+    require(small.drawCount() == reference.drawCount(), "exhaustive bounds preserve draw count");
 }
 
 void testSmallScaledRealPath() {

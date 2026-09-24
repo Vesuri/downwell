@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 33.19 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 33.22 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -30,6 +30,27 @@ particular, phase 34 includes the 184-row animation loop even when settled;
 the measurement does not yet isolate that loop from the other frame flags.
 All new probes compile out of ordinary and FPSCOUNT-only builds. Host runtime
 fixture digests remain unchanged (`7e82f060aa3fcbf9`, `0db388a5b1c2a40a`).
+
+### Exact power-of-two integer RNG ranges
+
+`irandomSmall` now reduces power-of-two divisors by masking the low word,
+after consuming both original WELL512 words. This is algebraically identical
+to the recovered positive-63-bit remainder, including bounds zero and 65535;
+it does not substitute another RNG or skip draws. Tests compare every bound
+0..65535 with `irandom`, including the following stream word and draw count.
+
+The same 600-update probe tape reduces total generation time from 482.565 to
+463.278 ms, with instrumented fields falling from 1,134 to 1,127. The maximum
+generation bracket remains about 102 ms (102.373 ms in this run), so this
+optimization **does not fix the generation spike**. The remaining spike
+needs finer attribution rather than assuming RNG arithmetic dominates it.
+Evidence logs use `/tmp/downwell-rng-power2-`.
+The FPSCOUNT tape takes 903 PAL fields for 600 updates (33.22 FPS, maximum
+gap six fields), versus 904 fields previously: essentially unchanged, not a
+meaningful frame-rate fix by itself.
+The full host suite, bounded native cross-target replay and both 68000
+audits pass. All replay digests remain unchanged; the verification workflow
+restores the ordinary non-skip executable.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 

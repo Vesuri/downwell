@@ -54,6 +54,9 @@ std::uint32_t GameMakerRandom::irandomSmall(
     const std::uint32_t divisor = upperInclusive + 1U;
     const std::uint32_t low = nextU32();
     const std::uint32_t high = nextU32() & 0x7fffffffU;
+    // A power-of-two divisor uses only low bits, but both original stream
+    // words must still be consumed. Common builder choices use bounds 1/3/7.
+    if (!(divisor & (divisor - 1U))) return low & (divisor - 1U);
     /*
      * (high << 32 | low) % divisor, reduced a word at a time.  With a
      * divisor of at most 65536 every product remains inside uint32_t.
