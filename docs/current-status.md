@@ -32,9 +32,11 @@ These are coverage statements, not completed Windows-fidelity sign-offs.
 - [x] Shared static counter/table/case drawing and offline planar fixtures;
   Amiga composition uses the terrain cache, not recurring furniture redraws.
 - [x] Cased consumable icons (original frame 1), purchase disappearance and
-  changed-row cache refresh; merchant/menu rendering remains pending.
+  changed-row cache refresh; active menu rendering remains pending.
 - [x] Shared merchant Step/alarm controller and animation phase in both
-  runtimes; merchant drawing and enemy replacement remain pending.
+  runtimes; enemy replacement remains pending.
+- [x] Merchant moving-object drawing on SDL and Amiga, offline planar/DMA
+  frames, and existing sprite allocation/BOB fallback (not terrain redraw).
 - [ ] Live shop instances and entry/exit/control locking on both platforms.
 - [ ] Shared menu interaction, prices, sold cases and merchant feedback.
 - [ ] Offline shop art and native rendering without recurring terrain redraw.

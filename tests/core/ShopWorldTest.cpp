@@ -56,6 +56,13 @@ int main() {
         ++fixtures;
     });
     require(fixtures == 8 && run.shops.fixtureRevision == 1, "registration invalidates fixture rows once");
+    fixtures = 0;
+    downwell::drawShopKeepers(run.shops, [&](int sprite, unsigned frame, int x, int y) {
+        require(sprite == 485 && frame == 0 && x == 23 && y == 0,
+            "merchant drawing uses recovered child anchor and current animation");
+        ++fixtures;
+    });
+    require(fixtures == 1, "merchant is a separate moving-object draw");
     require(run.shops.playerSolidAt(39, 0) && run.shops.playerSolidAt(98, 7) &&
         !run.shops.playerSolidAt(38, 0) && !run.shops.playerSolidAt(99, 7),
         "table uses cropped solid mask, not full artwork bounds");

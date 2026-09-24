@@ -228,6 +228,9 @@ void Game::renderMain(Renderer& renderer) const {
     drawShopFixtures(startup_.shops(), [&](int sprite, int frame, int x, int y) {
         renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
     });
+    drawShopKeepers(startup_.shops(), [&](int sprite, int frame, int x, int y) {
+        renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
+    });
     if (startup_.mainPlayerVisible())
         renderer.drawSpriteTransformed(
             startup_.mainPlayerSpriteId(),

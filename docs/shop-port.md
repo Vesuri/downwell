@@ -296,3 +296,34 @@ cache check pass, with clean 68000 helper/instruction audits. The emulator tape
 still contains no merchant; the paired runtime and focused controller fixtures
 are the current evidence for the new behavior, not an original-game visual
 sign-off. Empty shop worlds skip merchant scans.
+
+## Merchant moving-object graphics
+
+`drawShopKeepers` emits the child's current sprite/frame at counter.x+18,y.
+SDL draws it after the shop fixtures and before the player. Amiga appends it to
+the existing moving-actor list in the same order; the existing priority allocator
+selects offline DMA parts or falls back to masked BOBs in the inactive display.
+BOB restoration uses the pristine terrain backing. Merchant animation does not
+advance the static-shop art revision or dirty terrain rows. Final original-game
+equal-depth overlap validation and the area-three bubble overlay remain open.
+
+All frames of sprites 485,486,487,496,497 are generated offline. The existing
+lossless cropper removes transparent canvas padding and preserves anchors, so
+the 48-pixel source canvases fit the existing 32-line DMA slots. Merchant events
+never change image_xscale, so unused mirrored planar copies are omitted; both
+DMA facings are still generated and checked against the pixel oracle.
+
+The initial expanded pack used 280236 resident Chip bytes and booted with 13872
+bytes free in the configured 512 KiB Chip/8 MiB Fast A500 emulator. Omitting unused mirrored planar
+copies saved 5472 bytes and restored the existing <=278000-byte resident-art
+assertion without raising it. The full generated pack is 309748 bytes, SHA-256
+`70c88c0b2e6ab5d1bc8687f2bc698683ab6cbb0f873bb5882f4a37d7fdedfaa6`.
+The renderer test now requires every merchant frame and checks 19894 offline
+sprite oracle cases. These checks do not replace an on-screen target shop test;
+normal 1-1 generation still does not produce a shop.
+
+Validation: full host tests, offline asset verification, SDL build and bounded
+SKIP_TO_GAME A500 cache regression pass. The final pack uses 274764 resident
+Chip bytes, leaving 19344 bytes at startup in that configuration. The target
+retains its task-stack safety margin; 68000 instruction/helper audits are clean.
+The cache verifier now reports resident art and startup headroom on every run.

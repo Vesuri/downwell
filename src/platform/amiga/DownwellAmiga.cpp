@@ -2582,9 +2582,9 @@ int main(void) {
                 }
             }
             DW_PROFILE_PHASE(profileSprite);
-            // SDL painter order: generated enemies, player, bullets, gems.
+            // Shared current painter order: enemies, merchants, player, bullets, gems.
             static GameplayBob actors[1 + AmigaPortRuntime::bulletCapacity +
-                AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity];
+                AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity + downwell::ShopWorld::capacity];
             unsigned actorCount = 0;
 #ifndef DOWNWELL_REPLAY_VERIFY
             for (unsigned index = 0; index < port.enemyCount(); ++index) {
@@ -2597,6 +2597,10 @@ int main(void) {
                         enemy.objectId != 119 && enemy.facing < 0)) frameReady = false;
             }
 #endif
+            downwell::drawShopKeepers(port.shops(), [&](int sprite, unsigned frame, int x, int y) {
+                if (!appendGameplayActor(actors, actorCount, sprite, frame,
+                    downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) frameReady = false;
+            });
             if (port.playerVisible() && !appendGameplayActor(actors, actorCount,
                     (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
                     (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),

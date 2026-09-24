@@ -88,6 +88,11 @@ SELECTIONS = {
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
         482: [0],    # sprShopCase, intact fixture (sold cases stay intact)
+        485: None,   # merchant idle
+        486: None,   # merchant thanks
+        487: None,   # merchant angry/blink
+        496: None,   # merchant goodbye
+        497: None,   # merchant confused
         550: None,   # sprScattered (generated plants)
         568: None,   # sprDungTorch
         569: None,   # sprGemChunk
@@ -331,7 +336,8 @@ def build_pack(manifest, extracted, profile):
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
             if profile == "game" and sprite_id in (153, 154, 157, 162, 163, 164,
-                    166, 168, 170, 173, 177, 178, 186, 187, 188, 278):
+                    166, 168, 170, 173, 177, 178, 186, 187, 188, 278,
+                    485, 486, 487, 496, 497):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -367,7 +373,11 @@ def build_pack(manifest, extracted, profile):
                         padded = Image.new("RGBA", (16, variant.height))
                         padded.paste(variant, (0, 0))
                         variant = padded
-                    for flip_x in (False, True):
+                    # shopKeeper never changes image_xscale. Keep only the
+                    # used planar facing; DMA variants remain independently
+                    # generated below and checked against the pixel oracle.
+                    facings = (False,) if sprite_id in (485, 486, 487, 496, 497) else (False, True)
+                    for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]
                         stride, data = encode_planar(pixels, image.width, image.height)
@@ -553,7 +563,8 @@ def build_pack(manifest, extracted, profile):
     if profile == "game":
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 157, 162, 163, 164,
-                  166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 459)
+                  166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 459,
+                  485, 486, 487, 496, 497)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:
                 continue

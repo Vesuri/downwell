@@ -44,6 +44,7 @@ printf "Deferred consumables passed three controller updates on 68000\n"
 printf "Overflow actors: %lu scalar-oracle comparisons, %lu mismatched bytes\n", gDownwellGameplayBobChecks, gDownwellGameplayBobFailures
 printf "Gameplay cache verified through 600 simulation ticks: %lu fresh-composition comparisons\n", gDownwellTerrainRasterChecks
 printf "Task stack retained its 256-byte safety margin\n"
+printf "Resident art=%lu bytes, startup Chip headroom=%lu bytes\n", gDownwellStartupAssetBytes, gDownwellStartupChipRemaining
 printf "DOWNWELL_GAMEPLAY_CACHE_READY\n"
 shell touch .run/gdb-ready.marker
 detach
