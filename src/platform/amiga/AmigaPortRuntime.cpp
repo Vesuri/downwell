@@ -403,7 +403,6 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemies_[i].active = true;
             enemies_[i].activationPending = false;
         });
-    input = downwell::playerGameplayInput(input, health_);
     // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
     const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int muzzleY = (int)downwell::roundGameMakerQ8(player_.offsetYFixed()) + 4;
@@ -426,7 +425,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
         return false;
     }, &headBreak);
-    AmigaPlayerMotion motion = player_.step(input);
+    AmigaPlayerMotion motion = player_.step(input, false, dead_);
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if (headBreak.index >= 0) {
         const Breakable& box = breakables_[headBreak.index];

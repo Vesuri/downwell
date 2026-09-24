@@ -1,5 +1,6 @@
 #include "PlayerMotion.h"
 #include "core/PlayerControls.h"
+#include "core/PlayerLifeRules.h"
 #include "core/SolidCollision.h"
 #include "core/StateDigest.h"
 
@@ -113,8 +114,9 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
     grounded_ = false;
 }
 
-PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controlsLocked)
+PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool controlsLocked, bool dead)
 {
+    const auto input = downwell::playerGameplayInput(rawInput, dead ? 0 : 1);
     frameStartX_ = x_;
     frameStartY_ = y_;
     const int oldPixelX = pixelX_;
@@ -136,7 +138,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controls
         speedY_ = fallMaximum;
         gravityRemainder_ = 0;
     }
-    if (fireReleased) {
+    if (fireReleased && !dead) {
         if (speedY_ < 0) {
             const long halved = (speedY_ * 5 + gravityRemainder_) / 2;
             speedY_ = halved / 5;
@@ -148,8 +150,23 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& input, bool controls
 
     const bool wasSpinning = spinJumping_;
     const int oldFacing = facing_;
-    downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
-        speedX_, facing_, grounded_, input.left, input.right, controlsLocked);
+    if (dead) {
+        if (controlsLocked) speedX_ = 0;
+        // scrPlMovement death branch bypasses living input/friction. Like
+        // living acceleration, 0.08 is rounded to the existing Q8 storage.
+        const long drag = downwell::FixedPlayerMath::ratio(2, 25);
+        speedX_ -= speedX_ > 0 ? drag : speedX_ < 0 ? -drag : 0;
+        // playerSpriteControl follows and snaps abs(xsp)<0.5 to zero.
+        if (speedX_ > -fixedOne / 2 && speedX_ < fixedOne / 2) speedX_ = 0;
+        if (speedY_ * 5 + gravityRemainder_ < 0) {
+            const long halved = (speedY_ * 5 + gravityRemainder_) / 2;
+            speedY_ = halved / 5;
+            gravityRemainder_ = static_cast<int>(halved % 5);
+        }
+    } else {
+        downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
+            speedX_, facing_, grounded_, input.left, input.right, controlsLocked);
+    }
     if (spinJumping_) facing_ = oldFacing;
     if (solidResolver_ != 0) {
         long remaining = speedX_;

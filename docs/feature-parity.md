@@ -9,6 +9,30 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared death movement
+
+Both runtime adapters now pass depleted-health state to `PlayerMotion::step`;
+the shared update owns input suppression as well as movement. The recovered
+`scrPlMovement.asm` block 152 subtracts sign(xsp)*0.08 and halves negative ysp.
+Its call to `playerSpriteControl` then zeros abs(xsp)<0.5. These rules replace
+the living no-input friction previously applied to dead players. Gravity still
+precedes movement, and positive falling velocity is not halved. Suppressed fire
+does not invoke living button-release braking a second time.
+
+Tests exercise drag, rest threshold, held-input rejection, upward damping after
+gravity with a previously held fire button, and unchanged downward gravity.
+The 0.08 drag is rounded to 20 Q8 units, consistent with current horizontal
+storage; it is not exact floating-point emulation. Complete original death
+publication timing, effects, alarms and restart still remain open. Both ports
+retain their existing depleted-health boundary rather than introducing separate
+backend death physics.
+
+Validation: full host suite and strict 6000-update death-state comparison pass
+(health 0/0, kills 10/10, currency 82/82). Bounded A500 cache and cross-target
+replay checks pass; the latter's living-player/currency fixture retains its
+digest and is a CPU regression, not target-side death coverage. Normal builds
+are restored and the 68000 helper/instruction audits remain clean.
+
 ### Shared depleted-health player pose
 
 Player sprite/frame selection now accepts the death state in `PlayerMotion`,
@@ -22,8 +46,8 @@ the living motion pose hidden underneath the native renderer's override.
 
 Both adapters still use the existing immediate depleted-health boundary and
 default deathani=1. This does not recover the original Begin Step publication,
-death drag/upward-velocity damping, alarms, flash/effects or menu/restart flow.
-Pose selection does not mutate physics; those source behaviours remain open.
+alarms, flash/effects or menu/restart flow. Pose selection itself does not mutate
+physics; death drag/upward damping were subsequently added as described above.
 
 Validation: full host tests and the 6000-update paired death-state gate pass
 (health 0/0, kills 10/10, currency 82/82). Bounded A500 cache verification and

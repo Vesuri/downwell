@@ -397,6 +397,28 @@ int main() {
     for (unsigned i = 0; i < 10; ++i) runningCorpse.step(input);
     require(runningCorpse.spriteFrame(true, 0) == 0,
             "grounded corpse still moving faster than half a pixel does not use resting frame");
+    const long preDeathSpeed = runningCorpse.speedXFixed();
+    input.fire = true;
+    runningCorpse.step(input, false, true);
+    require(runningCorpse.speedXFixed() == preDeathSpeed - 20 &&
+                runningCorpse.shots() == 0 && runningCorpse.jumps() == 0,
+            "death applies rounded 0.08 drag instead of living friction and rejects held controls");
+    for (unsigned i = 0; i < 30; ++i) runningCorpse.step(input, false, true);
+    require(runningCorpse.speedXFixed() == 0,
+            "death sprite-control threshold stops residual horizontal drift");
+    PlayerMotion risingCorpse(false, 1000);
+    input = downwell::Input{};
+    input.fire = true;
+    risingCorpse.step(input);
+    risingCorpse.contactKnockback(0, 1);
+    input.fire = false;
+    risingCorpse.step(input, false, true);
+    require(risingCorpse.speedYFixed() == -230,
+            "death halves upward speed after gravity once, not again for synthetic fire release");
+    PlayerMotion fallingCorpse(false, 1000);
+    fallingCorpse.step(input, false, true);
+    require(fallingCorpse.speedYFixed() == 51,
+            "death keeps downward gravity rather than halving positive velocity");
     std::cout << "Shared player tests passed\n";
     return 0;
 }
