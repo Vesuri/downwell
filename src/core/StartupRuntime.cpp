@@ -366,6 +366,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
     if (roomId_ == mainRoomId) {
+        run_.exitDither.step(mainCameraRenderViewY(), surfaceHeight);
         updateMainBullets();
         updateMainEnemies();
         updateMainEnemyInteractions();
@@ -1360,7 +1361,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
     // Goal-field overlap and boss completion remain separate source guards.
     run_.clock.advance(true, mainDeath_.active, run_.goalStopped);
-    run_.advanceLevelExitAlarms();
+    run_.advanceLevelExitAlarms(mainCameraRenderViewX(), mainCameraRenderViewY());
     mainDeath_.publishHealth(mainPlayerHealth_);
     mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
     run_.results.open(mainDeath_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);

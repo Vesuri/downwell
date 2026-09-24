@@ -878,6 +878,13 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 gameplay.levelResultRequested() == (tick >= 95) &&
                 reference.levelResultRequested() == (tick >= 95),
                 "both live adapters request dither at five and results at ninety-five ticks");
+            const auto& a = gameplay.exitDither();
+            const auto& b = reference.exitDither();
+            require(a.active == b.active && a.x == b.x && a.y == b.y &&
+                a.alarm0 == b.alarm0 && a.soundRequested == b.soundRequested,
+                "exit dither world motion and sound timing agree across adapters");
+            require(a.soundRequested == (tick >= 20),
+                "exit dither sound follows fifteen alarm phases after tick-five creation");
         }
         return;
     }

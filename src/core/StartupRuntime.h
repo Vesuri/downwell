@@ -176,6 +176,7 @@ public:
     const GoalTimeField& goalField() const { return run_.goalField; }
     bool goalStopped() const { return run_.goalStopped; }
     bool exitDitherRequested() const { return run_.exitDitherRequested; }
+    const ExitDither& exitDither() const { return run_.exitDither; }
     bool levelResultRequested() const { return run_.levelResultRequested; }
     const RunStage& runStage() const { return run_.stage; }
     int mainPlayerHealthMaximum() const { return run_.combo.healthReserve.maximum; }

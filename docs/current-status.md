@@ -121,9 +121,9 @@ Both runtimes now dispatch collision against the exit's recovered rectangular
 sprTouchWide mask using their current rounded player-mask adapter. A living
 collision latches goalStop/noControl, suppresses subsequent position integration
 and run-clock increments, and arms the shared alarm sequence. Sticky requests
-record dither on tick 5 and the result room on tick 95; the renderer/room loader
-do not consume these yet. Consequently reaching the live exit currently stops
-the player without progressing. A paired fixture covers 100 subsequent updates
+record dither on tick 5 and the result room on tick 95. The result room loader
+does not consume its request yet. Consequently reaching the live exit currently
+stops the player without progressing. A paired fixture covers 100 subsequent updates
 with held movement/fire, unchanged position/time, matching alarm requests and
 new-run reset. Exact trigger-edge contacts have focused tests; full fractional
 collision/event ordering and original Windows captures remain open.
@@ -131,6 +131,17 @@ The bounded SKIP_TO_GAME native cache gate still passes 600 simulation ticks,
 101 fresh-render comparisons and the 256-byte task-stack margin with this
 integration. That gate validates existing gameplay rendering, not reaching the
 level exit on target; exit timing is covered by the paired host runtime fixture.
+
+The tick-five request now creates shared ExitDither state. The recovered Create
+anchors x=viewX+80, y=viewY-100 and arms alarm 0 for 15; ordinary Step advances
+y by eight while below the current view bottom, without re-anchoring or clamping
+overshoot. Both adapters advance this state and latch its source sound request
+(187, priority 80, UI; no playback yet). SDL draws sprite 128 after the HUD,
+clipped to the 160-pixel room surface. Focused/paired tests cover moving camera,
+sound timing, matching world coordinates and repeat-render independence.
+Amiga dither presentation remains pending: its immutable mask needs a gameplay
+row-stride-compatible DMA layout and copper/palette integration, not the narrow
+style screen's mask pointer or per-frame terrain repainting.
 
 ## Still open beyond that milestone
 

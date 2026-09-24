@@ -12,6 +12,7 @@
 #include "ShopWorld.h"
 #include "LevelExit.h"
 #include "GoalTimeField.h"
+#include "ExitDither.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -40,11 +41,16 @@ struct RunSession {
     bool levelExitPresent = false;
     bool goalStopped = false, exitControlsLocked = false;
     bool exitDitherRequested = false, levelResultRequested = false;
+    ExitDither exitDither;
 
-    void advanceLevelExitAlarms() {
+    void advanceLevelExitAlarms(int viewX, int viewY) {
         if (!levelExitPresent) return;
+        exitDither.advanceAlarm();
         levelExit.advanceAlarms([&](LevelExit::Effect effect, int, int) {
-            if (effect == LevelExit::Effect::ditherTransition) exitDitherRequested = true;
+            if (effect == LevelExit::Effect::ditherTransition) {
+                exitDitherRequested = true;
+                exitDither.create(viewX, viewY);
+            }
             if (effect == LevelExit::Effect::resultRoom) levelResultRequested = true;
         });
     }
@@ -57,6 +63,7 @@ struct RunSession {
     void createLevelExit(int roomWidth, int y, GameMakerRandom& random, Camera& camera) {
         goalStopped = exitControlsLocked = false;
         exitDitherRequested = levelResultRequested = false;
+        exitDither = {};
         levelExit.create(roomWidth, y, [&](LevelExit::Effect effect, int x, int childY) {
             if (effect == LevelExit::Effect::roomEndSetter) camera.setLevelExit(childY);
             else if (effect == LevelExit::Effect::goalTimeField) goalField.create(x, childY, random);
@@ -85,6 +92,7 @@ struct RunSession {
         levelExitPresent = false;
         goalStopped = exitControlsLocked = false;
         exitDitherRequested = levelResultRequested = false;
+        exitDither = {};
     }
     ResultsDestination restart(DeathMenuSequence::Action action, const RunRecords& saved) {
         const auto destination = resultsDestination(action);

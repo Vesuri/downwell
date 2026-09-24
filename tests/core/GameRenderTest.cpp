@@ -45,6 +45,11 @@ public:
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
     void drawSprite(std::int32_t id, std::uint32_t, int x, int y) override {
         if (id == 489 && x == 110 && y == 57) ++shopPanels;
+        if (id == 128) {
+            ++exitDitherDraws; exitDitherX = x; exitDitherY = y;
+            require(clipX == 110 && clipY == 0 && clipWidth == 160 && clipHeight == 284,
+                "exit dither is clipped to the room surface, not the side HUD");
+        }
     }
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
                                float, float, float) override {
@@ -80,6 +85,8 @@ public:
     unsigned deathFlashCount = 0;
     unsigned shopPanels = 0, shopNameCenters = 0;
     unsigned triggerDraws = 0;
+    unsigned exitDitherDraws = 0;
+    int exitDitherX = 0, exitDitherY = 0;
     int setClipCount = 0;
     int clearClipCount = 0;
     int clipX = 0;
@@ -509,6 +516,15 @@ int main() {
     shopGame.render(closedShop);
     require(closedShop.shopPanels == 0 && closedShop.shopNameCenters == 0,
         "closed shop no longer submits menu overlay");
+    auto& exitDither = const_cast<downwell::ExitDither&>(shopRuntime.exitDither());
+    exitDither.create(shopRuntime.mainCameraRenderViewX(), shopRuntime.mainCameraRenderViewY());
+    exitDither.step(shopRuntime.mainCameraRenderViewY(), 284);
+    const int ditherWorldY = exitDither.y;
+    RecordingRenderer closingLevel;
+    shopGame.render(closingLevel); shopGame.render(closingLevel);
+    require(closingLevel.exitDitherDraws == 2 && closingLevel.exitDitherX == 190 &&
+        closingLevel.exitDitherY == -92 && exitDither.y == ditherWorldY && exitDither.alarm0 == 15,
+        "Game projects recovered exit sprite and repeated rendering does not advance motion or alarms");
     std::puts("game render tests passed");
     return 0;
 }

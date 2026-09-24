@@ -128,6 +128,13 @@ void Game::render(Renderer& renderer) const {
         renderer.clearClipRect();
     if (startup_.inMainRoom())
         renderLandscapeHud(renderer);
+    if (startup_.inMainRoom() && startup_.exitDither().active) {
+        renderer.setClipRect(playfieldX, 0, 160, logicalHeight);
+        const auto& dither = startup_.exitDither();
+        playfield.drawSprite(128, 0, dither.x - startup_.mainCameraRenderViewX(),
+            dither.y - startup_.mainCameraRenderViewY());
+        renderer.clearClipRect();
+    }
     if (startup_.inMainRoom() && startup_.deathResults().active) {
         renderer.setClipRect(playfieldX, 0, 160, logicalHeight);
         struct Sink {

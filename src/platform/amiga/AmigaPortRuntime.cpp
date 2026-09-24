@@ -477,7 +477,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     player_.configureMovementBoundary(nullptr, nullptr);
     // Goal-field overlap and boss completion remain separate source guards.
     run_.clock.advance(true, death_.active, run_.goalStopped);
-    run_.advanceLevelExitAlarms();
+    run_.advanceLevelExitAlarms(cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142);
     death_.publishHealth(health_);
     death_.advanceAlarms(player_.grounded());
     run_.results.open(death_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);
@@ -791,6 +791,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.y = downwell::GemMotion::rounded(gem.motion.y);
     }
 
+    run_.exitDither.step(cameraMotion_.pixelY() - 142, 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
     const long viewTop = 34L * 4096 + viewCameraYQ8() * 16;

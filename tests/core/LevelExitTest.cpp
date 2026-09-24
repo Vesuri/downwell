@@ -1,10 +1,26 @@
 #include "core/LevelExit.h"
+#include "core/ExitDither.h"
 #include <cstdio>
 #include <cstdlib>
 static void require(bool ok, const char* why) {
     if (!ok) { std::fprintf(stderr, "%s\n", why); std::abort(); }
 }
 int main() {
+    downwell::ExitDither dither;
+    dither.create(160, 1000);
+    require(dither.x == 240 && dither.y == 900 && dither.alarm0 == 15,
+        "transition captures world anchor from creation-time view");
+    dither.step(1000, 284);
+    require(dither.y == 908 && dither.alarm0 == 15,
+        "creation-frame ordinary Step moves without ticking new alarm");
+    for (unsigned tick = 1; tick <= 60; ++tick) {
+        dither.advanceAlarm();
+        dither.step(1000, 284);
+        require(dither.soundRequested == (tick >= 15), "transition sound fires fifteen alarm phases later");
+    }
+    require(dither.y == 1284 && dither.x == 240, "transition stops at view bottom without horizontal following");
+    dither.step(1001, 284);
+    require(dither.y == 1292, "moving camera can resume eight-pixel motion; no invented clamping");
     using Exit = downwell::LevelExit;
     Exit exit;
     unsigned creates = 0;
@@ -26,12 +42,12 @@ int main() {
         "dead player cannot begin level exit");
     require(exit.collide(false, stop, locked) && stop && locked && exit.active && exit.alarm0 == 5,
         "first living collision locks and arms the source countdown");
-    unsigned dither = 0, result = 0;
+    unsigned ditherEvents = 0, result = 0;
     for (unsigned tick = 1; tick <= 100; ++tick) {
         exit.advanceAlarms([&](Exit::Effect effect, int x, int y) {
             require(x == 0 && y == 0, "alarm transition origin");
             if (effect == Exit::Effect::ditherTransition) {
-                require(tick == 5, "dither starts on fifth alarm phase"); ++dither;
+                require(tick == 5, "dither starts on fifth alarm phase"); ++ditherEvents;
             } else {
                 require(effect == Exit::Effect::resultRoom && tick == 95,
                     "result-room request follows ninety further alarm phases"); ++result;
@@ -40,7 +56,7 @@ int main() {
         require(!exit.collide(tick > 10, stop, locked), "later living/dead collisions cannot rearm exit");
         if (tick == 5) require(exit.alarm1 == 90, "new alarm retains full duration in dispatch frame");
     }
-    require(dither == 1 && result == 1 && exit.alarm0 == -1 && exit.alarm1 == -1,
+    require(ditherEvents == 1 && result == 1 && exit.alarm0 == -1 && exit.alarm1 == -1,
         "alarms are one-shot and later death does not invent cancellation");
     std::puts("Shared level-exit Create, collision and alarm sequence passed");
 }
