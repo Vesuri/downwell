@@ -14,6 +14,7 @@
 #include "core/FrogBehavior.h"
 #include "core/FrogMotion.h"
 #include "core/StandardBulletStep.h"
+#include "core/StandardBulletImpact.h"
 #include "core/FrogVerticalMotion.h"
 #include "core/BatMotion.h"
 #include "core/Replay.h"
@@ -505,21 +506,13 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                             enemy.objectId == 117 ? enemy.motionState : enemy.facing,
                             enemy.objectId == 117 && enemy.speedY > 0 ? -1 : 1,
                             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
-                        if (!enemy.active || !enemy.awake || enemy.health <= 0 ||
+                        if (!enemy.active || enemy.health <= 0 ||
                             !path.intersects(contact))
                             continue;
-                        if (enemy.objectId != 112) {
-                            if (enemy.objectId == 113) enemy.frogHit.pending = true;
-                            if (enemy.objectId == 117) enemy.snailHit.pending = true;
-                            if (enemy.objectId == 116) enemy.batHit.queue(270);
-                            enemy.health -= 10;
-                            if (enemy.health <= 0) {
-                                spawnReward(enemy, false);
-                                enemy.active = false;
-                                ++enemiesDefeated_;
-                            }
-                        }
-                        return true;
+                        const auto impact = downwell::applyStandardBulletImpact(
+                            enemy, enemiesDefeated_, enemyRandom_,
+                            [this, &enemy] { spawnReward(enemy, false); });
+                        return impact.kind != downwell::BulletImpactKind::ignored;
                     }
                     return false;
                 }, [this, &destroyedBlockCount, &destroyedBlockX, &destroyedBlockY]

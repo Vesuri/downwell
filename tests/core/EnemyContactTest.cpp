@@ -1,5 +1,9 @@
 #include "core/EnemyContact.h"
 #include "core/EnemyContactResponse.h"
+#include "core/StandardBulletImpact.h"
+#include "core/BatHitState.h"
+#include "core/FrogHitState.h"
+#include "core/SnailHitState.h"
 #include <cstdlib>
 #include <iostream>
 
@@ -11,6 +15,51 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    {
+        struct Enemy {
+            bool active = true;
+            int objectId = 116, health = 15;
+            BatHitState batHit;
+            FrogHitState frogHit;
+            SnailHitState snailHit;
+        } enemy;
+        struct Random {
+            unsigned calls = 0, choice = 0;
+            unsigned irandomSmall(unsigned bound) {
+                require(bound == 1, "ricochet selection uses exactly two source sounds");
+                ++calls; return choice;
+            }
+        } random;
+        unsigned defeated = 0, rewards = 0;
+        const auto reward = [&] { ++rewards; };
+        for (int object : {113, 116, 117}) {
+            enemy = Enemy{}; enemy.objectId = object;
+            auto impact = applyStandardBulletImpact(enemy, defeated, random, reward);
+            require(impact.kind == BulletImpactKind::damaged && impact.sound == 29 &&
+                        enemy.active && enemy.health == 5 && random.calls == 0,
+                    "usual bullet applies ten damage without an invented random draw");
+            require(object == 113 ? enemy.frogHit.pending : object == 117 ? enemy.snailHit.pending :
+                        enemy.batHit.pending && enemy.batHit.pendingDirection == 270,
+                    "shared impact queues the appropriate existing enemy hit state");
+            impact = applyStandardBulletImpact(enemy, defeated, random, reward);
+            require(impact.kind == BulletImpactKind::defeated && !enemy.active && enemy.health == -5,
+                    "fatal usual hit emits the implemented retirement/reward response");
+            require(applyStandardBulletImpact(enemy, defeated, random, reward).kind == BulletImpactKind::ignored,
+                    "already retired targets cannot produce a second defeat");
+        }
+        require(defeated == 3 && rewards == 3, "each fatal target emits exactly one reward");
+        enemy = Enemy{}; enemy.objectId = 112;
+        for (unsigned choice = 0; choice < 2; ++choice) {
+            random.choice = choice;
+            const auto impact = applyStandardBulletImpact(enemy, defeated, random, reward);
+            require(impact.kind == BulletImpactKind::immune && impact.sound == static_cast<int>(30 + choice) &&
+                        enemy.health == 15 && enemy.active && random.calls == choice + 1 && rewards == 3,
+                    "immune turtle preserves health but consumes the source ricochet choice");
+        }
+        enemy.active = false;
+        require(applyStandardBulletImpact(enemy, defeated, random, reward).kind == BulletImpactKind::ignored &&
+                    random.calls == 2, "inactive targets consume no ricochet RNG");
+    }
     {
         struct PlayerProbe {
             int bounces = 0, knocks = 0, knockX = 0, knockY = 0;

@@ -10,6 +10,7 @@
 #include "FrogBehavior.h"
 #include "FrogMotion.h"
 #include "StandardBulletStep.h"
+#include "StandardBulletImpact.h"
 #include "BatMotion.h"
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
@@ -531,21 +532,13 @@ void StartupRuntime::updateMainBullets() {
           [this](const StandardBulletPath& path) {
             InstanceRecord* enemy = mainBulletEnemyCollision(path.x, path.fromY, path.toY);
             if (enemy != nullptr) {
-                // Ground turtles are bulletImmune in their recovered Create
-                // event. Other area-one enemies take the usual gun's 10 dmg.
-                if (enemy->objectId != 112) {
-                    if (enemy->objectId == 113) enemy->frogHit.pending = true;
-                    if (enemy->objectId == 117) enemy->snailHit.pending = true;
-                    if (enemy->objectId == 116) enemy->batHit.queue(270);
-                    enemy->health -= 10;
-                    if (enemy->health <= 0) {
+                const auto impact = applyStandardBulletImpact(*enemy, mainEnemiesDefeated_, random_,
+                    [this, enemy] {
                         spawnMainCurrency(static_cast<float>(enemy->x),
                                           static_cast<float>(enemy->y),
                                           enemy->reward);
-                        enemy->active = false;
-                        ++mainEnemiesDefeated_;
-                    }
-                }
+                    });
+                if (impact.kind == BulletImpactKind::ignored) return false;
                 ++soundPlayRequests_;
                 return true;
             }

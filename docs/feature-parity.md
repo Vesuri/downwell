@@ -47,11 +47,33 @@ The old SDL per-pixel loop could process a nearer wall before discovering an
 enemy farther along that same segment. A focused test covers that case and
 both segment endpoints.
 
-This does not recover the entire bullet system. Both adapters still apply
-enemy damage directly during the sweep rather than reproducing the original
+Both adapters now call `src/core/StandardBulletImpact.h` for the implemented
+usual gun's enemy response: ten damage, pending frog/snail/bat hit state,
+fatal reward/retirement, and immune turtle ricochet. The immune branch of
+`gml_GlobalScript_scrTypicalBulletDamage.asm` explicitly calls `choose(30,31)`
+before `soundPlay`; both ports previously omitted that RNG consumption. The
+shared handler now consumes the choice even without an audio backend. Tests
+cover both sound choices, nonfatal/fatal hits, duplicate-hit rejection and an
+airborne native shot absorbed by a turtle with exactly two WELL draws.
+Rendering activation no longer gates the native bullet collision query.
+
+This does not recover the entire bullet system. Both adapters still invoke
+the shared damage response during the sweep rather than reproducing the original
 collision-event phase. Their wall selection/storage,
 impact-position handling remain to be consolidated and
 validated; angled spread, other guns and piercing are outside this helper.
+Pending hits are still delivered on the next Step and fatal rewards are still
+immediate. Original hitAngle/hitDmg, damageStun, momentDelay and impact effects
+remain incomplete; matching this handler is not proof of full event-order or
+RNG fidelity.
+
+After this consolidation the full host suite (including both combat tapes and
+16,562 offline sprite comparisons), bounded A500 600-tick cache check (101
+fresh compositions and intact stack margin), and cross-CPU replay pass.
+The replay remains `64 9f0d3943 e7900d2b 400 8d8e8642 25e003ee 7f`; its
+player/currency fixture does not exercise enemy impacts. Impact coverage is
+provided by the host unit/integration fixtures and paired combat tapes, not
+by that unchanged replay digest. Both target instruction audits remain clean.
 
 Validation after this extraction: full host suite (including the 600-update
 combat comparison), bounded A500 600-tick terrain/cache oracle and cross-CPU

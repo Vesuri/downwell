@@ -364,6 +364,17 @@ int main() {
             "aligned batches extend the indexed collision path without losing prior blocks");
 
     AmigaPortRuntime combat(300);
+    {
+        AmigaPortRuntime immune(300, false, 1000);
+        require(immune.configureEnemy(0, 112, 186, -1, 12, 0, 0, 20, 0),
+                "configure a turtle in the first usual bullet's path");
+        const auto draws = immune.randomDrawCount();
+        immune.step(4);
+        require(immune.enemyAt(0).active && immune.enemyAt(0).health == 20 &&
+                    immune.bulletCount() == 0 && immune.enemiesDefeated() == 0 &&
+                    immune.randomDrawCount() == draws + 2,
+                "native immune impact absorbs the bullet and consumes choose's two WELL draws");
+    }
     require(combat.configureEnemy(0, 111, 163, -1, 12,
                                   0, 0, 5, 6),
             "bounded native enemy configuration succeeds");
