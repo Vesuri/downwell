@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared results-menu choice presentation
+
+Both backends draw RETRY, STYLE SELECT and SURFACE from a shared layout based
+on DeathMenu Draw VM blocks 79--87. Choices appear only after sequenceOver and
+while no goal notice is active. Earlier rows lift by two pixels with the cursor;
+the selected label draws red then white with the recovered bounce. Layout keeps
+fractional X in tenths: SDL retains that fraction, while the planar backend
+floors positive X to whole pixels. Windows fractional raster coverage remains
+unverified; this is not a claim of exact cross-backend animation pixels.
+
+Native text uses existing offline font masks, with no runtime conversion.
+Settled choices are cached; changes restore only y=186..221, including the
+lower dither behind SURFACE. The backdrop helper skips tiles outside that
+dirty region. Rendering does not advance menu state or execute actions.
+
+Fixtures cover all selections and bounce phases, source anchors/layer order,
+and hiding during unlock notices. The native cache fixture visits every choice
+and hides/reveals the menu before comparison against a fresh scalar final
+composition, also checking that terrain is untouched. Retry/style/surface
+actions and unlock presentation remain outstanding.
+
+Validation: full host suite and bounded 600-update A500 cache/overlay gate
+pass, with zero overlay mismatches, 101 terrain comparisons, intact asset packs
+and stack margin, and clean 68000 instruction/helper audits. Normal SDL and
+Amiga builds are restored. This does not establish a 20 ms results-frame budget.
+
 ### Shared stage state and area/level result row
 
 `RunStage` models the source zero reset and scrNextLevel's increment,

@@ -4,6 +4,7 @@
 #include "core/BuilderPatternPack.h"
 #include "core/DeathResultsBackdrop.h"
 #include "core/DeathResultsRows.h"
+#include "core/DeathResultsChoices.h"
 #include "core/StateDigest.h"
 #include <cstring>
 #include <cstdio>
@@ -84,6 +85,41 @@ public:
 } // namespace
 
 int main() {
+    struct ChoiceProbe {
+        struct Call { unsigned index; int x, y; unsigned pen; };
+        std::vector<Call> calls;
+        void choice(unsigned index, int x, int y, unsigned pen) { calls.push_back({index,x,y,pen}); }
+    } choices;
+    downwell::DeathMenuSequence choiceMenu;
+    downwell::drawDeathResultsChoices(choices, choiceMenu);
+    require(choices.calls.empty(), "choices hidden before results sequence finishes");
+    choiceMenu.sequenceOver = true;
+    for (int cursor = 0; cursor < 3; ++cursor) {
+        for (int bounce = 0; bounce <= 12; bounce += 4) {
+            choices.calls.clear();
+            choiceMenu.cursor = cursor;
+            choiceMenu.cursorBounceTenths = bounce;
+            downwell::drawDeathResultsChoices(choices, choiceMenu);
+            require(choices.calls.size() == 4, "selected label has shadow plus foreground");
+            unsigned call = 0;
+            for (int i = 0; i < 3; ++i) {
+                const int y = 190 + i * 10 - (cursor >= i ? 2 : 0);
+                const auto& red = choices.calls[call++];
+                require(red.index == static_cast<unsigned>(i) && red.pen == 2 &&
+                    red.x == (16+i*8)*10 + (cursor == i ? bounce-10 : 0) &&
+                    red.y == y + (cursor == i), "source left anchor and red layer");
+                if (cursor == i) {
+                    const auto& white = choices.calls[call++];
+                    require(white.pen == 1 && white.x == (16+i*8)*10+bounce &&
+                        white.y == y+1-bounce/10, "source fractional bounce and floor on white baseline");
+                }
+            }
+        }
+    }
+    choices.calls.clear();
+    choiceMenu.goalPassed = true;
+    downwell::drawDeathResultsChoices(choices, choiceMenu);
+    require(choices.calls.empty(), "unlock notice hides choices");
     downwell::RunStage stage;
     require(stage.area == 0 && stage.level == 0, "new run has source zero stage before confirmation");
     stage.advance();

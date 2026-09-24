@@ -3,6 +3,7 @@
 #include "HudNumbers.h"
 #include "DeathResultsBackdrop.h"
 #include "DeathResultsRows.h"
+#include "DeathResultsChoices.h"
 #include "DeathResultsProgressBar.h"
 #include "DeathResultsProgressLabels.h"
 #include "ObjectPack.h"
@@ -123,6 +124,11 @@ void Game::render(Renderer& renderer) const {
         renderer.setClipRect(playfieldX, 0, 160, logicalHeight);
         struct Sink {
             Renderer& renderer;
+            void choice(unsigned index, int xTenths, int y, unsigned pen) {
+                const char* labels[] = {"RETRY", "STYLE SELECT", "SURFACE"};
+                renderer.drawText(2, labels[index], xTenths / 10.0F, y,
+                    pen == 2 ? Color{255,0,0,255} : Color{255,255,255,255}, TextAlign::left);
+            }
             void sprite(int frame, int x, int y) { renderer.drawSprite(733, frame, x, y); }
             void asset(int id, unsigned frame, int x, int y) { renderer.drawSprite(id, frame, x, y); }
             void barRect(int x, int y, int w, int h, bool red) {
@@ -150,6 +156,7 @@ void Game::render(Renderer& renderer) const {
             startup_.runCombo().state.best, startup_.runStage());
         drawDeathResultsProgressLabels(sink, startup_.deathResults());
         DeathResultsProgressBar::from(startup_.deathResults()).draw(sink);
+        drawDeathResultsChoices(sink, startup_.deathResults().menu);
         renderer.clearClipRect();
     }
 }

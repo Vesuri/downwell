@@ -27,6 +27,7 @@
 #include "core/HudNumbers.h"
 #include "core/DeathResultsBackdrop.h"
 #include "core/DeathResultsRows.h"
+#include "core/DeathResultsChoices.h"
 #include "core/DeathResultsProgressBar.h"
 #include "core/DeathResultsProgressLabels.h"
 #include "framework/AmigaMemory.h"
@@ -532,11 +533,12 @@ static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
 }
 
 static void composeResultsBackdrop(AmigaRenderer* renderer,
-                                    int offset, int viewX, int viewY) {
+                                    int offset, int viewX, int viewY,
+                                    int top = 0, int bottom = 284) {
     UBYTE* saved = renderer->target;
-    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, top, 160, bottom - top);
     renderer->target = renderer->hud;
-    amigaRendererFillRect(renderer, downwellPlayfieldX, 0, 160, 284, 0);
+    amigaRendererFillRect(renderer, downwellPlayfieldX, top, 160, bottom - top, 0);
     struct Sink {
         AmigaRenderer* renderer;
         void sprite(int frame, int x, int y) {
@@ -553,7 +555,7 @@ static void composeResultsBackdrop(AmigaRenderer* renderer,
                 downwellPlayfieldX + x, y, 0, black ? 3 : 1);
         }
     } sink{renderer};
-    downwell::drawDeathResultsBackdrop(sink, offset, viewX, viewY);
+    downwell::drawDeathResultsBackdrop(sink, offset, viewX, viewY, top, bottom);
     amigaRendererClearClipRect(renderer);
     renderer->target = saved;
 }
@@ -653,6 +655,39 @@ static void redrawResultsProgress(AmigaRenderer* renderer,
     previous = bar;
     previousTotal = results.frame.displayedTotal; previousGoal = results.frame.nextGoal;
     composeResultsProgress(renderer, bar, results);
+}
+
+static void composeResultsChoices(AmigaRenderer* renderer,
+        const downwell::DeathMenuSequence& menu, int viewX, int viewY) {
+    // SURFACE overlaps the lower dither: restore that region, not a black box.
+    composeResultsBackdrop(renderer, menu.titleOffset, viewX, viewY, 186, 222);
+    UBYTE* saved = renderer->target;
+    amigaRendererSetClipRect(renderer, downwellPlayfieldX, 186, 160, 36);
+    renderer->target = renderer->hud;
+    struct Sink {
+        AmigaRenderer* renderer;
+        void choice(unsigned index, int xTenths, int y, unsigned pen) {
+            // Offline font-2 canvases have centered origins and eight-pixel advances.
+            const int halfWidths[] = {20, 48, 28};
+            amigaRendererDrawAssetPen(renderer, gDownwellResultsPack,
+                gDownwellResultsPack + gDownwellResultsAssetBytes, 65301 + index, 0,
+                downwellPlayfieldX + xTenths / 10 + halfWidths[index], y, 0, pen);
+        }
+    } sink{renderer};
+    downwell::drawDeathResultsChoices(sink, menu);
+    amigaRendererClearClipRect(renderer);
+    renderer->target = saved;
+}
+
+static void redrawResultsChoices(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force) {
+    const auto& menu = port.deathResults().menu;
+    const unsigned phase = menu.cursor | (menu.cursorBounceTenths << 2) |
+        (menu.bodyOffset << 6) | (menu.sequenceOver << 8) | (menu.goalPassed << 9);
+    static unsigned previous = ~0u;
+    if (!force && phase == previous) return;
+    previous = phase;
+    composeResultsChoices(renderer, menu, mainViewX + port.cameraOffsetX(),
+        mainInitialViewY + port.cameraOffsetY());
 }
 
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -2126,6 +2161,7 @@ int main(void) {
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port);
                 redrawResultsRows(&renderer, port, backdropChanged);
                 redrawResultsProgress(&renderer, port.deathResults(), backdropChanged);
+                redrawResultsChoices(&renderer, port, backdropChanged);
             }
         }
         {
@@ -2517,6 +2553,23 @@ int main(void) {
                 labelFixture.frame.displayedTotal = 500;
                 composeResultsProgress(&resultsOracle, barFixture, labelFixture);
                 composeResultsProgress(&renderer, barFixture, labelFixture);
+                rowFixture.sequenceOver = true;
+                // The real HUD visits all choices before the final frame;
+                // the scalar oracle draws only the final state on fresh backdrop.
+                for (int cursor = 0; cursor < 3; ++cursor) {
+                    rowFixture.cursor = cursor;
+                    for (int bounce = 0; bounce <= 12; bounce += 4) {
+                        rowFixture.cursorBounceTenths = bounce;
+                        composeResultsChoices(&renderer, rowFixture, 160, 34);
+                    }
+                }
+                rowFixture.goalPassed = true;
+                composeResultsChoices(&renderer, rowFixture, 160, 34);
+                rowFixture.goalPassed = false;
+                rowFixture.cursor = 2;
+                rowFixture.cursorBounceTenths = 12;
+                composeResultsChoices(&resultsOracle, rowFixture, 160, 34);
+                composeResultsChoices(&renderer, rowFixture, 160, 34);
                 redrawAmmo(&resultsOracle, 12, 15);
                 redrawAmmo(&renderer, 12, 15);
                 AmigaHardware::blitterDrain();
