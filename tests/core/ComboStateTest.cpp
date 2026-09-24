@@ -1,5 +1,6 @@
 #include "core/ComboState.h"
 #include "core/ComboGrants.h"
+#include "core/RunCombo.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
@@ -7,6 +8,57 @@ static void require(bool value, const char* message) {
 }
 int main() {
     using downwell::ComboState;
+    struct Live {
+        downwell::RunCombo combo;
+        downwell::CurrencyAccount currency;
+        PlayerMotion player;
+        int health = 4;
+        unsigned calls = 0;
+        unsigned boundaryGems = 0;
+        static void boundary(void* opaque) {
+            auto& value = *static_cast<Live*>(opaque);
+            value.boundaryGems = value.currency.gameGem;
+        }
+        static void complete(void* opaque) {
+            auto& value = *static_cast<Live*>(opaque);
+            ++value.calls;
+            value.combo.finish(value.player, value.currency, value.health);
+        }
+    } live;
+    live.combo.state.count = 25;
+    live.player.configureComboCompletion(Live::complete, &live, true);
+    live.player.step({});
+    require(live.calls == 0 && live.combo.state.count == 25, "time stop suppresses grounded completion");
+    live.player.configureComboCompletion(Live::complete, &live);
+    live.player.configureMovementBoundary(Live::boundary, &live);
+    live.player.step({});
+    require(live.calls == 1 && live.combo.state.best == 25 && live.combo.state.count == 0 &&
+            live.currency.gameGem == 100 && live.player.ammoCapacity() == 9 && live.combo.healthReserve.pieces == 1,
+            "grounded shared phase applies all grants synchronously");
+    require(live.boundaryGems == 100, "death statistics boundary sees grounded movement rewards");
+    live.player.step({});
+    require(live.calls == 2 && live.currency.gameGem == 100 && live.player.ammoCapacity() == 9,
+            "repeated grounded updates cannot award the same combo twice");
+    live.player = PlayerMotion(false, 0);
+    live.player.configureComboCompletion(Live::complete, &live);
+    live.player.configureMovementBoundary(Live::boundary, &live);
+    live.combo.state.count = 15;
+    live.player.step({});
+    require(live.calls == 3 && live.player.grounded() && live.player.ammo() == 9,
+            "landing completes before recharge, retaining the newly increased capacity");
+    require(live.boundaryGems == 100 && live.currency.gameGem == 200,
+            "death statistics boundary precedes later wall-collision landing rewards");
+    live.player = PlayerMotion(false, 0);
+    live.player.configureComboCompletion(Live::complete, &live);
+    live.player.configureSolidResolver([](void*, int x, int) { return x >= 3; }, nullptr, -60, 60);
+    live.combo.state.count = 8;
+    downwell::Input right; right.right = true;
+    live.player.step(right);
+    require(live.calls == 3 && live.combo.state.count == 8 && live.player.grounded(),
+            "simultaneous side collision suppresses landing completion");
+    live.player.step({});
+    require(live.calls == 4 && live.combo.state.count == 0 && live.currency.gameGem == 300,
+            "next grounded movement completes the deferred combo");
     PlayerMotion player(false, 1000);
     downwell::Input fire; fire.fire = true;
     player.step(fire);

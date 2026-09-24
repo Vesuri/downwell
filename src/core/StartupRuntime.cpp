@@ -143,6 +143,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainDeath_ = {};
     runGemStatistics_ = {};
     runClock_ = {};
+    runCombo_ = {};
     deathResults_ = {};
     mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
@@ -548,6 +549,7 @@ void StartupRuntime::updateMainBullets() {
             if (enemy != nullptr) {
                 const auto impact = applyStandardBulletImpact(*enemy, mainEnemiesDefeated_, random_,
                     [this, enemy] {
+                        runCombo_.state.enemyDefeated();
                         spawnMainCurrency(static_cast<float>(enemy->x),
                                           static_cast<float>(enemy->y),
                                           enemy->reward);
@@ -821,6 +823,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
             enemy.x - mainPlayerOriginX_, enemy.y - mainPlayerOriginY_,
             enemy.active, enemy.health, mainPlayerMotion_, mainPlayerHealth_,
             mainPlayerInvulnerability_, mainEnemiesDefeated_, [this, &enemy] {
+                runCombo_.state.enemyDefeated();
                 spawnMainCurrency(static_cast<float>(enemy.x), static_cast<float>(enemy.y),
                                   enemy.reward, true);
             });
@@ -1286,8 +1289,18 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.right = inputRight_;
     input.fire = inputFire_;
     mainDeath_.beginStep(input.fire);
-    runGemStatistics_.observeDeathMovement(mainDeath_.movementDead(), currencyAccount_.gameGem);
+    runCombo_.beginStep();
+    mainPlayerMotion_.configureComboCompletion([](void* context) {
+        auto& runtime = *static_cast<StartupRuntime*>(context);
+        runtime.runCombo_.finish(runtime.mainPlayerMotion_, runtime.currencyAccount_, runtime.mainPlayerHealth_);
+    }, this);
+    mainPlayerMotion_.configureMovementBoundary([](void* context) {
+        auto& runtime = *static_cast<StartupRuntime*>(context);
+        runtime.runGemStatistics_.observeDeathMovement(runtime.mainDeath_.movementDead(), runtime.currencyAccount_.gameGem);
+    }, this);
     mainPlayerMotion_.step(input, controlsLocked_, mainDeath_.movementDead());
+    mainPlayerMotion_.configureComboCompletion(nullptr, nullptr);
+    mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
     // Default rmMain subset: boss endings/goal stops and goalTimeField creation
     // are not implemented yet. Feed their source guards when those land.
     runClock_.advance(true, mainDeath_.active);
@@ -2103,6 +2116,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainAmmo_);
     digest.addI32(mainPlayerHealth_);
     if (roomId_ == mainRoomId) digest.addU32(runClock_.ticks);
+    if (roomId_ == mainRoomId) runCombo_.appendState(digest);
     if (mainDeath_.active) {
         digest.addBool(mainDeath_.started);
         digest.addBool(mainDeath_.priorFire);

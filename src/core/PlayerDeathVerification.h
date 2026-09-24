@@ -5,6 +5,7 @@
 #include "StateDigest.h"
 #include "RunClock.h"
 #include "RunTimeParts.h"
+#include "RunCombo.h"
 
 namespace downwell {
 struct PlayerDeathVerificationResult {
@@ -42,7 +43,17 @@ constexpr unsigned playerDeathVerificationCoverage = 511;
     }
     for (unsigned scenario = 0; scenario < 2; ++scenario) {
         PlayerMotion player(false, 32);
-        if (scenario == 1) player.increaseAmmoCapacity(1);
+        if (scenario == 1) {
+            RunCombo combo;
+            CurrencyAccount currency;
+            int health = 4;
+            combo.state.count = 25;
+            combo.finish(player, currency, health);
+            deathHashWord(digest, currency.gameGem);
+            deathHashWord(digest, combo.state.best);
+            deathHashWord(digest, combo.healthReserve.pieces);
+            deathHashWord(digest, combo.reward.soundMask);
+        }
         PlayerDeathSequence death;
         RunClock clock;
         int health = 4;

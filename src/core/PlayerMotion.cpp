@@ -124,6 +124,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     const bool firePressed = input.fire && !priorFire_;
     const bool fireReleased = !input.fire && priorFire_;
     bool shotFired = false;
+    bool horizontalCollision = false;
 
     if (shotDelay_ > 0)
         --shotDelay_;
@@ -185,6 +186,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
                 solidResolver_(solidResolverContext_, nextPixelX + 3,
                                pixelY_ + 7)) {
                 speedX_ = 0;
+                horizontalCollision = true;
                 break;
             }
             x_ = nextX;
@@ -196,10 +198,12 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     if (x_ < (long)horizontalLeftLimit_ * fixedOne) {
         x_ = (long)horizontalLeftLimit_ * fixedOne;
         speedX_ = 0;
+        horizontalCollision = true;
     }
     if (x_ > (long)horizontalRightLimit_ * fixedOne) {
         x_ = (long)horizontalRightLimit_ * fixedOne;
         speedX_ = 0;
+        horizontalCollision = true;
     }
     if (landingResolver_ != 0) {
         landingY_ = landingResolver_(landingResolverContext_,
@@ -252,6 +256,11 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         shotDelay_ = 7;
     }
 
+    // scrPlMovement's grounded branch runs after input/jump decisions.
+    if (grounded_ && comboCompletion_ && !comboTimeStopped_) comboCompletion_(comboContext_);
+    // scrPlMovement's death/saveStats tail precedes scrWallCol and its
+    // landing combo/recharge. Keep that observable boundary shared.
+    if (movementBoundary_) movementBoundary_(movementBoundaryContext_);
     if (!grounded_) {
         if (solidResolver_ != 0 && speedY_ < 0) {
             long collisionX = x_ * 5;
@@ -290,6 +299,10 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             gravityRemainder_ = 0;
             verticalPositionRemainder_ = 0;
             grounded_ = true;
+            // scrWallCol: airborne landing completes only without xcollision,
+            // before scrRecharge. A simultaneous wall hit defers completion.
+            if (!horizontalCollision && comboCompletion_ && !comboTimeStopped_)
+                comboCompletion_(comboContext_);
             ammo_ = ammoCapacity_;
             airborneShot_ = false;
             spinJumping_ = false;

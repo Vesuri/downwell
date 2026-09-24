@@ -246,11 +246,11 @@ void Game::renderLandscapeHud(Renderer& renderer) const {
     // the 110-pixel side regions after adding origin.
     renderer.drawSprite(415, 1, origin - 102, 6);
     renderer.fillRect(origin - 98, 11,
-                      20 * startup_.mainPlayerHealth(), 6,
+                      80 * startup_.mainPlayerHealth() / startup_.mainPlayerHealthMaximum(), 6,
                       {255, 0, 0, 255});
     renderer.drawSprite(415, 0, origin - 102, 6);
     drawHudHealthNumber(renderer, origin - 58, 15,
-                        startup_.mainPlayerHealth(), 4);
+                        startup_.mainPlayerHealth(), startup_.mainPlayerHealthMaximum());
 
     constexpr int gaugeX = origin + 174;
     constexpr int gaugeTop = 43;

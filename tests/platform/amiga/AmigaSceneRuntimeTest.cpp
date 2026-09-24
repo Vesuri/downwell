@@ -874,6 +874,13 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             const auto& nativeDeath = gameplay.deathSequence();
             const auto& hostDeath = reference.mainDeathSequence();
+            require(gameplay.runCombo().state.count == reference.runCombo().state.count &&
+                    gameplay.runCombo().state.best == reference.runCombo().state.best &&
+                    gameplay.runCombo().state.record == reference.runCombo().state.record &&
+                    gameplay.runCombo().healthReserve.maximum == reference.runCombo().healthReserve.maximum &&
+                    gameplay.runCombo().healthReserve.pieces == reference.runCombo().healthReserve.pieces &&
+                    gameplay.player().ammoCapacity() == reference.mainAmmoCapacity(),
+                    "live combo counters, records and grant reserves agree each update");
             require(gameplay.runTimeTicks() == reference.runTimeTicks() &&
                         gameplay.runTimeTicks() == beforeNativeTime + (nativePublishedDeath ? 0u : 1u) &&
                         reference.runTimeTicks() == beforeHostTime + (hostPublishedDeath ? 0u : 1u),
@@ -1078,7 +1085,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         }
         std::cout << "COMBAT END health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
                   << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
-                  << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal() << '\n';
+                  << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()
+                  << " bestCombo=" << gameplay.runCombo().state.best << ',' << reference.runCombo().state.best << '\n';
+        require(gameplay.runCombo().state.best > 0, "combat tape completes a nonzero combo");
         require(sawPairedCurrencyAnimation, "combat tape actually covers live currency animation");
         require(gameplay.enemiesDefeated() > 0 && reference.mainEnemiesDefeated() > 0 &&
                     gameplay.currency() > 0 && reference.mainCurrencyTotal() > 0,

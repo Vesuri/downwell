@@ -377,6 +377,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     const int oldAmmo = player_.ammo();
     const int oldAmmoCapacity = player_.ammoCapacity();
     const int oldHealth = health_;
+    const int oldHealthMaximum = healthMaximum();
     const unsigned oldCurrency = currencyAccount_.currency;
     const unsigned oldGemStreak = currencyAccount_.streak;
     const unsigned oldShots = player_.shots();
@@ -390,7 +391,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     deathResults_.beginStep(input);
     death_.beginStep(input.fire);
-    runGemStatistics_.observeDeathMovement(death_.movementDead(), currencyAccount_.gameGem);
+    runCombo_.beginStep();
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
     downwell::advanceMainRoomActivation(activationY_,
@@ -426,7 +427,17 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
         return false;
     }, &headBreak);
+    player_.configureComboCompletion([](void* context) {
+        auto& runtime = *static_cast<AmigaPortRuntime*>(context);
+        runtime.runCombo_.finish(runtime.player_, runtime.currencyAccount_, runtime.health_);
+    }, this);
+    player_.configureMovementBoundary([](void* context) {
+        auto& runtime = *static_cast<AmigaPortRuntime*>(context);
+        runtime.runGemStatistics_.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
+    }, this);
     AmigaPlayerMotion motion = player_.step(input, false, death_.movementDead());
+    player_.configureComboCompletion(nullptr, nullptr);
+    player_.configureMovementBoundary(nullptr, nullptr);
     // Normal rmMain subset, with the same unsupported ending/time-field guards
     // as StartupRuntime. This is deliberately independent of video refresh Hz.
     runClock_.advance(true, death_.active);
@@ -514,7 +525,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                             continue;
                         const auto impact = downwell::applyStandardBulletImpact(
                             enemy, enemiesDefeated_, enemyRandom_,
-                            [this, &enemy] { spawnReward(enemy, false); });
+                            [this, &enemy] { runCombo_.state.enemyDefeated(); spawnReward(enemy, false); });
                         return impact.kind != downwell::BulletImpactKind::ignored;
                     }
                     return false;
@@ -717,7 +728,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
         downwell::applyEnemyContact(enemy.objectId, enemyContact,
             enemy.x, enemy.y, enemy.active, enemy.health, player_, health_, invulnerability_, enemiesDefeated_,
-            [this, &enemy] { spawnReward(enemy, true); });
+            [this, &enemy] { runCombo_.state.enemyDefeated(); spawnReward(enemy, true); });
     }
 
     DW_PROFILE_PHASE(profileGems);
@@ -774,7 +785,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     deathResults_.presentationStep();
     frame.playerMotion = motion;
     frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity;
-    frame.healthChanged = health_ != oldHealth;
+    frame.healthChanged = health_ != oldHealth || healthMaximum() != oldHealthMaximum;
     frame.currencyChanged = currencyAccount_.currency != oldCurrency;
     frame.streakChanged = currencyAccount_.streak != oldGemStreak;
     frame.bulletChanged = bulletChanged;

@@ -9,6 +9,46 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Live shared combo completion and rewards
+
+Both runtimes now own `RunCombo` and increment it at their existing shared
+bullet/stomp defeat callbacks. `PlayerMotion` supplies common completion
+boundaries: grounded movement after input/jump decisions, and airborne landing
+without a simultaneous horizontal collision, before recharge. These map to
+scrPlMovement block 123 and scrWallCol block 42. The shared hook supports
+pTimeStop suppression; the live default subset still has no time-stop upgrade.
+The underlying collision/death-retirement approximations are unchanged and
+are not claimed to reproduce the complete original event scheduler.
+
+Completion synchronously grants currency, capacity/refill and health pieces,
+updates best/record, and clears the combo. Reward, save-record, achievement,
+sound and effect requests remain available in shared state, but reward UI,
+momentDelay, audio and file persistence are not yet consumed. Maximum-health
+bar scaling now uses the shared reserve on both backends; the native health
+number helper still needs multi-digit support, and the heart-piece HUD row is
+unfinished. The results combo row has not yet been connected.
+
+The death-statistics snapshot now uses an explicit shared movement boundary:
+after grounded-movement rewards, before later wall-collision landing rewards.
+This follows the saveStats call in scrPlMovement's death tail, rather than
+placing the snapshot after the entire combined player step. Callbacks are
+configured only for a live update and cleared afterward.
+
+Fixtures cover time-stop suppression, synchronous grants, no double grants,
+landing recharge, simultaneous side collision and deferred completion, plus
+both sides of the death-statistics boundary. The paired combat test compares
+combo count/best/record, health reserve and ammo capacity on every update and
+requires a nonzero completed combo. The target CPU fixture now applies a real
+25-combo grant before its second death scenario instead of directly bumping
+ammo capacity.
+Validation: full host suite and 6,000-update paired replay pass, ending with
+health 0/0, kills 10/10, currency 84/84 and best combo 3/3. That live tape does
+not reach the reward tiers; focused grant fixtures cover them separately. The
+bounded 68000 grant/death fixture passes (`92011f16a7b26409`), with unchanged
+default player/currency prefixes, clean instruction/helper audits and intact
+stack margin. Normal builds are restored; this is not yet a visual acceptance
+test of combo reward presentation.
+
 ### Overlay target correction and capacity-aware ammo HUD
 
 Audit found a blind spot in the previous results fixture: SetClipRect selects

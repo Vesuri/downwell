@@ -19,6 +19,13 @@ class PlayerMotion {
 public:
     typedef int (*LandingResolver)(void* context, int x, int minimumY);
     typedef bool (*SolidResolver)(void* context, int x, int y);
+    typedef void (*ComboCompletion)(void* context);
+    void configureComboCompletion(ComboCompletion callback, void* context, bool timeStopped = false) {
+        comboCompletion_ = callback; comboContext_ = context; comboTimeStopped_ = timeStopped;
+    }
+    void configureMovementBoundary(ComboCompletion callback, void* context) {
+        movementBoundary_ = callback; movementBoundaryContext_ = context;
+    }
     // Coordinates use fifths of Q8, matching FixedCollisionMath.
     typedef bool (*BreakBoxResolver)(void* context, long x, long y);
     void configureBreakBoxResolver(BreakBoxResolver resolver, void* context) {
@@ -109,6 +116,11 @@ private:
     int pixelY_;
     int ammo_;
     int ammoCapacity_ = 8;
+    ComboCompletion comboCompletion_ = nullptr;
+    void* comboContext_ = nullptr;
+    bool comboTimeStopped_ = false;
+    ComboCompletion movementBoundary_ = nullptr;
+    void* movementBoundaryContext_ = nullptr;
     bool grounded_;
     bool priorFire_;
     bool jumpShootLocked_;

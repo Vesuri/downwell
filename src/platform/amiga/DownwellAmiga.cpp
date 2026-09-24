@@ -488,13 +488,13 @@ static void redrawAmmo(AmigaRenderer* renderer, unsigned ammo, unsigned maximumA
     drawAmmoDigit(renderer, 290, 239, ammo);
 }
 
-static void redrawHealth(AmigaRenderer* renderer, unsigned health) {
+static void redrawHealth(AmigaRenderer* renderer, unsigned health, unsigned maximum) {
     amigaRendererClearClipRect(renderer);
     amigaRendererFillRect(renderer, 8, 6, 92, 28, 3);
     drawAsset(renderer, 415, 1, 8, 6, 0);
-    amigaRendererFillRect(renderer, 12, 11, (int)health * 20, 6, 2);
+    amigaRendererFillRect(renderer, 12, 11, maximum ? (int)(health * 80 / maximum) : 0, 6, 2);
     drawAsset(renderer, 415, 0, 8, 6, 0);
-    drawHealthNumber(renderer, 52, 15, health, 4);
+    drawHealthNumber(renderer, 52, 15, health, maximum);
 }
 
 static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
@@ -2108,7 +2108,7 @@ int main(void) {
             if (result.ammoChanged)
                 redrawAmmo(&renderer, (unsigned)port.player().ammo(), (unsigned)port.player().ammoCapacity());
             if (result.healthChanged)
-                redrawHealth(&renderer, (unsigned)port.health());
+                redrawHealth(&renderer, (unsigned)port.health(), (unsigned)port.healthMaximum());
             if (result.currencyChanged)
                 redrawCurrency(&renderer, port.currency());
             if ((result.streakChanged || wasDead != port.dead()) && !port.deathResults().active)
