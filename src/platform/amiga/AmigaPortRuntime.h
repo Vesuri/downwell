@@ -104,6 +104,7 @@ public:
         downwell::SnailMotion snail;
         downwell::SnailHitState snailHit;
         downwell::BatHitState batHit;
+        unsigned short batDirectionFraction;
         downwell::BatActivity batActivity;
         downwell::WalkingEnemyMotion walker;
         int motionState;

@@ -49,6 +49,7 @@ BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& st
     if (!state.flying) {
         if (state.hang > -10) bat.facing = -state.hang;
         bat.direction = 270;
+        bat.directionFraction = 0;
         bat.speedFortieths = 80;
     }
     return {consumed, sounds, batPresentation(state, hit)};

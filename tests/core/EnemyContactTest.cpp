@@ -87,6 +87,11 @@ int main() {
         const auto highImpact = applyStandardBulletImpact(enemy, defeated, random, reward, bornHigh);
         require(highImpact.kind == BulletImpactKind::defeated && enemy.health == 0,
                 "powered-up birth profile applies fifteen damage at impact");
+        enemy = Enemy{};
+        applyStandardBulletImpact(enemy, defeated, random, reward, false, 0xc1000000u);
+        require(enemy.health == 6 && enemy.batHit.pendingDirection == 271 &&
+                    enemy.batHit.pendingFraction == 26624,
+                "surviving live impact queues the supplied spread-adjusted direction");
     }
     {
         struct PlayerProbe {

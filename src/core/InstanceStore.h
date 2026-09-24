@@ -61,6 +61,7 @@ struct InstanceRecord {
     SnailMotion snail;
     SnailHitState snailHit;
     BatHitState batHit;
+    unsigned short batDirectionFraction = 0;
     BatActivity batActivity;
     WalkingEnemyMotion walker;
     bool frogMotionInitialized = false;

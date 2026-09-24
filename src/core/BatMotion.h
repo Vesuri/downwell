@@ -10,7 +10,7 @@
 namespace downwell {
 
 // Angles are degrees Q16; positions/velocities Q8; speed is exact 1/40 pixels.
-// CORDIC point_direction and a one-degree sine table avoid target floating
+// CORDIC point_direction and an interpolated one-degree sine table avoid target floating
 // point and the old ten-degree heading bins. Trig is a bounded approximation,
 // not a claim of bit-identical GameMaker double arithmetic.
 inline long batPointDirection(long dx, long screenDy) {
@@ -69,7 +69,16 @@ struct BatMotion {
     int direction;
     int speedFortieths;
     int facing = 1;
+    unsigned short directionFraction = 0; // Q16 tail retained across pursuit turns.
 };
+
+inline long batFractionalSine(int direction, unsigned short fraction) {
+    // The adjacent Q15 values differ by at most 572: multiplication fits
+    // signed 32 bits on 68000. Keep integer headings bit-for-bit unchanged.
+    const long first = batSine(direction);
+    if (!fraction) return first;
+    return first + (batSine(direction + 1) - first) * fraction / 65536L;
+}
 
 template<class Solid>
 bool batMeetsTiles(long x, long y, int facing, Solid solid) {
@@ -105,7 +114,7 @@ void stepBatMotion(BatMotion& bat, long targetX, long targetY,
     const long jitter = (long)(random >> 16) * 40 +
         (long)(((random & 65535u) * 40u) >> 16) - 20L * 65536;
     const long target = batPointDirection(targetX - bat.x, targetY - bat.y) + jitter;
-    long difference = (long)batNormalizeDirection(bat.direction) * 65536 - target;
+    long difference = (long)batNormalizeDirection(bat.direction) * 65536 + bat.directionFraction - target;
     if (difference > 180L * 65536) difference -= 360L * 65536;
     else if (difference < -180L * 65536) difference += 360L * 65536;
     // Preserve the VM's ordered branches, including acceleration overshoot.
@@ -118,8 +127,8 @@ void stepBatMotion(BatMotion& bat, long targetX, long targetY,
     if (difference > 0) bat.direction -= 10;
     else if (difference < 0) bat.direction += 10;
     bat.direction = batNormalizeDirection(bat.direction);
-    bat.speedX = batSine(bat.direction + 90) * bat.speedFortieths / 5120;
-    bat.speedY = -batSine(bat.direction) * bat.speedFortieths / 5120;
+    bat.speedX = batFractionalSine(bat.direction + 90, bat.directionFraction) * bat.speedFortieths / 5120;
+    bat.speedY = -batFractionalSine(bat.direction, bat.directionFraction) * bat.speedFortieths / 5120;
     resolveBatMotion(bat, solid);
 }
 
@@ -129,7 +138,10 @@ template<class Random, class Solid>
 bool stepActiveBat(BatMotion& bat, BatHitState& hit, long targetX, long targetY,
                    Random& random, Solid solid) {
     const bool consumed = hit.consume();
-    if (consumed) { bat.direction = hit.direction; bat.speedFortieths = 120; }
+    if (consumed) {
+        bat.direction = hit.direction; bat.directionFraction = hit.fraction;
+        bat.speedFortieths = 120;
+    }
     if (!hit.stunned) stepBatMotion(bat, targetX, targetY, random.nextU32(), solid);
     return consumed;
 }

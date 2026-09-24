@@ -211,6 +211,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.snail.initialize(x, y, speedY >= 0);
     enemy.snailHit = {};
     enemy.batHit = {};
+    enemy.batDirectionFraction = 0;
     enemy.batActivity = {};
     enemy.walker.initialize(x, y, speedX * 5L, speedY * 5L, grounded);
     enemy.preciseY = (long)y * 256L;
@@ -598,7 +599,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                         const auto impact = downwell::applyStandardBulletImpact(
                             enemy, enemiesDefeated_, enemyRandom_,
                             [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); },
-                            bullet.gemHigh);
+                            bullet.gemHigh, bullet.trajectory.direction);
                         return impact.kind != downwell::BulletImpactKind::ignored;
                     }
                     return false;
@@ -694,7 +695,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.grounded = enemy.walker.grounded;
         } else if (enemy.objectId == 116) {
             downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
-                enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing};
+                enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing,
+                enemy.batDirectionFraction};
             const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
                 enemy.x, enemy.y, enemy.spriteId, player_.frameStartXFixed(),
                 player_.frameStartYFixed(), enemyRandom_,
@@ -711,6 +713,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.speedX = bat.speedX;
             enemy.speedY = bat.speedY;
             enemy.direction = bat.direction;
+            enemy.batDirectionFraction = bat.directionFraction;
             enemy.facing = bat.facing;
             enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         } else if (enemy.objectId == 113) {

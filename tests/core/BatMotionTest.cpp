@@ -12,6 +12,42 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    {
+        BatHitState hit;
+        hit.queueTurns(0xc1000000u); // 271.40625 degrees.
+        hit.advanceFrame();
+        require(hit.direction == 271 && hit.fraction == 26624,
+                "spread direction reaches the hit queue without whole-degree rounding");
+        BatMotion bat{0, 0, 0, 0, 270, 50};
+        struct Random { unsigned calls = 0; std::uint32_t nextU32() { ++calls; return 0x80000000u; } } random;
+        auto clear = [](int, int) { return false; };
+        require(stepActiveBat(bat, hit, 0, 10000, random, clear) &&
+                    bat.direction == 271 && bat.directionFraction == 26624 && random.calls == 0,
+                "hit adopts the fractional heading but does not move or draw pursuit RNG");
+        hit.alarm();
+        stepActiveBat(bat, hit, 0, 10000, random, clear);
+        require(bat.direction == 261 && bat.directionFraction == 26624 && random.calls == 1,
+                "pursuit turns ten degrees without losing the captured fraction");
+        hit.queue(270); hit.advanceFrame();
+        require(hit.fraction == 0, "an integer hit replaces rather than retains an old fraction");
+        for (std::uint64_t turns = 0; turns <= 0xffffffffULL; turns += 65537) {
+            hit.queueTurns(static_cast<std::uint32_t>(turns));
+            const auto expected = (turns * (360u * 65536u)) >> 32;
+            require(static_cast<unsigned>(hit.pendingDirection) * 65536u + hit.pendingFraction == expected,
+                    "target split-product angle conversion matches independent 64-bit arithmetic");
+        }
+        double maximumError = 0;
+        for (int degrees = 0; degrees < 360; ++degrees)
+            for (unsigned fraction : {0u, 1u, 16384u, 32768u, 49152u, 65535u}) {
+                const double expected = std::sin((degrees + fraction / 65536.0) * 3.14159265358979323846 / 180);
+                const double error = std::abs(batFractionalSine(degrees, fraction) / 32768.0 - expected);
+                if (error > maximumError) maximumError = error;
+                require(error < 0.00009, "fractional lengthdir interpolation has a bounded sine error");
+                if (!fraction) require(batFractionalSine(degrees, 0) == batSine(degrees),
+                                       "integer headings retain their exact previous table values");
+            }
+        std::cout << "Fractional bat sine maximum sampled error " << maximumError << '\n';
+    }
     BatMotion rightWall{0, 0, 2 * 256, 128, 0, 50};
     resolveBatMotion(rightWall, [](int x, int) { return x >= 8; });
     require(rightWall.x == 256 && rightWall.y == 128 &&

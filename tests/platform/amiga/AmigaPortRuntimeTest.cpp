@@ -1012,7 +1012,7 @@ int main() {
     std::cout << "Weapon fixture digest: " << std::hex << weapon.digest << std::dec
               << " coverage=" << weapon.coverage << '\n';
     require(weapon.coverage == downwell::machineGunVerificationCoverage &&
-                weapon.digest == 0x53327c8bf4c44bd1ULL,
+                weapon.digest == 0xeac8d0b3568553dbULL,
             "weapon CPU fixture pins segment intersections, spread, expiry, cadences and retained impacts");
     std::cout << "Amiga port runtime tests passed\n";
     return 0;

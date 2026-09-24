@@ -11,8 +11,9 @@
 #include "MachineGunTrajectory.h"
 #include "ProjectileSegment.h"
 #include "GameMakerRandom.h"
+#include "BatMotion.h"
 namespace downwell {
-constexpr unsigned machineGunVerificationCoverage = 4095;
+constexpr unsigned machineGunVerificationCoverage = 8191;
 struct MachineGunVerificationResult { std::uint64_t digest; unsigned coverage; };
 
 // Focused CPU-equivalence fixture, not a Windows recording or rendering test.
@@ -28,10 +29,13 @@ inline MachineGunVerificationResult verifyMachineGun() {
     } shots[8];
     unsigned count = 0, coverage = 0, hits = 0, defeated = 0;
     bool correct = true;
-    struct Random { unsigned irandomSmall(unsigned) { return 0; } } random;
+    struct Random {
+        unsigned irandomSmall(unsigned) { return 0; }
+        std::uint32_t nextU32() { return 0x80000000u; }
+    } random;
     GameMakerRandom trajectoryRandom(2);
     VerificationDigest digest;
-    digest.addU32(3);
+    digest.addU32(4);
     Input fire; fire.fire = true;
     for (unsigned tick = 0; tick < 64; ++tick) {
         currency.beginStep();
@@ -73,11 +77,24 @@ inline MachineGunVerificationResult verifyMachineGun() {
                     FrogHitState frogHit;
                     SnailHitState snailHit;
                 } enemy;
-                const auto impact = applyStandardBulletImpact(enemy, defeated, random, [] {}, shot.high);
+                const auto impact = applyStandardBulletImpact(enemy, defeated, random, [] {}, shot.high,
+                                                              shot.trajectory.direction);
                 correct &= impact.kind == BulletImpactKind::damaged &&
                     enemy.health == (shot.high ? 25 : 31) && enemy.batHit.pending;
                 if (shot.high && !high && enemy.health == 25) coverage |= 16;
                 digest.addI32(enemy.health);
+                enemy.batHit.advanceFrame();
+                BatMotion bat{0, 0, 0, 0, 270, 50};
+                const auto clear = [](int, int) { return false; };
+                stepActiveBat(bat, enemy.batHit, 0, 10000, random, clear);
+                if (bat.directionFraction && bat.directionFraction == enemy.batHit.fraction) coverage |= 4096;
+                const auto fraction = bat.directionFraction;
+                enemy.batHit.alarm();
+                stepActiveBat(bat, enemy.batHit, 0, 10000, random, clear);
+                correct &= bat.directionFraction == fraction;
+                digest.addI32(bat.direction); digest.addU32(bat.directionFraction);
+                digest.addI32(bat.x); digest.addI32(bat.y);
+                digest.addI32(bat.speedX); digest.addI32(bat.speedY);
                 shot.hit = true; ++hits;
             }
             digest.addU32(shot.born); digest.addBool(shot.high); digest.addBool(shot.hit);

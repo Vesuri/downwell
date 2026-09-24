@@ -9,6 +9,39 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Fractional projectile direction reaches bat hit reactions
+
+Both live impact adapters now pass the retained projectile Q32 turn to the
+shared impact helper. `scrTypicalBulletDamage` VM writes `bDir` to `hitDir`,
+and `enmBat` Step copies that value to `direction` with speed 3; the pinned
+machine-gun verifier checks this chain. The shared hit queue converts turns
+to degrees Q16 with a split product, preserving the fractional tail through
+stun and subsequent ten-degree pursuit turns. Both adapters retain the same
+tail, and scene comparisons include queued/applied fractions and motion state.
+
+An independently computed 64-bit host oracle verifies 65,536 angle samples,
+including both Q32 endpoints. The existing one-degree Q15 sine table now
+interpolates fractional headings without changing integer-heading results.
+The maximum sampled sine error is `6.53878e-5`; focused hit/pursuit and
+AddressSanitizer/UndefinedBehaviorSanitizer tests pass. This is still bounded
+fixed-point trig, not bit-identical Windows libm or exact collision scheduling.
+
+Weapon CPU fixture schema 4 adds fractional-hit/pursuit coverage: digest
+`eac8d0b3568553db`, coverage `1fff`. The bounded native replay matches the host
+and retains the 256-byte task-stack guard; 68000 instruction/helper audits
+pass. The first invocation reported a timeout despite having printed its
+matching result: the verifier now distinguishes its completed-result marker
+from a blocked debugger detach, while retaining exact result comparison and
+the run deadline. The repeat passes. Startup digest schema 44 is
+`cdfa52fd45e4d2c8`.
+
+The full standard host suite passes, including all upgraded combat tapes and
+22,834 offline sprite comparisons. Both 6,000-update host combat tapes retain
+the death/survival outcomes below. Integer headings bypass interpolation.
+Projectile artwork still uses offline downward quarter-turn variants; spread
+orientation rendering remains open. No assets are converted at runtime, and
+no new 20 ms performance claim is made.
+
 ### Restored natural-death coverage after live spread
 
 The long death gate now uses firing phase 6 (the same five-held/five-released

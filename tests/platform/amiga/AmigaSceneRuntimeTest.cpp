@@ -241,7 +241,9 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
                     native.batHit.pending == enemy.batHit.pending &&
                     native.batHit.ready == enemy.batHit.ready &&
                     native.batHit.stunned == enemy.batHit.stunned &&
-                    native.batHit.direction == enemy.batHit.direction,
+                    native.batHit.direction == enemy.batHit.direction &&
+                    native.batHit.pendingFraction == enemy.batHit.pendingFraction &&
+                    native.batHit.fraction == enemy.batHit.fraction,
                     "surviving bat hit state matches across both adapters");
         if (enemy.objectId == 116 && enemy.active && native.active) {
             const bool equal = native.preciseX == std::lround((enemy.preciseX - 240) * 256) &&
@@ -249,6 +251,7 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
                     native.speedX == std::lround(enemy.velocityX * 256) &&
                     native.speedY == std::lround(enemy.velocityY * 256) &&
                     native.direction == static_cast<int>(enemy.direction) &&
+                    native.batDirectionFraction == enemy.batDirectionFraction &&
                     native.facing == (enemy.scaleX < 0 ? -1 : 1);
             if (!equal) std::cerr << "BAT ordinal=" << ordinal << " native="
                 << native.preciseX << ',' << native.preciseY << ',' << native.speedX << ',' << native.speedY

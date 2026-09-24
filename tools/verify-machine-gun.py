@@ -61,3 +61,8 @@ assert step.index("call.i gml_Script_scrBulCheckSolid(argc=0)") < step.index("po
 assert "push.v self.x\npush.v self.xsp\nadd.v.v\npop.v.v self.x" in step
 assert "push.v self.y\npush.v self.ysp\nadd.v.v\npop.v.v self.y" in step
 print("VM spread/velocity initialization precedes solid checks and retained vector movement")
+impact = (export / "Assembly/gml_GlobalScript_scrTypicalBulletDamage.asm").read_text()
+bat = (export / "Assembly/gml_Object_enmBat_Step_0.asm").read_text()
+assert "push.v self.bDir\npop.v.v other.hitDir" in impact
+assert "push.v self.hitDir\npop.v.v self.direction\npushi.e 3\npop.v.i self.movesp" in bat
+print("VM bat hit heading receives the projectile's spread-adjusted bDir")

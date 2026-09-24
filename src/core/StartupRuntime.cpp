@@ -591,7 +591,7 @@ void StartupRuntime::updateMainBullets() {
                         spawnMainCurrency(static_cast<float>(enemy->x),
                                           static_cast<float>(enemy->y),
                                           enemy->reward);
-                    }, bullet.gemHigh);
+                    }, bullet.gemHigh, bullet.trajectory.direction);
                 if (impact.kind == BulletImpactKind::ignored) return false;
                 ++soundPlayRequests_;
                 return true;
@@ -781,7 +781,7 @@ void StartupRuntime::updateMainEnemies() {
                 static_cast<long>(std::round(enemy.velocityY * 256.0F)),
                 static_cast<int>(enemy.direction),
                 static_cast<int>(std::round(enemy.moveSpeed * 40.0F)),
-                enemy.scaleX < 0 ? -1 : 1
+                enemy.scaleX < 0 ? -1 : 1, enemy.batDirectionFraction
             };
             const auto effects = stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
                 enemy.x, enemy.y, enemy.spriteId,
@@ -801,6 +801,7 @@ void StartupRuntime::updateMainEnemies() {
             enemy.velocityX = bat.speedX / 256.0F;
             enemy.velocityY = bat.speedY / 256.0F;
             enemy.direction = static_cast<float>(bat.direction);
+            enemy.batDirectionFraction = bat.directionFraction;
             enemy.moveSpeed = bat.speedFortieths / 40.0F;
             enemy.scaleX = static_cast<float>(bat.facing);
         } else if (enemy.objectId == 117) {
@@ -2134,7 +2135,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(43); // Includes retained fractional projectile trajectories.
+    digest.addU32(44); // Includes fractional bat headings and queued hit directions.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2354,6 +2355,9 @@ std::uint64_t StartupRuntime::stateDigest() const {
             digest.addBool(instance.batHit.stunned);
             digest.addI32(instance.batHit.pendingDirection);
             digest.addI32(instance.batHit.direction);
+            digest.addU32(instance.batHit.pendingFraction);
+            digest.addU32(instance.batHit.fraction);
+            digest.addU32(instance.batDirectionFraction);
         }
         if (instance.objectId == 111 || instance.objectId == 112) {
             digest.addI32(instance.walker.x);
