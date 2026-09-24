@@ -69,6 +69,9 @@ public:
                             const BuilderPatternPack* builderPatternPack = nullptr);
 
     void reset(PlatformProfile profile);
+    // Call at a room-transition boundary, after consuming the results action.
+    // Seed is explicit so randomize can be recorded/replayed by the platform.
+    bool restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed);
     void step(bool advancePressed);
     void step(const Input& input, bool advancePressed);
 
@@ -268,6 +271,7 @@ private:
                      std::int32_t codeId,
                      bool advancePressed = false);
     void gotoRoom(int roomId);
+    void resetSceneState();
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;
 

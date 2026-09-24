@@ -872,6 +872,22 @@ int main() {
     contact.step(4);
     require(contact.deathFrames() == 150 && contact.deathMenuReady(),
             "death-flash room speed yields 30 plus 120 update death alarms");
+    const auto savedRecords = contact.runGemStatistics();
+    require(contact.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 42, 300) ==
+                downwell::ResultsDestination::gameplay,
+            "native dead world can be recreated for Retry");
+    require(contact.health() == 4 && !contact.dead() && !contact.deathMenuReady() &&
+                !contact.deathResults().active && contact.tick() == 0 && contact.runTimeTicks() == 0 &&
+                contact.player().ammoCapacity() == 8 && contact.player().ammo() == 8 &&
+                contact.enemyCount() == 0 && contact.currency() == 0 && contact.enemiesDefeated() == 0 &&
+                contact.runStage().area == 1 && contact.runStage().level == 1 &&
+                contact.runGemStatistics().lifetime == savedRecords.lifetime &&
+                !contact.runGemStatistics().recorded && contact.randomDrawCount() == 0,
+            "native restart clears dead world and run state, retaining lifetime records");
+    for (unsigned i = 0; i < AmigaPortRuntime::bulletCapacity; ++i)
+        require(!contact.bulletAt(i).active, "restart removes old bullets");
+    for (unsigned i = 0; i < AmigaPortRuntime::gemCapacity; ++i)
+        require(!contact.gemAt(i).active, "restart removes old gems");
 
     AmigaPortRuntime sideCamera(300, true, 0, true);
     sideCamera.configureSolidResolver(noSolid, 0);

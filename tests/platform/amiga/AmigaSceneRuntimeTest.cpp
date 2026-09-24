@@ -521,6 +521,43 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     require(rooms.valid() && objects.valid() && patterns.valid(),
             "generated recovery packs are valid for scene parity");
 
+    {
+        downwell::StartupRuntime restarted(downwell::PlatformProfile::desktop,
+            &rooms, &objects, 2, &patterns);
+        restarted.skipToGameForTesting();
+        for (int visit = 0; visit < 3; ++visit) {
+            downwell::Input moving;
+            moving.right = true;
+            for (int frame = 0; frame < 180; ++frame) restarted.step(moving, false);
+            const auto oldTick = restarted.tick();
+            require(restarted.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 42),
+                    "host retry recreates main-room instances");
+            downwell::GameMakerRandom roomRandom(42);
+            AmigaTerrainFragment restartFragments[19];
+            AmigaAreaOneTerrainBuilder restartBuilder(restartFragments, 19);
+            restartBuilder.resetRoom(-16, 704, roomRandom);
+            require(roomRandom.drawCount() == restarted.randomDrawCount(),
+                    "fresh native builder consumes the same room-creation RNG draws as decoded Retry");
+            require(restarted.inMainRoom() && restarted.tick() == oldTick &&
+                    restarted.mainPlayerHealth() == 4 && restarted.mainAmmo() == 8 &&
+                    restarted.mainBulletCount() == 0 && restarted.mainCurrencyCount() == 0 &&
+                    restarted.runTimeTicks() == 0 && !restarted.deathResults().active &&
+                    restarted.runStage().area == 1 && restarted.runStage().level == 1 &&
+                    restarted.controllerPersistent(),
+                    "host restart clears gameplay state without resetting lifetime clock/controller");
+            require(restarted.restartFromResults(downwell::DeathMenuSequence::Action::StyleSelect, 42) &&
+                    restarted.inPlayMenu() && !restarted.playMenuSelected() &&
+                    restarted.playMenuCursor() == 0 && restarted.runStage().area == 0,
+                    "host style return recreates unconfirmed style room");
+            require(restarted.restartFromResults(downwell::DeathMenuSequence::Action::Surface, 42) &&
+                    restarted.inMenu() && restarted.menuPlayerNapping() &&
+                    restarted.showSplash() == 0 && restarted.runStage().area == 0,
+                    "host surface return recreates garden without publisher sequence");
+            require(restarted.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 42),
+                    "host returns from garden directly to fresh gameplay");
+        }
+    }
+
     downwell::StartupRuntime reference(
         downwell::PlatformProfile::nonDesktop, &rooms, &objects,
         downwell::StartupRuntime::defaultRandomSeed, &patterns);

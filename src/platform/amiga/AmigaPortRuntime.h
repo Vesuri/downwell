@@ -66,6 +66,10 @@ public:
         generationSucceeded_ = true;
     }
     bool generationSucceeded() const { return generationSucceeded_; }
+    // Recreate the implemented gameplay world without a large stack temporary.
+    // Owner must rebuild terrain and rebind callbacks before stepping again.
+    downwell::ResultsDestination restartFromResults(downwell::DeathMenuSequence::Action action,
+        std::uint32_t seed, unsigned initialRingOrigin);
 
     struct BulletState {
         int x;

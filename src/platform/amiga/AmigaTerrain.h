@@ -83,6 +83,8 @@ public:
         observerContext_ = context;
     }
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
+    // New-run entry uses the source Create logic, not the seed-2 startup capture.
+    void resetRoom(int x, int y, downwell::GameMakerRandom& random);
     bool stepVisible(const downwell::BuilderPatternPack& patterns,
                      downwell::GameMakerRandom& random, int viewBottomCeiling,
                      downwell::AreaOneBuilderStep& result);

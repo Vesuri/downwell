@@ -9,6 +9,35 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Runtime recreation for results destinations
+
+Both runtimes expose `restartFromResults` with an explicit RNG seed. The
+decoded host path clears scene/gameplay state, retains the persistent controller
+and runtime tick, resets controller alarms 0..6, applies shared record/reset
+rules and recreates the destination room through the ordinary loader. It does
+not replay rmInit/publisher startup. The native path reconstructs its gameplay
+runtime in place, clearing actors, projectiles, gems, callbacks and death state
+without putting a runtime-sized temporary on the 4 KiB target stack. Its owner
+must rebind the external terrain/generation world before another gameplay step.
+
+The existing native builder initialization is a captured seed-2 checkpoint
+(470 draws, fixed right-room choices), unsuitable for a fresh Retry seed.
+`resetRoom` now runs the shared AreaOneBuilder Create logic with the supplied
+stream and clears emitted fragment/enemy/decoration counts. Focused tests verify
+matching RNG consumption against decoded rmMain creation after Retry.
+
+Tests recreate decoded rooms repeatedly, reset a native runtime after actual
+death/menu entry, check default health/ammo/actors and retained records, and
+check that old bullets/gems do not survive. The scene-verification build also
+executes in-place recreation on the actual 68000 before ordinary scene setup.
+These are callable runtime boundaries, not yet live results-action dispatch:
+platform seed acquisition, external world rebinding and presentation invalidation
+must be connected together before enabling the menu choices.
+Validation: full host suite passes, including repeated room recreation and
+fresh-seed builder checks. The bounded A500 scene gate passes after exercising
+in-place reset, with clean 68000 audits and the stack guard intact. The earlier
+cross-target replay also passes unchanged. Normal builds are restored.
+
 ### Results destinations and repeatable scene entry
 
 `ResultsDestination` shares the recovered room mapping (Retry=11,

@@ -1269,6 +1269,17 @@ int main(void) {
 #else
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true);
+#ifdef DOWNWELL_SCENE_VERIFY
+    // Exercise in-place recreation on the real 68000 before binding terrain.
+    // Finish at the ordinary entry state so the complete scene oracle applies.
+    if (port.restartFromResults(downwell::DeathMenuSequence::Action::StyleSelect, 42,
+            initialRingOrigin) != downwell::ResultsDestination::styleSelect ||
+        port.runStage().area != 0 ||
+        port.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 2,
+            initialRingOrigin) != downwell::ResultsDestination::gameplay ||
+        port.health() != 4 || port.runStage().area != 1 || port.tick() != 0)
+        return 20;
+#endif
 #endif
 #ifndef DOWNWELL_REPLAY_VERIFY
     // Long-lived scene state must not consume the small AmigaDOS call stack.

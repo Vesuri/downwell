@@ -123,6 +123,13 @@ void AmigaAreaOneTerrainBuilder::resetInitialCheckpoint(
     failed_ = false;
 }
 
+void AmigaAreaOneTerrainBuilder::resetRoom(int x, int y,
+        downwell::GameMakerRandom& random) {
+    builder_.reset(x, y, random);
+    fragmentCount_ = enemyCount_ = decorationCount_ = 0;
+    failed_ = false;
+}
+
 bool AmigaAreaOneTerrainBuilder::stepVisible(
     const downwell::BuilderPatternPack& patterns,
     downwell::GameMakerRandom& random, int viewBottomCeiling,

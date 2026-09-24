@@ -22,6 +22,23 @@
 #include "core/BatMotion.h"
 #include "core/Replay.h"
 #include "core/SolidCollision.h"
+#ifdef DOWNWELL_FREESTANDING
+inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return address; }
+#else
+#include <new>
+#endif
+
+downwell::ResultsDestination AmigaPortRuntime::restartFromResults(
+        downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
+    const auto destination = downwell::resultsDestination(action);
+    if (destination == downwell::ResultsDestination::none) return destination;
+    const auto records = run_.records();
+    this->~AmigaPortRuntime();
+    new (this) AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true);
+    run_.restart(action, records);
+    enemyRandom_.setSeed(seed);
+    return destination;
+}
 
 AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
                                    bool startsGrounded,

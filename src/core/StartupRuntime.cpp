@@ -88,6 +88,37 @@ void StartupRuntime::reset(PlatformProfile profile) {
     inputFirePressed_ = false;
     inputFireReleased_ = false;
     anyInput_ = false;
+    resetSceneState();
+
+    // rmInit instance order in the recovered room data.
+    const RoomInstanceDefinition definitions[] = {
+        {controllerInstanceId, 37, true},
+        {initRoomInstanceId, 36, false}
+    };
+    const auto instanceHandler = [this](InstanceRecord& instance,
+                                        RoomInstancePhase phase) {
+        dispatchInstancePhase(instance, phase);
+    };
+    const auto roomCreationHandler = [this](std::int32_t roomId) {
+        dispatchRoomCreation(roomId);
+    };
+    const auto deferredHandler = [this](InstanceStore<instanceCapacity>& instances) {
+        flushDeferredInstances(instances, entryRoomId);
+    };
+    if (roomPack_ != nullptr) {
+        roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
+            instances_, *roomPack_, entryRoomId, true,
+            instanceHandler, roomCreationHandler,
+            deferredHandler) == PackedRoomLoadResult::success;
+    } else {
+        roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
+            instances_, entryRoomId, definitions, 2, true,
+            instanceHandler, roomCreationHandler,
+            deferredHandler) == LoadRoomResult::success;
+    }
+}
+
+void StartupRuntime::resetSceneState() {
     menuPlayerInitialized_ = false;
     menuPlayerNapping_ = false;
     menuPlayerX_ = 112.0F;
@@ -182,33 +213,26 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainCameraMotion_ = {};
     mainCameraY_ = 176.0F;
     mainCameraTargetY_ = 176.0F;
+}
 
-    // rmInit instance order in the recovered room data.
-    const RoomInstanceDefinition definitions[] = {
-        {controllerInstanceId, 37, true},
-        {initRoomInstanceId, 36, false}
-    };
-    const auto instanceHandler = [this](InstanceRecord& instance,
-                                        RoomInstancePhase phase) {
-        dispatchInstancePhase(instance, phase);
-    };
-    const auto roomCreationHandler = [this](std::int32_t roomId) {
-        dispatchRoomCreation(roomId);
-    };
-    const auto deferredHandler = [this](InstanceStore<instanceCapacity>& instances) {
-        flushDeferredInstances(instances, entryRoomId);
-    };
-    if (roomPack_ != nullptr) {
-        roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
-            instances_, *roomPack_, entryRoomId, true,
-            instanceHandler, roomCreationHandler,
-            deferredHandler) == PackedRoomLoadResult::success;
-    } else {
-        roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
-            instances_, entryRoomId, definitions, 2, true,
-            instanceHandler, roomCreationHandler,
-            deferredHandler) == LoadRoomResult::success;
-    }
+bool StartupRuntime::restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed) {
+    if (resultsDestination(action) == ResultsDestination::none) return false;
+    const auto records = run_.records();
+    resetSceneState();
+    const auto destination = run_.restart(action, records);
+    // randomize is an external entropy boundary. Replays explicitly supply it.
+    random_.setSeed(seed);
+    deferredInstances_.clear();
+    showSplash_ = 0;
+    roomDestinationSet_ = false;
+    roomDestination_ = static_cast<int>(destination);
+    controlsLocked_ = false;
+    ++initTimes_;
+    ++soundPlayRequests_; // ResetPlayer's soundPlayOL(321).
+    if (auto* controller = instances_.find(controllerInstanceId))
+        for (unsigned alarm = 0; alarm <= 6; ++alarm) controller->alarms.set(alarm, 0);
+    gotoRoom(static_cast<int>(destination));
+    return roomLoadSucceeded_;
 }
 
 void StartupRuntime::skipIntroForTesting() {
