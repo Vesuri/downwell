@@ -9,6 +9,36 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Results time row on both backends
+
+Both renderers now consume the shared time-row layout and live run clock.
+DeathMenu Draw VM block 15 uses icon 401:6 at (42,136+wholePowan), colon
+401:0 at x=62 and timerNumber at x=114 with row-4 bounce added only to
+the numeric baseline. The timer emits centiseconds, seconds and minutes in
+that order, as two six-pixel-spaced digits per pair with frame-11 separators.
+
+The prior single-digit uncertainty is resolved by inspecting the untouched
+Windows executable (SHA-256
+`340b43dae1a18d2861cba9f6a9cdbb92f3754699854e0dc1a1ca367a8cd11085`).
+The registration at 0x53fc1a maps string_char_at to 0x53dcd0. At 0x53dcf0
+it subtracts one from the index and conditionally copies only a nonnegative
+result into a zero-initialized index. Thus script index -1 selects the first
+character, not an empty string: the source single-digit branch produces the
+ordinary leading-zero pair. This is static runner evidence, not a Windows
+visual capture. Timer arithmetic still assumes binary64 intermediates.
+Runs of 100 minutes or more enter the source's negative array-index writes;
+that exceptional behavior is not modeled (the port shows the last two digits).
+
+Native row invalidation now includes run time, row-4 reveal and bounce. Rows
+clear only y=88..147 and progress clears y=148..185, avoiding erasure of a
+bouncing time glyph. Settled results do not continually repaint these regions.
+The native overlay fixture includes a 01:01:64 timer at maximum bounce before
+drawing progress; shared layout tests check exact glyph order and coordinates.
+Validation: full host suite and bounded 600-update A500 cache/overlay gate pass,
+including zero overlay differences, results/HUD asset integrity, 101 terrain
+comparisons and the stack margin. Both 68000 audits pass. This fixture is not
+a complete Windows or cross-backend results-screen screenshot comparison.
+
 ### Timer arithmetic recovered; drawing semantics still under audit
 
 `RunTimeParts` models timerNumber VM blocks 2/3 with binary64 rounding after

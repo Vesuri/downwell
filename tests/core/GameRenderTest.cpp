@@ -90,11 +90,11 @@ int main() {
         void asset(int id, unsigned frame, int x, int y) { calls.push_back({id, frame, x, y}); }
     } rows;
     downwell::DeathMenuSequence rowMenu;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699);
     require(rows.calls.empty(), "results rows remain hidden until published");
     rowMenu.visible[1] = rowMenu.visible[2] = true;
     rowMenu.rowOffset[1] = 3; rowMenu.rowOffset[2] = 2;
-    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10);
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699);
     require(rows.calls.size() == 8 && rows.calls[0].id == 401 && rows.calls[0].frame == 1 &&
                 rows.calls[0].x == 42 && rows.calls[0].y == 102 && rows.calls[1].frame == 0 &&
                 rows.calls[2].id == 403 && rows.calls[2].frame == 8 && rows.calls[2].x == 72 &&
@@ -102,6 +102,17 @@ int main() {
                 rows.calls[4].frame == 4 && rows.calls[6].frame == 1 && rows.calls[7].frame == 0 &&
                 rows.calls[7].y == 114,
             "source row icons, colon, digit order and separate numeric bounce");
+    rows.calls.clear();
+    rowMenu.visible[1] = rowMenu.visible[2] = false;
+    rowMenu.visible[4] = true;
+    downwell::drawDeathResultsRows(rows, rowMenu, 84, 10, 3699);
+    const unsigned timeFrames[] = {6,0,6,4,11,0,1,11,0,1};
+    const int timeX[] = {42,62,108,114,102,90,96,84,72,78};
+    require(rows.calls.size() == 10, "time row has icon, colon and eight timer glyphs");
+    for (unsigned i = 0; i < 10; ++i)
+        require(rows.calls[i].frame == timeFrames[i] && rows.calls[i].x == timeX[i] &&
+                    rows.calls[i].y == (i < 2 ? 140 : 144),
+                "timer preserves source pair order, zero padding, separators and independent bounce");
     rows.calls.clear();
     downwell::drawResultNumber(rows, 0, 72, 98);
     require(rows.calls.size() == 1 && rows.calls[0].frame == 0, "zero is one visible digit");

@@ -557,12 +557,12 @@ static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntim
 }
 
 static void composeResultsRows(AmigaRenderer* renderer,
-        const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills) {
+        const downwell::DeathMenuSequence& menu, unsigned gems, unsigned kills, unsigned ticks) {
     UBYTE* saved = renderer->target;
     renderer->target = renderer->hud;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
-    // Both current rows lie wholly inside the original opaque black panel.
-    amigaRendererFillRect(renderer, downwellPlayfieldX, 88, 160, 40, 3);
+    // Include the time row's maximum bounce; progress starts at y=148.
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 88, 160, 60, 3);
     struct Sink {
         AmigaRenderer* renderer;
         void asset(int id, unsigned frame, int x, int y) {
@@ -571,20 +571,24 @@ static void composeResultsRows(AmigaRenderer* renderer,
                 downwellPlayfieldX + x, y, 0);
         }
     } sink{renderer};
-    downwell::drawDeathResultsRows(sink, menu, gems, kills);
+    downwell::drawDeathResultsRows(sink, menu, gems, kills, ticks);
     amigaRendererClearClipRect(renderer);
     renderer->target = saved;
 }
 
 static void redrawResultsRows(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force) {
     static unsigned lastGems = ~0u, lastKills = ~0u, lastPhase = ~0u;
+    static unsigned lastTime = ~0u;
     const auto& menu = port.deathResults().menu;
     const unsigned phase = menu.titleOffset | (menu.rowOffset[1] << 3) |
-        (menu.rowOffset[2] << 6) | (menu.visible[1] << 9) | (menu.visible[2] << 10);
+        (menu.rowOffset[2] << 6) | (menu.visible[1] << 9) | (menu.visible[2] << 10) |
+        (menu.rowOffset[4] << 11) | (menu.visible[4] << 14);
     const unsigned gems = port.gameGemTotal(), kills = port.enemiesDefeated();
-    if (!force && lastGems == gems && lastKills == kills && lastPhase == phase) return;
+    const unsigned ticks = port.runTimeTicks();
+    if (!force && lastGems == gems && lastKills == kills && lastPhase == phase && lastTime == ticks) return;
     lastGems = gems; lastKills = kills; lastPhase = phase;
-    composeResultsRows(renderer, menu, gems, kills);
+    lastTime = ticks;
+    composeResultsRows(renderer, menu, gems, kills, ticks);
 }
 
 static void composeResultsProgress(AmigaRenderer* renderer,
@@ -592,7 +596,7 @@ static void composeResultsProgress(AmigaRenderer* renderer,
     UBYTE* saved = renderer->target;
     renderer->target = renderer->hud;
     amigaRendererSetClipRect(renderer, downwellPlayfieldX, 0, 160, 284);
-    amigaRendererFillRect(renderer, downwellPlayfieldX, 143, 160, 43, 3);
+    amigaRendererFillRect(renderer, downwellPlayfieldX, 148, 160, 38, 3);
     struct Sink {
         AmigaRenderer* renderer;
         void asset(int id, unsigned frame, int x, int y) {
@@ -2471,11 +2475,11 @@ int main(void) {
                 composeResultsBackdrop(&resultsOracle, 4, 160, 34);
                 composeResultsBackdrop(&renderer, 4, 160, 34);
                 downwell::DeathMenuSequence rowFixture;
-                rowFixture.visible[1] = rowFixture.visible[2] = true;
+                rowFixture.visible[1] = rowFixture.visible[2] = rowFixture.visible[4] = true;
                 rowFixture.rowOffset[1] = 3;
                 rowFixture.rowOffset[2] = 2;
-                composeResultsRows(&resultsOracle, rowFixture, 84, 10);
-                composeResultsRows(&renderer, rowFixture, 84, 10);
+                composeResultsRows(&resultsOracle, rowFixture, 84, 10, 3699);
+                composeResultsRows(&renderer, rowFixture, 84, 10, 3699);
                 downwell::DeathResultsProgressBar barFixture;
                 barFixture.visible = true; barFixture.length = 47; barFixture.separator = 24;
                 downwell::DeathResults labelFixture;
