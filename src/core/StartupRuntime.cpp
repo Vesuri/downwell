@@ -142,6 +142,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainPlayerHealth_ = 4;
     mainDeath_ = {};
     runGemStatistics_ = {};
+    deathResults_ = {};
     mainPlayerInvulnerability_ = 0;
     mainShootLeg_ = -1;
     mainShotsFired_ = 0;
@@ -271,6 +272,13 @@ void StartupRuntime::stepInternal(bool advancePressed,
     inputFire_ = fire;
     anyInput_ = anyInput;
     if (roomId_ == mainRoomId) currencyAccount_.beginStep();
+    if (roomId_ == mainRoomId) {
+        Input resultsInput;
+        resultsInput.left = left;
+        resultsInput.right = right;
+        resultsInput.fire = fire;
+        deathResults_.beginStep(resultsInput);
+    }
 
     for (std::size_t i = 0; i < instances_.size(); ++i) {
         auto& instance = instances_.at(i);
@@ -332,6 +340,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         updateMainEnemyInteractions();
         updateMainCurrency();
         updateMainLifecycle();
+        deathResults_.presentationStep();
     }
 }
 
@@ -1280,6 +1289,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     mainPlayerMotion_.step(input, controlsLocked_, mainDeath_.movementDead());
     mainDeath_.publishHealth(mainPlayerHealth_);
     mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
+    deathResults_.open(mainDeath_.menuReady, runGemStatistics_.lifetime, currencyAccount_.gameGem);
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);
@@ -2100,6 +2110,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU32(runGemStatistics_.record);
         digest.addU32(runGemStatistics_.savedRunGems);
         digest.addBool(runGemStatistics_.recorded);
+        deathResults_.appendState(digest);
     }
     digest.addI32(mainPlayerInvulnerability_);
     digest.addI32(mainShootLeg_);

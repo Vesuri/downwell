@@ -9,6 +9,32 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Results controller now runs on both gameplay paths
+
+Both live runtimes now own the same `DeathResults` controller. The player's
+menu-ready request opens it once using the saved lifetime total and current
+run gems. Subsequent updates drive shared input edges, reveal/notice alarms,
+unlock acknowledgement and the explicit results-progress phase. Holding the
+death-skip button across creation cannot synthesize another press. Rendering
+does not drive simulation. The full controller state and emitted effects are
+compared in paired combat and included in the host's active-death digest.
+
+The native progress calculation uses base-65536 division for large saved
+totals and ordinary 32-bit division for normal totals, avoiding forbidden
+64-bit arithmetic helpers without truncating the source sentinel. Boundary
+tests compare it with host 64-bit arithmetic.
+
+This is live state integration, not a finished results screen. Neither renderer
+consumes the new snapshot yet; retry/style/surface requests are exposed but
+not executed. Unlock persistence, notice presentation and save I/O remain open.
+Creation-frame alarm participation still needs verification against the Windows
+runner; the adapters currently start menu Begin Step/alarms on the next update.
+Validation: final full host suite and the 6,000-update full-state paired replay
+pass, ending health 0/0, kills 10/10 and currency 84/84. Bounded A500 cross-CPU
+regression passes with clean 68000 audits and normal builds restored. That CPU
+fixture does not cover the new results controller; its live-state verification
+is currently host-side, not a target results-screen capture.
+
 ### Live runtimes latch run-gem statistics at death entry
 
 Both runtimes now use `RunGemStatistics` at the first death-movement Begin

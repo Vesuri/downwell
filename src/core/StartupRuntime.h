@@ -11,6 +11,7 @@
 #include "MainCameraMotion.h"
 #include "PlayerDeathSequence.h"
 #include "RunGemStatistics.h"
+#include "DeathResults.h"
 #include "PlayerLifeRules.h"
 #include "Input.h"
 #include "PlayerMotion.h"
@@ -153,6 +154,7 @@ public:
     int mainPlayerHealth() const { return mainPlayerHealth_; }
     const PlayerDeathSequence& mainDeathSequence() const { return mainDeath_; }
     const RunGemStatistics& runGemStatistics() const { return runGemStatistics_; }
+    const DeathResults& deathResults() const { return deathResults_; }
     int mainPlayerInvulnerability() const { return mainPlayerInvulnerability_; }
     bool mainPlayerVisible() const { return playerDamageVisible(mainPlayerInvulnerability_); }
     std::uint32_t mainShotsFired() const { return mainShotsFired_; }
@@ -360,6 +362,7 @@ private:
     int mainPlayerHealth_ = 4;
     PlayerDeathSequence mainDeath_;
     RunGemStatistics runGemStatistics_;
+    DeathResults deathResults_;
     int mainPlayerInvulnerability_ = 0;
     int mainShootLeg_ = -1;
     std::uint32_t mainShotsFired_ = 0;

@@ -30,6 +30,24 @@ struct DeathMenuProgress {
     unsigned filling = 0;
     bool maxed = false;
 
+    // Divide the rare >32-bit saved total in base 65536 using only 32-bit
+    // divisions. Avoid a 64-bit compiler division helper on the 68000.
+    static std::uint64_t ceilingStep(std::uint64_t value, unsigned divisor) {
+        value += divisor - 1;
+        if (value <= 0xffffffffULL)
+            return static_cast<std::uint32_t>(value) / divisor;
+        std::uint64_t quotient = 0;
+        std::uint32_t remainder = 0;
+        for (unsigned i = 0; i < 4; ++i) {
+            const std::uint32_t digit = static_cast<std::uint32_t>(value >> 48);
+            value <<= 16;
+            const std::uint32_t partial = (remainder << 16) | digit;
+            quotient = (quotient << 16) | (partial / divisor);
+            remainder = partial % divisor;
+        }
+        return quotient;
+    }
+
     // Create computes the previous total before unlockGoalNum caps totalGems.
     // Reject only a previous total outside the table (the source would overrun).
     // The caller must persist `total` if the source cap changes its saved value.
@@ -64,8 +82,8 @@ struct DeathMenuProgress {
         frame.previousGoal = goal ? goals[goal - 1] : 0;
         if (menu.visible[5] && menu.visible[6] && !menu.goalPassed) {
             if (animatedTotal < total) {
-                const auto remainingStep = (total - animatedTotal + 14) / 15;
-                const auto goalStep = (frame.nextGoal - frame.previousGoal + 29) / 30;
+                const auto remainingStep = ceilingStep(total - animatedTotal, 15);
+                const auto goalStep = ceilingStep(frame.nextGoal - frame.previousGoal, 30);
                 animatedTotal += remainingStep < goalStep ? remainingStep : goalStep;
                 frame.fillSound = (++filling % 3) == 0;
             } else {

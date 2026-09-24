@@ -872,6 +872,24 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const auto& hostDeath = reference.mainDeathSequence();
             const auto& nativeStats = gameplay.runGemStatistics();
             const auto& hostStats = reference.runGemStatistics();
+            const auto& nativeResults = gameplay.deathResults();
+            const auto& hostResults = reference.deathResults();
+            downwell::StateDigest nativeResultsDigest, hostResultsDigest;
+            nativeResults.appendState(nativeResultsDigest);
+            hostResults.appendState(hostResultsDigest);
+            require(nativeResultsDigest.value() == hostResultsDigest.value(),
+                    "complete results state and emitted effects agree on every combat update");
+            require(nativeResults.active == nativeDeath.menuReady && hostResults.active == hostDeath.menuReady &&
+                        !nativeResults.failed && !hostResults.failed &&
+                        nativeResults.menu.resultShown == hostResults.menu.resultShown &&
+                        nativeResults.menu.cursor == hostResults.menu.cursor &&
+                        nativeResults.menu.sequenceOver == hostResults.menu.sequenceOver &&
+                        nativeResults.menu.inputAlarm == hostResults.menu.inputAlarm &&
+                        nativeResults.menu.revealAlarm == hostResults.menu.revealAlarm &&
+                        nativeResults.progress.animatedTotal == hostResults.progress.animatedTotal &&
+                        nativeResults.frame.displayedTotal == hostResults.frame.displayedTotal &&
+                        nativeResults.inputEffects.action == hostResults.inputEffects.action,
+                    "live results controllers agree throughout death and continued input");
             if (!nativeWasRecorded && nativeStats.recorded)
                 require(nativeStats.savedRunGems == gemsBeforeNative,
                         "native stats snapshot precedes this update's gem collection");

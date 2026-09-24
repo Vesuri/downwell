@@ -1,11 +1,29 @@
 #include "core/DeathMenuProgress.h"
 #include "core/RunGemStatistics.h"
+#include "core/DeathResults.h"
 #include <cstdlib>
 #include <iostream>
 static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
 }
 int main() {
+    downwell::DeathResults results;
+    downwell::Input held;
+    held.fire = true;
+    results.beginStep(held);
+    results.open(true, 80, 84);
+    results.presentationStep();
+    require(results.active && results.progress.animatedTotal == 0,
+            "entry uses saved lifetime and current run gems separately");
+    results.beginStep(held);
+    require(results.menu.resultShown == -1 && results.menu.revealAlarm == 44,
+            "held skip input is not replayed when results opens");
+    results.open(true, 999, 999);
+    require(results.progress.total == 80, "repeated menu-ready flag cannot recreate results");
+    results.beginStep({});
+    results.beginStep(held);
+    require(results.menu.resultShown == 6 && results.menu.inputDisabled,
+            "new press reaches shared results sequence");
     downwell::RunGemStatistics stats;
     require(!stats.observeDeathMovement(false, 80), "no save at health depletion/publication");
     require(stats.observeDeathMovement(true, 80) && stats.lifetime == 80 && stats.record == 80,
@@ -20,6 +38,12 @@ int main() {
             "new high score replaces record");
     using downwell::DeathMenuProgress;
     using downwell::DeathMenuSequence;
+    for (const unsigned divisor : {15u, 30u})
+        for (const std::uint64_t base : {0ULL, 1000ULL, 0xffffffffULL, 99999999999ULL})
+            for (unsigned offset = 0; offset < 64; ++offset)
+                require(DeathMenuProgress::ceilingStep(base + offset, divisor) ==
+                            (base + offset + divisor - 1) / divisor,
+                        "68000-friendly division matches wide integer arithmetic at boundaries");
     DeathMenuProgress progress;
     DeathMenuSequence menu;
     require(progress.initialize(84, 84, false), "initialize first run");

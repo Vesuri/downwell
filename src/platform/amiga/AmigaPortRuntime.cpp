@@ -387,6 +387,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     ++tick_;
     currencyAccount_.beginStep();
     downwell::Input input = downwell::unpackReplayInput(packedInput);
+    deathResults_.beginStep(input);
     death_.beginStep(input.fire);
     runGemStatistics_.observeDeathMovement(death_.movementDead(), currencyAccount_.gameGem);
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
@@ -427,6 +428,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     AmigaPlayerMotion motion = player_.step(input, false, death_.movementDead());
     death_.publishHealth(health_);
     death_.advanceAlarms(player_.grounded());
+    deathResults_.open(death_.menuReady, runGemStatistics_.lifetime, currencyAccount_.gameGem);
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if (headBreak.index >= 0) {
         const Breakable& box = breakables_[headBreak.index];
@@ -765,6 +767,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 #endif
 
     AmigaPortFrame frame = {};
+    deathResults_.presentationStep();
     frame.playerMotion = motion;
     frame.ammoChanged = player_.ammo() != oldAmmo;
     frame.healthChanged = health_ != oldHealth;
