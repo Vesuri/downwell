@@ -6,8 +6,10 @@ behavioral authority. Agreement between two independent adaptations is not a
 substitute for this architecture or original-game validation.
 
 Current status: main-room player movement, gun/jump state, animation state and
-knockback now use `PlayerMotion` in both runtimes. World storage/adapters, enemy,
-bullet, reward, camera and menu simulation still need consolidation. Native
+knockback now use `PlayerMotion` in both runtimes. Currency motion/lifetime/
+animation and default main-room camera rules are also shared, along with frog
+and bat motion slices. World storage/adapters, broader enemy behavior, bullets,
+reward orchestration, special camera modes and menus still need consolidation. Native
 world classes contain domain logic that does not belong under `src/platform`.
 Rendering/storage optimizations do not justify separate gameplay rules.
 
@@ -709,3 +711,42 @@ The expanded bounded 68000 replay matches this schema-2 digest and coverage
 work, a stale host reference exposed missing header prerequisites in multi-file
 test/tool builds. Those executables now depend explicitly on shared headers,
 and a simulated GemVerification.h edit was checked to force recompilation.
+
+## Shared default main-room camera
+
+Both runtimes now use MainCameraMotion for the default 480-pixel rmMain
+shaft/side-room policy and easing. It owns Q12 position, retained targets and
+both slowdown values; renderer-facing float/Q8 values are adapters. The
+recovered camMain Step VM uses strict 160/320 player boundaries, clamps shaft
+target X to 240, and follows player Y+24. Side rooms set target X to 80/400
+without replacing target Y. At exact boundary equality, the old X target is
+retained. Returning from a side camera position uses slowdown one on both
+axes before restoring shaft slowdown 10/5. These rules previously differed
+between SDL and native, especially vertical side-room tracking.
+
+The source death branch retains targets but still executes easing. Native
+follow-camera death no longer falls into its synthetic replay scroll path
+(one row every other tick). That synthetic path remains only for the explicit
+non-following replay configuration. Hardware ring updates still consume the
+resulting signed pixel delta; shared simulation does not manipulate DMA.
+
+Focused tests cover side entry/return, exact boundaries, death-target retention,
+top clamp and 1,000 updates against the source easing equation (<.002 pixel
+error). Native side-entry checks use fractional player X, not rounded pixels.
+The initial and 600-update combat comparisons pass without tolerance changes.
+Startup digest schema 32 includes authoritative camera state; its menu replay
+baseline is deliberately updated to a56e534c0975af1c. Q12 retains sufficient
+precision while covering the source room's 300,000-pixel height in signed
+32-bit arithmetic; a high-coordinate fixture guards that range.
+
+This is the normal rmMain subset, not all camera modes. Free camera, lockers,
+focus, shake, autoscroll, endings and room-end limits remain separate work.
+Adapters still supply their current player snapshot and retain existing view
+publication rounding; exact source global.plx/ply event timing and final
+rounded camera-view publication still need auditing. Shared rules and CPU
+arithmetic do not resolve those scheduling/presentation questions by themselves.
+Validation: full host suite, bounded 68000 player/gem replay, and the A500
+600-tick terrain-cache oracle pass with the final Q12 representation. The
+existing replay does not hash camera state; camera rule tests and actual
+follow-camera terrain execution provide separate evidence, not full Windows
+camera equivalence.

@@ -115,6 +115,11 @@ HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h)
 $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test: $(HOST_CHECK_HEADERS)
 
 test: build/gem-homing-test
+test: build/main-camera-test
+
+build/main-camera-test: tests/core/MainCameraMotionTest.cpp src/core/MainCameraMotion.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MainCameraMotionTest.cpp
 
 build/gem-homing-test: tests/core/GemHomingTest.cpp src/core/GemHoming.h src/core/GemMotion.h src/core/GemLifetime.h src/core/GemAnimation.h src/core/BatMotion.h
 	@mkdir -p build
@@ -281,6 +286,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/enemy-contact-test
 	./build/bat-motion-test
 	./build/gem-homing-test
+	./build/main-camera-test
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)

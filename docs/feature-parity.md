@@ -21,9 +21,9 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Slice | Current evidence | Remaining parity work |
 | --- | --- | --- |
 | Publisher, credits, controls, garden, well, style select | Native implementations and decoded scene comparison tests | Full-sequence display regression after gameplay changes |
-| Player, camera, landing, jumping, gunboots | SDL/native comparison through entrance and first scrolling section | Longer combat tapes; current position comparisons allow fixed-point tolerances |
+| Player, camera, landing, jumping, gunboots | Shared player and default main-room camera; SDL/native comparison through entrance and scrolling | Special camera modes and original event timing; longer combat tapes; position checks still allow tolerances |
 | Area-one geometry and endings | Shared live builder, emitted-object collision/rendering, terrain cache oracle | Live SDL replay comparison; side-room reversals and offscreen destruction coverage |
-| Bullets and gems | Shared 16-bullet / 64-gem limits | Dense encounter behavior and ordering comparisons |
+| Bullets and gems | Shared limits, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet consolidation, source bounce/terrain semantics, dense encounters and event ordering |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
 | Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency and player presentation | Gem trajectories, ordering and broader actor states remain unverified |
 | HUD | Health, ammo, currency and streak implementations | State-driven image comparisons for damage, depletion and streak expiry |

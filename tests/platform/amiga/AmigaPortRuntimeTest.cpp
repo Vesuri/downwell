@@ -687,7 +687,7 @@ int main() {
     for (unsigned frame = 0;
          frame < 120 && sideCamera.cameraOffsetX() == 0; ++frame)
         sideFrame = sideCamera.step(downwell::packReplayInput(walkRight));
-    require(sideCamera.player().offsetX() > 80 &&
+    require(sideCamera.player().offsetXFixed() > 80L * 256 &&
                 sideCamera.cameraOffsetX() == 160 &&
                 sideFrame.cameraXChanged && sideFrame.cameraXDelta == 160,
             "crossing the recovered shaft edge snaps to the right-room camera");

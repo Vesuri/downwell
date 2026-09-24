@@ -6,6 +6,7 @@
 #include "core/StateDigest.h"
 #include "core/GameplayLimits.h"
 #include "core/GemMotion.h"
+#include "core/MainCameraMotion.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogBehavior.h"
@@ -195,6 +196,7 @@ private:
     unsigned ringOrigin_;
     bool followCamera_;
     long cameraY_;
+    downwell::MainCameraMotion cameraMotion_;
     int cameraPixelY_;
     int cameraPixelX_;
     int activationY_;

@@ -35,7 +35,8 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
          * player receives movement. Its recovered +24 target and /5 easing
          * therefore establish the first visible camera/ring position here.
          */
-        cameraY_ = (24L * 256L) / 5L;
+        cameraMotion_.step(240 * 256L, 176 * 256L);
+        cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
         cameraPixelY_ = (int)(cameraY_ >> 8);
         ringOrigin_ = (ringOrigin_ + (unsigned)cameraPixelY_) % ringHeight;
     }
@@ -432,15 +433,14 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     DW_PROFILE_PHASE(profilePlayer);
     int scrollDelta = 0;
     int cameraXDelta = 0;
-    if (followCamera_ && !dead_) {
+    if (followCamera_) {
         const int oldCameraPixelX = cameraPixelX_;
         const int oldCameraPixelY = cameraPixelY_;
-        const int playerWorldX = 240 + player_.offsetX();
-        cameraPixelX_ = playerWorldX < 160 ? -160
-                        : playerWorldX > 320 ? 160 : 0;
+        cameraMotion_.step(240L * 256 + player_.offsetXFixed(),
+                           176L * 256 + player_.offsetYFixed(), dead_);
+        cameraPixelX_ = static_cast<int>(cameraMotion_.x / 4096) - 240;
         cameraXDelta = cameraPixelX_ - oldCameraPixelX;
-        const long target = player_.offsetYFixed() + 24L * 256L;
-        cameraY_ += (target - cameraY_) / 5L;
+        cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
         cameraPixelY_ = cameraY_ >= 0
                             ? (int)(cameraY_ >> 8)
                             : -(int)((-cameraY_) >> 8);

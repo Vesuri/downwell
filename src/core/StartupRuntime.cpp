@@ -172,6 +172,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     mainBuilderSpecialObjectsGenerated_ = 0;
     mainCameraInitialized_ = false;
     mainCameraX_ = 240.0F;
+    mainCameraMotion_ = {};
     mainCameraY_ = 176.0F;
     mainCameraTargetY_ = 176.0F;
 
@@ -1303,23 +1304,11 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
 void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     if (!mainCameraInitialized_ || !mainPlayerInitialized_)
         return;
-    float targetX = mainCameraX_;
-    float slowdownX = 1.0F;
-    if (mainPlayerX_ > 160.0F && mainPlayerX_ < 320.0F) {
-        // camMain follows the playable center shaft with its recovered +24
-        // downward bias. For this 480-pixel room, the horizontal clamps both
-        // resolve to 240 while the player remains in the center section.
-        targetX = 240.0F;
-        mainCameraTargetY_ = mainPlayerY_ + 24.0F;
-        slowdownX = mainCameraX_ > 160.0F && mainCameraX_ < 320.0F
-                        ? 10.0F : 1.0F;
-    } else {
-        targetX = mainPlayerX_ < 160.0F ? 80.0F : 400.0F;
-    }
-    mainCameraX_ += (targetX - mainCameraX_) / slowdownX;
-    mainCameraY_ += (mainCameraTargetY_ - mainCameraY_) / 5.0F;
-    if (mainCameraY_ < 142.0F)
-        mainCameraY_ = 142.0F;
+    mainCameraMotion_.step(static_cast<long>(std::round(mainPlayerX_ * 256.0F)),
+                           static_cast<long>(std::round(mainPlayerY_ * 256.0F)), mainPlayerHealth_ == 0);
+    mainCameraX_ = mainCameraMotion_.x / 4096.0F;
+    mainCameraY_ = mainCameraMotion_.y / 4096.0F;
+    mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
     instance.x = static_cast<std::int32_t>(std::round(mainCameraX_));
     instance.y = static_cast<std::int32_t>(std::round(mainCameraY_));
 }
@@ -1804,6 +1793,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainCameraX_ = static_cast<float>(instance->x);
             mainCameraY_ = static_cast<float>(instance->y);
             mainCameraTargetY_ = mainCameraY_;
+            mainCameraMotion_.reset(instance->x, instance->y);
         }
         return;
     case 999: // gml_Object_camMain_Step_0 (menu/rmMain camera subsets)
@@ -2038,7 +2028,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(31); // Startup-state digest schema.
+    digest.addU32(32); // Includes authoritative shared camera state.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2182,6 +2172,12 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addF32(mainCameraX_);
     digest.addF32(mainCameraY_);
     digest.addF32(mainCameraTargetY_);
+    digest.addI32(mainCameraMotion_.x);
+    digest.addI32(mainCameraMotion_.y);
+    digest.addI32(mainCameraMotion_.targetX);
+    digest.addI32(mainCameraMotion_.targetY);
+    digest.addI32(mainCameraMotion_.slowdownX);
+    digest.addI32(mainCameraMotion_.slowdownY);
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

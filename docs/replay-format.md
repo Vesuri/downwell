@@ -41,11 +41,11 @@ padding, native booleans, or host-endian memory.
 
 Each state family starts with its own schema number and appends fields in a
 documented fixed order. Changing the field order or meaning requires a schema
-increment and a deliberate golden-digest update. Startup-state schema 31
+increment and a deliberate golden-digest update. Startup-state schema 32
 includes the room-load result, runtime instance state, gameplay/player/builder
 state, and the complete Windows-runner RNG state and draw count. The bounded
 startup replay seeded with `decafbad` has a pinned digest of
-`9a7487de074ed927` after 13 ticks and transition to `rmMenu`.
+`a56e534c0975af1c` after 13 ticks and transition to `rmMenu`.
 
 The current code provides memory encoding/decoding, seeded RNG initialization,
 state comparison, and a cross-target native-port runner. File recording and

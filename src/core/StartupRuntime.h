@@ -7,6 +7,7 @@
 #include "GameMakerRandom.h"
 #include "GameplayLimits.h"
 #include "GemMotion.h"
+#include "MainCameraMotion.h"
 #include "Input.h"
 #include "PlayerMotion.h"
 #include <array>
@@ -385,6 +386,7 @@ private:
     std::uint32_t mainBuilderSpecialObjectsGenerated_ = 0;
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
+    MainCameraMotion mainCameraMotion_;
     float mainCameraY_ = 176.0F;
     float mainCameraTargetY_ = 176.0F;
 };
