@@ -59,6 +59,8 @@ public:
     void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
                   downwell::TextAlign align) override {
+        if (std::strstr(text, "CLEARED")) ++clearTitleDraws;
+        if (std::strcmp(text, "CHOOSE 1 UPGRADE") == 0) ++clearChoiceDraws;
         if (x == 190 && y == 64 && color.r == 255 && color.g == 255 &&
             align == downwell::TextAlign::center) ++shopNameCenters;
         if (std::strcmp(text, "GAME OVER") == 0) {
@@ -84,6 +86,7 @@ public:
     int clearCount = 0;
     unsigned deathFlashCount = 0;
     unsigned shopPanels = 0, shopNameCenters = 0;
+    unsigned clearTitleDraws = 0, clearChoiceDraws = 0;
     unsigned triggerDraws = 0;
     unsigned exitDitherDraws = 0;
     int exitDitherX = 0, exitDitherY = 0;
@@ -530,6 +533,24 @@ int main() {
     require(closingLevel.exitDitherDraws == 2 && closingLevel.exitDitherX == 190 &&
         closingLevel.exitDitherY == -92 && exitDither.y == ditherWorldY && exitDither.alarm0 == 15,
         "Game projects recovered exit sprite and repeated rendering does not advance motion or alarms");
+    downwell::Game clearGame(&rooms, &objects, &builders);
+    auto& clearRuntime = const_cast<downwell::StartupRuntime&>(clearGame.startup());
+    clearRuntime.skipToGameForTesting();
+    clearRuntime.registerLevelExit(int(clearRuntime.mainPlayerY()));
+    for (unsigned tick = 0; tick < 96; ++tick) clearGame.update({});
+    require(clearRuntime.levelClearActive(), "Game automatically consumes result request at scene boundary");
+    const auto clockBeforeClear = clearRuntime.runTimeTicks();
+    for (unsigned tick = 0; tick < 60; ++tick) clearGame.update({});
+    require(clearRuntime.levelClear().selection.visible, "live clear scene reaches upgrade selection");
+    const auto timeBeforeDraw = clearRuntime.levelClearFrame().time;
+    RecordingRenderer clearRenderer;
+    clearGame.render(clearRenderer); clearGame.render(clearRenderer);
+    require(clearRenderer.clearTitleDraws == 14 && clearRenderer.clearChoiceDraws == 14 &&
+        clearRuntime.levelClearFrame().time == timeBeforeDraw && clearRuntime.runTimeTicks() == clockBeforeClear,
+        "live clear title/choice shadow layers render without advancing time or gameplay");
+    downwell::Input navigate; navigate.right = true;
+    clearGame.update(navigate); clearGame.update(navigate);
+    require(clearRuntime.levelClear().selection.cursor == 2, "held navigation causes only one menu edge");
     std::puts("game render tests passed");
     return 0;
 }

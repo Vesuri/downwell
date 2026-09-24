@@ -11,10 +11,13 @@
 #include "ObjectPack.h"
 #include "ShopFixtures.h"
 #include "ShopMenuText.h"
+#include "LevelClearLayout.h"
 #include "../../generated/amiga-shop.text.h"
+#include "../../generated/amiga-clear.text.h"
 #include <array>
 #include <cmath>
 #include <string>
+#include <cstring>
 namespace downwell {
 namespace {
 void drawBorderText(Renderer& renderer, float x, float y, const char* text,
@@ -75,12 +78,67 @@ Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
 
 void Game::update(const Input& input, std::uint32_t restartSeed) {
     finished_ = finished_ || input.quit;
-    startup_.step(input, input.fire && !fire_);
+    if (startup_.levelClearActive()) {
+        bool confirm = input.fire;
+        startup_.stepLevelClear(confirm, input.left && !left_, input.right && !right_, heartGoal_,
+            [](LevelClearSelection::Effect, unsigned) {});
+    } else {
+        startup_.step(input, input.fire && !fire_);
+        if (startup_.levelResultRequested())
+            startup_.enterLevelClear(startup_.playStyle(), heartGoal_);
+    }
     const auto action = startup_.deathResults().inputEffects.action;
     if (action != DeathMenuSequence::Action::None &&
         !startup_.restartFromResults(action, restartSeed)) finished_ = true;
     fire_ = input.fire;
+    left_ = input.left; right_ = input.right;
     ++tick_;
+}
+
+void Game::renderLevelClear(Renderer& renderer) const {
+    const auto real = [](HudReal value) {
+        return std::ldexp(static_cast<double>(value.mantissa), value.exponent - 52);
+    };
+    const auto sample = [](double value) {
+        if (value == 0) return HudReal{};
+        std::uint64_t bits; std::memcpy(&bits, &value, sizeof bits);
+        return HudReal{(bits & 0xfffffffffffffULL) | (1ULL << 52), int((bits >> 52) & 2047) - 1023};
+    };
+    const auto& room = startup_.levelClear();
+    const auto& frame = startup_.levelClearFrame();
+    struct Sink {
+        Renderer& renderer;
+        const StartupRuntime& runtime;
+        decltype(real)& convert;
+        int viewY;
+        float coordinate(LevelClearCoordinate p) const {
+            return static_cast<float>((p.negative ? -1 : 1) * convert(p.magnitude));
+        }
+        void sprite(unsigned id, unsigned subimage, LevelClearCoordinate x, LevelClearCoordinate y) {
+            renderer.drawSpriteTransformed(id, subimage, coordinate(x), coordinate(y) - viewY, 1, 1, 0);
+        }
+        void player(LevelClearCoordinate x, LevelClearCoordinate y) {
+            renderer.drawSpriteTransformed(runtime.mainPlayerSpriteId(), unsigned(runtime.mainPlayerImageIndex()),
+                coordinate(x), coordinate(y) - viewY, runtime.mainPlayerFacing(), 1, 0);
+        }
+        void label(unsigned id, LevelClearCoordinate x, LevelClearCoordinate y, unsigned pen) {
+            std::string text = levelClearLabel(id);
+            if (id == 64000) text = std::to_string(runtime.runStage().area) + "-" +
+                std::to_string(runtime.runStage().level) + "\n" + text;
+            renderer.drawText(2, text.c_str(), coordinate(x), coordinate(y) - viewY,
+                pen == 1 ? Color{255,255,255,255} : Color{255,0,0,255}, TextAlign::center);
+        }
+        void description(unsigned id, LevelClearCoordinate x, LevelClearCoordinate y, unsigned suffix) {
+            std::string text = levelClearLabel(id);
+            if (suffix) text += " " + std::to_string(suffix);
+            drawBorderText(renderer, coordinate(x), coordinate(y) - viewY, text.c_str(), {255,255,255,255});
+        }
+    } sink{renderer, startup_, real, room.motion.viewY()};
+    drawLevelClear(sink, room, frame, startup_.upgrades(),
+        sample(std::fabs(std::cos(frame.circle * (3.14159265358979323846 / 180.0)))),
+        sample(std::fabs(std::sin(frame.time / 20.0))));
+    const auto& dither = startup_.exitDither();
+    if (dither.active) renderer.drawSprite(128, 0, dither.x, dither.y - room.motion.viewY());
 }
 
 void Game::render(Renderer& renderer) const {
@@ -92,7 +150,9 @@ void Game::render(Renderer& renderer) const {
                          logicalHeight);
     OffsetRenderer playfield(renderer, playfieldX);
     bool clipReleased = false;
-    if (startup_.inMenu()) {
+    if (startup_.levelClearActive()) {
+        renderLevelClear(playfield);
+    } else if (startup_.inMenu()) {
         renderMenu(playfield);
     } else if (startup_.inPlayMenu()) {
         renderPlayMenu(playfield);
@@ -126,9 +186,9 @@ void Game::render(Renderer& renderer) const {
     }
     if (!clipReleased)
         renderer.clearClipRect();
-    if (startup_.inMainRoom())
+    if (startup_.inMainRoom() && !startup_.levelClearActive())
         renderLandscapeHud(renderer);
-    if (startup_.inMainRoom() && startup_.exitDither().active) {
+    if (startup_.inMainRoom() && !startup_.levelClearActive() && startup_.exitDither().active) {
         renderer.setClipRect(playfieldX, 0, 160, logicalHeight);
         const auto& dither = startup_.exitDither();
         playfield.drawSprite(128, 0, dither.x - startup_.mainCameraRenderViewX(),

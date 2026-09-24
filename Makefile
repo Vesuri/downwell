@@ -347,6 +347,10 @@ generated/amiga-shop.text.h: tools/generate-amiga-hud.py data/language.ini
 	tools/generate-amiga-hud.py --profile shop
 
 build/src/core/Game.o $(GAME_RENDER_TEST_TARGET): generated/amiga-shop.text.h
+generated/amiga-clear.text.h: tools/generate-amiga-hud.py data/language.ini
+	tools/generate-amiga-hud.py --profile clear
+
+build/src/core/Game.o $(GAME_RENDER_TEST_TARGET): generated/amiga-clear.text.h
 
 build/%.o: %.cpp
 	@mkdir -p $(@D)

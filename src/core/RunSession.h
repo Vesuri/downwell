@@ -56,7 +56,9 @@ struct RunSession {
         if (!levelResultRequested || levelClearActive) return false;
         if (!levelClear.create(style, heartGoal, health, upgrades, player, random)) return false;
         levelClearActive = true;
-        levelClearFrame = {};
+        // Room creation is followed by Draw before the next Step/Alarm phase.
+        levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
+            levelClear.selection.next, levelClear.selection.visible);
         levelResultRequested = exitDitherRequested = false;
         levelExitPresent = false;
         exitDither = {};

@@ -49,6 +49,12 @@ struct HudReal {
                              (mantissa << 4) + (mantissa << 3);
         return rounded(product << 3, exponent);
     }
+    HudReal timesSmall(unsigned factor) const {
+        if (factor > 32) return {};
+        std::uint64_t product = 0;
+        for (unsigned i = 0; i < factor; ++i) product += mantissa;
+        return rounded(product << 3, exponent);
+    }
     // Small positive divisors used by Result's easing. Normalize before
     // division to retain three rounding bits plus a sticky remainder. The
     // bitwise quotient avoids a 64-bit divide helper on the 68000.

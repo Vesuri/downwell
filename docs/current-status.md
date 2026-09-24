@@ -287,6 +287,24 @@ words, motion, grants and departure requests. This is adapter integration,
 not an automatic live scene switch: the application presenters still need to
 invoke entry after retiring the old display and then render these snapshots.
 
+SDL Game now invokes that entry automatically on the live exit request and
+routes subsequent input to the result controller instead of gameplay. A shared
+LevelClearLayout emits borders, player anchor, six red/one white title passes,
+upgrade icon positions/clamping and selected name/description anchors. It uses
+integer-only binary64 arithmetic after receiving trigonometric samples; SDL
+currently supplies those samples with host sin/cos and resolves localized text.
+The scene suppresses gameplay/HUD rendering, handles left/right edges and draws
+the departure wipe in result coordinates. Entry also prepares the first Draw
+snapshot without prematurely advancing alarms. Live Game tests reach selection,
+check both title stacks, held-input navigation and repeated-render independence;
+focused layout tests cover source order, icon bob/clamp and owned-name suffixes.
+The normal falling player pose is retained from gameplay; full inherited player
+animation and optional bonus/heart Draw branches remain unaudited here. Audio
+and goal-field heart detection are still absent. Next-level requests still wait
+for a loader (the SDL screen consequently stops under its final wipe), and the
+Amiga application has not yet switched to this presenter. This is visible SDL
+integration, not completed progression, native presentation or Windows parity.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

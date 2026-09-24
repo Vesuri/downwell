@@ -1,4 +1,5 @@
 #include "core/LevelClearPresentation.h"
+#include "core/LevelClearLayout.h"
 #include <cstdio>
 #include <cstdlib>
 static void require(bool ok, const char* why) {
@@ -44,5 +45,42 @@ int main() {
             }
         }
     }
-    std::puts("Result border snapshots and presentation clocks passed across all four areas");
+    LevelClearController room;
+    room.offers.ids[0] = 0; room.offers.ids[1] = 6; room.offers.ids[2] = 13;
+    UpgradeInventory inventory;
+    inventory.levels[6] = 1;
+    LevelClearPresentation::Frame frame;
+    frame.choices = true;
+    struct Sink {
+        unsigned sprites = 0, players = 0, labels = 0, descriptions = 0;
+        void sprite(unsigned id, unsigned subimage, LevelClearCoordinate x, LevelClearCoordinate y) {
+            if (sprites >= 76) {
+                const unsigned option = sprites - 76;
+                const unsigned ids[] = {524, 522, 516};
+                require(id == ids[option] && subimage == 0 && x.magnitude.floor() == 42 + 38 * option &&
+                    y.magnitude.floor() == (option == 1 ? 348u : 354u),
+                    "source icon curve is clamped after subtracting bob and adding eight");
+            }
+            ++sprites;
+        }
+        void player(LevelClearCoordinate x, LevelClearCoordinate y) {
+            require(sprites == 76 && x.magnitude.floor() == 80 && !y.magnitude.mantissa,
+                "player is drawn between borders and text"); ++players;
+        }
+        void label(unsigned id, LevelClearCoordinate x, LevelClearCoordinate y, unsigned pen) {
+            const unsigned layer = labels % 7;
+            require(id == (labels < 7 ? 64000u : 64001u) &&
+                x.magnitude.floor() == 80 - layer && y.magnitude.floor() == (labels < 7 ? 96u : 278u) - layer &&
+                pen == (layer == 6 ? 1u : 2u), "six red shadow passes precede white title"); ++labels;
+        }
+        void description(unsigned id, LevelClearCoordinate x, LevelClearCoordinate y, unsigned suffix) {
+            require(id == (descriptions ? 64306u : 64106u) && x.magnitude.floor() == 80 &&
+                y.magnitude.floor() == (descriptions ? 382u : 320u) && suffix == (descriptions ? 0u : 2u),
+                "selected owned upgrade name suffix and description anchors"); ++descriptions;
+        }
+    } sink;
+    drawLevelClear(sink, room, frame, inventory, HudReal::integer(1), HudReal::integer(1));
+    require(sink.sprites == 79 && sink.players == 1 && sink.labels == 14 && sink.descriptions == 2,
+        "shared visible result layout emits every source layer");
+    std::puts("Result border snapshots, clocks and shared layout passed");
 }

@@ -30,12 +30,14 @@ private:
     void renderMenu(Renderer& renderer) const;
     void renderPlayMenu(Renderer& renderer) const;
     void renderMain(Renderer& renderer) const;
+    void renderLevelClear(Renderer& renderer) const;
     void renderLandscapeHud(Renderer& renderer) const;
 
     std::uint64_t tick_ = 0;
     StartupRuntime startup_;
     const ObjectPack* objectPack_ = nullptr;
     bool fire_ = false;
+    bool left_ = false, right_ = false, heartGoal_ = false;
     bool finished_ = false;
 };
 

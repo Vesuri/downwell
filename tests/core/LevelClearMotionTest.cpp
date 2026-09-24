@@ -24,6 +24,8 @@ int main() {
         const unsigned divisor = 1 + test % 32;
         require(asDouble(value.divideSmall(divisor)) == asDouble(value) / divisor,
             "integer-only small division matches correctly rounded binary64");
+        require(asDouble(value.timesSmall(divisor)) == asDouble(value) * divisor,
+            "integer-only small multiplication matches correctly rounded binary64");
     }
     downwell::LevelClearMotion motion;
     double player = 0, target = 160, camera = 142, cameraTarget = 142, acceleration = 0;
