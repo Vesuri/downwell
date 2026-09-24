@@ -63,7 +63,7 @@ int main() {
                         objectPack.valid() ? &objectPack : nullptr,
                         builderPatternPack.valid() ? &builderPatternPack : nullptr);
     while (!game.finished()) {
-        game.update(platform.pollInput());
+        game.update(platform.pollInput(), static_cast<std::uint32_t>(SDL_GetPerformanceCounter()));
         game.render(platform);
         platform.present();
         platform.waitForNextTick();

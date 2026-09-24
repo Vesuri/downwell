@@ -68,9 +68,12 @@ Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
 #endif
 }
 
-void Game::update(const Input& input) {
+void Game::update(const Input& input, std::uint32_t restartSeed) {
     finished_ = finished_ || input.quit;
     startup_.step(input, input.fire && !fire_);
+    const auto action = startup_.deathResults().inputEffects.action;
+    if (action != DeathMenuSequence::Action::None &&
+        !startup_.restartFromResults(action, restartSeed)) finished_ = true;
     fire_ = input.fire;
     ++tick_;
 }

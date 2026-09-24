@@ -579,6 +579,12 @@ verify-amiga-scenes:
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_scenes.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE READY_DESCRIPTION="complete native scene sequence through scrolling gameplay and enemy activation" amiga/verify_startup.sh'
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
+.PHONY: verify-amiga-results-restart
+verify-amiga-results-restart:
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 RESULTS_RESTART_VERIFY=1 SKIP_TO_GAME=1'
+	bash -c '. amiga/env.sh && GDB_SOURCE=verify_results_restart.gdb READY_MARKER=DOWNWELL_RESULTS_RESTART_READY READY_DESCRIPTION="all results destinations and gameplay reentry" amiga/verify_startup.sh'
+	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
+
 amiga:
 	@bash -c '. amiga/env.sh && $(MAKE) -C amiga'
 

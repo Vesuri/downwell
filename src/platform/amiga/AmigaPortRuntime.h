@@ -70,6 +70,7 @@ public:
     // Owner must rebuild terrain and rebind callbacks before stepping again.
     downwell::ResultsDestination restartFromResults(downwell::DeathMenuSequence::Action action,
         std::uint32_t seed, unsigned initialRingOrigin);
+    void confirmFirstStage() { if (run_.stage.area == 0) run_.stage.advance(1); }
 
     struct BulletState {
         int x;

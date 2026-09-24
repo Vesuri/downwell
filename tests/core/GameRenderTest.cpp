@@ -350,6 +350,89 @@ int main() {
                 "Game renderer submits results title and four-way outline at source anchors");
         require(before.value() == after.value(), "drawing results never advances simulation");
     }
+    // Drive real Game input dispatch; only publication of the results menu is
+    // injected here (natural death has separate long-replay coverage).
+    for (int selection = 0; selection < 3; ++selection) {
+        auto& runtime = const_cast<downwell::StartupRuntime&>(damagedGame.startup());
+        if (!runtime.inMainRoom())
+            require(runtime.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 42),
+                    "dispatch fixture recreates main room");
+        damagedGame.update({});
+        auto& results = const_cast<downwell::DeathResults&>(runtime.deathResults());
+        results = {};
+        results.open(true, 0, 0);
+        results.menu.sequenceOver = true;
+        results.menu.visible[5] = true;
+        results.menu.cursor = selection;
+        input = {};
+        input.fire = true;
+        damagedGame.update(input, 42);
+        const int destinations[] = {11, 8, 20};
+        require(runtime.roomId() == destinations[selection] && !runtime.deathResults().active &&
+                    runtime.randomSeed() == 42 && !damagedGame.finished(),
+                "confirmation executes the chosen results destination using supplied seed");
+        damagedGame.update(input, 99);
+        require(runtime.randomSeed() == 42 && !runtime.playMenuSelected(),
+                "held confirmation cannot repeat restart or select a style");
+    }
+    downwell::Game naturalDeath(&rooms, &objects, &builders);
+    unsigned combatTicks = 0;
+    bool entranceLanded = false;
+    unsigned approachTicks = 0;
+    bool retried = false;
+    for (unsigned frame = 0; frame < 14000 && !retried; ++frame) {
+        const auto& runtime = naturalDeath.startup();
+        input = {};
+        if (runtime.inMenu()) input.right = true;
+        else if (runtime.inPlayMenu() && runtime.playMenuYOffset() == 0) input.fire = true;
+        else if (runtime.inMainRoom()) {
+            if (runtime.deathResults().active) {
+                const auto& menu = runtime.deathResults().menu;
+                if (menu.sequenceOver && !menu.inputDisabled && !menu.goalPassed) {
+                    const auto lifetime = runtime.runGemStatistics().lifetime;
+                    require(runtime.mainPlayerHealth() == 0, "natural results follow actual fatal damage");
+                    input.fire = true;
+                    naturalDeath.update(input, 42);
+                    require(runtime.inMainRoom() && runtime.mainPlayerHealth() == 4 &&
+                        !runtime.deathResults().active && runtime.runTimeTicks() == 0 &&
+                        runtime.runGemStatistics().lifetime == lifetime,
+                        "natural death confirmation returns to a living run with records retained");
+                    retried = true;
+                    break;
+                }
+                if (menu.goalPassed && menu.goalNotice >= 3) input.fire = (frame % 2) == 0;
+            } else {
+                entranceLanded = entranceLanded || runtime.mainPlayerGrounded();
+                if (entranceLanded && approachTicks < 600) {
+                    input.right = true;
+                    ++approachTicks;
+                } else if (entranceLanded) {
+                    input.left = (combatTicks / 90) % 2 == 0;
+                    input.right = !input.left;
+                    input.fire = (combatTicks + 5) % 10 < 5;
+                    ++combatTicks;
+                }
+            }
+        }
+        const bool wasDeadWithResults = runtime.mainPlayerHealth() == 0 && runtime.deathResults().active;
+        const auto lifetime = runtime.runGemStatistics().lifetime;
+        naturalDeath.update(input, 42);
+        // The original event can acknowledge its last unlock and confirm the
+        // selected action on the same press. Observe that path as well.
+        if (wasDeadWithResults && !runtime.deathResults().active) {
+            require(runtime.inMainRoom() && runtime.mainPlayerHealth() == 4 &&
+                runtime.runTimeTicks() == 0 && runtime.runGemStatistics().lifetime == lifetime &&
+                runtime.randomSeed() == 42, "unlock acknowledgement can also execute Retry in its source event");
+            retried = true;
+        }
+    }
+    if (!retried) std::fprintf(stderr, "death tape health=%d y=%.1f room=%d results=%d over=%d goal=%d notice=%d\n",
+        naturalDeath.startup().mainPlayerHealth(), naturalDeath.startup().mainPlayerY(),
+        naturalDeath.startup().roomId(), naturalDeath.startup().deathResults().active,
+        naturalDeath.startup().deathResults().menu.sequenceOver,
+        naturalDeath.startup().deathResults().menu.goalPassed,
+        naturalDeath.startup().deathResults().menu.goalNotice);
+    require(retried, "bounded natural-death tape reaches and executes Retry");
     std::puts("game render tests passed");
     return 0;
 }

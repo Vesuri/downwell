@@ -265,6 +265,11 @@ volatile ULONG gDownwellMenuCopperPatchFailures;
 volatile ULONG gDownwellCaptureTick;
 volatile LONG gDownwellCapturePlayerXQ8, gDownwellCapturePlayerYQ8;
 volatile LONG gDownwellCaptureViewX, gDownwellCaptureViewY;
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+volatile ULONG gDownwellResultsRestartCount;
+volatile ULONG gDownwellResultsRestartMask;
+__attribute__((noinline, used)) void downwellResultsRestartReady() { __asm__ volatile("" ::: "memory"); }
+#endif
 #endif
 
 struct DownwellMenuFrameCapture {
@@ -560,14 +565,14 @@ static void composeResultsBackdrop(AmigaRenderer* renderer,
     renderer->target = saved;
 }
 
-static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntime& port) {
+static bool redrawResultsBackdrop(AmigaRenderer* renderer, const AmigaPortRuntime& port, bool force = false) {
     const int viewX = mainViewX + port.cameraOffsetX();
     const int viewY = mainInitialViewY + port.cameraOffsetY();
     const int offset = port.deathResults().menu.titleOffset;
     static int lastX = -1, lastY = -1, lastOffset = -1;
     const int phaseX = ((viewX % 8) + 8) % 8;
     const int phaseY = ((viewY % 8) + 8) % 8;
-    if (lastX == phaseX && lastY == phaseY && lastOffset == offset) return false;
+    if (!force && lastX == phaseX && lastY == phaseY && lastOffset == offset) return false;
     lastX = phaseX; lastY = phaseY; lastOffset = offset;
     composeResultsBackdrop(renderer, offset, viewX, viewY);
     return true;
@@ -1297,6 +1302,10 @@ int main(void) {
     unsigned menuSpriteFrameCount = 0;
     int renderedMenuTitleFrame = -1;
     int menuCopperMode[2] = {-1, -1};
+    bool sceneResetRequested = false;
+    bool newRunWorldPending = false;
+    std::uint32_t newRunSeed = 2;
+    bool resultsWasActive = false;
 #ifdef DOWNWELL_SCENE_VERIFY
     const UWORD* expectedSplashCopper = 0;
     bool sceneGameplayLandedReported = false;
@@ -1706,10 +1715,29 @@ int main(void) {
             packedInput = downwell::packReplayInput(replayInput);
 #else
 #ifdef DOWNWELL_SCENE_VERIFY
-            const downwell::Input liveInput = sceneVerificationInput(
+            downwell::Input liveInput = sceneVerificationInput(
                 scenes, sceneStyleFrameReported,
                 sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+            // Inject only results readiness. Confirmation, reset, room changes,
+            // resource reuse and subsequent gameplay take the production path.
+            if (scenes.scene() == AmigaScene::gameplay && port.tick() == 12 &&
+                gDownwellResultsRestartCount < 3) {
+                auto& results = const_cast<downwell::DeathResults&>(port.deathResults());
+                results = {};
+                results.open(true, 0, 0);
+                results.menu.sequenceOver = true;
+                results.menu.visible[5] = true;
+                results.menu.cursor = gDownwellResultsRestartCount;
+                liveInput = {};
+            } else if (scenes.scene() == AmigaScene::gameplay && port.tick() == 13 &&
+                       gDownwellResultsRestartCount < 3) {
+                // Present the overlay for a full frame before confirmation.
+                liveInput = {};
+                liveInput.fire = true;
+            }
+#endif
 #else
             downwell::Input liveInput = AmigaInput::sample();
 #ifdef DOWNWELL_PROFILE_AUTORUN
@@ -1735,12 +1763,14 @@ int main(void) {
 #endif
             packedInput = downwell::packReplayInput(liveInput);
             DW_PROFILE_PHASE(profileSimulation);
-            scenes.step(liveInput);
+            if (!sceneResetRequested) scenes.step(liveInput);
             DW_PROFILE_PHASE(profileOther);
             {
                 const bool presentationChanged =
+                    sceneResetRequested ||
                     scenes.scene() != presentedScene ||
                     scenes.splashStage() != presentedSplash;
+                sceneResetRequested = false;
                 const AmigaScene priorPresentedScene = presentedScene;
                 const bool splashDitherChanged =
                     scenes.splashDitherFrame() != presentedSplashDither;
@@ -1865,6 +1895,51 @@ int main(void) {
                     splashBlankList.finish();
                     platform.publish(splashBlankList);
                     platform.waitVblank();
+                    if (newRunWorldPending) {
+                        AmigaHardware::blitterDrain();
+                        amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
+                        terrainTiles.clear();
+                        terrainCollision.fragmentCount = 0;
+                        bool roomReady = true;
+                        for (unsigned i = 0; i < mainRoom.instanceCount; ++i) {
+                            downwell::PackedRoomInstance instance;
+                            if (!rooms.roomInstance(mainRoom, i, instance) ||
+                                (instance.objectId == 60 && !amigaAddTerrainObject(
+                                    terrainIndex, 60, instance.x, instance.y, true))) {
+                                roomReady = false;
+                                break;
+                            }
+                        }
+                        if (!roomReady) break;
+                        enemyRandom.setSeed(newRunSeed);
+                        liveBuilder.resetRoom(-16, 704, enemyRandom);
+                        liveBuilder.setCreateObserver(appendGeneratedTerrain, &liveGeneration);
+                        liveGeneration.dirtyFirst = terrainRasterRows;
+                        liveGeneration.dirtyEnd = 0;
+                        port.configureEnemyRandom(enemyRandom);
+                        port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
+                        port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
+                        port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision);
+                        port.confirmFirstStage();
+                        terrainRasterReady = false;
+                        terrainCopyTarget = nullptr;
+                        terrainCopyBacking = nullptr;
+                        stagedBuffer = memory.menuForeground();
+                        for (unsigned buffer = 0; buffer < 2; ++buffer) {
+                            gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
+                            gameRingInitialized[buffer] = false;
+                            gameRowsPending[buffer] = false;
+                            gameDirtyFirst[buffer] = downwellGameRingHeight;
+                            gameDirtyEnd[buffer] = 0;
+                            gameListReady[buffer] = false;
+                        }
+                        for (unsigned row = 0; row < downwellGameRingHeight; ++row) gameDirtyRows[row] = 3;
+                        worldViewX = mainViewX + port.cameraOffsetX();
+                        worldViewY = mainInitialViewY + port.cameraOffsetY();
+                        stagedViewX = -10000;
+                        stagedFirst = stagedEnd = 0;
+                        newRunWorldPending = false;
+                    }
                     const unsigned hudBytes = amiga_hud_pack_end - amiga_hud_pack;
                     const auto storage = GameplaySceneStorage::partition(
                         menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
@@ -2178,6 +2253,24 @@ int main(void) {
             const bool wasDead = port.dead();
             const AmigaPortFrame result = port.step(packedInput);
             if (!port.generationSucceeded()) break;
+#ifndef DOWNWELL_REPLAY_VERIFY
+            const auto resultsAction = port.deathResults().inputEffects.action;
+            if (resultsAction != downwell::DeathMenuSequence::Action::None) {
+                // An entropy boundary, separate from the gameplay RNG stream.
+                // Frame timing supplies a live seed; fixtures call reset with explicit seeds.
+                newRunSeed = liveFrameCount;
+                const auto destination = port.restartFromResults(resultsAction, newRunSeed, initialRingOrigin);
+                if (!scenes.enterResultsDestination(destination)) break;
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+                gDownwellResultsRestartMask |= 1u << (static_cast<unsigned>(resultsAction) - 1);
+                ++gDownwellResultsRestartCount;
+#endif
+                newRunWorldPending = true;
+                sceneResetRequested = true;
+                resultsWasActive = false;
+                continue;
+            }
+#endif
             DW_PROFILE_PHASE(profileTitle);
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
@@ -2199,11 +2292,20 @@ int main(void) {
             if ((result.streakChanged || wasDead != port.dead()) && !port.deathResults().active)
                 redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
             if (port.deathResults().active) {
-                const bool backdropChanged = redrawResultsBackdrop(&renderer, port);
+                const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
+#ifndef DOWNWELL_REPLAY_VERIFY
+                    !resultsWasActive
+#else
+                    false
+#endif
+                );
                 redrawResultsRows(&renderer, port, backdropChanged);
                 redrawResultsProgress(&renderer, port.deathResults(), backdropChanged);
                 redrawResultsChoices(&renderer, port, backdropChanged);
             }
+#ifndef DOWNWELL_REPLAY_VERIFY
+            resultsWasActive = port.deathResults().active;
+#endif
         }
         {
             const unsigned back = front ^ 1u;
@@ -2526,6 +2628,12 @@ int main(void) {
             /* AmigaPlatform makes the published list live at next VBlank. */
             DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayCopperLists[back]);
+#ifdef DOWNWELL_RESULTS_RESTART_VERIFY
+            if (gDownwellResultsRestartCount == 3 && port.tick() == 200) {
+                platform.waitVblank();
+                downwellResultsRestartReady();
+            }
+#endif
             DW_PROFILE_PHASE(profileOther);
             front = back;
 #ifdef DOWNWELL_SCENE_VERIFY

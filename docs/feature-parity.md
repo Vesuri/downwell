@@ -9,6 +9,46 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Live results actions and native world reentry
+
+Game now consumes the shared results action after its simulation update, using
+an explicitly supplied restart seed (fixed by default for replay callers;
+the SDL frontend supplies its performance-counter value). The native frontend
+likewise consumes the action, with its live frame counter supplying a seed,
+recreates the runtime and enters the chosen scene. These are entropy sources,
+not claims to reproduce the Windows runner's exact randomize seed algorithm.
+
+Native gameplay entry after a restart clears and rebuilds the terrain index,
+uses fresh shared builder initialization, rebinds collision/generation callbacks,
+restores the two display-ring pointers and staging pointer, and invalidates
+terrain/copper caches before publishing. This includes undoing side-room buffer
+swaps. Gameplay DMA is retired before reused Chip memory is overwritten. First
+stage confirmation advances the shared stage after a Style Select return.
+Results cache invalidation also recognizes a newly opened results screen, even
+when its fields happen to match the preceding run's final values.
+
+Host dispatch fixtures cover all three choices and held-confirmation behavior.
+An additional full Game tape waits for the entrance landing, approaches right
+for 600 updates and then runs the combat input cycle until actual fatal damage.
+It waits through results and confirms Retry, requiring restored health, zero
+run time and retained lifetime records; it also accepts the source's same-press
+unlock acknowledgement plus confirmation path. No death/results state is
+injected in this tape.
+The dedicated `verify-amiga-results-restart` gate injects results readiness,
+then drives real confirmation and all three production transitions, including
+returning through the garden and style selection to 200 gameplay updates. It
+checks the stack guard and existing terrain, buffer, style and copper oracles.
+It does not inject a claimed natural death or prove Windows visual parity.
+Original garden RNG/pose diversity, full save-file reload, audio reset and exact
+GameMaker event-boundary timing still need fidelity work; the source defaults
+and in-memory records are the implemented subset.
+Validation: the final full host suite, including the natural-death fixture,
+passes in the normal debug build (also checked separately with optimization). The bounded A500
+results-reentry gate passes with every overlay presented before confirmation,
+all three destinations visited and 200 updates of final gameplay. The ordinary
+scene gate and unchanged cross-target replay also pass, with clean 68000 audits.
+Normal SDL and Amiga executables are restored.
+
 ### Runtime recreation for results destinations
 
 Both runtimes expose `restartFromResults` with an explicit RNG seed. The
