@@ -556,8 +556,9 @@ void StartupRuntime::updateMainBullets() {
             return false;
           });
         bullet.y = static_cast<float>(nextY);
-        if (bullet.y > mainCameraViewY() + surfaceHeight + 32.0F ||
-            bullet.y < mainCameraViewY() - 100.0F)
+        if (standardBulletOutsideView(static_cast<long>(nextY) * 4096,
+                                      mainCameraMotion_.y - surfaceHeight / 2L * 4096,
+                                      surfaceHeight))
             alive = false;
         if (alive)
             mainBullets_[write++] = bullet;

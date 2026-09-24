@@ -7,6 +7,17 @@ static void require(bool value, const char* message) {
 }
 
 int main() {
+    using downwell::standardBulletOutsideView;
+    const long top = 34L * 4096;
+    require(!standardBulletOutsideView(top - 100L * 4096, top) &&
+            !standardBulletOutsideView(top + 316L * 4096, top),
+            "source keeps bullets exactly on both expiry boundaries");
+    require(standardBulletOutsideView(top - 100L * 4096 - 1, top) &&
+            standardBulletOutsideView(top + 316L * 4096 + 1, top),
+            "one fractional unit beyond either boundary expires bullet");
+    require(!standardBulletOutsideView(350L * 4096, top + 1) &&
+            standardBulletOutsideView(350L * 4096, top - 1),
+            "expiry follows fractional camera rather than integer DMA position");
     using downwell::StandardBulletPath;
     using downwell::stepStandardBullet;
     int y = 10, enemies = 0, walls = 0;

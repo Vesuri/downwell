@@ -23,7 +23,7 @@ Frame-rate figures from earlier forecast builds must also be remeasured.
 | Publisher, credits, controls, garden, well, style select | Native implementations and decoded scene comparison tests | Full-sequence display regression after gameplay changes |
 | Player, camera, landing, jumping, gunboots | Shared player and default main-room camera; SDL/native comparison through entrance and scrolling | Special camera modes and original event timing; longer combat tapes; position checks still allow tolerances |
 | Area-one geometry and endings | Shared live builder, emitted-object collision/rendering, terrain cache oracle | Live SDL replay comparison; side-room reversals and offscreen destruction coverage |
-| Bullets and gems | Shared usual-bullet segment arbitration, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet masks, spread, collision-event scheduling and expiry; source bounce/terrain semantics and dense encounters |
+| Bullets and gems | Shared usual-bullet segment arbitration and fractional-camera expiry, currency motion/lifetime/animation and source collection masks; 400-update gem CPU fixture | Bullet masks, spread and collision-event scheduling; source bounce/terrain semantics and dense encounters |
 | Actor presentation | Offline hardware sprites plus masked planar overflow; no actor discarded just because DMA slots are full | Overlap/draw-order comparison with SDL; broader crowded-scene timing |
 | Enemies and rewards | Initial live tape plus 600-update combat continuation; matching health, kills, currency and player presentation | Gem trajectories, ordering and broader actor states remain unverified |
 | HUD | Health, ammo, currency and streak implementations | State-driven image comparisons for damage, depletion and streak expiry |
@@ -50,7 +50,7 @@ both segment endpoints.
 This does not recover the entire bullet system. Both adapters still apply
 enemy damage directly during the sweep rather than reproducing the original
 collision-event phase. Their provisional enemy boxes, wall selection/storage,
-impact-position handling and offscreen expiry remain to be consolidated and
+impact-position handling remain to be consolidated and
 validated; angled spread, other guns and piercing are outside this helper.
 
 Validation after this extraction: full host suite (including the 600-update
@@ -59,6 +59,15 @@ replay all pass. Replay remains `64 9f0d3943 e7900d2b` with the separate
 400-update gem digest `9543220e d0d8e596` and coverage `3f`. Normal SDL and
 Amiga builds were restored; both 68000 audits are clean. These fixtures do not
 prove complete bullet-event fidelity to Windows.
+
+Bullet expiry now also uses one shared Q12 rule. The bytecode for
+`scrBulletOov` compares strictly above `viewY + viewHeight + 32` and below
+`viewY - 100`; equality survives. Amiga previously used `>=` against the
+rounded display offset and omitted the upper-screen check. Both runtimes now
+use the authoritative fractional camera state, independent of DMA scrolling.
+Tests cover equality, one fractional unit outside, and a subpixel camera
+change across an integer bullet coordinate. End Step scheduling remains part
+of the wider event-order consolidation, not proven by this helper.
 
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600

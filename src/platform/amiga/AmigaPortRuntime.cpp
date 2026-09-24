@@ -534,7 +534,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     }
                     return false;
                 });
-            if (bullet.y >= cameraPixelY_ + bulletBottom)
+            const long cameraCentreQ12 = followCamera_ ? cameraMotion_.y
+                : 176L * 4096 + cameraY_ * 16;
+            if (downwell::standardBulletOutsideView((bullet.y + 176L) * 4096,
+                                                    cameraCentreQ12 - 142L * 4096))
                 bullet.active = false;
         }
     }

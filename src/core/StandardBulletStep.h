@@ -2,6 +2,14 @@
 #define DOWNWELL_CORE_STANDARD_BULLET_STEP_H
 
 namespace downwell {
+// scrBulletOov uses strict comparisons to the fractional view position.
+// Keep this independent of the renderer's rounded bitplane/camera offset.
+inline bool standardBulletOutsideView(long yQ12, long viewTopQ12,
+                                     int viewHeight = 284) {
+    return yQ12 > viewTopQ12 + (viewHeight + 32L) * 4096L ||
+           yQ12 < viewTopQ12 - 100L * 4096L;
+}
+
 // Vertical usual-gun subset. scrBulCheckSolid suppresses wall processing
 // when the complete motion segment intersects an enemy. Spread, other guns
 // and exact enemy collision-event scheduling remain separate work. The

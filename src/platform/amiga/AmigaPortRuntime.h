@@ -43,8 +43,6 @@ public:
     static constexpr unsigned destroyedCapacity = amigaPortDestroyedCapacity;
     static constexpr unsigned enemyCapacity = amigaPortEnemyCapacity;
     static constexpr unsigned gemCapacity = amigaPortGemCapacity;
-    /* Player-relative Y at the recovered 284-pixel view bottom plus 32. */
-    static constexpr int bulletBottom = 174;
     typedef bool (*SolidResolver)(void* context, int x, int y);
     // Called once after existing alarms and camera Step, before bullets and
     // enemy motion. Receives the shared RNG and ceil(world-space view bottom).
