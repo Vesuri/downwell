@@ -160,8 +160,8 @@ eligibility, duplicate rejection, 61 rejected rolls per slot, fallback 100 in
 the first three slots, and the source's unchanged fourth slot on exhaustion.
 Focused tests cover exhausted/single-candidate pools, final-attempt acceptance,
 and 256 seeded comparisons of offered IDs plus full runner RNG state. This
-component is not yet connected to a live level-clear menu or an upgrade
-inventory; selecting and applying upgrades, room rendering and progression
+component is not yet connected to a live level-clear menu; selecting upgrades,
+room rendering and progression
 remain work. It does not restrict the original upgrade pool to implemented
 effects merely to make a menu usable.
 
@@ -173,8 +173,20 @@ the 30-update departure alarm, followed by the source 90-update dither wait.
 Tests exercise held confirm, simultaneous direction edges, additional awards,
 zero-upgrade departure, event ordering and complete alarm timing. This is not
 yet wired into either runtime's room loading. Original heart-goal application,
-upgrade inventory/effects, presentation easing and result-room rendering remain
+ongoing upgrade effects, presentation easing and result-room rendering remain
 required; the selection model does not replace them with direct stage advance.
+
+RunSession now owns a shared UpgradeInventory, reset at new-run boundaries.
+Normal IDs 0..22 retain source caps: 2, 19 and 21 have cap zero; the other twenty
+have cap one. Grants retain one-based acquisition order, duplicate currency
+refunds, immediate Youth/Apple healing (also after a refund), Super Charge's
+charge/refill, and Fortune's direct currency/gameGem award without pickup streak
+side effects. IDs 100..105 still queue the existing consumables. Both runtime
+adapters expose this same grant path. Focused tests cover caps, refunds,
+overflow healing and exhausted offers; paired fixtures compare native/host
+grants and host rendering tests check reset. Persistent combat modifiers,
+effects/sound playback and the live level-clear menu are not implemented by
+inventory ownership alone and remain open.
 
 ## Still open beyond that milestone
 

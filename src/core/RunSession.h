@@ -13,6 +13,7 @@
 #include "LevelExit.h"
 #include "GoalTimeField.h"
 #include "ExitDither.h"
+#include "UpgradeInventory.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -35,6 +36,7 @@ struct RunSession {
     AmmoHudMotion ammoHud;
     AmmoGaugeRows ammoGauge;
     Consumables consumables;
+    UpgradeInventory upgrades;
     ShopWorld shops;
     LevelExit levelExit;
     GoalTimeField goalField;
@@ -86,6 +88,7 @@ struct RunSession {
         ammoHud = {};
         ammoGauge = {};
         consumables = {};
+        upgrades = {};
         shops = {};
         levelExit = {};
         goalField = {};

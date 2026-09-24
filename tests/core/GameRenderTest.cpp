@@ -131,6 +131,9 @@ int main() {
     session.results.open(true, 123, 123);
     session.results.previous.fire = true;
     session.consumables.pending[0] = 2;
+    session.upgrades.levels[6] = 1;
+    session.upgrades.order[1] = 6;
+    session.upgrades.count = 1;
     const auto saved = session.records();
     session.reset(saved);
     require(!session.levelExitPresent && !session.levelExit.active &&
@@ -149,6 +152,8 @@ int main() {
         !session.results.active && !session.results.previous.fire,
         "new run clears upgrades, pending effects and results input history");
     require(session.consumables.pending[0] == 0, "new run discards unconsumed purchases");
+    require(session.upgrades.count == 0 && session.upgrades.levels[6] == 0 &&
+        session.upgrades.order[1] == 0, "new run clears upgrade ownership and acquisition order");
     require(session.gems.observeDeathMovement(true, 7) &&
         !session.gems.observeDeathMovement(true, 7) && session.gems.lifetime == 130,
         "next run death adds its own gems exactly once");

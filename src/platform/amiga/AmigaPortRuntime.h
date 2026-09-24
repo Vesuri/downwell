@@ -210,6 +210,11 @@ public:
     std::uint32_t runTimeTicks() const { return run_.clock.ticks; }
     const downwell::RunCombo& runCombo() const { return run_.combo; }
     bool grantConsumable(unsigned id) { return run_.consumables.grant(id, currencyAccount_); }
+    bool grantUpgrade(unsigned id) {
+        return run_.upgrades.grant(id, run_.consumables, currencyAccount_,
+            player_, health_, run_.combo.healthReserve);
+    }
+    const downwell::UpgradeInventory& upgrades() const { return run_.upgrades; }
     const downwell::Consumables& consumables() const { return run_.consumables; }
     downwell::ShopWorld::Instance* registerShop(int x, int y) {
         return run_.shops.create(x, y, [this](unsigned lo, unsigned hi) {

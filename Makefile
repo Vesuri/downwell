@@ -223,6 +223,13 @@ test: test-shop-interaction test-shop-menu-layout
 test: test-level-exit
 test: test-level-upgrade-offers
 test: test-level-clear-selection
+test: test-upgrade-inventory
+.PHONY: test-upgrade-inventory
+build/upgrade-inventory-test: tests/core/UpgradeInventoryTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/UpgradeInventoryTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp
+test-upgrade-inventory: build/upgrade-inventory-test
+	./build/upgrade-inventory-test
 .PHONY: test-level-clear-selection
 build/level-clear-selection-test: tests/core/LevelClearSelectionTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

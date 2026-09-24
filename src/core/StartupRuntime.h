@@ -163,6 +163,11 @@ public:
     std::uint32_t runTimeTicks() const { return run_.clock.ticks; }
     const RunCombo& runCombo() const { return run_.combo; }
     bool grantConsumable(unsigned id) { return run_.consumables.grant(id, currencyAccount_); }
+    bool grantUpgrade(unsigned id) {
+        return run_.upgrades.grant(id, run_.consumables, currencyAccount_,
+            mainPlayerMotion_, mainPlayerHealth_, run_.combo.healthReserve);
+    }
+    const UpgradeInventory& upgrades() const { return run_.upgrades; }
     const Consumables& consumables() const { return run_.consumables; }
     ShopWorld::Instance* registerShop(int x, int y) {
         return run_.shops.create(x, y, [this](unsigned lo, unsigned hi) {

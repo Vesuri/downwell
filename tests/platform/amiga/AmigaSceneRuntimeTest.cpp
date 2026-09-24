@@ -886,6 +886,16 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(a.soundRequested == (tick >= 20),
                 "exit dither sound follows fifteen alarm phases after tick-five creation");
         }
+        for (unsigned id : {6u, 6u, 13u, 19u, 21u, 100u}) {
+            require(gameplay.grantUpgrade(id) && reference.grantUpgrade(id), "shared upgrade grant accepted");
+            require(gameplay.health() == reference.mainPlayerHealth() &&
+                gameplay.healthMaximum() == reference.mainPlayerHealthMaximum() &&
+                gameplay.player().ammoCapacity() == reference.mainAmmoCapacity() &&
+                gameplay.currency() == reference.mainCurrencyTotal() &&
+                gameplay.upgrades().count == reference.upgrades().count &&
+                gameplay.consumables().pending[0] == reference.consumables().pending[0],
+                "both runtime adapters apply identical grants, refunds and deferred consumables");
+        }
         return;
     }
     require(gameplay.player().spriteId(gameplay.deathSequence().movementDead()) == reference.mainPlayerSpriteId() &&
