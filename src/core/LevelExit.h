@@ -1,0 +1,39 @@
+#ifndef DOWNWELL_CORE_LEVEL_EXIT_H
+#define DOWNWELL_CORE_LEVEL_EXIT_H
+#include "AlarmBank.h"
+namespace downwell {
+// objLineToResult inherits objLineToMain Create. Child creation callbacks
+// must execute synchronously (their Create events may consume shared RNG).
+struct LevelExit {
+    enum class Effect { roomEndSetter, goalTimeField, ditherTransition, resultRoom };
+    int x = 0, y = 0;
+    int alarm0 = -1, alarm1 = -1;
+    bool active = false;
+    template<class Emit>
+    void create(int roomWidth, int positionY, Emit emit) {
+        *this = LevelExit{};
+        x = roomWidth / 2; y = positionY;
+        emit(Effect::roomEndSetter, x, y);
+        emit(Effect::goalTimeField, x, y + 32);
+    }
+    bool collide(bool dead, bool& goalStop, bool& noControl) {
+        if (dead || active) return false;
+        alarm0 = 5;
+        goalStop = noControl = active = true;
+        return true;
+    }
+    // Call in the alarm phase, before that frame's collisions. Newly armed
+    // alarms are not decremented again during the same dispatch.
+    template<class Emit>
+    void advanceAlarms(Emit emit) {
+        const bool first = AlarmBank::advanceValue(alarm0);
+        const bool second = AlarmBank::advanceValue(alarm1);
+        if (first) {
+            emit(Effect::ditherTransition, 0, 0);
+            alarm1 = 90;
+        }
+        if (second) emit(Effect::resultRoom, 0, 0);
+    }
+};
+}
+#endif

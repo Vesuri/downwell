@@ -69,6 +69,17 @@ later calls scrNextLevel(0). The trigger's Create also creates goalTimeField at
 y+32. These events and their required result/upgrade behavior remain unported.
 Stage advancement alone would skip visible behavior and RNG-consuming events.
 
+`LevelExit.h` now models inherited/derived child creation order, the guarded
+collision latch and both alarm events. Its focused test checks trigger anchors,
+dead-player exclusion, repeated collisions, fifth-tick dither creation and
+result-room request ninety further alarm phases later. It is not connected to
+live collision/room loading yet; child Create behavior and the playable result
+room remain prerequisites. Alarm requests alone are not a completed level exit.
+
+The resource audit also found objLineToResult (306) and its parent marked
+Visible=false. Current generated-decoration drawing still maps 306 to sprite
+127; remove that debug-like presentation when integrating the actual trigger.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
