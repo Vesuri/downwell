@@ -35,7 +35,8 @@ public:
         composition.blitterEnabled = 0;
         renderer = &composition;
         lastWordWrites = 0;
-        const bool retainEdges = damage_.valid && damage_.meter == meter && !forceFull;
+        const bool retainEdges = damage_.valid && !previousWideClear_ && !forceFull;
+        const unsigned previousMeter = damage_.meter;
         const bool initialize = !damage_.valid;
         const unsigned previousAmmo = damage_.ammo, previousOffset = damage_.offset;
         damage_.update(ammo, capacity, offset, meter, rows);
@@ -52,17 +53,21 @@ public:
             amigaRendererFillRect(renderer, 272, 0, 48, 284, 0);
             amigaRendererDrawAsset(renderer, pack, end, 416, 1, 284, 43, 0);
             amigaRendererCacheHudColumns(rim_, working_, 17, 3);
-            // Find the long, black interior with a transparent foreground rim.
-            // Derive this from the cached original artwork, not assumed bounds.
+            // Find a vertically constant span of the complete background and
+            // rim, with black interior and no rim pixels in the row-art column.
+            // Its sides stay unchanged even when the gauge jiggles vertically.
             bodyTop_ = bodyBottom_ = 0;
             int start = 0;
             for (int y = 0; y <= downwellDisplayHeight; ++y) {
                 const bool interior = y < downwellDisplayHeight &&
                     (background_[y*6+1] & background_[y*6+4] & 0xfff0u) == 0xfff0u &&
                     !((rim_[y*6+1] | rim_[y*6+4]) & 0xfff0u);
-                if (!interior) {
-                    if (y-start > bodyBottom_-bodyTop_) { bodyTop_ = start; bodyBottom_ = y; }
-                    start = y+1;
+                if (!interior) start = y+1;
+                else {
+                    if (y > start) for (unsigned word = 0; word < 6; ++word)
+                        if (background_[y*6+word] != background_[(y-1)*6+word] ||
+                            rim_[y*6+word] != rim_[(y-1)*6+word]) { start = y; break; }
+                    if (y+1-start > bodyBottom_-bodyTop_) { bodyTop_ = start; bodyBottom_ = y+1; }
                 }
             }
         }
@@ -173,10 +178,13 @@ public:
             DW_PROFILE_PHASE(profileAmmoBase);
         };
         auto strip = [&](int top, int bottom) {
-            if (retainEdges && clearDigits == 1 && bottom > bodyTop_ + static_cast<int>(meter) &&
-                top < bodyBottom_ + static_cast<int>(meter)) {
-                const int begin = top > bodyTop_+static_cast<int>(meter) ? top : bodyTop_+meter;
-                const int end = bottom < bodyBottom_+static_cast<int>(meter) ? bottom : bodyBottom_+meter;
+            // Only the overlap of old/new constant spans has stationary sides.
+            // Caps and the number still follow the original displaced artwork.
+            const int stableTop = bodyTop_ + (meter > previousMeter ? meter : previousMeter);
+            const int stableBottom = bodyBottom_ + (meter < previousMeter ? meter : previousMeter);
+            if (retainEdges && clearDigits == 1 && bottom > stableTop && top < stableBottom && stableTop < stableBottom) {
+                const int begin = top > stableTop ? top : stableTop;
+                const int end = bottom < stableBottom ? bottom : stableBottom;
                 if (top < begin) paint(top, begin, false);
                 paint(begin, end, true);
                 if (end < bottom) paint(end, bottom, false);

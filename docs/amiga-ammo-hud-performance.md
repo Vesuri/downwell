@@ -158,3 +158,28 @@ cannot confound the row-only comparison. Evidence is in
 `/tmp/downwell-hud-rowdamage-profile.log`; the restored implementation passes
 `/tmp/downwell-hud-row-transitions.log`. Future work should target compositing
 and publication costs, not add another per-row damage lookup.
+
+## Retain constant sides during gauge jiggle
+
+Previously any change to the meter's vertical offset disabled retained sides
+for the whole strip. Cache preparation now finds the longest vertically
+constant span of the **complete** background and rim columns, with black
+interior and transparent rim in the animated-row column. The intersection
+of this span at the old and new offsets has identical side pixels; only its
+interior needs recomposition. Caps, labels, newly exposed edges and pending
+wide-label backing repairs keep the full path. Nothing is inferred from
+assumed artwork dimensions, and no simulation/palette/scroll behavior changes.
+
+On the same 600-update probe tape, fields fall from 1,179 to 1,147. HUD phases
+are 1,163.464 + 689.702 + 504.856 + 698.458 = 3,056.480 ms, down 17.8%:
+5.09 ms per game update, or approximately 21.99 ms per actual HUD update.
+This still does not establish a 20 ms game frame. There is no new buffer or
+per-row damage table. Tests compare every pair of the four meter offsets at
+each ammo count 0..8 against complete reconstruction, alongside the existing
+multi-capacity/label and isolated-row tests. Sanitizers pass. Evidence logs
+use the `/tmp/downwell-hud-jiggle-` prefix.
+The separate FPSCOUNT-only measurement is 600 updates in 940 fields:
+**31.91 FPS**, maximum gap six fields, versus 980 fields before this change.
+Native shot and recharge captures both remain pixel-identical to SDL
+(0/99,968 differences), and both 68000 audits pass. The verification workflow
+restores the ordinary non-skip build after the bounded emulator runs.

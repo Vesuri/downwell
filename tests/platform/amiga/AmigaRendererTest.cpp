@@ -520,6 +520,17 @@ int main(int argc, char** argv) {
                     }
                     require(actualHud == expectedHud, "isolated row damage matches full redraw");
                 }
+        for (unsigned ammo = 0; ammo <= 8; ++ammo)
+            for (unsigned from = 0; from < 4; ++from)
+                for (unsigned to = 0; to < 4; ++to) {
+                    rows.step(ammo, 8);
+                    retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(), ammo, 8, 0, &rows, from);
+                    fullRedraw(ammo, 8, 0, from);
+                    require(actualHud == expectedHud, "gauge jiggle starting image");
+                    retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(), ammo, 8, 0, &rows, to);
+                    fullRedraw(ammo, 8, 0, to);
+                    require(actualHud == expectedHud, "all gauge jiggle pairs preserve full reconstruction");
+                }
     }
     amigaRendererClearClipRect(&actualRenderer);
     amigaRendererClearClipRect(&expectedRenderer);
