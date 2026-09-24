@@ -415,3 +415,27 @@ These are unresolved migration targets, not reasons to pick one port as oracle.
 Default host tests and combat counters pass unchanged. Bounded 68000 replay
 and A500 terrain-cache checks pass; normal target build and clean 68000 audits
 are restored. Full frog physics consolidation remains unfinished.
+
+## Frog landing remainder and leading edges
+
+The tick-478 trace exposed an inconsistency in the previous correction:
+native landing advanced preciseY by whole pixels, preserving a fractional
+position, but cleared its fifth-Q8 remainder. SDL retained that fraction.
+The provisional native landing now preserves both components. It must clear
+the remainder only when a future source-mask resolver actually snaps Y.
+This repairs internal arithmetic; it does not claim that the provisional
+fractional landing position is the original runner's correct contact position.
+
+The next strict divergence was tick 518: native's seven-pixel left probe
+rebounded before the source frog rectangle touched the wall. Both adapters
+now derive their side probe from the recovered fixed mask: -6 on the left,
++5 on the right (the right edge is exclusive). Fixtures check one-pixel
+clearance in each direction and persistence of the full resting Y position.
+
+The strict combat diagnostic now first fails at tick 521: native X=-16588
+versus SDL X=-16589 Q8 units after rebound, with matching normalized velocity
+and Y. Native still represents rebound speed with -(xsp*77)/256 instead of
+the source -0.3 and lacks horizontal sub-Q8 accumulation. This is the next
+numerical migration target; the strict diagnostic remains unresolved.
+DOWNWELL_TRACE_FROG_MOTION=1 (with the strict diagnostic enabled) prints raw
+landing/jump state from tick 474 onward for reproducing this audit.

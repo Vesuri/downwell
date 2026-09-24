@@ -213,6 +213,14 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         require(ordinal < amiga.enemyCount(), "frog diagnostic retains creation-order pairing");
         const auto& native = amiga.enemyAt(ordinal++);
         if (enemy.objectId != 113 || !enemy.active || !native.active) continue;
+        if (std::getenv("DOWNWELL_TRACE_FROG_MOTION") && amiga.tick() >= 474)
+            std::cerr << "FROG RAW tick=" << amiga.tick()
+                      << " nativeY=" << native.preciseY << '+' << unsigned(native.gravityPositionRemainder) << "/5"
+                      << " nativeVY=" << native.speedY << '+' << unsigned(native.gravityRemainder) << "/5"
+                      << " SDL Y=" << (enemy.preciseY - 176.0F) * 256.0F
+                      << " VY=" << enemy.velocityY * 256.0F
+                      << " ground=" << native.grounded << ',' << enemy.grounded
+                      << " alarm=" << native.alarm0 << ',' << enemy.alarms.get(0) << '\n';
         require(native.objectId == 113, "frog diagnostic pairs the same object type");
         const long referenceX = static_cast<long>(std::round((enemy.preciseX - 240.0F) * 256.0F));
         const long referenceY = static_cast<long>(std::round((enemy.preciseY - 176.0F) * 256.0F));

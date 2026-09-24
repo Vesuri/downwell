@@ -689,7 +689,8 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.preciseY = nextY;
                 enemy.grounded = false;
                 const float nextX = enemy.preciseX + enemy.velocityX;
-                if (mainSolidAt(nextX + (enemy.velocityX < 0 ? -6.0F : 6.0F),
+                const auto mask = contactSpriteBounds(166);
+                if (mainSolidAt(nextX + (enemy.velocityX < 0 ? mask.left : mask.right - 1),
                                 enemy.preciseY))
                     enemy.velocityX *= -0.3F;
                 else

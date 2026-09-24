@@ -411,6 +411,32 @@ int main() {
             "terminal velocity clears gravity remainder rather than accumulating hidden speed");
 
     AmigaPortRuntime unsupportedFrog(300);
+    AmigaPortRuntime fractionalLanding(300);
+    for (int direction : {-1, 1}) {
+        AmigaPortRuntime edgeProbe(300);
+        edgeProbe.configureSolidResolver([](void* opaque, int x, int) {
+            return *static_cast<int*>(opaque) < 0 ? x <= -9 : x >= 8;
+        }, &direction);
+        require(edgeProbe.configureEnemy(0, 113, 166, 0, 40,
+                    direction * 512, 0, 35, 20, 0, 0, -1, -1),
+                "configure frog one pixel away from a side wall after movement");
+        edgeProbe.step(0);
+        require(edgeProbe.enemyAt(0).preciseX == direction * 512 &&
+                    edgeProbe.enemyAt(0).speedX == direction * 512,
+                "recovered frog leading edge does not rebound one pixel before contact");
+    }
+    fractionalLanding.configureSolidResolver(flatGround, nullptr);
+    require(fractionalLanding.configureEnemy(0, 113, 166, 40, 0,
+                0, 0, 35, 20, 0, 0, -1, -1), "configure fractional frog landing");
+    for (unsigned i = 0; i < 4; ++i) fractionalLanding.step(0);
+    require(fractionalLanding.enemyAt(0).grounded &&
+                fractionalLanding.enemyAt(0).gravityPositionRemainder == 2,
+            "whole-pixel provisional landing movement preserves the position fraction");
+    const long restingY = fractionalLanding.enemyAt(0).preciseY;
+    fractionalLanding.step(0);
+    require(fractionalLanding.enemyAt(0).preciseY == restingY &&
+                fractionalLanding.enemyAt(0).gravityPositionRemainder == 2,
+            "resting on support preserves complete position, not just Q8 whole");
     unsupportedFrog.configureSolidResolver(flatGround, nullptr);
     require(unsupportedFrog.configureEnemy(0, 113, 171, 40, 1,
                 0, 0, 35, 20, 0, 0, -1, 60), "configure frog on removable support");

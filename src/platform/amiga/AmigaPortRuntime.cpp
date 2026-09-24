@@ -646,7 +646,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.direction = bat.direction;
             enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         } else if (enemy.objectId == 113) {
-            enum { halfWidth = 7, foot = 8 };
+            enum { foot = 8 };
+            const auto mask = downwell::contactSpriteBounds(166);
             // Ground support is queried every Step in the recovered frog
             // logic. A remembered landing cannot hold it over a destroyed
             // block until its jump alarm fires.
@@ -669,7 +670,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 }
                 const int nextX = (int)downwell::floorQ8Coordinate(enemy.preciseX + enemy.speedX);
                 const int edge = nextX +
-                    (enemy.speedX < 0 ? -halfWidth : halfWidth);
+                    (enemy.speedX < 0 ? mask.left : mask.right - 1);
                 if (solidResolver_(solidResolverContext_, edge,
                         (int)downwell::floorQ8Coordinate(enemy.preciseY)))
                     enemy.speedX = -(enemy.speedX * 77L) / 256L;
@@ -686,7 +687,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     enemy.speedY = 0;
                     enemy.grounded = true;
                     enemy.gravityRemainder = 0;
-                    enemy.gravityPositionRemainder = 0;
+                    // This provisional resolver only adds whole pixels to
+                    // preciseY; it does not snap its fraction. Preserve that
+                    // fraction too until source-mask collision replaces it.
                 } else {
                     downwell::integrateFifthsQ8(enemy.preciseY,
                         enemy.gravityPositionRemainder, enemy.speedY, enemy.gravityRemainder);
