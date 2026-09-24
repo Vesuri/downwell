@@ -196,6 +196,19 @@ void PlatformSDL::drawSpriteTransformed(std::int32_t spriteId,
     const float top = static_cast<float>(item.targetY - sprite.originY);
     const float right = left + static_cast<float>(item.targetWidth);
     const float bottom = top + static_cast<float>(item.targetHeight);
+    if ((spriteId == 458 || spriteId == 459) && rotation >= 267 && rotation <= 273 &&
+            scaleX == 1 && scaleY == 1 && std::floor(x) == x && std::floor(y) == y) {
+        SDL_RendererInfo info{};
+        if (SDL_GetRendererInfo(renderer_, &info) == 0 && (info.flags & SDL_RENDERER_SOFTWARE)) {
+            // The offline generator checks the entire angular interval, all
+            // twelve source frames and every possible nearest-pixel sample:
+            // at integer anchors these pixels equal the 270-degree variant.
+            // Use that equivalent raster only for SDL's software backend,
+            // whose generic rotation path differs from the GPU's sampling.
+            // Keep the actual angle for GPU rendering and all other artwork.
+            rotation = 270;
+        }
+    }
     const float transformedLeft = std::min(left * scaleX, right * scaleX);
     const float transformedTop = std::min(top * scaleY, bottom * scaleY);
     const SDL_FRect destination{x + transformedLeft,

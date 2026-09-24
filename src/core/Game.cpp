@@ -316,7 +316,8 @@ void Game::renderMain(Renderer& renderer) const {
             startup_.mainBulletAt(index);
         renderer.drawSpriteTransformed(machineGunProfile(bullet.gemHigh).sprite, bullet.animation.frame(),
                             static_cast<int>(bullet.x - viewX),
-                            static_cast<int>(bullet.y - viewY), 1.0F, 1.0F, 270.0F);
+                            static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
+                            static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
     }
     for (std::size_t index = 0; index < startup_.mainCurrencyCount(); ++index) {
         const StartupRuntime::MainCurrencyState& gem =

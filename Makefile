@@ -607,6 +607,7 @@ verify-amiga-hud: generate-amiga-hud
 	tools/generate-amiga-hud.py --check
 
 generate-amiga-game:
+	python3 tests/projectile-art-test.py
 	tools/generate-amiga-hud.py --profile game
 
 .PHONY: generate-amiga-clear verify-amiga-clear
@@ -862,5 +863,18 @@ build/capture-sdl-landing: tools/capture-sdl-landing.cpp $(filter-out src/main.c
 build/capture-sdl-game: tools/capture-sdl-landing.cpp $(filter-out src/main.cpp,$(SOURCES)) $(HOST_CHECK_HEADERS) src/platform/sdl/PlatformSDL.h
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -DDOWNWELL_SKIP_TO_GAME -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
+
+build/capture-projectile-art: tools/capture-projectile-art.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
+
+.PHONY: verify-projectile-art
+test: verify-projectile-art
+verify-projectile-art: generate-sprite-pack build/capture-projectile-art
+	python3 tests/projectile-art-test.py
+	@mkdir -p captures
+	@capture_dir=$$(mktemp -d captures/projectile-art-XXXXXX); \
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-projectile-art "$$capture_dir" && \
+	python3 tests/projectile-raster-test.py "$$capture_dir"
 
 -include $(DEPS)

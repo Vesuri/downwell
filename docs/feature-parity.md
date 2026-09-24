@@ -9,6 +9,42 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Machine-gun artwork follows retained spread without new Amiga assets
+
+`Game` now passes each projectile's retained direction to the renderer rather
+than hard-coding 270 degrees. The render tape requires the exact converted
+angle for every live shot in creation order and actually exercises nonzero
+spread. The original VM's `bDir -> image_angle` assignment remains the source
+of this behavior; SDL is not its authority.
+
+All twelve recovered frames have identical nearest-pixel RGBA rasters across
+267..273 degrees at unit scale and integer anchors. The pack generator checks
+this conservatively: for every destination pixel it finds inverse-coordinate
+extrema at interval endpoints and stationary points, widens the bounds, then
+checks every source pixel in their Cartesian product. It checks outside the
+original canvas too. Source smooth filtering must be disabled, the canvas must
+be centred/square, and a changed pixel aborts generation instead of silently
+reusing the quarter-turn. Synthetic corner-pixel and unsupported-anchor tests
+verify rejection. Thus native rendering can keep its existing offline planar
+and DMA frames: game-pack bytes/hash and resident Chip cost are unchanged.
+
+Actual SDL software `RenderCopyEx` produced 48 differing gameplay pixels at
+non-cardinal angles; accelerated Metal rendering of the same state matched
+all 99,968 native pixels. Textured-quad software rendering was also different
+and was not retained. The software-only workaround uses the proven equivalent
+quarter-turn for these two resource IDs, this interval, unit scale and integer
+anchors only. GPU rendering retains the actual angle, as do all other transforms.
+`make verify-projectile-art` is part of `make test`: 180 actual transforms
+cover all twelve frames at fifteen angles. Software and an independent Metal
+run both match recovered source rasters; the powered gameplay capture also
+matches native after the workaround. The full host suite passes. The bounded
+native capture gate passes with zero differing pixels, clean 68000 audits,
+and the ordinary Amiga executable restored; the ordinary SDL build also passes.
+
+This is evidence for the current source-sized nearest-sampled machine gun,
+not a Windows GPU recording or a general solution for other weapons, scales,
+fractional drawing anchors or aim angles. Those must be verified separately.
+
 ### Fractional projectile direction reaches bat hit reactions
 
 Both live impact adapters now pass the retained projectile Q32 turn to the

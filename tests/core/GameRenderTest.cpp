@@ -55,14 +55,18 @@ public:
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
                                float sx, float sy, float angle) override {
         if (sprite == 458 || sprite == 459) {
-            require(sx == 1 && sy == 1 && angle == 270,
-                    "current downward bullets draw at the source firing angle");
+            require(sx == 1 && sy == 1 && angle >= 267 && angle <= 273,
+                    "machine-gun artwork follows the source spread range");
+            bulletAngles.push_back(angle);
+            spreadBulletDrawn |= angle != 270;
             ++bulletDraws;
         }
         if (sprite == targetPlayer) ++playerDraws;
         if (sprite == 127) ++triggerDraws;
     }
     unsigned bulletDraws = 0;
+    std::vector<float> bulletAngles;
+    bool spreadBulletDrawn = false;
     void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
                   downwell::TextAlign align) override {
@@ -378,7 +382,14 @@ int main() {
         if (!damaged) continue;
         renderer.targetPlayer = state.mainPlayerSpriteId();
         renderer.playerDraws = 0;
+        renderer.bulletAngles.clear();
         damagedGame.render(renderer);
+        require(renderer.bulletAngles.size() == state.mainBulletCount(),
+                "each live projectile emits exactly one artwork transform");
+        for (std::size_t i = 0; i < state.mainBulletCount(); ++i)
+            require(renderer.bulletAngles[i] == static_cast<float>(
+                        state.mainBulletAt(i).trajectory.direction * (360.0 / 4294967296.0)),
+                    "artwork receives the retained trajectory direction in creation order");
         require(renderer.playerDraws == (immunity % 2 == 0 ? 1u : 0u),
                 "actual Game render suppresses odd damage phases and draws even phases once");
         if (immunity == 0) recovered = true;
@@ -388,6 +399,7 @@ int main() {
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
     require(renderer.bulletDraws > 0, "live render tape exercises projectile transforms");
+    require(renderer.spreadBulletDrawn, "live rendering actually exercises nonzero spread angles");
     // Renderer fixture only: natural death entry is exercised by the long
     // paired simulation replay. This tape deliberately ends after recovery.
     auto& resultsFixture = const_cast<downwell::DeathResults&>(damagedGame.startup().deathResults());

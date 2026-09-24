@@ -5,6 +5,7 @@ import argparse
 import configparser
 import hashlib
 import json
+import math
 import os
 import struct
 import tempfile
@@ -373,6 +374,47 @@ def decode_planar(data, width, height, dma_width):
     return pens
 
 
+def verify_projectile_spread_pixels(canvas, origin_x, origin_y):
+    """Conservative nearest-pixel inverse-map proof over 267..273 degrees.
+
+    Bound each source coordinate independently using endpoints and every
+    stationary point of a*cos(angle)+b*sin(angle). Every pixel in the Cartesian
+    product of those ranges must have the quarter-turn's RGBA. This deliberately
+    includes impossible coordinate pairs, so passing cannot hide a transition.
+    Epsilon widens bounds rather than excluding floating-point boundary ties.
+    This checks pixel-centre nearest sampling, not Windows GPU raster rules.
+    """
+    low, high = math.radians(267), math.radians(273)
+
+    def bounds(a, b, origin):
+        candidates = [low, high]
+        stationary = math.atan2(b, a)
+        for period in range(-3, 4):
+            angle = stationary + period * math.pi
+            if low <= angle <= high:
+                candidates.append(angle)
+        values = [origin + a * math.cos(t) + b * math.sin(t) for t in candidates]
+        return range(math.floor(min(values) - 1e-10), math.floor(max(values) + 1e-10) + 1)
+
+    def pen(x, y):
+        pixel = canvas.getpixel((x, y)) if 0 <= x < canvas.width and 0 <= y < canvas.height else (0, 0, 0, 0)
+        return pixel if pixel[3] else (0, 0, 0, 0)
+
+    # Cover the whole rotated canvas, including potential pixels outside its
+    # original bounds. Source canvases are square and centrally anchored.
+    require(canvas.width == canvas.height and origin_x * 2 == canvas.width and
+            origin_y * 2 == canvas.height, "spread proof requires a centred square projectile")
+    radius = math.ceil(math.hypot(canvas.width, canvas.height) / 2) + 1
+    for y in range(origin_y - radius, origin_y + radius):
+        for x in range(origin_x - radius, origin_x + radius):
+            dx, dy = x + 0.5 - origin_x, y + 0.5 - origin_y
+            expected = pen(math.floor(origin_x + dy), math.floor(origin_y - dx))
+            for sx in bounds(dx, -dy, origin_x):
+                for sy in bounds(dy, dx, origin_y):
+                    require(pen(sx, sy) == expected,
+                            "projectile spread changes pixels: add offline angle variants")
+
+
 def build_pack(manifest, extracted, profile, language_path=None):
     require(manifest["schemaVersion"] == 3, "unexpected extraction schema")
     require(manifest["source"]["sha256"] == SOURCE_SHA256,
@@ -399,6 +441,9 @@ def build_pack(manifest, extracted, profile, language_path=None):
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
                 bullet = sprite_id in (458, 459)
+                if bullet:
+                    require(not sprite["smooth"], "spread proof requires nearest-sampled source artwork")
+                    verify_projectile_spread_pixels(canvas, sprite["originX"], sprite["originY"])
                 turns = (0, 3) if bullet else range(2 if snail else 4 if sprite_id == 278 else 1)
                 for turn in turns:
                     if turn == 0:

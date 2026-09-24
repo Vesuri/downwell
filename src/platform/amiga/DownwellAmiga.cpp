@@ -2939,8 +2939,10 @@ int main(void) {
                     port.player().facing() < 0)) frameReady = false;
             for (unsigned index = 0; index < AmigaPortRuntime::bulletCapacity; ++index) {
                 const auto& bullet = port.bulletAt(index);
-                // Offline quarter-turn variant: the current vertical shot's
-                // image_angle is 270, not the artwork's authored zero angle.
+                // The pack generator checks every possible nearest-pixel
+                // sample over 267..273 degrees for all twelve source frames:
+                // the spread-adjusted artwork equals this offline quarter
+                // turn. Other angles/guns need separately verified variants.
                 if (bullet.active && !appendGameplayActor(actors, actorCount,
                         downwell::machineGunProfile(bullet.gemHigh).sprite, 768 + bullet.animation.frame(),
                         downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
