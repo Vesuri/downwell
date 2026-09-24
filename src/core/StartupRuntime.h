@@ -201,6 +201,7 @@ public:
     }
     bool levelClearActive() const { return run_.levelClearActive; }
     bool nextLevelRequested() const { return run_.nextLevelRequested; }
+    bool loadNextAreaOneLevel(const Input& input);
     const LevelClearController& levelClear() const { return run_.levelClear; }
     const LevelClearPresentation::Frame& levelClearFrame() const { return run_.levelClearFrame; }
     const RunStage& runStage() const { return run_.stage; }

@@ -82,6 +82,10 @@ void Game::update(const Input& input, std::uint32_t restartSeed) {
         bool confirm = input.fire;
         startup_.stepLevelClear(confirm, input.left && !left_, input.right && !right_, heartGoal_,
             [](LevelClearSelection::Effect, unsigned) {});
+        if (startup_.nextLevelRequested()) {
+            startup_.loadNextAreaOneLevel(input);
+            if (!startup_.roomLoadSucceeded()) finished_ = true;
+        }
     } else {
         startup_.step(input, input.fire && !fire_);
         if (startup_.levelResultRequested())

@@ -551,6 +551,42 @@ int main() {
     downwell::Input navigate; navigate.right = true;
     clearGame.update(navigate); clearGame.update(navigate);
     require(clearRuntime.levelClear().selection.cursor == 2, "held navigation causes only one menu edge");
+    require(clearRuntime.grantUpgrade(19), "entry retention fixture increases charge capacity");
+    const int retainedCapacity = clearRuntime.mainAmmoCapacity();
+    const unsigned retainedCurrency = clearRuntime.mainCurrencyTotal();
+    int retainedHealth = clearRuntime.mainPlayerHealth();
+    downwell::Input confirm; confirm.fire = true;
+    bool nextRoomLoaded = false;
+    for (unsigned tick = 0; tick < 240; ++tick) {
+        if (clearRuntime.levelClearActive() && !clearRuntime.levelClear().selection.visible)
+            retainedHealth = clearRuntime.mainPlayerHealth();
+        clearGame.update(confirm);
+        if (clearRuntime.runStage().level == 2) { nextRoomLoaded = true; break; }
+    }
+    require(nextRoomLoaded && !clearRuntime.levelClearActive() && clearRuntime.inMainRoom() &&
+        clearRuntime.roomLoadSucceeded() && clearRuntime.deferredCommandsSucceeded(),
+        "live clear selection and departure load the next area-one room");
+    require(clearRuntime.mainBuilderGenerationCount() == -10 && !clearRuntime.mainBuilderShopSuppressed(),
+        "second stage uses its source generation count and permits natural shops");
+    require(clearRuntime.mainAmmoCapacity() == retainedCapacity && clearRuntime.mainAmmo() == retainedCapacity &&
+        clearRuntime.mainCurrencyTotal() >= retainedCurrency && clearRuntime.mainPlayerHealth() == retainedHealth &&
+        clearRuntime.upgrades().count == 1 && clearRuntime.runTimeTicks() == clockBeforeClear,
+        "room loading preserves grants, health, currency and run clock while refilling charge");
+    const auto beforePlay = clearRuntime.mainPlayerY();
+    clearGame.update({});
+    require(clearRuntime.runTimeTicks() > clockBeforeClear && clearRuntime.mainPlayerY() >= beforePlay,
+        "new stage resumes gameplay updates instead of remaining in result ownership");
+    clearRuntime.registerLevelExit(int(clearRuntime.mainPlayerY()));
+    for (unsigned tick = 0; tick < 330 && clearRuntime.runStage().level == 2; ++tick)
+        clearGame.update(confirm);
+    require(clearRuntime.runStage().area == 1 && clearRuntime.runStage().level == 3 &&
+        !clearRuntime.levelClearActive() && clearRuntime.upgrades().count == 2,
+        "a second complete selection/departure enters area-one level three without resetting inventory");
+    clearRuntime.registerLevelExit(int(clearRuntime.mainPlayerY()));
+    for (unsigned tick = 0; tick < 330; ++tick) clearGame.update(confirm);
+    require(clearRuntime.levelClearActive() && clearRuntime.nextLevelRequested() &&
+        clearRuntime.runStage().area == 1 && clearRuntime.runStage().level == 3,
+        "unimplemented next-area builder retains request rather than silently reusing area-one terrain");
     std::puts("game render tests passed");
     return 0;
 }

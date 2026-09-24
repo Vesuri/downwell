@@ -1537,6 +1537,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainPlayerInvulnerability_ = 0;
                 mainShootLeg_ = -1;
                 mainShotsFired_ = 0;
+                // These are adapter event counters, not game globals. Rebase
+                // them so a new instance is not mistaken for a shot/recharge.
+                run_.ammoHud.previousShots = 0;
+                run_.ammoHud.previousRecharges = 0;
                 mainBlocksDestroyed_ = 0;
                 mainLandings_ = 0;
                 mainActivationY_ = 0;
@@ -1573,7 +1577,11 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         if (instance != nullptr && instance->roomId == mainRoomId) {
             mainBuilderInitialized_ = true;
-            areaOneBuilder_.reset(instance->x, instance->y, random_);
+            AreaOneBuilder::Setup setup;
+            setup.level = run_.stage.level > 0 ? unsigned(run_.stage.level) : 1;
+            setup.style = unsigned(playStyle_);
+            setup.member = run_.upgrades.levels[14] != 0;
+            areaOneBuilder_.reset(instance->x, instance->y, random_, setup);
             syncMainBuilderState();
         }
         return;
@@ -2045,6 +2053,23 @@ void StartupRuntime::initRoomEndStep(bool advancePressed) {
             gotoRoom(roomDestination_);
         }
     }
+}
+
+bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
+    // Later-area builders are not implemented: retain their pending request
+    // rather than silently generating another area-one room with a new label.
+    if (!run_.levelClearActive || !run_.nextLevelRequested ||
+        run_.stage.area != 1 || run_.stage.level >= 3 || !roomPack_ || !objectPack_) return false;
+    if (!run_.advanceAfterLevelClear()) return false;
+    run_.shops = {};
+    mainCameraInitialized_ = false;
+    mainCameraMotion_ = {};
+    inputFire_ = input.fire;
+    inputLeft_ = input.left;
+    inputRight_ = input.right;
+    inputFirePressed_ = inputFireReleased_ = inputLeftPressed_ = inputRightPressed_ = false;
+    gotoRoom(mainRoomId);
+    return roomLoadSucceeded_ && deferredCommandsSucceeded_;
 }
 
 void StartupRuntime::gotoRoom(int roomId) {

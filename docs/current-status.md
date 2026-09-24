@@ -354,6 +354,20 @@ plus existing startup/restart rendering regressions. The room loader itself is
 still not connected to the final result request; this removes a reset hazard
 before that integration, not a claim of next-stage playability.
 
+SDL now consumes the completed result request to reload rmMain for area-one
+levels 2 and 3. It preserves the run/RNG/inventory, retires old shops and camera
+state, seeds held input for the new player, and passes current level/style/Member's
+Card state to the existing AreaOneBuilder instead of always using 1-1 defaults.
+New instance shot/recharge counters are rebased without inventing HUD events.
+Live Game regressions follow injected exits through actual selection/departure
+and two successive room loads, checking retained health/currency/capacity,
+inventory accumulation, level-two -10 generation count/shop eligibility and
+resumed gameplay. SDL builds successfully. The area-two request is intentionally
+left pending because no area-two builder is implemented; the port does not
+mislabel recycled area-one terrain. Native next-room loading and the entrance
+dither/audio/full upgrade effects remain unfinished, so this does not establish
+complete progression or original-game parity.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
