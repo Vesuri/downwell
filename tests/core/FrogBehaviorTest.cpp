@@ -1,5 +1,7 @@
 #include "core/FrogBehavior.h"
 #include "core/FractionalMotion.h"
+#include "core/FrogHorizontalMotion.h"
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -8,6 +10,31 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    downwell::FrogHorizontalMotion horizontal;
+    horizontal.velocity = -2 * 65536L;
+    horizontal.step([](int) { return true; });
+    require(horizontal.position == 0 && horizontal.velocity == 39322,
+            "source -0.3 rebound retains Q16 precision and does not advance blocked X");
+    for (unsigned i = 0; i < 100; ++i) horizontal.step([](int) { return false; });
+    require(std::fabs(horizontal.position / 65536.0 - 60.0) < 0.001,
+            "one hundred rebound steps retain fractional movement rather than rounded Q8 speed");
+    for (int sign : {-1, 1}) {
+        horizontal = {};
+        horizontal.velocity = sign * 2 * 65536L;
+        double expected = sign * 2.0;
+        for (unsigned i = 0; i < 8; ++i) {
+            horizontal.step([](int) { return true; });
+            expected *= -0.3;
+            require(std::fabs(horizontal.velocity / 65536.0 - expected) < 1.0 / 65536.0,
+                    "repeated signed rebounds remain within one Q16 unit of source multiplier");
+        }
+    }
+    horizontal = {};
+    horizontal.velocity = -1;
+    int probe = 0;
+    horizontal.step([&probe](int edge) { probe = edge; return false; });
+    require(probe == -7 && horizontal.position == -1,
+            "negative fractional X uses floor for the provisional terrain point query");
     long position = 0;
     unsigned char remainder = 0;
     downwell::integrateFifthsQ8(position, remainder, -1, 1);

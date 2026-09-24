@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_INSTANCE_STORE_H
 
 #include "AlarmBank.h"
+#include "FrogHorizontalMotion.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -40,6 +41,8 @@ struct InstanceRecord {
     bool motionInitialized = false;
     bool grounded = false;
     bool frogLanded = true; // enmFrog Create; cleared by an airborne Step
+    FrogHorizontalMotion frogHorizontal;
+    bool frogHorizontalInitialized = false;
     AlarmBank alarms;
 };
 

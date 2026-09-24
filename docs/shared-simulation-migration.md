@@ -439,3 +439,35 @@ the source -0.3 and lacks horizontal sub-Q8 accumulation. This is the next
 numerical migration target; the strict diagnostic remains unresolved.
 DOWNWELL_TRACE_FROG_MOTION=1 (with the strict diagnostic enabled) prints raw
 landing/jump state from tick 474 onward for reproducing this audit.
+
+## Shared frog horizontal state and rebound
+
+Both adapters now own FrogHorizontalMotion in src/core rather than independent
+float and Q8 rebound calculations. Its authoritative position and velocity use
+Q16; SDL floats and native Q8 values are mirrors, never reintegrated inputs.
+Alarm preparation/launch update this shared velocity directly. SDL state hashes
+include the authoritative values and initialization flag.
+
+The VM's `push.d -0.3; mul.d.v` replaces the native 77/256 factor. Rebound is
+rounded to Q16, with horizontal integration retaining that fraction across
+frames. Signed repeated-rebound fixtures stay within one Q16 unit of double
+math; 100 steps following the first rebound stay within .001 pixel of 60 pixels.
+These are explicit numeric approximation bounds, not bit-identical VM doubles.
+
+This removed the tick-521 discrepancy. The next difference at tick 555 was
+native xx integration on the landing frame; enmFrog Step integrates xx only
+when still airborne after support resolution. Native now makes that decision
+after resolving landing, and a targeted fixture guards it.
+
+The strict combat comparison now reaches tick 727: matching X/velocity but
+native Y=536320 versus SDL Y=536576 in relative Q8 units. The diagnostic also
+compares the full shared Q16 horizontal state, not merely its rounded mirrors.
+Vertical motion and full source-mask collision are still not consolidated;
+current point probes are provisional and their ordering is not a complete
+scrCheckCollisionWith implementation. The strict full-frog gate remains failing.
+
+Validation: default host suite and combat counters pass; the bounded 68000
+replay retains `9f0d3943e7900d2b`, and the A500 terrain-cache oracle passes.
+Target instruction/helper audits are clean. Normal SDL/Amiga builds are
+restored after verification; no runtime sprite generation or scrolling
+architecture changes are involved.

@@ -671,6 +671,11 @@ void StartupRuntime::updateMainEnemies() {
             }
             enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
         } else if (enemy.objectId == 113) {
+            if (!enemy.frogHorizontalInitialized) {
+                enemy.frogHorizontal.position = static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 65536.0F));
+                enemy.frogHorizontal.velocity = static_cast<long>(std::round(enemy.velocityX * 65536.0F));
+                enemy.frogHorizontalInitialized = true;
+            }
             enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.15F);
             const float nextY = enemy.preciseY + enemy.velocityY;
             // The recovered Step rechecks support at yy+1. A landed frog
@@ -688,13 +693,11 @@ void StartupRuntime::updateMainEnemies() {
             } else {
                 enemy.preciseY = nextY;
                 enemy.grounded = false;
-                const float nextX = enemy.preciseX + enemy.velocityX;
-                const auto mask = contactSpriteBounds(166);
-                if (mainSolidAt(nextX + (enemy.velocityX < 0 ? mask.left : mask.right - 1),
-                                enemy.preciseY))
-                    enemy.velocityX *= -0.3F;
-                else
-                    enemy.preciseX = nextX;
+                enemy.frogHorizontal.step([this, &enemy](int edge) {
+                    return mainSolidAt(mainPlayerOriginX_ + edge, enemy.preciseY);
+                });
+                enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
+                enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
             }
             if (enemy.velocityX != 0.0F)
                 enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
@@ -1648,6 +1651,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             if (direction != 0) {
                 instance->auxiliaryState = 1;
                 instance->velocityX = static_cast<float>(direction);
+                instance->frogHorizontal.velocity = direction * 65536L;
                 instance->motionState = direction * 2;
                 instance->alarms.set(0, 60);
                 ++soundPlayRequests_;
@@ -1662,6 +1666,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             if (instance->grounded) {
                 instance->velocityY = -4.0F;
                 instance->velocityX = static_cast<float>(instance->motionState);
+                instance->frogHorizontal.velocity = instance->motionState * 65536L;
                 ++soundPlayRequests_;
             }
             instance->auxiliaryState = 0;
@@ -2223,6 +2228,11 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addBool(instance.motionInitialized);
         digest.addBool(instance.grounded);
         digest.addBool(instance.frogLanded);
+        if (instance.objectId == 113) {
+            digest.addBool(instance.frogHorizontalInitialized);
+            digest.addI32(instance.frogHorizontal.position);
+            digest.addI32(instance.frogHorizontal.velocity);
+        }
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm)
             digest.addI32(instance.alarms.get(alarm));
     }

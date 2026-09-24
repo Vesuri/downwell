@@ -5,6 +5,7 @@
 #include "core/GameMakerRandom.h"
 #include "core/StateDigest.h"
 #include "core/GameplayLimits.h"
+#include "core/FrogHorizontalMotion.h"
 
 #include <cstdint>
 
@@ -72,6 +73,7 @@ public:
         long speedY;
         unsigned char gravityRemainder; // fifths of one Q8 velocity unit
         unsigned char gravityPositionRemainder; // fifth-Q8 integration residual
+        downwell::FrogHorizontalMotion frogHorizontal;
         int motionState;
         int auxiliaryState;
         int alarm0;

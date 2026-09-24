@@ -412,6 +412,13 @@ int main() {
 
     AmigaPortRuntime unsupportedFrog(300);
     AmigaPortRuntime fractionalLanding(300);
+    AmigaPortRuntime movingLanding(300);
+    movingLanding.configureSolidResolver(flatGround, nullptr);
+    require(movingLanding.configureEnemy(0, 113, 166, 40, 1,
+                512, 0, 35, 20, 0, 0, -1, -1), "configure moving frog reaching support");
+    movingLanding.step(0);
+    require(movingLanding.enemyAt(0).grounded && movingLanding.enemyAt(0).preciseX == 40 * 256L,
+            "source integration suppresses horizontal displacement on the landing frame");
     for (int direction : {-1, 1}) {
         AmigaPortRuntime edgeProbe(300);
         edgeProbe.configureSolidResolver([](void* opaque, int x, int) {
