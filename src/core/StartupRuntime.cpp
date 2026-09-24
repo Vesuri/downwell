@@ -922,6 +922,10 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
         *builderPatternPack_, random_, static_cast<int>(std::ceil(viewBottom)),
         [](void* opaque, const DeferredCreateInstance& command) {
             StartupRuntime* runtime = static_cast<StartupRuntime*>(opaque);
+            // Shop Create consumes stock/text RNG immediately, before the
+            // builder visits its next cell. Do not defer it with plain tiles.
+            if (command.objectId == 277)
+                return runtime->registerShop(command.x, command.y) != nullptr;
             return runtime->deferredInstances_.enqueueCreate(command);
         },
         this, result);

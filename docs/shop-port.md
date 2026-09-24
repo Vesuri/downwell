@@ -495,3 +495,21 @@ and item-name anchors, repeats rendering without advancing cursor state, and
 checks that closing stops submissions. This does not yet establish a Windows
 pixel match or natural shop appearance. Production generation, merchant speech,
 prompts and end-to-end original-game comparisons remain open.
+
+## Generated instance dispatch
+
+Both live builder creation callbacks now route object 277 directly to shared
+shop registration. This occurs synchronously inside pattern traversal, so
+stock and farewell RNG draws precede subsequent cell/Create draws. SDL does
+not enqueue a duplicate generic Shop instance; Amiga does not store the Shop
+as a static terrain tile. Shared shop fixture revisions handle its cached art.
+Capacity failure propagates through the existing generation-failure path.
+
+This does not enable shops in ordinary 1-1, which scrLevelPat1 suppresses.
+The builder still lacks full stage/style configuration: source rightRoomAmt
+can be three, style 1 uses choose(0,0,0,0,0,0,1), style 4 forces a shop on the
+last side room without that probability draw, and membership forces a shop
+after the style-specific choice. Those rules, later-stage setup and a seeded
+generated-shop replay are still required. Existing paired fixtures exercise
+registration directly; baseline regressions do not cover natural object-277
+emission because the current ordinary 1-1 path deliberately emits none.

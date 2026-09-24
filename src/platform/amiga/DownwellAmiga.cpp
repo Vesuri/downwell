@@ -126,6 +126,10 @@ static bool generateLiveTerrain(void*, AmigaPortRuntime&,
 static bool appendGeneratedTerrain(void* opaque,
     const downwell::DeferredCreateInstance& command) {
     auto& live = *static_cast<LiveGenerationContext*>(opaque);
+    // The live builder is stepping on this runtime's RNG stream. Register
+    // synchronously so stock/farewell draws precede the next pattern cell.
+    if (command.objectId == 277)
+        return live.runtime->registerShop(command.x, command.y) != nullptr;
     if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
         !terrainTiles.append(command)) return false;
     if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||
