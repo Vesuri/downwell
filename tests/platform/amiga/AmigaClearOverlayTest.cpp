@@ -8,7 +8,7 @@
 #include <cstring>
 #include <cmath>
 int amigaBlitterDrawPlanarMasked(const UBYTE*, const UBYTE*, UWORD, UWORD, UWORD,
-    UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD) { return 0; }
+    UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD, int) { return 0; }
 int amigaBlitterClearPlanar(UBYTE*, UWORD, UWORD) { return 0; }
 int amigaBlitterSolidRect(UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD) { return 0; }
 static void require(bool ok, const char* why) {

@@ -5,7 +5,7 @@ extern int amigaBlitterDrawPlanarMasked(
     UWORD sourceWidth, UWORD sourceHeight, UWORD sourceDataWidth,
     UBYTE* destination, UWORD destinationHeight,
     UWORD destinationX, UWORD destinationY,
-    UWORD sourceX, UWORD sourceY, UWORD width, UWORD height);
+    UWORD sourceX, UWORD sourceY, UWORD width, UWORD height, int outputPen);
 extern int amigaBlitterClearPlanar(UBYTE* destination,
                                    UWORD height, UWORD planes);
 extern int amigaBlitterSolidRect(UBYTE*, UWORD, UWORD, UWORD, UWORD, UWORD, UWORD);
@@ -85,7 +85,7 @@ static void drawAssetNormal(AmigaRenderer* renderer,
                             const UBYTE* data,
                             int originX, int originY,
                             int width, int height, int planeBytes,
-                            int anchorX, int anchorY) {
+                            int anchorX, int anchorY, int outputPen) {
     const int left = anchorX - originX;
     const int top = anchorY - originY;
     int clipLeft = renderer->clipX;
@@ -134,7 +134,7 @@ static void drawAssetNormal(AmigaRenderer* renderer,
                     renderer->target, (UWORD)targetHeight,
                     (UWORD)clipLeft, (UWORD)targetY,
                     (UWORD)(clipLeft - left), (UWORD)sourceY,
-                    (UWORD)(clipRight - clipLeft), (UWORD)rows))
+                    (UWORD)(clipRight - clipLeft), (UWORD)rows, outputPen))
                 break;
             remaining -= rows;
             sourceY += rows;
@@ -175,6 +175,10 @@ static void drawAssetNormal(AmigaRenderer* renderer,
             plane1 = sourceSpanByte(source1, planeBytes,
                                     destinationX - left);
             opaque = (UBYTE)((plane0 | plane1) & clipMask);
+            if (outputPen >= 0) {
+                plane0 = outputPen & 1 ? 0xff : 0;
+                plane1 = outputPen & 2 ? 0xff : 0;
+            }
             if (!opaque)
                 continue;
             target0 = renderer->target + rowOffset + destinationByte;
@@ -432,7 +436,7 @@ void amigaRendererDrawAsset(AmigaRenderer* renderer,
 
     if (!flipX) {
         drawAssetNormal(renderer, data, originX, originY,
-                        width, height, planeBytes, anchorX, anchorY);
+                        width, height, planeBytes, anchorX, anchorY, -1);
         return;
     }
 
@@ -478,6 +482,11 @@ void amigaRendererDrawAssetPen(AmigaRenderer* renderer,
     data = pack + readLong(record + 16);
     if (data < pack || data + readLong(record + 20) > packEnd)
         return;
+    if (!flipX) {
+        drawAssetNormal(renderer, data, originX, originY,
+                        width, height, planeBytes, anchorX, anchorY, (int)(outputPen & 3));
+        return;
+    }
     for (y = 0; y < height; ++y) {
         const ULONG sourcePlaneBytes = (ULONG)planeBytes * (ULONG)height;
         const UBYTE* row = data + y * planeBytes;

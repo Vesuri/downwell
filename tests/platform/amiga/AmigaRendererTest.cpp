@@ -13,7 +13,7 @@
 
 int amigaBlitterDrawPlanarMasked(const UBYTE*, const UBYTE*, UWORD, UWORD,
                                  UWORD, UBYTE*, UWORD, UWORD, UWORD, UWORD,
-                                 UWORD, UWORD, UWORD) {
+                                 UWORD, UWORD, UWORD, int) {
     return 0;
 }
 

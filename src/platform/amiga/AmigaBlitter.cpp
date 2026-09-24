@@ -20,7 +20,7 @@ extern "C" int amigaBlitterDrawPlanarMasked(
     UWORD sourceWidth, UWORD sourceHeight, UWORD sourceDataWidth,
     UBYTE* destination, UWORD destinationHeight,
     UWORD destinationX, UWORD destinationY,
-    UWORD sourceX, UWORD sourceY, UWORD width, UWORD height)
+    UWORD sourceX, UWORD sourceY, UWORD width, UWORD height, int outputPen)
 {
     if ((ULONG)source >= 0x200000UL ||
         (ULONG)mask >= 0x200000UL ||
@@ -38,7 +38,14 @@ extern "C" int amigaBlitterDrawPlanarMasked(
     }
     Bitmap destinationBitmap(destination, 380, destinationHeight, 2,
                              false, false, 384);
-    destinationBitmap.copyWithMask(
+    if (outputPen >= 0) {
+        for (unsigned plane = 0; plane < 2; ++plane) {
+            Bitmap target(destination + plane * destinationBitmap.bitplaneSizeInBytes,
+                380, destinationHeight, 1, false, false, 384);
+            target.patternWithMask(art->mask, destinationX, destinationY,
+                sourceX, sourceY, width, height, outputPen & (1u << plane) ? 0xffff : 0);
+        }
+    } else destinationBitmap.copyWithMask(
         art->source, art->mask,
         destinationX, destinationY,
         sourceX, sourceY, sourceX, sourceY,

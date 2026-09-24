@@ -600,6 +600,13 @@ test-amiga-clear-bank: generate-amiga-clear build/amiga-clear-bank-test
 test: test-amiga-clear-bank
 test: test-amiga-clear-border-cache
 test: test-amiga-clear-overlay
+test: test-amiga-pen-blit
+.PHONY: test-amiga-pen-blit
+build/amiga-pen-blit-test: tests/platform/amiga/AmigaPenBlitTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaPenBlitTest.cpp src/platform/amiga/AmigaRenderer.c
+test-amiga-pen-blit: build/amiga-pen-blit-test
+	./build/amiga-pen-blit-test
 .PHONY: test-amiga-clear-overlay
 build/amiga-clear-overlay-test: tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build

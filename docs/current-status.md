@@ -426,6 +426,22 @@ and owned-name suffix handling). Forced-pen text still uses the existing scalar
 renderer path and needs framework mask-blit acceleration before timing claims.
 No emulator performance claim follows from these host raster comparisons.
 
+Unflipped forced-pen assets now use the same clipped/ring-split planar dispatch
+as normal sprites. In Chip RAM, the existing framework Bitmap::patternWithMask
+recolors each destination plane from the offline opacity mask; no glyph or mask
+is generated at runtime. The CPU fallback composes bytes rather than individual
+pixels. Flipped assets retain their scalar path. An independent pixel oracle
+covers 3,840 combinations of pens, offsets, clipping, HUD/game targets and ring
+origins, including 2,072 successful emulated blit calls. This checks dispatch
+coordinates and fallback bytes, not the physical blitter's shift implementation.
+The 360-frame retained-overlay comparison and existing 20,580 sprite comparisons
+also pass, and the native build passes 68000 instruction/64-bit helper audits.
+The 45-second-bounded SKIP_TO_GAME results-restart gate also passes all three
+destinations and 200 subsequent gameplay updates with the stack guard intact.
+Its emulator is stopped and the normal build restored. That gate checks scene
+reentry/state and existing failure counters, not pixel-exact recolored output
+or timing; those hardware-specific checks remain outstanding.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
