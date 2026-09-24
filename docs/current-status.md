@@ -210,6 +210,17 @@ offer bundles plus shared labels have a conservative 11,564-byte bound inside
 the 32,140-byte bank. Selected-resource copying and room rendering are still
 pending; no additional resident Chip assets have been introduced.
 
+`AmigaClearBank.h` now constructs a bounded DWAP bank for up to four offered
+upgrades plus the clear/choose labels. It copies already-planar bytes, preserves
+resource IDs/origins/provenance and deduplicates repeated fallback bundles.
+All selected records, payload ranges and capacity are validated before writing,
+so a failed replacement cannot corrupt the previous bank. Tests cover 256 offer
+sets, byte-for-byte payload equality, adjacent-memory guards, malformed offsets,
+undersized buffers and duplicates; the largest sampled bank is 9,464 bytes.
+This helper is not yet called by the live level-clear renderer. Its eventual
+caller must retire the exit-mask DMA and drain the blitter before reusing that
+same bank; passing the bounds test does not establish safe scene ownership.
+
 ## Still open beyond that milestone
 
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.

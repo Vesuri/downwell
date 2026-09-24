@@ -566,6 +566,14 @@ verify-amiga-clear: generate-amiga-clear
 	tools/generate-amiga-hud.py --profile clear --check
 	python3 tests/clear-pack-test.py
 
+build/amiga-clear-bank-test: tests/platform/amiga/AmigaClearBankTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+.PHONY: test-amiga-clear-bank
+test-amiga-clear-bank: generate-amiga-clear build/amiga-clear-bank-test
+	./build/amiga-clear-bank-test generated/amiga-clear.dwap
+test: test-amiga-clear-bank
+
 verify-amiga-game: generate-amiga-game
 	python3 tools/verify-amiga-menu-sprites.py
 	tools/generate-amiga-hud.py --profile game --check
