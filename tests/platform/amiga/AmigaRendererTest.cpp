@@ -490,6 +490,36 @@ int main(int argc, char** argv) {
                 require(retained.lastWordWrites == 0, "unchanged gauge does not write either visible plane");
             }
         }
+        // Isolate every artwork transition, including the special bottom row
+        // and both sides of the fill boundary. Adjacent overlays can conceal
+        // changed pixels, but damage must never omit a surviving difference.
+        rows.filled = 92;
+        // Settle the three-digit-to-one-digit backing transition from the
+        // preceding capacity-127 sweep before isolating row-only changes.
+        for (unsigned ammo : {4u, 5u}) {
+            retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(), ammo, 8, 0, &rows, 0);
+            fullRedraw(ammo, 8, 0, 0);
+        }
+        for (unsigned index : {0u, 1u, 91u, 92u, 183u})
+            for (unsigned from = 0; from < 5; ++from)
+                for (unsigned to = 0; to < 5; ++to) {
+                    for (auto& state : rows.state) state = 3;
+                    rows.state[index] = from;
+                    retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(), 4, 8, 0, &rows, 0);
+                    fullRedraw(4, 8, 0, 0);
+                    require(actualHud == expectedHud, "isolated row transition starting image");
+                    rows.state[index] = to;
+                    retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(), 4, 8, 0, &rows, 0);
+                    fullRedraw(4, 8, 0, 0);
+                    if (actualHud != expectedHud) {
+                        std::cerr << "row=" << index << " from=" << from << " to=" << to << '\n';
+                        for (unsigned byte=0; byte<actualHud.size(); ++byte) if (actualHud[byte]!=expectedHud[byte]) {
+                            std::cerr << "byte=" << byte << " actual=" << unsigned(actualHud[byte])
+                                << " expected=" << unsigned(expectedHud[byte]) << '\n'; break;
+                        }
+                    }
+                    require(actualHud == expectedHud, "isolated row damage matches full redraw");
+                }
     }
     amigaRendererClearClipRect(&actualRenderer);
     amigaRendererClearClipRect(&expectedRenderer);

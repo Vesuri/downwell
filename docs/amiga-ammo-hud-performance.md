@@ -139,3 +139,22 @@ maximum gap six fields), versus 989 fields before this change.
 Native firing and recharge captures again have zero differing pixels out of
 99,968 against SDL. Both 68000 audits pass, and the capture workflow restores
 the ordinary non-skip executable. No shared simulation code changed.
+
+## Rejected experiment: per-frame artwork-difference damage
+
+A 100-byte table of exact changed scanline bounds for each pair of gauge-row
+frames reduced row/divider/label drawing slightly, but computing and looking
+up the row identities raised base cost. On the same bounded 600-update probe
+tape, fields increased from 1,179 to 1,185. HUD phase totals were 1,603.903 +
+647.138 + 459.389 + 1,053.790 = 3,764.220 ms, versus 3,719.592 ms beforehand.
+The implementation was removed; do not reintroduce it on the assumption that
+smaller damage bounds automatically mean lower 68000 cost.
+
+The experiment leaves stronger tests: every state pair 0..4 is isolated at
+row indices 0, 1, 91, 92 and 183 against the complete reconstruction oracle,
+covering the special bottom sprite and both sides of the fill boundary.
+The preceding wide-number backing transition is settled separately so it
+cannot confound the row-only comparison. Evidence is in
+`/tmp/downwell-hud-rowdamage-profile.log`; the restored implementation passes
+`/tmp/downwell-hud-row-transitions.log`. Future work should target compositing
+and publication costs, not add another per-row damage lookup.
