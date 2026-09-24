@@ -117,6 +117,11 @@ $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) 
 test: build/gem-homing-test
 test: build/main-camera-test
 test: build/standard-bullet-test
+test: build/crawler-motion-test
+
+build/crawler-motion-test: tests/core/CrawlerMotionTest.cpp src/core/CrawlerMotion.h src/core/SolidCollision.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CrawlerMotionTest.cpp
 
 build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp src/core/StandardBulletStep.h src/core/EnemyContact.h src/core/GameMakerRounding.h
 	@mkdir -p build
@@ -293,6 +298,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./build/gem-homing-test
 	./build/main-camera-test
 	./build/standard-bullet-test
+	./build/crawler-motion-test
 	python3 tools/verify-amiga-style-mask.py
 	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(REPLAY_TEST_TARGET)
@@ -316,6 +322,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./$(AMIGA_PLAYER_TEST_TARGET)
 	./$(AMIGA_PORT_TEST_TARGET)
 	DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_FROG_MOTION=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+	DOWNWELL_COMBAT_FIRE_PHASE=5 DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_FROG_MOTION=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	./$(AMIGA_MENU_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob
 	./$(AMIGA_MENU_SCROLL_TEST_TARGET)
 	./$(AMIGA_RENDERER_TEST_TARGET) generated/amiga-game.dwap generated/amiga-hud.dwap

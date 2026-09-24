@@ -10,6 +10,7 @@
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
 #include "core/FrogBehavior.h"
+#include "core/CrawlerMotion.h"
 
 #include <cstdint>
 
@@ -77,6 +78,7 @@ public:
         unsigned char gravityPositionRemainder; // fifth-Q8 integration residual
         downwell::FrogHorizontalMotion frogHorizontal;
         downwell::FrogHitState frogHit;
+        downwell::CrawlerMotion crawler;
         int motionState;
         int auxiliaryState;
         int alarm0;
@@ -179,6 +181,7 @@ public:
 private:
     void applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect);
     void advanceEnemyAlarms();
+    void updateCrawler(EnemyState& enemy, bool alarm);
     GenerationStep generationStep_ = nullptr;
     void* generationContext_ = nullptr;
     bool generationSucceeded_ = true;

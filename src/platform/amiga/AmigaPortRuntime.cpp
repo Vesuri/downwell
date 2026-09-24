@@ -152,6 +152,8 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.frogHorizontal.position = (long)x * 65536L;
     enemy.frogHorizontal.velocity = (long)speedX * 256L;
     enemy.frogHit = {};
+    enemy.crawler.initialize(x, y);
+    enemy.crawler.latched = grounded;
     enemy.preciseY = (long)y * 256L;
     enemy.speedX = speedX;
     enemy.speedY = speedY;
@@ -323,29 +325,31 @@ void AmigaPortRuntime::advanceEnemyAlarms()
                 applyFrogAlarm(enemy, downwell::frogPreparationAlarm(direction));
             }
         } else if (enemy.objectId == 119 && alarm0Fired) {
-            if (enemy.grounded) {
-                const int crawl = enemy.motionState > 0 ? 1 : -1;
-                int nextX = enemy.x;
-                int nextY = enemy.y;
-                if (solidResolver_ != 0 && solidResolver_(
-                        solidResolverContext_, enemy.x + crawl, enemy.y)) {
-                    enemy.speedX = 0;
-                    enemy.speedY = -crawl * 256;
-                    nextY -= crawl;
-                } else {
-                    enemy.speedX = crawl * 256;
-                    enemy.speedY = 0;
-                    nextX += crawl;
-                }
-                if (solidResolver_ == 0 || !solidResolver_(
-                        solidResolverContext_, nextX, nextY)) {
-                    enemy.preciseX = (long)nextX * 256L;
-                    enemy.preciseY = (long)nextY * 256L;
-                }
-            }
+            updateCrawler(enemy, true);
             enemy.alarm0 = 2;
         }
     }
+}
+
+void AmigaPortRuntime::updateCrawler(EnemyState& enemy, bool alarm)
+{
+    const long cx = followCamera_ ? cameraMotion_.x - 240L * 4096 : 0;
+    const long cy = followCamera_ ? cameraMotion_.y - 176L * 4096 : cameraY_ * 16;
+    const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
+        cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
+        alarm ? 0 : 64);
+    const auto meeting = [this](long x, long y) {
+        return downwell::CrawlerMotion::meetsTiles(x, y, [this](int px, int py) {
+            return solidResolver_ && solidResolver_(solidResolverContext_, px, py);
+        });
+    };
+    if (alarm) enemy.crawler.alarm(enemy.motionState > 0, visible, meeting);
+    else enemy.crawler.step(enemy.motionState > 0, visible, meeting);
+    enemy.preciseX = enemy.crawler.x / 5;
+    enemy.preciseY = enemy.crawler.y / 5;
+    enemy.speedX = enemy.crawler.vx / 5;
+    enemy.speedY = enemy.crawler.vy / 5;
+    enemy.grounded = enemy.crawler.latched;
 }
 
 AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
@@ -678,31 +682,16 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                 enemy.speedY = -enemy.speedY;
             enemy.preciseY += enemy.speedY;
         } else if (enemy.objectId == 119) {
-            enum { foot = 6 };
-            if (!enemy.grounded) {
-                enemy.speedY += 51;
-                if (enemy.speedY > 7 * 256)
-                    enemy.speedY = 7 * 256;
-                const int nextY =
-                    (int)((enemy.preciseY + enemy.speedY) / 256L);
-                if (solidResolver_(solidResolverContext_,
-                                   enemy.x, nextY + foot)) {
-                    while (!solidResolver_(solidResolverContext_, enemy.x,
-                                           enemy.y + foot + 1)) {
-                        ++enemy.y;
-                        enemy.preciseY = (long)enemy.y * 256L;
-                    }
-                    enemy.speedY = 0;
-                    enemy.grounded = true;
-                } else {
-                    enemy.preciseY += enemy.speedY;
-                }
-            }
+            updateCrawler(enemy, false);
         }
         // World origins (240,176) are even integers, so ties-to-even is
         // unchanged by storing these positions relative to the origin.
         enemy.x = (int)downwell::roundGameMakerQ8(enemy.preciseX);
         enemy.y = (int)downwell::roundGameMakerQ8(enemy.preciseY);
+        if (enemy.objectId == 119) {
+            enemy.x = enemy.crawler.pixelX();
+            enemy.y = enemy.crawler.pixelY();
+        }
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
         enemy.spriteId = downwell::enemyPresentationSprite(enemy.objectId,

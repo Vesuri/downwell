@@ -32,7 +32,7 @@ bool shortRightWall(void*, int x, int y) {
 }
 
 bool crawlerCorner(void*, int x, int y) {
-    return y >= 7 || x >= 2;
+    return y >= 7 || x >= 8;
 }
 
 struct GenerationOrderProbe {
@@ -550,10 +550,10 @@ int main() {
         crawler.step(0);
     require(crawler.enemyAt(0).grounded,
             "crawler falls onto terrain before beginning surface motion");
-    for (unsigned frame = 0; frame < 6; ++frame)
+    for (unsigned frame = 0; frame < 12; ++frame)
         crawler.step(0);
-    require(crawler.enemyAt(0).preciseX == 256L &&
-                crawler.enemyAt(0).preciseY < 256L &&
+    require(crawler.enemyAt(0).preciseX == 3 * 256L &&
+                crawler.enemyAt(0).preciseY < 2 * 256L &&
                 crawler.enemyAt(0).alarm0 > 0,
             "crawler advances along the floor then turns up the wall");
 

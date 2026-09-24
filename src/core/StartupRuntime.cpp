@@ -619,6 +619,27 @@ void StartupRuntime::updateMainCurrency() {
     mainCurrencyCount_ = write;
 }
 
+void StartupRuntime::updateCrawler(InstanceRecord& enemy, bool alarm) {
+    if (!enemy.crawler.initialized) enemy.crawler.initialize(enemy.x, enemy.y);
+    const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
+        mainCameraMotion_.x - 80L * 4096, mainCameraMotion_.y - 142L * 4096,
+        mainCameraMotion_.x + 80L * 4096, mainCameraMotion_.y + 142L * 4096,
+        alarm ? 0 : 64);
+    const auto meeting = [this](long x, long y) {
+        return CrawlerMotion::meetsTiles(x, y, [this](int px, int py) {
+            return mainSolidAt(px, py);
+        });
+    };
+    if (alarm) enemy.crawler.alarm(enemy.motionState > 0, visible, meeting);
+    else enemy.crawler.step(enemy.motionState > 0, visible, meeting);
+    enemy.preciseX = enemy.crawler.x / 1280.0F;
+    enemy.preciseY = enemy.crawler.y / 1280.0F;
+    enemy.velocityX = enemy.crawler.vx / 1280.0F;
+    enemy.velocityY = enemy.crawler.vy / 1280.0F;
+    enemy.grounded = enemy.crawler.latched;
+    enemy.rotation = enemy.crawler.direction * 90 + (enemy.motionState > 0 ? 0 : 180);
+}
+
 void StartupRuntime::updateMainEnemies() {
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         InstanceRecord& enemy = instances_.at(index);
@@ -747,17 +768,8 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.preciseY += enemy.velocityY;
                 enemy.scaleY = enemy.velocityY < 0.0F ? 1.0F : -1.0F;
             }
-        } else if (enemy.objectId == 119 && !enemy.grounded) {
-            enemy.velocityY = std::min(7.0F, enemy.velocityY + 0.2F);
-            const float nextY = enemy.preciseY + enemy.velocityY;
-            if (mainSolidAt(enemy.preciseX, nextY + 6.0F)) {
-                while (!mainSolidAt(enemy.preciseX, enemy.preciseY + 7.0F))
-                    enemy.preciseY += 1.0F;
-                enemy.velocityY = 0.0F;
-                enemy.grounded = true;
-            } else {
-                enemy.preciseY = nextY;
-            }
+        } else if (enemy.objectId == 119) {
+            updateCrawler(enemy, false);
         }
         enemy.x = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
         enemy.y = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
@@ -1651,23 +1663,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1254: // gml_Object_enmCrawler_Alarm_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            if (instance->grounded) {
-                const float crawl = instance->motionState > 0 ? 1.0F : -1.0F;
-                if (mainSolidAt(instance->preciseX + crawl,
-                                instance->preciseY)) {
-                    instance->velocityX = 0.0F;
-                    instance->velocityY = -crawl;
-                } else {
-                    instance->velocityX = crawl;
-                    instance->velocityY = 0.0F;
-                }
-                const float nextX = instance->preciseX + instance->velocityX;
-                const float nextY = instance->preciseY + instance->velocityY;
-                if (!mainSolidAt(nextX, nextY)) {
-                    instance->preciseX = nextX;
-                    instance->preciseY = nextY;
-                }
-            }
+            updateCrawler(*instance, true);
             instance->alarms.set(0, 2);
         }
         return;
@@ -2035,7 +2031,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(32); // Includes authoritative shared camera state.
+    digest.addU32(33); // Includes authoritative crawler motion.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2216,6 +2212,15 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(instance.moveSpeed);
         digest.addI32(instance.motionState);
         digest.addI32(instance.auxiliaryState);
+        if (instance.objectId == 119) {
+            digest.addI32(instance.crawler.x);
+            digest.addI32(instance.crawler.y);
+            digest.addI32(instance.crawler.vx);
+            digest.addI32(instance.crawler.vy);
+            digest.addU32(instance.crawler.direction);
+            digest.addBool(instance.crawler.latched);
+            digest.addBool(instance.crawler.initialized);
+        }
         digest.addBool(instance.motionInitialized);
         digest.addBool(instance.grounded);
         digest.addBool(instance.frogLanded);

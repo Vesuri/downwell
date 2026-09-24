@@ -216,6 +216,14 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (!amigaEnemyHealth(enemy.objectId)) continue;
         require(ordinal < amiga.enemyCount(), "frog diagnostic retains creation-order pairing");
         const auto& native = amiga.enemyAt(ordinal++);
+        if (enemy.objectId == 119 && enemy.active && native.active) {
+            const auto& a = native.crawler;
+            const auto& b = enemy.crawler;
+            require(a.x == b.x - 240L * 1280 && a.y == b.y - 176L * 1280 &&
+                    a.vx == b.vx && a.vy == b.vy && a.direction == b.direction &&
+                    a.latched == b.latched && native.alarm0 == enemy.alarms.get(0),
+                    "shared crawler state and alarm match exactly across adapters");
+        }
         if (enemy.objectId != 113 || !enemy.active || !native.active) continue;
         if (std::getenv("DOWNWELL_TRACE_FROG_MOTION") && amiga.tick() >= 474)
             std::cerr << "FROG RAW tick=" << amiga.tick()

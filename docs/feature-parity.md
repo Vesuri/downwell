@@ -119,6 +119,43 @@ The next implementation must consolidate those source rules rather than copy
 either existing approximation. This trace establishes the reproduction and
 causal chain; it does not fix crawler fidelity.
 
+#### Shared crawler movement replaces the divergent adapters
+
+`CrawlerMotion` now owns fifth-Q8 position and velocity, latching and four-way
+wall following for both runtimes. Step uses the shared recovered solid solver,
+exact .2 gravity without the old seven-pixel cap, and the 64-pixel lower view
+margin. Alarm 0 handles inner/outer corners in either traversal direction,
+loses its latch when all diagonal contact probes are empty, and integrates
+only within the source's strict view bounds. The alarm interval remains two
+updates. Both old platform-specific movement branches have been removed.
+
+Rectangle queries use mask 278 against the present aligned 16×16 wall cells;
+four corners suffice for this smaller 10×10 mask. This adapter is not a
+general-purpose arbitrary-shape collision implementation. Published integer
+coordinates remain separate from precise state, as in the recovered events.
+The shared state is now included in startup digest schema 33; the menu replay
+pin is `c26f108728127ae9`.
+
+The default and phase-5 scene tapes now compare exact crawler position,
+velocity, direction, latch and alarm state on every live paired update, in
+addition to existing combat/frog/gem checks. Phase 5 passes (health 4/4,
+kills 2/2, currency 2/2), superseding the collection failure above. Phases
+1–5, 7 and 8 pass; phase 6 lacks a surviving frog hit and phase 9 has no
+currency coverage. No equality checks were relaxed to accommodate those
+missing-coverage runs.
+
+Still incomplete: crawler hit-stun and source sprite transitions, time-stop
+integration and Amiga quarter-turn presentation. SDL receives the source
+movement angle; native sprite orientation remains a backend follow-up. This
+is a shared movement migration, not a claim of full crawler fidelity.
+
+Validation: the full host suite now runs both default and phase-5 combat
+tapes; both pass with exact crawler-state assertions. The bounded A500
+600-tick cache oracle and cross-CPU replay pass, retaining the player/gem
+replay digests. Normal SDL/Amiga builds are restored and both 68000 audits
+remain clean. Crawler state is covered by the live scene comparison, not by
+the older narrow player/gem CPU fixture.
+
 Run the scene test with `DOWNWELL_TRACE_COMBAT=1` for a diagnostic continuation,
 or `DOWNWELL_VERIFY_COMBAT=1` for a nonzero exit on disagreement. It adds 600
 steps, alternates horizontal direction every 90 frames and holds fire for five

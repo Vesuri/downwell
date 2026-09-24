@@ -231,6 +231,7 @@ private:
     void updateMainCurrency();
     void updateMainLifecycle();
     void updateMainEnemies();
+    void updateCrawler(InstanceRecord& enemy, bool alarm);
     void updateMainEnemyInteractions();
     InstanceRecord* mainBulletEnemyCollision(int x, int fromY, int toY);
     InstanceRecord* mainBulletCollision(int x, int fromY, int toY);
