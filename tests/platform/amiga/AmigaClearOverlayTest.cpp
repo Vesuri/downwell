@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaClearOverlay.h"
 #include "platform/amiga/AmigaClearDrawList.h"
+#include "platform/amiga/AmigaClearPresenter.h"
 #include "core/LevelClearLayout.h"
 #include <vector>
 #include <fstream>
@@ -28,6 +29,12 @@ int main(int argc, char** argv) {
     require(pack.size() > 20, "clear pack loaded");
     std::vector<UBYTE> game(downwellGameRingBytes), hud[2], reference(downwellLayerBytes);
     AmigaClearOverlay caches[2];
+    AmigaClearPresenter presenter;
+    std::vector<UBYTE> presentedGame[2], presentedHud[2], fullBorder(downwellGameRingBytes);
+    for (unsigned i = 0; i < 2; ++i) {
+        presentedGame[i].resize(downwellGameRingBytes, 0xa5);
+        presentedHud[i].resize(downwellLayerBytes, 0x5a);
+    }
     for (auto& pixels : hud) pixels.resize(downwellLayerBytes);
     downwell::LevelClearController room;
     downwell::UpgradeInventory inventory;
@@ -104,6 +111,42 @@ int main(int argc, char** argv) {
             else amigaRendererDrawAssetPen(&full, pack.data(), pack.data() + pack.size(), c.id, c.frame, c.x, c.y, 0, c.pen);
         }
         require(hud[back] == reference, "retained double-buffer overlay matches full source-order rasterization");
+        if (tick == 220) {
+            std::vector<UBYTE> replacementGame(downwellGameRingBytes, 0xa5);
+            std::vector<UBYTE> replacementHud(downwellLayerBytes, 0x5a);
+            presentedGame[back].swap(replacementGame);
+            presentedHud[back].swap(replacementHud);
+        }
+        if (tick == 240) presenter.reset();
+        AmigaRenderer integrated;
+        amigaRendererInit(&integrated, presentedGame[back].data(), presentedHud[back].data());
+        AmigaClearPresenter::Frame output;
+        if (tick == 180) presenter.artworkChanged();
+        require(presenter.render(back, integrated, pack.data(), pack.data() + pack.size(), room, frame, inventory, output) &&
+            output.ready && output.playerX == native.playerX && output.playerY == native.playerY,
+            "combined presenter returns publication parameters and separate player position");
+        require(presentedHud[back] == reference, "combined overlay matches independent full rasterization");
+        std::fill(fullBorder.begin(), fullBorder.end(), 0);
+        AmigaRenderer borderOracle;
+        amigaRendererInit(&borderOracle, fullBorder.data(), reference.data());
+        amigaRendererSetClipRect(&borderOracle, 110, 0, 160, 284);
+        frame.borders([&](int area, int image, int x, int y) {
+            amigaRendererDrawAsset(&borderOracle, pack.data(), pack.data() + pack.size(),
+                downwell::levelBorderSprite(area), image, 110 + x, y - room.motion.viewY(), 0);
+        });
+        for (unsigned plane = 0; plane < 2; ++plane) for (unsigned y = 0; y < 284; ++y)
+            require(std::memcmp(presentedGame[back].data() + plane * downwellGameRingPlaneBytes +
+                ((output.origin + y) % 320) * 48, fullBorder.data() + plane * downwellGameRingPlaneBytes + y * 48, 48) == 0,
+                "combined circular border matches full source-order rasterization including margins");
+        require(presenter.render(back, integrated, pack.data(), pack.data() + pack.size(), room, frame, inventory, output) &&
+            output.ready && output.borderRows == 0 && output.overlayPixels == 0,
+            "repeated complete presentation draws nothing and does not advance clocks");
+        if (tick == 200) {
+            require(!presenter.render(back, integrated, pack.data(), pack.data() + 20, room, frame, inventory, output) && !output.ready,
+                "failed frame cannot be published");
+            require(presenter.render(back, integrated, pack.data(), pack.data() + pack.size(), room, frame, inventory, output) &&
+                output.ready && presentedHud[back] == reference, "valid retry rebuilds an unpublished failed back frame");
+        }
         const auto savedPixels = hud[back];
         require(!caches[back].render(renderer, pack.data(), pack.data() + 20, sink.commands, sink.count, painted) &&
             !painted && hud[back] == savedPixels, "missing artwork fails without touching pixels");

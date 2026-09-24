@@ -515,6 +515,21 @@ this establishes the explicit floor-after-float policy used by the comparison
 fixture, not an undocumented claim about the original runner. The remaining
 live handoff must publish these tested components together and be profiled.
 
+AmigaClearPresenter now combines the native default draw list, retained overlay
+and circular border renderer as one back-frame operation. It returns the ring
+origin and hardware-player position only on success, never advances game clocks,
+and clears retired gameplay/HUD pixels (including landscape margins) only on
+entry, reset or buffer rebinding. Artwork replacement invalidates retained
+overlay content; a failed back frame is explicitly unpublishable and retried
+from clean state. The 360-frame alternating-buffer fixture compares both border
+planes and both overlay planes against independent full source-order redraws,
+including repeated zero-work frames, bank invalidation, failure/retry, reset and
+new backing addresses. The combined presenter compiles for 68000 without FP or
+64-bit arithmetic helpers. Its probe reports 272 local stack bytes and the
+nested overlay renderer 1,488, not a complete live-stack measurement. The
+application still must supply retired buffers, drain blits, update player and
+copper pointers, and publish this frame through the platform scene handoff.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.
