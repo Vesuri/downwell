@@ -83,6 +83,31 @@ int main(int argc, char** argv) {
                              pattern) && pattern.rowCount == 10,
             "last recovered area-one ending is addressable");
 
+    for (unsigned id = 0; id < pack.patternCount(); ++id) {
+        require(pack.pattern(id, pattern), "enumerate row-view pattern");
+        for (unsigned y = 0; y < pattern.rowCount; ++y) {
+            const std::uint8_t* row = nullptr;
+            std::uint32_t width = 0, expectedWidth = 0;
+            require(pack.rowData(pattern, y, row, width) && pack.rowWidth(pattern, y, expectedWidth) &&
+                    width == expectedWidth, "row view preserves each serialized row width");
+            for (unsigned x = 0; x < width; ++x)
+                require(pack.cell(pattern, x, y, cell) && row[x] == static_cast<std::uint8_t>(cell),
+                        "row view equals individual cell reads");
+        }
+        const std::uint8_t* row = nullptr;
+        std::uint32_t width = 123;
+        require(!pack.rowData(pattern, pattern.rowCount, row, width) && !row && width == 123,
+                "invalid row leaves outputs untouched");
+        auto invalid = pattern; invalid.firstRow = 0xffffffffu;
+        require(!pack.rowData(invalid, 0, row, width), "row view rejects invalid row range");
+        invalid = pattern; invalid.firstCell = 0xffffffffu;
+        require(!pack.rowData(invalid, 0, row, width), "row view rejects invalid cell range");
+        invalid = pattern; invalid.cellCount = 0;
+        require(!pack.rowData(invalid, 0, row, width), "row view rejects cells outside pattern");
+        invalid = pattern; invalid.width = 0;
+        require(!pack.rowData(invalid, 0, row, width), "row view rejects excessive row width");
+    }
+
     std::vector<std::uint8_t> damaged = bytes;
     damaged[40] = 0xff;
     damaged[41] = 0xff;

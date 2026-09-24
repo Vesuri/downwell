@@ -47,6 +47,9 @@ public:
               std::uint16_t y, char& output) const;
     bool rowWidth(const PackedBuilderPattern& pattern, std::uint16_t y,
                   std::uint32_t& output) const;
+    // Validated immutable row view; lifetime is that of the backing pack.
+    bool rowData(const PackedBuilderPattern& pattern, std::uint16_t y,
+                 const std::uint8_t*& output, std::uint32_t& width) const;
 
 private:
     const std::uint8_t* bytes_ = nullptr;

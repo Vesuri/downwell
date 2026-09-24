@@ -168,12 +168,11 @@ bool AreaOneBuilder::emitPattern(
     for (std::uint16_t row = 0; row < pattern.rowCount; ++row) {
         const int rowY = y_ + row * 16;
         std::uint32_t width = 0;
-        if (!patterns.rowWidth(pattern, row, width))
+        const std::uint8_t* cells = nullptr;
+        if (!patterns.rowData(pattern, row, cells, width))
             return false;
         for (std::uint16_t column = 0; column < width; ++column) {
-            char symbol = 0;
-            if (!patterns.cell(pattern, column, row, symbol))
-                return false;
+            const char symbol = static_cast<char>(cells[column]);
             const int ordinal = column + 1;
             const int buildX = reversed ? 320 - ordinal * 16
                                         : 160 + ordinal * 16;

@@ -140,4 +140,19 @@ bool BuilderPatternPack::rowWidth(const PackedBuilderPattern& value,
     return true;
 }
 
+bool BuilderPatternPack::rowData(const PackedBuilderPattern& value,
+                                 std::uint16_t y, const std::uint8_t*& out,
+                                 std::uint32_t& width) const {
+    if (!valid() || y >= value.rowCount ||
+        !range(value.firstRow, value.rowCount, rowCount_) ||
+        !range(value.firstCell, value.cellCount, cellCount_)) return false;
+    const std::uint8_t* row = bytes_ + rowsOffset_ + (value.firstRow+y)*rowRecordSize;
+    const std::uint32_t first = u32(row), count = u32(row+4);
+    if (!count || count > value.width || first < value.firstCell ||
+        !range(first-value.firstCell, count, value.cellCount)) return false;
+    out = bytes_ + cellsOffset_ + first;
+    width = count;
+    return true;
+}
+
 } // namespace downwell

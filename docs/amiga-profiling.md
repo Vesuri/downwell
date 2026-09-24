@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at about 33.2 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at about 33.3 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -85,6 +85,27 @@ FPSCOUNT reports 904 fields for 600 updates (33.19 FPS, maximum gap six),
 versus 903 previously: effectively unchanged, not a frame-rate improvement.
 The full host suite and bounded native replay pass with unchanged digests.
 Both 68000 audits pass, and the ordinary non-skip executable is restored.
+
+### Read pattern rows once
+
+Area-one generation now requests a validated immutable row view rather than
+decoding the same little-endian row record and checking its ranges for every
+cell. Per-row widths (including the anomalous shop row) and cell order remain
+unchanged. The view borrows the pack storage and introduces no allocation,
+format change, RNG draw or scheduling change. It validates both row and cell
+ranges, including caller-supplied pattern metadata, before exposing a pointer.
+
+All 737 rows / 8,435 cells are compared with individual cell reads; invalid
+rows, cell ranges and widths are rejected. The pack sanitizer and deterministic
+builder tests pass. With the same detailed native probes, builder-exclusive
+time falls from 424.684 to 398.312 ms over 600 updates (6.2%). Maximum whole
+frame falls from 159.589 to 146.233 ms, still far outside the 20 ms budget.
+Instrumented fields are 1,136 versus 1,135, so do not infer a general frame-rate
+gain from that maximum alone. Evidence uses `/tmp/downwell-builder-rows-`.
+FPSCOUNT-only result: 901 fields for 600 updates (33.30 FPS, maximum gap
+five fields), versus 904 fields and a six-field maximum before this change.
+The complete host suite, bounded native replay, and both 68000 audits pass.
+All replay digests are unchanged, and the normal non-skip executable is restored.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 
