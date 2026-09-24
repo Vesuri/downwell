@@ -4,7 +4,9 @@ namespace downwell {
 enum class BulletImpactKind { ignored, immune, damaged, defeated };
 struct BulletImpact { BulletImpactKind kind; int sound; };
 
-// Implemented usual gun: non-piercing, ten damage, downward direction 270.
+// Implemented usual gun: non-piercing, nine damage, downward direction 270.
+// bStatInitialize's temporary 10 is overwritten by bStatUpdate(0, 0), which
+// reads bStatInitLevel1's MACHINEGUN entry. Gem-high level 1 remains separate.
 // Enemy storage exposes the same hit-state fields on both platforms. Queued
 // hit delivery and immediate fatal retirement remain phase approximations;
 // original hitAngle/hitDmg, damageStun, momentDelay and effects are not modeled.
@@ -20,7 +22,7 @@ BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
     if (enemy.objectId == 113) enemy.frogHit.pending = true;
     if (enemy.objectId == 117) enemy.snailHit.pending = true;
     if (enemy.objectId == 116) enemy.batHit.queue(270);
-    enemy.health -= 10;
+    enemy.health -= 9;
     if (enemy.health > 0) return {BulletImpactKind::damaged, 29};
     reward();
     enemy.active = false;

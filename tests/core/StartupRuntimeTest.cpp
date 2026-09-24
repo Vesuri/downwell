@@ -634,7 +634,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             bat.imageSpeed = 0.2F;
             bat.alarms.reset();
             batCombat.step(releasedMain, false);
-            require(batCombat.instanceAt(targetIndex).health == 5 &&
+            require(batCombat.instanceAt(targetIndex).health == 6 &&
                         batCombat.instanceAt(targetIndex).batHit.pending,
                     "SDL usual bullet queues a surviving bat hit");
             const float batX = batCombat.instanceAt(targetIndex).preciseX;

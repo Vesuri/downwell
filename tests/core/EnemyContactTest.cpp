@@ -36,13 +36,13 @@ int main() {
             enemy = Enemy{}; enemy.objectId = object;
             auto impact = applyStandardBulletImpact(enemy, defeated, random, reward);
             require(impact.kind == BulletImpactKind::damaged && impact.sound == 29 &&
-                        enemy.active && enemy.health == 5 && random.calls == 0,
-                    "usual bullet applies ten damage without an invented random draw");
+                        enemy.active && enemy.health == 6 && random.calls == 0,
+                    "usual bullet applies table-selected nine damage without an invented random draw");
             require(object == 113 ? enemy.frogHit.pending : object == 117 ? enemy.snailHit.pending :
                         enemy.batHit.pending && enemy.batHit.pendingDirection == 270,
                     "shared impact queues the appropriate existing enemy hit state");
             impact = applyStandardBulletImpact(enemy, defeated, random, reward);
-            require(impact.kind == BulletImpactKind::defeated && !enemy.active && enemy.health == -5,
+            require(impact.kind == BulletImpactKind::defeated && !enemy.active && enemy.health == -3,
                     "fatal usual hit emits the implemented retirement/reward response");
             require(applyStandardBulletImpact(enemy, defeated, random, reward).kind == BulletImpactKind::ignored,
                     "already retired targets cannot produce a second defeat");

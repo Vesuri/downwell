@@ -554,7 +554,7 @@ int main() {
     require(hitFrog.configureEnemy(0, 113, 166, -1, 16, 512, 0, 35, 20,
                 2, 1, 30, -1, 0, 0, true, false, true), "configure live bullet-hit frog");
     hitFrog.step(4);
-    require(hitFrog.enemyAt(0).health == 25 && hitFrog.enemyAt(0).frogHit.pending &&
+    require(hitFrog.enemyAt(0).health == 26 && hitFrog.enemyAt(0).frogHit.pending &&
                 hitFrog.enemyAt(0).frogHit.remaining == 0,
             "bullet damage queues a surviving frog's reaction for its next Step");
     hitFrog.step(0);
@@ -719,7 +719,7 @@ int main() {
                 0, 0, -1, -1, 270, 256, true, false, true),
             "configure bat that survives one usual-gun bullet");
     hitBat.step(4);
-    require(hitBat.enemyAt(0).health == 5 && hitBat.enemyAt(0).batHit.pending,
+    require(hitBat.enemyAt(0).health == 6 && hitBat.enemyAt(0).batHit.pending,
             "surviving bat hit queues its recovered response");
     const long batX = hitBat.enemyAt(0).preciseX, batY = hitBat.enemyAt(0).preciseY;
     for (int frame = 0; frame < 3; ++frame) {
@@ -738,7 +738,7 @@ int main() {
                                     0, 0, -1, -1, 0, 0, true, false, true),
             "configure snail that survives a usual-gun bullet");
     hitSnail.step(4);
-    require(hitSnail.enemyAt(0).health == 10 && hitSnail.enemyAt(0).snailHit.pending &&
+    require(hitSnail.enemyAt(0).health == 11 && hitSnail.enemyAt(0).snailHit.pending &&
             hitSnail.enemyAt(0).spriteId == 177, "surviving hit queues the snail reaction");
     hitSnail.step(0);
     require(hitSnail.enemyAt(0).spriteId == 178 && hitSnail.enemyAt(0).snailHit.alarm2 == 4 &&

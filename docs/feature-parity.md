@@ -9,6 +9,29 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Ordinary machine-gun damage comes from the selected weapon table
+
+The shared impact path now subtracts nine, not ten. `bStatInitialize` assigns
+a temporary default damage of ten, then initializes weapon tables and calls
+`bStatUpdate(global.pGunType, global.pGunLevel)`. For normal MACHINEGUN (0,0),
+`bStatInitLevel1` VM assembly assigns nine; level 1 assigns fifteen.
+`bulPropertyCheck` copies the selected value into the new projectile, and
+`scrTypicalBulletDamage` passes it to `scrDamageEnemy` without adding one.
+
+Focused hit fixtures now require bat 15→6, snail 20→11 and frog 35→26 after
+one usual shot. This fixes the currently implemented normal machine-gun path;
+it does not implement gem-high level switching, other weapons, randomized
+direction, or the original deferred death/collision/effect phases. In
+particular, powered-up shots still need per-projectile birth-time properties,
+not a global damage value consulted at impact. Historical notes referring to
+ten-damage usual bullets describe the superseded implementation.
+The full host suite passes. Both 6,000-update paired tapes pass: phase 1
+retains its death coverage; phase 5 now verifies survival with health 2,
+defeats 8 and gems 90 on both runtimes. Its old mandatory-death assertion
+was incompatible with the corrected source damage; inputs are unchanged.
+Bounded native replay and both CPU audits pass, and the normal build is
+restored. Its unchanged short digest does not exercise this damage correction.
+
 See [upgrade coverage](upgrade-coverage.md) for the per-ID implementation,
 validation gaps and dependency-led work order. The chronological notes below
 must not be counted as completed whole-game features.

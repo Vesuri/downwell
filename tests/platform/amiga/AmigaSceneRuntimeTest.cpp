@@ -1486,6 +1486,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         if (std::getenv("DOWNWELL_VERIFY_DEATH"))
             require(pairedDeadFrames >= 120,
                     "death-state regression includes at least 120 paired depleted-health updates");
+        if (std::getenv("DOWNWELL_VERIFY_SURVIVAL"))
+            require(combatTicks == 6000 && pairedDeadFrames == 0 &&
+                    gameplay.health() > 0 && reference.mainPlayerHealth() > 0 &&
+                    !gameplay.dead() && !reference.mainDeathSequence().movementDead(),
+                    "long survival tape remains alive on both adapters with corrected normal damage");
     }
     // Exercise the real controller boundaries after the existing tape, without
     // changing its inputs, digests or required combat encounters.
