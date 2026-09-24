@@ -588,15 +588,15 @@ void StartupRuntime::updateMainCurrency() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainCurrencyCount_; ++index) {
         MainCurrencyState gem = mainCurrencyItems_[index];
-        ++gem.age;
-        gem.motion.step(gem.age, mainPlayerMotion_.frameStartXFixed(), mainPlayerMotion_.frameStartYFixed(),
-            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_);
+        if (!gem.motion.step(mainPlayerMotion_.frameStartXFixed(), mainPlayerMotion_.frameStartYFixed(),
+            [this](int x, int y) { return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y); }, random_)) continue;
+        gem.age = gem.motion.lifetime.age;
         gem.x = mainPlayerOriginX_ + gem.motion.x / 12800.0F;
         gem.y = mainPlayerOriginY_ + gem.motion.y / 12800.0F;
         gem.speedX = gem.motion.vx / 12800.0F;
         gem.speedY = gem.motion.vy / 12800.0F;
         gem.attracted = gem.motion.attracted;
-        const bool collected = gem.motion.collectible(gem.age, mainPlayerMotion_.offsetXFixed(),
+        const bool collected = gem.motion.collectible(mainPlayerMotion_.offsetXFixed(),
                                                       mainPlayerMotion_.offsetYFixed());
         if (collected) {
             mainCurrencyTotal_ += static_cast<std::uint32_t>(gem.amount);
@@ -604,7 +604,7 @@ void StartupRuntime::updateMainCurrency() {
             mainGemStreak_ += static_cast<std::uint32_t>(gem.amount);
             mainGemStreakTimer_ = 300;
             ++soundPlayRequests_;
-        } else if (gem.age < 310) {
+        } else {
             mainCurrencyItems_[write++] = gem;
         }
     }

@@ -768,9 +768,12 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         GemState& gem = gems_[gemIndex];
         if (!gem.active)
             continue;
-        ++gem.age;
-        gem.motion.step(gem.age, player_.frameStartXFixed(), player_.frameStartYFixed(),
-            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_);
+        if (!gem.motion.step(player_.frameStartXFixed(), player_.frameStartYFixed(),
+            [this](int x, int y) { return solidResolver_ && solidResolver_(solidResolverContext_, x, y); }, enemyRandom_)) {
+            gem.active = false;
+            continue;
+        }
+        gem.age = gem.motion.lifetime.age;
         gem.preciseX = downwell::GemMotion::q8(gem.motion.x);
         gem.preciseY = downwell::GemMotion::q8(gem.motion.y);
         gem.speedX = downwell::GemMotion::q8(gem.motion.vx);
@@ -778,12 +781,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         gem.attracted = gem.motion.attracted;
         gem.x = downwell::roundGameMakerQ8(gem.preciseX);
         gem.y = downwell::roundGameMakerQ8(gem.preciseY);
-        if (gem.motion.collectible(gem.age, player_.offsetXFixed(), player_.offsetYFixed())) {
+        if (gem.motion.collectible(player_.offsetXFixed(), player_.offsetYFixed())) {
             currency_ += (unsigned)gem.amount;
             gemStreak_ += (unsigned)gem.amount;
             gemStreakTimer_ = 300;
-            gem.active = false;
-        } else if (gem.age >= 310) {
             gem.active = false;
         }
     }

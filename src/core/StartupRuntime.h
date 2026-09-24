@@ -39,7 +39,7 @@ public:
         GemMotion motion;
         float x = 0.0F, y = 0.0F, speedX = 0.0F, speedY = 0.0F;
         std::int32_t amount = 0;
-        std::uint16_t age = 0;
+        unsigned age = 0;
         bool large = false;
         bool attracted = false;
     };

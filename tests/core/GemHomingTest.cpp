@@ -7,6 +7,20 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    downwell::GemLifetime loose, attracted;
+    for (unsigned age = 1; age <= 400; ++age) {
+        require(attracted.advance(true), "attracted gem survives its source expiry alarm");
+        require(attracted.obtainable() == (age >= 10) &&
+                attracted.suckable() == (age >= 15) &&
+                attracted.disappearing() == (age >= 190),
+                "default currency alarm boundaries match Create and Alarm 0/1/3");
+        if (age <= 310)
+            require(loose.advance(false) == (age < 310), "loose gem expires exactly at Alarm 2");
+    }
+    require(attracted.advance(false), "expired Alarm 2 is not repeated if attraction later clears");
+    attracted.age = 65535;
+    require(attracted.advance(true) && attracted.age == 65536 && attracted.obtainable(),
+            "long-lived attracted gems do not wrap the former SDL 16-bit age counter");
     struct Random {
         unsigned call = 0;
         unsigned irandomSmall(unsigned) {
@@ -23,14 +37,24 @@ int main() {
     motion = {};
     const auto empty = [](int, int) { return false; };
     for (unsigned tick = 1; tick <= 20; ++tick) {
-        motion.step(tick, 10000 * 256L, 0, empty, random);
+        motion.step(10000 * 256L, 0, empty, random);
         require(motion.vy == 448L * tick && motion.y == 224L * tick * (tick + 1) && motion.vx == 0,
                 "free gravity is exact .035 and sign(0) does not invent horizontal motion");
     }
     motion = {};
-    motion.step(15, 10 * 256L, 0, empty, random);
+    motion.lifetime.age = 14;
+    motion.step(10 * 256L, 0, empty, random);
     require(motion.attracted && motion.homing.speedEighths == 32 && motion.vy == 448,
             "acquisition update still performs free motion; homing begins next update");
+    motion = {};
+    motion.lifetime.age = 309;
+    require(!motion.step(10 * 256L, 0, empty, random) && !motion.attracted && motion.y == 0,
+            "expiry alarm runs before motion and cannot acquire a nearby player on its last tick");
+    motion = {};
+    motion.attracted = true;
+    motion.lifetime.age = 309;
+    require(motion.step(10 * 256L, 0, empty, random) && motion.x != 0,
+            "already attracted gem survives expiry and still moves that update");
     downwell::GemHoming gem;
     long vx, vy;
     gem.step(0, -25600, vx, vy);

@@ -618,3 +618,27 @@ the shared code. Sharing it removes divergent implementations, not that debt.
 The bounded 68000 replay (`64 9f0d3943 e7900d2b`) and 600-tick target
 terrain-cache check pass. Those target checks are regression evidence, not
 complete gem-trajectory verification against the Windows executable.
+
+## Shared currency lifetime
+
+GemMotion now owns GemLifetime and advances it before any movement or target
+acquisition. The adapters no longer increment age or independently decide when
+to delete a gem; they retain an age mirror for presentation. The SDL mirror is
+no longer 16-bit, since attracted gems can outlive 65,535 updates.
+
+Recovered objCurrency Alarm 0 makes the gem obtainable and starts obtime=180;
+Alarm 1 marks disappearing and starts distime=120; Alarm 2 destroys only if
+not attracted, and does not rearm itself. Create's unobtime=10 and Alarm 3=15
+give the default 10/15/190/310 boundaries. The old adapters deleted attracted
+gems at age 310 and allowed loose gems one movement/acquisition update before
+expiry. Both now consume the shared one-shot expiry result instead.
+
+Core tests cover every boundary, attracted survival, non-repeating Alarm 2,
+the former 16-bit wrap, and expiry before acquisition in the actual motion
+update. This models the default schedule, not upgrades/time-stop rescheduling.
+Creation-frame participation in the original runner's alarm/Step phases still
+needs verification; durations alone do not prove that frame alignment. The
+source disappearing flag is exposed but its Draw flashing is not yet wired.
+Full host regressions and the bounded 68000 replay (`64 9f0d3943 e7900d2b`)
+pass. The replay is a target regression, not a direct test of the 310-tick
+gem lifetime; those boundary cases are exercised by the shared core tests.
