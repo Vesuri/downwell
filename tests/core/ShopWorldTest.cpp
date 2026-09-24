@@ -43,6 +43,26 @@ int main() {
             created->farewellVariant == farewell, "all three creation-time farewell choices are retained");
     }
     using Feedback = downwell::ShopFeedback;
+    {
+        downwell::ShopWorld world;
+        auto& sign = world.instances[0];
+        sign.present = true; sign.x = 320; sign.y = 500;
+        sign.prompt.phase = downwell::HudReal::integer(5);
+        unsigned draws = 0;
+        auto emit = [&](int sprite, unsigned frame, int x, int y) {
+            require(sprite == 707 && frame == 5 && x == 320 && y == 480,
+                "sign uses original sprite/frame and counter-relative anchor");
+            ++draws;
+        };
+        downwell::drawShopPrompts(world, false, emit);
+        sign.menu.speaking = true;
+        downwell::drawShopPrompts(world, false, emit);
+        sign.menu.speaking = false;
+        downwell::drawShopPrompts(world, true, emit);
+        sign.present = false;
+        downwell::drawShopPrompts(world, false, emit);
+        require(draws == 1, "speaking, criminal and retired-shop prompt suppression");
+    }
     using Effect = downwell::ShopInteraction::Effect;
     Feedback feedback;
     downwell::ShopInventory stock;

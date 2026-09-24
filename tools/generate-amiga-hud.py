@@ -102,6 +102,7 @@ SELECTIONS = {
         487: None,   # merchant angry/blink
         496: None,   # merchant goodbye
         497: None,   # merchant confused
+        707: None,   # interaction sign, offline planar and DMA variants
         550: None,   # sprScattered (generated plants)
         568: None,   # sprDungTorch
         569: None,   # sprGemChunk
@@ -603,7 +604,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 459,
-                  485, 486, 487, 496, 497)
+                  485, 486, 487, 496, 497, 707)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:
                 continue

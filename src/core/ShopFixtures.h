@@ -25,6 +25,13 @@ void drawShopFixtures(const ShopWorld& world, Emit emit) {
 }
 // Moving-object pass: never bake merchant animation into the terrain cache.
 template<class Emit>
+void drawShopPrompts(const ShopWorld& world, bool criminal, Emit emit) {
+    if (criminal) return;
+    for (const auto& shop : world.instances)
+        if (shop.present && !shop.menu.speaking)
+            emit(707, shop.prompt.frame(), shop.x, shop.y - 20);
+}
+template<class Emit>
 void drawShopKeepers(const ShopWorld& world, Emit emit) {
     for (const auto& shop : world.instances)
         if (shop.allocated && shop.keeper.present)

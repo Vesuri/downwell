@@ -1436,7 +1436,8 @@ int main(void) {
     static AmigaTerrainFragment fragments[amigaInitialTerrainFragmentCount];
     static AmigaTerrainDecoration
         generatedDecorations[amigaTerrainDecorationCapacity];
-    AmigaAreaOneTerrainBuilder liveBuilder(fragments,
+    alignas(AmigaAreaOneTerrainBuilder) static UBYTE liveBuilderStorage[sizeof(AmigaAreaOneTerrainBuilder)];
+    auto& liveBuilder = *new (liveBuilderStorage) AmigaAreaOneTerrainBuilder(fragments,
         amigaInitialTerrainFragmentCount, nullptr, 0,
         generatedDecorations, amigaTerrainDecorationCapacity);
     LiveGenerationContext liveGeneration{&liveBuilder, &builders, &objects, &port};
@@ -2635,7 +2636,7 @@ int main(void) {
             DW_PROFILE_PHASE(profileSprite);
             // Shared current painter order: enemies, merchants, player, bullets, gems.
             static GameplayBob actors[1 + AmigaPortRuntime::bulletCapacity +
-                AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity + downwell::ShopWorld::capacity];
+                AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity + 2 * downwell::ShopWorld::capacity];
             unsigned actorCount = 0;
 #ifndef DOWNWELL_REPLAY_VERIFY
             for (unsigned index = 0; index < port.enemyCount(); ++index) {
@@ -2649,6 +2650,10 @@ int main(void) {
             }
 #endif
             downwell::drawShopKeepers(port.shops(), [&](int sprite, unsigned frame, int x, int y) {
+                if (!appendGameplayActor(actors, actorCount, sprite, frame,
+                    downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) frameReady = false;
+            });
+            downwell::drawShopPrompts(port.shops(), false, [&](int sprite, unsigned frame, int x, int y) {
                 if (!appendGameplayActor(actors, actorCount, sprite, frame,
                     downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) frameReady = false;
             });
@@ -2811,7 +2816,9 @@ int main(void) {
                 else {
                     static AmigaShopMenu shopActual, shopOracle;
                     shopActual.reset(); shopOracle.reset();
-                    downwell::ShopWorld::Instance fixture;
+                    alignas(downwell::ShopWorld::Instance) static UBYTE
+                        shopFixtureStorage[sizeof(downwell::ShopWorld::Instance)];
+                    auto& fixture = *new (shopFixtureStorage) downwell::ShopWorld::Instance;
                     fixture.present = fixture.menu.active = true;
                     fixture.menu.menuState = 1;
                     fixture.x = 240; fixture.y = 240;

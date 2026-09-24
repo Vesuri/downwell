@@ -569,3 +569,28 @@ updates against host binary64 arithmetic; the paired runtime fixture compares
 prompt state as well. Native build and 68000 audits pass. Rendering sprite 707
 is not connected yet: neither an absent prompt nor matching internal phase
 constitutes original-game visual parity.
+
+## Interaction sign rendering
+
+Both drawing adapters now submit original sprite 707 at counter.x,counter.y-20
+using the shared prompt frame. The shared draw helper suppresses speaking,
+criminal and retired-counter signs. Current runtime callers still supply the
+supported noncriminal state; theft/criminal behavior is not implemented by this
+change. Amiga's six planar and DMA frames are converted offline, use existing
+hardware-channel assignment/BOB fallback, and never enter the static terrain
+cache. Actor capacity reserves space for a merchant plus a sign per shop.
+
+Host tests check source resource/position/frame and visibility guards; renderer
+tests require all six DMA frames and run 20580 offline sprite pixel comparisons.
+The existing 278000-byte resident-art budget is unchanged. Ordinary gameplay
+cache runs still contain no shop; that regression validates memory/asset
+integration, not a live prompt screenshot against Windows.
+
+The 600-tick target regression initially exposed insufficient task-stack
+margin. Moving only the verifier's shop fixture improved but did not resolve
+it; moving the long-lived live terrain builder to static Fast storage resolved
+the remaining pressure. No stack allowance or safety threshold was increased.
+The final bounded run passed all 101 terrain comparisons, shop overlay checks
+and the original 256-byte stack guard on a 4096-byte task stack. Resident art
+is now 276684 bytes and startup Chip headroom 17424 bytes. Normal native build
+restored after the verifier run; SDL build and renderer tests also pass.
