@@ -15,7 +15,7 @@ struct FrogVerticalMotion {
     }
     int pixel() const { return static_cast<int>(floorDivide(position, 1280)); }
     template<class SolidAtY>
-    void step(SolidAtY solid) {
+    void step(SolidAtY solid, bool integrate = true) {
         velocity += 192;
         if (velocity >= 7 * 1280) velocity = 7 * 1280;
         const long next = position + velocity;
@@ -25,7 +25,7 @@ struct FrogVerticalMotion {
             velocity = 0;
             grounded = true;
         } else {
-            position = next;
+            if (integrate) position = next;
             grounded = false;
         }
     }

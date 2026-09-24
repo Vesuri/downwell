@@ -580,7 +580,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                                      enemy.imageSpeed);
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)
             enemy.awake = true;
-        if (!enemy.awake || solidResolver_ == 0)
+        if ((!enemy.awake && enemy.objectId != 113) || solidResolver_ == 0)
             continue;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const int halfWidth = enemy.objectId == 112 ? 8 : 6;
@@ -650,12 +650,15 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             enemy.direction = bat.direction;
             enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
         } else if (enemy.objectId == 113) {
+            const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
+                (cameraPixelX_ - 80) * 256L, cameraY_ - 142 * 256L,
+                (cameraPixelX_ + 80) * 256L, cameraY_ + 142 * 256L);
             downwell::FrogVerticalMotion vertical{
                 enemy.preciseY * 5 + enemy.gravityPositionRemainder,
                 enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
             vertical.step([this, &enemy](int y) {
                 return solidResolver_(solidResolverContext_, enemy.frogHorizontal.pixel(), y);
-            });
+            }, integrate);
             enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(vertical.position, 5);
             enemy.gravityPositionRemainder = static_cast<unsigned char>(vertical.position - enemy.preciseY * 5);
             enemy.speedY = downwell::FrogVerticalMotion::floorDivide(vertical.velocity, 5);
@@ -664,7 +667,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             if (!enemy.grounded) {
                 enemy.frogHorizontal.step([this, &vertical](int edge) {
                     return solidResolver_(solidResolverContext_, edge, vertical.pixel());
-                });
+                }, integrate);
                 enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
                 enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
             }

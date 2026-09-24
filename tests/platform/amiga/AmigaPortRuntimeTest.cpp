@@ -388,6 +388,15 @@ int main() {
     }
 
     AmigaPortRuntime fallingFrog(300);
+    AmigaPortRuntime offscreenFrog(300);
+    offscreenFrog.configureSolidResolver(noSolid, nullptr);
+    require(offscreenFrog.configureEnemy(0, 113, 166, 40, 400,
+                512, 0, 35, 20, 0, 0, -1, -1), "configure frog below motion view");
+    for (unsigned i = 0; i < 60; ++i) offscreenFrog.step(0);
+    require(offscreenFrog.enemyAt(0).preciseX == 40 * 256L &&
+                offscreenFrog.enemyAt(0).preciseY == 400 * 256L &&
+                offscreenFrog.enemyAt(0).speedY == 7 * 256L,
+            "native offscreen frog accumulates gravity without moving, even before legacy wake threshold");
     fallingFrog.configureSolidResolver(noSolid, nullptr);
     require(fallingFrog.configureEnemy(0, 113, 171, 40, 1,
                 0, 0, 35, 20, 0, 0, -1, -1), "configure free-falling frog");

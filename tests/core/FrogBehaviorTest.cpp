@@ -64,6 +64,26 @@ int main() {
     require(position == 0 && remainder == 0,
             "opposite fractional displacements cancel exactly");
     using downwell::frogPreparationDirection;
+    using downwell::frogMotionVisible;
+    require(frogMotionVisible(0, 173 * 256L, -80 * 256L, -142 * 256L, 80 * 256L, 142 * 256L),
+            "motion includes the source's extra thirty-two-pixel bottom margin");
+    require(!frogMotionVisible(0, 174 * 256L, -80 * 256L, -142 * 256L, 80 * 256L, 142 * 256L),
+            "expanded motion bottom edge is strict");
+    require(!frogMotionVisible(80 * 256L, 0, -80 * 256L, -142 * 256L, 80 * 256L, 142 * 256L) &&
+            !frogMotionVisible(0, -142 * 256L, -80 * 256L, -142 * 256L, 80 * 256L, 142 * 256L),
+            "movement adds no horizontal or top margin");
+    vertical = {};
+    for (unsigned i = 0; i < 60; ++i) vertical.step([](int) { return false; }, false);
+    require(vertical.position == 0 && vertical.velocity == 7 * 1280,
+            "offscreen gravity continues to terminal speed without displacement");
+    vertical.step([](int) { return false; }, true);
+    require(vertical.position == 7 * 1280,
+            "entering view integrates accumulated offscreen velocity");
+    horizontal = {};
+    horizontal.velocity = 2 * 65536L;
+    horizontal.step([](int) { return true; }, false);
+    require(horizontal.velocity == -39322 && horizontal.position == 0,
+            "offscreen collision still rebounds without integrating position");
     auto direction = [](long x, long y, long playerX, bool grounded = true) {
         return frogPreparationDirection(grounded, x, y, playerX,
             -80 * 256L, -142 * 256L, 80 * 256L, 142 * 256L);

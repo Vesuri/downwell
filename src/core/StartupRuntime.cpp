@@ -671,6 +671,11 @@ void StartupRuntime::updateMainEnemies() {
             }
             enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
         } else if (enemy.objectId == 113) {
+            const bool integrate = frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
+                static_cast<long>(std::round(mainCameraViewX() * 256.0F)),
+                static_cast<long>(std::round(mainCameraViewY() * 256.0F)),
+                static_cast<long>(std::round((mainCameraViewX() + surfaceWidth) * 256.0F)),
+                static_cast<long>(std::round((mainCameraViewY() + surfaceHeight) * 256.0F)));
             if (!enemy.frogMotionInitialized) {
                 enemy.frogHorizontal.position = static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 65536.0F));
                 enemy.frogHorizontal.velocity = static_cast<long>(std::round(enemy.velocityX * 65536.0F));
@@ -681,14 +686,14 @@ void StartupRuntime::updateMainEnemies() {
             enemy.frogVertical.grounded = enemy.grounded;
             enemy.frogVertical.step([this, &enemy](int y) {
                 return mainSolidAt(mainPlayerOriginX_ + enemy.frogHorizontal.pixel(), mainPlayerOriginY_ + y);
-            });
+            }, integrate);
             enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
             enemy.velocityY = enemy.frogVertical.velocity / 1280.0F;
             enemy.grounded = enemy.frogVertical.grounded;
             if (!enemy.grounded) {
                 enemy.frogHorizontal.step([this, &enemy](int edge) {
                     return mainSolidAt(mainPlayerOriginX_ + edge, mainPlayerOriginY_ + enemy.frogVertical.pixel());
-                });
+                }, integrate);
                 enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
                 enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
             }

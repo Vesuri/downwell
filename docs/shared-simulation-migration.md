@@ -500,3 +500,23 @@ bounded 68000 replay and A500 600-tick terrain-cache oracle pass. Both target
 instruction/helper audits are clean; normal builds are restored. The short
 cross-CPU checksum remains `9f0d3943e7900d2b` and is not a substitute for the
 longer host-side actor-state comparison.
+
+## Frog movement visibility
+
+enmFrog Step's VM calls scrInView(0,0,32) immediately before integrating xx/yy.
+The shared predicate now enforces strict camera edges with an extra 32 pixels
+only at the bottom. Both adapters pass the previous rounded instance position
+and current camera view, separately from Alarm 1's zero-margin preparation
+test. Shared motion routines gate displacement while continuing gravity and
+their existing collision responses; they do not freeze the whole frog.
+
+Native no longer skips active frogs solely because they are below its legacy
+generic enemy wake threshold. That skip suppressed source gravity accumulation
+outside the movement view. A native fixture starts a frog below that threshold
+and verifies unchanged X/Y plus terminal downward velocity after sixty steps.
+Core fixtures cover the strict bottom extension, unchanged top/side edges,
+offscreen gravity, re-entry movement and offscreen rebound.
+
+The full strict frog/combat tape remains passing with unchanged final counters.
+This does not complete source collision fidelity: masks/thin platforms, exact
+collision-event ordering, time-stop, water and hit-stun remain open.
