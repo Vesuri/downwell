@@ -3,10 +3,31 @@
 #include "core/ShopFixtures.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    downwell::InteractionPrompt prompt;
+    double sourcePhase = 0;
+    for (unsigned tick = 0; tick < 10000; ++tick) {
+        const bool eligible = (tick % 71) < 30;
+        if (eligible) {
+            if (sourcePhase < 2) sourcePhase = 2;
+            if (sourcePhase <= 5.1) sourcePhase += 0.3;
+        } else {
+            sourcePhase += 0.1;
+            if (sourcePhase > 2) sourcePhase -= 2;
+        }
+        prompt.step(eligible);
+        std::uint64_t bits = 0;
+        std::memcpy(&bits, &sourcePhase, sizeof(bits));
+        require(prompt.phase.mantissa == ((bits & 0xfffffffffffffULL) | 0x10000000000000ULL) &&
+            prompt.phase.exponent == int((bits >> 52) & 0x7ff) - 1023,
+            "interaction prompt matches source binary64 phase exactly");
+        require(prompt.frame() == unsigned(sourcePhase),
+            "interaction prompt preserves binary64 frame boundaries through approach/leave cycles");
+    }
     for (unsigned farewell = 0; farewell < 3; ++farewell) {
         downwell::ShopWorld world;
         unsigned call = 0;

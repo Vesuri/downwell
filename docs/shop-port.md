@@ -554,3 +554,18 @@ events between builder steps, use actual runtime stage selection, or prove
 Windows equivalence. Gameplay still defaults to ordinary 1-1, and its setup and
 shop price context must be wired together when other styles/stages become
 available. No test-only forced shop was inserted into production 1-1.
+
+## Interaction sign state
+
+Shop Step's final scrCheckThisSignStep call is now shared. Eligible contact
+raises checkThis to at least 2 and adds binary64 0.3 while it is <=5.1.
+Otherwise it adds binary64 0.1, then subtracts 2 once if above 2. It runs after
+interaction/mask changes, including while speaking; Draw's speaking/criminal
+suppression is a separate concern. InteractionPrompt uses HudReal, avoiding
+target floating-point helpers and decimal-counter drift.
+
+Tests compare all phase bits and floor frames over 10,000 approach/leave
+updates against host binary64 arithmetic; the paired runtime fixture compares
+prompt state as well. Native build and 68000 audits pass. Rendering sprite 707
+is not connected yet: neither an absent prompt nor matching internal phase
+constitutes original-game visual parity.

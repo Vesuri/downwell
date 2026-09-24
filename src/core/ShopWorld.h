@@ -3,6 +3,7 @@
 #include "ShopInteraction.h"
 #include "ShopFeedback.h"
 #include "ShopKeeper.h"
+#include "InteractionPrompt.h"
 #include "Input.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
@@ -20,6 +21,7 @@ struct ShopWorld {
         ShopInteraction menu;
         ShopFeedback feedback;
         ShopKeeper keeper;
+        InteractionPrompt prompt;
     };
     Instance instances[capacity];
     unsigned allocatedCount = 0;
@@ -136,6 +138,9 @@ struct ShopWorld {
                     if (hadItem && !shop.feedback.itemPresent[cursor - 1]) ++shop.artRevision;
                     emit(shop, effect);
                 });
+            // Tail call in Shop Step: runs even while speaking or dead. Draw
+            // suppresses the sign separately when speaking or criminal.
+            shop.prompt.step(meets(shop, x, y) && interactable);
         }
     }
     void endStep(int viewY) {
