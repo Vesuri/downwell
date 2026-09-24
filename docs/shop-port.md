@@ -594,3 +594,20 @@ The final bounded run passed all 101 terrain comparisons, shop overlay checks
 and the original 256-byte stack guard on a 4096-byte task stack. Resident art
 is now 276684 bytes and startup Chip headroom 17424 bytes. Normal native build
 restored after the verifier run; SDL build and renderer tests also pass.
+
+## Shared HUD overlap repair
+
+Retained shop composition now accepts an in-clip foreground overlay callback.
+After clearing dirty bounds and replaying shop commands, native rendering
+replays the gem-streak art without clearing its rectangle a second time. A
+streak change explicitly invalidates its intersecting HUD rectangle even when
+the shop commands are unchanged. This prevents stale holes in the panel and
+preserves the foreground streak while the shop moves or closes, matching the
+host's current HUD-after-world ordering. Original equal-depth ordering still
+needs visual comparison with Windows.
+
+Host regression deliberately clears the overlapping HUD rectangle, then checks
+unchanged/open/closed shop results against fresh composition with a foreground
+overlay. Renderer tests (including 20580 sprite comparisons) and the native
+build/68000 audits pass. This particular overlap case has not yet been exercised
+in the emulator with a live shop and a real changing streak.

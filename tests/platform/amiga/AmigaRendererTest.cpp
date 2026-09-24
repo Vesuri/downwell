@@ -403,6 +403,26 @@ int main(int argc, char** argv) {
         }
         for (auto byte : world) require(byte == 0x5a, "shop overlay never repaints the terrain ring");
         for (auto byte : retainedHud) require(byte == 0, "closed shop leaves no stale overlay pixels");
+        auto overlay = [](AmigaRenderer* renderer, void*) {
+            amigaRendererFillRect(renderer, 175, 60, 20, 4, 1);
+        };
+        shop.menu.active = true;
+        for (unsigned phase = 0; phase < 3; ++phase) {
+            // Simulate another HUD component clearing pixels in its bounds.
+            amigaRendererClearClipRect(&retainedRenderer);
+            amigaRendererFillRect(&retainedRenderer, 160, 44, 64, 24, 0);
+            retained.invalidateStreak();
+            if (phase == 2) shop.menu.active = false;
+            require(retained.draw(&retainedRenderer, shopPack.data(), shopPack.data()+shopPack.size(),
+                &shop, 160, 34, 200, overlay), "externally invalidated shop region recomposes");
+            std::fill(freshHud.begin(), freshHud.end(), 0);
+            AmigaShopMenu fresh;
+            fresh.invalidateStreak();
+            require(fresh.draw(&freshRenderer, shopPack.data(), shopPack.data()+shopPack.size(),
+                &shop, 160, 34, 200, overlay), "fresh HUD-over-shop composition");
+            require(retainedHud == freshHud,
+                "unchanged and closing shop restores foreground HUD without erasing underlying panel");
+        }
     }
     std::cout << "Amiga renderer tests passed\n";
     return 0;

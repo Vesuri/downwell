@@ -17,7 +17,9 @@ struct AmigaShopMenu {
     Command previous[capacity], current[capacity];
     unsigned previousCount = 0, count = 0;
     bool valid = true;
-    void reset() { previousCount = count = 0; valid = true; }
+    bool hudDirty = false;
+    void reset() { previousCount = count = 0; valid = true; hudDirty = false; }
+    void invalidateStreak() { hudDirty = true; }
     void append(Command command) {
         if (count == capacity) { valid = false; return; }
         current[count++] = command;
@@ -33,11 +35,13 @@ struct AmigaShopMenu {
     }
     bool draw(AmigaRenderer* renderer, const UBYTE* pack, const UBYTE* end,
               const downwell::ShopWorld::Instance* shop, int viewX, int viewY,
-              unsigned currency) {
+              unsigned currency, void (*overlay)(AmigaRenderer*, void*) = nullptr,
+              void* overlayContext = nullptr) {
         count = 0; valid = true;
         if (shop && !downwell::drawShopMenu(*shop, viewX, viewY, 284, currency, *this)) return false;
         if (!valid) return false;
         int left = 160, top = 284, right = 0, bottom = 0;
+        if (hudDirty) { left = 50; top = 44; right = 114; bottom = 68; }
         auto include = [&](const Command& command) {
             int x, y, w, h;
             if (!amigaRendererAssetBounds(pack, end, command.id, command.frame,
@@ -70,10 +74,14 @@ struct AmigaShopMenu {
                 else amigaRendererDrawAsset(renderer, pack, end, c.id, c.frame,
                     downwellPlayfieldX+c.x, c.y, 0);
             }
+            // HUD Draw follows world/shop Draw. Restore intersecting HUD art
+            // inside this same clip, without clearing the menu underneath it.
+            if (overlay) overlay(renderer, overlayContext);
             amigaRendererClearClipRect(renderer);
             renderer->target = saved;
         }
         previousCount = count;
+        hudDirty = false;
         for (unsigned i = 0; i < count; ++i) previous[i] = current[i];
         return true;
     }

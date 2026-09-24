@@ -551,11 +551,8 @@ static void redrawCurrency(AmigaRenderer* renderer, unsigned currency) {
     }
 }
 
-static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
+static void composeStreak(AmigaRenderer* renderer, unsigned streak) {
     enum { streakTextBase = 65100, maximumPackedStreak = 99 };
-    amigaRendererClearClipRect(renderer);
-    /* PF2 is transparent here, so clearing reveals the scrolling PF1 again. */
-    amigaRendererFillRect(renderer, 160, 44, 64, 24, 0);
     if (streak == 0)
         return;
     if (streak > maximumPackedStreak)
@@ -563,6 +560,11 @@ static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
     drawGameAsset(renderer, 133, 0, downwellPlayfieldX + 65, 55, 0);
     drawGameText(renderer, (UWORD)(streakTextBase + streak),
                  downwellPlayfieldX + 81, 51);
+}
+static void redrawStreak(AmigaRenderer* renderer, unsigned streak) {
+    amigaRendererClearClipRect(renderer);
+    amigaRendererFillRect(renderer, 160, 44, 64, 24, 0);
+    composeStreak(renderer, streak);
 }
 
 static void composeDeathFlash(AmigaRenderer* renderer, bool visible) {
@@ -2368,12 +2370,14 @@ int main(void) {
                 break;
             }
             if (!port.deathResults().active && !port.deathSequence().flashVisible() && gDownwellShopPack) {
-                const bool hadShop = shopMenuOverlay.previousCount != 0;
+                if (result.streakChanged || wasDead != port.dead()) shopMenuOverlay.invalidateStreak();
+                unsigned streak = port.dead() ? 0 : port.gemStreak();
                 if (!shopMenuOverlay.draw(&renderer, gDownwellShopPack,
                         gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
                         mainViewX + port.cameraOffsetX(), mainInitialViewY + port.cameraOffsetY(),
-                        port.currency())) { exitCode = 20; break; }
-                if (hadShop && !activeShop) redrawStreak(&renderer, port.dead() ? 0 : port.gemStreak());
+                        port.currency(), [](AmigaRenderer* target, void* context) {
+                            composeStreak(target, *static_cast<unsigned*>(context));
+                        }, &streak)) { exitCode = 20; break; }
             } else shopMenuOverlay.reset();
             if (port.deathResults().active) {
                 if (!selectOverlayAssetBank(false)) { exitCode = 20; break; }
