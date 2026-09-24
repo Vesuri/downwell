@@ -9,7 +9,9 @@ struct ShopFeedback {
     enum class Message : std::uint8_t { none, welcome, hello, hoho, maido, poor,
         question, what, huh, thank };
     enum class Channel : std::uint8_t { merchant, ui };
-    struct Sound { std::uint8_t resource = 0, volume = 0; Channel channel = Channel::merchant; };
+    // soundPlayOL's second argument is audio priority, not gain. The wrapper
+    // obtains gain from the sound asset and multiplies it by gameVolume.
+    struct Sound { std::uint8_t resource = 0, priority = 0; Channel channel = Channel::merchant; };
     static constexpr unsigned soundCapacity = 8;
     Sound sounds[soundCapacity];
     unsigned soundCount = 0;
@@ -24,10 +26,10 @@ struct ShopFeedback {
         soundCount = 0; overflow = false; message = Message::none;
         resetKeeperImage = false;
     }
-    void sound(unsigned id, unsigned volume, Channel channel) {
+    void sound(unsigned id, unsigned priority, Channel channel) {
         if (soundCount == soundCapacity) { overflow = true; return; }
         sounds[soundCount++] = {static_cast<std::uint8_t>(id),
-            static_cast<std::uint8_t>(volume), channel};
+            static_cast<std::uint8_t>(priority), channel};
     }
     void say(Message text, unsigned id) {
         message = text; sound(id, 90, Channel::merchant);

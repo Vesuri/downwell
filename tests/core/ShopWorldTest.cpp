@@ -32,7 +32,7 @@ int main() {
         feedback.beginStep();
         feedback.apply(replies[i], 1, stock);
         require(feedback.soundCount == 1 && feedback.sounds[0].resource == sounds[i] &&
-            feedback.sounds[0].volume == 90 && feedback.sounds[0].channel == Feedback::Channel::merchant &&
+            feedback.sounds[0].priority == 90 && feedback.sounds[0].channel == Feedback::Channel::merchant &&
             feedback.message != Feedback::Message::none, "source merchant reply resource/channel mapping");
     }
     feedback.confused = 2;
@@ -129,7 +129,7 @@ int main() {
         shop->feedback.itemPresent[1] && shop->feedback.thankful == 1 &&
         shop->feedback.resetKeeperImage && shop->feedback.soundCount == 2 &&
         shop->feedback.sounds[0].resource == 104 && shop->feedback.sounds[1].resource == 105 &&
-        shop->feedback.sounds[1].volume == 50,
+        shop->feedback.sounds[1].priority == 50,
         "purchase removes only purchased contents and retains ordered merchant/UI feedback");
     require(run.shops.fixtureRevision == 1, "purchase must not dirty unchanged furniture");
     require(shop->artRevision == 2, "purchase invalidates cached contents once");

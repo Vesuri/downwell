@@ -801,7 +801,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 "both runtimes retain identical merchant feedback");
             for (unsigned i = 0; i < a.soundCount; ++i)
                 require(a.sounds[i].resource == b.sounds[i].resource &&
-                    a.sounds[i].volume == b.sounds[i].volume && a.sounds[i].channel == b.sounds[i].channel,
+                    a.sounds[i].priority == b.sounds[i].priority && a.sounds[i].channel == b.sounds[i].channel,
                     "merchant/UI sound requests preserve source order across adapters");
             for (unsigned i = 0; i < 3; ++i)
                 require(a.itemPresent[i] == b.itemPresent[i] && a.storedItem[i] == b.storedItem[i],

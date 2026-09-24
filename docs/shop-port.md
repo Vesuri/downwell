@@ -162,8 +162,8 @@ state. Buying exhausted stock clears that case's stored-item flag and removes
 its item child, not the glass case. Keeper thankful/confused/goodbye mutations
 and image-reset requests follow Shop Step; opening clears only thankful/goodbye.
 Per-update rising-text identifiers and ordered sound requests retain original
-resource IDs, volume and merchant/UI channels. Purchases request merchant 104
-at volume 90 before UI 105 at volume 50. Held input produces no repeated requests.
+resource IDs, audio priority and merchant/UI channels. Purchases request merchant
+104 at priority 90 before UI 105 at priority 50. Held input produces no repeated requests.
 The bounded sound queue reports overflow explicitly.
 
 These requests are not audio playback, localized text rendering, or the keeper's
@@ -340,3 +340,9 @@ Focused tests assert the complete range-call order (including the discarded
 third-stock roll) for all three farewell outcomes, and both runtime fixtures
 compare the selected variant. The earlier stock-only registration omitted this
 draw and therefore was not equivalent to the complete source Create event.
+
+The same audit corrected the sound descriptor: soundPlayOL argument two is
+`soundPriority`, passed to audio_play_sound, not a volume percentage. Gain is
+read from the playing sound and multiplied by gameVolume. `Sound::priority`
+now names the retained field correctly so future playback cannot mistake 90/50
+for gain. No sound playback is added by this correction.
