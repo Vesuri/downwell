@@ -1,6 +1,10 @@
 #ifndef DOWNWELL_CORE_LEVEL_UPGRADE_ART_H
 #define DOWNWELL_CORE_LEVEL_UPGRADE_ART_H
 namespace downwell {
+inline unsigned levelClearStageLabel(unsigned area, unsigned level) {
+    return area >= 1 && area <= 4 && level >= 1 && level <= 3 ?
+        64500 + (area - 1) * 3 + level - 1 : 0;
+}
 // scrInitialize's levelTile resource table (including the incoming final area).
 inline unsigned levelBorderSprite(unsigned area) {
     static const unsigned short sprites[] = {76, 51, 74, 72, 70, 55};

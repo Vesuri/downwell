@@ -399,6 +399,17 @@ guard. This uses A500 CPU/512 KiB Chip plus 8 MiB Fast, not stock-memory proof.
 The emulator was stopped and the normal uninstrumented build restored. This
 existing death-results gate does not exercise the new level-clear presenter.
 
+Clear artwork now includes all twelve area/level headings, composed offline as
+the source Result Draw string (stage number, newline, localized CLEARED). Shared
+layout selects the same heading ID on both targets; SDL no longer separately
+constructs that string. The native selected bank includes only the current
+stage heading. The export has 96 records / 51,452 bytes, SHA-256
+`3a3d8e440f49ab21e7c0fb5600d70765042837f97d49866617b8eb5f23dc3bda`.
+Source-pixel verification covers every record; the conservative selected-bank
+bound is 12,908 bytes within the existing 32,140-byte allocation. This prepares
+native title presentation without runtime glyph composition; it does not yet
+connect the native clear-screen scene.
+
 - Level exit/progression, upgrade selection, other weapons/styles and later areas.
 - Complete enemy roster, bosses and ending flow.
 - Audio playback on both backends, remaining feedback/effects and pacing.

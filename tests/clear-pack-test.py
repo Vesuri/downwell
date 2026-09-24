@@ -35,7 +35,10 @@ for i in range(pack.HEADER.unpack_from(data)[3]):
         assert (ox, oy) == (sprite["originX"], sprite["originY"])
     assert pack.decode_planar(data[offset:offset + length], width, height, stride) == [
         pack.pixel_to_pen(pixel) for pixel in expected.get_flattened_data()]
-assert len(records) == 84 and {(ident, 0) for ident in texts} <= records.keys()
+assert len(records) == 96 and {(ident, 0) for ident in texts} <= records.keys()
+for area in range(1, 5):
+    for level in range(1, 4):
+        assert texts[64500 + (area - 1) * 3 + level - 1] == f"{area}-{level}\n{texts[64000]}"
 sprites = [524, 528, 512, 520, 518, 521, 522, 506, 507, 508, 509, 510,
            511, 516, 523, 525, 529, 530, 531, 532, 533, 534, 535]
 bundles = [records[sprite, 0][-1] + records[64100 + i, 0][-1] + records[64300 + i, 0][-1]
@@ -44,7 +47,8 @@ bundles = [records[sprite, 0][-1] + records[64100 + i, 0][-1] + records[64300 + 
 area_sprites = [51, 74, 72, 70, 55]
 borders = max(sum(records[sprite, frame][-1] for sprite in area_sprites[area:area + 2]
                   for frame in (7, 13)) for area in range(4))
-bound = (sum(sorted(bundles, reverse=True)[:4]) + records[64000, 0][-1] + records[64001, 0][-1]
+titles = max(records[ident, 0][-1] for ident in range(64500, 64512))
+bound = (sum(sorted(bundles, reverse=True)[:4]) + titles + records[64001, 0][-1]
          + borders + pack.HEADER.size + 18 * pack.RECORD.size)
 assert bound <= 32140, "four offered upgrade bundles must fit the existing retired-art bank"
 print(f"Clear pack: {len(records)} source-verified records; selected-offer bank bound {bound} bytes")

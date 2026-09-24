@@ -5,7 +5,7 @@ namespace downwell {
 // renderers can replay the resulting frame without advancing source state.
 struct LevelClearPresentation {
     struct Frame {
-        int tileY = 0, borderRow = 36, area = 1;
+        int tileY = 0, borderRow = 36, area = 1, level = 1;
         unsigned circle = 0, time = 0;
         bool choices = false;
         template<class Emit> void borders(Emit emit) const {
@@ -25,7 +25,7 @@ struct LevelClearPresentation {
     unsigned circle = 0, time = 0;
     Frame advance(int area, int level, int next, bool choices) {
         Frame frame;
-        frame.tileY = tileY; frame.borderRow = borderRow; frame.area = area;
+        frame.tileY = tileY; frame.borderRow = borderRow; frame.area = area; frame.level = level;
         tileY -= area == 3 ? 3 : 6;
         if (tileY <= -16) {
             tileY += 16;

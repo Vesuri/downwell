@@ -18,6 +18,8 @@ int main() {
                 if (tick == 60) { state.circle = 0; circle = 0; }
                 if (tick == 75) { state.time = 0; time = 0; }
                 const auto frame = state.advance(area, level, next, choices);
+                require(frame.area == area && frame.level == level,
+                    "presentation snapshot retains stage for the composed heading");
                 for (unsigned render = 0; render < 2; ++render) {
                     unsigned count = 0;
                     frame.borders([&](int emittedArea, int spriteFrame, int x, int y) {
@@ -53,6 +55,7 @@ int main() {
     frame.choices = true;
     struct Sink {
         unsigned sprites = 0, players = 0, labels = 0, descriptions = 0;
+        unsigned stageLabel = 64500;
         void sprite(unsigned id, unsigned subimage, LevelClearCoordinate x, LevelClearCoordinate y) {
             if (sprites >= 76) {
                 const unsigned option = sprites - 76;
@@ -69,7 +72,7 @@ int main() {
         }
         void label(unsigned id, LevelClearCoordinate x, LevelClearCoordinate y, unsigned pen) {
             const unsigned layer = labels % 7;
-            require(id == (labels < 7 ? 64000u : 64001u) &&
+            require(id == (labels < 7 ? stageLabel : 64001u) &&
                 x.magnitude.floor() == 80 - layer && y.magnitude.floor() == (labels < 7 ? 96u : 278u) - layer &&
                 pen == (layer == 6 ? 1u : 2u), "six red shadow passes precede white title"); ++labels;
         }
@@ -82,5 +85,15 @@ int main() {
     drawLevelClear(sink, room, frame, inventory, HudReal::integer(1), HudReal::integer(1));
     require(sink.sprites == 79 && sink.players == 1 && sink.labels == 14 && sink.descriptions == 2,
         "shared visible result layout emits every source layer");
+    for (int area = 1; area <= 4; ++area) {
+        for (int level = 1; level <= 3; ++level) {
+            Sink stageSink;
+            stageSink.stageLabel = 64500 + (area - 1) * 3 + level - 1;
+            frame.area = area;
+            frame.level = level;
+            drawLevelClear(stageSink, room, frame, inventory, HudReal::integer(1), HudReal::integer(1));
+            require(stageSink.labels == 14, "every stage uses its offline heading for all shadow passes");
+        }
+    }
     std::puts("Result border snapshots, clocks and shared layout passed");
 }

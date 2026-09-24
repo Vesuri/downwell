@@ -22,7 +22,7 @@ void drawLevelClear(Sink& sink, const LevelClearController& room,
             sink.label(label, C::integer(80).add(offset), C::integer(y).add(offset), i == 6 ? 1 : 2);
         }
     };
-    shadow(64000, 96);
+    shadow(levelClearStageLabel(frame.area, frame.level), 96);
     if (!frame.choices) return;
     shadow(64001, 278);
     for (unsigned i = 0; i <= room.selection.lastIndex; ++i) {

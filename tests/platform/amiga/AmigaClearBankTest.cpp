@@ -24,16 +24,23 @@ int main(int argc, char** argv) {
             offers[i] = id == 23 ? 100 : id;
         }
         const unsigned area = 1 + sample % 4;
-        const unsigned bytes = AmigaClearBank::build(source.data(), source.size(), offers, 4, target, 32140, area);
-        require(bytes && bytes <= 12620, "selected offers and borders fit source-verified conservative bound");
+        const unsigned level = 1 + sample % 3;
+        const unsigned bytes = AmigaClearBank::build(source.data(), source.size(), offers, 4, target, 32140, area, level);
+        require(bytes && bytes <= 12908, "selected offers, stage title and borders fit source-verified bound");
         if (bytes > maximum) maximum = bytes;
         require(std::memcmp(target + 12, source.data() + 12, 8) == 0, "input provenance prefix preserved");
         const unsigned count = AmigaClearBank::longword(target + 8);
         require(count >= 9 && count <= 18, "duplicates deduplicated by resource ID/frame");
         unsigned borders = 0;
+        unsigned titles = 0;
         for (unsigned i = 0; i < count; ++i) {
             const auto* copied = target + 20 + i * 24;
             const auto key = AmigaClearBank::longword(copied);
+            if (AmigaClearBank::word(copied) >= 64500) {
+                require(AmigaClearBank::word(copied) == downwell::levelClearStageLabel(area, level),
+                    "bank includes only this stage's composed title");
+                ++titles;
+            }
             require(i == 0 || AmigaClearBank::longword(copied - 24) < key,
                 "selected directory is strictly ordered for renderer binary search");
             if (AmigaClearBank::word(copied + 2) != 0) {
@@ -58,6 +65,7 @@ int main(int argc, char** argv) {
                 "all selected planar payload bytes preserved");
         }
         require(borders == 4, "both border frames from both selected areas survive sorting");
+        require(titles == 1, "exactly one stage title is banked");
         for (unsigned i = 0; i < 16; ++i)
             require(storage[i] == 0xa5 && storage[storage.size() - 1 - i] == 0xa5, "adjacent staging/HUD guards intact");
     }
@@ -68,6 +76,7 @@ int main(int argc, char** argv) {
         !AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 1) &&
         !AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140, 0) &&
         !AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140, 5) &&
+        !AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140, 1, 4) &&
         !AmigaClearBank::build(source.data(), source.size(), fallback, 5, target, 32140) && storage == before,
         "rejected requests leave existing bank untouched");
     require(AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140) &&
@@ -76,7 +85,7 @@ int main(int argc, char** argv) {
     const auto validBank = storage;
     for (unsigned j = 0; j < AmigaClearBank::longword(source.data() + 8); ++j) {
         auto* record = source.data() + 20 + j * 24;
-        if (AmigaClearBank::word(record) == 64000) {
+        if (AmigaClearBank::word(record) == 64500) {
             AmigaClearBank::putLong(record + 16, 0xffffffffu);
             break;
         }

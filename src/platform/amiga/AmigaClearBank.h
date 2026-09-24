@@ -15,14 +15,15 @@ struct AmigaClearBank {
     }
     static unsigned build(const std::uint8_t* source, unsigned size,
             const unsigned* offers, unsigned offerCount,
-            std::uint8_t* target, unsigned capacity, unsigned area = 1) {
+            std::uint8_t* target, unsigned capacity, unsigned area = 1, unsigned level = 1) {
         if (!source || !target || (offerCount && !offers) || offerCount > 4 || size < 20 ||
             longword(source) != 0x44574150u || word(source + 4) != 2 || word(source + 6) != 20)
             return 0;
-        if (area < 1 || area > 4) return 0;
+        const unsigned stageLabel = downwell::levelClearStageLabel(area, level);
+        if (!stageLabel) return 0;
         const unsigned sourceCount = longword(source + 8);
         if (sourceCount > (size - 20) / 24) return 0;
-        unsigned ids[18] = {64000, 64001}, frames[18] = {}, count = 2;
+        unsigned ids[18] = {stageLabel, 64001}, frames[18] = {}, count = 2;
         for (unsigned selectedArea = area; selectedArea <= area + 1; ++selectedArea) {
             ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 7;
             ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 13;

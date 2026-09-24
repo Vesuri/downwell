@@ -284,8 +284,12 @@ def clear_texts(language_path):
         keys[64100 + upgrade] = f"ugName{upgrade}"
         keys[64300 + upgrade] = f"ugDesc{upgrade}"
     # langString uses a single space for absent keys (some cap-zero upgrades).
-    return {ident: english.get(key, " ").replace("*", "\n").replace("#", "\n")
-            for ident, key in keys.items()}
+    texts = {ident: english.get(key, " ").replace("*", "\n").replace("#", "\n")
+             for ident, key in keys.items()}
+    for area in range(1, 5):
+        for level in range(1, 4):
+            texts[64500 + (area - 1) * 3 + level - 1] = f"{area}-{level}\n{texts[64000]}"
+    return texts
 
 
 def render_text(manifest, pages, text, centered=False):

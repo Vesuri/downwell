@@ -127,8 +127,6 @@ void Game::renderLevelClear(Renderer& renderer) const {
         }
         void label(unsigned id, LevelClearCoordinate x, LevelClearCoordinate y, unsigned pen) {
             std::string text = levelClearLabel(id);
-            if (id == 64000) text = std::to_string(runtime.runStage().area) + "-" +
-                std::to_string(runtime.runStage().level) + "\n" + text;
             renderer.drawText(2, text.c_str(), coordinate(x), coordinate(y) - viewY,
                 pen == 1 ? Color{255,255,255,255} : Color{255,0,0,255}, TextAlign::center);
         }
