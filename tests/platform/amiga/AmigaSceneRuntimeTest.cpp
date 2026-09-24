@@ -727,8 +727,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     }
     require(gameplay.player().grounded() && reference.mainPlayerGrounded(),
             "both gameplay runtimes land on the recovered entrance floor");
-    require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
-                gameplay.player().spriteFrame() ==
+    require(gameplay.player().spriteId(gameplay.dead()) == reference.mainPlayerSpriteId() &&
+                gameplay.player().spriteFrame(gameplay.dead()) ==
                     static_cast<unsigned>(reference.mainPlayerImageIndex()),
             "landed gameplay pose follows decoded runtime");
 
@@ -976,16 +976,16 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(nativeGems == referenceGems,
                     "live currency birth order, motion and animation agree exactly across adapters");
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
-            if (gameplay.player().spriteId() != reference.mainPlayerSpriteId() ||
-                    gameplay.player().spriteFrame() != static_cast<unsigned>(reference.mainPlayerImageIndex()))
+            if (gameplay.player().spriteId(gameplay.dead()) != reference.mainPlayerSpriteId() ||
+                    gameplay.player().spriteFrame(gameplay.dead()) != static_cast<unsigned>(reference.mainPlayerImageIndex()))
                 std::cerr << "PRESENTATION tick=" << gameplay.tick()
                           << " health=" << gameplay.health() << ',' << reference.mainPlayerHealth()
-                          << " sprite=" << gameplay.player().spriteId() << ',' << reference.mainPlayerSpriteId()
-                          << " frame=" << gameplay.player().spriteFrame() << ',' << reference.mainPlayerImageIndex()
+                          << " sprite=" << gameplay.player().spriteId(gameplay.dead()) << ',' << reference.mainPlayerSpriteId()
+                          << " frame=" << gameplay.player().spriteFrame(gameplay.dead()) << ',' << reference.mainPlayerImageIndex()
                           << " y=" << 176 + gameplay.player().offsetYFixed() / 256.0F << ',' << reference.mainPlayerY()
                           << '\n';
-            require(gameplay.player().spriteId() == reference.mainPlayerSpriteId() &&
-                    gameplay.player().spriteFrame() ==
+            require(gameplay.player().spriteId(gameplay.dead()) == reference.mainPlayerSpriteId() &&
+                    gameplay.player().spriteFrame(gameplay.dead()) ==
                         static_cast<unsigned>(reference.mainPlayerImageIndex()),
                     "combat player presentation agrees across adapters, including forced spins");
             if (!playerReported && std::fabs(176 + gameplay.player().offsetYFixed() / 256.0F - reference.mainPlayerY()) > 3.0F) {

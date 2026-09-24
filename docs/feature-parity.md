@@ -9,6 +9,28 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Shared depleted-health player pose
+
+Player sprite/frame selection now accepts the death state in `PlayerMotion`,
+and SDL state publication and native rendering both use it. This replaces the
+native renderer's hardcoded sprite/frame override and SDL's living pose after
+health depletion. `playerSpriteControl.asm` blocks 62--65 select sprite 0 and
+frame 0, permitting frame 1 only with abs(xsp)<0.5, grounded and deathani==0.
+Focused tests cover grounded, airborne/spinning, moving and deathani states.
+The long paired combat test now compares the effective death pose, not just
+the living motion pose hidden underneath the native renderer's override.
+
+Both adapters still use the existing immediate depleted-health boundary and
+default deathani=1. This does not recover the original Begin Step publication,
+death drag/upward-velocity damping, alarms, flash/effects or menu/restart flow.
+Pose selection does not mutate physics; those source behaviours remain open.
+
+Validation: full host tests and the 6000-update paired death-state gate pass
+(health 0/0, kills 10/10, currency 82/82). Bounded A500 cache verification and
+cross-target replay pass with clean 68000 audits and unchanged replay digest.
+Player creation resets health before publishing its initial pose. Normal builds
+are restored. No full death-scene pixel comparison is claimed by these tests.
+
 ### Extended combat: remove the artificial Y4096 floor
 
 Extending the paired combat continuation beyond 600 updates exposed a landing
@@ -31,8 +53,8 @@ fire or jump after death. The diagnostic after the fix finishes at health 0/0,
 kills 10/10 and currency 82/82 without reported movement/accounting divergence.
 
 This is simulation-state coverage, NOT death-menu or death-rendering parity.
-Native rendering overrides the player with sprite 0 on death while SDL still
-uses the shared motion pose; source death physics, animation/alarm publication,
+The initial audit found a native sprite-0 override versus SDL's living pose
+(now corrected in the shared pose section above); source death physics, animation/alarm publication,
 effects and complete restart flow remain unfinished.
 
 Validation: strict death-state target passes, as do the full host suite, the

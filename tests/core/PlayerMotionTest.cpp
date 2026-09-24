@@ -383,6 +383,20 @@ int main() {
     require(profiled.grounded() && profiled.offsetY() == 74,
             "walking beyond a platform edge starts a fall to lower terrain");
 
+    PlayerMotion corpse;
+    require(corpse.spriteId(true) == 0 && corpse.spriteFrame(true) == 0 &&
+                corpse.spriteFrame(true, 0) == 1 && corpse.spriteFrame(true, -1) == 0,
+            "death pose uses sprite zero and source deathani guards for grounded resting frame");
+    corpse.stompBounce();
+    require(corpse.spriteId(true) == 0 && corpse.spriteFrame(true, 0) == 0 &&
+                corpse.spriteId() == 1,
+            "death pose overrides airborne spin without mutating living motion state");
+    PlayerMotion runningCorpse;
+    input = downwell::Input{};
+    input.right = true;
+    for (unsigned i = 0; i < 10; ++i) runningCorpse.step(input);
+    require(runningCorpse.spriteFrame(true, 0) == 0,
+            "grounded corpse still moving faster than half a pixel does not use resting frame");
     std::cout << "Shared player tests passed\n";
     return 0;
 }

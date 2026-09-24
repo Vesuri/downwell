@@ -515,8 +515,8 @@ void StartupRuntime::syncMainPlayerState() {
     mainPlayerSpeedY_ = mainPlayerMotion_.speedYFixed() / 256.0F;
     mainPlayerGrounded_ = mainPlayerMotion_.grounded();
     mainPlayerFacing_ = mainPlayerMotion_.facing();
-    mainPlayerSpriteId_ = mainPlayerMotion_.spriteId();
-    mainPlayerImageIndex_ = static_cast<float>(mainPlayerMotion_.spriteFrame());
+    mainPlayerSpriteId_ = mainPlayerMotion_.spriteId(mainPlayerHealth_ == 0);
+    mainPlayerImageIndex_ = static_cast<float>(mainPlayerMotion_.spriteFrame(mainPlayerHealth_ == 0));
     mainJumpShootLocked_ = mainPlayerMotion_.jumpShootLocked();
     mainShotDelayed_ = mainPlayerMotion_.shotDelayed();
     mainAirborneShot_ = mainPlayerMotion_.airborneShot();
@@ -1441,8 +1441,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainPlayerOriginY_ = instance->y;
                 mainPlayerMotion_ = PlayerMotion(false);
                 mainPlayerMotion_.initializeEntryInput(inputFire_);
-                syncMainPlayerState();
                 mainPlayerHealth_ = 4;
+                syncMainPlayerState();
                 mainPlayerInvulnerability_ = 0;
                 mainShootLeg_ = -1;
                 mainShotsFired_ = 0;

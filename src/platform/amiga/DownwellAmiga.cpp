@@ -2184,8 +2184,8 @@ int main(void) {
             }
 #endif
             if (port.playerVisible() && !appendGameplayActor(actors, actorCount,
-                    (UWORD)(port.dead() ? 0 : port.player().spriteId()),
-                    (UWORD)(port.dead() ? 0 : port.player().spriteFrame()),
+                    (UWORD)port.player().spriteId(port.dead()),
+                    (UWORD)port.player().spriteFrame(port.dead()),
                     downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(port.player().offsetXFixed()) - port.cameraOffsetX(),
 #ifdef DOWNWELL_REPLAY_VERIFY
                     gameplayPlayerGroundY + port.player().offsetY(),

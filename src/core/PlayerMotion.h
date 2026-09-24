@@ -66,8 +66,8 @@ public:
     int ammo() const { return ammo_; }
     bool grounded() const { return grounded_; }
     int facing() const { return facing_; }
-    int spriteId() const;
-    unsigned spriteFrame() const;
+    int spriteId(bool dead = false) const;
+    unsigned spriteFrame(bool dead = false, int deathAnimation = 1) const;
     unsigned jumps() const { return jumps_; }
     unsigned shots() const { return shots_; }
     void stompBounce();

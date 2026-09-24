@@ -372,15 +372,19 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
     digest.addU32(jumps_); digest.addU32(shots_);
 }
 
-int PlayerMotion::spriteId() const
+int PlayerMotion::spriteId(bool dead) const
 {
+    if (dead) return 0; // playerSpriteControl: sprPlDead.
     if (grounded_) return running_ ? 27 : balancing_ ? 15 : 31;
     if (spinJumping_) return 1;
     return airborneShot_ ? 3 : 37;
 }
 
-unsigned PlayerMotion::spriteFrame() const
+unsigned PlayerMotion::spriteFrame(bool dead, int deathAnimation) const
 {
+    // Source death branch is not an animated living/spinning pose. Its second
+    // frame requires grounded, abs(xsp)<0.5 and deathani==0, all together.
+    if (dead) return grounded_ && speedX_ > -128 && speedX_ < 128 && deathAnimation == 0 ? 1 : 0;
     if (grounded_)
         return running_ ? runPhaseTenths_ / 10
                         : balancing_ ? balancePhaseQuarters_ / 4
