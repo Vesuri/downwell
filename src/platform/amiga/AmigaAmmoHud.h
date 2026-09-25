@@ -18,6 +18,8 @@ class AmigaAmmoHud {
     const UBYTE* stampPack_ = nullptr;
     alignas(UWORD) UBYTE working_[downwellLayerBytes]; // Fast RAM, never displayed/DMA fetched.
     UWORD background_[downwellDisplayHeight*6], rim_[downwellDisplayHeight*6];
+    UWORD dividers_[downwellDisplayHeight*2];
+    unsigned dividerAmmo_ = ~0u, dividerCapacity_ = ~0u;
     int bodyTop_ = 0, bodyBottom_ = 0;
 public:
     unsigned lastWordWrites = 0;
@@ -41,6 +43,7 @@ public:
         const unsigned previousAmmo = damage_.ammo, previousOffset = damage_.offset;
         damage_.update(ammo, capacity, offset, meter, rows);
         if (stampPack_ != pack) {
+            dividerAmmo_ = dividerCapacity_ = ~0u;
             stampsReady_ = true;
             for (unsigned i = 0; i < 10; ++i)
                 if (!amigaRendererPrepareWordStamp(&stamps_[i], pack, end,
@@ -160,7 +163,27 @@ public:
                 }
             }
             DW_PROFILE_PHASE(profileAmmoDividers);
-            layout_.draw(ammo, capacity, 1, 288, 229 + 4 * meter,
+            if (stampsReady_ && !forceFull && capacity <= 64 && meter <= 3) {
+                // Retain the ordered divider composition, not just positions.
+                // Animation strips reuse it; jiggle only shifts its row origin.
+                if (dividerAmmo_ != ammo || dividerCapacity_ != capacity) {
+                    for (auto& word : dividers_) word = 0;
+                    layout_.draw(ammo, capacity, 1, 288, 229,
+                        [&](unsigned, unsigned frame, int, unsigned y) {
+                            const auto& stamp = stamps_[8 + frame];
+                            for (unsigned row = stamp.first; row < stamp.last; ++row) {
+                                if (y + row >= downwellDisplayHeight) continue;
+                                UWORD* target = dividers_ + (y + row)*2;
+                                const UWORD mask = stamp.mask[row];
+                                target[0] = (target[0] & (UWORD)~mask) | (stamp.low[row] & mask);
+                                target[1] = (target[1] & (UWORD)~mask) | (stamp.high[row] & mask);
+                            }
+                        });
+                    dividerAmmo_ = ammo; dividerCapacity_ = capacity;
+                }
+                amigaRendererApplyHudColumns(renderer, dividers_, 18, 1,
+                    4 * meter, top, bottom, 1);
+            } else layout_.draw(ammo, capacity, 1, 288, 229 + 4 * meter,
                 [&](unsigned sprite, unsigned frame, int x, unsigned y) {
                     if (static_cast<int>(y) < bottom && static_cast<int>(y) + 8 > top)
                         asset(sprite, frame, x, y);

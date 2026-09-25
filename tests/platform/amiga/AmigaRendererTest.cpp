@@ -514,6 +514,17 @@ int main(int argc, char** argv) {
                 require(retained.lastWordWrites == 0, "unchanged gauge does not write either visible plane");
             }
         }
+        // Every cached divider capacity, charge boundary and jiggle offset.
+        // Compare against ordered original draws, not against another cache.
+        for (unsigned cap = 1; cap <= 64; ++cap)
+            for (unsigned ammo = 0; ammo <= cap; ++ammo)
+                for (unsigned meter = 0; meter < 4; ++meter) {
+                    rows.step(ammo, cap);
+                    retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(),
+                        ammo, cap, 0, &rows, meter);
+                    fullRedraw(ammo, cap, 0, meter);
+                    require(actualHud == expectedHud, "composed divider cache preserves all charge and jiggle states");
+                }
         // Isolate every artwork transition, including the special bottom row
         // and both sides of the fill boundary. Adjacent overlays can conceal
         // changed pixels, but damage must never omit a surviving difference.

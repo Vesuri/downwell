@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 34.88 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 34.92 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -164,6 +164,30 @@ runs are limited to 45 seconds; the ordinary non-skip build is restored.
 A separate experiment caching actor bounds between collection and BOB
 drawing was rejected after measuring 866 fields / 34.64 FPS. Its extra actor
 record fields are not retained. Evidence: `/tmp/downwell-bob-bounds-fps.log`.
+
+### Retain composed divider artwork
+
+`AmigaAmmoHud` now caches the ordered divider pixels as a single native-word
+column when ammo or capacity changes. Row-animation strips reuse that column;
+the four meter jiggle positions translate it vertically. Capacities above 64,
+unsupported stamps and forced full draws retain the old path. This adds
+1,136 bytes of planar words plus two cache keys in Fast RAM, no Chip buffer.
+
+The divider probe total falls from 481.339 to **358.377 ms / 600 updates**
+(0.802 to 0.597 ms/update, about 26% less), with the maximum bracket falling
+from 10.527 to 5.147 ms. Other HUD phases remain essentially unchanged. The
+shipping-style tape is **859 PAL fields / 600 updates = 34.92 FPS**, max gap
+five fields: no meaningful overall FPS improvement over 34.88 FPS. The
+20 ms requirement remains unmet.
+
+Expanded host tests compare every capacity 1..64, every ammo count and all
+four offsets against the ordered full-render oracle, in addition to existing
+animation, fallback and unchanged-write tests. These also pass ASan/UBSan.
+The bounded native shot capture differs from SDL by 0/99,968 pixels, and both
+68000 audits pass. Logs: `/tmp/downwell-divider-cache-{test,sanitized,frame,
+fps,profile,restore}.log`. Native runs are limited to 45 seconds and the
+ordinary non-skip executable is restored. These tests preserve the existing
+source-derived rendering; they do not independently prove Windows fidelity.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 
