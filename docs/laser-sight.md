@@ -133,13 +133,29 @@ adapters agree and leave RNG draw counts unchanged; the replay retains health
 build passes its 68000 instruction and 64-bit-helper audits. Logs are
 `/tmp/downwell-ray-adapters-{build,test,amiga}.log`.
 
+The runtime convenience endpoints now use each player's actual Q8 position
+and horizontal speed and the published camera bottom. Shared `fromQ8` retains
+negative-coordinate fractions; `turnsFromQ8Degrees` truncates exactly to Q32
+turns using bounded 32-bit operations. Tests compare all 184,321 Q8 values
+from -360 through +360 degrees and signed 32-bit extremes to an independent
+64-bit oracle; position conversion is reconstructed exactly as well. The
+live replay also compares these actual-player endpoints (not just injected
+origins). Focused and sanitizer tests pass, as does the ordinary native build.
+Logs: `/tmp/downwell-ray-input-{build,test,amiga}.log`.
+
 These APIs deliberately do not decide whether to draw: upgrade ownership,
-goalStop/noDraw gating, actual player aim/speed conversion, red-line rasterizing,
+goalStop/noDraw gating, actual player aim control, red-line rasterizing,
 draw order and Amiga dirty-row restoration still belong to the pending
 presentation integration. This is coverage of currently modeled area-one
 instances, not all 23 wall-family objects or the hostile shopkeeper. Crates,
 other unimplemented wall types, destructive shop state and exact Windows
 collision-line edges remain fidelity gaps, not implied support.
+
+The original `playerDraw` places the ray outside the `!dFlash` player-sprite
+branch, but inside `!goalStop && !noDraw`. Therefore presentation must not use
+the existing damage-blink `playerVisible` gate for the ray. The current
+convenience endpoints use zero aim, as does the implemented machine-gun
+control path; they do not claim to implement the original aim controller.
 
 `playerDraw` traces cumulative lines against `parentWall` and `subparentEnemy`,
 starting at the player origin. Each iteration advances Y by

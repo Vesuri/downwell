@@ -212,6 +212,13 @@ public:
     downwell::LaserSightRay traceLaserSight(downwell::LaserSightRay::Coordinate x,
         downwell::LaserSightRay::Coordinate y, downwell::LaserSightRay::Coordinate bottom,
         std::uint32_t speedTurns, std::uint32_t aimTurns = 0) const;
+    downwell::LaserSightRay laserSightEndpoint() const {
+        using Ray = downwell::LaserSightRay;
+        return traceLaserSight(Ray::fromQ8(player_.offsetXFixed(), 240),
+            Ray::fromQ8(player_.offsetYFixed(), 176),
+            Ray::fromQ8(viewCameraYQ8(), 176 + 142),
+            Ray::turnsFromQ8Degrees(player_.speedXFixed()));
+    }
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
     unsigned ringOrigin() const { return ringOrigin_; }

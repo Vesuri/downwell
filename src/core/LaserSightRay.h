@@ -8,6 +8,21 @@ namespace downwell {
 struct LaserSightRay {
     using Coordinate = MachineGunTrajectory::Coordinate;
     Coordinate x, y;
+    // Convert the shared player's Q8 position without rounding away subpixels.
+    static Coordinate fromQ8(std::int32_t value, int origin = 0) {
+        std::int32_t whole = value / 256, remainder = value % 256;
+        if (remainder < 0) { --whole; remainder += 256; }
+        return {origin + whole, static_cast<std::uint32_t>(remainder) << 12};
+    }
+    // Exact truncation to Q32 turns from Q8 degrees, modulo one revolution.
+    // 2^32/(360*256) = 2^21/45. Split before multiplying so the 68000 path
+    // needs neither a 64-bit product nor a 64-bit division helper.
+    static std::uint32_t turnsFromQ8Degrees(std::int32_t value) {
+        const auto reduced = value % (360*256);
+        const auto magnitude = static_cast<std::uint32_t>(reduced < 0 ? -reduced : reduced);
+        const auto turns = (magnitude / 45u << 21) + ((magnitude % 45u) << 21) / 45u;
+        return reduced < 0 ? 0u - turns : turns;
+    }
     template<class Walls, class Enemies>
     static LaserSightRay trace(Coordinate originX, Coordinate originY,
                                Coordinate viewBottom, std::uint32_t xSpeedTurns,

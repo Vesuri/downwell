@@ -1261,6 +1261,11 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 const C bottom{static_cast<int>(reference.mainCameraViewY()) + 284, 0};
                 const auto nativeDraws = gameplay.randomDrawCount();
                 const auto hostDraws = reference.randomDrawCount();
+                const auto actualNative = gameplay.laserSightEndpoint();
+                const auto actualHost = reference.mainLaserSightEndpoint();
+                require(actualNative.x.pixel == actualHost.x.pixel && actualNative.x.fraction == actualHost.x.fraction &&
+                        actualNative.y.pixel == actualHost.y.pixel && actualNative.y.fraction == actualHost.y.fraction,
+                        "actual player speed, subpixels and camera feed identical ray endpoints");
                 for (std::uint32_t aim : {0u, 0x0aaaaaaau, 0xf5555556u}) {
                     const auto native = gameplay.traceLaserSight(x, y, bottom, 0, aim);
                     const auto host = reference.traceLaserSight(x, y, bottom, 0, aim);

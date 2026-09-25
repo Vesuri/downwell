@@ -6,6 +6,19 @@
 using namespace downwell;
 int main() {
     using C = LaserSightRay::Coordinate;
+    for (int value = -92160; value <= 92160; ++value) {
+        const auto expected = static_cast<std::uint32_t>(
+            (static_cast<std::int64_t>(value) * 0x100000000LL) / (360*256));
+        assert(LaserSightRay::turnsFromQ8Degrees(value) == expected);
+        const auto coordinate = LaserSightRay::fromQ8(value, 176);
+        assert(coordinate.fraction < MachineGunTrajectory::unit);
+        assert((std::int64_t(coordinate.pixel)-176)*MachineGunTrajectory::unit + coordinate.fraction ==
+               std::int64_t(value)*4096);
+    }
+    for (std::int32_t value : {INT32_MIN, INT32_MAX}) {
+        assert(LaserSightRay::turnsFromQ8Degrees(value) == static_cast<std::uint32_t>(
+            (std::int64_t(value)*0x100000000LL) / (360*256)));
+    }
     int wallCalls = 0, enemyCalls = 0;
     auto emptyWall = [&](const ProjectileSegment&) { ++wallCalls; return false; };
     auto emptyEnemy = [&](const ProjectileSegment&) { ++enemyCalls; return false; };

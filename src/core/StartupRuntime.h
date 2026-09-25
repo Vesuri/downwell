@@ -151,6 +151,12 @@ public:
     // Pure query of the implemented area-one collision snapshot, room coordinates.
     LaserSightRay traceLaserSight(LaserSightRay::Coordinate x, LaserSightRay::Coordinate y,
         LaserSightRay::Coordinate bottom, std::uint32_t speedTurns, std::uint32_t aimTurns = 0) const;
+    LaserSightRay mainLaserSightEndpoint() const {
+        return traceLaserSight(LaserSightRay::fromQ8(mainPlayerMotion_.offsetXFixed(), mainPlayerOriginX_),
+            LaserSightRay::fromQ8(mainPlayerMotion_.offsetYFixed(), mainPlayerOriginY_),
+            {mainCameraRenderViewY() + surfaceHeight, 0},
+            LaserSightRay::turnsFromQ8Degrees(mainPlayerMotion_.speedXFixed()));
+    }
     float mainPlayerY() const { return mainPlayerY_; }
     float mainPlayerSpeedX() const { return mainPlayerSpeedX_; }
     float mainPlayerSpeedY() const { return mainPlayerSpeedY_; }
