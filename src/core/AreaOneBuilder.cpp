@@ -1,5 +1,6 @@
 #include "AreaOneBuilder.h"
 #include "EnemyCreateProfile.h"
+#include "Profile.h"
 
 namespace downwell {
 
@@ -67,7 +68,10 @@ void AreaOneBuilder::restoreInitialCheckpoint(
 bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
                                 GameMakerRandom& random,
                                 EmitFunction emit, void* context) {
+    DW_PROFILE_SCOPE(profileBuilderCommand);
+    DW_PROFILE_PHASE(profileBuilderInitialize);
     DeferredCreateInstance command{objectId, x, y};
+    DW_PROFILE_PHASE(profileBuilderCommand);
     switch (objectId) {
     case 92: {
         random.irandomSmall(3);

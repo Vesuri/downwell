@@ -20,6 +20,7 @@ printf "HUD detail phases: 37=damage_scan 38=fill_geometry 39=changed_word_publi
 printf "Player detail phases: 40=movement_without_nested_terrain 41=shops_and_keepers\n"
 printf "Actor detail phases: 42=collection 43=channel_selection 44=hardware_sprite_update\n"
 printf "Laser phases: 45=endpoint_trace 46=retention_checks 47=CPU_ray_draw 48=ray_draw_blitter_wait 49=planar_actor_draw 50=ray_restore 51=ray_prepare_blitter_wait\n"
+printf "Generation detail: 67=command_create 68=command_initialize 69=terrain_cell 70=landing_index 71=tile_list 72=breakable_register 73=enemy_register 74=shop_create\n"
 while $i < sizeof(gDownwellProfileTicks[0])/sizeof(gDownwellProfileTicks[0][0])
     printf "%u %lu %.3f %.3f %.3f\n", $i, gDownwellProfileCalls[$s][$i], gDownwellProfileTicks[$s][$i]*20.0/80128.0, gDownwellProfileTicks[$s][$i]*20.0/80128.0/gDownwellProfileFrames[$s], gDownwellProfileMax[$s][$i]*20.0/80128.0
     set $i = $i + 1

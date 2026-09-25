@@ -25,6 +25,9 @@ enum DownwellProfilePhase {
     profileClearDrain, profileClearPublish,
     profileClearBorderPaint, profileClearOverlayPaint, profileClearTrig,
     profileGoalFieldPrepare, profileGoalFieldDraw,
+    profileBuilderCommand, profileBuilderInitialize, profileGeneratedCell,
+    profileGeneratedLanding, profileGeneratedTiles, profileGeneratedBreakable,
+    profileGeneratedEnemy, profileGeneratedShop,
     profilePhaseCount
 };
 

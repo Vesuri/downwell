@@ -88,6 +88,38 @@ the passing invocation with the required builder-pack argument.
 Next investigate command initialization/creation and terrain indexing in the
 generation burst; the bounded remainder candidate is not the main bottleneck.
 
+## Generation detail instrumentation
+
+Added optional phases 67–74 for command setup, command initialization, terrain
+cell insertion, landing-index updates, tile-list insertion, and breakable,
+enemy and shop registration. They compile away outside `PROBES`; generation
+ordering and RNG consumption are unchanged.
+
+The same bounded 600-update tape completed with valid exclusive accounting,
+zero clock clamps and unchanged collision/sprite counters. The worst frame is
+still sample 258. It contains no breakable, enemy or shop registration; the
+burst is terrain-command generation. Detailed exclusive brackets there are:
+command setup 37.970 ms, initialization 18.040 ms, terrain cells 13.098 ms,
+landing index 15.948 ms, tile list 10.092 ms, plus remaining generation
+51.501 ms, registration 23.249 ms and index coordination 44.049 ms.
+
+These are **not production operation costs**. The many fine-grained phase
+switches inflate the worst frame from the older 140.392 ms to 236.404 ms;
+the detailed run takes 1,017 fields. In particular the tile-list probe includes
+early rejection of non-tile commands. Do not infer that each reported bracket
+is removable work, or treat this run as a shipping slowdown. The actionable
+narrowing is that the largest burst does not create actors or shops. Further
+measurement should use coarse isolated/batched probes or a matched empty-probe
+control before choosing an optimization. Shipping throughput remains the
+low-overhead baseline above, not a new 20 ms result.
+
+Evidence: `/tmp/downwell-generation-detail-probes-v2.log`. Host builder and
+incremental terrain tests pass with ordered emission digest
+`ffcdfc23dc638be7` (`/tmp/downwell-generation-detail-host.log`). The initial
+instrumented build exposed a missing explicit `Profile.h` include in
+`GameplayWorld.h`; that was fixed before the successful run. Normal startup
+was restored and both 68000 audits passed.
+
 ## Fidelity scope
 
 SDL and Amiga both currently stop advancing after cavern level 3 because
