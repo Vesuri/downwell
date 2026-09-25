@@ -342,6 +342,11 @@ volatile ULONG gDownwellSplashPublicationFailures;
 volatile const UWORD* gDownwellMenuSpriteOracle;
 volatile ULONG gDownwellMenuCopperPatchFailures;
 volatile ULONG gDownwellConsumableChecks, gDownwellConsumableFailures;
+#ifdef DOWNWELL_CAMERA_VERIFY
+volatile ULONG gDownwellCameraColumns, gDownwellCameraTransitions;
+volatile ULONG gDownwellCameraStaged, gDownwellCameraFallback;
+volatile ULONG gDownwellCameraFrameChecks;
+#endif
 volatile ULONG gDownwellCaptureTick;
 #ifdef DOWNWELL_GEMHIGH_VERIFY
 volatile ULONG gDownwellGemHighCapture = 1;
@@ -1676,6 +1681,16 @@ int main(void) {
                 scenes, sceneStyleFrameReported,
                 sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
+#ifdef DOWNWELL_CAMERA_VERIFY
+            // Synthetic flat collision fixture, not a natural shop traversal.
+            // Real movement/camera and all display staging/publication still run.
+            if (scenes.scene() == AmigaScene::gameplay) {
+                liveInput = {};
+                const unsigned phase = port.tick() % 320;
+                liveInput.right = phase < 80 || phase >= 240;
+                liveInput.left = !liveInput.right;
+            }
+#endif
 #ifdef DOWNWELL_LASER_VERIFY
             if (sceneGameplayLandedReported && !port.upgrades().levels[12]) port.grantUpgrade(12);
 #endif
@@ -2321,6 +2336,11 @@ int main(void) {
 #endif
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
                 oldShopArt[i] = port.shops().instances[i].artRevision;
+#ifdef DOWNWELL_CAMERA_VERIFY
+            // Bind through the world: step() rebinds the player's callbacks.
+            port.configureLandingResolver([](void*, int, int) { return 0; }, nullptr);
+            port.configureSolidResolver([](void*, int, int) { return false; }, nullptr);
+#endif
             const AmigaPortFrame result = port.step(packedInput);
 #ifdef DOWNWELL_CLEAR_VERIFY
             gDownwellClearTick = port.tick();
@@ -2356,6 +2376,10 @@ int main(void) {
             DW_PROFILE_PHASE(profileTitle);
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
+#ifdef DOWNWELL_CAMERA_VERIFY
+            gDownwellCameraColumns |= 1u << ((port.cameraOffsetX() + 160) / 160);
+            if (cameraXChanged) ++gDownwellCameraTransitions;
+#endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
             gDownwellProfileScroll = scrollDelta;
             gDownwellProfileCameraChange = result.cameraXDelta;
@@ -2443,8 +2467,15 @@ int main(void) {
             }
             if (cameraXChanged) {
                 worldViewX = mainViewX + port.cameraOffsetX();
+#ifdef DOWNWELL_CAMERA_VERIFY
+                // Force exactly one absent-prefetch case as well as real hits.
+                if (gDownwellCameraTransitions == 1) stagedViewX = -10000;
+#endif
                 if (stagedViewX == worldViewX && stagedFirst <= worldViewY &&
                     stagedEnd >= worldViewY + downwellDisplayHeight) {
+#ifdef DOWNWELL_CAMERA_VERIFY
+                    ++gDownwellCameraStaged;
+#endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
                     ++gDownwellProfileStagedHits;
 #endif
@@ -2483,6 +2514,9 @@ int main(void) {
                         liveBuilder.decorationCount(), &port, worldViewX, worldViewY, 0, downwellDisplayHeight);
 #endif
                 } else {
+#ifdef DOWNWELL_CAMERA_VERIFY
+                ++gDownwellCameraFallback;
+#endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
                 gDownwellProfileStageShortfall = worldViewY + downwellDisplayHeight - stagedEnd;
 #endif
@@ -2802,6 +2836,17 @@ int main(void) {
             DW_PROFILE_PHASE(profileOther);
             front = back;
 #ifdef DOWNWELL_SCENE_VERIFY
+#ifdef DOWNWELL_CAMERA_VERIFY
+            static unsigned cameraFramesToCheck = 0;
+            if (cameraXChanged) cameraFramesToCheck = 2;
+            if (cameraFramesToCheck) {
+                // Check the switched frame and the other alternating display.
+                AmigaHardware::blitterDrain();
+                exposeGameplayFrame(memory, gameDisplay[back], back, port);
+                ++gDownwellCameraFrameChecks;
+                --cameraFramesToCheck;
+            }
+#endif
             if (port.tick() == 600) {
                 // Deterministic coverage independent of enemy encounters and
                 // travel distance: validate every strip of all three views.

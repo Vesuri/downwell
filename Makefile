@@ -824,6 +824,10 @@ verify-cross-replay: $(PORT_REPLAY_REFERENCE_TARGET)
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 .PHONY: verify-amiga-gameplay-cache
+.PHONY: verify-amiga-gameplay-camera
+verify-amiga-gameplay-camera:
+	bash amiga/verify_gameplay_camera.sh
+
 .PHONY: verify-amiga-memory
 verify-amiga-memory:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SKIP_TO_GAME=1'

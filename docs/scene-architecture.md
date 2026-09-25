@@ -171,6 +171,36 @@ the original border stride and palette rules.
 Hardware pointer scrolling is wired for both completion layers and the style
 reveal. Full seven-scene class separation remains unfinished.
 
+### Live horizontal camera verification
+
+`make verify-amiga-gameplay-camera` builds a separate `CAMERA_VERIFY=1`
+fixture starting at gameplay, with a 120-second emulator deadline. Its exit
+trap restores the ordinary startup executable, including on failure.
+The fixture replaces collision callbacks with a flat floor and supplies a
+600-update left/right tape. Shared movement and camera logic, terrain
+generation, retained rasters, prefetch, display swaps and publication remain
+the production paths. Exactly the first horizontal transition discards its
+prefetch tag to exercise the fallback path; later transitions can use real
+staged buffers. None of this is compiled into normal builds.
+
+The gate requires all three camera columns, at least six transitions, both
+staged and fallback paths, and checks of both alternating displays after
+each transition. Existing fresh-terrain comparisons, display-versus-backing
+checks (excluding explicitly dirty actor rows), reserved-asset checks and
+the stack guard must remain clean. This is a rendering regression fixture,
+not a natural shop playthrough, complete actor-composition oracle, performance
+measurement or comparison with a new Windows capture.
+
+The native run passes with seven transitions (six staged, one fallback),
+119 fresh-terrain comparisons and 14 display checks, zero raster/display
+mismatches and an intact stack guard. The shared `main-camera-test` also
+passes. Evidence: `/tmp/downwell-camera-transitions-v3.log` and
+`/tmp/downwell-camera-transitions-v3-gdb.log`. Earlier fixture attempts
+correctly failed coverage: first because player-level callbacks were rebound
+by the world, then because every transition found a prepared buffer. The
+final fixture binds collision through the world and explicitly exercises the
+missing-prefetch case.
+
 ### Terrain raster boundary
 
 `AmigaTerrainRaster.h/.cpp` owns the three-column Fast-RAM raster, dirty rows,

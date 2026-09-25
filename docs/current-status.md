@@ -24,6 +24,11 @@ two ports proves original-game completion. The active parity goal is unfinished.
   injects exits; it does not prove a natural full-level playthrough.
 - Results-menu tests cover all three destinations and 200 final gameplay
   updates, including display-memory reuse and the task-stack guard.
+- A dedicated native horizontal-camera fixture covers all three columns and
+  seven live transitions: six prepared-buffer swaps and one forced fallback.
+  It passes 119 fresh-terrain comparisons and 14 alternating-display checks
+  with no mismatches. This uses synthetic flat collision geometry, not natural
+  side-room/shop traversal; that end-to-end coverage is still outstanding.
 - Style and upgrade selection share `AmigaSelectionLayer`. Static content is
   retained; common vertical movement changes bitplane pointers. Style content
   borrows retired game/HUD buffers without another Chip allocation. Its
