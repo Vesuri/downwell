@@ -1145,8 +1145,6 @@ int main(void) {
     unsigned front = 0;
     int worldViewX = mainViewX;
     int worldViewY = mainInitialViewY;
-    int cachedWorldFirst = worldViewY;
-    int cachedWorldEnd = worldViewY + downwellDisplayHeight;
     unsigned oldShopArt[downwell::ShopWorld::capacity] = {};
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
@@ -1383,6 +1381,7 @@ int main(void) {
         memory.copper(), memory.copper() + downwellCopperWords
     };
     AmigaGameplayScene gameplayScene(dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
+    gameplayScene.setBackingRange(worldViewY, worldViewY + downwellDisplayHeight);
     DownwellSelectionCopperList selectionLists[2] = {
         DownwellSelectionCopperList(dynamicCopperWords[0], downwellCopperWords),
         DownwellSelectionCopperList(dynamicCopperWords[1], downwellCopperWords)
@@ -1885,8 +1884,8 @@ int main(void) {
                             fragments, liveBuilder.fragmentCount(),
                             generatedDecorations, liveBuilder.decorationCount(),
                             &port, port.ringOrigin(), worldViewX, worldViewY);
-                        cachedWorldFirst = worldViewY;
-                        cachedWorldEnd = worldViewY + downwellDisplayHeight + gameplayPrefetchLines;
+                        gameplayScene.setBackingRange(worldViewY,
+                            worldViewY + downwellDisplayHeight + gameplayPrefetchLines);
                         syncGameRows(gameDisplay[0], gameBitmap, 0);
                         syncGameRows(gameDisplay[1], gameBitmap, 1);
                     }
@@ -2408,19 +2407,8 @@ int main(void) {
                 gameplayScene.invalidateStage();
                 // Discard dirty retained rows outside the current view. Visible
                 // intersections are refreshed below, after any camera swap.
-                if (liveGeneration.dirtyFirst < worldViewY &&
-                    liveGeneration.dirtyEnd > cachedWorldFirst) {
-                    const int end = liveGeneration.dirtyEnd < worldViewY
-                        ? liveGeneration.dirtyEnd : worldViewY;
-                    if (end > cachedWorldFirst) cachedWorldFirst = end;
-                }
-                const int viewEnd = worldViewY + downwellDisplayHeight;
-                if (liveGeneration.dirtyEnd > viewEnd &&
-                    liveGeneration.dirtyFirst < cachedWorldEnd) {
-                    const int first = liveGeneration.dirtyFirst > viewEnd
-                        ? liveGeneration.dirtyFirst : viewEnd;
-                    if (first < cachedWorldEnd) cachedWorldEnd = first;
-                }
+                gameplayScene.invalidateBackingOutside(liveGeneration.dirtyFirst,
+                    liveGeneration.dirtyEnd, worldViewY, downwellDisplayHeight);
             }
             if (cameraXChanged) {
                 worldViewX = mainViewX + port.cameraOffsetX();
@@ -2449,8 +2437,7 @@ int main(void) {
                     backingCopyPending = true;
                     dirtyGameRows(0, 0, downwellGameRingHeight);
                     gameplayRows.copied(0, downwellGameRingHeight, back);
-                    cachedWorldFirst = gameplayScene.stageFirst();
-                    cachedWorldEnd = gameplayScene.stageEnd();
+                    gameplayScene.setBackingRange(gameplayScene.stageFirst(), gameplayScene.stageEnd());
 #ifdef DOWNWELL_SCENE_VERIFY
                     AmigaHardware::blitterDrain();
                     const unsigned column = (worldViewX - mainViewX + 160) / 160;
@@ -2488,27 +2475,16 @@ int main(void) {
                     fragments, liveBuilder.fragmentCount(),
                     generatedDecorations, liveBuilder.decorationCount(),
                     &port, port.ringOrigin(), worldViewX, worldViewY);
-                cachedWorldFirst = worldViewY;
-                cachedWorldEnd = worldViewY + downwellDisplayHeight + gameplayPrefetchLines;
+                gameplayScene.setBackingRange(worldViewY,
+                    worldViewY + downwellDisplayHeight + gameplayPrefetchLines);
                 }
                 gameplayScene.invalidateStage();
             }
             // Keep both ends of the actual cached interval. A jumping camera
             // can reverse into retained rows without repainting either edge.
-            int missingFirst = 0, missingHeight = 0;
-            if (worldViewY < cachedWorldFirst) {
-                missingFirst = worldViewY - 8;
-                missingHeight = cachedWorldFirst - missingFirst;
-                cachedWorldFirst = missingFirst;
-                if (cachedWorldEnd > cachedWorldFirst + downwellGameRingHeight)
-                    cachedWorldEnd = cachedWorldFirst + downwellGameRingHeight;
-            } else if (worldViewY + downwellDisplayHeight > cachedWorldEnd) {
-                missingFirst = cachedWorldEnd;
-                missingHeight = worldViewY + downwellDisplayHeight + 8 - cachedWorldEnd;
-                cachedWorldEnd += missingHeight;
-                if (cachedWorldFirst < cachedWorldEnd - downwellGameRingHeight)
-                    cachedWorldFirst = cachedWorldEnd - downwellGameRingHeight;
-            }
+            const auto exposed = gameplayScene.exposeBacking(worldViewY,
+                downwellDisplayHeight, downwellGameRingHeight);
+            const int missingFirst = exposed.first, missingHeight = exposed.count;
             if (missingHeight > 0) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
                 int origin = (int)port.ringOrigin() + missingFirst - worldViewY;
@@ -2542,10 +2518,7 @@ int main(void) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
                 gameplayScene.invalidateStage();
                 const int first = shop.y - 21, end = shop.y + 12;
-                int below = first > worldViewY + downwellDisplayHeight ? first : worldViewY + downwellDisplayHeight;
-                if (end > below && cachedWorldEnd > below) cachedWorldEnd = below;
-                int above = end < worldViewY ? end : worldViewY;
-                if (first < above && cachedWorldFirst < above) cachedWorldFirst = above;
+                gameplayScene.invalidateBackingOutside(first, end, worldViewY, downwellDisplayHeight);
                 int top = first - worldViewY, bottom = end - worldViewY;
                 if (top < 0) top = 0;
                 if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
@@ -2567,15 +2540,8 @@ int main(void) {
                     // Bullets can change rows retained just outside the view.
                     // Exclude those rows from the ring's valid interval so
                     // they are refreshed before the camera exposes them.
-                    int below = centerY - 8;
-                    if (below < worldViewY + downwellDisplayHeight)
-                        below = worldViewY + downwellDisplayHeight;
-                    if (centerY + 8 > below && cachedWorldEnd > below)
-                        cachedWorldEnd = below;
-                    int above = centerY + 8;
-                    if (above > worldViewY) above = worldViewY;
-                    if (centerY - 8 < above && cachedWorldFirst < above)
-                        cachedWorldFirst = above;
+                    gameplayScene.invalidateBackingOutside(centerY - 8, centerY + 8,
+                        worldViewY, downwellDisplayHeight);
                     int top = centerY - 8 - worldViewY;
                     int bottom = top + 16;
                     int left = downwellPlayfieldX + 240 + destroyedBlockX[block] - 8 - worldViewX;

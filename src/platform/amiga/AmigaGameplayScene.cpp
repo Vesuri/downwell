@@ -1,5 +1,38 @@
 #include "AmigaGameplayScene.h"
 
+void AmigaGameplayScene::invalidateBackingOutside(int first, int end, int viewY, int height) {
+    if (first >= end) return;
+    const int below = first > viewY + height ? first : viewY + height;
+    if (end > below && cachedEnd_ > below) cachedEnd_ = below;
+    const int above = end < viewY ? end : viewY;
+    if (first < above && cachedFirst_ < above) cachedFirst_ = above;
+}
+
+AmigaGameplayScene::StageSpan AmigaGameplayScene::exposeBacking(int viewY, int height, int ringHeight) {
+    int first = 0, count = 0;
+    if (viewY < cachedFirst_) {
+        first = viewY - 8;
+        count = cachedFirst_ - first;
+        cachedFirst_ = first;
+        if (cachedEnd_ > cachedFirst_ + ringHeight) cachedEnd_ = cachedFirst_ + ringHeight;
+    } else if (viewY + height > cachedEnd_) {
+        first = cachedEnd_;
+        count = viewY + height + 8 - cachedEnd_;
+        cachedEnd_ += count;
+        if (cachedFirst_ < cachedEnd_ - ringHeight) cachedFirst_ = cachedEnd_ - ringHeight;
+    }
+    // A discontinuous camera snap can skip more than an entire ring. None of
+    // those skipped rows will be displayed: replace only the destination view
+    // and its guards, never write the ring repeatedly for intermediate rows.
+    if (count > ringHeight) {
+        cachedFirst_ = viewY - 8;
+        cachedEnd_ = viewY + height + 8;
+        first = cachedFirst_;
+        count = cachedEnd_ - cachedFirst_;
+    }
+    return {first, count};
+}
+
 AmigaGameplayScene::StageSpan AmigaGameplayScene::stageSpan(int x, int y, int visibleHeight) {
     if (x != stagedX_) {
         stagedX_ = x;

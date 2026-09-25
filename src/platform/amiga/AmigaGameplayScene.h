@@ -2,15 +2,25 @@
 #define DOWNWELL_AMIGA_GAMEPLAY_SCENE_H
 #include "DownwellCopperLists.h"
 
-// Owns gameplay's alternating Copper programs and side-view staging validity.
+// Owns gameplay's alternating Copper programs and backing/staging validity.
 // Storage is borrowed from other mutually exclusive scenes. The application
 // retires DMA before invalidate/reuse and publishes only successful frames.
 class AmigaGameplayScene {
     DownwellGameplayCopperList lists_[2];
     bool ready_[2] = {false, false};
     int stagedX_ = -10000, stagedFirst_ = 0, stagedEnd_ = 0;
+    int cachedFirst_ = 0, cachedEnd_ = 0;
 public:
     struct StageSpan { int first, count; };
+    void setBackingRange(int first, int end) { cachedFirst_ = first; cachedEnd_ = end; }
+    // Visible damage is repainted by the caller. Retained offscreen damage
+    // must leave the valid interval before the camera can expose it.
+    void invalidateBackingOutside(int first, int end, int viewY, int height);
+    // Requires height + 16 <= ringHeight (284 visible rows, 320 allocated).
+    // Caller must paint the returned span before publishing the frame.
+    StageSpan exposeBacking(int viewY, int height, int ringHeight);
+    int backingFirst() const { return cachedFirst_; }
+    int backingEnd() const { return cachedEnd_; }
     // Staging belongs to the scene, independently of the Copper slot lifetime.
     // A span is committed only after its clean source rows have been copied.
     void invalidateStage() { stagedX_ = -10000; }

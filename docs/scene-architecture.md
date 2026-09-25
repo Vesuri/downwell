@@ -18,7 +18,7 @@ has already moved out of the application loop.
 | Controls | `AmigaControlsScene` | Shared startup timing and application publication |
 | Garden | `AmigaGardenScene` | DMA retirement, publication and transition orchestration |
 | Style selection | `AmigaStyleScene` | Shared startup rules and application publication |
-| Gameplay | `AmigaGameplayScene` plus dedicated terrain/actor components | Scene owns Copper lifecycle and side-view staging ranges; backing-cache refresh/display coordination still needs consolidation |
+| Gameplay | `AmigaGameplayScene` plus dedicated terrain/actor components | Scene owns Copper lifecycle and backing/staging ranges; transfer execution/display coordination still needs consolidation |
 | Upgrade selection | `AmigaUpgradeScene` | Display binding, sprites, publication and next-level transition |
 
 Style and upgrade selection share `AmigaSelectionLayer` for retained content,
@@ -39,8 +39,8 @@ commits validity only after a clean terrain transfer. Column changes, dirty
 terrain, shop art changes, destroyed blocks and completed swaps invalidate
 the same scene-owned state. Room entry resets the range separately from Copper
 slot invalidation: rebuilding a list does not itself change retained pixels.
-The main loop still performs transfers and owns the active backing interval;
-those remaining responsibilities have not been disguised as completed work.
+The main loop still performs transfers. The scene now also owns the active
+backing interval as described below; display coordination remains unfinished.
 
 The host test models the actual row/column stored in every circular-buffer row
 over 20,000 updates. It checks 15,897 covered views, 378 failed-copy invalidations
@@ -57,6 +57,37 @@ and `/tmp/downwell-scene-staging-native-gdb.log`. The wrapper restores ordinary
 startup, and both 68000 audits pass. This verifies the ownership refactor on
 the synthetic camera fixture, not natural side-room traversal or a new FPS
 measurement.
+
+### Active backing interval and discontinuous scrolling
+
+`AmigaGameplayScene` now tracks active backing validity as well as staging.
+Generation, shop changes and destroyed blocks use one offscreen-invalidation
+routine. Visible damage still uses the existing clipped repair path. Ordinary
+scrolling retains the eight-row lookahead and repaints only newly exposed
+rows. Pointer-based scrolling and the two independent display-copy debts are
+unchanged; this moves no simulation or RNG into rendering.
+
+Previously a sufficiently large camera snap could request more than 320 rows,
+repeatedly overwriting the circular buffer with intermediate rows never shown.
+Such requests now cover only the destination view and eight rows on either
+side: 300 rows for a 284-row view. The caller paints before publication. This
+does not make a full destination refresh free or claim a 20 ms frame budget.
+
+The independent backing-row/revision test covers 20,000 updates, 207 camera
+snaps, offscreen damage and reversals. All visible rows match; 17,813 updates
+request no backing refresh. Explicit large forward/backward jumps each request
+300 rows. Normal and ASan/UBSan runs pass, including the earlier staging and
+Copper lifecycle tests. Logs: `/tmp/downwell-scene-backing-host.log` and
+`/tmp/downwell-scene-backing-sanitized.log`.
+
+The bounded native camera gate passes 600 updates, seven transitions (six
+staged/one fallback), 119 terrain comparisons, 14 display checks, four camera
+locks and three releases, with no mismatches and an intact stack guard.
+Logs: `/tmp/downwell-scene-backing-native.log` and
+`/tmp/downwell-scene-backing-native-gdb.log`. This native tape checks ordinary
+live transitions; the large skipped-interval case is covered by the host row
+oracle, not a new native snap fixture. Ordinary startup is restored, and both
+68000 audits pass.
 
 ## Upgrade scene: first extraction
 

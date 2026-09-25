@@ -107,5 +107,41 @@ int main() {
     assert(!scene.stageCovers(x,y,284));
     std::printf("Staging: 20000 updates, %u covered views, %u failed copies, %u upward strips\n",
                 covered,failed,upward);
+    // Independent pixel-row identity/revision oracle for the active backing.
+    // Damage outside the view must be repaired before it becomes visible.
+    int revisions[4096]{}, storedRevision[320]{};
+    y=1024;
+    scene.setBackingRange(y,y+284);
+    for (int row=y;row<y+284;++row) storedY[row%320]=row;
+    unsigned unchanged=0, snaps=0;
+    for (unsigned tick=0;tick<20000;++tick) {
+        random=random*1664525U+1013904223U;
+        if (tick%97==0) { y=512+int((random>>8)%2300); ++snaps; }
+        else y+=int((random>>8)%7)-3;
+        if (y<32) y=32;
+        if (y>3600) y=3600;
+        const auto exposed=scene.exposeBacking(y,284,320);
+        assert(exposed.count>=0 && exposed.count<=320);
+        if (!exposed.count) ++unchanged;
+        for (int row=exposed.first;row<exposed.first+exposed.count;++row) {
+            storedY[row%320]=row; storedRevision[row%320]=revisions[row];
+        }
+        const int damaged=y+int((random>>16)%360)-32;
+        for (int row=damaged;row<damaged+16;++row) {
+            ++revisions[row];
+            if (row>=y && row<y+284) storedRevision[row%320]=revisions[row];
+        }
+        scene.invalidateBackingOutside(damaged,damaged+16,y,284);
+        assert(scene.backingFirst()<=y && scene.backingEnd()>=y+284);
+        for (int row=y;row<y+284;++row)
+            assert(storedY[row%320]==row && storedRevision[row%320]==revisions[row]);
+    }
+    assert(unchanged>10000 && snaps>200);
+    scene.setBackingRange(1000,1300);
+    auto snap=scene.exposeBacking(2000,284,320);
+    assert(snap.first==1992 && snap.count==300);
+    snap=scene.exposeBacking(500,284,320);
+    assert(snap.first==492 && snap.count==300);
+    std::printf("Backing: 20000 updates, %u unchanged views and %u camera snaps\n",unchanged,snaps);
     std::puts("Gameplay scene: retired-slot rebuilds, 600 patched frames, exit masks and failure recovery");
 }
