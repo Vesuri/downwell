@@ -8,10 +8,11 @@ case "$mode" in
   fps) flags=FPSCOUNT=1; script=profile_fps.gdb ;;
   *) echo "usage: bash amiga/profile.sh [probes|fps]" >&2; exit 1 ;;
 esac
+if [[ ${SKIP_LEVEL:-0} == 1 ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
   make clean > .run/profile-restore.log 2>&1
-  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 PROFILE_LASER=0 >> .run/profile-restore.log 2>&1
+  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
 trap restore EXIT
@@ -24,4 +25,4 @@ VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh
 cp .run/gdb-startup.log ".run/profile-${mode}.log"
-sed -n '/PROFILE scene/,$p' ".run/profile-${mode}.log"
+sed -n '/PROFILE scene\|CLEAR PROFILE/,$p' ".run/profile-${mode}.log"

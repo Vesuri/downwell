@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_CLEAR_PRESENTER_H
 #include "AmigaClearBorderRenderer.h"
 #include "AmigaClearDrawList.h"
+#include "core/Profile.h"
 
 // Persistent Fast-RAM scene state. Caller supplies one RETIRED border/overlay
 // pair, drains the blitter after success, patches its copper list with origin
@@ -33,6 +34,7 @@ struct AmigaClearPresenter {
                 const downwell::LevelClearPresentation::Frame& snapshot,
                 const downwell::UpgradeInventory& inventory, Frame& result) {
         result = {};
+        DW_PROFILE_SCOPE(profileClearDrawList);
         if (back >= 2 || !renderer.game || !renderer.hud || !pack || !end ||
             !drawList.build(room, snapshot, inventory)) return false;
         auto& border = borders[back];
@@ -47,8 +49,12 @@ struct AmigaClearPresenter {
             amigaRendererClear(&renderer, 0);
         }
         unsigned rows = 0, pixels = 0;
-        if (!amigaRenderClearBorder(renderer, border, pack, end, snapshot, room.motion.viewY(), rows) ||
-            !overlay.render(renderer, pack, end, drawList.commands, drawList.count, pixels)) {
+        bool success;
+        { DW_PROFILE_SCOPE(profileClearBorder);
+          success = amigaRenderClearBorder(renderer, border, pack, end, snapshot, room.motion.viewY(), rows); }
+        if (success) { DW_PROFILE_SCOPE(profileClearOverlay);
+            success = overlay.render(renderer, pack, end, drawList.commands, drawList.count, pixels); }
+        if (!success) {
             // A failed back frame must never be published; retry starts clean.
             initialized[back] = false;
             return false;

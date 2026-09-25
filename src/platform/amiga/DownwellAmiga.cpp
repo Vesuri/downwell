@@ -1936,12 +1936,23 @@ int main(void) {
             else if (scenes.scene() == AmigaScene::menu)
                 liveInput.right = ++profileMenuFrames > 40;
             else if (scenes.scene() == AmigaScene::gameplay) {
+#ifdef DOWNWELL_SKIP_LEVEL
+                static unsigned clearProfileFrames = 0;
+                if (port.levelClearActive()) {
+                    ++clearProfileFrames;
+                    liveInput.right = clearProfileFrames >= 160 && clearProfileFrames < 240 && (clearProfileFrames % 16) == 0;
+                    liveInput.fire = clearProfileFrames >= 240;
+                    gDownwellProfileSection = clearProfileFrames >= 240 ? 5 :
+                        clearProfileFrames >= 160 ? 4 : port.levelClearFrame().choices ? 3 : 2;
+                } else gDownwellProfileSection = clearProfileFrames ? 6 : 0;
+#else
 #ifdef DOWNWELL_PROFILE_LASER
                 if (!port.upgrades().levels[12]) port.grantUpgrade(12);
 #endif
                 liveInput.right = ((port.tick() / 120) & 1) == 0;
                 liveInput.left = !liveInput.right;
                 liveInput.fire = (port.tick() % 16) == 0 || (port.tick() % 16) == 3;
+#endif
             }
 #ifdef DOWNWELL_PROFILE_NAVIGATE
             else if (scenes.scene() == AmigaScene::styleSelect &&
@@ -2454,6 +2465,10 @@ int main(void) {
             if (port.levelResultRequested() || port.levelClearActive()) {
                 const bool entering = !clear.presented;
                 if (entering) {
+                    DW_PROFILE_SCOPE(profileClearEntry);
+#if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
+                    gDownwellProfileSection = 1;
+#endif
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 1; downwellClearProbe();
 #endif
@@ -2484,6 +2499,7 @@ int main(void) {
                         gameListReady[buffer] = false;
                     }
                 } else if (!port.nextLevelRequested()) {
+                    DW_PROFILE_SCOPE(profileClearStep);
                     bool confirm = liveInput.fire;
                     if (!port.stepLevelClear(confirm, liveInput.left && !clear.left, liveInput.right && !clear.right,
                         clear.heartGoal, [](downwell::LevelClearSelection::Effect, unsigned) {})) { exitCode = 20; break; }
@@ -2510,6 +2526,7 @@ int main(void) {
                 for (unsigned i = 0; i < count; ++i) bankChanged |= clear.offers[i] != room.offers.ids[i];
                 for (unsigned i = 0; i < 23; ++i) bankChanged |= clear.owned[i] != port.upgrades().levels[i];
                 if (bankChanged) {
+                    DW_PROFILE_SCOPE(profileClearBank);
                     AmigaHardware::blitterDrain();
                     if (!clear.assets.changeOffers(memory.menuForeground(), amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack,
                         room.offers.ids, count, port.runStage().area, port.runStage().level, port.upgrades().levels)) {
@@ -2531,6 +2548,7 @@ int main(void) {
                 AmigaClearPresenter::Frame frame;
                 if (!clear.presenter.render(back, target, bank, bank + clear.assets.bankBytes,
                         room, snapshot, port.upgrades(), frame)) { exitCode = 20; break; }
+                DW_PROFILE_PHASE(profileClearSprites);
                 for (unsigned channel = 0; channel < 8; ++channel) {
                     Sprite& sprite = channel == 0 ? playerSprites[back] :
                         actorSpriteAt(bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back], channel - 1);
@@ -2546,6 +2564,7 @@ int main(void) {
                         frame.playerX, frame.playerY, port.player().facing() < 0, sprite.data(), playerSpriteHeight) != 0;
                 }
                 Bitmap overlay(target.hud, downwellVisibleWidth, downwellDisplayHeight, 2, false, false, downwellDmaWidth);
+                DW_PROFILE_PHASE(profileClearCopper);
                 if (!ready || !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], frame.origin) :
                     gameplayCopperLists[back].build(gameDisplay[back], overlay, playerSprites[back],
                         bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette, frame.origin)) ||
@@ -2554,6 +2573,7 @@ int main(void) {
                         memory.menuForeground() + AmigaExitMask::offset(port.exitDither().y - room.motion.viewY()) : nullptr)) {
                     exitCode = 20; break;
                 }
+                DW_PROFILE_PHASE(profileClearDrain);
                 AmigaHardware::blitterDrain();
 #ifdef DOWNWELL_CLEAR_VERIFY
                 alignas(2) static UBYTE expectedGame[2][downwellGameRingBytes], expectedHud[2][downwellLayerBytes];
@@ -2576,6 +2596,7 @@ int main(void) {
                     downwellClearProbe();
 #endif
                 gameListReady[back] = true;
+                DW_PROFILE_PHASE(profileClearPublish);
                 platform.publish(gameplayCopperLists[back]); front = back;
                 continue;
             }
@@ -3084,6 +3105,7 @@ int main(void) {
                 }
             }
             if (fieldShape.visible || gameplayFields[back].present()) {
+                DW_PROFILE_SCOPE(profileGoalFieldPrepare);
                 AmigaHardware::blitterDrain();
                 if (!gameplayFields[back].prepare((UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape, fieldChanged,
                         [&](unsigned row) { return (gameDirtyRows[row] & (1u << back)) != 0; })) {
@@ -3092,6 +3114,7 @@ int main(void) {
             }
             syncGameRows(gameDisplay[back], gameBitmap, back);
             if (fieldShape.visible) {
+                DW_PROFILE_SCOPE(profileGoalFieldDraw);
                 AmigaHardware::blitterDrain();
                 gameplayFields[back].draw();
 #ifdef DOWNWELL_CLEAR_VERIFY

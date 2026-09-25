@@ -23,9 +23,12 @@ struct AmigaClearDrawList {
     bool build(const downwell::LevelClearController& room,
                const downwell::LevelClearPresentation::Frame& frame,
                const downwell::UpgradeInventory& inventory, Rasterize pixel) {
-        return build(room, frame, inventory,
-            downwell::LevelClearTrig::absoluteCosine(frame.circle),
-            downwell::LevelClearTrig::absoluteSine(frame.time), pixel);
+        downwell::HudReal cosine, sine;
+        { DW_PROFILE_SCOPE(profileClearTrig);
+            cosine = downwell::LevelClearTrig::absoluteCosine(frame.circle);
+            sine = downwell::LevelClearTrig::absoluteSine(frame.time);
+        }
+        return build(room, frame, inventory, cosine, sine, pixel);
     }
     template<class Rasterize>
     bool build(const downwell::LevelClearController& room,

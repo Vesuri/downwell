@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_AMIGA_CLEAR_OVERLAY_H
 #define DOWNWELL_AMIGA_CLEAR_OVERLAY_H
 #include "AmigaRenderer.h"
+#include "core/Profile.h"
 
 // One instance per retired overlay buffer. The owner keeps player sprites and
 // hardware-scrolled borders separate and retires DMA before replacing the pack.
@@ -79,6 +80,7 @@ struct AmigaClearOverlay {
         const AmigaRenderer saved = renderer;
         renderer.target = renderer.hud;
         for (unsigned i = 0; i < dirtyCount; ++i) {
+            DW_PROFILE_SCOPE(profileClearOverlayPaint);
             const auto& r = dirty[i];
             renderer.clipX = r.x; renderer.clipY = r.y;
             renderer.clipWidth = r.width; renderer.clipHeight = r.height;

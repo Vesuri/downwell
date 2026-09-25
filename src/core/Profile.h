@@ -20,6 +20,11 @@ enum DownwellProfilePhase {
     profileActorCollect, profileActorChannels, profileHardwareSpriteUpdate,
     profileLaserTrace, profileLaserPrepare, profileLaserDraw,
     profileLaserDrawDrain, profileGameplayBobs, profileLaserRestore, profileLaserPrepareDrain,
+    profileClearEntry, profileClearStep, profileClearBank, profileClearDrawList,
+    profileClearBorder, profileClearOverlay, profileClearSprites, profileClearCopper,
+    profileClearDrain, profileClearPublish,
+    profileClearBorderPaint, profileClearOverlayPaint, profileClearTrig,
+    profileGoalFieldPrepare, profileGoalFieldDraw,
     profilePhaseCount
 };
 
@@ -32,6 +37,7 @@ extern "C" volatile long gDownwellProfileScroll;
 extern "C" volatile long gDownwellProfileCameraChange;
 extern "C" volatile long gDownwellProfileStagedHits;
 extern "C" volatile long gDownwellProfileStageShortfall;
+extern "C" volatile unsigned long gDownwellProfileSection;
 class DownwellProfileFrame {
 public:
     explicit DownwellProfileFrame(unsigned scene) { downwellProfileBegin(scene); }

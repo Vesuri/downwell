@@ -7,7 +7,12 @@ static const ULONG ticksPerField = 313UL * 256UL;
 extern "C" {
 #ifdef DOWNWELL_SKIP_TO_GAME
 volatile ULONG gDownwellProfileTargetScene = 3;
-volatile ULONG gDownwellProfileTargetFrames = 600;
+volatile ULONG gDownwellProfileTargetFrames =
+#ifdef DOWNWELL_SKIP_LEVEL
+    480;
+#else
+    600;
+#endif
 #elif defined(DOWNWELL_SKIP_INTRO)
 volatile ULONG gDownwellProfileTargetScene = 2;
 volatile ULONG gDownwellProfileTargetFrames = 180;
@@ -35,6 +40,9 @@ volatile ULONG gDownwellProfileMax[4][profilePhaseCount];
 volatile ULONG gDownwellProfileFrameMax[4];
 volatile ULONG gDownwellProfileFrozen;
 volatile ULONG gDownwellProfileClockClamps;
+volatile ULONG gDownwellProfileSection;
+volatile ULONG gDownwellSectionFrames[7], gDownwellSectionFields[7], gDownwellSectionMaxGap[7];
+volatile ULONG gDownwellSectionTicks[7][profilePhaseCount], gDownwellSectionMax[7][profilePhaseCount];
 #ifdef DOWNWELL_PROBES
 volatile unsigned long gDownwellProfileCounters[profileCounterCount];
 volatile ULONG gDownwellProfileWorstTicks[4][profilePhaseCount];
@@ -148,6 +156,17 @@ void downwellProfileEnd()
         return;
     }
     const ULONG fields = gDownwellProfileVbi - startField;
+    const unsigned section = gDownwellProfileSection < 7 ? gDownwellProfileSection : 0;
+    ++gDownwellSectionFrames[section];
+    gDownwellSectionFields[section] += fields;
+    if (fields > gDownwellSectionMaxGap[section]) gDownwellSectionMaxGap[section] = fields;
+#ifdef DOWNWELL_PROBES
+    for (unsigned phase = 0; phase < profilePhaseCount; ++phase) {
+        gDownwellSectionTicks[section][phase] += frameTicks[phase];
+        if (frameTicks[phase] > gDownwellSectionMax[section][phase])
+            gDownwellSectionMax[section][phase] = frameTicks[phase];
+    }
+#endif
     ++gDownwellProfileFrames[sceneId];
     if (sceneId == gDownwellProfileTargetScene && fields > 1) {
         const ULONG slot = gDownwellProfileMissCount++;

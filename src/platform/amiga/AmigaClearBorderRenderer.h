@@ -3,6 +3,7 @@
 #include "AmigaClearBorderCache.h"
 #include "AmigaRenderer.h"
 #include "core/LevelUpgradeArt.h"
+#include "core/Profile.h"
 // Render into a retired/back border buffer. The owner publishes cache.origin
 // through the existing copper pointer/wrap helpers after draining the blitter.
 // No allocation or source conversion; the pack must already be in Chip RAM
@@ -28,6 +29,7 @@ inline bool amigaRenderClearBorder(AmigaRenderer& renderer, AmigaClearBorderCach
     struct Span { int y = 0, height = 0, anchor = 0; unsigned current = 0, incoming = 0; } span;
     const auto flush = [&]() {
         if (!span.height) return;
+        DW_PROFILE_SCOPE(profileClearBorderPaint);
         amigaRendererSetGameOrigin(&renderer, cache.origin);
         amigaRendererClearGameRows(&renderer, span.y, span.height, 0);
         amigaRendererSetClipRect(&renderer, downwellPlayfieldX, span.y, 160, span.height);
