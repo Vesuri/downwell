@@ -4,6 +4,26 @@
 
 ### Actor presentation breakdown
 
+#### Rejected immutable-directory cache shortcuts
+
+An explicit immutable-bank lifetime API allowed linked gameplay artwork to
+reuse validated directory records without checking its header and directory
+bounds on every cache hit. Mutable scene banks kept the existing validation;
+the setter invalidated records even for same-address bank replacement.
+The first variant reused the existing 64-slot cache; a second added an
+independent 64-pointer cache so mutable lookups could not evict its entries.
+
+Both passed renderer oracle/lifetime tests and bounded native firing captures
+(0/99,968 differing pixels). The first also passed the sanitized renderer.
+The 600-update FPSCOUNT tape measured **814 fields / 36.86 FPS** for the
+shared cache and **821 / 36.54 FPS** for the separate cache, both maximum gap
+five. Neither demonstrated improvement over the repeated 812–813 baseline.
+Both implementations and their lifetime API were removed; the ordinary build
+was restored. Logs use `/tmp/downwell-immutable-` and
+`/tmp/downwell-immutable-separated-` (`test`, `fps`, `frame`; `sanitized` for
+the first variant). This rejects extra lookup-cache paths, not the untested
+larger change of passing one resolved actor descriptor through all stages.
+
 Additional PROBES-only phases separate gameplay actor collection (42),
 hardware-channel selection (43), and each hardware-sprite update (44).
 Counters 8–10 distinguish header-only updates from copying already-offline
