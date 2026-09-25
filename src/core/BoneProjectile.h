@@ -3,6 +3,7 @@
 #include "BoneMotion.h"
 #include "RandomBinary64.h"
 #include "UnitSequenceFrames.h"
+#include "EnemyContact.h"
 namespace downwell {
 // Object 269's Create and event state. The owner must call create synchronously
 // before installing the skeleton's velocity overrides.
@@ -17,6 +18,32 @@ struct BoneProjectile {
     bool active = true, destroyRequested = false;
     bool hit = false, hitEffect = false;
     Animation animation = Animation::instanceDefault;
+    ContactBounds collisionBounds() const {
+        // The original uses published x/y and an unrotated, unit-scale
+        // AxisAlignedRect. Animation changes artwork, not this shared mask.
+        auto bounds=mask==582?ContactBounds{0,0,0,0}:contactSpriteBounds(460);
+        bounds.left+=motion.x; bounds.right+=motion.x;
+        bounds.top+=motion.y; bounds.bottom+=motion.y;
+        return bounds;
+    }
+    bool meetsPlayer(const ContactActor& player) const {
+        const auto a=collisionBounds(), b=contactWorldBounds(player);
+        return a.left<a.right && a.top<a.bottom && b.left<b.right && b.top<b.bottom &&
+            a.left<b.right && b.left<a.right && a.top<b.bottom && b.top<a.bottom;
+    }
+    // The owner supplies the spatial index's rectangle query, not a per-pixel
+    // scan. It dispatches each collision family in original engine order.
+    template<class WallQuery,class Events>
+    bool dispatchWall(WallQuery query,Events& events) {
+        const auto bounds=collisionBounds();
+        if(bounds.left>=bounds.right || bounds.top>=bounds.bottom || !query(bounds)) return false;
+        collideWall(events); return true;
+    }
+    template<class Events>
+    bool dispatchPlayer(const ContactActor& player,bool stopped,Events& events) {
+        if(!meetsPlayer(player)) return false;
+        collidePlayer(stopped,events); return true;
+    }
     // Sprite 460: four consecutive unit sequence keys. The owner advances
     // animation before Begin Step/alarms, using the speed from the prior Step.
     // Bone events do not write image_index or change the sprite.

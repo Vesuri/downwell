@@ -32,6 +32,14 @@ extern "C" unsigned boneProjectileCompile(downwell::BoneProjectile* bone,
     if (wallCollision) bone->collideWall(events);
     return events.trace;
 }
+extern "C" unsigned boneContactCompile(downwell::BoneProjectile* bone,
+    downwell::ContactActor player,bool stopped,bool wall) {
+    BoneEvents events;
+    // Compile each adapter; this fixture does not assert collision-family order.
+    if(wall) bone->dispatchWall([](downwell::ContactBounds b){return b.left<0;},events);
+    else bone->dispatchPlayer(player,stopped,events);
+    return events.trace;
+}
 extern "C" bool randomBinary64Compile(unsigned word, downwell::MotionBinary64 scale,
     downwell::MotionBinary64* result) {
     return downwell::randomBinary64(word,scale,*result);

@@ -10,7 +10,7 @@ assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee49275
 assert manifest["extractor"]["version"] == "0.9.2.0"
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
-assert {int(row[0]) for row in records} == {31, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 278}
+assert {int(row[0]) for row in records} == {31, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 278, 460}
 for row in records:
     sprite = manifest["resources"]["sprites"][int(row[0])]
     assert sprite["id"] == int(row[0])
@@ -26,6 +26,8 @@ assert manifest["resources"]["objects"][112]["spriteId"] == 186
 assert manifest["resources"]["objects"][248]["spriteId"] == 133
 assert manifest["resources"]["objects"][248]["textureMaskId"] == -1
 assert manifest["resources"]["objects"][116]["spriteId"] == 153
+assert manifest["resources"]["objects"][269]["spriteId"] == 460
+assert manifest["resources"]["objects"][269]["textureMaskId"] == -1
 assert manifest["resources"]["rooms"][11]["name"] == "rmMain"
 assert manifest["resources"]["rooms"][11]["width"] == 480
-print("13 enemy/player/currency contact rectangles match pinned source metadata")
+print("14 enemy/player/currency/bone contact rectangles match pinned source metadata")

@@ -21,6 +21,38 @@ static bool same(downwell::MotionBinary64 actual, double expected) {
 }
 int main() {
     using downwell::BoneProjectile;
+    unsigned contactCases=0;
+    for(int dx=-12;dx<=12;++dx) for(int dy=-16;dy<=16;++dy)
+    for(bool stopped:{false,true}) for(bool active:{false,true}) {
+        BoneProjectile bone;
+        bone.motion.x=240; bone.motion.y=990; bone.active=active;
+        // Precise accumulator deliberately differs: collision uses published x/y.
+        bone.motion.xx=downwell::MotionBinary64::fromInteger(1000);
+        bone.motion.yy=downwell::MotionBinary64::fromInteger(2000);
+        downwell::ContactActor player{(240L+dx)*256,(990L+dy)*256,1,1,31};
+        const bool overlap=dx+4>-5 && dx-4<5 && dy+8>-4 && dy-4<5;
+        Events events;
+        check(bone.dispatchPlayer(player,stopped,events)==overlap);
+        std::vector<int> expected;
+        if(overlap && active) {
+            if(!stopped) expected.push_back(3);
+            expected.push_back(2); expected.push_back(1);
+        }
+        check(events.calls==expected && bone.destroyRequested==(overlap && active));
+        bone.mask=582;
+        check(!bone.meetsPlayer(player));
+        unsigned queries=0;
+        check(!bone.dispatchWall([&](downwell::ContactBounds){++queries;return true;},events) && !queries);
+        ++contactCases;
+    }
+    {
+        BoneProjectile bone; bone.motion.x=10; bone.motion.y=20; Events events;
+        unsigned queries=0;
+        check(bone.dispatchWall([&](downwell::ContactBounds b) {
+            ++queries; check(b.left==5 && b.right==15 && b.top==16 && b.bottom==25); return true;
+        },events));
+        check(queries==1 && events.calls==std::vector<int>({1,2}) && bone.destroyRequested);
+    }
     unsigned cases = 0;
     downwell::MotionBinary64Verification expectedCreate;
     downwell::MotionBinary64Verification expectedAnimation;
@@ -109,5 +141,5 @@ int main() {
                     }
                     ++cases;
                 }
-    std::printf("Bone projectile lifecycle: %u Step/viewport/collision cases match reference\n",cases);
+    std::printf("Bone projectile lifecycle: %u Step/viewport/collision cases and %u contact cases match reference\n",cases,contactCases);
 }

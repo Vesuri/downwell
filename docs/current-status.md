@@ -350,6 +350,14 @@ and the ordinary build was restored after both attempts.
   store exposes explicit phase snapshots with tests for creation and slot
   reuse during dispatch. See `runner-step-eligibility.md`; collision traversal
   and original same-object list ordering remain outside this proof.
+  Bone contact geometry now uses the metadata-verified sprite-460 rectangle
+  (-5..4 X, -4..4 Y) at published coordinates, not the precise accumulators or
+  changing artwork. Shared dispatch adapters connect player overlap and a
+  caller-supplied wall rectangle query to the existing event bodies; the latter
+  avoids a per-pixel terrain scan. 3,300 player/edge/time-stop/inactive cases,
+  empty-mask checks, ordered wall effects and existing lifecycle/ownership
+  tests pass normally and with sanitizers. This does not choose collision-family
+  order or connect damage/effect sinks to the live world yet.
 
 ## Working evidence
 
