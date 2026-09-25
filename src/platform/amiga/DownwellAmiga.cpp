@@ -16,6 +16,7 @@
 #include "AmigaGameplayRows.h"
 #include "AmigaGameplayScene.h"
 #include "AmigaGameplayActors.h"
+#include "AmigaGameplayDrawList.h"
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
@@ -1187,24 +1188,6 @@ extern "C" __attribute__((noinline)) void downwellGameplayRenderFailure() {
     __asm__ volatile("" ::: "memory");
 }
 
-static bool appendGameplayActor(GameplayBob* actors, unsigned& count,
-                                 UWORD sprite, UWORD frame, int x, int y, int flip) {
-    // Offline gameplay actors have <=64-pixel canvases and origins inside
-    // them. Avoid Chip-directory reads for actors far outside the viewport.
-    if (x < downwellPlayfieldX - 64 || x > downwellPlayfieldX + downwellPlayfieldWidth + 64 ||
-        y < -64 || y > downwellDisplayHeight + 64) return true;
-    int left, top, width, height;
-    if (!amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
-            sprite, frame, x, y, flip, &left, &top, &width, &height)) {
-        gDownwellActorFailureSprite = sprite;
-        gDownwellActorFailureFrame = frame;
-        return false;
-    }
-    if (left < downwellPlayfieldX + downwellPlayfieldWidth &&
-        left + width > downwellPlayfieldX && top < downwellDisplayHeight && top + height > 0)
-        actors[count++] = {sprite, frame, x, y, flip};
-    return true;
-}
 
 #ifdef DOWNWELL_BOB_VERIFY
 extern "C" __attribute__((noinline)) void downwellGameplayBobsReady() {
@@ -2762,73 +2745,20 @@ int main(void) {
                         gameplayRows.dirty(AmigaLaserSight::physicalRow(port.ringOrigin(), y), back))
                         fieldChanged = true;
                 });
-            // Shared current painter order: field, enemies, merchants, player, bullets, gems.
             DW_PROFILE_PHASE(profileActorCollect);
-            static GameplayBob actors[2 + AmigaPortRuntime::bulletCapacity +
-                AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity + 2 * downwell::ShopWorld::capacity];
-            unsigned actorCount = 0;
-#ifndef DOWNWELL_REPLAY_VERIFY
-            for (unsigned index = 0; index < port.enemyCount(); ++index) {
-                const auto& enemy = port.enemyAt(index);
-                if (!enemy.active || !enemy.awake) continue;
-                if (!appendGameplayActor(actors, actorCount,
-                        (UWORD)enemy.spriteId, (UWORD)enemy.drawFrame(),
-                        downwellPlayfieldX + 80 + enemy.x - port.cameraOffsetX(),
-                        gameplayPlayerStartY + enemy.y - port.cameraOffsetY(),
-                        enemy.objectId != 119 && enemy.facing < 0)) frameReady = false;
+            static AmigaGameplayDrawList actorList{};
+            static_assert(gameplayPlayerStartY == AmigaGameplayDrawList::playerStartY &&
+                          gameplayPlayerGroundY == AmigaGameplayDrawList::replayGroundY,
+                          "Actor and gameplay camera anchors must agree");
+            if (!actorList.collect(port, activeGamePack, activeGamePackEnd, worldViewX, worldViewY)) {
+                gDownwellActorFailureSprite = actorList.failedSprite;
+                gDownwellActorFailureFrame = actorList.failedFrame;
+                frameReady = false;
             }
-#endif
-            downwell::drawShopKeepers(port.shops(), [&](int sprite, unsigned frame, int x, int y) {
-                if (!appendGameplayActor(actors, actorCount, sprite, frame,
-                    downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) frameReady = false;
-            });
-            downwell::drawShopPrompts(port.shops(), false, [&](int sprite, unsigned frame, int x, int y) {
-                if (!appendGameplayActor(actors, actorCount, sprite, frame,
-                    downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) frameReady = false;
-            });
-            if (port.playerVisible() && !appendGameplayActor(actors, actorCount,
-                    (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
-                    (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),
-                    downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(port.player().offsetXFixed()) - port.cameraOffsetX(),
-#ifdef DOWNWELL_REPLAY_VERIFY
-                    gameplayPlayerGroundY + port.player().offsetY(),
-#else
-                    gameplayPlayerStartY + downwell::roundGameMakerQ8(port.player().offsetYFixed()) - port.cameraOffsetY(),
-#endif
-                    port.player().facing() < 0)) frameReady = false;
-            downwell::LaserSightLine rayLine{};
-            const bool rayVisible = port.upgrades().levels[12] && !port.goalStopped();
-            if (rayVisible) {
-                DW_PROFILE_SCOPE(profileLaserTrace);
-                using Ray = downwell::LaserSightRay;
-                rayLine = downwell::LaserSightLine::from(
-                    Ray::fromQ8(port.player().offsetXFixed(), 240),
-                    Ray::fromQ8(port.player().offsetYFixed(), 176), port.laserSightEndpoint(),
-                    worldViewX - downwellPlayfieldX, worldViewY);
-                actors[actorCount++] = {gameplayRayMarker, 0, 0, 0, 0};
-            }
-            for (unsigned index = 0; index < port.bulletSlotEnd(); ++index) {
-                const auto& bullet = port.bulletAt(index);
-                // The pack generator checks every possible nearest-pixel
-                // sample over 267..273 degrees for all twelve source frames:
-                // the spread-adjusted artwork equals this offline quarter
-                // turn. Other angles/guns need separately verified variants.
-                if (bullet.active && !appendGameplayActor(actors, actorCount,
-                        downwell::machineGunProfile(bullet.gemHigh).sprite, 768 + bullet.animation.frame(),
-                        downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
-                        gameplayPlayerStartY + bullet.y - port.cameraOffsetY(), 0))
-                    frameReady = false;
-            }
-#ifndef DOWNWELL_REPLAY_VERIFY
-            for (unsigned index = 0; index < port.gemSlotEnd(); ++index) {
-                const auto& gem = port.gemAt(index);
-                if (gem.active && gem.motion.lifetime.visible() && !appendGameplayActor(actors, actorCount,
-                        (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),
-                        downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
-                        gameplayPlayerStartY + gem.y - port.cameraOffsetY(), 0))
-                    frameReady = false;
-            }
-#endif
+            const GameplayBob* actors = actorList.actors;
+            const unsigned actorCount = actorList.count;
+            const auto& rayLine = actorList.rayLine;
+            const bool rayVisible = actorList.rayVisible;
             static_assert(gameplayRegularSpriteCount == AmigaGameplayActors::regularChannels,
                           "Gameplay Copper and sprite slots must agree");
             DW_PROFILE_PHASE(profileActorChannels);

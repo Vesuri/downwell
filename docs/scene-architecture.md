@@ -136,12 +136,41 @@ the original border stride and palette rules.
   incremental boundaries, not a completed gameplay scene extraction.
   Overflow BOB rasterization now lives in `AmigaGameplayActors.h/.cpp` with
   explicit artwork, retired display, dirty-row and laser inputs. Actor
-  collection and terrain composition remain in the main loop; hardware-channel
-  assignment now lives alongside the actor renderer. The move preserves painter order, clipping, circular row
+  collection now lives in `AmigaGameplayDrawList`; terrain composition remains
+  in the main loop. Hardware-channel assignment lives alongside the actor
+  renderer. The move preserves painter order, clipping, circular row
   addressing and the native scalar verification oracle.
 
 Hardware pointer scrolling is wired for both completion layers and the style
 reveal. Full seven-scene class separation remains unfinished.
+
+### Actor collection boundary
+
+`AmigaGameplayDrawList` projects the shared `GameplayWorld` without stepping
+or mutating it. It preserves enemies, shopkeepers/prompts, player, planar ray,
+bullets and gems in their existing painter order, including the replay-only
+player anchor and omitted replay enemies/gems. Canvas bounds still filter
+fully invisible actors; this is not hardware-sprite clipping. Resource IDs,
+frames, facing and GameMaker coordinate rounding are unchanged.
+The fixed-capacity list has an explicit append guard; failure prevents frame
+publication and records the responsible resource. Its storage remains static
+and constant-initialized, avoiding both the small task stack and freestanding
+C++ local-static guard functions.
+
+Host tests project 600 stepped worlds in each layout and compare every emitted
+command with independently assembled expected order/coordinates: 3,647 normal
+commands and 3,047 replay commands. Collection leaves the world checkpoint
+unchanged. Missing-art failure followed by successful recollection clears old
+diagnostics. The normal test passes ASan/UBSan. Evidence:
+`/tmp/downwell-actor-collection-host.log` and
+`/tmp/downwell-actor-collection-sanitized.log`.
+After correcting local-static initialization, the 45-second-bounded native
+Laser Sight capture matches all 99,968 SDL pixels at tick 180
+(`/tmp/downwell-actor-collection-laser-v2.log`). The separate 120-second-bounded
+cross-target replay gate passes its complete host/native result vector
+(`/tmp/downwell-actor-collection-replay.log`). These checks cover both target
+build modes, not original Windows completeness. Normal startup is restored;
+the 68000 instruction and helper audits pass.
 
 ### Overflow actor renderer boundary
 

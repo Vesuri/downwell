@@ -769,6 +769,19 @@ test-amiga-gameplay-sprite-assignment: build/amiga-gameplay-sprite-assignment-te
 	./build/amiga-gameplay-sprite-assignment-test
 test: test-amiga-gameplay-sprite-assignment
 
+GAMEPLAY_DRAW_LIST_TEST_SOURCES := tests/platform/amiga/AmigaGameplayDrawListTest.cpp src/platform/amiga/AmigaGameplayDrawList.cpp src/core/GameplayWorld.cpp src/core/PlayerMotion.cpp src/core/Replay.cpp src/core/GameMakerRandom.cpp
+.PHONY: test-amiga-gameplay-draw-list
+build/amiga-gameplay-draw-list-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(GAMEPLAY_DRAW_LIST_TEST_SOURCES)
+build/amiga-gameplay-draw-list-replay-test: $(GAMEPLAY_DRAW_LIST_TEST_SOURCES) $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -DDOWNWELL_REPLAY_VERIFY -o $@ $(GAMEPLAY_DRAW_LIST_TEST_SOURCES)
+test-amiga-gameplay-draw-list: build/amiga-gameplay-draw-list-test build/amiga-gameplay-draw-list-replay-test
+	./build/amiga-gameplay-draw-list-test
+	./build/amiga-gameplay-draw-list-replay-test
+test: test-amiga-gameplay-draw-list
+
 .PHONY: test-amiga-style-retained
 build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
