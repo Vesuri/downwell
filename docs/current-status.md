@@ -76,10 +76,16 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - **Immediate fidelity correction:** original-executable inspection proves
   `choose` uses one WELL word modulo argument count, whereas existing
   translations often use two-word `irandomSmall`. The distinct shared
-  `chooseIndexSmall` primitive is tested, but call sites still need a VM-backed
+  `chooseIndexSmall` primitive is tested. Shared cavern generation and reward
+  choices are migrated; remaining call sites need a VM-backed
   audit and coordinated migration, followed by rebuilt checkpoints and route
   verification. See `runner-choose.md`. This takes priority over new-area work;
   earlier paired replays prove adapter agreement, not original RNG equivalence.
+  After the builder correction, seed 99 passes with 1,684 gameplay updates,
+  211 upgrade updates and 120 re-entry updates. The seed-4 host gate currently
+  fails its stale decoded-entry checkpoint assertion before gameplay. Previous
+  native seed-4/sweep results above are historical, not revalidated for this
+  corrected stream. Do not hide the failure by burning compensating RNG words.
 
 - Complete the seven scene boundaries. All seven now have named Amiga scene
   classes; gameplay's owner controls its Copper lifecycle and backing/staging

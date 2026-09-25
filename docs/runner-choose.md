@@ -32,9 +32,9 @@ lists of up to 65,535 entries. The RNG unit test covers all those counts over
 32 seeds, comparing selection, draw count, index and all sixteen state words.
 A singleton case also pins the next word of the existing WELL test vector.
 
-**Existing translations have not yet been migrated.** For example, the
-area-one builder's room-count choice and `BuilderRewardChoice` use
-`irandomSmall` where the VM calls `choose`. Other sites mix genuine `irandom`
+**Migration is partial.** The shared area-one builder and
+`BuilderRewardChoice` now use `chooseIndexSmall` where their implemented VM
+branches call `choose`. Other sites mix genuine `irandom`
 with translated `choose`, so globally replacing `irandomSmall` is incorrect.
 Audit each call against VM instructions and correct both adapters together.
 Generated fixtures/checkpoints must then be rebuilt from the corrected stream,
@@ -45,3 +45,47 @@ This finding supersedes the unresolved singleton question in area-two recovery.
 It also limits previous parity evidence: matching two translations with the
 same RNG mistake does not prove original-runner fidelity. Correcting existing
 choices takes priority over enabling catacomb content.
+
+## First migration: shared cavern generation
+
+Audited against `scrLevelPat1`, `scrBuilder`, `builderCavern` and the relevant
+Create-event VM call sites. Both SDL and Amiga consume this shared builder.
+
+| Corrected choice | Argument count |
+| --- | ---: |
+| Side-room count | 3 |
+| Mirroring, including otherwise empty prelude rows | 2 |
+| Shop chance, normal/style 1 | 2 / 7 |
+| Optional wall/box cells | 2 |
+| Scattered decoration / mixed enemy symbol | 5 / 4 |
+| Reward chunk/crate / low-health override | 2 / 6 |
+| Box break sound / normal frame / gem frame | 4 / 2 / 2 |
+| Turtle walking, snail direction, crawler orientation, decoration flip | 2 |
+| Gun-module type / low-health overwrite | 2 / 7 |
+
+The missing GunModule low-health overwrite draw is now retained after its
+initial choice. Pattern indices, room-position ranges, gem chance, actor
+alarms, scatter frame and module-number rejection remain genuine `irandom`
+calls. The general builder still has other known incomplete behavior (such as
+later-level cavern spawn rules); this migration does not claim to fix all of it.
+
+Validation:
+
+- 128 independent mixed-choice/range setup cases compare all RNG state;
+  61,440 reward decisions compare against raw-word modulo choices.
+- All 64 complete generation traversals and the visible/incremental builder
+  tests pass, normally and under address/undefined-behavior sanitizers.
+- New regression fingerprint: `1fd36f0408435e8b`. The superseded
+  `ffcdfc23dc638be7` used the wrong RNG algorithm. Neither is a Windows capture.
+- Ordinary SDL and Amiga builds pass, including the 68000 instruction and
+  64-bit-helper audits (`/tmp/downwell-builder-choose-{sdl,amiga}.log`).
+- The natural host gate passes seed 99 at 1,684 gameplay updates, 211 upgrade
+  updates and 120 re-entry updates. It then **fails** the seed-4 decoded-entry
+  checkpoint assertion; that shortcut still pins the pre-correction stream.
+  Evidence: `/tmp/downwell-builder-choose-natural.log`. Do not report this
+  gate, the native seed-4 route or old route-sweep results as current passes.
+
+Next audit: startup/garden choices, shared gem/player/impact choices, enemy
+alarm callbacks and other gameplay calls. Regenerate checkpoints after those
+corrections, keeping genuine integer-range calls intact. There are no extra
+draws added to manufacture compatibility with the old stream.

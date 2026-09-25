@@ -77,18 +77,40 @@ bool sameCommand(const DeferredCreateInstance& a, const DeferredCreateInstance& 
 }
 
 int main(int argc, char** argv) {
+    for (unsigned seed = 0; seed < 128; ++seed) {
+        AreaOneBuilder builder;
+        GameMakerRandom actual(seed), expected(seed);
+        builder.reset(240, 704, actual, {2, 0, false, false});
+        const unsigned count = expected.nextU32() % 3 == 2 ? 3 : 2;
+        int rooms[3] = {};
+        for (unsigned i = 0; i < count; ++i) {
+            unsigned rejected = 0;
+            for (;;) {
+                rooms[i] = 3 + static_cast<int>(expected.irandom(13));
+                bool conflict = false;
+                for (unsigned j = 0; j < i; ++j)
+                    if (std::abs(rooms[i] - rooms[j]) <= 2) conflict = true;
+                if (!conflict) break;
+                if (++rejected > 100) { rooms[i] = 9999; break; }
+            }
+        }
+        require(builder.rightRoomCount() == count && sameRandom(actual, expected),
+                "setup mixes one-word room-count choice with two-word position irandom");
+        for (unsigned i = 0; i < count; ++i)
+            require(builder.rightRoom(i) == rooms[i], "source-order room positions match");
+    }
     for (unsigned seed = 0; seed < 128; ++seed)
         for (int health : {-1, 0, 1, 2, 3, 4})
             for (unsigned style = 0; style < 5; ++style) {
                 GameMakerRandom actual(seed), expected(seed);
                 int a = 0, b = 0;
                 for (unsigned item = 0; item < 16; ++item) {
-                    // Source-order oracle uses the general 63-bit chooser.
-                    if (!b) b = expected.irandom(1) ? 109 : 293;
+                    // Original Windows choose is a single unsigned word modulo argc.
+                    if (!b) b = expected.nextU32() % 2 ? 109 : 293;
                     else b = b == 109 ? 293 : 109;
                     if (health <= 2 && b != 109) {
                         const unsigned choices[] = {0, 1, 1, 1, 1, 1};
-                        if (choices[expected.irandom(5)]) b = 109;
+                        if (choices[expected.nextU32() % 6]) b = 109;
                     }
                     if (style == 1) b = 109;
                     a = builderRewardChoice(a, health, style, actual);
@@ -143,9 +165,10 @@ int main(int argc, char** argv) {
         capture(emitted, configuredRandom);
     }
     std::cout << "ordered emission digest " << std::hex << emissionDigest << std::dec << '\n';
-    // Captured independently with c1f968f's pre-symbol-dispatch implementation.
-    // A refactoring oracle, not a claim of independent Windows-runner capture.
-    require(emissionDigest == 0xffcdfc23dc638be7ULL,
+    // Re-recorded after VM-audited choose migration; the old ffcdfc23dc638be7
+    // included an incorrect two-word draw per choose. This is a regression
+    // fingerprint, not an independent Windows-runner capture.
+    require(emissionDigest == 0x1fd36f0408435e8bULL,
         "64 seeded levels preserve ordered Create fields and complete RNG state");
     GameMakerRandom random(2);
     AreaOneBuilder builder;
@@ -167,7 +190,7 @@ int main(int argc, char** argv) {
     require(builder.stepVisible(pack, random, 577, collect, &commands, result),
             "fractional boundary crossing generates a row");
     require(builder.y() == 720 && builder.generationCount() == -29 &&
-                commands.size() == 2 && random.drawCount() == before.drawCount() + 21,
+                commands.size() == 2 && random.drawCount() == before.drawCount() + 20,
             "prelude advances one row with its two walls and exact RNG cost");
     require(builder.stepVisible(pack, random, 100000, collect, &commands, result) &&
                 builder.y() == 736 && builder.generationCount() == -28 &&

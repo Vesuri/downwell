@@ -37,7 +37,7 @@ void AreaOneBuilder::reset(int x, int y, GameMakerRandom& random, const Setup& s
     chunkOrCrate_ = 0;
     specialObjectsGenerated_ = 0;
 
-    rightRoomCount_ = random.irandomSmall(2) == 2 ? 3 : 2;
+    rightRoomCount_ = random.chooseIndexSmall(3) == 2 ? 3 : 2;
     if (shopMade_) rightRoomCount_ = 2;
     if (member_) ++rightRoomCount_;
     for (unsigned i = 0; i < rightRoomCount_; ++i) {
@@ -75,14 +75,14 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     DW_GENERATION_PHASE(profileBuilderCommand);
     switch (objectId) {
     case 92: {
-        random.irandomSmall(3);
+        random.chooseIndexSmall(4);
         command.imageSpeed = 0.0F;
-        command.integerImageIndex = 16 + random.irandomSmall(1);
+        command.integerImageIndex = 16 + random.chooseIndexSmall(2);
 #ifndef DOWNWELL_FREESTANDING
         command.imageIndex = static_cast<float>(command.integerImageIndex);
 #endif
         if (random.irandomSmall(50) < 1) {
-            random.irandomSmall(1);
+            random.chooseIndexSmall(2);
             command.integerImageIndex = 22;
             command.imageIndex = 22.0F;
         }
@@ -100,7 +100,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.imageSpeed = enemyCreateProfile(112).animationRate / 20.0F;
         command.velocityX = 0.25F;
         command.integerVelocityX = 64;
-        command.auxiliaryState = random.irandomSmall(1) == 0 ? 1 : -1;
+        command.auxiliaryState = random.chooseIndexSmall(2) == 0 ? 1 : -1;
         command.motionInitialized = true;
         command.grounded = true;
         command.alarms.set(1, 60 + static_cast<int>(random.irandomSmall(60)));
@@ -128,7 +128,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     break;
     case 117: {
         command.imageSpeed = enemyCreateProfile(117).animationRate / 20.0F;
-        command.integerVelocityY = random.irandomSmall(1) == 0 ? 26 : -26;
+        command.integerVelocityY = random.chooseIndexSmall(2) == 0 ? 26 : -26;
         command.velocityY = command.integerVelocityY > 0 ? 0.1F : -0.1F;
         command.motionInitialized = true;
         command.alarms.set(1, 60);
@@ -136,7 +136,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     break;
     case 119: {
         command.imageSpeed = enemyCreateProfile(119).animationRate / 20.0F;
-        command.motionState = random.irandomSmall(1) == 0 ? 1 : -1;
+        command.motionState = random.chooseIndexSmall(2) == 0 ? 1 : -1;
         command.moveSpeed = 1.0F;
         command.integerMoveSpeed = 256;
         command.motionInitialized = true;
@@ -145,7 +145,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     break;
     case 289: {
         command.imageSpeed = 0.0F;
-        command.integerScaleX = random.irandomSmall(1) == 0 ? 1 : -1;
+        command.integerScaleX = random.chooseIndexSmall(2) == 0 ? 1 : -1;
         command.scaleX = command.integerScaleX < 0 ? -1.0F : 1.0F;
         command.integerImageIndex = random.irandomSmall(15);
 #ifndef DOWNWELL_FREESTANDING
@@ -170,7 +170,10 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.imageSpeed = 0.0F;
         command.alarms.set(0, 10);
         command.alarms.set(3, 10);
-        random.irandomSmall(1);
+        random.chooseIndexSmall(2);
+        // GunModule Create overwrites moduleType at low health, but both
+        // choices still advance the stream before moduleNum is selected.
+        if (playerHealth_ <= 2) random.chooseIndexSmall(7);
         std::uint32_t module = 2;
         while (module == 2)
             module = random.irandomSmall(6);
@@ -212,7 +215,7 @@ bool AreaOneBuilder::emitPattern(
             if ((symbol == 'I' || symbol == 'J') &&
                 !emitObject(296, buildX, rowY, random, emit, context))
                 return false;
-            if (symbol == '^' && random.irandomSmall(4) != 0 &&
+            if (symbol == '^' && random.chooseIndexSmall(5) != 0 &&
                 !emitObject(289, buildX, rowY, random, emit, context))
                 return false;
             if (random.nextU32() <= 0x55555555U) {
@@ -225,7 +228,7 @@ bool AreaOneBuilder::emitPattern(
                 case 't': enemyId = 112; break;
                 case '%': {
                     const std::int32_t enemies[] = {113, 111, 119, 112};
-                    enemyId = enemies[random.irandomSmall(3)];
+                    enemyId = enemies[random.chooseIndexSmall(4)];
                     break;
                 }
                 default: break;
@@ -237,10 +240,10 @@ bool AreaOneBuilder::emitPattern(
             std::int32_t objectId = -1;
             switch (symbol) {
             case '1': case '|': objectId = 60; break;
-            case '2': if (random.irandomSmall(1) != 0) objectId = 60; break;
+            case '2': if (random.chooseIndexSmall(2) != 0) objectId = 60; break;
             case '-': objectId = 93; break;
             case 'B': objectId = 92; break;
-            case '3': if (random.irandomSmall(1) != 0) objectId = 92; break;
+            case '3': if (random.chooseIndexSmall(2) != 0) objectId = 92; break;
             case 'v': objectId = 376; break;
             case 'O': objectId = 82; break;
             case '_': objectId = 62; break;
@@ -312,7 +315,7 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
     if (endReached_)
         return true;
     if (generationCount_ < -1) {
-        random.irandomSmall(1);
+        random.chooseIndexSmall(2);
         for (int cell = 0; cell < 19; ++cell)
             random.nextU32();
         if (!emitObject(60, 160, y_, random, emit, context) ||
@@ -337,13 +340,13 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
     if (generationCount_ == -1) {
         selected = static_cast<std::uint16_t>(random.irandomSmall(4));
         family = BuilderPatternFamily::areaOneStart;
-        reversed = random.irandomSmall(1) != 0;
+        reversed = random.chooseIndexSmall(2) != 0;
         startPattern_ = selected;
         startReversed_ = reversed;
     } else if (generationCount_ > static_cast<int>(levelLength_)) {
         selected = static_cast<std::uint16_t>(random.irandomSmall(3));
         family = BuilderPatternFamily::areaOneEnd;
-        reversed = random.irandomSmall(1) != 0;
+        reversed = random.chooseIndexSmall(2) != 0;
         appendPillars = true;
     } else {
         if (!spawnerMade_) {
@@ -358,9 +361,9 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
         if (sideRoom) {
             ++rightRoomsMade_;
             if (!shopMade_) {
-                if (style_ == 1) makeShop = random.irandomSmall(6) == 6;
+                if (style_ == 1) makeShop = random.chooseIndexSmall(7) == 6;
                 else if (style_ == 4) makeShop = rightRoomsMade_ >= rightRoomCount_;
-                else makeShop = random.irandomSmall(1) != 0;
+                else makeShop = random.chooseIndexSmall(2) != 0;
                 if (member_) makeShop = true;
             }
             if (makeShop) {
@@ -385,7 +388,7 @@ bool AreaOneBuilder::step(const BuilderPatternPack& patterns,
                 selected = static_cast<std::uint16_t>(random.irandomSmall(40));
             } while (selected == lastMainPattern_);
         }
-        reversed = makeShop ? false : random.irandomSmall(1) != 0;
+        reversed = makeShop ? false : random.chooseIndexSmall(2) != 0;
         appendPillars = true;
     }
     if (!patterns.findPattern(family, selected, pattern))
