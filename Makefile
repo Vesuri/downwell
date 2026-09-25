@@ -721,6 +721,14 @@ test-amiga-style-scene: build/amiga-style-scene-test
 	./build/amiga-style-scene-test
 test: test-amiga-style-scene
 
+.PHONY: test-amiga-style-retained
+build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)
+test-amiga-style-retained: generate-amiga-game build/amiga-style-retained-test
+	./build/amiga-style-retained-test generated/amiga-game.dwap
+test: test-amiga-style-retained
+
 build/amiga-clear-overlay-test: tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c

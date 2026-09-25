@@ -1636,8 +1636,10 @@ int main(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 
-    AmigaStyleScene styleScene(memory.sceneCache(), sceneCacheBytes,
-        memory.copper(), memory.copper() + downwellCopperWords, downwellCopperWords);
+    alignas(AmigaStyleScene) static UBYTE styleStorage[sizeof(AmigaStyleScene)];
+    auto& styleScene = *new (styleStorage) AmigaStyleScene(memory.sceneCache(), sceneCacheBytes,
+        memory.copper(), memory.copper() + downwellCopperWords, downwellCopperWords,
+        memory.game(), memory.hud(), downwellLayerBytes);
 #if defined(DOWNWELL_SKIP_INTRO) && !defined(DOWNWELL_SKIP_TO_GAME)
     if (!styleScene.prepare(activeGamePack, activeGamePackEnd)) {
         platform.restore();
@@ -2345,18 +2347,18 @@ int main(void) {
                     AmigaStyleFrameState referenceState;
                     if (!amigaRenderStyleFrame(activeGamePack, activeGamePackEnd,
                             memory.sceneCache() + amigaStyleFrameBytes * 2,
-                            scenes, memory.hud(), referenceState, true)) break;
+                            scenes, memory.sceneCache(), referenceState, true)) break;
                     ++gDownwellStyleReferenceFrames;
-                    UBYTE* styleComposite = memory.hud() + amigaStyleFrameBytes;
+                    UBYTE* styleComposite = memory.sceneCache() + amigaStyleFrameBytes;
                     const UBYTE* referenceBorder = memory.sceneCache() + amigaStyleFrameBytes * 2 - scenes.styleTileY() * amigaStyleBytesPerRow;
                     for (unsigned byte = 0; byte < amigaStylePlaneBytes; ++byte) {
-                        const UBYTE occupied = styleFrame[byte] | styleFrame[byte + amigaStylePlaneBytes];
+                        const UBYTE occupied = styleFrame[byte] | styleFrame[byte + AmigaSelectionLayer::planeBytes];
                         styleComposite[byte] = styleFrame[byte] | (referenceBorder[byte] & ~occupied);
-                        styleComposite[byte + amigaStylePlaneBytes] = styleFrame[byte + amigaStylePlaneBytes] |
+                        styleComposite[byte + amigaStylePlaneBytes] = styleFrame[byte + AmigaSelectionLayer::planeBytes] |
                             (referenceBorder[byte + amigaStyleBorderPlaneBytes] & ~occupied);
                     }
                     for (unsigned byte = 0; byte < amigaStyleFrameBytes; ++byte) {
-                        if (styleComposite[byte] != memory.hud()[byte]) {
+                        if (styleComposite[byte] != memory.sceneCache()[byte]) {
                             ++gDownwellStyleReferenceFailures;
                             break;
                         }

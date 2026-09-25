@@ -3,6 +3,7 @@
 
 #include <exec/types.h>
 #include "AmigaRenderer.h"
+#include "AmigaStyleRenderer.h"
 #include "framework/CopperList.h"
 
 class Bitmap;
@@ -94,12 +95,14 @@ public:
 
 class DownwellStyleCopperList : public CopperList {
 public:
-    DownwellStyleCopperList(UWORD* words, unsigned capacityWords);
+    DownwellStyleCopperList(UWORD* words, unsigned capacityWords,
+                           unsigned framePlaneBytes = amigaStylePlaneBytes);
     bool build(const UBYTE* frame, const UBYTE* mask,
                const Sprite& nullSprite, const Palette& palette, const UBYTE* border = 0);
     bool update(const UBYTE* frame, const UBYTE* mask, const UBYTE* border = 0);
 private:
     unsigned frame0Offset_, frame1Offset_, maskOffset_, border0Offset_, border1Offset_, modeOffset_;
+    unsigned framePlaneBytes_;
 };
 
 #endif

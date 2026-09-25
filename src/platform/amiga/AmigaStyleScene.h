@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_STYLE_SCENE_H
 #include "AmigaStyleRenderer.h"
 #include "DownwellCopperLists.h"
+#include "AmigaStyleDrawList.h"
 
 // Owns style presentation state, not the shared startup/selection rules.
 // The application retires DMA before prepare() and publishes only the retired
@@ -9,7 +10,8 @@
 class AmigaStyleScene {
 public:
     AmigaStyleScene(UBYTE* cache, unsigned cacheBytes, UWORD* firstList,
-                   UWORD* secondList, unsigned listWords);
+                   UWORD* secondList, unsigned listWords,
+                   UBYTE* firstFrame, UBYTE* secondFrame, unsigned frameBytes);
     AmigaStyleScene(const AmigaStyleScene&) = delete;
     AmigaStyleScene& operator=(const AmigaStyleScene&) = delete;
     bool prepare(const UBYTE* pack, const UBYTE* end);
@@ -28,7 +30,10 @@ private:
     const UBYTE* pack_ = nullptr;
     const UBYTE* end_ = nullptr;
     bool prepared_ = false;
-    AmigaStyleFrameState frames_[2];
+    UBYTE* targets_[2];
+    unsigned frameBytes_;
+    AmigaSelectionLayer layers_[2];
+    AmigaStyleDrawList drawList_;
     DownwellStyleCopperList lists_[2];
     bool built_[2] = {false, false};
 };

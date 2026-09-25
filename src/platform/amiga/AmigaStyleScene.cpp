@@ -1,17 +1,22 @@
 #include "AmigaStyleScene.h"
 #include "AmigaSceneRuntime.h"
+#include "AmigaProfile.h"
+#include "framework/AmigaHardware.h"
 
 AmigaStyleScene::AmigaStyleScene(UBYTE* cache, unsigned cacheBytes,
-    UWORD* firstList, UWORD* secondList, unsigned listWords)
+    UWORD* firstList, UWORD* secondList, unsigned listWords,
+    UBYTE* firstFrame, UBYTE* secondFrame, unsigned frameBytes)
     : cache_(cache), cacheBytes_(cacheBytes),
-      lists_{DownwellStyleCopperList(firstList,listWords),
-             DownwellStyleCopperList(secondList,listWords)} {}
+      targets_{firstFrame,secondFrame},frameBytes_(frameBytes),
+      lists_{DownwellStyleCopperList(firstList,listWords,AmigaSelectionLayer::planeBytes),
+             DownwellStyleCopperList(secondList,listWords,AmigaSelectionLayer::planeBytes)} {}
 
 bool AmigaStyleScene::prepare(const UBYTE* pack, const UBYTE* end) {
     prepared_ = false;
-    frames_[0] = {}; frames_[1] = {};
+    layers_[0].invalidate(); layers_[1].invalidate();
     built_[0] = built_[1] = false;
     if (!cache_ || cacheBytes_ < amigaStyleCacheBytes || !pack || !end ||
+        !targets_[0] || !targets_[1] || targets_[0]==targets_[1] || frameBytes_<AmigaSelectionLayer::bytes ||
         !amigaBuildStyleBorder(pack,end,cache_ + amigaStyleFrameBytes*2)) return false;
     pack_ = pack; end_ = end; prepared_ = true;
     return true;
@@ -21,10 +26,15 @@ bool AmigaStyleScene::render(unsigned slot, const AmigaSceneRuntime& scenes,
     Frame& frame) {
     frame = {};
     if (!prepared_ || slot >= 2) return false;
-    auto* content = cache_ + slot*amigaStyleFrameBytes;
+    const int top=AmigaStyleDrawList::baseView-scenes.styleYOffset();
+    if(top<0 || top>int(AmigaSelectionLayer::height-284) || !drawList_.build(scenes)) return false;
     const auto* border = cache_ + amigaStyleFrameBytes*2;
-    if (!amigaRenderStyleFrame(pack_,end_,border,scenes,content,frames_[slot])) return false;
-    frame.content = content;
+    DW_PROFILE_PHASE(profileStyleActors);
+    unsigned painted=0;
+    if (!layers_[slot].render(targets_[slot],pack_,end_,drawList_.commands,drawList_.count,painted)) return false;
+    DW_PROFILE_PHASE(profileStyleDrain);
+    AmigaHardware::blitterDrain();
+    frame.content = layers_[slot].view(unsigned(top));
     frame.border = border - scenes.styleTileY()*amigaStyleBytesPerRow;
     frame.mask = scenes.styleDitherY() < 684 || scenes.styleSelected()
         ? amigaStyleMask(cache_,scenes) : nullptr;

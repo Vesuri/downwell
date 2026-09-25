@@ -23,7 +23,7 @@ must not become a wrapper around a permanently monolithic main loop.
 
 ## Remaining consolidation
 
-### Retained selection canvas (live upgrade path; style migration pending)
+### Retained selection canvas (live upgrade and style paths)
 
 `AmigaSelectionLayer.h/.cpp` supplies a reusable 160-pixel content canvas with
 176-pixel DMA rows and 608 world-space rows. Two planes occupy 26,752 bytes,
@@ -65,7 +65,10 @@ PF2 holds content above player sprites. The offline cover supplies BPL5/6
 during the wipe. Lists are built once per alternating slot, then only pointer
 and plane-count words are patched. The narrow window starts two beam pixels
 right of the landscape shaft; the player sprite receives the same translation.
-Style selection has not yet migrated to the shared retained layer.
+Style selection also uses `AmigaSelectionLayer` for its content, retaining its
+existing periodic border and five-plane priority/masking arrangement. Its
+dedicated Copper list accepts the taller content-plane stride while retaining
+the original border stride and palette rules.
 
 - Publisher, credits and controls currently share splash cache/runtime paths.
   They need distinct scene controllers, sharing prepared-screen machinery.
@@ -73,23 +76,65 @@ Style selection has not yet migrated to the shared retained layer.
   presentation orchestration remain in the main loop.
 - Style selection now has `AmigaStyleScene.h/.cpp`, owning both alternating
   frame states, preparation/re-entry reset and Copper build-versus-patch
-  state. It delegates drawing to `AmigaStyleRenderer.cpp`. The application
+  state. It delegates drawing to `AmigaSelectionLayer`. The application
   still retires DMA and publishes the completed list, and shared startup
   rules remain in `AmigaSceneRuntime`. This extraction introduces no new
-  Chip allocation or change to drawing/selection trajectories. The renderer's
+  Chip allocation or change to drawing/selection trajectories. The old renderer's
   prepared-art cache remains single-scene scratch; this is not a concurrent
-  multi-instance renderer. Upgrade selection must still share retained
-  layer/scrolling infrastructure with style selection.
+  multi-instance renderer. Both selection scenes now share the retained
+  content-layer implementation; the old style renderer remains the native
+  full-redraw verification oracle.
 - Both selection screens should retain world-space text and icon layers and
   use bitplane pointers for common reveal/camera translation. Source-specific
   item trajectories, easing, bobbing and shadow animation must remain intact.
-  The existing style reveal still redraws on vertical movement; do not copy
-  that limitation into the shared implementation.
+  Style's common vertical reveal now changes the viewport pointer without
+  moving commands or repainting the text. Independent icon animation and
+  cursor changes still repair local retained damage.
 - Gameplay logic lives in core `GameplayWorld.cpp`, but the separate SDL
   `StartupRuntime` world loop and Amiga display orchestration still need work.
 
-Hardware pointer scrolling is now wired for both completion layers. Full
-scene-class separation and sharing this backend with style selection remain.
+Hardware pointer scrolling is wired for both completion layers and the style
+reveal. Full seven-scene class separation remains unfinished.
+
+### Retained style content
+
+`AmigaStyleDrawList` keeps the original carousel parabola, integer rounding,
+run animation, arrow rules and selected-player descent. A world-space center
+of 302 and viewport `160 - styleYOffset` reproduce the original screen center
+`142 + styleYOffset`. The reveal's viewport stays in rows 160..288, within the
+608-row canvas. Each alternating slot retains its own world-space commands.
+
+The two canvases borrow the game and HUD buffers retired during style selection
+(each fits 26,752 bytes). Existing scene-cache memory retains the periodic
+border and entry/exit masks. No Chip allocation is added. Verification uses
+the unused first two old style-frame slots in the scene cache, not the live
+HUD canvas. Long-lived command/damage arrays are in static placement storage,
+not the 4 KiB AmigaDOS stack. Re-entry invalidates both canvases and Copper
+states before memory is reused.
+
+Host comparisons exercise 364 frames covering all five cursors, reveal and
+confirmation against full source-order draws using original sprite IDs and
+individual labels. Eighty-eight unchanged command updates leave storage
+byte-identical and report zero repaint; allocation guards remain intact.
+ASan/UBSan pass. The bounded native check matches 105 full-redraw frames;
+normal, locked and selected capture hashes are unchanged. Evidence:
+`/tmp/downwell-style-retained-pixels.log`,
+`/tmp/downwell-style-retained-sanitized.log`, and
+`/tmp/downwell-style-retained-native-gdb.log`.
+The bounded results-restart run also passes all three destinations, 640
+overlay Copper checks, the stack guard and 200 final gameplay updates with
+no style, garden or gameplay comparison failures. Evidence:
+`/tmp/downwell-style-retained-reentry-gdb.log`.
+
+The bounded navigating style profile (`SKIP_INTRO=1 PROFILE_NAVIGATE=1`)
+measures 43.48 FPS over 180 updates/207 PAL fields with low-overhead counting,
+maximum two fields per update. Detailed probes separately measure retained
+content at 9.51 ms average/27.78 ms peak and drain at 0.42 ms average/11.10 ms
+peak, with zero clock clamps. These are current measurements, not a claim
+of a measured speedup over the previous implementation or of 50 FPS.
+Selection-change damage still needs optimization. Both runs restore normal
+startup. Logs: `/tmp/downwell-style-retained-profile.log` and
+`/tmp/downwell-style-retained-fps.log`.
 
 ### Style scene ownership checks
 

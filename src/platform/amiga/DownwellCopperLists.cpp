@@ -83,8 +83,8 @@ static bool buildNarrow(CopperList& list, const UBYTE* frame,
     return list.finish();
 }
 
-DownwellStyleCopperList::DownwellStyleCopperList(UWORD* words, unsigned capacityWords)
-    : CopperList(words, capacityWords), frame0Offset_(0), frame1Offset_(0), maskOffset_(0), border0Offset_(0), border1Offset_(0), modeOffset_(0)
+DownwellStyleCopperList::DownwellStyleCopperList(UWORD* words, unsigned capacityWords, unsigned framePlaneBytes)
+    : CopperList(words, capacityWords), frame0Offset_(0), frame1Offset_(0), maskOffset_(0), border0Offset_(0), border1Offset_(0), modeOffset_(0), framePlaneBytes_(framePlaneBytes)
 {
 }
 
@@ -124,7 +124,7 @@ bool DownwellStyleCopperList::build(const UBYTE* frame, const UBYTE* mask,
     modeOffset_ = moveOffset(bplcon0);
     if (!pointer(bpl1pth, frame)) return false;
     frame1Offset_ = size();
-    if (!pointer(bpl3pth, frame + amigaStylePlaneBytes)) return false;
+    if (!pointer(bpl3pth, frame + framePlaneBytes_)) return false;
     maskOffset_ = size();
     if (!pointer(bpl5pth, mask)) return false;
     border0Offset_ = size();
@@ -139,7 +139,7 @@ bool DownwellStyleCopperList::build(const UBYTE* frame, const UBYTE* mask,
 bool DownwellStyleCopperList::update(const UBYTE* frame, const UBYTE* mask, const UBYTE* border)
 {
     return patchPointer(frame0Offset_, frame) &&
-           patchPointer(frame1Offset_, frame + amigaStylePlaneBytes) &&
+           patchPointer(frame1Offset_, frame + framePlaneBytes_) &&
            patchPointer(maskOffset_, mask) &&
            patchPointer(border0Offset_, border) &&
            patchPointer(border1Offset_, border + amigaStyleBorderPlaneBytes) &&
