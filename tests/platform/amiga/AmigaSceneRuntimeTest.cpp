@@ -1875,6 +1875,57 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         }
         std::cout << "Natural exit seed=" << seed << " gameplay=" << updates
                   << " upgrade=" << clearUpdates << " reentry=120 passed\n";
+        if (seed == 4) {
+            bool reached = false;
+            unsigned shopUpdates = 0;
+            for (; shopUpdates < 1500 && !game.dead() && !game.levelResultRequested(); ++shopUpdates) {
+                const unsigned tick = shopUpdates;
+                const int x = 240 + game.player().offsetX(), y = 176 + game.player().offsetY();
+                if (tick % 16 == 0) {
+                    int best = -1000000;
+                    for (int candidate = 180; candidate <= 300; candidate += 8) {
+                        int floor = amigaResolveTerrainLanding(&live.collision, candidate - 240, y - 176 + 8);
+                        if (floor == downwell::gameplayNoLanding) floor = y + 400 - 176;
+                        const int score = std::min(floor + 176 - y, 400) * 4 - std::abs(candidate - x);
+                        if (score > best) { best = score; target = candidate; }
+                    }
+                }
+                for (const auto& shop : game.shops().instances)
+                    if (shop.present && y < shop.y + 12 && y > shop.y - 200) target = shop.x - 6;
+                downwell::Input input;
+                input.left = x > target + 2; input.right = x < target - 2;
+                input.fire = tick % 40 == 0 || tick % 40 == 3;
+                game.step(downwell::packReplayInput(input)); reference.step(input, false);
+                parityFrame = tick;
+                compareInitialGameplay(game, reference);
+                if (game.shops().interactable) { reached = true; ++shopUpdates; break; }
+            }
+            require(reached && reference.shops().interactable, "ordinary input reaches the generated second-level shop");
+            auto shopTick = [&](bool fire, bool left = false) {
+                downwell::Input input; input.fire = fire; input.left = left;
+                game.step(downwell::packReplayInput(input)); reference.step(input, false);
+                compareInitialGameplay(game, reference);
+                require(game.shops().noControl == reference.shops().noControl &&
+                    game.shops().allocatedCount == reference.shops().allocatedCount, "natural shop ownership agrees");
+                for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
+                    const auto& a = game.shops().instances[i]; const auto& b = reference.shops().instances[i];
+                    require(a.present == b.present && a.menu.active == b.menu.active && a.menu.cursor == b.menu.cursor,
+                        "natural shop menu agrees");
+                    if (!a.allocated) continue;
+                    for (unsigned j = 0; j < 3; ++j)
+                        require(a.stock.items[j].upgrade == b.stock.items[j].upgrade &&
+                            a.stock.items[j].price == b.stock.items[j].price &&
+                            a.stock.items[j].remaining == b.stock.items[j].remaining, "unmodified natural stock agrees");
+                }
+            };
+            shopTick(false); shopTick(true);
+            require(game.shops().noControl, "natural counter opens shop instead of jumping");
+            shopTick(true); // Held opening input must remain filtered.
+            shopTick(false, true); // Cursor 1 -> Leave.
+            shopTick(true);
+            require(!game.shops().noControl, "natural shop Leave returns movement ownership");
+            std::cout << "Natural shop seed=4 approach=" << shopUpdates << " open/hold/leave passed\n";
+        }
     }
 }
 
