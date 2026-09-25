@@ -3,10 +3,12 @@
 from hashlib import sha256
 from pathlib import Path
 import runpy
+import struct
 review = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = review["region"]
 assert region(0x7FE3CC, 12) == b"image_index\0"
 assert region(0x7FE47C, 12) == b"image_speed\0"
+assert struct.unpack("<d", region(0x8A6C28,8))[0] == 0.00001
 for start, end, digest in (
     (0x430D0C, 0x430D22, "dfd0255b5282e2fc5ca46c4826e10ff4ff839c2f5d5bab168e923331a441b187"),
     (0x430E0E, 0x430E24, "88a8f4957a1aef678da7b40e03bfa06b2796bbd211a2bc7deb0b77e270ac5c70"),
@@ -23,6 +25,8 @@ for start, end, digest in (
     (0x50EE2A, 0x50EE87, "700ae1a8476c7deac0f9947ba512bbb97a1673ff2424fcea5e02dec776da0e47"),
     (0x4E2855, 0x4E289C, "8a6a5da926ee43702ade4633a4f4d912926041b974b33981af6e1e6829a52d44"),
     (0x4BBD30, 0x4BBDA1, "ae0718a149130b196208ffc60c39f54486214dbc501370993a70e5c566e4f738"),
+    (0x4F8FAA, 0x4F906B, "1bbe042cc209e6ddbf1739a9cd411617650e6b87df8bca40b0255cbe66b3311c"),
+    (0x50EC49, 0x50EC8F, "ee18698466337c93ca6659489fef13e535d4efe9c615896c0cb4624017b1e0b1"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest
 print("Pinned Windows image field registration, narrowing setters and speed getter verified")

@@ -119,6 +119,14 @@ all: $(TARGET)
 .PHONY: verify-runner-image-value
 .PHONY: verify-legacy-image-animation
 .PHONY: verify-sequence-timeline
+.PHONY: verify-unit-sequence-frames
+verify-unit-sequence-frames: build/unit-sequence-frames-test
+	./build/unit-sequence-frames-test
+
+build/unit-sequence-frames-test: tests/core/UnitSequenceFramesTest.cpp src/core/UnitSequenceFrames.h src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/UnitSequenceFramesTest.cpp
+
 verify-sequence-timeline: build/sequence-timeline-test
 	./build/sequence-timeline-test
 

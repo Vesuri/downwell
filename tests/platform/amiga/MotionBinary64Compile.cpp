@@ -3,6 +3,7 @@
 #include "core/RunnerImageValue.h"
 #include "core/LegacyImageAnimation.h"
 #include "core/SequenceTimeline.h"
+#include "core/UnitSequenceFrames.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
@@ -45,4 +46,10 @@ extern "C" bool legacyImageAnimationCompile(downwell::RunnerImageValue* index,
 extern "C" bool sequenceTimelineCompile(downwell::RunnerImageValue* position,
     downwell::RunnerImageValue speed, unsigned length, bool* crossed) {
     return downwell::SequenceTimeline::advance(*position, speed, length, *crossed);
+}
+extern "C" bool unitSequenceFramesCompile(downwell::RunnerImageValue* position,
+    downwell::RunnerImageValue speed, unsigned frames, downwell::RunnerImageValue* image,
+    bool* crossed, bool* reconcile) {
+    return downwell::UnitSequenceFrames::needsReconcile(*image,*position,*reconcile) &&
+        downwell::UnitSequenceFrames::advance(*position,speed,frames,*image,*crossed);
 }

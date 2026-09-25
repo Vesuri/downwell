@@ -136,3 +136,28 @@ ASan/UBSan runs pass. The 68000 compile fixture has no undefined helper symbols;
 this is compilation evidence, not a native execution or timing measurement.
 Frame-track evaluation, index-write reconciliation, sprite changes and owner
 integration remain outstanding, so playable builds are unchanged.
+
+## Unit frame-track evaluation and write detection
+
+For consecutive frame keys, `0x4f9014`–`0x4f906a` interpolates between the
+current/next key. At the last key, `0x4f8faa`–`0x4f9011` interpolates toward
+the current frame plus one over the key's length. With the verified keys
+`time=i, length=1, frame=i`, both reduce to `i + (position-i)/1 * 1`.
+For in-range normal binary32 positions this recovers position exactly; the
+first key's final addition canonicalizes negative zero. `UnitSequenceFrames`
+uses that checked specialization, not a general claim about arbitrary tracks.
+It rejects negative/out-of-range timelines rather than assuming a wrap mode.
+
+The ordinary sequence owner compares the GML-visible index against evaluated
+track position at `0x50ec49`–`0x50ec8f`: subtract, round to binary32, take
+absolute value, promote to double, then compare with **0.00001** at `0x8a6c28`.
+Only a strictly larger difference enters index-write reconciliation. The
+helper implements this detection; it does not yet implement the subsequent
+inverse mapping or sprite-change semantics. This is a recovered tolerance,
+not an epsilon introduced to hide a numerical mismatch.
+
+50,804 host interpolation/threshold comparisons pass normally and under
+ASan/UBSan, with a reverse-timeline-to-frame integration check. The 68000
+fixture has no undefined helper symbols. Native execution and timing remain
+unmeasured for this component. Frame evaluation can now follow timeline advance,
+but live ownership and reconciliation still prevent enabling the new actor.

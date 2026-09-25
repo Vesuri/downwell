@@ -266,6 +266,11 @@ and the ordinary build was restored after both attempts.
   host reference cases and sanitizers pass; 68000 compilation needs no helper
   symbols. Frame-track evaluation and index/sprite-write synchronization remain
   unwired, and no new actor is enabled by this arithmetic component.
+  `UnitSequenceFrames` now evaluates the verified consecutive frame keys and
+  detects GML index-write differences using the original float-rounded
+  subtraction and 0.00001 double threshold. 50,804 host cases, sanitizers and
+  helper-free 68000 compilation pass. Inverse index mapping, sprite changes
+  and live ownership remain unfinished; the component is not a playable actor.
 
 ## Working evidence
 
