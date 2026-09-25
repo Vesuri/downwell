@@ -37,6 +37,13 @@ struct MotionBinary64 {
         return e != 2047 && (e || (!(high & 0xfffff) && !low));
     }
     bool zero() const { return !(high & 0x7fffffff) && !low; }
+    static MotionBinary64 fromInteger(std::int32_t value) {
+        if (!value) return {};
+        Words m{0, value < 0 ? 0u - static_cast<std::uint32_t>(value) : static_cast<std::uint32_t>(value)};
+        int exponent = 1023 + 52;
+        while (!(m.high & 0x100000u)) { m.leftOne(); --exponent; }
+        return {(value < 0 ? 0x80000000u : 0u) | (unsigned(exponent) << 20) | (m.high & 0xfffff), m.low};
+    }
     bool add(MotionBinary64 other) {
         if (!valid() || !other.valid()) return false;
         if (zero()) {

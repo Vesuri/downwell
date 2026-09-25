@@ -1,4 +1,5 @@
 #include "core/MotionBinary64.h"
+#include "core/MotionBinary64Verification.h"
 #include "core/GameMakerRounding.h"
 #include <cstring>
 #include <cstdio>
@@ -17,6 +18,12 @@ static void check(bool ok) { if (!ok) std::abort(); }
 int main() {
     unsigned state = 1234;
     auto next = [&] { state = state * 1664525u + 1013904223u; return state; };
+    for (unsigned i = 0; i < 10000; ++i) {
+        const auto integer = static_cast<std::int32_t>(next());
+        const auto actual = MotionBinary64::fromInteger(integer), expected = bits(double(integer));
+        check(actual.high == expected.high && actual.low == expected.low);
+    }
+    downwell::MotionBinary64Verification expectedReplay;
     for (unsigned i = 0; i < 200000; ++i) {
         MotionBinary64 a{(next() & 0x800fffffu) | ((970 + next()%90) << 20), next()};
         MotionBinary64 b{(next() & 0x800fffffu) | ((970 + next()%90) << 20), next()};
@@ -34,8 +41,14 @@ int main() {
                 check(targetY.high == bits(y).high && targetY.low == bits(y).low);
                 std::int32_t pixel;
                 check(targetY.roundPixel(pixel) && pixel == downwell::roundGameMakerCoordinate(y));
+                expectedReplay.mix(bits(vy).high); expectedReplay.mix(bits(vy).low);
+                expectedReplay.mix(bits(y).high); expectedReplay.mix(bits(y).low);
+                expectedReplay.mix(static_cast<std::uint32_t>(downwell::roundGameMakerCoordinate(y)));
+                ++expectedReplay.updates;
             }
         }
+    const auto replay = downwell::verifyMotionBinary64();
+    check(replay.digest == expectedReplay.digest && replay.updates == expectedReplay.updates && !replay.failures);
     for (double x : {-2.5, -1.5, -0.5, 0.0, 0.5, 1.5, 2.5}) {
         auto a = bits(x); std::int32_t pixel;
         check(a.roundPixel(pixel) && pixel == downwell::roundGameMakerCoordinate(x));

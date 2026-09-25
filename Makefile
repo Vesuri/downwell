@@ -120,7 +120,7 @@ all: $(TARGET)
 verify-motion-binary64: build/motion-binary64-test
 	./build/motion-binary64-test
 
-build/motion-binary64-test: tests/core/MotionBinary64Test.cpp src/core/MotionBinary64.h src/core/GameMakerRounding.h
+build/motion-binary64-test: tests/core/MotionBinary64Test.cpp src/core/MotionBinary64.h src/core/MotionBinary64Verification.h src/core/GameMakerRounding.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/MotionBinary64Test.cpp
 

@@ -1,6 +1,7 @@
 #include "core/PortReplay.h"
 #include "core/Replay.h"
 #include "core/GemVerification.h"
+#include "core/MotionBinary64Verification.h"
 #include "core/PlayerDeathVerification.h"
 #include "core/MachineGunVerification.h"
 #include "core/GameplayWorld.h"
@@ -35,5 +36,9 @@ int main() {
                 (std::uint32_t)gems.digest, gems.coverage,
                 (std::uint32_t)(death.digest >> 32), (std::uint32_t)death.digest, death.coverage,
                 (std::uint32_t)(weapon.digest >> 32), (std::uint32_t)weapon.digest, weapon.coverage);
+    const auto motion = downwell::verifyMotionBinary64();
+    const auto bench = downwell::benchmarkMotionBinary64();
+    if (motion.failures || bench.failures) return 6;
+    std::printf("MOTION %u %08x %u %08x %u\n", motion.updates, motion.digest, motion.failures, bench.digest, bench.failures);
     return 0;
 }

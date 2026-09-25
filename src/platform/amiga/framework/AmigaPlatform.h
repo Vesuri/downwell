@@ -21,6 +21,7 @@ public:
     void publish(const CopperList& copper);
     const UWORD* publishedCopper() const { return publishedCopper_; }
     void waitVblank() const;
+    static UWORD vblankCount() { return vblankCount_; }
     void restore();
 
 private:

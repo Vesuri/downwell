@@ -223,3 +223,27 @@ comparison and frame-cost measurement before selecting it for the bone owner;
 code-generation success alone does not prove a 20 ms budget. The skeleton's
 fixed choice constants can be supplied as reviewed binary64 words; converting
 random animation speed and the remaining lifecycle is separate work.
+
+### Native numeric replay and cost
+
+The cross-target replay now additionally executes `MotionBinary64Verification`:
+24,000 velocity/position/rounded-pixel updates, whose host checksum is checked
+against independently evaluated double trajectories. The A500/68000 run matches
+`adb59284` with zero failures; the benchmark final-state checksum also matches
+`000505fa`. The four pre-existing gameplay/gem/death/weapon digests still match,
+and the 256-byte task-stack guard survives. Integer-coordinate conversion is
+also tested against 10,000 host double conversions. Host sanitizer tests pass.
+
+A separate 1,000-update native batch, without per-update hashing, takes 23 PAL
+fields: approximately **0.46 ms/update**, with less than 0.02 ms/update endpoint
+quantization uncertainty. This measures two binary64 additions and pixel
+rounding plus loop/failure bookkeeping, under the verification display/DMA
+configuration. It is not the cost of complete bone motion (horizontal updates,
+animation, collisions, rendering and owner traversal are not included), nor
+a live-game frame-time guarantee. No storage allocation occurs in the loop.
+
+Evidence: `/tmp/downwell-motion-native-replay.log` and
+`/tmp/downwell-motion-native-gdb.log`. The emulator had a 180-second deadline,
+was stopped afterward and the ordinary executable was restored. Both native
+instruction/helper audits pass. Arithmetic is still verification-only, not
+yet installed in live projectile state.

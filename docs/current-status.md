@@ -163,7 +163,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
   live collision/damage dispatch remain integration work, not completed parity.
   An integer-only binary64 addition/pixel-rounding candidate now matches the
   host numeric reference and cross-compiles to 68000 without library helpers.
-  It is not deployed yet: native replay and timing evidence remain required.
+  Native numeric replay now matches 24,000 updates; an isolated two-add/
+  pixel-round batch costs about 0.46 ms/update on the emulated 68000. It is
+  still not deployed: complete projectile integration and live cost remain.
 
 ## Working evidence
 

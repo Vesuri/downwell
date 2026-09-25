@@ -103,7 +103,7 @@ else
   wait "$GDB_PID" 2>/dev/null || true
 fi
 
-ACTUAL="$(sed -n 's/^DOWNWELL_REPLAY_RESULT //p' "$RUN/gdb-out.log" | tail -1)"
+ACTUAL="$(sed -n 's/^DOWNWELL_REPLAY_RESULT //p' "$RUN/gdb-out.log")"
 if [ -z "$ACTUAL" ]; then
   echo "replay result missing from debugger output"
   tail -80 "$RUN/gdb-out.log"

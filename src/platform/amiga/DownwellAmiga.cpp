@@ -261,6 +261,7 @@ extern "C" { volatile ULONG gDownwellStackGuardReady; }
 
 #ifdef DOWNWELL_REPLAY_VERIFY
 #include "core/GemVerification.h"
+#include "core/MotionBinary64Verification.h"
 #include "core/PlayerDeathVerification.h"
 #include "core/MachineGunVerification.h"
 extern "C" {
@@ -277,6 +278,8 @@ volatile ULONG gDeathReplayCoverage;
 volatile ULONG gWeaponReplayDigestHigh;
 volatile ULONG gWeaponReplayDigestLow;
 volatile ULONG gWeaponReplayCoverage;
+volatile ULONG gMotionReplayDigest, gMotionReplayUpdates, gMotionReplayFailures;
+volatile ULONG gMotionBenchDigest, gMotionBenchFailures, gMotionBenchFields;
 
 __attribute__((noinline, used)) void downwellReplayComplete(void) {
     __asm__ volatile("" ::: "memory");
@@ -3028,6 +3031,13 @@ int main(void) {
             gWeaponReplayDigestHigh = (ULONG)(weapon.digest >> 32);
             gWeaponReplayDigestLow = (ULONG)weapon.digest;
             gWeaponReplayCoverage = weapon.coverage;
+            const auto motion = downwell::verifyMotionBinary64();
+            gMotionReplayDigest = motion.digest; gMotionReplayUpdates = motion.updates;
+            gMotionReplayFailures = motion.failures;
+            const UWORD motionStart = AmigaPlatform::vblankCount();
+            const auto motionBench = downwell::benchmarkMotionBinary64();
+            gMotionBenchFields = UWORD(AmigaPlatform::vblankCount() - motionStart);
+            gMotionBenchDigest = motionBench.digest; gMotionBenchFailures = motionBench.failures;
             gReplayComplete = 1;
             downwellReplayComplete();
             for (;;) platform.waitVblank();
