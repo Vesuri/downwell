@@ -33,6 +33,19 @@ bool oracle(const Segment& line, int left, int right, int top, int bottom) {
 }
 }
 int main() {
+    std::uint32_t random = 0x238491abu;
+    auto next = [&]() { random = random * 1664525u + 1013904223u; return random; };
+    for (unsigned i = 0; i < 100000; ++i) {
+        Segment::Fraction a{next(), next(), false}, b{next(), next(), true};
+        if (i % 2) b.denominator = a.denominator;
+        if (i % 7 == 0) a.denominator = b.denominator = 1;
+        if (i % 11 == 0) a.numerator = b.numerator;
+        if (i % 17 == 0) a.denominator = b.denominator = 0;
+        const std::uint64_t left = std::uint64_t(a.numerator) * b.denominator;
+        const std::uint64_t right = std::uint64_t(b.numerator) * a.denominator;
+        require(Segment::compare(a, b) == (left == right ? 0 : left < right ? -1 : 1),
+                "fraction shortcut matches full-width cross products");
+    }
     constexpr int unit = downwell::MachineGunTrajectory::unit;
     unsigned checks = 0;
     for (int x = -3; x <= 3; ++x) for (int y = -3; y <= 3; ++y)

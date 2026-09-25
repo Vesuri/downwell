@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 35.71 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 35.76 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -253,6 +253,26 @@ Evidence logs use `/tmp/downwell-word-publish-` with `test`, `sanitized`,
 `profile`, `fps` and `frame` suffixes. The native shot capture matches SDL
 with 0/99,968 differing pixels, both 68000 audits pass, and the ordinary
 non-skip executable is restored. Emulator runs are limited to 45 seconds.
+
+### Exact equal-denominator projectile comparisons
+
+The shared continuous projectile/rectangle test compares numerators directly
+when the positive denominators match. In particular, an untouched initial
+0/1..1/1 interval no longer needs wide cross-products. Unequal denominators
+retain the original calculation; strict edge handling, collision order and
+RNG consumption are unchanged.
+
+100,000 fraction cases match host 64-bit cross-products, and 490,000 segment
+intersections match the independent slab oracle. The latter also pass
+ASan/UBSan. Runtime fixtures and bounded native cross-target replay retain all
+four digests, including weapon digest `0db388a5b1c2a40a`, coverage `3fff`.
+Both 68000 audits pass and the ordinary executable is restored.
+
+FPSCOUNT reports **839 fields / 600 updates = 35.76 FPS**, max gap five,
+versus 840 / 35.71 previously: essentially unchanged, not a meaningful FPS
+gain. This small arithmetic simplification does not resolve the frame budget
+or generation stall. Logs: `/tmp/downwell-fraction-compare-{test,sanitized,
+fps,replay}.log`; emulator runs are bounded to 45 seconds.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 

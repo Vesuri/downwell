@@ -23,6 +23,10 @@ struct ProjectileSegment {
 
     struct Fraction { std::uint32_t numerator, denominator; bool strict; };
     static int compare(Fraction a, Fraction b) {
+        // Most broad-phase candidates leave the initial 0/1..1/1 interval
+        // untouched. Equal positive denominators need no wide products.
+        if (a.denominator == b.denominator && a.denominator)
+            return a.numerator == b.numerator ? 0 : a.numerator < b.numerator ? -1 : 1;
         const auto highA = LevelClearTrig::productHigh(a.numerator, b.denominator);
         const auto highB = LevelClearTrig::productHigh(b.numerator, a.denominator);
         if (highA != highB) return highA < highB ? -1 : 1;
