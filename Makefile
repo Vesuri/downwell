@@ -130,6 +130,15 @@ build/bone-store-test: tests/core/BoneProjectileStoreTest.cpp src/core/BoneProje
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/GameMakerRandom.cpp
 
 .PHONY: verify-skeleton-actor
+test: verify-skeleton-encounter
+.PHONY: verify-skeleton-encounter
+verify-skeleton-encounter: build/skeleton-encounter-test
+	./build/skeleton-encounter-test
+
+build/skeleton-encounter-test: tests/core/SkeletonEncounterTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/GameMakerRandom.cpp
+
 verify-skeleton-actor: build/skeleton-actor-test
 	./build/skeleton-actor-test
 

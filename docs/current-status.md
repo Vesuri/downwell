@@ -23,6 +23,25 @@ two ports proves original-game completion. The active parity goal is unfinished.
 This queue describes priorities, not a replacement for the full goal. The old
 `open-work.md` is an early milestone inventory, not the current ordered queue.
 
+### Joined skeleton/bone encounter regression
+
+`make verify-skeleton-encounter` now runs the actor and owned projectiles through
+animation, global alarm slots, ordinary Step, synchronous throws and deferred
+projectile retirement together. Its separate host float/double model compares
+57,600 updates across 64 seeds, including exact animation, alarms, facing,
+projectile trajectories and every RNG word. The tape covers initially inactive
+actors, repeated attacks, hit-stun, time-stop/resume, aligned throws, both
+facings and slot reuse: 736 throws and 640 out-of-view retirements. New children
+are excluded from their birth Step and retain their initial animation speed.
+The regression is included in `make test`. The normal and address/undefined-
+behavior sanitizer runs pass, as do the existing actor and bone-store tests.
+
+This is integrated component evidence, not live world admission or a Windows
+execution capture. The test's rectangular projectile retirement bounds are
+fixture geometry, not a claim about the original viewport. Collision-family
+scheduling, real damage/effect sinks, renderer consumption and connection to
+the live world remain unfinished.
+
 ### Latest correction: creation-phase enemy timing
 
 Both live enemy adapters now skip ordinary Step for children generated during
