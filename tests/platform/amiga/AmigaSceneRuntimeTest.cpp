@@ -1797,7 +1797,92 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
 }
 }
 
+// Input-only route: inspect terrain to choose buttons, never modify the world.
+// This checks the actual room builder and collision adapters, not exit fixtures.
+void testNaturalExit(const char* roomPath, const char* objectPath, const char* patternPath) {
+    auto rb = readFile(roomPath), ob = readFile(objectPath), pb = readFile(patternPath);
+    downwell::RoomPack rooms(rb.data(), rb.size());
+    downwell::ObjectPack objects(ob.data(), ob.size());
+    downwell::BuilderPatternPack patterns(pb.data(), pb.size());
+    downwell::PackedRoom room;
+    require(rooms.findRoom(11, room), "natural route has decoded main room");
+    for (unsigned seed : {99u, 4u}) {
+        downwell::StartupRuntime reference(downwell::PlatformProfile::nonDesktop,
+            &rooms, &objects, seed, &patterns);
+        reference.skipToGameForTesting();
+        AmigaPortRuntime game(300, false, 1201 - 176, true);
+        game.initializeEntryInput(false);
+        LiveSceneWorld live(patterns, objects);
+        live.bind(game, rooms, room, false, &reference);
+        int target = 240;
+        unsigned updates = 0;
+        for (; updates < 2500 && !game.levelResultRequested() && !game.dead(); ++updates) {
+            const int x = 240 + game.player().offsetX(), y = 176 + game.player().offsetY();
+            if (updates % 16 == 0) {
+                int best = -1000000;
+                for (int candidate = 180; candidate <= 300; candidate += 8) {
+                    int floor = amigaResolveTerrainLanding(&live.collision, candidate - 240, y - 176 + 8);
+                    if (floor == downwell::gameplayNoLanding) floor = y + 400 - 176;
+                    const int score = std::min(floor + 176 - y, 400) * 4 - std::abs(candidate - x);
+                    if (score > best) { best = score; target = candidate; }
+                }
+            }
+            downwell::Input input;
+            input.left = x > target + 2; input.right = x < target - 2;
+            input.fire = updates % 40 == 0 || updates % 40 == 3;
+            game.step(downwell::packReplayInput(input)); reference.step(input, false);
+            parityFrame = updates;
+            compareInitialGameplay(game, reference);
+        }
+        require(!game.dead() && game.levelResultRequested() && reference.levelResultRequested(),
+            "input-only route reaches a naturally generated exit alive on both adapters");
+        require(game.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
+            "natural exit transfers to upgrade scene");
+        bool heartA = false, heartB = false;
+        unsigned clearUpdates = 0;
+        for (; clearUpdates < 400 && !game.nextLevelRequested(); ++clearUpdates) {
+            bool fireA = true, fireB = true;
+            std::vector<unsigned> eventsA, eventsB;
+            require(game.stepLevelClear(fireA, false, false, heartA,
+                [&](downwell::LevelClearSelection::Effect e, unsigned v) { eventsA.push_back(unsigned(e)); eventsA.push_back(v); }) &&
+                reference.stepLevelClear(fireB, false, false, heartB,
+                [&](downwell::LevelClearSelection::Effect e, unsigned v) { eventsB.push_back(unsigned(e)); eventsB.push_back(v); }),
+                "natural upgrade sequence advances");
+            require(eventsA == eventsB && fireA == fireB && heartA == heartB &&
+                game.nextLevelRequested() == reference.nextLevelRequested(), "natural upgrade effects agree");
+            for (unsigned i = 0; i < 4; ++i)
+                require(game.levelClear().offers.ids[i] == reference.levelClear().offers.ids[i], "natural offers agree");
+            require(game.randomDrawCount() == reference.randomDrawCount() &&
+                game.randomState().stateIndex() == reference.randomState().stateIndex(), "natural upgrade RNG cursor agrees");
+            for (unsigned i = 0; i < 16; ++i)
+                require(game.randomState().stateWord(i) == reference.randomState().stateWord(i), "natural upgrade RNG state agrees");
+            for (unsigned i = 0; i < 23; ++i)
+                require(game.upgrades().levels[i] == reference.upgrades().levels[i], "natural upgrade inventory agrees");
+        }
+        require(game.nextLevelRequested(), "natural upgrade sequence finishes within budget");
+        downwell::Input held; held.fire = true;
+        require(game.prepareNextAreaOneLevel(held, 319) && reference.loadNextAreaOneLevel(held),
+            "natural route enters second cavern");
+        require(game.runStage().level == 2 && reference.runStage().level == 2,
+            "natural route advances exactly one level");
+        live.bind(game, rooms, room, true);
+        for (unsigned tick = 0; tick < 120; ++tick) {
+            downwell::Input input;
+            input.fire = tick < 4;
+            game.step(downwell::packReplayInput(input)); reference.step(input, false);
+            parityFrame = tick;
+            compareInitialGameplay(game, reference);
+        }
+        std::cout << "Natural exit seed=" << seed << " gameplay=" << updates
+                  << " upgrade=" << clearUpdates << " reentry=120 passed\n";
+    }
+}
+
 int main(int argc, char** argv) {
+    if (argc >= 4 && std::getenv("DOWNWELL_VERIFY_NATURAL_EXIT")) {
+        testNaturalExit(argv[1], argv[2], argv[3]);
+        return 0;
+    }
     {
         AmigaSceneRuntime revisited;
         require(!revisited.enterResultsDestination(downwell::ResultsDestination::none),

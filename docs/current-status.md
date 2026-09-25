@@ -24,6 +24,13 @@ two ports proves original-game completion. The active parity goal is unfinished.
   This supersedes the old claim that
   the result room or all level advancement remains unimplemented. The fixture
   injects exits; it does not prove a natural full-level playthrough.
+- `make verify-natural-exit` adds input-only paired host routes for seeds 99
+  and 4: 1,883/1,477 gameplay updates to naturally generated exits, 211 upgrade
+  updates and 120 second-cavern updates each. Terrain inspection selects
+  ordinary movement/fire input; no exit, player position, health or terrain is
+  injected. Gameplay state is compared each update, with upgrade effects,
+  offers, inventory and RNG checks. This is host adapter evidence, not a
+  native rendering gate or natural shop coverage.
 - Results-menu tests cover all three destinations and 200 final gameplay
   updates, including display-memory reuse and the task-stack guard.
 - A dedicated native horizontal-camera fixture covers all three columns and
