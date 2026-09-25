@@ -30,6 +30,9 @@
 #include "AmigaUpgradeScene.h"
 #include "AmigaSplashCache.h"
 #include "AmigaStyleScene.h"
+#include "AmigaPublisherScene.h"
+#include "AmigaCreditsScene.h"
+#include "AmigaControlsScene.h"
 #include "AmigaShopMenu.h"
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
@@ -1669,12 +1672,6 @@ int main(void) {
         DownwellMenuCopperList(dynamicCopperWords[0], downwellCopperWords),
         DownwellMenuCopperList(dynamicCopperWords[1], downwellCopperWords)
     };
-    DownwellSplashCopperList dynamicSplashLists[2] = {
-        DownwellSplashCopperList(dynamicCopperWords[0],
-                                 downwellCopperWords),
-        DownwellSplashCopperList(dynamicCopperWords[1],
-                                 downwellCopperWords)
-    };
     DownwellSelectionCopperList selectionLists[2] = {
         DownwellSelectionCopperList(dynamicCopperWords[0], downwellCopperWords),
         DownwellSelectionCopperList(dynamicCopperWords[1], downwellCopperWords)
@@ -1686,12 +1683,13 @@ int main(void) {
                   "Selection borders must fit the smaller retired HUD buffer");
     DownwellSplashCopperList splashBlankList(
         memory.copper() + downwellCopperWords * 2, downwellCopperWords);
-    DownwellSplashCopperList splashLogoList(
+    AmigaPublisherScene publisherScene(
         memory.copper() + downwellCopperWords * 3, downwellCopperWords);
-    DownwellSplashCopperList splashCreditsList(
+    AmigaCreditsScene creditsScene(
         memory.copper() + downwellCopperWords * 4, downwellCopperWords);
-    DownwellSplashCopperList splashControlsList(
-        memory.copper() + downwellCopperWords * 5, downwellCopperWords);
+    AmigaControlsScene controlsScene(
+        memory.copper() + downwellCopperWords * 5,
+        dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
     UBYTE* stagedBuffer = memory.menuForeground();
     Bitmap gameBitmap(memory.game(), downwellVisibleWidth,
                       downwellGameRingHeight, 2, false, false,
@@ -1799,11 +1797,9 @@ int main(void) {
 #else
         !splashBlankList.buildNarrow(
             amigaSplashFrame(memory.sceneCache(), 1), nullSprite, palette) ||
-        !splashLogoList.buildNarrow(
-            amigaSplashFrame(memory.sceneCache(), 2), nullSprite, palette) ||
-        !splashCreditsList.buildWide(hudBitmap, nullSprite, palette) ||
-        !splashControlsList.buildNarrow(
-            amigaSplashFrame(memory.sceneCache(), 4), nullSprite, palette)
+        !publisherScene.prepare(memory.sceneCache(), sceneCacheBytes, nullSprite, palette) ||
+        !creditsScene.prepare(hudBitmap, nullSprite, palette) ||
+        !controlsScene.prepare(memory.sceneCache(), sceneCacheBytes, nullSprite, palette)
 #endif
     ) {
         platform.restore();
@@ -2013,31 +2009,15 @@ int main(void) {
                 }
                 if (presentedScene == AmigaScene::splash) {
                     if (presentationChanged || splashDitherChanged) {
-                        CopperList* splashProgram =
-                            &dynamicSplashLists[back];
-                        bool built = true;
-                        if (presentationChanged && presentedSplash == 2) {
-                            splashProgram = &splashLogoList;
-                        } else if (presentationChanged &&
-                                   presentedSplash == 3) {
-                            splashProgram = &splashCreditsList;
-                        } else if (presentationChanged &&
-                                   presentedSplash == 4) {
-                            splashProgram = &splashControlsList;
-                        } else {
-                            built = dynamicSplashLists[back].buildNarrow(
-                                amigaSplashFrame(memory.sceneCache(),
-                                                 presentedSplash),
-                                nullSprite, palette,
-                                presentedSplash == 5 || presentedSplash == 6
-                                    ? amigaSplashDitherTile(
-                                          memory.sceneCache(),
-                                          presentedSplashDither)
-                                    : 0);
-                            front = back;
-                        }
-                        if (!built)
-                            break;
+                        const CopperList* splashProgram = nullptr;
+                        bool alternating = false;
+                        if (presentedSplash == 1) splashProgram = &splashBlankList;
+                        else if (presentedSplash == 2) splashProgram = publisherScene.presentation();
+                        else if (presentedSplash == 3) splashProgram = creditsScene.presentation();
+                        else splashProgram = controlsScene.presentation(presentedSplash,
+                            presentedSplashDither, back, nullSprite, palette, alternating);
+                        if (!splashProgram) break;
+                        if (alternating) front = back;
                         platform.publish(*splashProgram);
 #ifdef DOWNWELL_SCENE_VERIFY
                         expectedSplashCopper = splashProgram->data();
@@ -2052,23 +2032,21 @@ int main(void) {
                         if (!sceneCreditsFrameReported &&
                             presentedSplash == 3) {
                             sceneCreditsFrameReported = true;
-                            gDownwellCreditsFrame = memory.hud();
+                            gDownwellCreditsFrame = creditsScene.pixels();
                             gDownwellCreditsCopper = platform.publishedCopper();
                             downwellCreditsFrameReady();
                         }
                         if (!sceneSplashFrameReported &&
                             presentedSplash == 2) {
                             sceneSplashFrameReported = true;
-                            gDownwellSplashFrame = amigaSplashFrame(
-                                memory.sceneCache(), presentedSplash);
+                            gDownwellSplashFrame = publisherScene.pixels();
                             downwellSplashFrameReady();
                         }
                         if (!sceneControlsFrameReported &&
                             presentedSplash == 4) {
                             gDownwellControlsCopper = platform.publishedCopper();
                             sceneControlsFrameReported = true;
-                            gDownwellControlsFrame = amigaSplashFrame(
-                                memory.sceneCache(), presentedSplash);
+                            gDownwellControlsFrame = controlsScene.pixels();
                             downwellControlsFrameReady();
                         }
 #endif

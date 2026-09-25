@@ -721,6 +721,14 @@ test-amiga-style-scene: build/amiga-style-scene-test
 	./build/amiga-style-scene-test
 test: test-amiga-style-scene
 
+.PHONY: test-amiga-splash-scenes
+build/amiga-splash-scenes-test: tests/platform/amiga/AmigaSplashScenesTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaPublisherScene.cpp src/platform/amiga/AmigaCreditsScene.cpp src/platform/amiga/AmigaControlsScene.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-amiga-splash-scenes: build/amiga-splash-scenes-test
+	./build/amiga-splash-scenes-test
+test: test-amiga-splash-scenes
+
 .PHONY: test-amiga-style-retained
 build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
@@ -924,6 +932,9 @@ verify-amiga-credits-frame:
 verify-amiga-scenes:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_scenes.gdb READY_MARKER=DOWNWELL_GAMEPLAY_ACTIVE READY_DESCRIPTION="complete native scene sequence through scrolling gameplay and enemy activation" amiga/verify_startup.sh'
+	printf '%s  %s\n' '$(AMIGA_SPLASH_FRAME_SHA256)' 'amiga/.run/splash-frame.bin' | shasum -a 256 -c -
+	printf '%s  %s\n' '$(AMIGA_CREDITS_FRAME_SHA256)' 'amiga/.run/credits-frame.bin' | shasum -a 256 -c -
+	printf '%s  %s\n' '$(AMIGA_CONTROLS_FRAME_SHA256)' 'amiga/.run/controls-frame.bin' | shasum -a 256 -c -
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 .PHONY: verify-amiga-results-restart

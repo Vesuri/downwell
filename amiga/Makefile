@@ -115,7 +115,7 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
-	obj/AmigaMenuCache.o obj/AmigaSplashCache.o obj/AmigaStyleRenderer.o obj/AmigaStyleScene.o obj/AmigaUpgradeScene.o obj/AmigaSelectionLayer.o \
+	obj/AmigaMenuCache.o obj/AmigaSplashCache.o obj/AmigaPublisherScene.o obj/AmigaCreditsScene.o obj/AmigaControlsScene.o obj/AmigaStyleRenderer.o obj/AmigaStyleScene.o obj/AmigaUpgradeScene.o obj/AmigaSelectionLayer.o \
 	obj/AmigaRenderer.o obj/AmigaBlitter.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
 	obj/GCCRuntime.o obj/AmigaPlatform.o \
@@ -222,6 +222,16 @@ obj/AmigaUpgradeScene.o: $(AMIGA_SRC)/AmigaUpgradeScene.cpp $(AMIGA_SRC)/AmigaUp
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 obj/AmigaStyleScene.o: $(AMIGA_SRC)/AmigaStyleScene.cpp $(AMIGA_SRC)/AmigaStyleScene.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaPublisherScene.o: $(AMIGA_SRC)/AmigaPublisherScene.cpp $(AMIGA_SRC)/AmigaPublisherScene.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+obj/AmigaCreditsScene.o: $(AMIGA_SRC)/AmigaCreditsScene.cpp $(AMIGA_SRC)/AmigaCreditsScene.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+obj/AmigaControlsScene.o: $(AMIGA_SRC)/AmigaControlsScene.cpp $(AMIGA_SRC)/AmigaControlsScene.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

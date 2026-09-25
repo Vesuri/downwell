@@ -1,8 +1,34 @@
 set pagination off
 set confirm off
 target remote 127.0.0.1:2345
+set $splash_captures = 0
+break downwellSplashFrameReady
+commands
+silent
+dump binary memory .run/splash-frame.bin gDownwellSplashFrame gDownwellSplashFrame+12496
+set $splash_captures = $splash_captures | 1
+continue
+end
+break downwellCreditsFrameReady
+commands
+silent
+dump binary memory .run/credits-frame.bin gDownwellCreditsFrame gDownwellCreditsFrame+27264
+set $splash_captures = $splash_captures | 2
+continue
+end
+break downwellControlsFrameReady
+commands
+silent
+dump binary memory .run/controls-frame.bin gDownwellControlsFrame gDownwellControlsFrame+12496
+set $splash_captures = $splash_captures | 4
+continue
+end
 break downwellSceneGameplayActive
 continue
+if $splash_captures != 7
+    printf "Missing current-run splash captures: %lu\n", $splash_captures
+    quit 1
+end
 if gDownwellMenuCopperPatchFailures != 0
     printf "Patched garden copper differs from freshly built oracle\n"
     quit 1

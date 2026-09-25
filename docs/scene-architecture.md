@@ -23,6 +23,35 @@ must not become a wrapper around a permanently monolithic main loop.
 
 ## Remaining consolidation
 
+### Publisher, credits and controls owners
+
+Each now has its own header/translation unit and borrowed Copper-list storage.
+`AmigaPublisherScene` prepares the narrow logo list; `AmigaCreditsScene`
+prepares the wide credits list. `AmigaControlsScene` owns the held controls
+list and both alternating dither lists, including the blank-backed final fade.
+Their common machinery remains `AmigaSplashCache` and
+`DownwellSplashCopperList`; there are no duplicate image converters or new
+Chip allocations. The existing startup controller retains all input/timers.
+The application still publishes through `AmigaPlatform` and owns display
+retirement/blanking used by subsequent scenes.
+
+Failed preparation makes a scene unpublishable; failed fade preparation does
+not advance the front slot. Held controls return their prepared list without
+rebuilding it. Host lifecycle tests cover preparation, 240 held frames,
+both fade slots, invalid input, failed preparation and recovery; ASan/UBSan
+pass. These doubles verify ownership, not actual hardware execution.
+
+The bounded full startup gate also captures publisher, credits and controls
+at their presentation boundaries and checks their existing hashes. A per-run
+capture bitset rejects a missing boundary rather than accepting an old file.
+The final 180-second-bounded run passes all three hashes, original splash
+durations, garden Copper checks, 138 style comparisons and the stack guard.
+Normal startup is restored and both 68000 audits pass. Evidence:
+`/tmp/downwell-splash-scenes-final.log`,
+`/tmp/downwell-splash-scenes-final-gdb.log`, and
+`/tmp/downwell-splash-scenes-sanitized.log`. This is a native regression check,
+not a new Windows-runner capture or a completed seven-scene migration.
+
 ### Retained selection canvas (live upgrade and style paths)
 
 `AmigaSelectionLayer.h/.cpp` supplies a reusable 160-pixel content canvas with
@@ -70,8 +99,12 @@ existing periodic border and five-plane priority/masking arrangement. Its
 dedicated Copper list accepts the taller content-plane stride while retaining
 the original border stride and palette rules.
 
-- Publisher, credits and controls currently share splash cache/runtime paths.
-  They need distinct scene controllers, sharing prepared-screen machinery.
+- Publisher, credits and controls have dedicated `AmigaPublisherScene`,
+  `AmigaCreditsScene` and `AmigaControlsScene` classes and translation units.
+  They share `AmigaSplashCache` and the existing splash Copper builder; the
+  controls owner manages its held list and both alternating dither slots.
+  Startup timing/input remains in the existing controller. Application-level
+  blanking and final platform publication remain in the main loop.
 - Garden has menu renderer/cache/scroll translation units, but lifecycle and
   presentation orchestration remain in the main loop.
 - Style selection now has `AmigaStyleScene.h/.cpp`, owning both alternating
