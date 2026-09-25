@@ -77,7 +77,8 @@ two ports proves original-game completion. The active parity goal is unfinished.
   `choose` uses one WELL word modulo argument count, whereas existing
   translations often use two-word `irandomSmall`. The distinct shared
   `chooseIndexSmall` primitive is tested. Shared cavern generation and reward
-  choices are migrated; remaining call sites need a VM-backed
+  choices plus garden tree/grass and host title-event choices are migrated;
+  remaining call sites need a VM-backed
   audit and coordinated migration, followed by rebuilt checkpoints and route
   verification. See `runner-choose.md`. This takes priority over new-area work;
   earlier paired replays prove adapter agreement, not original RNG equivalence.
@@ -86,6 +87,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   fails its stale decoded-entry checkpoint assertion before gameplay. Previous
   native seed-4/sweep results above are historical, not revalidated for this
   corrected stream. Do not hide the failure by burning compensating RNG words.
+  Garden reconstruction passes an independent VM-call/RNG-state oracle (77
+  Create words). The broader startup test now fails its stale fragment-four
+  assertion after reaching gameplay: the corrected stream selects fragment 2.
+  Title RNG order tests pass, but omitted particle visuals remain omitted.
 
 - Complete the seven scene boundaries. All seven now have named Amiga scene
   classes; gameplay's owner controls its Copper lifecycle and backing/staging

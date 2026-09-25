@@ -6,6 +6,7 @@
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
 #include "EnemyCreateProfile.h"
+#include "TitleParticleRandom.h"
 #include "EnemyStepPresentation.h"
 #include "EnemyContact.h"
 #include "EnemyContactResponse.h"
@@ -1574,7 +1575,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         return;
     case 2478: { // gml_Object_objTree_Create_0
         ++implementedCodeCalls_;
-        const std::uint64_t choice = random_.irandom(5);
+        const std::uint32_t choice = random_.chooseIndexSmall(6);
         if (instance != nullptr) {
             instance->imageIndex = choice == 5 ? 1.0F : 0.0F;
             instance->imageSpeed = 0.0F;
@@ -1592,7 +1593,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         if (instance != nullptr) {
             instance->spriteId = 635 + static_cast<std::int32_t>(
-                random_.irandom(3));
+                random_.chooseIndexSmall(4));
             instance->imageSpeed =
                 static_cast<float>(0.15 + random_.random(0.1));
             instance->imageIndex = static_cast<float>(random_.irandom(3));
@@ -1636,13 +1637,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 2498: // gml_Object_objTitle_Alarm_0 (visual effects omitted)
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            for (int effect = 0; effect < 20; ++effect) {
-                random_.random(140.0);
-                random_.random(32.0);
-                random_.irandom(1);
-                random_.random(0.165);
-                random_.random(0.1);
-            }
+            consumeTitleBurstRandom(random_);
             instance->alarms.set(1, 75);
         }
         return;
@@ -1656,13 +1651,8 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 instance->alarms.set(2, 15);
                 menuTitleFirstBoot_ = true;
             }
-            if (menuTitleFirstBoot_ && instance->imageIndex < 9.0F &&
-                random_.irandom(1) != 0) {
-                random_.random(132.0);
-                random_.random(32.0);
-                random_.irandom(1);
-                random_.random(0.4);
-            }
+            if (menuTitleFirstBoot_ && instance->imageIndex < 9.0F)
+                consumeTitleRiseRandom(random_);
             if (instance->imageSpeed > 0.0F) {
                 instance->imageIndex += instance->imageSpeed;
                 if (instance->imageIndex >= 9.0F) {

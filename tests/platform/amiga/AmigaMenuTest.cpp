@@ -44,6 +44,51 @@ int main(int argc, char** argv) {
     require(list.randomDrawCount == reference.randomDrawCount(),
             "native menu reconstruction consumes the recovered RNG stream");
 
+    // Independent raw-word oracle for the VM's mixed choose/irandom calls.
+    // Comparing only the two adapters could preserve the same mistake in both.
+    downwell::GameMakerRandom oracle(2);
+    downwell::PackedRoom menu;
+    require(rooms.findRoom(20, menu), "decoded menu exists");
+    for (unsigned index = 0; index < menu.instanceCount; ++index) {
+        downwell::PackedRoomInstance placed;
+        downwell::PackedObjectEvent event;
+        require(rooms.roomInstance(menu, index, placed), "decoded placement exists");
+        if (!objects.findEvent(placed.objectId, 0, 0, event)) continue;
+        const auto* instance = reference.instance(placed.instanceId);
+        switch (event.codeId) {
+        case 836:
+            oracle.irandom(5); // groundPlayerSet, not choose.
+            break;
+        case 2478: {
+            const unsigned frame = oracle.nextU32() % 6 == 5 ? 1 : 0;
+            require(instance && instance->imageIndex == frame, "tree choice matches VM operand order");
+            break;
+        }
+        case 2480:
+            require(instance && instance->imageIndex == oracle.irandom(3),
+                    "ground-tree frame remains a genuine integer range");
+            break;
+        case 2486: {
+            const int sprite = 635 + oracle.nextU32() % 4;
+            const float speed = static_cast<float>(0.15 + oracle.random(0.1));
+            const unsigned frame = oracle.irandom(3);
+            const bool active = oracle.random(10) >= 1;
+            require(instance && instance->spriteId == sprite && instance->imageIndex == frame &&
+                    instance->imageSpeed == speed && instance->active == active,
+                    "grass choice, range, frame and removal preserve VM order");
+            break;
+        }
+        default: break;
+        }
+    }
+    require(oracle.drawCount() == reference.randomDrawCount() &&
+            oracle.stateIndex() == reference.randomState().stateIndex(),
+            "startup RNG count/index match independent VM call sequence");
+    for (unsigned word = 0; word < 16; ++word)
+        require(oracle.stateWord(word) == reference.randomState().stateWord(word),
+                "all startup RNG words match independent VM call sequence");
+    std::cout << "Garden creation draws=" << oracle.drawCount() << '\n';
+
     unsigned grassCount = 0;
     unsigned alternateGrassCount = 0;
     for (unsigned index = 0; index < list.count; ++index) {

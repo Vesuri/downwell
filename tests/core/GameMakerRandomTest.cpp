@@ -1,7 +1,9 @@
 #include "core/GameMakerRandom.h"
+#include "core/TitleParticleRandom.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 
 namespace {
 
@@ -69,6 +71,45 @@ void testChoose() {
             "singleton choose still advances to the second pinned WELL word");
 }
 
+void testTitleParticleOrder() {
+    struct Trace {
+        std::vector<double> calls;
+        unsigned gate;
+        double random(double upper) { calls.push_back(upper); return 0; }
+        unsigned chooseIndexSmall(unsigned count) {
+            require(count == 2, "title sprite/gate choices have two arguments");
+            calls.push_back(-2); return gate;
+        }
+    };
+    Trace burst{{}, 1};
+    downwell::consumeTitleBurstRandom(burst);
+    std::vector<double> expected;
+    for (unsigned i = 0; i < 20; ++i)
+        for (double value : {0.1, 0.165, -2.0, 32.0, 140.0}) expected.push_back(value);
+    require(burst.calls == expected, "title burst evaluates VM arguments right-to-left");
+    for (unsigned gate : {0u, 1u}) {
+        Trace rise{{}, gate};
+        downwell::consumeTitleRiseRandom(rise);
+        require(rise.calls == (gate ? std::vector<double>{-2, 0.4, -2, 32, 132}
+                                   : std::vector<double>{-2}),
+                "title rise gate preserves conditional choice and range order");
+    }
+    for (unsigned seed = 0; seed < 128; ++seed) {
+        downwell::GameMakerRandom actual(seed), reference(seed);
+        downwell::consumeTitleBurstRandom(actual);
+        for (unsigned i = 0; i < 100; ++i) reference.nextU32();
+        for (unsigned frame = 0; frame < 100; ++frame) {
+            downwell::consumeTitleRiseRandom(actual);
+            if (reference.nextU32() % 2)
+                for (unsigned i = 0; i < 4; ++i) reference.nextU32();
+            require(actual.drawCount() == reference.drawCount() && actual.stateIndex() == reference.stateIndex(),
+                    "title events consume one word per builtin");
+            for (unsigned i = 0; i < 16; ++i)
+                require(actual.stateWord(i) == reference.stateWord(i), "title events retain full RNG state");
+        }
+    }
+}
+
 void testSmallIntegerPath() {
     constexpr std::uint32_t maxima[] = {
         0, 1, 2, 3, 4, 5, 6, 7, 9, 12, 15, 30, 40, 50, 60,
@@ -124,6 +165,7 @@ int main() {
     testIntegerRangeAndReset();
     testRealRange();
     testChoose();
+    testTitleParticleOrder();
     testSmallIntegerPath();
     testSmallScaledRealPath();
     std::cout << "GameMaker random tests passed\n";

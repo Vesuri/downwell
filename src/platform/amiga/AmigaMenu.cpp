@@ -33,17 +33,17 @@ void applyRecoveredCreate(int codeId,
                           unsigned& frame,
                           bool& active) {
     switch (codeId) {
-    case 836: // objPlayer_n: choose one of six sleeping poses.
+    case 836: // groundPlayerSet: genuine irandom(5), not the choose builtin.
         random.irandomSmall(5);
         break;
     case 2478: // objTree: five chances of frame zero, one of frame one.
-        frame = random.irandomSmall(5) == 5 ? 1U : 0U;
+        frame = random.chooseIndexSmall(6) == 5 ? 1U : 0U;
         break;
     case 2480: // groundTrees: static random frame.
         frame = random.irandomSmall(3);
         break;
     case 2486: // objGrass: sprite, animation phase, and 10% removal.
-        spriteId = 635 + static_cast<int>(random.irandomSmall(3));
+        spriteId = 635 + static_cast<int>(random.chooseIndexSmall(4));
         random.nextU32(); // random(0.1), used only for image_speed.
         frame = random.irandomSmall(3);
         active = random.randomIntegerSmall(10) != 0;

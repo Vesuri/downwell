@@ -89,3 +89,38 @@ Next audit: startup/garden choices, shared gem/player/impact choices, enemy
 alarm callbacks and other gameplay calls. Regenerate checkpoints after those
 corrections, keeping genuine integer-range calls intact. There are no extra
 draws added to manufacture compatibility with the old stream.
+
+## Second migration: garden and title events
+
+The SDL startup handler and native `AmigaMenu` preparation now use one-word
+choices for `objTree` (six arguments) and `objGrass` sprite selection (four).
+The VM retains genuine `irandom` for `groundPlayerSet`'s sleeping pose,
+`groundTrees` frame and grass frame; `soundLand`/`soundFootstep` sample lookup
+uses `irandom_range`. Those calls were deliberately not replaced.
+
+Title Alarm 0 and Step 0 now use `TitleParticleRandom` for their currently
+unrendered effects' stream consumption. The VM's right-to-left argument order
+is retained: burst movement speed, animation speed, sprite choice, y, x;
+rising particles first choose whether to emit, then animation speed, sprite,
+y, x. `parentMovingFx` Create contains no additional random draws. This does
+not implement the missing particle visuals or prove native title-event parity.
+
+Checks:
+
+- Native garden reconstruction matches SDL and an independent raw-word VM
+  call sequence for each randomized object, plus all sixteen final RNG words.
+  Menu Create consumption is **77 words**, replacing the old 92-word result.
+- Title tests assert argument-call order and both conditional outcomes;
+  128 seeds each check a twenty-particle burst and 100 rising-particle Steps
+  against a raw-word oracle. RNG tests pass normally and with sanitizers.
+- The broad startup test reaches the gameplay entrance but **fails** its
+  stale fragment-four assertion: current output is fragment 2, unmirrored,
+  six fragment rows / 35 total rows, 92 new instances and 89 fragment draws.
+  Log: `/tmp/downwell-startup-choose-test.log`. Downstream geometry-specific
+  assertions are not yet rerun; do not report the full startup suite as passing.
+- Both ordinary builds pass, including Amiga 68000 instruction/helper audits
+  (`/tmp/downwell-startup-choose-{amiga,sdl}.log`). No emulator was launched.
+
+Remaining audit starts with shared gems, player/impact choices and enemy alarm
+callbacks. Native gameplay shortcuts and geometry-dependent test tapes still
+require regeneration after the migration is complete.

@@ -165,7 +165,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     require(player->objectId == 35, "rmMenu player has recovered object ID");
     require(player->roomId == 20, "rmMenu player belongs to recovered room");
     require(runtime.randomSeed() == downwell::StartupRuntime::defaultRandomSeed &&
-                runtime.randomDrawCount() == 92,
+                runtime.randomDrawCount() == 77,
             "menu creation preserves all recovered shared-stream RNG draws");
     if (objects != nullptr)
         require(runtime.implementedCodeCalls() == 191,
