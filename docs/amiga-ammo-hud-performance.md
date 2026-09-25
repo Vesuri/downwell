@@ -35,6 +35,22 @@ runs used a 45-second timeout and started directly in gameplay.
 
 ### Retained implementation
 
+Another rejected experiment detected homogeneous opaque eight-row overlaps
+inside a damaged interior strip. When all contributing stamps had the same
+family/frame and their combined mask covered all 12 pixels, it copied their
+cached final words directly, skipping both background and row draws. Mixed
+strips retained the original path. The scan excluded the special bottom
+stamp and checked all contributing rows and the original y<232 restriction.
+
+This was pixel-correct (complete renderer oracle, sanitizers, native firing
+capture with 0/99,968 differing pixels; native audits clean), but the bounded
+600-update FPSCOUNT tape took **824 fields / 36.41 FPS**, maximum gap five,
+versus the 812-field baseline. The implementation was removed. The additional
+homogeneity scan is a suspected cost, not independently measured by this
+whole-frame comparison. Do not repeat per-draw uniformity detection without
+measuring that overhead or reusing already-computed run information.
+Logs: `/tmp/downwell-hud-opaque-{test,sanitized,fps,frame}.log`.
+
 - Original binary64 divider-loop geometry is cached by capacity for the
   current one-charge weapon, including all four recharge offsets. Visibility
   still depends on ammo. Capacities above 64 and other consumption values
