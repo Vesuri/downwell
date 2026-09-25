@@ -167,7 +167,9 @@ public:
                 }
             }
             DW_PROFILE_PHASE(profileAmmoDividers);
-            if (stampsReady_ && !forceFull && capacity <= 64 && meter <= 3) {
+            const bool cachedDividers = stampsReady_ && !forceFull && capacity <= 64 && meter <= 3;
+            const bool fusedPublish = interior && cachedDividers;
+            if (cachedDividers) {
                 // Retain the ordered divider composition, not just positions.
                 // Animation strips reuse it; jiggle only shifts its row origin.
                 if (dividerAmmo_ != ammo || dividerCapacity_ != capacity) {
@@ -185,7 +187,7 @@ public:
                         });
                     dividerAmmo_ = ammo; dividerCapacity_ = capacity;
                 }
-                amigaRendererApplyHudColumns(renderer, dividers_, 18, 1,
+                if (!fusedPublish) amigaRendererApplyHudColumns(renderer, dividers_, 18, 1,
                     4 * meter, top, bottom, 1);
             } else layout_.draw(ammo, capacity, 1, 288, 229 + 4 * meter,
                 [&](unsigned sprite, unsigned frame, int x, unsigned y) {
@@ -203,7 +205,10 @@ public:
             }
             {
                 DW_PROFILE_SCOPE(profileAmmoWordPublish);
-                lastWordWrites += amigaRendererCopyHudWords(display->hud, working_, stripLeft, top, stripRight, bottom, 1);
+                if (fusedPublish)
+                    lastWordWrites += amigaRendererPublishHudColumn(display->hud, working_,
+                        dividers_, 18, top, bottom, 4 * meter, 0xfff0);
+                else lastWordWrites += amigaRendererCopyHudWords(display->hud, working_, stripLeft, top, stripRight, bottom, 1);
             }
             DW_PROFILE_PHASE(profileAmmoBase);
         };

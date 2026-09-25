@@ -1,5 +1,40 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Fuse retained divider composition with interior publication
+
+For the gauge's stable one-word interior, the ordered divider overlay and
+changed-word publication now share a row loop. The overlay is clipped once;
+its final words update the Fast-RAM backing and only changed display-plane
+words are written. The rim is outside this strip. Caps, labels, full redraws
+and unsupported cached-divider layouts keep the previous path. No buffer,
+asset, animation, palette or simulation change is introduced.
+
+The initial per-row bounds-check version regressed to 828 fields and was
+replaced by once-clipped pointer traversal. The retained version takes the
+same **825 fields / 36.36 FPS / four-field maximum** as the baseline.
+Instrumented divider plus publication time falls from 718.262 to 665.295 ms
+over 600 updates (1.197 to 1.109 ms/update). Publication now includes the
+fused overlay, so neither phase should be compared alone. This is a modest
+CPU-cost reduction, not a measured throughput or worst-gap improvement.
+Logs: `/tmp/downwell-hud-current-probes.log`,
+`/tmp/downwell-hud-fused-fps.log`,
+`/tmp/downwell-hud-fused-fast-fps.log` and
+`/tmp/downwell-hud-fused-fast-probes.log`.
+
+Direct tests compare backing bytes, display bytes and write counts against
+separate composition/publication over three columns, three shifts, three
+vertical ranges and three clip widths. Repeated publication writes nothing.
+All existing retained/full HUD comparisons, 12,000 damage comparisons and
+22,834 asset comparisons pass, as do ASan/UBSan. Logs:
+`/tmp/downwell-hud-fused-fast-host.log` and
+`/tmp/downwell-hud-fused-sanitized.log`.
+
+The bounded native shop gate passes all 13 retained/scalar HUD comparisons,
+with zero state/pixel failures and an intact stack guard. The emulator is
+stopped and ordinary startup restored; both 68000 audits pass. Logs:
+`/tmp/downwell-hud-fused-native.log` and
+`/tmp/downwell-hud-fused-native-gdb.log`.
+
 ## HUD remeasurement and rejected grouped damage scan
 
 At `1199a31`, a fresh coarse profile still attributes about 4.10 ms/update

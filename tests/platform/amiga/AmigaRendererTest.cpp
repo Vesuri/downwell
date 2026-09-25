@@ -271,6 +271,35 @@ int main(int argc, char** argv) {
     }
     verifyDamageEndpoints();
     {
+        UWORD overlay[downwellDisplayHeight*2];
+        for (unsigned i = 0; i < downwellDisplayHeight*2; ++i)
+            overlay[i] = (i % 7) ? (i*173u + 0x1257u) : 0;
+        for (unsigned word : {0u, 18u, 22u})
+            for (int shift : {-12, 0, 12})
+                for (int top : {0, 41, 280})
+                    for (unsigned width : {8u, 12u, 16u}) {
+                        const int bottom = top+44 < 284 ? top+44 : 284;
+                        std::vector<UBYTE> working(downwellLayerBytes), actual(downwellLayerBytes, 0x96);
+                        for (unsigned i = 0; i < working.size(); ++i) working[i] = i*73u + i/31u;
+                        auto expectedWorking = working, expected = actual;
+                        AmigaRenderer oracle;
+                        amigaRendererInit(&oracle, nullptr, expectedWorking.data());
+                        amigaRendererSetClipRect(&oracle, word*16, top, width, bottom-top);
+                        amigaRendererApplyHudColumns(&oracle, overlay, word, 1, shift, top, bottom, 1);
+                        const unsigned writes = amigaRendererCopyHudWords(expected.data(),
+                            expectedWorking.data(), word*16, top, word*16+width, bottom, 1);
+                        const UWORD clip = static_cast<UWORD>(0xffffu << (16-width));
+                        require(amigaRendererPublishHudColumn(actual.data(), working.data(), overlay,
+                            word, top, bottom, shift, clip) == writes,
+                            "fused publication preserves changed-plane write counts");
+                        require(actual == expected && working == expectedWorking,
+                            "fused publication equals separate masked composition and copy");
+                        require(amigaRendererPublishHudColumn(actual.data(), working.data(), overlay,
+                            word, top, bottom, shift, clip) == 0,
+                            "repeated fused publication writes neither display plane");
+                    }
+    }
+    {
         std::vector<UBYTE> source(downwellLayerBytes), actual(downwellLayerBytes), expected;
         for (unsigned i = 0; i < source.size(); ++i) source[i] = (i*73u + i/31u) & 255;
         for (int word = 0; word < 24; ++word)

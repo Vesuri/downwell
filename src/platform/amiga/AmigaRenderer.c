@@ -605,6 +605,49 @@ unsigned amigaRendererCopyHudWords(UBYTE* destination, const UBYTE* source,
     return writes;
 }
 
+unsigned amigaRendererPublishHudColumn(UBYTE* destination, UBYTE* working,
+    const UWORD* overlay, unsigned word, int top, int bottom, int shiftY, UWORD clip) {
+    unsigned writes = 0;
+    UBYTE* target;
+    UBYTE* input;
+    const UWORD* source;
+    int first = top > shiftY ? top : shiftY;
+    int last = bottom < downwellDisplayHeight+shiftY ? bottom : downwellDisplayHeight+shiftY;
+    int y;
+    if (word >= downwellVisibleWidth / 16 || top < 0 ||
+        bottom > downwellDisplayHeight || top >= bottom) return 0;
+    if (first >= last)
+        return amigaRendererCopyHudWords(destination, working, word*16, top, word*16+16, bottom, 1);
+    if (first > top) writes += amigaRendererCopyHudWords(destination, working,
+        word*16, top, word*16+16, first, 1);
+    if (last < bottom) writes += amigaRendererCopyHudWords(destination, working,
+        word*16, last, word*16+16, bottom, 1);
+    target = destination + first*downwellBytesPerPlaneLine + word*2;
+    input = working + first*downwellBytesPerPlaneLine + word*2;
+    source = overlay + (first-shiftY)*2;
+    for (y = first; y < last; ++y) {
+        UWORD low = readWord(input), high = readWord(input+downwellPlaneBytes);
+        {
+            const UWORD a = source[0], b = source[1];
+            const UWORD mask = (a | b) & clip;
+            if (mask) {
+                low = (low & (UWORD)~mask) | (a & mask);
+                high = (high & (UWORD)~mask) | (b & mask);
+                writeWord(input, low);
+                writeWord(input+downwellPlaneBytes, high);
+            }
+        }
+        if (readWord(target) != low) { writeWord(target, low); ++writes; }
+        if (readWord(target+downwellPlaneBytes) != high) {
+            writeWord(target+downwellPlaneBytes, high); ++writes;
+        }
+        input += downwellBytesPerPlaneLine;
+        target += downwellBytesPerPlaneLine;
+        source += 2;
+    }
+    return writes;
+}
+
 int amigaRendererPrepareWordStamp(AmigaWordStamp* stamp, const UBYTE* pack,
                                   const UBYTE* end, UWORD sprite, UWORD frame) {
     const UBYTE* record = findAsset(pack, end, sprite, frame);

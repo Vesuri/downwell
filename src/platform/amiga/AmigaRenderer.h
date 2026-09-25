@@ -63,6 +63,9 @@ int amigaRendererPrepareWordStamp(AmigaWordStamp*, const UBYTE*, const UBYTE*, U
 int amigaRendererDrawWordStamp(AmigaRenderer*, const AmigaWordStamp*, int, int);
 int amigaRendererDrawWordStampRun(AmigaRenderer*, const AmigaWordStamp*, int, int, unsigned);
 unsigned amigaRendererCopyHudWords(UBYTE*, const UBYTE*, int, int, int, int, int);
+// Compose one retained masked column and publish only changed plane words.
+unsigned amigaRendererPublishHudColumn(UBYTE*, UBYTE*, const UWORD*, unsigned,
+                                      int, int, int, UWORD);
 /* One aligned HUD column, already clipped by caller; masked planar words. */
 void amigaRendererFillHudWordColumn(UBYTE*, unsigned, unsigned, unsigned, UWORD, UWORD, UWORD);
 void amigaRendererCacheHudColumns(UWORD*, const UBYTE*, unsigned, unsigned);
