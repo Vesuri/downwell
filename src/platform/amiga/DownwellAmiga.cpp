@@ -20,6 +20,7 @@
 #include "AmigaRenderer.h"
 #include "AmigaAmmoHud.h"
 #include "AmigaLaserSight.h"
+#include "AmigaBufferCompare.h"
 #include "AmigaSceneRuntime.h"
 #include "GameplaySceneStorage.h"
 #include "AmigaExitMask.h"
@@ -2543,7 +2544,7 @@ int main(void) {
                 }
                 AmigaHardware::blitterDrain();
 #ifdef DOWNWELL_CLEAR_VERIFY
-                static UBYTE expectedGame[2][downwellGameRingBytes], expectedHud[2][downwellLayerBytes];
+                alignas(2) static UBYTE expectedGame[2][downwellGameRingBytes], expectedHud[2][downwellLayerBytes];
                 static AmigaClearPresenter oracle;
                 if (entering) oracle.reset();
                 if (bankChanged) oracle.artworkChanged();
@@ -2554,10 +2555,8 @@ int main(void) {
                 gDownwellClearActualGame = target.game; gDownwellClearExpectedGame = expectedGame[back];
                 if (!oracle.render(back, reference, bank, bank + clear.assets.bankBytes, room, snapshot, port.upgrades(), expected) ||
                     expected.origin != frame.origin) ++gDownwellClearFailures;
-                for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
-                    if (target.game[byte] != expectedGame[back][byte]) ++gDownwellClearFailures;
-                for (unsigned byte = 0; byte < downwellLayerBytes; ++byte)
-                    if (target.hud[byte] != expectedHud[back][byte]) ++gDownwellClearFailures;
+                gDownwellClearFailures += amigaBufferDifferences(target.game, expectedGame[back], downwellGameRingBytes);
+                gDownwellClearFailures += amigaBufferDifferences(target.hud, expectedHud[back], downwellLayerBytes);
                 ++gDownwellClearFrames;
                 if (snapshot.choices) ++gDownwellClearChoices;
                 gDownwellClearPhase = 4;

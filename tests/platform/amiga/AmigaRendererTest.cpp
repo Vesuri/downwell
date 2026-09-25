@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/AmigaAmmoHud.h"
 #include "platform/amiga/AmigaLaserSight.h"
+#include "platform/amiga/AmigaBufferCompare.h"
 #include "platform/amiga/GameplaySceneStorage.h"
 #include "platform/amiga/AmigaExitMask.h"
 #include "core/ShopFixtures.h"
@@ -114,6 +115,27 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 } // namespace
 
 int main(int argc, char** argv) {
+    {
+        alignas(4) unsigned char a[68], b[68];
+        for (unsigned offset : {0u, 2u}) for (unsigned length = 0; length <= 64; ++length) {
+            for (unsigned i = 0; i < 68; ++i) a[i] = b[i] = i*37;
+            require(!amigaBufferDifferences(a+offset,b+offset,length), "equal aligned buffers compare exactly");
+            b[offset+length] ^= 255;
+            require(!amigaBufferDifferences(a+offset,b+offset,length), "comparison ignores bytes beyond the requested range");
+            b[offset+length] ^= 255;
+            for (unsigned i = 0; i < length; ++i) {
+                for (unsigned bit = 0; bit < 8; ++bit) {
+                    b[offset+i] ^= 1u << bit;
+                    require(amigaBufferDifferences(a+offset,b+offset,length) == 1,
+                            "word comparison detects every byte and bit including tail bytes");
+                    b[offset+i] ^= 1u << bit;
+                }
+            }
+            for (unsigned i = 0; i < length; ++i) b[offset+i] ^= 255;
+            require(amigaBufferDifferences(a+offset,b+offset,length) == length,
+                    "word comparison preserves the exact mismatching-byte count");
+        }
+    }
     {
         std::vector<UBYTE> pixels(downwellGameRingBytes), pristine;
         for (unsigned i = 0; i < pixels.size(); ++i) pixels[i] = (i*37u + i/11u) & 255u;

@@ -9,6 +9,30 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Bounded clear-scene verification: partial, not a new full pass
+
+The current `verify-amiga-clear-scene` run with a 45-second limit timed out
+after reporting 120 clear frames and 40 choice frames, with no pixel failures
+and no completed reentry. This does not revalidate the full two-clear gate
+after the shop-reset change.
+
+The verifier now compares aligned buffers in unrolled longword groups rather
+than byte by byte. It still compares every byte and preserves the exact
+mismatching-byte count; no frame, choice, reentry or stack assertion was
+removed. Tests flip every bit at every byte position for lengths 0..64 and
+both four-/two-byte-aligned starts, and check fully differing buffers and
+tails. Renderer and address/undefined-behavior sanitizer tests pass. This
+helper is used only in the verification build, not ordinary game rendering.
+
+Under the same 45-second bound, single-word comparison reached 300 frames;
+unrolled comparison reached 420 frames, 70 choice frames and one completed
+reentry, all with zero reported mismatches. The second reentry and 60 third-
+level updates remain unverified in this run. Logs:
+`/tmp/downwell-clear-reset-regression.log`,
+`/tmp/downwell-clear-word-compare.log`,
+`/tmp/downwell-clear-block-compare.log`. Ordinary builds are restored after
+these diagnostics; the timeout is not reported as a full clear-scene pass.
+
 ### Results reentry stack regression fixed
 
 Re-running `verify-amiga-results-restart` exposed an overwritten 256-byte
