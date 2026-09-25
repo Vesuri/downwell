@@ -569,6 +569,23 @@ unsigned amigaRendererCopyHudWords(UBYTE* destination, const UBYTE* source,
     if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
     if (left >= right || top >= bottom) return 0;
     left >>= 4; right = (right+15) >> 4;
+    if (changedOnly && right-left == 1) {
+        /* Gauge interiors occupy one word. Walk both planes together without
+           a per-row width loop, still never writing an unchanged plane. */
+        const ULONG start = top*downwellBytesPerPlaneLine + left*2;
+        UBYTE* target = destination + start;
+        const UBYTE* input = source + start;
+        for (y = top; y < bottom; ++y) {
+            const UWORD low = readWord(input);
+            const UWORD high = readWord(input+downwellPlaneBytes);
+            if (readWord(target) != low) { writeWord(target, low); ++writes; }
+            if (readWord(target+downwellPlaneBytes) != high) {
+                writeWord(target+downwellPlaneBytes, high); ++writes;
+            }
+            target += downwellBytesPerPlaneLine; input += downwellBytesPerPlaneLine;
+        }
+        return writes;
+    }
     for (plane = 0; plane < 2; ++plane) {
         const ULONG start = plane*downwellPlaneBytes + top*downwellBytesPerPlaneLine + left*2;
         UBYTE* target = destination + start;

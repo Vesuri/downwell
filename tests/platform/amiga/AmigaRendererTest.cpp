@@ -115,6 +115,32 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 int main(int argc, char** argv) {
     verifyDamageEndpoints();
     {
+        std::vector<UBYTE> source(downwellLayerBytes), actual(downwellLayerBytes), expected;
+        for (unsigned i = 0; i < source.size(); ++i) source[i] = (i*73u + i/31u) & 255;
+        for (int word = 0; word < 24; ++word)
+            for (unsigned planes = 0; planes < 4; ++planes) {
+                actual = source;
+                for (unsigned plane = 0; plane < 2; ++plane)
+                    if (planes & (1u << plane))
+                        for (unsigned y = 0; y < 284; y += 3)
+                            actual[plane*downwellPlaneBytes+y*downwellBytesPerPlaneLine+word*2] ^= 0xa5;
+                expected = actual;
+                unsigned count = 0;
+                for (unsigned plane = 0; plane < 2; ++plane)
+                    for (unsigned y = 7; y < 279; ++y) {
+                        const unsigned offset = plane*downwellPlaneBytes+y*downwellBytesPerPlaneLine+word*2;
+                        if (expected[offset] != source[offset] || expected[offset+1] != source[offset+1]) ++count;
+                        expected[offset] = source[offset]; expected[offset+1] = source[offset+1];
+                    }
+                require(amigaRendererCopyHudWords(actual.data(), source.data(), word*16+1, 7,
+                            word*16+11, 279, 1) == count,
+                        "one-word publication counts only changed planes");
+                require(actual == expected, "one-word publication preserves other rows and columns");
+                require(amigaRendererCopyHudWords(actual.data(), source.data(), word*16+1, 7,
+                            word*16+11, 279, 1) == 0, "repeated publication performs no writes");
+            }
+    }
+    {
         std::vector<UBYTE> actual(downwellLayerBytes, 0x5a), expected = actual;
         for (unsigned plane = 0; plane < 2; ++plane)
             for (unsigned y = 3; y < 281; ++y) {

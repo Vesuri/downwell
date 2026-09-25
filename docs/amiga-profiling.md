@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 35.42 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 35.71 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -233,6 +233,26 @@ jiggle pixel comparisons and ASan/UBSan also pass. Evidence logs use
 and `frame` suffixes. The native shot capture matches SDL with 0/99,968
 differing pixels, both 68000 audits pass, and the ordinary non-skip build is
 restored. Every emulator run is bounded to 45 seconds.
+
+### Publish narrow HUD strips without the general width loop
+
+Changed-only one-word strips now walk both planes together, avoiding the
+general per-row width loop. Each plane is still compared independently and
+unchanged words are never written. Wider rectangles and unconditional copies
+retain the general implementation; no additional retained buffer is used.
+
+Phase 39 falls from 459.644 to **325.872 ms / 600 updates** (29% less), with
+the maximum bracket falling from 6.017 to 3.280 ms. The lightweight tape is
+**840 PAL fields / 600 updates = 35.71 FPS**, versus 847 / 35.42 FPS before.
+Maximum gap remains five fields; this is not completion of the 20 ms gate.
+
+Direct tests cover all 24 columns and all combinations of modified planes,
+check exact write counts, preserve outside rows/columns, and require zero
+writes on repetition. Full retained-HUD pixel comparisons and ASan/UBSan pass.
+Evidence logs use `/tmp/downwell-word-publish-` with `test`, `sanitized`,
+`profile`, `fps` and `frame` suffixes. The native shot capture matches SDL
+with 0/99,968 differing pixels, both 68000 audits pass, and the ordinary
+non-skip executable is restored. Emulator runs are limited to 45 seconds.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 
