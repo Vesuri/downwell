@@ -70,6 +70,36 @@ struct GenerationOrderProbe {
 
 int main() {
     {
+        AmigaPortRuntime indexed(0), fallback(0);
+        int xs[129], ys[129];
+        for (int i = 0; i < 128; ++i) {
+            xs[i] = -512 + (i%16)*64;
+            ys[i] = (i/16)*32;
+        }
+        // Duplicate masks have the same boolean ray result, but deliberately
+        // disable the spatial index. Equivalent geometry must produce the same
+        // result regardless of whether the runtime's index is available.
+        xs[128] = xs[0]; ys[128] = ys[0];
+        indexed.configureBreakables(xs, ys, 128);
+        fallback.configureBreakables(xs, ys, 129);
+        using Ray = downwell::LaserSightRay;
+        for (int x = -525; x <= 525; x += 21)
+            for (int y = -20; y <= 260; y += 14)
+                for (int aim : {-30, 0, 30}) {
+                    const auto angle = Ray::turnsFromQ8Degrees(aim*256);
+                    const auto speed = Ray::turnsFromQ8Degrees((x%5)*256);
+                    const Ray::Coordinate px{x+240, 524287}, py{y+176, 524289};
+                    const auto a = indexed.traceLaserSight(px,py,{476,0},speed,angle);
+                    const auto b = fallback.traceLaserSight(px,py,{476,0},speed,angle);
+                    require(a.x.pixel == b.x.pixel && a.x.fraction == b.x.fraction &&
+                            a.y.pixel == b.y.pixel && a.y.fraction == b.y.fraction,
+                            "ray hits are independent of index availability across boundaries and angles");
+                }
+        require(indexed.randomDrawCount() == fallback.randomDrawCount() &&
+                indexed.blocksDestroyed() == 0 && fallback.blocksDestroyed() == 0,
+                "ray lookup preserves RNG and block lifetime");
+    }
+    {
         AmigaPortRuntime pool(0);
         require(pool.bulletSlotEnd() == 0 && pool.gemSlotEnd() == 0, "new pools have empty occupied spans");
         for (unsigned tick = 0; tick < 1200; ++tick) {

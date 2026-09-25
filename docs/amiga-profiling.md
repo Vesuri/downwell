@@ -2,6 +2,25 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Rejected indexed Laser Sight breakable lookup
+
+An experiment reused the existing breakable-cell index to test at most four
+cells for each eight-pixel ray segment, keeping the linear fallback for
+unaligned/duplicate layouts. It passed 3,213 paired endpoint comparisons over
+fractional origins, both index boundaries, +/-30-degree aims and signed
+horizontal speeds, and the live upgraded combat replay retained its prior
+state. Nevertheless the same upgraded FPSCOUNT tape measured **1,968 fields /
+600 updates = 15.24 FPS**, versus **1,896 / 15.82 FPS** before the change;
+maximum gap remained seven fields. No speedup was demonstrated, so the
+production change was removed. The availability/layout-invariance test remains.
+This result does not isolate the reason for the regression; fewer candidate
+tests alone did not justify retaining it.
+
+Logs: `/tmp/downwell-laser-index-{build,test,replay,fps}.log` and
+`/tmp/downwell-laser-index-restored-{test,build}.log`. The ordinary build is
+restored. Ray overlay writing/restoration and the extra planar-actor path
+remain higher-priority performance targets than this rejected lookup change.
+
 ### Laser Sight cost (not a 20 ms success)
 
 `PROFILE_LASER=1 SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh fps`
