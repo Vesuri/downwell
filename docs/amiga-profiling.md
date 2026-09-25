@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 34.97 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 34.88 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -144,6 +144,26 @@ being lost. Frequent timing brackets also add overhead; do not equate this
 instrumented phase directly with shipping cost. Evidence:
 `/tmp/downwell-collision-routes-profile.log`. This diagnostic change makes
 no new FPS claim and does not alter collision behavior.
+
+### Restore actor damage only in the touched display
+
+BOBs previously marked their rows dirty in both display buffers, although
+only the inactive buffer received the drawing. Actor damage now marks only
+that buffer; changes to the terrain backing still mark both. OR-ing the
+damage bits preserves outstanding terrain or actor damage in either buffer.
+This avoids requesting restoration solely because an actor was drawn in the
+other display. It does not yet retain unchanged BOB compositions.
+
+The bounded native forced-BOB scalar oracle and 600-tick terrain/cache oracle
+both pass, as do the 68000 instruction/helper audits. The FPSCOUNT tape takes
+860 PAL fields for 600 updates: **34.88 FPS**, maximum gap five fields. This
+is essentially unchanged from 858 fields / 34.97 FPS; no frame-rate gain is
+claimed. Evidence: `/tmp/downwell-bob-damage-{verify,cache,fps}.log`. Emulator
+runs are limited to 45 seconds; the ordinary non-skip build is restored.
+
+A separate experiment caching actor bounds between collection and BOB
+drawing was rejected after measuring 866 fields / 34.64 FPS. Its extra actor
+record fields are not retained. Evidence: `/tmp/downwell-bob-bounds-fps.log`.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 

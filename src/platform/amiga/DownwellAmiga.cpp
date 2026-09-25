@@ -916,18 +916,19 @@ static void transferTerrainRows(AmigaRenderer* renderer, int viewX,
     }
 }
 
-static void dirtyGameRows(unsigned origin, unsigned y, unsigned height) {
-    gameRowsPending[0] = gameRowsPending[1] = true;
+static void dirtyGameRows(unsigned origin, unsigned y, unsigned height, UBYTE buffers = 3) {
     unsigned first = (origin + y) % downwellGameRingHeight;
     unsigned end = first + height;
     if (end > downwellGameRingHeight) { first = 0; end = downwellGameRingHeight; }
     for (unsigned buffer = 0; buffer < 2; ++buffer) {
+        if (!(buffers & (1u << buffer))) continue;
+        gameRowsPending[buffer] = true;
         if (first < gameDirtyFirst[buffer]) gameDirtyFirst[buffer] = first;
         if (end > gameDirtyEnd[buffer]) gameDirtyEnd[buffer] = end;
     }
     unsigned physical = (origin + y) % downwellGameRingHeight;
     for (unsigned row = 0; row < height; ++row) {
-        gameDirtyRows[physical] = 3;
+        gameDirtyRows[physical] |= buffers;
         if (++physical == downwellGameRingHeight) physical = 0;
     }
 }
@@ -1259,7 +1260,7 @@ extern "C" __attribute__((noinline)) void downwellGameplayBobsReady() {
 // never into the pristine terrain backing. Only their touched rows are restored
 // before this display buffer is reused.
 static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
-                             unsigned origin, const GameplayBob* bobs,
+                             unsigned buffer, unsigned origin, const GameplayBob* bobs,
                              unsigned count) {
     renderer.game = (UBYTE*)display.data;
     renderer.target = renderer.game;
@@ -1293,7 +1294,9 @@ static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
         int bottom = y + height;
         if (y < 0) y = 0;
         if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
-        dirtyGameRows(origin, y, bottom - y);
+        // Only this display contains the BOB. Preserve pending terrain damage
+        // in either buffer, but do not invalidate the untouched other display.
+        dirtyGameRows(origin, y, bottom - y, (UBYTE)(1u << buffer));
     }
     AmigaHardware::blitterDrain();
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -2977,7 +2980,7 @@ int main(void) {
             DW_PROFILE_PHASE(profileCopper);
             syncGameRows(gameDisplay[back], gameBitmap, back);
             if (bobCount)
-                drawGameplayBobs(renderer, gameDisplay[back], port.ringOrigin(), actors, bobCount);
+                drawGameplayBobs(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount);
             if (frameReady &&
                 !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], port.ringOrigin()) :
                   gameplayCopperLists[back].build(
