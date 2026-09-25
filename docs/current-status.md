@@ -35,8 +35,13 @@ two ports proves original-game completion. The active parity goal is unfinished.
   Leave, including menu state and generated stock. No currency or shop items
   are injected. A purchase with 22 gems against a 300-gem price is rejected;
   43 subsequent updates return the player and camera to the main shaft.
-  Successful naturally funded purchasing and native route rendering remain
+  Successful naturally funded purchasing and native shop-route rendering remain
   unverified.
+- The seed-4 native natural-route gate now reaches the generated exit at
+  update 1,477, compares 211 upgrade frames and 135 exit-field frames with no
+  failures, and completes 120 second-cavern updates with an intact stack guard.
+  `make verify-amiga-natural-route` runs this bounded check and restores the
+  ordinary build. Native shop traversal remains outside this gate.
 - Results-menu tests cover all three destinations and 200 final gameplay
   updates, including display-memory reuse and the task-stack guard.
 - A dedicated native horizontal-camera fixture covers all three columns and

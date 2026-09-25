@@ -872,7 +872,10 @@ verify-amiga-gameplay-cache:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SKIP_TO_GAME=1 SCENE_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_gameplay_cache.gdb READY_MARKER=DOWNWELL_GAMEPLAY_CACHE_READY READY_DESCRIPTION="600-tick terrain cache oracle" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} amiga/verify_startup.sh'
 
-.PHONY: verify-amiga-clear-scene
+.PHONY: verify-amiga-natural-route verify-amiga-clear-scene
+verify-amiga-natural-route: verify-natural-exit
+	bash -c '. amiga/env.sh; trap "$(MAKE) -C amiga clean && $(MAKE) -C amiga -j4" EXIT; $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SKIP_TO_GAME=1 NATURAL_VERIFY=1 && GDB_SOURCE=verify_natural.gdb READY_MARKER=DOWNWELL_NATURAL_READY READY_DESCRIPTION="natural cavern exit and reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-360} amiga/verify_startup.sh'
+
 verify-amiga-clear-scene:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SKIP_TO_GAME=1 CLEAR_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_clear.gdb READY_MARKER=DOWNWELL_CLEAR_READY READY_DESCRIPTION="two native clears and third-level reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-360} amiga/verify_startup.sh'

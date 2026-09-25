@@ -222,6 +222,12 @@ volatile ULONG gDownwellExitWipeFrames, gDownwellExitWipeFailures;
 __attribute__((noinline, used)) void downwellExitWipeReady() { __asm__ volatile("" ::: "memory"); }
 #endif
 static AmigaShopMenu shopMenuOverlay;
+#ifdef DOWNWELL_NATURAL_VERIFY
+#include "AmigaNaturalRouteVerification.h"
+static AmigaNaturalRouteVerification naturalRoute;
+volatile ULONG gDownwellNaturalExitTick;
+__attribute__((noinline, used)) void downwellNaturalReady() { __asm__ volatile("" ::: "memory"); }
+#endif
 #ifdef DOWNWELL_CLEAR_VERIFY
 volatile ULONG gDownwellClearFrames, gDownwellClearChoices, gDownwellClearFailures;
 volatile ULONG gDownwellClearChoiceInputFrames, gDownwellClearCursorMasks[2];
@@ -1321,6 +1327,9 @@ int main(void) {
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask);
         liveBuilder.resetInitialCheckpoint(enemyRandom);
+#ifdef DOWNWELL_NATURAL_VERIFY
+        AmigaNaturalRouteVerification::entry(liveBuilder, enemyRandom);
+#endif
         liveBuilder.setCreateObserver(appendGeneratedTerrain, &liveGeneration);
         port.configureEnemyRandom(enemyRandom);
         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
@@ -1633,6 +1642,11 @@ int main(void) {
                 liveInput.left = frame == 20 || frame == 21 || frame == 28 || frame == 29;
                 liveInput.fire = frame >= 52;
             }
+#endif
+#ifdef DOWNWELL_NATURAL_VERIFY
+            if (scenes.scene() == AmigaScene::gameplay)
+                liveInput = naturalRoute.input(port, terrainCollision);
+            if (gDownwellClearReentries) liveInput.fire = gDownwellClearGameplayUpdates < 4;
 #endif
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
             // Inject only results readiness. Confirmation, reset, room changes,
@@ -2105,6 +2119,9 @@ int main(void) {
                 const bool entering = !clear.presented;
                 if (entering) {
                     DW_PROFILE_SCOPE(profileClearEntry);
+#ifdef DOWNWELL_NATURAL_VERIFY
+                    gDownwellNaturalExitTick = port.tick();
+#endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
                     gDownwellProfileSection = 1;
 #endif
@@ -2242,7 +2259,11 @@ int main(void) {
                     const unsigned frame = gDownwellClearChoiceInputFrames;
                     const unsigned expectedCursor = frame >= 13 && frame <= 20 ? 2 :
                         frame >= 29 && frame <= 36 ? 0 : 1;
+#ifndef DOWNWELL_NATURAL_VERIFY
                     if (room.selection.cursor != expectedCursor) ++gDownwellClearFailures;
+#else
+                    (void)expectedCursor;
+#endif
                 }
                 gDownwellClearPhase = 4;
                 if (gDownwellClearFrames == 1 || gDownwellClearFrames % 60 == 0)
@@ -2260,7 +2281,7 @@ int main(void) {
             // Isolated collision fixture, not a change to production generation.
             if (port.tick() == 180) port.registerLevelExit(176 + port.player().offsetY());
 #endif
-#ifdef DOWNWELL_CLEAR_VERIFY
+#if defined(DOWNWELL_CLEAR_VERIFY) && !defined(DOWNWELL_NATURAL_VERIFY)
             if ((port.tick() == 180 && !gDownwellClearReentries) ||
                 (gDownwellClearReentries == 1 && gDownwellClearGameplayUpdates == 60))
                 port.registerLevelExit(176 + port.player().offsetY());
@@ -2290,7 +2311,11 @@ int main(void) {
             if (port.tick() % 60 == 0) downwellClearProbe();
             if (gDownwellClearReentries) {
                 ++gDownwellClearGameplayUpdates;
+#ifdef DOWNWELL_NATURAL_VERIFY
+                if (gDownwellClearReentries == 1 && gDownwellClearGameplayUpdates == 120) downwellNaturalReady();
+#else
                 if (gDownwellClearReentries == 2 && gDownwellClearGameplayUpdates == 60) downwellClearReady();
+#endif
             }
 #endif
             if (!port.generationSucceeded()) break;

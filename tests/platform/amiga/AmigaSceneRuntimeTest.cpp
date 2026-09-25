@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaSceneRuntime.h"
 #include "platform/amiga/AmigaPortRuntime.h"
 #include "platform/amiga/AmigaTerrain.h"
+#include "platform/amiga/AmigaNaturalRouteVerification.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/EnemyAlarmEvents.h"
@@ -1810,6 +1811,21 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         downwell::StartupRuntime reference(downwell::PlatformProfile::nonDesktop,
             &rooms, &objects, seed, &patterns);
         reference.skipToGameForTesting();
+        AmigaNaturalRouteVerification nativeRoute;
+        if (seed == 4) {
+            downwell::GameMakerRandom random;
+            AmigaAreaOneTerrainBuilder checkpoint(nullptr, 0);
+            AmigaNaturalRouteVerification::entry(checkpoint, random);
+            require(random.drawCount() == reference.randomDrawCount() &&
+                random.stateIndex() == reference.randomState().stateIndex() &&
+                reference.mainBuilderState().rightRoom(0) == 8 &&
+                reference.mainBuilderState().rightRoom(1) == 13 &&
+                reference.mainBuilderState().generationCount() == -30 &&
+                reference.mainBuilderState().rowsGenerated() == 0,
+                "native seed-4 shortcut is the decoded startup entry checkpoint");
+            for (unsigned i = 0; i < 16; ++i)
+                require(random.stateWord(i) == reference.randomState().stateWord(i), "native entry RNG matches decoded startup");
+        }
         AmigaPortRuntime game(300, false, 1201 - 176, true);
         game.initializeEntryInput(false);
         LiveSceneWorld live(patterns, objects);
@@ -1830,6 +1846,9 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             downwell::Input input;
             input.left = x > target + 2; input.right = x < target - 2;
             input.fire = updates % 40 == 0 || updates % 40 == 3;
+            if (seed == 4)
+                require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision)),
+                    "native input controller reproduces host natural route");
             game.step(downwell::packReplayInput(input)); reference.step(input, false);
             parityFrame = updates;
             compareInitialGameplay(game, reference);
