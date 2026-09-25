@@ -720,6 +720,18 @@ int main(int argc, char** argv) {
         };
         std::fill(actualHud.begin(), actualHud.end(), 0x5a);
         std::fill(expectedHud.begin(), expectedHud.end(), 0x5a);
+        unsigned oldAmmo = ~0u, skipped = 0;
+        for (unsigned tick = 0; tick < 1000; ++tick) {
+            const unsigned ammo = tick % 31 < 12 ? 8 : 7;
+            rows.step(ammo, 8);
+            if (ammo != oldAmmo || rows.visuallyChanged())
+                retained.draw(&actualRenderer, hudPack.data(), hudPack.data()+hudPack.size(), ammo, 8, 0, &rows, 0);
+            else ++skipped;
+            oldAmmo = ammo;
+            fullRedraw(ammo, 8, 0, 0);
+            require(actualHud == expectedHud, "skipping invisible row-state changes preserves all HUD pixels");
+        }
+        require(skipped > 500, "stable and invisible animation updates bypass retained HUD composition");
         for (unsigned cap : {8u, 15u, 1u, 64u, 127u}) {
             for (unsigned tick = 0; tick < (cap+1)*10; ++tick) {
                 const unsigned ammo = (tick / 5) % (cap + 1);

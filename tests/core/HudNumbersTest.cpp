@@ -81,6 +81,13 @@ int main() {
                 "row threshold handles full-width capacities without overflow");
     }
     downwell::AmmoGaugeRows rows;
+    {
+        downwell::AmmoGaugeRows initial;
+        require(initial.step(8, 8) && !initial.visuallyChanged(),
+            "3-to-4 animation advances without invalidating identical frame 3");
+        require(!initial.step(8, 8) && !initial.visuallyChanged(),
+            "settling clears both change flags");
+    }
     double original[184];
     for (auto& row : original) row = 3;
     for (unsigned tick = 0; tick < 1000; ++tick) {
@@ -113,14 +120,18 @@ int main() {
             const unsigned ammo = tick % 97 < 80 ? cap : (tick * 17u) % (cap+1);
             const unsigned filled = static_cast<unsigned>(std::ceil(184.0*(double(ammo)/cap)));
             bool changed = filled != sourceFilled;
+            bool visualChanged = changed;
             sourceFilled = filled;
             for (unsigned i = 0; i < 184; ++i) {
                 const double old = source[i];
                 if (i < filled) { if (source[i] <= 3) source[i] += .8; }
                 else if (source[i] >= 1) source[i] -= .8;
                 changed |= source[i] != old;
+                visualChanged |= static_cast<unsigned>(source[i]) != static_cast<unsigned>(old);
             }
             require(cached.step(ammo, cap) == changed, "settled cache retains original changed flag");
+            require(cached.visuallyChanged() == visualChanged,
+                "presentation invalidation matches original sprite family and integer frame changes");
             require(cached.filled == filled, "settled cache retains fractional fill boundary");
             for (unsigned i = 0; i < 184; ++i)
                 require((cached.state[i] < 4 ? cached.state[i] : 3) == static_cast<unsigned>(source[i]),

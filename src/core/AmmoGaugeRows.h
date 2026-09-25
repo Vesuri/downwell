@@ -40,13 +40,17 @@ private:
     // Derived cache, copied/reset with the animation. Production row state is
     // advanced only by step(); renderers observe it without mutation.
     bool settled_ = false;
+    bool visualChanged_ = false;
 public:
     AmmoGaugeRows() { for (auto& row : state) row = 3; }
+    bool visuallyChanged() const { return visualChanged_; }
     bool step(std::uint32_t ammo, std::uint32_t capacity) {
         bool changed = false;
+        visualChanged_ = false;
         if (ammo != lastAmmo || capacity != lastCapacity) {
             const unsigned next = ammoGaugeFilledRows(ammo, capacity);
             changed = next != filled;
+            visualChanged_ = changed; // The filled/empty sprite family changes.
             filled = next;
             lastAmmo = ammo;
             lastCapacity = capacity;
@@ -60,6 +64,9 @@ public:
             if (i < filled) { if (state[i] < 4) ++state[i]; }
             else if (state[i]) --state[i];
             changed |= old != state[i];
+            // Internal states 3 and 4 both select sprite frame 3. Keep their
+            // VM progression but do not invalidate identical presentation.
+            visualChanged_ = visualChanged_ || (old != state[i] && (old < 3 || state[i] < 3));
         }
         settled_ = !changed;
         return changed;

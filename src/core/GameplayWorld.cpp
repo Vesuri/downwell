@@ -912,8 +912,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     frame.playerMotion = motion;
     DW_PROFILE_PHASE(profileHudState);
     const bool ammoMotionChanged = run_.ammoHud.step(player_.shots(), player_.recharges());
-    const bool ammoRowsChanged = run_.ammoGauge.step(player_.ammo(), player_.ammoCapacity());
-    frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity || ammoMotionChanged || ammoRowsChanged;
+    run_.ammoGauge.step(player_.ammo(), player_.ammoCapacity());
+    frame.ammoChanged = player_.ammo() != oldAmmo || player_.ammoCapacity() != oldAmmoCapacity || ammoMotionChanged || run_.ammoGauge.visuallyChanged();
     frame.healthChanged = health_ != oldHealth || healthMaximum() != oldHealthMaximum ||
                           healthReserve().pieces != oldHeartPieces;
     frame.currencyChanged = currencyAccount_.currency != oldCurrency;

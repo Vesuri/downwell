@@ -1,5 +1,30 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Skip invisible ammo-row transitions
+
+`AmmoGaugeRows` still advances every original internal state and retains its
+existing `step()` change result. A separate presentation flag records sprite
+family or integer-frame changes. States 3 and 4 both display frame 3, so their
+transition alone no longer sets `GameplayFrame::ammoChanged`. Ammo, capacity
+and HUD motion changes still independently invalidate the gauge. No divider,
+fill, rim, animation timing or palette behavior is changed.
+
+Twenty thousand updates match the original fractional animation's state-change
+and visual-change results. A 1,000-update single-digit firing/idle test omits
+unchanged composition and remains byte-identical to full redraws; existing
+capacity/divider and 22,834 sprite comparisons also pass. The new comparison
+starts with a clean HUD history: appending it after the multi-digit tests gave
+the scalar oracle an extra narrow clearing pass on an unchanged frame.
+Logs: `/tmp/downwell-ammo-visible-rows.log`,
+`/tmp/downwell-ammo-visible-render.log`, `/tmp/downwell-ammo-visible-host.log`.
+
+The bounded native tape takes 827 fields, **36.28 FPS**, with the same
+four-field maximum. The one-field difference from the matched 828-field
+baseline is small; this is removal of a redundant redraw trigger, not a
+meaningful resolution of the frame budget. Cross-target replay retains all
+four expected simulation digests. Logs: `/tmp/downwell-ammo-visible-fps.log`
+and `/tmp/downwell-ammo-visible-replay.log`.
+
 ## Current matched measurement after natural-route integration
 
 At `7144495`, the unchanged ordinary gameplay tape takes **828 PAL fields,
