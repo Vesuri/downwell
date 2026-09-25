@@ -4,7 +4,8 @@
 CXX := clang++
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
-export SKIP_INTRO SKIP_TO_GAME
+SKIP_LEVEL ?= 0
+export SKIP_INTRO SKIP_TO_GAME SKIP_LEVEL
 
 SDL_CFLAGS  := $(shell pkg-config --cflags sdl2 SDL2_image)
 SDL_LDFLAGS := $(shell pkg-config --libs sdl2 SDL2_image)
@@ -13,8 +14,11 @@ CPPFLAGS := -Isrc $(SDL_CFLAGS)
 ifeq ($(SKIP_INTRO),1)
 CPPFLAGS += -DDOWNWELL_SKIP_INTRO
 endif
-ifeq ($(SKIP_TO_GAME),1)
+ifneq ($(filter 1,$(SKIP_TO_GAME) $(SKIP_LEVEL)),)
 CPPFLAGS += -DDOWNWELL_SKIP_TO_GAME
+endif
+ifeq ($(SKIP_LEVEL),1)
+CPPFLAGS += -DDOWNWELL_SKIP_LEVEL
 endif
 CXXFLAGS := -std=c++17 -g -O0 -Wall -Wextra -Wpedantic -MMD -MP
 LDFLAGS  := $(SDL_LDFLAGS)
@@ -248,6 +252,15 @@ build/skip-to-game-test: tests/core/SkipToGameTest.cpp $(filter-out tests/core/G
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -DDOWNWELL_SKIP_TO_GAME -o $@ $^
 
+build/skip-level-test: tests/core/SkipLevelTest.cpp $(filter-out tests/core/GameRenderTest.cpp,$(GAME_RENDER_TEST_SOURCES)) src/platform/amiga/AmigaSceneRuntime.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -DDOWNWELL_SKIP_TO_GAME -DDOWNWELL_SKIP_LEVEL -o $@ $(filter %.cpp,$^)
+
+.PHONY: test-skip-level
+test-skip-level: build/skip-level-test
+	./build/skip-level-test
+test: test-skip-level
+
 .PHONY: FORCE_STARTUP_OPTIONS
 build/ammo-dividers-test: tests/core/AmmoDividersTest.cpp src/core/AmmoDividers.h src/core/HudReal.h
 	@mkdir -p build
@@ -370,7 +383,7 @@ test-ammo-dividers: build/ammo-dividers-test
 
 build/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p build
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): build/startup-options

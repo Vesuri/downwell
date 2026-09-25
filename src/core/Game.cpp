@@ -73,6 +73,10 @@ Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
       objectPack_(objectPack) {
 #ifdef DOWNWELL_SKIP_TO_GAME
     startup_.skipToGameForTesting();
+#ifdef DOWNWELL_SKIP_LEVEL
+    // Exercise the real collision/alarms/wipe, without generating a whole descent.
+    if (startup_.inMainRoom()) startup_.registerLevelExit(static_cast<int>(startup_.mainPlayerY()));
+#endif
 #elif defined(DOWNWELL_SKIP_INTRO)
     startup_.skipIntroForTesting();
 #endif

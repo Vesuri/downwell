@@ -1459,6 +1459,9 @@ int main(void) {
     int presentedSplash = scenes.splashStage();
     unsigned presentedSplashDither = scenes.splashDitherFrame();
     unsigned liveFrameCount = 0;
+#ifdef DOWNWELL_SKIP_LEVEL
+    bool skipLevelPending = true;
+#endif
     unsigned menuSpriteFrameCount = 0;
     int renderedMenuTitleFrame = -1;
     int menuCopperMode[2] = {-1, -1};
@@ -2440,6 +2443,14 @@ int main(void) {
             }
             if (scenes.scene() != AmigaScene::gameplay)
                 continue;
+#ifdef DOWNWELL_SKIP_LEVEL
+            if (skipLevelPending) {
+                // Initialization has now bound terrain and the entry RNG.
+                // Only the first level is skipped; later levels play normally.
+                port.registerLevelExit(176 + port.player().offsetY());
+                skipLevelPending = false;
+            }
+#endif
             if (port.levelResultRequested() || port.levelClearActive()) {
                 const bool entering = !clear.presented;
                 if (entering) {

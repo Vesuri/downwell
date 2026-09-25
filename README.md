@@ -50,6 +50,23 @@ player starts at the normal level entrance. Both toggles trigger automatic
 rebuilds when changed. Use `SKIP_TO_GAME=0 SKIP_INTRO=0` for the full startup.
 Headless check: `make build/skip-to-game-test && build/skip-to-game-test`.
 
+To test the first level's completion sequence without playing the descent:
+
+```sh
+make run SKIP_LEVEL=1           # SDL
+make amiga SKIP_LEVEL=1         # Amiga; then run with amiga/run.sh
+```
+
+`SKIP_LEVEL=1` implies direct gameplay startup and takes precedence over the
+other skip options. It places the normal level-exit trigger at the player's
+starting position: the exit alarms, wipe, completion screen and upgrade
+selection still run normally. It does not generate an entire level offscreen
+or fabricate score/rewards. Only the first level is skipped; after choosing
+an upgrade and leaving the completion room, the next level plays normally.
+The default is `0`; switching it automatically rebuilds both targets.
+Use `SKIP_LEVEL=0 SKIP_TO_GAME=0 SKIP_INTRO=0` for normal startup.
+Headless regression: `make test-skip-level`.
+
 ## Repository layout
 
 ```text

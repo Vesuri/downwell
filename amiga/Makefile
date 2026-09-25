@@ -18,6 +18,7 @@ EXIT_WIPE_VERIFY ?= 0
 CLEAR_VERIFY ?= 0
 SKIP_INTRO ?= 0
 SKIP_TO_GAME ?= 0
+SKIP_LEVEL ?= 0
 PROBES ?= 0
 FPSCOUNT ?= 0
 PROFILE_AUTORUN ?= 0
@@ -68,8 +69,11 @@ endif
 ifeq ($(SKIP_INTRO),1)
 CFLAGS += -DDOWNWELL_SKIP_INTRO
 endif
-ifeq ($(SKIP_TO_GAME),1)
+ifneq ($(filter 1,$(SKIP_TO_GAME) $(SKIP_LEVEL)),)
 CFLAGS += -DDOWNWELL_SKIP_TO_GAME
+endif
+ifeq ($(SKIP_LEVEL),1)
+CFLAGS += -DDOWNWELL_SKIP_LEVEL
 endif
 ifeq ($(PROBES),1)
 CFLAGS += -DDOWNWELL_PROBES
@@ -127,7 +131,7 @@ all: check $(OUT).exe
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
