@@ -126,9 +126,9 @@ build/bone-reference-test: tests/core/BoneProjectileReferenceTest.cpp src/core/B
 verify-skeleton-throw: build/skeleton-throw-test
 	./build/skeleton-throw-test
 
-build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThrow.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
+build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThrow.h src/core/BoneProjectileReference.h src/core/GameMakerRounding.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
 	@mkdir -p build
-	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/SkeletonThrowTest.cpp src/core/GameMakerRandom.cpp
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/SkeletonThrowTest.cpp src/core/GameMakerRandom.cpp
 
 verify-catacomb-symbols: build/catacomb-symbols-test
 	./build/catacomb-symbols-test

@@ -1,5 +1,6 @@
 #include "core/SkeletonThrow.h"
 #include "core/GameMakerRandom.h"
+#include "core/BoneProjectileReference.h"
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -11,19 +12,21 @@ struct Ops {
     bool allocated = true;
     int vx = 0, vy = 0, spin = 0;
     bool latched = false;
+    downwell::BoneProjectileReference bone;
     explicit Ops(unsigned seed) : random(seed) {}
     bool createBone(int object, int x, int y) {
         trace.insert(trace.end(), {1, object, x, y});
         if (!allocated) return false;
-        // Model the three explicit random_range calls in bone Create. The
-        // orchestration test does not claim projectile lifecycle completeness.
-        for (unsigned i = 0; i < 3; ++i) random.nextU32();
+        bone.create(x, y, random);
         return true;
     }
     void throwSound(int sound) { trace.insert(trace.end(), {2, sound}); }
     unsigned choose(unsigned count) { trace.insert(trace.end(), {3, int(count)}); return random.chooseIndexSmall(count); }
-    void setVelocityTenths(int x, int y) { trace.push_back(4); vx = x; vy = y; }
-    void multiplyAnimationSpeed(int sign) { trace.push_back(5); spin = sign; }
+    void setVelocityTenths(int x, int y) {
+        trace.push_back(4); vx = x; vy = y;
+        bone.xsp = x / 10.0; bone.ysp = y / 10.0;
+    }
+    void multiplyAnimationSpeed(int sign) { trace.push_back(5); spin = sign; bone.imgSp *= sign; }
     void latchShot() { trace.push_back(6); latched = true; }
 };
 int main() {
@@ -33,7 +36,8 @@ int main() {
             for (int playerX : {239, 240, 241}) {
                 Ops actual(seed);
                 downwell::GameMakerRandom oracle(seed);
-                for (unsigned i = 0; i < 3; ++i) oracle.nextU32();
+                oracle.nextU32(); oracle.nextU32();
+                const double animation = 0.05 + (oracle.nextU32()/4294967296.0)*0.45;
                 const int vy = -30 - int(oracle.nextU32() % 3);
                 int vx = 10;
                 if (playerX != 240) {
@@ -48,6 +52,11 @@ int main() {
                 trace.push_back(6);
                 require(actual.trace == trace && actual.latched && actual.vx == vx && actual.vy == vy);
                 require(actual.spin == (vx > 0 ? -1 : vx < 0 ? 1 : 0));
+                require(actual.bone.x == 240 && actual.bone.y == 990 &&
+                    actual.bone.xx == 240 && actual.bone.yy == 990 &&
+                    actual.bone.xsp == vx/10.0 && actual.bone.ysp == vy/10.0 &&
+                    actual.bone.imgSp == animation * (vx > 0 ? -1 : 1) &&
+                    actual.bone.imageSpeed == 1);
                 require(actual.random.drawCount() == oracle.drawCount() && actual.random.stateIndex() == oracle.stateIndex());
                 for (unsigned i = 0; i < 16; ++i) require(actual.random.stateWord(i) == oracle.stateWord(i));
                 ++cases;

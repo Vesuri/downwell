@@ -12,6 +12,26 @@ struct Events {
 };
 int main() {
     using downwell::BoneProjectileReference;
+    // Do not silently substitute exact decimal tenths for VM double addition.
+    // These are arithmetic counterexamples, not proof a live collision occurs
+    // on the differing frame (actual camera/walls still own that question).
+    struct Boundary { int start, velocity, updates, vmY, rationalY; };
+    for (const auto c : {Boundary{0,-30,5,-13,-14}, Boundary{32,-31,10,7,6},
+                        Boundary{128,-32,25,81,80}, Boundary{704,-30,114,1017,1018}}) {
+        BoneProjectileReference bone;
+        bone.x = 240; bone.xx = 240; bone.y = c.start; bone.yy = c.start;
+        bone.ysp = c.velocity/10.0;
+        long tenths = c.start*10, velocity = c.velocity;
+        Events events;
+        for (int tick = 0; tick < c.updates; ++tick) {
+            // Interleave stopped Steps: only non-stopped updates advance either model.
+            bone.step(true, -10000, -10000, 20000, 20000, events);
+            bone.step(false, -10000, -10000, 20000, 20000, events);
+            tenths += ++velocity;
+        }
+        check(bone.y == c.vmY && downwell::roundGameMakerCoordinate(tenths/10.0) == c.rationalY &&
+              c.vmY != c.rationalY && events.calls.empty());
+    }
     for (unsigned seed = 0; seed < 1024; ++seed) {
         downwell::GameMakerRandom random(seed), oracle(seed);
         BoneProjectileReference bone;

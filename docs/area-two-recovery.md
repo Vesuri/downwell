@@ -173,3 +173,29 @@ independent Windows execution trace. Draw (`drawShade`, `draw_self`), animation
 advancement, masks, live collision dispatch and damage/effect implementations
 remain external. A target motion representation still needs comparison against
 this oracle before enabling bone actors in either playable backend.
+
+### Numeric representation check and throw/Create integration
+
+The skeleton throw tests now invoke the real bone numeric-reference Create,
+not a callback that merely burns three RNG words. All 9,216 cases check the
+child position, overridden velocities, signed randomized animation rate,
+unchanged initial image speed and complete RNG state. Normal and sanitizer
+runs pass with floating-point contraction disabled.
+
+Exact integer tenths are **not** an exact substitute for repeated VM double
+addition. New regression cases demonstrate differing rounded Y positions:
+
+| Starting Y | Initial vertical speed | Moving updates | VM reference Y | Exact-tenths Y |
+| --- | --- | --- | --- | --- |
+| 0 | -3 | 5 | -13 | -14 |
+| 32 | -3.1 | 10 | 7 | 6 |
+| 128 | -3.2 | 25 | 81 | 80 |
+| 704 | -3 | 114 | 1017 | 1018 |
+
+Stopped Steps are interleaved in these tests and must not advance either
+trajectory. These are numeric counterexamples, not claims that all cases
+occur before live wall collision/offscreen retirement. No constant epsilon
+or rounding-mode change was introduced to hide them. Native integration
+must either preserve the relevant floating-add rounding or establish a
+source-backed bounded domain where a cheaper representation produces the
+same observable positions. A simple tenths implementation is not yet accepted.
