@@ -23,3 +23,13 @@ for y in range(648):
                 expected = bool(pack[offset + (y - 284) * 20 + sx // 8] & (128 >> (sx % 8)))
         assert bool(mask[y * 48 + x // 8] & (128 >> (x % 8))) == expected, (x, y)
 print("248832 exit-mask bits match recovered edge and shaft-only coverage")
+selection = (root / "generated/amiga-game.selection-mask").read_bytes()
+assert len(selection) == 648 * 22
+for y in range(648):
+    for x in range(176):
+        expected = x < 160 and bool(mask[y * 48 + (110 + x) // 8] & (128 >> ((110 + x) % 8)))
+        assert bool(selection[y * 22 + x // 8] & (128 >> (x % 8))) == expected, (x, y)
+# Every DMA viewport at every supported cover offset must fit in its bank.
+for row in range(365):
+    assert row * 22 + 284 * 22 <= len(selection)
+print("114048 selection-mask bits match gameplay cover; all 365 view offsets fit")

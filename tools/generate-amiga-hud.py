@@ -815,7 +815,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
         b"".join(records), bytes(payload)))
 
 
-def build_exit_mask(pack):
+def build_exit_mask(pack, stride=48, left=110):
     """Gameplay-stride exit cover: solid / original edge / transparent.
 
     Position the 160-pixel shaft at x=110 in a 384-pixel DMA row offline.
@@ -828,7 +828,9 @@ def build_exit_mask(pack):
     _, _, _, _, width, height, dma_width, _, offset, length = record
     require(width == 160 and height == 80 and dma_width == 160 and length >= 1600,
             "unexpected exit-edge planar layout")
-    stride, rows, left = 48, 648, 110
+    require(stride > 0 and left >= 0 and left + 160 <= stride * 8,
+            "exit mask shaft exceeds its DMA row")
+    rows = 648
     output = bytearray(stride * rows)
     for y in range(364):
         for x in range(160):
@@ -895,6 +897,25 @@ def main():
         else:
             atomic_write(mask_path, mask)
             atomic_write(provenance_path, provenance)
+        # Same recovered cover, in the narrow style/upgrade playfield layout.
+        # Keep the gameplay export unchanged; never shift/repack it on 68000.
+        selection_mask = build_exit_mask(data, stride=22, left=0)
+        selection_path = args.output.with_suffix(".selection-mask")
+        selection_provenance = json.dumps({
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/selection-mask-v1",
+            "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
+            "packSha256": digest, "sourceSpriteId": 128, "sourceFrame": 0,
+            "derivedStripId": 65005, "width": 176, "height": 648,
+            "playfieldX": 0, "playfieldWidth": 160, "bytesPerRow": 22,
+            "maskSha256": hashlib.sha256(selection_mask).hexdigest(),
+        }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
+        selection_manifest = args.output.with_suffix(".selection-mask.json")
+        if args.check:
+            require(selection_path.read_bytes() == selection_mask, "selection mask is not reproducible")
+            require(selection_manifest.read_bytes() == selection_provenance, "selection mask provenance differs")
+        else:
+            atomic_write(selection_path, selection_mask)
+            atomic_write(selection_manifest, selection_provenance)
     if args.profile == "hud":
         provenance = json.dumps({
             "schemaVersion": 1, "generator": "generate-amiga-hud.py/hud-v2",
