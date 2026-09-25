@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_SKELETON_TIMING_H
 
 #include "MotionBinary64.h"
+#include "AlarmBank.h"
 
 namespace downwell {
 // enmSkeleton's four Alarm events and the timing writes in Step_0.
@@ -14,6 +15,16 @@ struct SkeletonTiming {
     bool damaged = false, hitStun = false, shot = false;
 
     static MotionBinary64 throwRate() { return {0x3fd33333u, 0x33333333u}; }
+
+    // The runner visits alarm indices globally, then instances within each
+    // index. The owner must call this in that order, not run all slots for
+    // one instance before visiting the next. Higher-slot writes take effect
+    // in this phase; lower-slot writes wait until the next phase.
+    bool advanceAlarm(unsigned index) {
+        if (index >= 4 || !AlarmBank::advanceValue(alarms[index])) return false;
+        alarm(index);
+        return true;
+    }
 
     void alarm(unsigned index) {
         switch (index) {

@@ -119,7 +119,7 @@ all: $(TARGET)
 verify-skeleton-timing: build/skeleton-timing-test
 	./build/skeleton-timing-test
 
-build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonTiming.h src/core/MotionBinary64.h
+build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/AlarmBank.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/SkeletonTimingTest.cpp
 

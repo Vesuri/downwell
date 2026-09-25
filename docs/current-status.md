@@ -207,8 +207,11 @@ This queue describes priorities, not a replacement for the full goal. The old
   projectile ownership, animation advancement, collision dispatch or drawing.
   `SkeletonTiming` now implements the four recovered alarm bodies and Step's
   hit/throw-stop/time-stop timing writes. The 64-case host matrix and sanitizers
-  pass; animation advancement and same-phase cross-alarm countdown ordering
-  remain unverified against the original runner, so live admission stays off.
+  pass. Original-runner inspection now proves immediate dispatch in global
+  ascending alarm-index order; Alarm 2's write to Alarm 3 counts down in the
+  same phase. The new per-slot API and restart tests preserve this distinction
+  from snapshot dispatch (see `runner-alarms.md`). Global owner integration
+  and animation advancement remain incomplete, so live admission stays off.
 
 ## Working evidence
 

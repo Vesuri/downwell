@@ -131,11 +131,12 @@ Time-stop sets image speed to zero and compensates only positive Alarm 0;
 it does not freeze the other alarms. Tests cover 64 combinations and the
 throw/restart sequence, including repeated hits and delayed speed changes.
 
-The component does not advance images or choose an alarm countdown/dispatch
-policy. In particular, whether Alarm 2's write to Alarm 3 gets decremented
-in the same phase requires original-runner evidence before live integration;
-the event bodies alone cannot answer that question. No skeleton is enabled
-by this component, and no native frame-time claim is made.
+The component does not advance images. Original-runner disassembly now
+resolves cross-alarm scheduling: indices are processed globally in ascending
+order with immediate dispatch, so Alarm 2's write to Alarm 3 is decremented
+in the same phase. `advanceAlarm(index)` exposes this ordering to the future
+owner; see `runner-alarms.md` for addresses and remaining instance-order scope.
+No skeleton is enabled by this component, and no native frame-time claim is made.
 
 `SkeletonThrow.h` implements `enmSkeleton_Step_0` VM blocks 21–26 as a shared
 operation sequence: synchronously create object 269 at `(x,y-10)`, emit sound

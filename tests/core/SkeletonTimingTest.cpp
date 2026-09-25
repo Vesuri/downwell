@@ -29,6 +29,23 @@ int main() {
     timing.alarm(2);
     check(!timing.shot && same(timing.imageIndex, 0) && timing.alarms[3] == 15);
 
+    SkeletonTiming restart;
+    restart.shot = true;
+    restart.alarms[2] = 1;
+    // Even an already-expiring Alarm 3 is overwritten by Alarm 2 before
+    // its countdown. This distinguishes dispatch from snapshot countdowns.
+    restart.alarms[3] = 1;
+    for (unsigned i = 0; i < 4; ++i)
+        check(restart.advanceAlarm(i) == (i == 2));
+    check(restart.alarms[3] == 14 && !restart.shot && same(restart.rate, 0));
+    for (unsigned frame = 1; frame <= 14; ++frame) {
+        for (unsigned i = 0; i < 4; ++i)
+            check(restart.advanceAlarm(i) == (frame == 14 && i == 3));
+        check(same(restart.rate, frame == 14 ? 0.3 : 0));
+    }
+    check(!restart.advanceAlarm(3) && restart.alarms[3] == -1);
+    check(!restart.advanceAlarm(4));
+
     unsigned cases = 0;
     for (int a = -1; a <= 30; ++a) for (bool stopped : {false, true}) {
         SkeletonTiming s;
