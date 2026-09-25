@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <cmath>
 static void check(bool ok) { if (!ok) std::abort(); }
 struct Events {
     std::vector<int> calls;
@@ -22,6 +23,7 @@ int main() {
     using downwell::BoneProjectile;
     unsigned cases = 0;
     downwell::MotionBinary64Verification expectedCreate;
+    downwell::MotionBinary64Verification expectedAnimation;
     for (unsigned seed = 0; seed < 1024; ++seed) {
         BoneProjectile target;
         downwell::BoneProjectileReference source;
@@ -41,15 +43,35 @@ int main() {
         for (unsigned i = 0; i < 16; ++i) check(random.stateWord(i) == oracle.stateWord(i));
         // The same motion component also handles the unmodified Create ranges.
         Events a,b;
+        // Alternate actual throw spin direction while retaining sampled rate.
+        if(seed&1) { target.sampledAnimationRate.high^=0x80000000u; source.imgSp=-source.imgSp; }
+        float timeline=0, speed=1;
         for (unsigned frame = 0; frame < 100; ++frame) {
             const bool stopped = frame%7 == 0;
+            timeline=float(timeline+speed);
+            const bool wrapped=timeline<0 || timeline>=4;
+            if(wrapped) timeline=std::fmod(float(std::fmod(timeline,4.0f)+4.0f),4.0f);
+            bool crossed=false;
+            check(target.advanceImage(crossed) && crossed==wrapped);
+            std::uint32_t raw; std::memcpy(&raw,&timeline,4);
+            check(target.imageIndex.bits==raw && target.drawFrame()==unsigned(timeline));
             check(target.step(stopped,[](int,int) { return true; },a));
             source.step(stopped,-10000,-10000,20000,20000,b);
+            speed=float(source.imageSpeed);
+            std::memcpy(&raw,&speed,4); check(target.imageSpeed.bits==raw);
+            if(seed<16 && frame<64) {
+                std::uint32_t indexRaw; std::memcpy(&indexRaw,&timeline,4);
+                expectedAnimation.mix(indexRaw); expectedAnimation.mix(raw);
+                expectedAnimation.mix(unsigned(timeline)); expectedAnimation.mix(wrapped);
+                ++expectedAnimation.updates;
+            }
             check(same(target.motion.xx,source.xx) && same(target.motion.yy,source.yy) &&
                   target.motion.x == source.x && target.motion.y == source.y && a.calls == b.calls);
         }
     }
     const auto created = downwell::verifyBoneCreate();
+    const auto animated=downwell::verifyBoneAnimation();
+    check(!animated.failures && animated.updates==expectedAnimation.updates && animated.digest==expectedAnimation.digest);
     check(created.digest == expectedCreate.digest && created.updates == expectedCreate.updates && !created.failures);
     for (int x : {0,1,80,159,160}) for (int y : {0,1,100,283,284})
         for (int vx : {-12,-10,-8,0,8,10,12}) for (int vy : {-30,-31,-32})

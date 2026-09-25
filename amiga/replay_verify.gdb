@@ -23,6 +23,7 @@ printf "Motion benchmark: 1000 updates, %u PAL fields (20 ms/field, endpoint unc
 printf "DOWNWELL_REPLAY_RESULT BONE %u %08x %u %08x %u\n", gBoneReplayUpdates, gBoneReplayDigest, gBoneReplayFailures, gBoneBenchDigest, gBoneBenchFailures
 printf "Bone motion benchmark: 1000 two-axis updates, %u PAL fields\n", gBoneBenchFields
 printf "DOWNWELL_REPLAY_RESULT BONE_CREATE %u %08x %u\n", gBoneCreateCount, gBoneCreateDigest, gBoneCreateFailures
+printf "DOWNWELL_REPLAY_RESULT BONE_ANIMATION %u %08x %u\n", gBoneAnimationCount, gBoneAnimationDigest, gBoneAnimationFailures
 shell touch .run/gdb-ready.marker
 detach
 quit

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_BONE_PROJECTILE_H
 #include "BoneMotion.h"
 #include "RandomBinary64.h"
+#include "UnitSequenceFrames.h"
 namespace downwell {
 // Object 269's Create and event state. The owner must call create synchronously
 // before installing the skeleton's velocity overrides.
@@ -11,10 +12,23 @@ struct BoneProjectile {
     enum class Animation { instanceDefault, sampledRate, stopped };
     BoneMotion motion;
     MotionBinary64 sampledAnimationRate;
+    RunnerImageValue timeline{}, imageIndex{}, imageSpeed{0x3f800000u};
     int health = 1, mask = -1;
     bool active = true, destroyRequested = false;
     bool hit = false, hitEffect = false;
     Animation animation = Animation::instanceDefault;
+    // Sprite 460: four consecutive unit sequence keys. The owner advances
+    // animation before Begin Step/alarms, using the speed from the prior Step.
+    // Bone events do not write image_index or change the sprite.
+    bool advanceImage(bool& crossed) {
+        return UnitSequenceFrames::advance(timeline,imageSpeed,4,imageIndex,crossed);
+    }
+    unsigned drawFrame() const {
+        // Valid sequence evaluation is nonnegative and strictly below four.
+        const unsigned exponent=(imageIndex.bits>>23)&255u;
+        if (exponent<127u) return 0;
+        return ((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
+    }
     template<class Random>
     bool create(std::int32_t x, std::int32_t y, Random& random) {
         BoneProjectile next;
@@ -39,17 +53,21 @@ struct BoneProjectile {
     template<class InView, class Events>
     bool step(bool timeStopped, InView inView, Events& events) {
         if (!timeStopped) {
-            if (!motion.step(false)) return false;
+            // GML stores the sampled double into the builtin binary32 field
+            // before motion; the newly selected speed affects next animation.
+            if (!imageSpeed.assign(sampledAnimationRate)) return false;
             animation = Animation::sampledRate;
+            if (!motion.step(false)) return false;
             if (health <= 0 && active) {
                 animation = Animation::stopped;
+                imageSpeed = {};
                 mask = 582;
                 motion.xsp = {}; motion.ysp = {};
                 active = false;
                 requestDestroy(events);
                 events.effect(85, 3); // scrFxNol(85, 0.3), speed in tenths.
             }
-        } else animation = Animation::stopped;
+        } else { animation = Animation::stopped; imageSpeed = {}; }
         // Source executes this after health destruction too. Do not early-out
         // on destroyRequested; the owner retires storage at the event boundary.
         if (!inView(motion.x, motion.y)) requestDestroy(events);

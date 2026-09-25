@@ -310,6 +310,16 @@ and the ordinary build was restored after both attempts.
   reference memcpy and integer multiply/modulo helpers. No timing improvement
   or live gameplay is claimed: creation-frame eligibility, animation, collision
   scheduling and presentation still need connection to GameplayWorld.
+  Bone animation is now part of the owned projectile itself: default speed one,
+  four-frame unit-sequence advance before Step, binary32 sampled-speed writes,
+  reverse looping and zero speed on time-stop/death. `drawFrame()` exposes the
+  frame for either renderer. Independent host arithmetic checks 102,400 updates
+  across sampled positive/negative rates and stop/resume, alongside the existing
+  6,300 lifecycle cases; sanitizers pass. The bounded native CPU replay adds
+  `BONE_ANIMATION 1024 7376a886 0`, matching an independently checked host digest.
+  Existing replay digests and task-stack guard also pass. Evidence:
+  `/tmp/downwell-bone-animation-native.log`. This is CPU/state evidence, not
+  live projectile rendering or an encounter-performance claim.
 
 ## Working evidence
 

@@ -79,5 +79,26 @@ inline MotionBinary64Verification verifyBoneCreate() {
     }
     return result;
 }
+inline MotionBinary64Verification verifyBoneAnimation() {
+    MotionBinary64Verification result;
+    struct Events {
+        void destroy() {}
+        void effect(int,int) {}
+    } events;
+    for(unsigned seed=0;seed<16;++seed) {
+        GameMakerRandom random(seed); BoneProjectile bone;
+        if(!bone.create(240,990,random)) ++result.failures;
+        if(seed&1) bone.sampledAnimationRate.high^=0x80000000u;
+        for(unsigned frame=0;frame<64;++frame) {
+            bool crossed=false;
+            if(!bone.advanceImage(crossed) ||
+               !bone.step(frame%7==0,[](int,int){return true;},events)) ++result.failures;
+            result.mix(bone.imageIndex.bits); result.mix(bone.imageSpeed.bits);
+            result.mix(bone.drawFrame()); result.mix(crossed);
+            ++result.updates;
+        }
+    }
+    return result;
+}
 }
 #endif
