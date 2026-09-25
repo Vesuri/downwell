@@ -131,6 +131,10 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
+$(OBJECTS): $(REPO)/generated/downwell-goal-mask.h
+
+$(REPO)/generated/downwell-goal-mask.h: $(REPO)/tools/generate-goal-mask.py $(REPO)/tools/export-goal-mask.csx $(REPO)/data/data.win
+	$(MAKE) -C $(REPO) generated/downwell-goal-mask.h
 
 check:
 	@set -e; for tool in $(CC) $(AS) $(OBJDUMP) elf2hunk; do \

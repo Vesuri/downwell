@@ -7,6 +7,35 @@ not equivalence with Windows. Historical SDL-parity notes do not supersede this.
 See also [activation lifecycle findings](activation-fidelity.md) for the
 source-backed frontier/phase correction and remaining region-boundary gaps.
 
+## Exit-field timer guard
+
+The shared live player phase now supplies the missing `goalTimeField`
+overlap guard to the run clock on both SDL and Amiga. Original
+`objPlayer_n` Begin Step tests `place_meeting(x,y,goalTimeField)` before
+incrementing `global.gameTime`, and only later assigns `x=round(xx)` and
+`y=round(yy)`. The query therefore uses the previous published player position,
+not the newly integrated position used by shop observation.
+
+Object 255 uses sprite 616 (`sprCircleArea`), a precise 128x128 mask with
+origin (64,64); its Create assembly sets both image scales to 2. The animated
+Draw radius is unrelated to this mask. `tools/generate-goal-mask.py` uses pinned
+UndertaleModTool 0.9.2.0 to recover the actual mask, verifies the input hash and
+mask hash, and losslessly compresses each row to an interval. All generated
+payloads and provenance remain ignored. The query needs at most seven row
+checks and no floating-point, square root, repaint or runtime conversion.
+
+The player-phase test exhaustively compares 83,521 positions against the raw
+mask, and checks timer behavior while crossing the mask and after retiring
+the field. This corrects the implemented timer guard only: the field's wind
+audio/associated RNG and Draw behavior still need original-game integration.
+
+The focused test also passes address/undefined-behavior sanitizers. The bounded
+60-second A500 clear/reentry check passes two clears, 432 planar comparisons
+and 60 third-level updates; the ordinary executable is restored with clean
+68000 audits. Logs: `/tmp/downwell-goal-field-native.log` and
+`/tmp/downwell-goal-field-restore.log`. These checks validate the implemented
+guard and existing transitions, not the still-missing field effects.
+
 ## Current extended-combat checkpoint
 
 The historical tick-600/666/702 failures below are superseded by the current

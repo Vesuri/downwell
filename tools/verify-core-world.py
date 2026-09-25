@@ -17,7 +17,8 @@ for flags in ([], ["-DDOWNWELL_PROBES", "-DDOWNWELL_FREESTANDING"]):
         assert source in dependencies, (source, "missing source dependency")
         for dependency in dependencies:
             path = (root / dependency).resolve()
-            assert path == root / source or root / "src/core" in path.parents, (source, dependency)
+            assert (path == root / source or root / "src/core" in path.parents or
+                    path == root / "generated/downwell-goal-mask.h"), (source, dependency)
 subprocess.run(compiler + ["-Isrc", "-std=c++17", "-fsyntax-only", "-Wunreachable-code",
                           "-Werror=unreachable-code", "src/core/StartupRuntime.cpp"],
                cwd=root, check=True)
