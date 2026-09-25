@@ -78,3 +78,15 @@ assert "pushi.e 0\npush.v self.myBullet\npushi.e -9\npop.v.i [stacktop]self.bdir
 assert hashlib.sha256((root / "data/Downwell.exe").read_bytes()).hexdigest() == \
     "340b43dae1a18d2861cba9f6a9cdbb92f3754699854e0dc1a1ca367a8cd11085"
 print("Laser Sight VM birth rules and reviewed zero-range RNG runner are pinned")
+
+# Reviewed playerDraw blocks 23..34: zero-length origin query, cumulative
+# parentWall(57) then subparentEnemy(83) queries (precise/notme both false),
+# Y += lengthdir_y(8,270+aimAngle), X += lengthdir_x(8,270+aimAngle-xsp),
+# strict view-bottom exit after advancement, then red line from (x,y+8).
+draw = (export / "Assembly/gml_GlobalScript_playerDraw.asm").read_text()
+ray = draw.split(":[23]\n", 1)[1].split(":[35]\n", 1)[0]
+assert hashlib.sha256(ray.encode()).hexdigest() == \
+    "7f15feddae0ae5adcf00d0fdd3e6a9d3e89681322c520020eeee29d797163c9f"
+assert ray.count("call.i collision_line(argc=7)") == 2
+assert "random" not in ray
+print("Laser Sight stepped ray order, collision parents and draw anchors are VM-pinned")

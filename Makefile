@@ -159,6 +159,15 @@ test-machine-gun-trajectory: build/machine-gun-trajectory-test
 	./build/machine-gun-trajectory-test
 
 .PHONY: test-projectile-segment
+.PHONY: test-laser-sight-ray
+test: test-laser-sight-ray
+test-laser-sight-ray: build/laser-sight-ray-test
+	./build/laser-sight-ray-test
+
+build/laser-sight-ray-test: tests/core/LaserSightRayTest.cpp src/core/LaserSightRay.h $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/LaserSightRayTest.cpp
+
 test: test-projectile-segment
 test-projectile-segment: build/projectile-segment-test
 	./build/projectile-segment-test

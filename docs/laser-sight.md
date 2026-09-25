@@ -46,6 +46,40 @@ a native full-upgrade playthrough or rendered laser test.
 
 ## Remaining work
 
+### Shared stepped-ray foundation
+
+`LaserSightRay` now provides a platform-independent endpoint tracer. It
+queries the starting point first, short-circuits wall before enemy queries,
+advances in source-sized eight-pixel vectors, and tests the strict view-bottom
+limit after advancement. Nonzero aim changes both components; player X speed
+changes only the horizontal component. Q32-turn input uses the existing Q20
+trajectory trig approximation, with positive vertical progress as a caller
+precondition (the ordinary downward aim range).
+
+`make test-laser-sight-ray` is included in `make test`. Tests cover initial
+overlap, wall-before-enemy short-circuiting, stepped rather than exact-contact
+endpoints, equality at the view bottom, fractional/negative coordinates,
+opposite horizontal speeds, and aims -30/-15/0/15/30 with speeds -5/0/5.
+An independent binary64 trig calculation bounds each tested component's error
+below 0.001 pixels per step; the existing Q20 representation is not claimed
+to reproduce the Windows runner's binary64 rounding exactly. Host sanitizer
+tests pass. `verify-machine-gun.py` pins the reviewed playerDraw VM blocks
+23–34, including collision parent IDs 57/83, flags, loop ordering and draw
+anchors. Logs: `/tmp/downwell-ray-{test,vm,sanitized}.log`.
+
+The tracer replaces cumulative queries with queries of each new segment only
+for pure queries on a stable collision snapshot. Earlier empty segments then
+cannot add a hit. Platform adapters must preserve that condition and the
+original object-family selection; do not reuse a generic solid-terrain query
+without auditing its membership. The current rectangle primitive uses the
+port's half-open contact convention; original `collision_line` rounding and
+mask behavior remain an explicit integration gate.
+
+This foundation is **not yet connected to either renderer** and has no
+native timing or pixel-capture claim. The red ray remains a missing visible
+feature until shared wall/enemy adapters, source visibility/order, SDL drawing
+and Amiga draw/restore handling are connected and verified.
+
 `playerDraw` traces cumulative lines against `parentWall` and `subparentEnemy`,
 starting at the player origin. Each iteration advances Y by
 `lengthdir_y(8,270+aimAngle)` but X by
