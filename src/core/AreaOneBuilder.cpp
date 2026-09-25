@@ -67,7 +67,8 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
                                 GameMakerRandom& random,
                                 EmitFunction emit, void* context) {
     DeferredCreateInstance command{objectId, x, y};
-    if (objectId == 92) {
+    switch (objectId) {
+    case 92: {
         random.irandomSmall(3);
         command.imageSpeed = 0.0F;
         command.integerImageIndex = 16 + random.irandomSmall(1);
@@ -80,14 +81,16 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
             command.imageIndex = 22.0F;
         }
     }
-    if (objectId == 111) {
+    break;
+    case 111: {
         command.imageSpeed = 0.25F;
         command.velocityX = 0.5F;
         command.integerVelocityX = 128;
         command.motionInitialized = true;
         command.grounded = true;
     }
-    if (objectId == 112) {
+    break;
+    case 112: {
         command.imageSpeed = 0.15F;
         command.velocityX = 0.25F;
         command.integerVelocityX = 64;
@@ -96,13 +99,15 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.grounded = true;
         command.alarms.set(1, 60 + static_cast<int>(random.irandomSmall(60)));
     }
-    if (objectId == 113) {
+    break;
+    case 113: {
         command.imageSpeed = 0.0F;
         command.motionInitialized = true;
         command.alarms.set(1,
             60 + static_cast<int>(random.randomIntegerSmall(60)));
     }
-    if (objectId == 116) {
+    break;
+    case 116: {
         command.imageSpeed = 0.2F;
         random.nextU32();
         command.integerDirection = random.irandomSmall(359);
@@ -114,14 +119,16 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.motionInitialized = true;
         command.active = false;
     }
-    if (objectId == 117) {
+    break;
+    case 117: {
         command.imageSpeed = 0.1F;
         command.integerVelocityY = random.irandomSmall(1) == 0 ? 26 : -26;
         command.velocityY = command.integerVelocityY > 0 ? 0.1F : -0.1F;
         command.motionInitialized = true;
         command.alarms.set(1, 60);
     }
-    if (objectId == 119) {
+    break;
+    case 119: {
         command.imageSpeed = 0.1F;
         command.motionState = random.irandomSmall(1) == 0 ? 1 : -1;
         command.moveSpeed = 1.0F;
@@ -129,7 +136,8 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         command.motionInitialized = true;
         command.alarms.set(0, 2);
     }
-    if (objectId == 289) {
+    break;
+    case 289: {
         command.imageSpeed = 0.0F;
         command.integerScaleX = random.irandomSmall(1) == 0 ? 1 : -1;
         command.scaleX = command.integerScaleX < 0 ? -1.0F : 1.0F;
@@ -142,14 +150,17 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
             command.imageIndex = 16.0F;
         }
     }
-    if (objectId == 82)
+    break;
+    case 82:
         random.nextU32();
-    if (objectId == 293) {
+        break;
+    case 293: {
         command.imageSpeed = 0.0F;
         command.alarms.set(1, 30 + static_cast<int>(random.irandomSmall(30)));
         command.alarms.set(2, 180 + static_cast<int>(random.irandomSmall(180)));
     }
-    if (objectId == 109) {
+    break;
+    case 109: {
         command.imageSpeed = 0.0F;
         command.alarms.set(0, 10);
         command.alarms.set(3, 10);
@@ -157,6 +168,9 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
         std::uint32_t module = 2;
         while (module == 2)
             module = random.irandomSmall(6);
+    }
+    break;
+    default: break;
     }
     return emit != nullptr && emit(context, command);
 }

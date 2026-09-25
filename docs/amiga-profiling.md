@@ -2,6 +2,29 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Mutually exclusive builder Create dispatch
+
+`AreaOneBuilder::emitObject` now dispatches its distinct object IDs with a
+switch instead of a sequence of independent equality checks. All initializers,
+RNG calls, default command construction and synchronous observer ordering are
+unchanged. Static terrain takes the default path without testing every
+special Create handler. This is shared core code, not Amiga-only behavior.
+
+Against the preceding resolved-sprite build, worst instrumented frame 258
+falls from **149.695 to 145.317 ms**; exclusive builder phase 32 falls from
+**77.458 to 72.897 ms** (about 5.9%). Registration/index phases measure
+22.537 / 25.373 ms. This reduces the sampled generation stall but does not
+remove it. These values include probes and are not shipping frame times.
+
+The separate FPSCOUNT tape takes **815 fields / 600 updates = 36.81 FPS**,
+maximum gap five, versus 813 immediately before. There is no average-FPS
+improvement claim; the measured benefit is the smaller generation spike.
+Builder fixtures, live incremental terrain tests, builder sanitizers and
+bounded cross-target replay pass; replay digests are unchanged. Both native
+audits pass, and the ordinary non-skip executable is restored. Logs use
+`/tmp/downwell-builder-dispatch-` (`test`, `sanitized`, `fps`, `profile`,
+`replay`, `restored`). All emulator runs have a 45-second bound.
+
 ### Actor presentation breakdown
 
 #### Resolve the selected hardware part once
