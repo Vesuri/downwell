@@ -74,6 +74,42 @@ also needs concrete synchronous actor creation and any observed builder-instance
 state such as `spawnChance`; this helper currently owns only emission decisions.
 No emulator run or frame-rate improvement is claimed for this isolated change.
 
+## Actor integration findings
+
+The next actor is not just another entry in `EnemyCreateProfile`: that table's
+nonzero health also admits objects to `GameplayWorld::createGeneratedInstance`.
+Adding stats before motion, collisions, presentation and alarms exist would
+silently register an incomplete actor. Keep that supported-actor gate intact.
+
+`enmJumpySkull` Create VM explicitly assigns `imgSp=0.175`. Existing supported
+actors use twentieth-frame rates, which cannot represent this value.
+`advanceEnemyImageFortiethsQ8` now supports 7/40 without floating-point target
+work. Its residual unit remains fifths of one Q8 phase unit (256/40=32/5).
+The existing twentieth-frame API delegates with twice the rate, preserving
+all current stored rates and residuals. Forty updates at 7/40 produce seven
+frames exactly. This represents the recovered rational rate, not a claim of
+bit-identical historical floating-point accumulation at every boundary.
+
+The presentation tests check 50,000 old/new-equivalent updates and 50,000
+fortieth-rate updates, including zero speed, nonzero initial residuals and
+rate changes. They pass normally and under address/undefined-behavior
+sanitizers. Both natural host routes, upgrades, re-entry and the seed-4 shop
+return pass (`/tmp/downwell-fortieth-animation-natural.log`). These are
+existing-actor regression checks, not a playable skull verification.
+The ordinary Amiga build and its 68000 instruction/64-bit-helper audits also
+pass (`/tmp/downwell-fortieth-animation-amiga.log`). No emulator was launched
+for this arithmetic-only change, and no new timing measurement is claimed.
+
+Further source inspection identifies important prerequisites: skull Step uses
+thin-wall versus solid collision handling, hit stun, viewport-gated movement,
+landing re-arming and time-stop alarm compensation; its collision events can
+also trigger jumps with a different random range. Skeleton throwing requires
+synchronous bone Create before its velocity overrides; the bone Create itself
+draws random values. Skeleton also uses alarms 2 and 3, beyond the two direct
+alarm fields of the current shared enemy state. Spider Create makes ordered
+line-collision queries to decide and shorten its hanging web. These cannot be
+replaced with cavern behavior just to make the new patterns run.
+
 Remaining work includes wiring catacomb symbol emission into traversal, new actor
 and hazard behavior, matching offline art and both rendering backends, and
 verified area 1-3 → 2-1 transition ownership. Do not remove the current

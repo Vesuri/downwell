@@ -7,13 +7,21 @@ namespace downwell {
 // GML's numeric boolean conversion is not C++'s nonzero conversion.
 inline bool groundTurtleWalking(int walking) { return walking > 0; }
 
-// Rates are exact twentieths of a frame (0.1, 0.15, 0.2, 0.25).
-// Preserve fifths of one Q8 phase unit instead of rounding each increment.
-inline void advanceEnemyImageQ8(unsigned& phase, unsigned char& remainder,
-                                 unsigned twentieths) {
-    const unsigned numerator = twentieths * 64u + remainder;
+// Fortieths also represent the catacomb skull's 0.175 (7/40) exactly.
+// 256/40 = 32/5: the stored remainder is still fifths of a Q8 phase unit,
+// so existing state snapshots, frame resets and rate changes keep their units.
+inline void advanceEnemyImageFortiethsQ8(unsigned& phase, unsigned char& remainder,
+                                        unsigned fortieths) {
+    const unsigned numerator = fortieths * 32u + remainder;
     phase += numerator / 5u;
     remainder = static_cast<unsigned char>(numerator % 5u);
+}
+
+// Existing actors and snapshots retain twentieth-frame rates. Do not silently
+// reinterpret those fields when introducing an actor with a half-step rate.
+inline void advanceEnemyImageQ8(unsigned& phase, unsigned char& remainder,
+                                 unsigned twentieths) {
+    advanceEnemyImageFortiethsQ8(phase, remainder, twentieths * 2u);
 }
 
 // Recovered resource IDs and Step-state choices; no asset payloads.

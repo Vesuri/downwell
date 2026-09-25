@@ -17,6 +17,43 @@ void require(bool value, const char* message) {
 
 int main() {
     {
+        // Integer rational oracle: no repeated floating-point additions. The
+        // initial remainder and changing rates survive without quantization.
+        for (unsigned initial = 0; initial < 5; ++initial) {
+            unsigned phase = 319, oldPhase = phase;
+            unsigned char remainder = initial, oldRemainder = initial;
+            unsigned long long numerator = phase * 5u + initial;
+            for (unsigned step = 0; step < 10000; ++step) {
+                const unsigned rate = (step * 7u) % 21u;
+                downwell::advanceEnemyImageQ8(phase, remainder, rate);
+                // Previous production implementation, kept as an equivalence check.
+                const unsigned oldNumerator = rate * 64u + oldRemainder;
+                oldPhase += oldNumerator / 5u;
+                oldRemainder = oldNumerator % 5u;
+                numerator += rate * 64u;
+                require(phase == oldPhase && remainder == oldRemainder &&
+                        phase == numerator / 5u && remainder == numerator % 5u,
+                        "twentieth-frame callers retain exact previous animation state");
+            }
+            phase = 319; remainder = initial; numerator = phase * 5u + initial;
+            for (unsigned step = 0; step < 10000; ++step) {
+                // Skull (7), stopped (0), spider (10), skeleton throw (12),
+                // then skull again: no remainder loss at a rate transition.
+                const unsigned rates[] = {7, 0, 10, 12, 7};
+                const unsigned rate = rates[(step / 13) % 5];
+                downwell::advanceEnemyImageFortiethsQ8(phase, remainder, rate);
+                numerator += rate * 32u;
+                require(phase == numerator / 5u && remainder == numerator % 5u,
+                        "fortieth-frame rates preserve exact fractional phase across changes");
+            }
+        }
+        unsigned phase = 0; unsigned char remainder = 0;
+        for (unsigned step = 0; step < 40; ++step)
+            downwell::advanceEnemyImageFortiethsQ8(phase, remainder, 7);
+        require(phase == 7u * 256u && remainder == 0,
+                "skull 0.175 rate advances exactly seven frames in forty updates");
+    }
+    {
         struct Instance { int health = -1, reward = -1; float imageSpeed = -1; int untouched = 37; };
         for (int object : {111, 112, 113, 116, 117, 119}) {
             const auto profile = downwell::enemyCreateProfile(object);

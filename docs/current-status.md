@@ -116,7 +116,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   cases, retaining exact builtin calls and synchronous emission order, but is
   not yet wired into either live generator. Historical singleton-choice RNG
   consumption remains unverified. Gameplay remains disabled pending integration,
-  actors/hazards and artwork. See `area-two-recovery.md`.
+  actors/hazards and artwork. Shared animation now supports exact fortieth-frame
+  rates for the skull's 0.175 while preserving existing actor state and passing
+  both natural host routes; new actors remain unregistered until their behavior
+  is implemented. See `area-two-recovery.md`.
 
 ## Working evidence
 
