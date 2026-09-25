@@ -11,6 +11,8 @@ two ports proves original-game completion. The active parity goal is unfinished.
   ordered death callbacks and player contact. It is not in the live enemy pool.
   Next connect instance/projectile ownership and global phase scheduling,
   precise contact predicates and actual effect sinks, then both renderers.
+  `skeleton-effect-ownership.md` records the audited synchronous Create/RNG
+  dependencies; effects cannot be omitted or batched after reward creation.
 - **Next:** connect the catacomb builder and remaining actors/hazards, with
   original-source checks and bounded cross-target route verification. Do not
   enable incomplete actors merely to advance the area counter.
@@ -24,6 +26,16 @@ This queue describes priorities, not a replacement for the full goal. The old
 `open-work.md` is an early milestone inventory, not the current ordered queue.
 
 ### Joined skeleton/bone encounter regression
+
+After the shared player bounce signature change, the bounded native CPU replay
+passes unchanged gameplay/weapon digests and all motion/bone lines, including
+`BONE_ANIMATION 1024 7376a886 0`. The 180-second-limited verifier completed and
+the ordinary Amiga build was restored with clean 68000 instruction/helper
+audits. Evidence: `/tmp/downwell-stomp-cross-replay.log`. This checks the current
+live paths and existing replay fixtures; it does not exercise a native skeleton
+encounter or establish frame time. The death-effect audit is now recorded in
+`skeleton-effect-ownership.md` so future owner integration preserves child
+Create ordering and terrain-dependent RNG rather than just reward totals.
 
 The skeleton stomp body now preserves `scrEnemyStomped` ordering rather than
 using the cavern adapter's immediate-retirement shortcut: blood, style-dependent
