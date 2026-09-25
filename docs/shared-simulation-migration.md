@@ -18,6 +18,33 @@ The fixed-point world now lives in core, but SDL's live `StartupRuntime` still
 owns a separate world loop. Extracting the class does not complete that switch.
 Rendering/storage optimizations do not justify separate gameplay rules.
 
+## Shared live enemy-contact pass
+
+`stepEnemyContacts` now owns the live pass in both `StartupRuntime` and
+`GameplayWorld`: once-per-update immunity expiry, supported enemy filtering,
+stable storage order, contact response, combo-before-reward ordering and
+publication only when a response was applied. Each adapter supplies storage,
+coordinate projection, reward emission and presentation hooks. No new storage,
+allocation or target-specific gameplay policy is introduced.
+
+Focused tests cover simultaneous damaging overlaps, expiry on the current
+update, stomping while immune, reward-before-retirement, inactive/non-enemy
+filtering and fatal damage suppressing later contacts. Immediate enemy
+retirement remains the documented approximation of the original collision
+and later enemy Step sequence; consolidating this pass does not resolve it.
+
+The extended combat clock assertion also now includes the already-implemented
+precise exit field, using the pre-movement player position. Previously both
+runtimes correctly stopped at tick 3008 while the fixture incorrectly expected
+an increment. This correction changes the test expectation, not simulation.
+
+Both 6,000-update combat tapes now pass, including death and survival coverage
+(`/tmp/downwell-contact-pass-tests.log`). The focused contact test passes
+address/undefined-behavior sanitizers. The bounded 45-second native run passes
+the 600-update gameplay cache oracle, and ordinary startup is restored with
+clean 68000 audits (`/tmp/downwell-contact-pass-native.log`). These checks do
+not establish complete original-runner event scheduling fidelity.
+
 ## Shared live player phase
 
 Both `StartupRuntime::updateMainPlayer` (the live SDL path) and

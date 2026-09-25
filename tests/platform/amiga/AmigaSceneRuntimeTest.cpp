@@ -7,6 +7,7 @@
 #include "core/Replay.h"
 #include "core/RoomPack.h"
 #include "core/StartupRuntime.h"
+#include "core/GameMakerRounding.h"
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -1374,8 +1375,15 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const auto beforeHostTime = reference.runTimeTicks();
             const bool nativePublishedDeath = gameplay.deathSequence().active;
             const bool hostPublishedDeath = reference.mainDeathSequence().active;
-            const bool nativeClockStopped = nativePublishedDeath || gameplay.goalStopped();
-            const bool hostClockStopped = hostPublishedDeath || reference.goalStopped();
+            // Begin Step tests the previous published position, before movement.
+            const bool nativeField = gameplay.levelExitPresent() && gameplay.goalField().meetsPlayer(
+                240 + downwell::roundGameMakerQ8(gameplay.player().offsetXFixed()),
+                176 + downwell::roundGameMakerQ8(gameplay.player().offsetYFixed()));
+            const bool hostField = reference.levelExitPresent() && reference.goalField().meetsPlayer(
+                downwell::roundGameMakerCoordinate(reference.mainPlayerX()),
+                downwell::roundGameMakerCoordinate(reference.mainPlayerY()));
+            const bool nativeClockStopped = nativePublishedDeath || gameplay.goalStopped() || nativeField;
+            const bool hostClockStopped = hostPublishedDeath || reference.goalStopped() || hostField;
             const unsigned gemsBeforeNative = gameplay.gameGemTotal();
             const unsigned gemsBeforeHost = reference.mainGameGemTotal();
             const bool nativeWasRecorded = gameplay.runGemStatistics().recorded;
@@ -1451,7 +1459,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(gameplay.runTimeTicks() == reference.runTimeTicks() &&
                         gameplay.runTimeTicks() == beforeNativeTime + (nativeClockStopped ? 0u : 1u) &&
                         reference.runTimeTicks() == beforeHostTime + (hostClockStopped ? 0u : 1u),
-                    "shared run clock agrees and respects pre-publication death and goal stop");
+                    "shared run clock agrees and respects pre-publication death, goal stop and exit field");
             const auto& nativeStats = gameplay.runGemStatistics();
             const auto& hostStats = reference.runGemStatistics();
             const auto& nativeResults = gameplay.deathResults();

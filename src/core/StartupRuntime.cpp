@@ -870,33 +870,26 @@ void StartupRuntime::updateMainEnemies() {
 }
 
 void StartupRuntime::updateMainEnemyInteractions() {
-    if (mainPlayerInvulnerability_ > 0)
-        --mainPlayerInvulnerability_;
-    for (std::size_t index = 0; index < instances_.size(); ++index) {
-        InstanceRecord& enemy = instances_.at(index);
-        const bool stompable = enemy.objectId == 111 || enemy.objectId == 112 ||
-                               enemy.objectId == 113 || enemy.objectId == 116;
-        const bool contactOnly = enemy.objectId == 117 || enemy.objectId == 119;
-        if (!enemy.active || enemy.health <= 0 || (!stompable && !contactOnly))
-            continue;
-        const ContactActor enemyContact{
+    stepEnemyContacts(static_cast<unsigned>(instances_.size()), mainPlayerMotion_,
+        mainPlayerHealth_, mainPlayerInvulnerability_, mainEnemiesDefeated_,
+        run_.combo.state, run_.upgrades.levels[7] != 0,
+        [this](unsigned i) -> InstanceRecord& { return instances_.at(i); },
+        [this](const InstanceRecord& enemy) {
+            return EnemyContactLocation{{
             static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 256.0F)),
             static_cast<long>(std::round((enemy.preciseY - mainPlayerOriginY_) * 256.0F)),
             enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
-            enemyContactMask(enemy.objectId, enemy.spriteId)};
-        const auto contact = applyEnemyContact(enemy.objectId, enemyContact,
-            enemy.x - mainPlayerOriginX_, enemy.y - mainPlayerOriginY_,
-            enemy.active, enemy.health, mainPlayerMotion_, mainPlayerHealth_,
-            mainPlayerInvulnerability_, mainEnemiesDefeated_, [this, &enemy] {
-                run_.combo.state.enemyDefeated();
-                spawnMainCurrency(static_cast<float>(enemy.x), static_cast<float>(enemy.y),
-                                  enemy.reward, true);
-            }, run_.upgrades.levels[7] != 0);
-        if (contact != EnemyContact::none) {
+            enemyContactMask(enemy.objectId, enemy.spriteId)},
+                enemy.x - mainPlayerOriginX_, enemy.y - mainPlayerOriginY_};
+        },
+        [this](InstanceRecord& enemy) {
+            spawnMainCurrency(static_cast<float>(enemy.x), static_cast<float>(enemy.y),
+                              enemy.reward, true);
+        },
+        [this](EnemyContact) {
             syncMainPlayerState();
             ++soundPlayRequests_;
-        }
-    }
+        });
 }
 
 void StartupRuntime::updateMainLifecycle() {

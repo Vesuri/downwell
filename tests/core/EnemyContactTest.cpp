@@ -147,6 +147,56 @@ int main() {
         require(apply() == EnemyContact::damage && health == 2 && immunity == 90,
                 "first expired contact damages and samples current ownership again");
     }
+    {
+        struct Player {
+            unsigned knocks = 0, bounces = 0;
+            long offsetXFixed() const { return 0; }
+            long offsetYFixed() const { return 0; }
+            long frameStartYFixed() const { return 0; }
+            int facing() const { return 1; }
+            void stompBounce() { ++bounces; }
+            void contactKnockback(int, int) { ++knocks; }
+        } motion;
+        struct Enemy { int objectId = 116, health = 15; bool active = true; long y = 0; };
+        Enemy enemies[5];
+        enemies[0].objectId = 1; // A live non-enemy in SDL's mixed store.
+        enemies[3].y = 3 * 256;
+        enemies[4].active = false;
+        struct Combo { unsigned kills = 0; void enemyDefeated() { ++kills; } } combo;
+        int health = 4;
+        unsigned immunity = 1, defeated = 0, rewards = 0, published = 0, located = 0;
+        auto step = [&] {
+            stepEnemyContacts(5, motion, health, immunity, defeated, combo, false,
+                [&](unsigned i) -> Enemy& { return enemies[i]; },
+                [&](const Enemy& e) {
+                    ++located;
+                    return EnemyContactLocation{{128, e.y, 1, 1, 153}, 7, 9};
+                },
+                [&](Enemy& e) {
+                    require(e.active && e.health == 15 && combo.kills == rewards + 1 &&
+                            defeated == rewards, "combo precedes reward, which precedes retirement");
+                    ++rewards;
+                },
+                [&](EnemyContact contact) {
+                    require(contact != EnemyContact::none, "only applied contacts publish effects");
+                    ++published;
+                });
+        };
+        step();
+        require(health == 3 && immunity == 90 && motion.knocks == 1 &&
+                motion.bounces == 1 && defeated == 1 && rewards == 1 &&
+                published == 2 && located == 3,
+                "one expiry per pass, one damage across two overlaps, then an immune stomp");
+        step();
+        require(immunity == 89 && health == 3 && published == 2 && rewards == 1,
+                "unchanged immune contacts and retired enemies have no repeat effects");
+        enemies[3] = Enemy{}; enemies[3].y = 3 * 256;
+        health = 1; immunity = 0;
+        step();
+        require(health == 0 && published == 3 && motion.knocks == 2 &&
+                enemies[3].active && rewards == 1 && defeated == 1,
+                "fatal damage suppresses later damage and stomp in stable instance order");
+    }
     ContactActor player{0, 0, 1, 1, 31};
     ContactActor bat{0, -11 * 256, 1, 1, 153};
     require(classifyEnemyContact(player, bat, 116, 0) == EnemyContact::none,

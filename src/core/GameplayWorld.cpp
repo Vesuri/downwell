@@ -811,22 +811,18 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     DW_PROFILE_PHASE(profileEnemyContact);
-    if (invulnerability_ > 0)
-        --invulnerability_;
-    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
-        EnemyState& enemy = enemies_[enemyIndex];
-        if (!enemy.active || enemy.health <= 0)
-            continue;
-        const downwell::ContactActor enemyContact{
+    downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
+        enemiesDefeated_, run_.combo.state, run_.upgrades.levels[7] != 0,
+        [this](unsigned i) -> EnemyState& { return enemies_[i]; },
+        [](const EnemyState& enemy) {
+            return downwell::EnemyContactLocation{{
             enemy.preciseX, enemy.preciseY,
             enemy.objectId == 117 ? enemy.motionState : enemy.facing,
             enemy.imageScaleY(),
-            downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
-        downwell::applyEnemyContact(enemy.objectId, enemyContact,
-            enemy.x, enemy.y, enemy.active, enemy.health, player_, health_, invulnerability_, enemiesDefeated_,
-            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, true); },
-            run_.upgrades.levels[7] != 0);
-    }
+            downwell::enemyContactMask(enemy.objectId, enemy.spriteId)}, enemy.x, enemy.y};
+        },
+        [this](EnemyState& enemy) { spawnReward(enemy, true); },
+        [](downwell::EnemyContact) {});
 
     DW_PROFILE_PHASE(profileGems);
     for (unsigned gemIndex = 0; gemIndex < gemSlotEnd_; ++gemIndex) {

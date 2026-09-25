@@ -36,5 +36,34 @@ EnemyContact applyEnemyContact(int object, const ContactActor& enemy,
     }
     return EnemyContact::none;
 }
+struct EnemyContactLocation {
+    ContactActor actor;
+    int publishedX, publishedY;
+};
+
+// Storage adapters retain their coordinate representation and presentation
+// hooks; eligibility, immunity expiry and ordered contact effects are shared.
+template<class Player, class Immunity, class Count, class Combo,
+         class Get, class Locate, class Reward, class Publish>
+void stepEnemyContacts(unsigned count, Player& player, int& health,
+    Immunity& immunity, Count& defeated, Combo& combo, bool candle,
+    Get get, Locate locate, Reward reward, Publish publish) {
+    if (immunity > 0) --immunity;
+    for (unsigned i = 0; i < count; ++i) {
+        auto& enemy = get(i);
+        const int object = enemy.objectId;
+        if (!enemy.active || enemy.health <= 0 ||
+            (object != 111 && object != 112 && object != 113 &&
+             object != 116 && object != 117 && object != 119)) continue;
+        const auto location = locate(enemy);
+        const auto contact = applyEnemyContact(object, location.actor,
+            location.publishedX, location.publishedY, enemy.active, enemy.health,
+            player, health, immunity, defeated, [&] {
+                combo.enemyDefeated();
+                reward(enemy);
+            }, candle);
+        if (contact != EnemyContact::none) publish(contact);
+    }
+}
 } // namespace downwell
 #endif
