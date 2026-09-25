@@ -391,6 +391,10 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             }
             require(native.objectId == enemy.objectId,
                     "paired actor identity matches throughout live comparison");
+            require(native.active == enemy.active && native.health == enemy.health,
+                    "paired enemies agree on activation and remaining health");
+            require(native.alarm0 == enemy.alarms.get(0) && native.alarm1 == enemy.alarms.get(1),
+                    "paired enemies retain identical compact alarm countdowns");
             if (enemy.objectId == 116 && enemy.active && native.active) {
                 require(240.0F + native.preciseX / 256.0F == enemy.preciseX &&
                         176.0F + native.preciseY / 256.0F == enemy.preciseY &&
@@ -511,14 +515,21 @@ void compareGameplayShot(const AmigaPortRuntime& amiga,
             "gameplay jump and shot counts follow decoded runtime");
     require(amiga.bulletCount() == reference.mainBulletCount(),
             "gameplay bullet count follows decoded runtime");
-    if (amiga.bulletCount() != 0) {
-        const AmigaPortRuntime::BulletState& bullet = amiga.bulletAt(0);
-        requireNear(static_cast<float>(240 + bullet.x),
-                    reference.mainBulletAt(0).x, 1.0F,
-                    "gameplay bullet X follows decoded runtime");
-        requireNear(static_cast<float>(176 + bullet.y),
-                    reference.mainBulletAt(0).y, 3.0F,
-                    "gameplay bullet Y follows decoded runtime");
+    unsigned ordinal = 0;
+    for (unsigned slot = 0; slot < amiga.bulletCapacity; ++slot) {
+        const auto& bullet = amiga.bulletAt(slot);
+        if (!bullet.active) continue;
+        const auto& host = reference.mainBulletAt(ordinal++);
+        const auto& a = bullet.trajectory;
+        const auto& b = host.trajectory;
+        require(a.x.pixel + 240 == b.x.pixel && a.y.pixel + 176 == b.y.pixel &&
+                a.x.fraction == b.x.fraction && a.y.fraction == b.y.fraction &&
+                a.velocityX == b.velocityX && a.velocityY == b.velocityY &&
+                a.direction == b.direction && a.zeroSpread == b.zeroSpread &&
+                bullet.gemHigh == host.gemHigh && bullet.animation.index.equal(host.animation.index),
+                "all live gameplay shots match fractional motion, birth state and animation in creation order");
+        require(240 + bullet.x == host.x && 176 + bullet.y == host.y,
+                "all live gameplay shots publish identical pixel positions");
     }
 }
 
@@ -1029,8 +1040,29 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             for (unsigned i = 0; i < 16; ++i)
                 require(gameplay.randomState().stateWord(i) == reference.randomState().stateWord(i),
                     "all RNG words match after next-room terrain reset");
-            for (unsigned tick = 0; tick < 90; ++tick) {
-                gameplay.step(0); reference.step({}, false);
+            const unsigned entryShots = gameplay.player().shots();
+            bool sawReentryEnemy = false;
+            for (unsigned tick = 0; tick < 720; ++tick) {
+                downwell::Input input;
+                if (tick >= 90) {
+                    input.left = (tick / 150) % 2 != 0;
+                    input.right = !input.left;
+                    if (!sawReentryEnemy) {
+                        // This seeded entrance closes around breakable centre
+                        // blocks. Clear that route before traversing the shaft.
+                        const int x = 240 + gameplay.player().offsetX();
+                        input.left = x > 244;
+                        input.right = x < 236;
+                    }
+                    // Sparse taps allow descent between jumps and shots.
+                    input.fire = tick % 60 == 0 || tick % 60 == 3;
+                }
+                gameplay.step(downwell::packReplayInput(input)); reference.step(input, false);
+                parityFrame = gameplay.tick();
+                compareInitialGameplay(gameplay, reference);
+                compareGameplayShot(gameplay, reference);
+                for (unsigned enemy = 0; enemy < gameplay.enemyCount(); ++enemy)
+                    sawReentryEnemy = sawReentryEnemy || gameplay.enemyAt(enemy).active;
                 require(gameplay.generationSucceeded() && reference.deferredCommandsSucceeded(),
                     "next-stage live generation succeeds on both adapters");
                 require(std::fabs(reference.mainPlayerX() - (240 + gameplay.player().offsetXFixed() / 256.0F)) < 0.01F &&
@@ -1042,6 +1074,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     34 + gameplay.cameraOffsetY() == reference.mainCameraRenderViewY(),
                     "both regenerated rooms publish identical camera views");
             }
+            std::cout << "REENTRY level=" << gameplay.runStage().level
+                << " enemies=" << gameplay.enemyCount() << " active=" << sawReentryEnemy
+                << " shots=" << gameplay.player().shots() - entryShots
+                << " player=" << 240 + gameplay.player().offsetX() << ',' << 176 + gameplay.player().offsetY() << '\n';
+            require(sawReentryEnemy && gameplay.player().shots() > entryShots,
+                    "each regenerated room exercises active enemies and firing, not just an idle landing");
             if (completedLevel == 1) {
                 // Reuse the same runtime and world, not fresh stage-two fixtures:
                 // exercise retiring and rebinding a second generated room.
