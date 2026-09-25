@@ -373,6 +373,28 @@ int main(int argc, char** argv) {
         require(fast.player().shots() > 0, "indexed/pixel live comparison exercises firing");
     }
     LiveCollision boundary;
+    {
+        AmigaTerrainIndex shuffled{};
+        bool occupied[4][AmigaTerrainIndex::rows]{};
+        for (unsigned insertion = 0; insertion < 128; ++insertion) {
+            const unsigned column = insertion % 4;
+            const unsigned row = (insertion * 197) % AmigaTerrainIndex::rows;
+            const int x = AmigaTerrainIndex::minX + column*42*16;
+            require(amigaAddTerrainObject(shuffled, 93, x, row*16),
+                "shuffled landing insertion succeeds");
+            occupied[column][row] = true;
+            require(amigaAddTerrainObject(shuffled, 93, x, row*16),
+                "duplicate shuffled landing insertion succeeds");
+            for (unsigned c = 0; c < 4; ++c) {
+                unsigned next = 0;
+                for (int y = AmigaTerrainIndex::rows-1; y >= 0; --y) {
+                    if (occupied[c][y]) next = y+1;
+                    require(shuffled.nextLanding[y*AmigaTerrainIndex::columns+c*42] == next,
+                        "each shuffled insertion preserves nearest landing in every row");
+                }
+            }
+        }
+    }
     AmigaTerrainCollisionContext empty{nullptr, nullptr, &patterns, nullptr, 0, nullptr};
     require(amigaBuildTerrainIndex(empty, boundary.index), "boundary map initializes");
     require(amigaResolveTerrainLanding(&empty, 0, 4096 - 176) == downwell::gameplayNoLanding,

@@ -32,6 +32,29 @@ applicable and a 45-second emulator limit.
 
 ### Separate runtime costs (2026-09-25)
 
+#### Baseline repeatability and rejected landing-entry-width experiment
+
+Two fresh runs of the unchanged implementation measured 812 and 813 PAL
+fields for 600 updates (36.95 and 36.90 FPS), both with maximum gap five.
+These runs used the same bounded FPSCOUNT autorun workflow and clean builds;
+one field of observed variation means tiny single-run differences should
+not be treated as precise CPU-time savings. Logs:
+`/tmp/downwell-baseline-repeat-{one,two}.log`.
+
+A 16-bit cached row+1 threshold in the upward landing-index propagation loop
+passed live terrain tests, sanitizers and cross-target replay. The slowest
+instrumented frame measured 148.575 ms; its index phase measured 24.769 ms
+(previously 149.453 / 25.624 ms). However the separate FPSCOUNT run took
+816 fields / 36.76 FPS, with maximum gap five. This did not improve the
+whole-frame target, so the implementation was removed. Do not describe the
+smaller exclusive phase sample as an overall speedup. Logs use
+`/tmp/downwell-index-width-{test,sanitized,profile,fps,replay}.log`.
+
+The retained regression test inserts 128 out-of-order one-way platforms into
+four columns, repeats each insertion, and verifies all 512 nearest-landing
+entries in all four columns after every insertion. The ordinary non-skip
+build was restored after the baseline repeats; both 68000 audits passed.
+
 The old `player` phase also covered camera and procedural generation, while
 `gems` covered retirement and HUD state after the gem loop. Four additional
 probe-only phases now separate these costs; existing phase IDs are stable.
