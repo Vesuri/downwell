@@ -11,6 +11,41 @@ static void require(bool ok, const char* message) {
 int main() {
     {
         downwell::ShopWorld world;
+        unsigned calls = 0;
+        const unsigned choices[] = {100,101,104,105,0};
+        auto random = [&](unsigned, unsigned) { return choices[calls++ % 5]; };
+        for (unsigned i = 0; i < world.capacity; ++i) {
+            auto* shop = world.create(100+i,200+i,random,4,1);
+            require(shop != nullptr, "reset fixture fills every shop slot");
+            shop->menu.active = true; shop->menu.cursor = 2;
+            shop->feedback.itemPresent[1] = false;
+            shop->keeper.alarm0 = 12; shop->keeper.present = false;
+            shop->prompt.step(true);
+        }
+        world.noControl = world.interactable = world.previous.fire = true;
+        const unsigned before = calls;
+        for (unsigned repeat = 0; repeat < 2; ++repeat) {
+            world.reset();
+            require(!world.allocatedCount && !world.fixtureRevision && !world.noControl &&
+                    !world.interactable && !world.previous.fire,
+                    "shop reset clears world ownership and input history");
+            for (const auto& shop : world.instances) {
+                require(!shop.allocated && !shop.present && !shop.wallPresent && !shop.x && !shop.y &&
+                        !shop.artRevision && shop.maskEnabled && shop.interactOk &&
+                        !shop.menu.active && shop.menu.leave && shop.menu.cursor == 1 &&
+                        shop.keeper.present && shop.keeper.sprite == 485 && shop.keeper.alarm0 == -1 &&
+                        !shop.prompt.frame(), "slot reset restores nonzero presentation defaults");
+                for (unsigned item = 0; item < 3; ++item)
+                    require(shop.stock.items[item].upgrade == 100 && shop.stock.items[item].remaining == 1 &&
+                            !shop.stock.items[item].price && shop.feedback.itemPresent[item] &&
+                            shop.feedback.storedItem[item], "slot reset restores inventory defaults");
+            }
+        }
+        require(calls == before && world.create(0,0,random,4,1) == &world.instances[0],
+                "reset consumes no RNG and reuses the first retired slot");
+    }
+    {
+        downwell::ShopWorld world;
         using C = downwell::LaserSightRay::Coordinate;
         using Segment = downwell::ProjectileSegment;
         constexpr auto unit = downwell::MachineGunTrajectory::unit;

@@ -170,7 +170,7 @@ struct RunSession {
         ammoGauge = {};
         consumables = {};
         upgrades = {};
-        shops = {};
+        shops.reset();
         gemHigh = false;
         levelExit = {};
         goalField = {};

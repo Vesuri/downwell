@@ -30,6 +30,15 @@ struct ShopWorld {
     bool noControl = false, interactable = false;
     Input previous;
 
+    void reset() {
+        // Do not materialize a whole eight-shop temporary on the A500's
+        // small task stack. Preserve every Instance's nonzero defaults.
+        for (auto& shop : instances) shop = {};
+        allocatedCount = fixtureRevision = 0;
+        noControl = interactable = false;
+        previous = {};
+    }
+
     template<class Range>
     Instance* create(int x, int y, Range random, int health, unsigned area,
                      bool hard = false, unsigned style = 0, bool member = false) {

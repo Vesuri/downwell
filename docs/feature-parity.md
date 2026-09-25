@@ -9,6 +9,31 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Results reentry stack regression fixed
+
+Re-running `verify-amiga-results-restart` exposed an overwritten 256-byte
+task-stack guard after all three destinations had executed. The instrumented
+68000 listing reserved 2,060 bytes in `main` and another 1,520 bytes in
+`RunSession::reset`: whole-world `shops = {}` materialized an eight-shop
+temporary before copying it into place.
+
+`ShopWorld::reset` now resets one instance at a time, keeping all nonzero
+stock, menu, merchant and visibility defaults. Both next-level adapters and
+run reset use it. The instrumented run-reset frame is now 200 bytes. The
+same bounded native test passes all three destinations, 200 updates of final
+gameplay, all 640 overlay copper checks, renderer/generation checks and the
+stack guard. Logs: `/tmp/downwell-results-restart-current.log` (failure) and
+`/tmp/downwell-results-stack-fixed.log` (pass). This changes storage strategy,
+not game reset semantics or the task's stack allocation.
+The bounded cross-CPU replay also passes with unchanged digests, including
+weapon fixture `0db388a5b1c2a40a` / coverage `3fff`
+(`/tmp/downwell-shop-reset-cross-replay.log`). Ordinary target settings are
+restored after both native runs, with clean 68000 instruction/helper audits.
+The full host suite passes (`/tmp/downwell-shop-reset-full-test.log`), as does
+the shop-world test under address/undefined-behavior sanitizers. Reset tests
+fill all eight slots, dirty stock/presentation/input state, reset twice and
+check default values, zero RNG consumption and first-slot reuse.
+
 ### Exact player state throughout long combat and death
 
 The combat loop now requires equal Q8 player X/Y and grounding on every

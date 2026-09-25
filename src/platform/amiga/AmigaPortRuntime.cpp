@@ -46,7 +46,7 @@ bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, uns
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
-    run_.shops = {};
+    run_.shops.reset();
     player_.enterRoom(input.fire, 1201 - 176);
     emitter_.reset(run_.upgrades.levels[12] != 0);
     run_.ammoHud.previousShots = run_.ammoHud.previousRecharges = 0;

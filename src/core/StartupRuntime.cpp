@@ -2105,7 +2105,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3 || !roomPack_ || !objectPack_) return false;
     if (!run_.advanceAfterLevelClear()) return false;
-    run_.shops = {};
+    run_.shops.reset();
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};
     inputFire_ = input.fire;
