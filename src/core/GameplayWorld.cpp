@@ -475,6 +475,11 @@ void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm)
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
+    // Runner advances existing instances' animation before Begin Step/alarms.
+    // In particular, an Alarm/Step frame reset must not then be advanced again.
+    for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active)
+        downwell::advanceEnemyImageQ8(enemies_[i].imagePhase,enemies_[i].imageRemainder,
+                                     enemies_[i].imageSpeed);
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
     if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_);
@@ -596,6 +601,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         ringOrigin_ = (unsigned)origin;
     }
 
+    const unsigned ordinaryStepEnemyCount=enemyCount_;
     if (generationStep_ && generationSucceeded_) {
         DW_PROFILE_SCOPE(profileGeneration);
         // Camera centre is 176 + cameraY_/256; view bottom is 142 below it.
@@ -696,12 +702,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
 
     DW_PROFILE_PHASE(profileEnemyMotion);
-    for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+    for (unsigned enemyIndex = 0; enemyIndex < ordinaryStepEnemyCount; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
             continue;
-        downwell::advanceEnemyImageQ8(enemy.imagePhase, enemy.imageRemainder,
-                                     enemy.imageSpeed);
         if (enemy.objectId == 113)
             enemy.imageSpeed = enemy.frogPresentation.beginStepRate();
         if (!enemy.awake && enemy.y - cameraPixelY_ <= 254)

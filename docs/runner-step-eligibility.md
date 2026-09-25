@@ -33,3 +33,24 @@ Normal and sanitizer tests cover creation after the cutoff, eligibility at
 the next cutoff, retirement/recreation of a later slot during iteration and
 the existing 2,048 owned creation/RNG cases. These remain component tests;
 the gameplay world has not yet adopted the store.
+
+## Correction to existing live enemy adapters
+
+The integration audit found that both existing enemy adapters manually ran
+new builder children immediately after the builder, outside the dispatcher.
+`GameplayWorld` now captures its ordinary-Step enemy count before generation;
+`StartupRuntime` marks records only when visited by ordinary-Step dispatch.
+Their manual enemy Step passes exclude newly created records. Later collision
+processing is not excluded by this flag.
+
+Both adapters also advance existing enemy animation before Begin Step/alarms,
+not inside the later manual Step pass. Newly generated enemies therefore keep
+their Create frame, while alarms and hit handlers can reset an already-advanced
+frame without an extra same-update increment.
+
+The decoded host's deferred creation path now initializes the serialized sprite
+before Create. Previously its missing sprite was hidden by the immediate Step
+presentation update. The route fixture explicitly checks that a new airborne
+frog retains its serialized sprite 166/frame zero until its first Step rather
+than requiring the later airborne pose immediately. The existing cross-adapter
+actor-state comparisons remain enforced.

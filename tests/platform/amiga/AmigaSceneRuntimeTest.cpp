@@ -443,7 +443,10 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                         "paired actor vertical trajectory agrees within Q8 projection error");
             require(240 + native.x == enemy.x && 176 + native.y == enemy.y,
                     "paired actors publish identical pixel positions");
-            if (enemy.objectId == 113 && enemy.active && enemy.frogHit.remaining != 0)
+            if (enemy.objectId == 113 && enemy.active && !enemy.enemyStepEligible)
+                require(enemy.spriteId == 166 && enemy.imageIndex == 0,
+                        "new frog retains serialized Create sprite/frame before its first Step");
+            else if (enemy.objectId == 113 && enemy.active && enemy.frogHit.remaining != 0)
                 require(enemy.spriteId == 173, "frog hit stun takes priority over flight presentation");
             else if (enemy.objectId == 113 && enemy.active && !enemy.grounded)
                 require(enemy.spriteId == 168 &&

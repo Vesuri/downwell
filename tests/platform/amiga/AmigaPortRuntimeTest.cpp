@@ -188,9 +188,9 @@ int main() {
     eventOrder.step(0);
     require(eventOrder.generationSucceeded() && generation.calls == 1 &&
                 eventOrder.enemyAt(0).alarm1 >= 120 &&
-                eventOrder.enemyAt(1).alarm1 == 1 && eventOrder.enemyAt(1).x == 59 &&
-                eventOrder.enemyAt(1).imagePhase == 38,
-            "new enemy moves and animates immediately without aging its Create alarm");
+                eventOrder.enemyAt(1).alarm1 == 1 && eventOrder.enemyAt(1).x == 60 &&
+                eventOrder.enemyAt(1).imagePhase == 0,
+            "builder child retains Create position/frame/alarm until the next ordinary Step");
     eventOrder.step(0);
     require(!eventOrder.generationSucceeded() && generation.calls == 2 &&
                 eventOrder.enemyAt(1).alarm1 >= 120,
@@ -590,12 +590,13 @@ int main() {
                 2, 1, 1, 1, 0, 0, true, true, true),
             "configure both frog alarms expiring together");
     simultaneousFrog.step(0);
-    require(simultaneousFrog.enemyAt(0).auxiliaryState == 1 &&
-                simultaneousFrog.enemyAt(0).motionState == -2 &&
-                simultaneousFrog.enemyAt(0).frogHorizontal.velocity == -65536L &&
-                simultaneousFrog.enemyAt(0).alarm0 == 60 &&
+    require(simultaneousFrog.enemyAt(0).auxiliaryState == 0 &&
+                simultaneousFrog.enemyAt(0).motionState == 2 &&
+                simultaneousFrog.enemyAt(0).frogHorizontal.velocity == 131072L &&
+                simultaneousFrog.enemyAt(0).alarm0 == 0 &&
+                simultaneousFrog.enemyAt(0).alarm1 == 59 &&
                 simultaneousFrog.enemyAt(0).speedY < 0,
-            "alarm zero jump precedes alarm one preparation without prematurely clearing support");
+            "alarm zero jump overwrites expiring alarm one before its countdown to 59");
     AmigaPortRuntime aimingFrog(300);
     aimingFrog.configureSolidResolver(flatGround, nullptr);
     require(aimingFrog.configureEnemy(0, 113, 166, 0, 1, 0, 0, 35, 20,

@@ -321,6 +321,18 @@ void StartupRuntime::stepInternal(bool advancePressed,
 
     for (std::size_t i = 0; i < instances_.size(); ++i) {
         auto& instance = instances_.at(i);
+        instance.enemyStepEligible=false;
+        const bool enemyObject=instance.objectId==111 || instance.objectId==112 ||
+            instance.objectId==113 || instance.objectId==116 || instance.objectId==117 || instance.objectId==119;
+        if (instance.active && enemyObject) {
+            if (!instance.enemyImageInitialized) {
+                instance.enemyImagePhase=static_cast<unsigned>(std::lround(instance.imageIndex*256));
+                instance.enemyImageInitialized=true;
+            }
+            advanceEnemyImageQ8(instance.enemyImagePhase,instance.enemyImageRemainder,
+                               static_cast<unsigned>(std::lround(instance.imageSpeed*20)));
+            instance.imageIndex=instance.enemyImagePhase/256.0F;
+        }
         if (instance.active && instance.objectId == 113) instance.frogHit.advanceFrame();
         if (instance.active && instance.objectId == 117) instance.snailHit.advanceFrame();
         if (instance.active && instance.objectId == 116) instance.batHit.advanceFrame();
@@ -350,6 +362,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     };
     const auto handler = [this, advancePressed](InstanceRecord& instance,
                                                  StepEvent event) {
+        if (event.phase==StepEventPhase::step) instance.enemyStepEligible=true;
         if (objectPack_ != nullptr) {
             if (event.phase == StepEventPhase::alarm) {
                 dispatchObjectEvent(instance, 2, event.subtype, advancePressed);
@@ -735,7 +748,7 @@ void StartupRuntime::updateMainEnemies() {
                                  enemy.objectId == 116 ||
                                  enemy.objectId == 117 ||
                                  enemy.objectId == 119;
-        if (!enemy.active || !enemyObject || enemy.health <= 0)
+        if (!enemy.active || !enemyObject || enemy.health <= 0 || !enemy.enemyStepEligible)
             continue;
         if (!enemy.motionInitialized) {
             enemy.preciseX = static_cast<float>(enemy.x);
@@ -743,13 +756,6 @@ void StartupRuntime::updateMainEnemies() {
             enemy.motionInitialized = true;
         }
 
-        if (!enemy.enemyImageInitialized) {
-            enemy.enemyImagePhase = static_cast<unsigned>(std::lround(enemy.imageIndex * 256));
-            enemy.enemyImageInitialized = true;
-        }
-        advanceEnemyImageQ8(enemy.enemyImagePhase, enemy.enemyImageRemainder,
-                            static_cast<unsigned>(std::lround(enemy.imageSpeed * 20)));
-        enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
         if (enemy.objectId == 113)
             enemy.imageSpeed = enemy.frogPresentation.beginStepRate() / 20.0F;
         if (enemy.objectId == 111 || enemy.objectId == 112) {

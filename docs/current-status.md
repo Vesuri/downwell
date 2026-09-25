@@ -23,7 +23,31 @@ two ports proves original-game completion. The active parity goal is unfinished.
 This queue describes priorities, not a replacement for the full goal. The old
 `open-work.md` is an early milestone inventory, not the current ordered queue.
 
-### Latest verification: original alarm ordering
+### Latest correction: creation-phase enemy timing
+
+Both live enemy adapters now skip ordinary Step for children generated during
+that phase, and advance existing enemy animation before Begin Step/alarms.
+The decoded host now initializes serialized sprites before Create rather than
+relying on an immediate presentation Step. See `runner-step-eligibility.md`.
+This corrects existing gameplay, not just the future skeleton components.
+
+Full decoded startup and deferred-instance tests pass. Gameplay tests pass
+normally and with address/undefined-behavior sanitizers. The old simultaneous
+frog-alarm assertion was stale after the earlier alarm-order correction; it
+now explicitly checks Alarm 0's jump and replacement Alarm 1 countdown of 59.
+Creation-frame tests require unchanged position, frame and alarm, including
+the newborn frog's serialized sprite 166 before its first airborne Step.
+
+Paired natural routes pass with unchanged completion limits and state checks:
+seed 99 exits at 1,339 updates, seed 4 at 1,646; both complete 211 upgrade and
+120 re-entry updates. Seed 4 reaches its shop after 518 updates and returns in
+43. Evidence: `/tmp/downwell-creation-phase-natural.log`.
+The bounded rendered Amiga route also passes: exit 1,646, 211 completion
+frames, 168 exit-field frames, 49 shop-HUD comparisons, 43 return updates and
+688 second-level updates total. The task-stack guard passes. Evidence:
+`/tmp/downwell-creation-phase-native.log` and `amiga/.run/gdb-startup.log`.
+
+### Previous verification: original alarm ordering
 
 The decoded scheduler and shared gameplay's explicit enemy Alarm 0/1 slots
 now dispatch immediately in global ascending alarm-index order. This corrects

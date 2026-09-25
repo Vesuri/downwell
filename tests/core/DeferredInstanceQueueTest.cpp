@@ -63,7 +63,10 @@ void testApplyIsOrderedAndAtomic() {
     require(queue.enqueueCreate(0, 30, 40), "second create is queued");
     std::uint32_t nextId = 105186;
     std::uint32_t callbacks = 0;
-    const auto onCreate = [&callbacks](downwell::InstanceRecord&) { ++callbacks; };
+    const auto onCreate = [&callbacks](downwell::InstanceRecord& instance) {
+        require(instance.spriteId == 12,"serialized sprite exists before Create callback");
+        ++callbacks;
+    };
     require(queue.apply(instances, objects, 20, nextId, onCreate) ==
                 downwell::ApplyInstanceCommandsResult::success,
             "valid queued creates apply");

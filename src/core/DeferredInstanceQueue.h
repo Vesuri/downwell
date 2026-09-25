@@ -106,6 +106,7 @@ public:
             InstanceRecord& instance = *instances.find(instanceId);
             instance.x = command.x;
             instance.y = command.y;
+            instance.spriteId = definition.spriteId;
             instance.scaleX = command.scaleX;
             instance.scaleY = command.scaleY;
             instance.imageSpeed = command.imageSpeed;

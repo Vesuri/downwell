@@ -32,6 +32,7 @@ struct InstanceRecord {
     unsigned enemyImagePhase = 0;
     unsigned char enemyImageRemainder = 0;
     bool enemyImageInitialized = false;
+    bool enemyStepEligible = false; // Set only by this tick's ordinary-Step dispatch.
     std::int32_t spriteId = -1;
     std::int32_t creationCodeId = -1;
     std::int32_t preCreateCodeId = -1;
