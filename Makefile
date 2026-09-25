@@ -118,6 +118,14 @@ all: $(TARGET)
 .PHONY: verify-bone-reference
 .PHONY: verify-motion-binary64
 .PHONY: verify-bone-motion
+.PHONY: verify-bone-projectile
+verify-bone-projectile: build/bone-projectile-test
+	./build/bone-projectile-test
+
+build/bone-projectile-test: tests/core/BoneProjectileTest.cpp src/core/BoneProjectile.h src/core/BoneMotion.h src/core/MotionBinary64.h src/core/BoneProjectileReference.h src/core/GameMakerRounding.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/BoneProjectileTest.cpp
+
 verify-bone-motion: build/bone-motion-test
 	./build/bone-motion-test
 

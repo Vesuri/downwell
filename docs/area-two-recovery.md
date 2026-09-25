@@ -278,3 +278,29 @@ stopped and restored ordinary startup with clean 68000 audits. The motion
 component is ready for ownership integration, but no skeleton or projectile
 has been enabled in the playable game. Health/collision event handling,
 animation and presentation remain outstanding.
+
+### Integer-only bone event state
+
+`BoneProjectile` now joins verified two-axis motion to post-launch Step and
+collision handling. It owns health, active/mask state, animation selection
+(instance default, sampled rate or stopped), and a destruction-request latch.
+Callbacks retain the original effect/damage order and do not free storage.
+In particular, Step still queries view membership after health destruction;
+wall contact destroys before its effect, while player contact emits damage
+(unless time-stopped), effect, then destruction. An inactive bone ignores
+player contact but not wall contact. View membership is supplied by the owner
+so fractional camera coordinates are not silently rounded.
+
+`make verify-bone-projectile` compares 6,300 combinations of starting position,
+velocity, health, activity and time-stop against the recovered reference,
+including half-pixel viewport edges and both collision dispatches. It checks
+motion bits, pixel coordinates, animation state, mask, destruction requests
+and ordered effects. Normal and ASan/UBSan tests pass. The expanded 68000
+compile fixture includes Step and both collisions with no undefined symbols.
+This is code-generation evidence, not a new native lifecycle replay.
+
+The component deliberately does not sample or advance animation, allocate
+instances, run mask collisions, apply player damage or render effects itself.
+Those belong to the forthcoming shared projectile owner/backend integration;
+the callbacks must be wired rather than dropped. It is not registered in live
+skeleton spawning yet, and no new frame-time claim is made.

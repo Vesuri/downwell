@@ -170,6 +170,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   replay. Its isolated complete-motion cost is about 0.90 ms/bone update;
   lifecycle, animation, collision and rendering costs are not included. No
   new live actor is enabled yet.
+  `BoneProjectile` now wraps motion with source-ordered Step, wall/player
+  collision and deferred destruction requests; 6,300 reference cases and
+  sanitizers pass, and 68000 code generation needs no helpers. Instance owner,
+  animation, real collision dispatch and presentation remain unwired.
 
 ## Working evidence
 

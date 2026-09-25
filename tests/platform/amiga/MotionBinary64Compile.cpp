@@ -1,8 +1,26 @@
 #include "core/MotionBinary64.h"
+#include "core/BoneProjectile.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
     downwell::MotionBinary64* velocity, std::int32_t* pixel) {
     return velocity->add({0x3fb99999u, 0x9999999au}) &&
         position->add(*velocity) && position->roundPixel(*pixel);
+}
+namespace {
+struct BoneEvents {
+    unsigned trace = 0;
+    void destroy() { trace = (trace << 2) | 1; }
+    void effect(int, int) { trace = (trace << 2) | 2; }
+    void damage(int, int, int) { trace = (trace << 2) | 3; }
+};
+}
+extern "C" unsigned boneProjectileCompile(downwell::BoneProjectile* bone,
+    bool stopped, bool playerCollision, bool wallCollision) {
+    BoneEvents events;
+    if (!bone->step(stopped, [](int x,int y) { return x > 0 && x < 160 && y > 0 && y < 284; }, events))
+        return 0xffffffffu;
+    if (playerCollision) bone->collidePlayer(stopped, events);
+    if (wallCollision) bone->collideWall(events);
+    return events.trace;
 }
