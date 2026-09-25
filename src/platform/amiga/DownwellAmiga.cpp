@@ -27,6 +27,7 @@
 #include "AmigaExitMask.h"
 #include "AmigaClearPresenter.h"
 #include "AmigaClearSceneAssets.h"
+#include "AmigaUpgradeScene.h"
 #include "AmigaSplashCache.h"
 #include "AmigaStyleRenderer.h"
 #include "AmigaShopMenu.h"
@@ -1442,15 +1443,8 @@ int main(void) {
     // Construct at entry (not before the framework startup), as for port.
     alignas(AmigaSceneRuntime) static UBYTE sceneStorage[sizeof(AmigaSceneRuntime)];
     AmigaSceneRuntime& scenes = *new (sceneStorage) AmigaSceneRuntime;
-    struct ClearState {
-        AmigaClearPresenter presenter;
-        AmigaClearSceneAssets assets;
-        unsigned offerCount = 0, offers[4] = {};
-        unsigned char owned[23] = {};
-        bool presented = false, left = false, right = false, heartGoal = false;
-    };
-    alignas(ClearState) static UBYTE clearStorage[sizeof(ClearState)];
-    auto& clear = *new (clearStorage) ClearState;
+    alignas(AmigaUpgradeScene) static UBYTE clearStorage[sizeof(AmigaUpgradeScene)];
+    auto& clear = *new (clearStorage) AmigaUpgradeScene;
     AmigaScene presentedScene = scenes.scene();
 #ifdef DOWNWELL_SKIP_TO_GAME
     // Force the normal main-room presentation setup on the first frame.
@@ -2482,28 +2476,20 @@ int main(void) {
                     platform.publish(splashBlankList);
                     platform.waitVblank();
                     AmigaHardware::blitterDrain();
-                    if (!port.enterLevelClear(scenes.styleCursor(), clear.heartGoal) ||
-                        !clear.assets.prepare(memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
+                    if (!clear.enter(port, scenes.styleCursor(), liveInput,
+                            memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                             amiga_hud_pack_end - amiga_hud_pack, amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack,
-                            amiga_exit_mask, amiga_exit_mask_end - amiga_exit_mask, nullptr, 0,
-                            port.runStage().area, port.runStage().level)) { exitCode = 20; break; }
-                    clear.presenter.reset(); clear.offerCount = 0;
-                    clear.left = liveInput.left; clear.right = liveInput.right;
-                    clear.presented = true;
+                            amiga_exit_mask, amiga_exit_mask_end - amiga_exit_mask)) { exitCode = 20; break; }
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 2;
 #endif
-                    for (unsigned i = 0; i < 23; ++i) clear.owned[i] = port.upgrades().levels[i];
                     for (unsigned buffer = 0; buffer < 2; ++buffer) {
                         gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
                         gameListReady[buffer] = false;
                     }
                 } else if (!port.nextLevelRequested()) {
                     DW_PROFILE_SCOPE(profileClearStep);
-                    bool confirm = liveInput.fire;
-                    if (!port.stepLevelClear(confirm, liveInput.left && !clear.left, liveInput.right && !clear.right,
-                        clear.heartGoal, [](downwell::LevelClearSelection::Effect, unsigned) {})) { exitCode = 20; break; }
-                    clear.left = liveInput.left; clear.right = liveInput.right;
+                    if (!clear.step(port, liveInput)) { exitCode = 20; break; }
                 }
                 if (port.nextLevelRequested() && port.runStage().area == 1 && port.runStage().level < 3) {
                     splashBlankList.reset(); splashBlankList.move(bplcon0, 0);
@@ -2521,21 +2507,13 @@ int main(void) {
                 }
                 const auto& room = port.levelClear();
                 const auto& snapshot = port.levelClearFrame();
-                const unsigned count = snapshot.choices ? room.selection.lastIndex + 1 : 0;
-                bool bankChanged = count != clear.offerCount;
-                for (unsigned i = 0; i < count; ++i) bankChanged |= clear.offers[i] != room.offers.ids[i];
-                for (unsigned i = 0; i < 23; ++i) bankChanged |= clear.owned[i] != port.upgrades().levels[i];
+                const bool bankChanged = clear.needsArtwork(port);
                 if (bankChanged) {
                     DW_PROFILE_SCOPE(profileClearBank);
                     AmigaHardware::blitterDrain();
-                    if (!clear.assets.changeOffers(memory.menuForeground(), amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack,
-                        room.offers.ids, count, port.runStage().area, port.runStage().level, port.upgrades().levels)) {
+                    if (!clear.refreshArtwork(port, memory.menuForeground(), amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack)) {
                         exitCode = 20; break;
                     }
-                    clear.offerCount = count;
-                    for (unsigned i = 0; i < count; ++i) clear.offers[i] = room.offers.ids[i];
-                    for (unsigned i = 0; i < 23; ++i) clear.owned[i] = port.upgrades().levels[i];
-                    clear.presenter.artworkChanged();
                 }
                 const unsigned back = front ^ 1u;
                 AmigaRenderer target = renderer;

@@ -82,8 +82,8 @@ not a new shipping-FPS claim. The baseline table above is intentionally kept.
 Log: `/tmp/downwell-clear-strip-profile.log`, detailed output in
 `amiga/.run/profile-probes.log` (replaced by subsequent profile runs).
 The expanded 3,840-frame host oracle includes reverse/large camera jumps,
-finite ends and all area transitions. Native verification is recorded with
-the scene extraction below once completed. Overlay pointer scrolling and
+finite ends and all area transitions. Native verification is recorded in
+`scene-architecture.md`: two clears and third-level reentry pass. Overlay pointer scrolling and
 shared style/upgrade presentation are still unfinished.
 
 - Source-derived clear state, camera/player easing and carousel logic run in
