@@ -37,9 +37,38 @@ effects, dissipate and buttons in that order at the view origin. A missing
 surface is created instead of presented in that branch. Surface dimensions are
 160 by `g_cameraHeight`.
 
-Therefore an ordinary smoke overlay is not a faithful replacement. Exact GPU
-blend/alpha behavior and global draw ordering must be established before choosing
-the Amiga composition implementation; routing tests alone do not prove pixels.
+Therefore an ordinary smoke overlay is not a faithful replacement. Global draw
+ordering, sampling and surface ownership still need live verification; routing
+tests alone do not prove pixels.
+
+## Pinned Windows blend path
+
+`verify-runner-effect-blend.py` pins the executable hash, registration at
+`0x519d41`, mode wrapper at `0x518ab0`, state cache/flush, backend dispatch,
+factor translators and blend-descriptor construction. Mode 3 assigns internal
+source factor 1 and destination factor 4 for both RGB and alpha. The RGB
+translator at `0x66c390` produces D3D11 factors 1/4; the alpha translator at
+`0x66c440` produces 1/6. Descriptor construction at `0x66c07e` sets both blend
+operations to ADD. This is **not** a D3D subtract operation.
+
+The [D3D11 factor definitions](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ne-d3d11-d3d11_blend)
+identify these as ZERO/INV_SRC_COLOR for RGB and ZERO/INV_SRC_ALPHA for alpha.
+The [descriptor contract](https://learn.microsoft.com/en-us/windows/win32/api/d3d11/ns-d3d11-d3d11_render_target_blend_desc)
+confirms that color and alpha use separate factors. Consequently:
+
+- RGB output is destination RGB times one minus source RGB.
+- Alpha output is destination alpha times one minus source alpha.
+- Normal mode restores SRC_ALPHA/INV_SRC_ALPHA for RGB and alpha.
+
+Source sprite 117 (`sprLight`) is 96 by 96, origin (48,48), with only transparent
+black and opaque black texels. It is exported offline as a planar masked asset,
+not as a 96-pixel-wide hardware sprite. Its alpha coverage can suppress opaque
+smoke with `smokeCoverage & ~shadeCoverage`. Under binary sampled alpha, surviving
+smoke remains opaque and covered smoke becomes transparent; no grayscale fade or
+RGB subtraction approximation is needed. Overlapping opaque shade coverage unions.
+This conclusion is limited to this opaque/binary path, not all particle alpha,
+shader, filtering or surface-recreation cases. It is static binary/API evidence,
+not a captured execution of Windows rendering.
 
 Reviewed assembly SHA-256 values:
 

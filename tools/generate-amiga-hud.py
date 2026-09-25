@@ -77,6 +77,7 @@ SELECTIONS = {
         76: None,    # sprTileSurface
         84: None,    # sprSmoke: all nine source animation frames
         96: None,    # sprFlashBall: source shader light/dark classes
+        117: [0],    # sprLight: opaque-black shade coverage for effect composition
         127: None,   # sprTouchWide (generated wide trigger presentation)
         133: None,   # sprGemSmall
         134: None,   # sprGemLarge

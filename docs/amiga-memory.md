@@ -17,8 +17,8 @@ memory requirement.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Resident game-art pack (directory, planar art, garden sprites) | 269,582 |
-| **Total** | **478,054** |
+| Resident game-art pack (directory, planar art, garden sprites) | 273,184 |
+| **Total** | **481,656** |
 
 A temporary 16-byte startup copper list is also allocated during initialization.
 Immutable planar/mask payloads may share byte-identical word-aligned subregions

@@ -1104,6 +1104,7 @@ verify-default-shader: generated/default-shader.json
 	python3 tools/verify-default-shader.py
 
 verify-amiga-game: generate-amiga-game verify-default-shader
+	python3 tools/verify-runner-effect-blend.py
 	python3 tools/verify-amiga-menu-sprites.py
 	tools/generate-amiga-hud.py --profile game --check
 	python3 tests/exit-mask-test.py
