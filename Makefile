@@ -118,6 +118,11 @@ all: $(TARGET)
 .PHONY: verify-skeleton-timing
 .PHONY: verify-runner-image-value
 .PHONY: verify-legacy-image-animation
+.PHONY: verify-animation-metadata
+verify-animation-metadata:
+	bash tools/export-animation-metadata.sh
+	python3 tools/verify-animation-metadata.py
+
 verify-legacy-image-animation: build/legacy-image-animation-test
 	./build/legacy-image-animation-test
 

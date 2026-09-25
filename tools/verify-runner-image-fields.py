@@ -15,6 +15,11 @@ for start, end, digest in (
     (0x42DD90, 0x42DDB1, "3b477aa2f2db6874eb6234c247eafe4a22b7af19e95a40da6d305d84c09f2fdf"),
     (0x50EBF0, 0x50EC06, "8fc0910f1d2d8035c3e83103aa75e5a745920681156c3f47d18a7368915a5a00"),
     (0x50EF0C, 0x50EFC0, "ed16169d69d02e8d555d838382f5d0c4899fc369551a6a518ff2d01da3ce9bb3"),
+    (0x4976F0, 0x4976FE, "65f22d449a57f8c5cdc48b36d48cf9fbd10d8e35ae336bd4e00f016b2a455815"),
+    (0x4977B2, 0x4977EA, "824cdcbaeebbff97a9fff0d00dda53a3b6598d420262984f56fd74df7c114fc5"),
+    (0x4979E8, 0x4979F3, "6eac5342e3808148018dd3a35a296710671b01b546f4a319e5d6d17ecdea715c"),
+    (0x50EE87, 0x50EEB0, "4a4b6db66c7c81da6f89b95b993963ff03e9b0fc23735059c1ddddd03c8984a8"),
+    (0x50DBF0, 0x50DC89, "5bde1a04d1364494f8b93200c107ebd208782a0489c031f2a8894ae835433004"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest
 print("Pinned Windows image field registration, narrowing setters and speed getter verified")

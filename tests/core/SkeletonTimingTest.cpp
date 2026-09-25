@@ -49,15 +49,17 @@ int main() {
     SkeletonTiming animation;
     animation.alarm(3);
     float image = 0;
+    float previousSpeed = 0;
     for (unsigned tick = 0; tick < 100; ++tick) {
         const bool stopped = tick % 11 == 3;
-        animation.beginStep(stopped);
-        image += stopped ? 0.0f : 0.3f;
+        image += previousSpeed;
         const bool expectedEnd = image >= 8;
         if (expectedEnd) image -= 8;
         bool ended = false;
         check(animation.advanceImage(8, ended));
         check(same(animation.imageIndex, double(image)) && ended == expectedEnd);
+        animation.beginStep(stopped);
+        previousSpeed = stopped ? 0.0f : 0.3f;
     }
 
     unsigned cases = 0;

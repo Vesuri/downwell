@@ -250,6 +250,11 @@ and the ordinary build was restored after both attempts.
   comparisons and skeleton's 100 time-stop/advance updates pass. Live phase
   ownership, resource-path selection and negative-frame rendering remain
   integration work; this does not enable skeletons or change live animation.
+  Follow-up proves this build selects GMS2 animation and that advancement
+  precedes Begin Step/alarms. The metadata export pins all 741 playback records;
+  skeleton/bone sprites have unit per-game-frame speed but also V2 sequences.
+  Mapping that sequence data to the runner's selected update branch remains
+  necessary; the legacy helper alone is not an original-build parity claim.
 
 ## Working evidence
 

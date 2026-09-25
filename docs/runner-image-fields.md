@@ -61,3 +61,25 @@ tracing that field all the way to the serialized version is still needed
 before calling path selection independently proven for every resource.
 Thus these are source-path tests, not original-runner execution or live actor
 parity. The region hashes now also guard the branch and legacy update body.
+
+## Build selection and phase follow-up
+
+The loader reads GEN8 payload into EDI at `0x4977c8`; `0x4979e8` compares
+payload offset `0x2c` against 2 and sets `0xb57f18`. The pinned data has 2
+at that offset, so **this build enters the GMS2 branch**, not the zero-flag
+legacy entry. The older helper is not by itself proof of the selected path.
+
+`make verify-animation-metadata` exports all 741 sprite records with pinned
+input hash, extractor version/commit and stable resource IDs. Skeleton sprites
+205–208 and bone 460 are normal sprites, with frame counts 1/1/8/6/4 and
+FramesPerGameFrame speed 1. There are five FramesPerSecond resources:
+399, 626, 738, 739 and 740. However, the skeleton/bone resources also contain
+V2 sequence data. Unit speed alone does not prove that the runner bypasses
+sequence handling: resolving how that maps to the `0x50ec22` pointer branch
+is still required. No playable actor is enabled based on the unit multiplier.
+
+The owner calls the animation routine at `0x50dc25` in an instance traversal,
+before the Begin Step type/subtype 3/1 setup at `0x50dc6b` and the alarm-phase
+call at `0x50dce6`. The component test now advances before applying ordinary
+Step's speed/time-stop writes, using the previous stored speed. This phase
+finding is independent of which animation branch each sprite selects.

@@ -18,6 +18,8 @@ struct SkeletonTiming {
 
     static MotionBinary64 throwRate() { return {0x3fd33333u, 0x33333333u}; }
 
+    // Runner advances the image before Begin Step and the alarm phase.
+    // Skeleton/bone metadata uses normal sprites with playback multiplier 1.
     bool advanceImage(unsigned frames, bool& ended) {
         RunnerImageValue index, speed;
         if (!index.assign(imageIndex) || !speed.assign(imageSpeed) ||
