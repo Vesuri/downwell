@@ -2,6 +2,8 @@
 #define DOWNWELL_CORE_MOTION_BINARY64_VERIFICATION_H
 #include "MotionBinary64.h"
 #include "BoneMotion.h"
+#include "BoneProjectile.h"
+#include "GameMakerRandom.h"
 namespace downwell {
 struct MotionBinary64Verification {
     std::uint32_t digest = 0x811c9dc5u, updates = 0, failures = 0;
@@ -59,6 +61,22 @@ inline MotionBinary64Verification verifyBoneMotion(bool benchmark = false) {
     result.mix(bone.xx.high); result.mix(bone.xx.low);
     result.mix(bone.yy.high); result.mix(bone.yy.low);
     result.mix(static_cast<std::uint32_t>(bone.x)); result.mix(static_cast<std::uint32_t>(bone.y));
+    return result;
+}
+inline MotionBinary64Verification verifyBoneCreate() {
+    MotionBinary64Verification result;
+    for (unsigned seed = 0; seed < 1024; ++seed) {
+        GameMakerRandom random(seed);
+        BoneProjectile bone;
+        if (!bone.create(240,990,random)) ++result.failures;
+        result.mix(bone.motion.xsp.high); result.mix(bone.motion.xsp.low);
+        result.mix(bone.motion.ysp.high); result.mix(bone.motion.ysp.low);
+        result.mix(bone.sampledAnimationRate.high); result.mix(bone.sampledAnimationRate.low);
+        result.mix(static_cast<std::uint32_t>(random.drawCount()));
+        result.mix(static_cast<std::uint32_t>(random.stateIndex()));
+        for (unsigned i = 0; i < 16; ++i) result.mix(random.stateWord(i));
+        ++result.updates;
+    }
     return result;
 }
 }

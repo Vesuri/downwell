@@ -1,5 +1,9 @@
 # Open work
 
+This is the early milestone inventory. For the current ordered queue, verified
+scope and remaining work, use [current-status.md](current-status.md). Some
+unchecked entries below have since been partially or fully superseded.
+
 ## Extraction
 
 - [x] Pin UndertaleModTool/UndertaleModLib 0.9.2.0 at commit `03c7048`.

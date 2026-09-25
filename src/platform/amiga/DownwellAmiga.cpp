@@ -282,6 +282,7 @@ volatile ULONG gMotionReplayDigest, gMotionReplayUpdates, gMotionReplayFailures;
 volatile ULONG gMotionBenchDigest, gMotionBenchFailures, gMotionBenchFields;
 volatile ULONG gBoneReplayDigest, gBoneReplayUpdates, gBoneReplayFailures;
 volatile ULONG gBoneBenchDigest, gBoneBenchFailures, gBoneBenchFields;
+volatile ULONG gBoneCreateDigest, gBoneCreateCount, gBoneCreateFailures;
 
 __attribute__((noinline, used)) void downwellReplayComplete(void) {
     __asm__ volatile("" ::: "memory");
@@ -3046,6 +3047,9 @@ int main(void) {
             const auto boneBench = downwell::verifyBoneMotion(true);
             gBoneBenchFields = UWORD(AmigaPlatform::vblankCount() - boneStart);
             gBoneBenchDigest = boneBench.digest; gBoneBenchFailures = boneBench.failures;
+            const auto createdBones = downwell::verifyBoneCreate();
+            gBoneCreateDigest = createdBones.digest; gBoneCreateCount = createdBones.updates;
+            gBoneCreateFailures = createdBones.failures;
             gReplayComplete = 1;
             downwellReplayComplete();
             for (;;) platform.waitVblank();

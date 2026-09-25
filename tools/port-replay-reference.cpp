@@ -43,5 +43,8 @@ int main() {
     const auto bones = downwell::verifyBoneMotion(), boneBench = downwell::verifyBoneMotion(true);
     if (bones.failures || boneBench.failures) return 7;
     std::printf("BONE %u %08x %u %08x %u\n", bones.updates, bones.digest, bones.failures, boneBench.digest, boneBench.failures);
+    const auto createdBones = downwell::verifyBoneCreate();
+    if (createdBones.failures) return 8;
+    std::printf("BONE_CREATE %u %08x %u\n",createdBones.updates,createdBones.digest,createdBones.failures);
     return 0;
 }

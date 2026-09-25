@@ -1,6 +1,8 @@
 #include "core/SkeletonThrow.h"
 #include "core/GameMakerRandom.h"
 #include "core/BoneProjectileReference.h"
+#include "core/BoneProjectile.h"
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -13,20 +15,26 @@ struct Ops {
     int vx = 0, vy = 0, spin = 0;
     bool latched = false;
     downwell::BoneProjectileReference bone;
+    downwell::BoneProjectile target;
     explicit Ops(unsigned seed) : random(seed) {}
     bool createBone(int object, int x, int y) {
         trace.insert(trace.end(), {1, object, x, y});
         if (!allocated) return false;
-        bone.create(x, y, random);
-        return true;
+        auto referenceRandom = random;
+        bone.create(x, y, referenceRandom);
+        return target.create(x,y,random);
     }
     void throwSound(int sound) { trace.insert(trace.end(), {2, sound}); }
     unsigned choose(unsigned count) { trace.insert(trace.end(), {3, int(count)}); return random.chooseIndexSmall(count); }
     void setVelocityTenths(int x, int y) {
         trace.push_back(4); vx = x; vy = y;
         bone.xsp = x / 10.0; bone.ysp = y / 10.0;
+        require(target.motion.launch(target.motion.x,target.motion.y,x,y));
     }
-    void multiplyAnimationSpeed(int sign) { trace.push_back(5); spin = sign; bone.imgSp *= sign; }
+    void multiplyAnimationSpeed(int sign) {
+        trace.push_back(5); spin = sign; bone.imgSp *= sign;
+        if (sign < 0) target.sampledAnimationRate.high ^= 0x80000000u;
+    }
     void latchShot() { trace.push_back(6); latched = true; }
 };
 int main() {
@@ -58,6 +66,13 @@ int main() {
                     actual.bone.imgSp == animation * (vx > 0 ? -1 : 1) &&
                     actual.bone.imageSpeed == 1);
                 require(actual.random.drawCount() == oracle.drawCount() && actual.random.stateIndex() == oracle.stateIndex());
+                const auto same = [](downwell::MotionBinary64 a,double b) {
+                    std::uint64_t raw; std::memcpy(&raw,&b,8);
+                    return a.high == std::uint32_t(raw>>32) && a.low == std::uint32_t(raw);
+                };
+                require(same(actual.target.motion.xsp,actual.bone.xsp) && same(actual.target.motion.ysp,actual.bone.ysp) &&
+                    same(actual.target.sampledAnimationRate,actual.bone.imgSp) &&
+                    actual.target.motion.x == actual.bone.x && actual.target.motion.y == actual.bone.y);
                 for (unsigned i = 0; i < 16; ++i) require(actual.random.stateWord(i) == oracle.stateWord(i));
                 ++cases;
             }

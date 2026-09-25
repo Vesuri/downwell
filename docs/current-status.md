@@ -4,6 +4,24 @@ The Windows Steam build and its VM/resource evidence are the ultimate oracle.
 SDL is a development comparison. Neither passing a CPU replay nor matching the
 two ports proves original-game completion. The active parity goal is unfinished.
 
+## Immediate queue
+
+- **Now:** integrate recovered catacomb skeleton/bone behavior into the shared
+  runtime. Numeric Create/motion and lifecycle components are tested, but are
+  not live actors. Next implement source-backed animation/event scheduling,
+  instance ownership and collision dispatch, then connect both renderers.
+- **Next:** connect the catacomb builder and remaining actors/hazards, with
+  original-source checks and bounded cross-target route verification. Do not
+  enable incomplete actors merely to advance the area counter.
+- **Continuing obligations:** worst-case 20 ms performance, natural-route
+  coverage and scene ownership cleanup. Keep these distinct from new-feature
+  completion; detailed measurements and outstanding coverage are below.
+- **Later/full scope:** remaining areas, weapons, styles, bosses, audio,
+  persistence and stock-A500 memory validation.
+
+This queue describes priorities, not a replacement for the full goal. The old
+`open-work.md` is an early milestone inventory, not the current ordered queue.
+
 ## Implemented and checked
 
 - Publisher/credits/controls, garden/well, style selection and first-area
@@ -155,12 +173,13 @@ two ports proves original-game completion. The active parity goal is unfinished.
   is implemented. See `area-two-recovery.md`.
   Shared skeleton throw orchestration now preserves synchronous child Create,
   conditional RNG choices and velocity overrides in VM order; 9,216 state/trace
-  cases and sanitizers pass. Bone lifecycle and live skeleton integration are
-  still outstanding; the helper does not enable a new actor.
+  cases and sanitizers pass. Live skeleton integration remains outstanding;
+  the helper does not enable a new actor.
   Bone Create/Step/collision behavior now has a host numeric/event reference,
   with 1,024 RNG cases and 102,400 motion updates passing plus sanitizer checks.
-  It deliberately retains VM-style doubles; target arithmetic, animation and
-  live collision/damage dispatch remain integration work, not completed parity.
+  That host reference deliberately retains VM-style doubles; the target
+  arithmetic components below are checked against it. Animation and live
+  collision/damage dispatch remain integration work, not completed parity.
   An integer-only binary64 addition/pixel-rounding candidate now matches the
   host numeric reference and cross-compiles to 68000 without library helpers.
   Native numeric replay now matches 24,000 updates; an isolated two-add/
@@ -177,6 +196,15 @@ two ports proves original-game completion. The active parity goal is unfinished.
   Target-side bone Create now retains the exact sampled binary64 ranges using
   integer-only conversion, with 600,000 conversion tests and full Create/RNG/
   motion comparisons passing. It remains a component, not live spawning.
+  Native Create verification now matches all sampled fields and complete RNG
+  state for 1,024 seeds (`BONE_CREATE 1024 ef0f74f5 0`), with a host double
+  reference independently checking that digest. The 9,216 skeleton-throw cases
+  now exercise target Create, velocity override and signed animation rate,
+  rather than only the double reference. Existing native replay lines remain
+  matched; the ordinary executable was restored with clean 68000 audits.
+  Evidence: `/tmp/downwell-bone-create-native.log` and `amiga/.run/gdb-out.log`
+  (the latter is overwritten by subsequent runs). This does not verify live
+  projectile ownership, animation advancement, collision dispatch or drawing.
 
 ## Working evidence
 

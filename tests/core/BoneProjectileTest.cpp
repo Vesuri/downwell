@@ -1,6 +1,7 @@
 #include "core/BoneProjectile.h"
 #include "core/BoneProjectileReference.h"
 #include "core/GameMakerRandom.h"
+#include "core/MotionBinary64Verification.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -20,6 +21,7 @@ static bool same(downwell::MotionBinary64 actual, double expected) {
 int main() {
     using downwell::BoneProjectile;
     unsigned cases = 0;
+    downwell::MotionBinary64Verification expectedCreate;
     for (unsigned seed = 0; seed < 1024; ++seed) {
         BoneProjectile target;
         downwell::BoneProjectileReference source;
@@ -29,6 +31,13 @@ int main() {
               same(target.sampledAnimationRate,source.imgSp) && target.animation == BoneProjectile::Animation::instanceDefault &&
               target.health == source.health && target.active == source.active && !target.hit && !target.hitEffect);
         check(random.drawCount() == 3 && random.stateIndex() == oracle.stateIndex());
+        for (double field : {source.xsp,source.ysp,source.imgSp}) {
+            std::uint64_t raw; std::memcpy(&raw,&field,8);
+            expectedCreate.mix(std::uint32_t(raw>>32)); expectedCreate.mix(std::uint32_t(raw));
+        }
+        expectedCreate.mix(std::uint32_t(oracle.drawCount())); expectedCreate.mix(std::uint32_t(oracle.stateIndex()));
+        for (unsigned i = 0; i < 16; ++i) expectedCreate.mix(oracle.stateWord(i));
+        ++expectedCreate.updates;
         for (unsigned i = 0; i < 16; ++i) check(random.stateWord(i) == oracle.stateWord(i));
         // The same motion component also handles the unmodified Create ranges.
         Events a,b;
@@ -40,6 +49,8 @@ int main() {
                   target.motion.x == source.x && target.motion.y == source.y && a.calls == b.calls);
         }
     }
+    const auto created = downwell::verifyBoneCreate();
+    check(created.digest == expectedCreate.digest && created.updates == expectedCreate.updates && !created.failures);
     for (int x : {0,1,80,159,160}) for (int y : {0,1,100,283,284})
         for (int vx : {-12,-10,-8,0,8,10,12}) for (int vy : {-30,-31,-32})
             for (bool active : {false,true}) for (bool stopped : {false,true})

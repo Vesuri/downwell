@@ -130,7 +130,7 @@ build/random-binary64-test: tests/core/RandomBinary64Test.cpp src/core/RandomBin
 verify-bone-projectile: build/bone-projectile-test
 	./build/bone-projectile-test
 
-build/bone-projectile-test: tests/core/BoneProjectileTest.cpp src/core/BoneProjectile.h src/core/BoneMotion.h src/core/RandomBinary64.h src/core/MotionBinary64.h src/core/BoneProjectileReference.h src/core/GameMakerRounding.h src/core/GameMakerRandom.cpp
+build/bone-projectile-test: tests/core/BoneProjectileTest.cpp src/core/BoneProjectile.h src/core/BoneMotion.h src/core/RandomBinary64.h src/core/MotionBinary64.h src/core/MotionBinary64Verification.h src/core/BoneProjectileReference.h src/core/GameMakerRounding.h src/core/GameMakerRandom.cpp
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/BoneProjectileTest.cpp src/core/GameMakerRandom.cpp
 
@@ -158,7 +158,7 @@ build/bone-reference-test: tests/core/BoneProjectileReferenceTest.cpp src/core/B
 verify-skeleton-throw: build/skeleton-throw-test
 	./build/skeleton-throw-test
 
-build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThrow.h src/core/BoneProjectileReference.h src/core/GameMakerRounding.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
+build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThrow.h src/core/BoneProjectile.h src/core/BoneMotion.h src/core/RandomBinary64.h src/core/MotionBinary64.h src/core/BoneProjectileReference.h src/core/GameMakerRounding.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/SkeletonThrowTest.cpp src/core/GameMakerRandom.cpp
 
