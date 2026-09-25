@@ -74,6 +74,11 @@ also needs concrete synchronous actor creation and any observed builder-instance
 state such as `spawnChance`; this helper currently owns only emission decisions.
 No emulator run or frame-rate improvement is claimed for this isolated change.
 
+**Follow-up:** the singleton uncertainty above is now resolved by direct
+inspection of the Windows executable: `choose` consumes one word, even for
+one argument. See `runner-choose.md`. Existing cavern choice translations
+must be corrected before using their RNG checkpoints as integration evidence.
+
 ## Actor integration findings
 
 The next actor is not just another entry in `EnemyCreateProfile`: that table's

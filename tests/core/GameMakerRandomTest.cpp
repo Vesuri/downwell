@@ -48,6 +48,27 @@ void testRealRange() {
             "random scales one unsigned output by exactly 2^-32");
 }
 
+void testChoose() {
+    for (unsigned seed = 0; seed < 32; ++seed) {
+        downwell::GameMakerRandom actual(seed), reference(seed);
+        for (unsigned count = 1; count <= 65535; ++count) {
+            const auto word = reference.nextU32();
+            require(actual.chooseIndexSmall(count) == word % count,
+                    "choose uses the unsigned single-word remainder, not irandom");
+            require(actual.drawCount() == reference.drawCount() &&
+                    actual.stateIndex() == reference.stateIndex(),
+                    "each nonempty choose consumes one word, including singleton");
+            for (unsigned i = 0; i < 16; ++i)
+                require(actual.stateWord(i) == reference.stateWord(i),
+                        "choose preserves complete runner RNG state");
+        }
+    }
+    downwell::GameMakerRandom singleton(0x12345678U);
+    require(singleton.chooseIndexSmall(1) == 0 && singleton.drawCount() == 1 &&
+            singleton.nextU32() == 0xe928654bU,
+            "singleton choose still advances to the second pinned WELL word");
+}
+
 void testSmallIntegerPath() {
     constexpr std::uint32_t maxima[] = {
         0, 1, 2, 3, 4, 5, 6, 7, 9, 12, 15, 30, 40, 50, 60,
@@ -102,6 +123,7 @@ int main() {
     testWell512Vector();
     testIntegerRangeAndReset();
     testRealRange();
+    testChoose();
     testSmallIntegerPath();
     testSmallScaledRealPath();
     std::cout << "GameMaker random tests passed\n";

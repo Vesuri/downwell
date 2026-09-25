@@ -62,6 +62,11 @@ std::uint64_t GameMakerRandom::irandom(std::uint64_t upperInclusive) {
     return positive63 % (upperInclusive + 1U);
 }
 
+std::uint32_t GameMakerRandom::chooseIndexSmall(std::uint32_t count) {
+    assert(count > 0 && count <= 0xffffU);
+    return nextU32() % count;
+}
+
 std::uint32_t GameMakerRandom::irandomSmall(
     std::uint32_t upperInclusive) {
     assert(upperInclusive <= 0xffffU);

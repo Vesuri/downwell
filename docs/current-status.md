@@ -73,6 +73,14 @@ two ports proves original-game completion. The active parity goal is unfinished.
 
 ## Remaining work — do not mark complete
 
+- **Immediate fidelity correction:** original-executable inspection proves
+  `choose` uses one WELL word modulo argument count, whereas existing
+  translations often use two-word `irandomSmall`. The distinct shared
+  `chooseIndexSmall` primitive is tested, but call sites still need a VM-backed
+  audit and coordinated migration, followed by rebuilt checkpoints and route
+  verification. See `runner-choose.md`. This takes priority over new-area work;
+  earlier paired replays prove adapter agreement, not original RNG equivalence.
+
 - Complete the seven scene boundaries. All seven now have named Amiga scene
   classes; gameplay's owner controls its Copper lifecycle and backing/staging
   validity ranges. Transfer execution remains in the application loop.
@@ -114,8 +122,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
   Area-two pattern recovery now has a VM-backed export/verification target
   (50 patterns). Shared catacomb symbol dispatch passes 306 operation-trace
   cases, retaining exact builtin calls and synchronous emission order, but is
-  not yet wired into either live generator. Historical singleton-choice RNG
-  consumption remains unverified. Gameplay remains disabled pending integration,
+  not yet wired into either live generator. Singleton-choice RNG consumption
+  is now resolved by original-executable inspection (one word; see above).
+  Gameplay remains disabled pending integration,
   actors/hazards and artwork. Shared animation now supports exact fortieth-frame
   rates for the skull's 0.175 while preserving existing actor state and passing
   both natural host routes; new actors remain unregistered until their behavior

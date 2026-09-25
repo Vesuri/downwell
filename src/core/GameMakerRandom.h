@@ -19,6 +19,11 @@ public:
     std::uint32_t nextU32();
     double random(double upperExclusive = 1.0);
     std::uint64_t irandom(std::uint64_t upperInclusive);
+    // Windows choose builtin: one unsigned WELL word modulo argument count,
+    // including count == 1. Not interchangeable with irandom(count - 1).
+    // Nonempty small lists only; integer-to-float rounding in the runner is
+    // exact throughout this range.
+    std::uint32_t chooseIndexSmall(std::uint32_t count);
     // Exact irandom path for the small inclusive ranges used by Downwell's
     // generators. This preserves the runner's 63-bit modulus without asking
     // a 68000 target for 64-bit division.
