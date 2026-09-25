@@ -29,6 +29,8 @@ int main(int argc, char** argv) {
     require(pack.size() > 20, "clear pack loaded");
     std::vector<UBYTE> game(downwellGameRingBytes), hud[2], reference(downwellLayerBytes);
     AmigaClearOverlay caches[2];
+    AmigaClearOverlay outlinedCaches[2];
+    std::vector<UBYTE> outlinedHud[2] = {std::vector<UBYTE>(downwellLayerBytes),std::vector<UBYTE>(downwellLayerBytes)};
     AmigaClearPresenter presenter;
     std::vector<UBYTE> presentedGame[2], presentedHud[2], fullBorder(downwellGameRingBytes);
     for (unsigned i = 0; i < 2; ++i) {
@@ -111,6 +113,15 @@ int main(int argc, char** argv) {
             else amigaRendererDrawAssetPen(&full, pack.data(), pack.data() + pack.size(), c.id, c.frame, c.x, c.y, 0, c.pen);
         }
         require(hud[back] == reference, "retained double-buffer overlay matches full source-order rasterization");
+        AmigaClearDrawList outlined;
+        require(outlined.build(room,frame,inventory,true) &&
+            outlined.count + (frame.choices ? 8 : 0) == native.count,
+            "two outlined labels replace eight redundant passes without changing other commands");
+        AmigaRenderer composed;
+        amigaRendererInit(&composed,game.data(),outlinedHud[back].data());
+        require(outlinedCaches[back].render(composed,pack.data(),pack.data()+pack.size(),
+            outlined.commands,outlined.count,painted) && outlinedHud[back]==reference,
+            "offline outlines preserve animated overlap, ownership and selection pixels");
         if (tick == 220) {
             std::vector<UBYTE> replacementGame(downwellGameRingBytes, 0xa5);
             std::vector<UBYTE> replacementHud(downwellLayerBytes, 0x5a);

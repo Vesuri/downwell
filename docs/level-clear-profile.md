@@ -220,3 +220,31 @@ and trig 2.60 ms. This is still not a 20 ms frame. Detailed-probe throughput
 must not be presented as shipping FPS. The run completed within its 120-second
 hard deadline with zero clock clamps and normal-build restoration. Log:
 `/tmp/downwell-border-geometry-profile.log`.
+
+### Offline fixed text outlines
+
+The live path now draws each upgrade name/description as one host-composed
+masked image, retaining frame-0 masks and the five-pass presenter as an oracle.
+All 71 variants and four clipping positions match; 360 animated host frames
+and 432 native completion frames also match. Red heading animation is unchanged.
+See `scene-architecture.md` for the bytecode basis and memory bound.
+
+The final 480-update detailed capture measures idle content rendering at
+21.37 ms (previously 24.47), and navigation at 21.68 ms (previously 25.34).
+Content-phase maxima fall from 61.77 / 70.75 ms to 42.88 / 46.24 ms.
+Layout still takes 15.44 / 17.39 ms. This does not satisfy the 20 ms budget.
+
+Keeping both oracle masks and outlined variants in the selected bank increases
+one-time preparation work. The first implementation peaked at 278.61 ms;
+validating the source directory once and merging requested keys reduces it to
+167.98 ms. This remains higher than the approximately 101 ms pre-outline bank
+preparation, so bank staging/copying is still unfinished optimization work.
+No additional Chip allocation is used; every possible selected bank fits the
+existing reservation. Do not confuse the preparation tradeoff with steady
+frame cost or present detailed-probe throughput as shipping FPS.
+
+The final native regression passes two clears, 192 exit-field frames, 60
+third-level updates and the stack guard. The final profile completes within
+its 120-second hard limit, reports zero clock clamps, and restores normal
+startup. Logs: `/tmp/downwell-outlined-merge-native-gdb.log` and
+`/tmp/downwell-outlined-merge-profile.log`.

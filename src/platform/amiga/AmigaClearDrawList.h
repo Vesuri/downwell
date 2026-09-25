@@ -16,26 +16,26 @@ struct AmigaClearDrawList {
     bool valid = false;
     bool build(const downwell::LevelClearController& room,
                const downwell::LevelClearPresentation::Frame& frame,
-               const downwell::UpgradeInventory& inventory) {
-        return build(room, frame, inventory, downwell::LevelClearRaster::floorBinary32);
+               const downwell::UpgradeInventory& inventory, bool outlined = false) {
+        return build(room, frame, inventory, downwell::LevelClearRaster::floorBinary32, outlined);
     }
     template<class Rasterize>
     bool build(const downwell::LevelClearController& room,
                const downwell::LevelClearPresentation::Frame& frame,
-               const downwell::UpgradeInventory& inventory, Rasterize pixel) {
+               const downwell::UpgradeInventory& inventory, Rasterize pixel, bool outlined = false) {
         downwell::HudReal cosine, sine;
         { DW_PROFILE_SCOPE(profileClearTrig);
             cosine = downwell::LevelClearTrig::absoluteCosine(frame.circle);
             sine = downwell::LevelClearTrig::absoluteSine(frame.time);
         }
-        return build(room, frame, inventory, cosine, sine, pixel);
+        return build(room, frame, inventory, cosine, sine, pixel, outlined);
     }
     template<class Rasterize>
     bool build(const downwell::LevelClearController& room,
                const downwell::LevelClearPresentation::Frame& frame,
                const downwell::UpgradeInventory& inventory,
                downwell::HudReal absoluteCosine, downwell::HudReal absoluteSine,
-               Rasterize pixel) {
+               Rasterize pixel, bool outlined = false) {
         count = 0; valid = false;
         if (!downwell::levelClearStageLabel(frame.area, frame.level) ||
             room.selection.lastIndex > 3 || room.selection.cursor > room.selection.lastIndex) return false;
@@ -45,6 +45,7 @@ struct AmigaClearDrawList {
             AmigaClearDrawList& list;
             Rasterize& pixel;
             int viewY;
+            bool outlined;
             void add(unsigned id, unsigned frame, int x, int y, int pen) {
                 if (!id || list.count == AmigaClearOverlay::capacity) { list.valid = false; return; }
                 list.commands[list.count++] = {id, frame, x, y, pen};
@@ -65,12 +66,13 @@ struct AmigaClearDrawList {
                     id = downwell::levelUpgradeNameLabel(id - 64100, suffix - 1);
                 }
                 const int px = 110 + pixel(x), py = pixel(y) - viewY;
+                if (outlined) { add(id, 1, px, py, -1); return; }
                 // Pen 3 is opaque black in PF2, not transparent pen 0.
                 add(id, 0, px + 1, py, 3); add(id, 0, px - 1, py, 3);
                 add(id, 0, px, py + 1, 3); add(id, 0, px, py - 1, 3);
                 add(id, 0, px, py, 1);
             }
-        } sink{*this, pixel, room.motion.viewY()};
+        } sink{*this, pixel, room.motion.viewY(), outlined};
         downwell::drawLevelClear(sink, room, frame, inventory, absoluteCosine, absoluteSine);
         return valid;
     }

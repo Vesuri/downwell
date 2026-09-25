@@ -159,3 +159,36 @@ output alone, justifies the cache key and its 76-command bound.
 The bounded native run passes 432 completion comparisons, 192 exit-field
 comparisons, both clears, 60 third-level updates and the stack guard with
 this cache live (`/tmp/downwell-border-geometry-native-gdb.log`).
+
+### Offline upgrade text outlines
+
+The clear exporter now keeps the original name/description masks in frame 0
+and adds a precomposed frame 1 under the same synthetic resource ID. It matches
+`gml_GlobalScript_scrDrawBorderTextJp.asm`: black at x+1, x-1, y+1, y-1, then
+white foreground. One-pixel padding is reflected in the anchor, including
+centered multiline descriptions and owned-name suffixes. Animated red heading
+shadows are not baked or simplified.
+
+The live upgrade draw list uses one masked planar command per outlined label
+instead of five; the old presenter retains the five-pass path as its oracle.
+Selected banks include both frames. A conservative bound over every area,
+level, offer and ownership state is 25,556 bytes, below the existing 31,756-byte
+bank capacity. No new Chip allocation is introduced. The full Fast-resident
+clear pack grows from 60,224 to 112,112 bytes. The ignored clear-v2 manifest
+records the frame convention, extractor version and source/language/pack hashes.
+
+Host checks compare all 71 variants at four clipping positions (284 cases),
+plus 360 animated overlap/ownership/selection frames against the five-pass
+oracle. Bank tests cover both representations and allocation/HUD/mask guards.
+The 240-second-bounded native run passes 432 completion frames, 192 exit-field
+frames, two clears and 60 third-level updates, including the stack guard and
+68000 audits, also after the ordered bank-selector change below. Evidence:
+`/tmp/downwell-outlined-merge-native-gdb.log`. Host outline
+tests also pass ASan/UBSan, and regenerating the pack with `--check` is exact.
+The expanded bank selector validates the source directory's strict ordering
+once and merges the sorted requested keys, rather than scanning every source
+record for each request. Duplicate or unordered directories fail before any
+destination write. Selected metadata/payloads and guard bytes are independently
+checked, including under ASan/UBSan.
+The game-profile export remains byte-identical (`--profile game --check`),
+so the shared outline helper has not altered credits/style/gameplay assets.

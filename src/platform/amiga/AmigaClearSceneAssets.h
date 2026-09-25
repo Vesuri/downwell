@@ -27,7 +27,7 @@ struct AmigaClearSceneAssets {
         if (!retiredStorage || !proposed.valid || !mask ||
             (maskBytes != AmigaExitMask::bytes && maskBytes != AmigaExitMask::selectionBytes)) return false;
         const unsigned bytes = AmigaClearBank::build(art, artBytes, offers, offerCount,
-            retiredStorage + proposed.resultsOffset, proposed.resultsCapacity, area, level, owned);
+            retiredStorage + proposed.resultsOffset, proposed.resultsCapacity, area, level, owned, true);
         if (!bytes) return false;
         for (unsigned i = 0; i < maskBytes; ++i) retiredStorage[i] = mask[i];
         layout = proposed; bankBytes = bytes;
@@ -38,7 +38,7 @@ struct AmigaClearSceneAssets {
                       const unsigned char* owned = nullptr) {
         if (!retiredStorage || !layout.valid || !bankBytes) return false;
         const unsigned bytes = AmigaClearBank::build(art, artBytes, offers, offerCount,
-            retiredStorage + layout.resultsOffset, layout.resultsCapacity, area, level, owned);
+            retiredStorage + layout.resultsOffset, layout.resultsCapacity, area, level, owned, true);
         if (!bytes) return false;
         bankBytes = bytes;
         return true;

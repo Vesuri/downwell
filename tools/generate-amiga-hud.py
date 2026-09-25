@@ -325,8 +325,8 @@ def render_text(manifest, pages, text, centered=False):
     return canvas
 
 
-def render_bordered_text(manifest, pages, text, color):
-    glyphs = render_text(manifest, pages, text)
+def render_bordered_text(manifest, pages, text, color, centered=False):
+    glyphs = render_text(manifest, pages, text, centered=centered)
     alpha = glyphs.getchannel("A")
     canvas = Image.new("RGBA", (glyphs.width + 2, glyphs.height + 2),
                        (0, 0, 0, 0))
@@ -637,6 +637,16 @@ def build_pack(manifest, extracted, profile, language_path=None):
         }
         encoded.append((sprite, 0, dma_width, planar))
 
+        if profile == "clear" and text_id not in (64000, 64001) and not 64500 <= text_id < 64512:
+            # Preserve frame 0 as the five-pass oracle. Frame 1 is the exact
+            # four black neighbours followed by white foreground, host-baked.
+            bordered = render_bordered_text(manifest, pages, text, "white", centered=True)
+            pens = [pixel_to_pen(pixel) for pixel in bordered.get_flattened_data()]
+            dma_width, planar = encode_planar(pens, bordered.width, bordered.height)
+            outlined = dict(sprite, width=bordered.width, height=bordered.height,
+                            originX=sprite["originX"] + 1, originY=1)
+            encoded.append((outlined, 1, dma_width, planar))
+
     if profile == "game":
         # Static style text panels, relative to centerY-80. They also serve
         # as clean backing pixels when restoring the moving carousel band.
@@ -930,11 +940,12 @@ def main():
     if args.profile in ("shop", "clear"):
         labels = shop_texts(args.language) if args.profile == "shop" else clear_texts(args.language)
         provenance = json.dumps({
-            "schemaVersion": 1, "generator": f"generate-amiga-hud.py/{args.profile}-v1",
+            "schemaVersion": 1, "generator": f"generate-amiga-hud.py/{args.profile}-v{2 if args.profile == 'clear' else 1}",
             "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
             "languageSha256": hashlib.sha256(args.language.read_bytes()).hexdigest(),
             "packSha256": digest, "language": "english",
             "textAssetIds": sorted(labels),
+            **({"outlinedTextFrame": 1} if args.profile == "clear" else {}),
         }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
         provenance_path = args.output.with_suffix(".manifest.json")
         if args.check:

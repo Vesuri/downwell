@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
             "rerolled offers fit alongside resident mask");
         std::vector<std::uint8_t> expected(layout.resultsCapacity);
         const unsigned bytes = AmigaClearBank::build(art.data(), art.size(), offers, 4, expected.data(), expected.size(),
-            1 + sample % 4, 1 + sample % 3, owned);
+            1 + sample % 4, 1 + sample % 3, owned, true);
         require(bytes == assets.bankBytes && std::memcmp(storage + layout.resultsOffset, expected.data(), bytes) == 0,
             "resident selected artwork matches independently selected bank");
         require(std::memcmp(storage, mask.data(), mask.size()) == 0, "offer changes preserve every departure mask byte");

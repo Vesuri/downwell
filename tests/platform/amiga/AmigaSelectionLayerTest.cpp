@@ -150,5 +150,34 @@ int main(int argc,char** argv) {
     assert(!cachedBorder.render(rebound.data(),pack.data(),pack.data()+pack.size(),frame,paint));
     frame.borderRow = -1;
     assert(!cachedBorder.render(rebound.data(),pack.data(),pack.data()+pack.size(),frame,paint));
+    unsigned outlinedCases = 0;
+    const unsigned records = AmigaClearBank::longword(pack.data()+8);
+    for (unsigned i = 0; i < records; ++i) {
+        const auto* record = pack.data()+20+i*24;
+        const unsigned id = AmigaClearBank::word(record);
+        if (id < 64000 || AmigaClearBank::word(record+2) != 1) continue;
+        const int xs[] = {80, 0, 160, 80}, ys[] = {60, 60, -3, 280};
+        for (unsigned position = 0; position < 4; ++position) {
+            const int x=xs[position], y=ys[position];
+            AmigaSelectionLayer::Command outlined{id,1,x,y,-1};
+            layer.invalidate();
+            assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),&outlined,1,paint));
+            std::fill(expected.begin(),expected.end(),0);
+            AmigaRenderer renderer;
+            amigaRendererInit(&renderer,game.data(),expected.data());
+            renderer.target=renderer.hud; renderer.clipX=110; renderer.clipWidth=160;
+            const int dx[] = {1,-1,0,0,0}, dy[] = {0,0,1,-1,0};
+            for (unsigned pass = 0; pass < 5; ++pass)
+                amigaRendererDrawAssetPen(&renderer,pack.data(),pack.data()+pack.size(),id,0,110+x+dx[pass],y+dy[pass],0,pass==4?1:3);
+            for(unsigned p=0;p<2;++p) for(unsigned row=0;row<284;++row) for(unsigned col=0;col<160;++col) {
+                const bool actual = canvas[p*AmigaSelectionLayer::planeBytes+row*22+col/8] & (128u>>(col&7));
+                const bool reference = expected[p*downwellPlaneBytes+row*48+(110+col)/8] & (128u>>((110+col)&7));
+                assert(actual==reference);
+            }
+            ++outlinedCases;
+        }
+    }
+    assert(outlinedCases==284); // 24 names + 24 descriptions + 23 owned-name variants
+    std::printf("%u offline outline/clipping cases match five source-ordered passes\n",outlinedCases);
     std::puts("325 selection camera positions match fresh rendering without repainting");
 }

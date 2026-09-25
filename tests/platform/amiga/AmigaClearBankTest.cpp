@@ -16,7 +16,7 @@ int main(int argc, char** argv) {
     const auto original = source;
     std::vector<std::uint8_t> storage(32140 + 32, 0xa5);
     auto* target = storage.data() + 16;
-    unsigned maximum = 0;
+    unsigned maximum = 0, maximumOutlined = 0;
     for (unsigned sample = 0; sample < 256; ++sample) {
         unsigned offers[4];
         for (unsigned i = 0; i < 4; ++i) {
@@ -77,8 +77,49 @@ int main(int argc, char** argv) {
         }
         for (unsigned i = 0; i < 16; ++i)
             require(storage[i] == 0xa5 && storage[storage.size() - 1 - i] == 0xa5, "adjacent staging/HUD guards intact");
+        const unsigned outlinedBytes = AmigaClearBank::build(source.data(), source.size(), offers, 4,
+            target, 31756, area, level, owned, true);
+        require(outlinedBytes && outlinedBytes <= 31756, "outlined bank fits existing retired storage");
+        if (outlinedBytes > maximumOutlined) maximumOutlined = outlinedBytes;
+        const unsigned outlinedCount = AmigaClearBank::longword(target+8);
+        require(outlinedCount <= 26, "outlined directory fits bounded scratch storage");
+        for (unsigned id : offers) {
+            const unsigned labels[] = {downwell::levelUpgradeNameLabel(id,id<23?owned[id]:0),64300+id};
+            for (unsigned label : labels) for (unsigned frame = 0; frame < 2; ++frame) {
+                unsigned found = 0;
+                for (unsigned i = 0; i < outlinedCount; ++i) {
+                    const auto* entry = target+20+i*24;
+                    found += AmigaClearBank::word(entry)==label && AmigaClearBank::word(entry+2)==frame;
+                }
+                require(found==1,"both oracle and precomposed text frames are banked once");
+            }
+        }
     }
     const auto before = storage;
+    const auto payload = [&](unsigned id, unsigned frame) {
+        for (unsigned i = 0; i < AmigaClearBank::longword(source.data()+8); ++i) {
+            const auto* record = source.data()+20+i*24;
+            if (AmigaClearBank::word(record)==id && AmigaClearBank::word(record+2)==frame)
+                return AmigaClearBank::longword(record+20);
+        }
+        require(false,"bound calculation requires every offered resource");
+        return std::uint32_t(0);
+    };
+    unsigned maximumBase = 0, maximumBundle = 0;
+    for (unsigned area=1;area<=4;++area) for (unsigned level=1;level<=3;++level) {
+        unsigned bytes=20+26*24+payload(downwell::levelClearStageLabel(area,level),0)+payload(64001,0);
+        for (unsigned a=area;a<=area+1;++a)
+            bytes+=payload(downwell::levelBorderSprite(a),7)+payload(downwell::levelBorderSprite(a),13);
+        if(bytes>maximumBase) maximumBase=bytes;
+    }
+    for (unsigned option=0;option<24;++option) for (unsigned owned=0;owned<(option==23?1u:2u);++owned) {
+        const unsigned id=option==23?100:option, name=downwell::levelUpgradeNameLabel(id,owned);
+        unsigned bytes=payload(downwell::levelUpgradeSprite(id),0);
+        for(unsigned frame=0;frame<2;++frame) bytes+=payload(name,frame)+payload(64300+id,frame);
+        if(bytes>maximumBundle) maximumBundle=bytes;
+    }
+    require(maximumBase+4*maximumBundle<=31756,"all four-offer combinations fit, without relying on sampled offers");
+    std::printf("Conservative all-offer outlined bank bound: %u bytes\n",maximumBase+4*maximumBundle);
     unsigned char invalidOwned[23] = {};
     invalidOwned[0] = 2;
     const unsigned ownedOffer[] = {0};
@@ -97,6 +138,17 @@ int main(int argc, char** argv) {
         AmigaClearBank::longword(target + 8) == 9, "four fallback offers share one bundle alongside four borders");
     require(source == original, "source pack untouched by bank construction");
     const auto validBank = storage;
+    auto unordered = source;
+    // Duplicate and reversed directory keys must fail before touching a bank.
+    std::memcpy(unordered.data()+44,unordered.data()+20,4);
+    require(!AmigaClearBank::build(unordered.data(),unordered.size(),fallback,4,target,32140) && storage==validBank,
+        "duplicate directory key rejected transactionally");
+    unordered=source;
+    for(unsigned i=0;i<24;++i) {
+        const auto byte=unordered[20+i]; unordered[20+i]=unordered[44+i]; unordered[44+i]=byte;
+    }
+    require(!AmigaClearBank::build(unordered.data(),unordered.size(),fallback,4,target,32140) && storage==validBank,
+        "unordered directory rejected transactionally");
     for (unsigned j = 0; j < AmigaClearBank::longword(source.data() + 8); ++j) {
         auto* record = source.data() + 20 + j * 24;
         if (AmigaClearBank::word(record) == 64500) {
@@ -107,4 +159,5 @@ int main(int argc, char** argv) {
     require(!AmigaClearBank::build(source.data(), source.size(), fallback, 4, target, 32140) && storage == validBank,
         "out-of-range payload offset is rejected before any destination write");
     std::printf("256 clear banks verified; largest sampled bank %u bytes\n", maximum);
+    std::printf("256 outlined banks verified; largest sampled bank %u bytes\n",maximumOutlined);
 }

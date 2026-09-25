@@ -16,7 +16,7 @@ struct AmigaClearBank {
     static unsigned build(const std::uint8_t* source, unsigned size,
             const unsigned* offers, unsigned offerCount,
             std::uint8_t* target, unsigned capacity, unsigned area = 1, unsigned level = 1,
-            const unsigned char* owned = nullptr) { // optional 23-entry source inventory
+            const unsigned char* owned = nullptr, bool outlined = false) { // optional 23-entry source inventory
         if (!source || !target || (offerCount && !offers) || offerCount > 4 || size < 20 ||
             longword(source) != 0x44574150u || word(source + 4) != 2 || word(source + 6) != 20)
             return 0;
@@ -24,7 +24,12 @@ struct AmigaClearBank {
         if (!stageLabel) return 0;
         const unsigned sourceCount = longword(source + 8);
         if (sourceCount > (size - 20) / 24) return 0;
-        unsigned ids[18] = {stageLabel, 64001}, frames[18] = {}, count = 2;
+        // Exported DWAP directories are strictly ordered. Validate once,
+        // then merge the selected keys instead of rescanning the full pack
+        // for every title, icon and text variant on a 68000.
+        for (unsigned i = 1; i < sourceCount; ++i)
+            if (longword(source + 20 + (i-1)*24) >= longword(source + 20 + i*24)) return 0;
+        unsigned ids[26] = {stageLabel, 64001}, frames[26] = {}, count = 2;
         for (unsigned selectedArea = area; selectedArea <= area + 1; ++selectedArea) {
             ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 7;
             ids[count] = downwell::levelBorderSprite(selectedArea); frames[count++] = 13;
@@ -37,9 +42,11 @@ struct AmigaClearBank {
             if (!name) return 0;
             const unsigned bundle[] = {sprite, name, 64300 + offers[i]};
             for (unsigned id : bundle) {
-                bool found = false;
-                for (unsigned j = 0; j < count; ++j) found |= ids[j] == id && frames[j] == 0;
-                if (!found) ids[count++] = id;
+                for (unsigned frame = 0; frame < (outlined && id >= 64000 ? 2u : 1u); ++frame) {
+                    bool found = false;
+                    for (unsigned j = 0; j < count; ++j) found |= ids[j] == id && frames[j] == frame;
+                    if (!found) { ids[count] = id; frames[count++] = frame; }
+                }
             }
         }
         // Renderer lookup is binary search over (resource ID, frame), not
@@ -52,17 +59,15 @@ struct AmigaClearBank {
             }
             ids[j] = id; frames[j] = frame;
         }
-        const std::uint8_t* records[18] = {};
+        const std::uint8_t* records[26] = {};
         unsigned bytes = 20 + count * 24;
         if (bytes > capacity) return 0;
+        unsigned sourceIndex = 0;
         for (unsigned i = 0; i < count; ++i) {
-            for (unsigned j = 0; j < sourceCount; ++j) {
-                const auto* record = source + 20 + j * 24;
-                if (word(record) == ids[i] && word(record + 2) == frames[i]) {
-                    if (records[i]) return 0; // ambiguous duplicate resource/frame
-                    records[i] = record;
-                }
-            }
+            const std::uint32_t key = (std::uint32_t(ids[i]) << 16) | frames[i];
+            while (sourceIndex < sourceCount && longword(source + 20 + sourceIndex*24) < key) ++sourceIndex;
+            if (sourceIndex < sourceCount && longword(source + 20 + sourceIndex*24) == key)
+                records[i] = source + 20 + sourceIndex*24;
             const auto* record = records[i];
             if (!record || word(record + 14) != 3) return 0;
             const unsigned offset = longword(record + 16), length = longword(record + 20);
