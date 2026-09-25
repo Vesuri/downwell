@@ -15,8 +15,8 @@ on PAL; do not add 60 Hz catch-up.
 - Verify original runtime FP-mode assumptions and measure the complete smoke
   geometry/effect cost on the native target.
 - Connect the fixed-capacity smoke owner to live global phases,
-  world collision dispatch and both renderers. Export Amiga artwork offline
-  and preserve the original effect-surface composition.
+  world collision dispatch and both renderers, preserving the original
+  effect-surface composition.
 - Implement remaining blood, corpse, debris and blast effect dependencies.
   Preserve synchronous child Create, RNG consumption and source mutation order
   before rewards and retirement.

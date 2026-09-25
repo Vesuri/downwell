@@ -46,8 +46,11 @@ except ValueError:
     pass
 else:
     raise AssertionError("general palette guard was weakened")
-for ident in (96, 205, 206, 207, 208, 460):
+for ident in (84, 96, 205, 206, 207, 208, 460):
     sprite = resources["sprites"][ident]
+    if ident == 84:
+        assert sprite["name"] == "sprSmoke" and len(sprite["frames"]) == 9
+        assert (sprite["originX"], sprite["originY"]) == (12, 12)
     for frame, source_frame in enumerate(sprite["frames"]):
         canvas = pack.frame_canvas(sprite, source_frame, resources["texturePageItems"], pages)
         for flip in (0, 1):
@@ -94,4 +97,4 @@ for ident in (96, 205, 206, 207, 208, 460):
                             actual[key] = pen
             assert actual == expected, (ident,frame,flip,"DMA")
             checked += 1
-print(f"Skeleton/bone/flash artwork: {checked} anchored planar/DMA facings match source color classes")
+print(f"Skeleton/bone/flash/smoke artwork: {checked} anchored planar/DMA facings match source color classes")
