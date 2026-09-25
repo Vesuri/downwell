@@ -13,7 +13,7 @@ void AmigaTerrainTiles::clear() {
 }
 
 bool AmigaTerrainTiles::append(const downwell::DeferredCreateInstance& command) {
-    DW_PROFILE_SCOPE(profileGeneratedTiles);
+    DW_GENERATION_SCOPE(profileGeneratedTiles);
     if (command.objectId != 92 && command.objectId != 93) return true;
     if (count_ == capacity || command.y < 0 || command.y >= rows * 16 ||
         (command.y & 15) || command.x < -512 || command.x >= 1536 || (command.x & 15))
@@ -354,10 +354,10 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
         : objectId == 92 ? breakableCell : objectId == 93 ? landingCell : 0;
     if (!flags) return true;
     {
-        DW_PROFILE_SCOPE(profileGeneratedCell);
+        DW_GENERATION_SCOPE(profileGeneratedCell);
         if (!indexAdd(index, x, y, flags)) return false;
     }
-    DW_PROFILE_SCOPE(profileGeneratedLanding);
+    DW_GENERATION_SCOPE(profileGeneratedLanding);
     const int column = (x - AmigaTerrainIndex::minX) / 16;
     const int landingRow = y / 16;
     // An existing closer landing terminates the update. No clearing, full-map

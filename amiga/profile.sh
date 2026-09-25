@@ -12,7 +12,7 @@ if [[ ${SKIP_LEVEL:-0} == 1 ]]; then script=profile_clear.gdb; fi
 # Always leave the playable binary behind, including after a timeout/failure.
 restore() {
   make clean > .run/profile-restore.log 2>&1
-  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 >> .run/profile-restore.log 2>&1
+  make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 GENERATION_DETAIL=0 >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
 trap restore EXIT
@@ -20,6 +20,7 @@ make clean
 make -j4 "$flags" PROFILE_AUTORUN=1
 printf 'Profile optimization: %s\n' "${AMIGA_OPTIMIZATION:--O3}"
 printf 'Profile Laser Sight fixture: %s\n' "${PROFILE_LASER:-0}"
+printf 'Profile inner generation probes: %s (only active in probes mode)\n' "${GENERATION_DETAIL:-0}"
 shasum -a 256 out/Downwell.exe
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \

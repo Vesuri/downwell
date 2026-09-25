@@ -906,7 +906,13 @@ build on exit. Reports remain in `amiga/.run/profile-fps.log` and
 
 ## Two distinct modes
 
-Gameplay: `SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh probes`
+Gameplay: `SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=120 bash amiga/profile.sh probes`
+
+Inner generation phases 67–74 are disabled by default because their frequent
+phase switches severely perturb generation bursts. Add `GENERATION_DETAIL=1`
+to opt in. The outer generation/registration/index phases remain enabled;
+compare optimizations with that coarse mode and the separate `fps` run.
+The profile wrapper always restores `GENERATION_DETAIL=0` afterward.
 (or `fps`). This measures 600 iterations after discarding the initial gameplay
 composition frame. Deterministic input alternates direction every 120 ticks
 and fires on ticks 0 and 3 modulo 16. Phase 4 means HUD updates for gameplay;

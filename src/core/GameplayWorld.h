@@ -218,20 +218,20 @@ public:
     bool createGeneratedInstance(const downwell::DeferredCreateInstance& command,
                                  const downwell::ObjectPack& objects, Terrain terrain) {
         if (command.objectId == 277) {
-            DW_PROFILE_SCOPE(profileGeneratedShop);
+            DW_GENERATION_SCOPE(profileGeneratedShop);
             return registerShop(command.x, command.y) != nullptr;
         }
         if (command.objectId == 306) registerLevelExit(command.y);
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
         if (!terrain(command)) return false;
         if (command.objectId == 92) {
-            DW_PROFILE_SCOPE(profileGeneratedBreakable);
+            DW_GENERATION_SCOPE(profileGeneratedBreakable);
             const int x = command.x - 240, y = command.y - 176;
             return appendBreakables(&x, &y, 1);
         }
         const auto profile = downwell::enemyCreateProfile(command.objectId);
         if (!profile.health) return true;
-        DW_PROFILE_SCOPE(profileGeneratedEnemy);
+        DW_GENERATION_SCOPE(profileGeneratedEnemy);
         downwell::PackedObject object;
         return objects.findObject(command.objectId, object) &&
             configureEnemy(enemyCount_, command.objectId, object.spriteId,

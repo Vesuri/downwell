@@ -69,4 +69,14 @@ public:
 
 #include "ProfileCounters.h"
 
+// Inner generation brackets are deliberately opt-in: hundreds of phase
+// switches per burst can cost more than the operations being measured.
+#if defined(DOWNWELL_PROBES) && defined(DOWNWELL_GENERATION_DETAIL)
+#define DW_GENERATION_SCOPE(phase) DW_PROFILE_SCOPE(phase)
+#define DW_GENERATION_PHASE(phase) DW_PROFILE_PHASE(phase)
+#else
+#define DW_GENERATION_SCOPE(phase) ((void)0)
+#define DW_GENERATION_PHASE(phase) ((void)0)
+#endif
+
 #endif

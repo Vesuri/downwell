@@ -1,5 +1,47 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Current remeasurement after backing/staging ownership
+
+At `3c5108e`, the same 600-update A500/PAL tape takes **822 fields, 36.50 FPS**,
+with a five-field maximum gap. This supersedes the older 815-field result
+below as the current measured baseline; it is not a claimed improvement.
+Camera-lock behavior and scene/cache ownership have changed since that older
+baseline. There are still zero staged column swaps in this particular tape.
+Log: `/tmp/downwell-current-cache-fps.log`.
+
+Matched instrumented runs isolate the inner generation probes' perturbation:
+
+| Instrumentation | Fields | Worst frame (sample 258) |
+| --- | ---: | ---: |
+| Including inner generation phases 67–74 | 1034 | 237.513 ms |
+| Without inner generation phases | 1017 | 141.681 ms |
+
+Both have zero clock clamps and identical indexed-collision/terrain-segment
+and hardware-sprite counters. The difference is 95.832 ms in that worst frame;
+it is measurement overhead/code-layout perturbation, not a shipping speedup.
+The coarse frame attributes 69.329 ms to generation, 23.391 ms to registration
+and 25.502 ms to indexing (118.222 ms combined). The ammo phases sum to about
+4.101 ms/update over the tape. All phase measurements still include probe
+overhead; low-overhead FPS remains the throughput measure.
+
+Inner probes are now explicitly opt-in with `GENERATION_DETAIL=1` and compile
+away otherwise. Existing outer phases remain enabled by `PROBES=1`. Use
+`GENERATION_DETAIL=1 SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=120 bash amiga/profile.sh probes`
+to recover the detailed view. The default probes command now takes the coarse
+view and prints the selected mode. The script explicitly resets the detail
+option when restoring the ordinary build.
+
+Logs: `/tmp/downwell-current-cache-probes.log` (inner detail before the toggle)
+and `/tmp/downwell-current-cache-coarse.log`. Normal startup is restored with
+both 68000 audits clean. Host tests verify disabled, coarse and detailed macro
+behavior, including return to the enclosing phase
+(`/tmp/downwell-generation-probe-toggle.log`). Production generation order,
+RNG consumption and painting are unchanged by this instrumentation switch.
+Next optimize generation with these coarse brackets as the timing comparison;
+do not treat the heavily instrumented inner brackets as removable game cost.
+
+## Earlier baseline
+
 Measured from `27da653`, A500 / 512 KB Chip / 8 MB Fast, `-O3`, PAL.
 Both runs start with `SKIP_TO_GAME=1`, use the existing 600-update deterministic
 left/right/fire profile, and have a 120-second emulator deadline. The profile

@@ -753,6 +753,22 @@ test-amiga-gameplay-scene: build/amiga-gameplay-scene-test
 	./build/amiga-gameplay-scene-test
 test: test-amiga-gameplay-scene
 
+.PHONY: test-generation-probes
+build/generation-probes-off-test: tests/core/ProfileGenerationTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+build/generation-probes-coarse-test: tests/core/ProfileGenerationTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_PROBES -o $@ $<
+build/generation-probes-detail-test: tests/core/ProfileGenerationTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_PROBES -DDOWNWELL_GENERATION_DETAIL -o $@ $<
+test-generation-probes: build/generation-probes-off-test build/generation-probes-coarse-test build/generation-probes-detail-test
+	./build/generation-probes-off-test
+	./build/generation-probes-coarse-test
+	./build/generation-probes-detail-test
+test: test-generation-probes
+
 .PHONY: test-amiga-gameplay-actors
 build/amiga-gameplay-actors-test: tests/platform/amiga/AmigaGameplayActorsTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaGameplayActors.cpp src/platform/amiga/AmigaGameplayRows.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
