@@ -80,6 +80,30 @@ native timing or pixel-capture claim. The red ray remains a missing visible
 feature until shared wall/enemy adapters, source visibility/order, SDL drawing
 and Amiga draw/restore handling are connected and verified.
 
+### Collision-family audit
+
+The serialized object ancestry confirms that `parentWall` includes the normal
+wall (60), breakable box (92), crate (254), shop table (278), and shop case
+(279). It **excludes** the thin platform (93). All five included objects have
+`Solid=false`: that resource flag cannot select ray targets. The six currently
+implemented area-one enemy types and the hostile shopkeeper (284) descend from
+`subparentEnemy`. The verifier now checks the complete 23-member wall family,
+these enemy memberships, thin-platform exclusion, and the selected default
+collision rectangles directly against the pinned export.
+
+Consequently `amigaResolveTerrainSegment` alone is not a complete ray wall
+adapter: its indexed terrain coverage does not supply the crate and shop
+instances. Those need live-instance queries, including removal/state changes.
+The table's default relative rectangle is X=-30..29, Y=0..7; the case is
+X=-9..8, Y=-9..8 (inclusive source margins). Neither is a generic 16x16 tile.
+Object masks take precedence over visual sprites; instance overrides, scaling
+and sprite changes still require inspection before using default rectangles.
+One concrete override is now VM-pinned: `shopCase` Step, when destroyed and
+not yet opened, switches `mask_index` to `noMask` (582). A ray adapter must not
+keep using its resource-default case rectangle after that transition.
+These metadata checks do not resolve the Windows runner's line-edge rounding
+or constitute a rendered-ray verification.
+
 `playerDraw` traces cumulative lines against `parentWall` and `subparentEnemy`,
 starting at the player origin. Each iteration advances Y by
 `lengthdir_y(8,270+aimAngle)` but X by

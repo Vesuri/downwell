@@ -90,3 +90,60 @@ assert hashlib.sha256(ray.encode()).hexdigest() == \
 assert ray.count("call.i collision_line(argc=7)") == 2
 assert "random" not in ray
 print("Laser Sight stepped ray order, collision parents and draw anchors are VM-pinned")
+
+# collision_line selects object ancestry, NOT the Solid flag or the player's
+# landing surfaces. Keep the full wall family explicit for the ray adapters.
+objects = manifest["resources"]["objects"]
+def descendants(parent):
+    result = set()
+    for obj in objects:
+        current, visited = obj["id"], set()
+        while current >= 0:
+            assert current not in visited, ("inheritance cycle", obj["id"])
+            visited.add(current)
+            if current == parent:
+                result.add(obj["id"])
+                break
+            current = objects[current]["parentId"]
+    return result
+
+walls = descendants(57)
+assert walls == {57, 59, 60, 61, 84, 85, 86, 92, 98, 99, 101, 102,
+                 254, 278, 279, 292, 293, 319, 354, 355, 356, 360, 368}
+enemies = descendants(83)
+assert {111, 112, 113, 116, 117, 119, 284} <= enemies
+assert not walls & enemies
+assert 93 not in walls | enemies  # objThinPlatform is a landing-only family.
+assert all(not objects[i]["Solid"] for i in (60, 92, 254, 278, 279))
+
+# Resource defaults only: instance mask/sprite overrides and transforms must
+# still be respected. These offsets are inclusive GameMaker bounding margins,
+# not a claim about collision_line's floating-point edge rounding.
+sprites = manifest["resources"]["sprites"]
+expected_bounds = {
+    60: (-8, 7, -8, 7), 92: (-8, 7, -8, 7),
+    254: (-8, 7, -8, 7), 278: (-30, 29, 0, 7),
+    279: (-9, 8, -9, 8),
+    111: (-6, 6, -4, 4), 112: (-8, 7, -4, 7),
+    113: (-6, 5, -5, 7), 116: (-6, 6, -4, 3),
+    117: (-7, 6, -6, 6), 119: (-5, 4, -5, 4),
+}
+for object_id, expected in expected_bounds.items():
+    obj = objects[object_id]
+    sprite_id = obj["textureMaskId"]
+    if sprite_id < 0:
+        sprite_id = obj["spriteId"]
+    sprite = sprites[sprite_id]
+    assert sprite["separateMasks"] == "AxisAlignedRect"
+    actual = (sprite["marginLeft"] - sprite["originX"],
+              sprite["marginRight"] - sprite["originX"],
+              sprite["marginTop"] - sprite["originY"],
+              sprite["marginBottom"] - sprite["originY"])
+    assert actual == expected, (object_id, actual, expected)
+print("Laser Sight wall ancestry, thin-platform exclusion and selected mask bounds verified")
+case_step = (export / "Assembly/gml_Object_shopCase_Step_0.asm").read_text()
+assert "push.v self.destroyed\nconv.v.b\nbf [5]" in case_step
+assert "push.v self.opened\nconv.v.b\nnot.b\nbf [4]" in case_step
+assert "pushi.e 582\npop.v.i self.mask_index" in case_step
+assert sprites[582]["name"] == "noMask"
+print("Destroyed shop-case first-Step mask override is VM-pinned")
