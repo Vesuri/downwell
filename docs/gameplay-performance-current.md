@@ -60,6 +60,34 @@ material; low-overhead FPS must remain the throughput measure.
    gates. Add separate fixtures for horizontal shop transitions and dense
    encounters; this tape alone cannot prove a worst-case 20 ms budget.
 
+## Rejected experiment: bounded RNG remainder
+
+A four-word reduction of the 63-bit bounded random value was tested as a
+replacement for the three general 32-bit remainder operations. The portable
+candidate matched 1,048,576 independent 64-bit-modulo cases across all 65,536
+divisors; existing RNG tests preserved results, draw counts and following
+stream words. Its 68000 twin used four quotient-bounded `DIVU.W` instructions.
+Cross-target replay passed, as did builder fixtures (ordered emission digest
+`ffcdfc23dc638be7`) and sanitizer checks of the portable reduction.
+
+It did **not** improve the unchanged gameplay tape: 600 updates / 816 fields,
+36.76 FPS, five-field maximum gap, versus the 815-field / 36.81 FPS baseline.
+The instrumented worst-frame generation/registration/index sum changed from
+117.217 to 116.718 ms, too small to establish a useful frame-time benefit.
+The production RNG and build files were restored; no extra division assembly
+or unused helper was retained. This experiment does not justify changing
+RNG/Create timing or splitting generation across simulation frames.
+
+Evidence: `/tmp/downwell-small-modulo-host.log`,
+`/tmp/downwell-small-modulo-rng.log`, `/tmp/downwell-small-modulo-sanitized.log`,
+`/tmp/downwell-small-modulo-builder.log`, `/tmp/downwell-small-modulo-replay.log`,
+`/tmp/downwell-small-modulo-probes.log`, `/tmp/downwell-small-modulo-fps.log`.
+The builder log includes an initial incorrect fixture invocation followed by
+the passing invocation with the required builder-pack argument.
+
+Next investigate command initialization/creation and terrain indexing in the
+generation burst; the bounded remainder candidate is not the main bottleneck.
+
 ## Fidelity scope
 
 SDL and Amiga both currently stop advancing after cavern level 3 because
