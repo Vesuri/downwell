@@ -51,6 +51,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     // stack: its run globals remain in place while old world ownership retires.
     run_.shops.reset();
     run_.flashEffects.clear();
+    run_.smokeEffects.clear();
     run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);
     emitter_.reset(run_.upgrades.levels[12] != 0);
@@ -478,6 +479,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
     // Only valid unit-sequence state is admitted through the effect owner.
     run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
+    run_.advanceSmokeAnimation();
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
     for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active)
@@ -578,6 +580,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     // Alarms follow Begin Step movement, before builder Step/Create events.
     advanceEnemyAlarms();
+    const auto smokeStepPhase=run_.smokeEffects.beginPhase();
     DW_PROFILE_PHASE(profilePlayer);
     int scrollDelta = 0;
     int cameraXDelta = 0;
@@ -833,6 +836,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     DW_PROFILE_PHASE(profileEnemyContact);
+    run_.stepSmoke(smokeStepPhase,enemyRandom_);
     downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
         enemiesDefeated_, run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> EnemyState& { return enemies_[i]; },

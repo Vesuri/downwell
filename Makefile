@@ -138,6 +138,13 @@ test: verify-smoke-distance
 test: verify-smoke-direction
 test: verify-smoke-trig
 test: verify-smoke-owner
+test: verify-smoke-world
+.PHONY: verify-smoke-world
+verify-smoke-world: build/smoke-world-test generate-room-pack generate-object-pack generate-builder-pattern-pack
+	./build/smoke-world-test
+build/smoke-world-test: tests/core/SmokeWorldTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) src/core/GameplayWorld.cpp src/core/Replay.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -ffp-contract=off -Isrc -o $@ $(filter %.cpp,$^)
 test: verify-effect-placement
 test: verify-binary-effects
 .PHONY: verify-binary-effects
@@ -169,7 +176,9 @@ verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
 	./build/smoke-trig-test
 
-generated/smoke-trig.inc: tools/export-smoke-trig.py
+$(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET): generated/smoke-trig.inc
+
+generated/smoke-trig.inc: tools/export-smoke-trig.py data/Downwell.exe
 	python3 tools/export-smoke-trig.py
 
 build/smoke-trig-test: tests/core/SmokeTrigTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc

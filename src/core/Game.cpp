@@ -97,6 +97,7 @@ void Game::update(const Input& input, std::uint32_t restartSeed) {
         if (startup_.levelResultRequested())
             startup_.enterLevelClear(startup_.playStyle(), heartGoal_);
     }
+    if(!startup_.effectsSucceeded())finished_=true;
     const auto action = startup_.deathResults().inputEffects.action;
     if (action != DeathMenuSequence::Action::None &&
         !startup_.restartFromResults(action, restartSeed)) finished_ = true;

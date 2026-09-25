@@ -265,6 +265,11 @@ public:
     const BulletState& bulletAt(unsigned index) const;
     const EnemyState& enemyAt(unsigned index) const;
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
+    const downwell::SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
+    bool effectsSucceeded()const{return run_.effectsSucceeded;}
+    bool emitSmokeBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+        return run_.emitSmokeBurst(x,y,enemyRandom_);
+    }
     // Effect positions use original absolute room coordinates, not player offsets.
     bool emitFlashBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y) {
         return run_.flashEffects.skeletonBurst(x,y,enemyRandom_);

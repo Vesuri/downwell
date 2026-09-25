@@ -19,6 +19,7 @@
 #include "MachineGunProfile.h"
 #include "LevelClearController.h"
 #include "FlashBallEffects.h"
+#include "SmokeEffects.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -45,6 +46,18 @@ struct RunSession {
     ShopWorld shops;
     // Room-owned effects are reset on run/room retirement, not on a repaint.
     FlashBallEffects<32> flashEffects;
+    SmokeEffects<32> smokeEffects;
+    bool effectsSucceeded=true;
+    void advanceSmokeAnimation(){
+        if(effectsSucceeded)effectsSucceeded=smokeEffects.advanceAnimation(smokeEffects.beginPhase());
+    }
+    void stepSmoke(SmokeEffects<32>::Phase phase,GameMakerRandom& random){
+        if(effectsSucceeded)effectsSucceeded=smokeEffects.step(phase,random);
+    }
+    bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+        if(effectsSucceeded)effectsSucceeded=smokeEffects.skeletonBurst(x,y,random);
+        return effectsSucceeded;
+    }
     SideCameraLockers sideCameraLockers;
     bool gemHigh = false;
     void selectWeaponLevel(const CurrencyAccount& currency) {
@@ -96,6 +109,7 @@ struct RunSession {
         if (!levelClear.create(style, heartGoal, health, upgrades, player, random)) return false;
         levelClearActive = true;
         flashEffects.clear();
+        smokeEffects.clear();
         // Room creation is followed by Draw before the next Step/Alarm phase.
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);
@@ -185,6 +199,8 @@ struct RunSession {
         upgrades = {};
         shops.reset();
         flashEffects.clear();
+        smokeEffects.clear();
+        effectsSucceeded=true;
         sideCameraLockers.clear();
         gemHigh = false;
         levelExit = {};

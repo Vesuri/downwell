@@ -31,9 +31,20 @@ public:
     static void runStep(InstanceStore<Capacity>& instances,
                         AlarmEvents alarmEvents,
                         Handler handler) {
+        runStep(instances,alarmEvents,handler,[](StepEventPhase){});
+    }
+    // External fixed-capacity owners snapshot at the same global boundary,
+    // including empty instance lists and births made by preceding alarms.
+    template <typename AlarmEvents, typename Handler, typename BeforePhase>
+    static void runStep(InstanceStore<Capacity>& instances,
+                        AlarmEvents alarmEvents, Handler handler, BeforePhase beforePhase) {
+        beforePhase(StepEventPhase::beginStep);
         dispatchPhase(instances, StepEventPhase::beginStep, handler);
+        beforePhase(StepEventPhase::alarm);
         dispatchAlarms(instances, alarmEvents, handler);
+        beforePhase(StepEventPhase::step);
         dispatchPhase(instances, StepEventPhase::step, handler);
+        beforePhase(StepEventPhase::endStep);
         dispatchPhase(instances, StepEventPhase::endStep, handler);
     }
 

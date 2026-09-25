@@ -299,6 +299,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if (run_.levelClearActive) return; // Result owner uses stepLevelClear.
     if(roomId_==mainRoomId)
         run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
+    if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
@@ -385,13 +386,18 @@ void StartupRuntime::stepInternal(bool advancePressed,
                 initRoomEndStep(advancePressed);
         }
     };
-    EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler);
+    auto smokeStepPhase=run_.smokeEffects.beginPhase();
+    EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler,
+        [&](StepEventPhase phase){
+            if(phase==StepEventPhase::step)smokeStepPhase=run_.smokeEffects.beginPhase();
+        });
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
     if (roomId_ == mainRoomId) {
         run_.exitDither.step(mainCameraRenderViewY(), surfaceHeight);
         updateMainBullets();
         updateMainEnemies();
+        run_.stepSmoke(smokeStepPhase,random_);
         updateMainEnemyInteractions();
         run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
@@ -1756,6 +1762,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     if (!run_.advanceAfterLevelClear()) return false;
     run_.shops.reset();
     run_.flashEffects.clear();
+    run_.smokeEffects.clear();
     run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};

@@ -2299,6 +2299,7 @@ int main(void) {
 #endif
             }
 #endif
+            if (!port.effectsSucceeded()) { exitCode=20; break; }
             if (!port.generationSucceeded()) break;
 #ifndef DOWNWELL_REPLAY_VERIFY
             // Invalidate before selecting a precomposed side-room ring.

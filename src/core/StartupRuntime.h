@@ -193,6 +193,9 @@ public:
     }
     const ShopWorld& shops() const { return run_.shops; }
     const FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
+    const SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
+    bool effectsSucceeded()const{return run_.effectsSucceeded;}
+    bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y){return run_.emitSmokeBurst(x,y,random_);}
     bool emitFlashBurst(MotionBinary64 x,MotionBinary64 y) {
         return run_.flashEffects.skeletonBurst(x,y,random_);
     }
