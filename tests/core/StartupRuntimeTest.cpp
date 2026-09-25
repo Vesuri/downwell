@@ -451,16 +451,16 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             << " rows=" << runtime.mainBuilderStartRowsGenerated() << ',' << runtime.mainBuilderRowsGenerated()
             << " instances=" << runtime.activeInstanceCount() - instancesBefore
             << " draws=" << runtime.randomDrawCount() - drawsBeforeStart << '\n';
-        require(runtime.mainBuilderStartPattern() == 4 &&
+        require(runtime.mainBuilderStartPattern() == 2 &&
                     !runtime.mainBuilderStartReversed() &&
                     runtime.mainBuilderGenerationCount() == 0,
-                "two first-Step spread draws select unmirrored entrance fragment four");
-        require(runtime.mainBuilderStartRowsGenerated() == 5 &&
-                    runtime.mainBuilderRowsGenerated() == 34,
-                "the complete fragment advances its five shared row intervals");
-        require(runtime.activeInstanceCount() == instancesBefore + 71,
+                "corrected choice stream selects unmirrored entrance fragment two");
+        require(runtime.mainBuilderStartRowsGenerated() == 6 &&
+                    runtime.mainBuilderRowsGenerated() == 35,
+                "the complete fragment advances its six shared row intervals");
+        require(runtime.activeInstanceCount() == instancesBefore + 92,
                 "the fragment creates its exact walls and breakable blocks");
-        require(runtime.randomDrawCount() == drawsBeforeStart + 73,
+        require(runtime.randomDrawCount() == drawsBeforeStart + 89,
                 "box Create RNG ordering includes the reference gem-tile branch");
 
         downwell::Input steerToPlatform;
@@ -492,11 +492,11 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             << " last=" << runtime.mainBuilderLastMainPattern()
             << " rows=" << runtime.mainBuilderRowsGenerated() << " blocks=" << runtime.mainBlocksDestroyed()
             << " sprite=" << runtime.mainPlayerSpriteId() << " vy=" << runtime.mainPlayerSpeedY() << '\n';
-        require(runtime.mainPlayerY() >= 1279.0F &&
-                    runtime.mainPlayerY() <= 1281.0F &&
+        require(runtime.mainPlayerY() >= 1199.0F &&
+                    runtime.mainPlayerY() <= 1201.0F &&
                     runtime.mainPlayerSpeedY() == 0.0F &&
-                    runtime.mainPlayerSpriteId() == 27,
-                "landing settles on lower generated geometry after the shot");
+                    runtime.mainPlayerSpriteId() == 31,
+                "landing settles on corrected entrance geometry after the shot");
         require(runtime.mainLandings() == 1 && runtime.mainAmmo() == 8,
                 "the airborne-to-grounded edge fully recharges the gunboots");
         bool standingOnGeneratedTerrain = false;
@@ -541,7 +541,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     instance.velocityX != 0.0F || instance.velocityY != 0.0F;
             }
             if (instance.active && (instance.objectId == 60 || instance.objectId == 92 || instance.objectId == 93) &&
-                instance.y == 1296 &&
+                instance.y == 1216 &&
                 runtime.mainPlayerX() + 3.0F >= instance.x - 8.0F &&
                 runtime.mainPlayerX() - 4.0F <= instance.x + 7.0F)
                 standingOnGeneratedTerrain = true;
@@ -575,16 +575,16 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         require(foundMovingEnemy,
                 "area-one enemies advance native fractional movement state");
-        require(runtime.mainBuilderMainPatternsGenerated() == 2 &&
-                    runtime.mainBuilderLastMainPattern() == 19 &&
-                    runtime.mainBuilderGenerationCount() == 2,
-                "the builder continues through two deterministic regular fragments");
-        require(runtime.mainBuilderRowsGenerated() == 62,
+        require(runtime.mainBuilderMainPatternsGenerated() == 1 &&
+                    runtime.mainBuilderLastMainPattern() == 18 &&
+                    runtime.mainBuilderGenerationCount() == 1,
+                "the corrected stream generates regular fragment eighteen below the entrance");
+        require(runtime.mainBuilderRowsGenerated() == 51,
                 "regular fragments preserve row overlap and append pillar rows");
         require(runtime.mainShotsFired() == shotsBeforeBlock + 1 &&
-                    runtime.mainBlocksDestroyed() == 0 &&
+                    runtime.mainBlocksDestroyed() == 1 &&
                     runtime.mainBulletCount() == 0,
-                "the randomized layout absorbs this shot without destroying a block; direct contact is covered above");
+                "the corrected layout's shot destroys one block and retires its projectile");
         {
             auto retirement = runtime;
             std::size_t boxIndex = retirement.activeInstanceCount();
@@ -743,13 +743,13 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                   << " specials=" << runtime.mainBuilderSpecialObjectsGenerated() << '\n';
         // This is a tape-specific regression, not a Windows trajectory oracle.
         // Spread consumes one RNG word at each bullet's first Step. This
-        // traversing tape selects scrRightPat1 pattern 4: v,O,_,@,{,}, no J.
+        // corrected-choice tape selects scrRightPat1 pattern 0: v,O,_,@,{,}, no J.
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 4 &&
+                    runtime.mainBuilderLastRightPattern() == 0 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
-                    runtime.mainBuilderRowsGenerated() == 92,
+                    runtime.mainBuilderRowsGenerated() == 89,
                 "the first scheduled side room preserves deterministic selection and rows");
         require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
                 "every special marker in deterministic right-room pattern is interpreted");
@@ -769,7 +769,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         require(!foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
-                "pattern 4 emits its utility/reward IDs without inventing a J torch marker");
+                "pattern 0 emits its utility/reward IDs without inventing a J torch marker");
     }
 }
 

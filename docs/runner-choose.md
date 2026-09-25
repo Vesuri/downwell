@@ -225,3 +225,25 @@ The runner stopped its emulator and restored ordinary build options. Logs:
 
 The broader startup test's geometry-specific expectations and the eight-seed
 sweep remain to be revalidated; this gate does not silently supersede them.
+
+## Startup fixture and sweep restored
+
+Follow-up revalidation now passes both outstanding checks. The full startup
+fixture retains its input tape and all behavior assertions; its pinned geometry
+now reflects entrance pattern 2 and right-room pattern 0. The player lands at
+y=1200 on generated terrain at y=1216 with zero vertical speed and full ammo;
+the shot destroys one block and retires. The checked right-room markers remain
+`v,O,_,@,{,}` with no invented torch. These are corrected-implementation
+regression observations, not independently captured Windows trajectories.
+Log: `/tmp/downwell-startup-rebaseline.log`.
+Address/undefined-behavior sanitizer validation also passes with a 65,520 KiB
+host stack limit (`/tmp/downwell-startup-rebaseline-sanitized.log`). The initial
+default-stack sanitizer run overflowed this test function's multiple copied
+runtime snapshots; no target stack setting was changed. The preceding native
+route's guard check remains separate evidence about the Amiga stack.
+
+The unchanged eight-seed input controller reaches every exit alive within the
+existing 2,500-update budget. It compares 15,118 gameplay updates and all RNG
+words, with 95 generated enemies and no adapter mismatch. Per-seed counts are
+in `natural-route-verification.md`; log `/tmp/downwell-corrected-sweep.log`.
+No production code or emulator build options changed during this revalidation.

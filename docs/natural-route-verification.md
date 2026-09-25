@@ -2,16 +2,15 @@
 
 ## After the Windows choose correction
 
-The tables and counts below record the earlier, two-word-choose implementation.
-They are historical, not current original-RNG evidence. The corrected two-seed
-host gate passes: seed 99 exits at 1,339 updates and seed 4 at 1,646; each
+The corrected two-seed host gate passes: seed 99 exits at 1,339 updates and
+seed 4 at 1,646; each
 compares 211 upgrade and 120 second-level updates. Seed 4 then reaches its
 generated shop after 259 more updates, rejects a 300-gem item with 16 gems,
 and returns to the shaft in 45 updates. Second-level total is 431 updates.
 Decoded entry checkpoints are seed 2: 330 words/rows 8,3 and seed 4:
 324 words/rows 8,4, checked against every RNG state word. See
-`runner-choose.md` for the audit and scope. The eight-seed sweep still needs
-revalidation after these corrections.
+`runner-choose.md` for the audit and scope. The eight-seed sweep below has also
+been revalidated against the corrected stream.
 
 The corrected native seed-4 gate also passes: 211 upgrade comparisons,
 168 exit-field comparisons, 51 retained shop-HUD comparisons, 45 return updates,
@@ -40,25 +39,25 @@ fails on death or a budget outcome rather than silently accepting a stall.
 
 | Seed | Updates to exit | Health | Gems | Generated enemies |
 | --- | ---: | ---: | ---: | ---: |
-| 0 | 2401 | 2 | 26 | 22 |
-| 1 | 2086 | 2 | 38 | 18 |
-| 2 | 1763 | 3 | 40 | 10 |
-| 3 | 2104 | 3 | 0 | 12 |
-| 4 | 1477 | 4 | 10 | 13 |
-| 5 | 2076 | 2 | 60 | 14 |
-| 6 | 1932 | 2 | 60 | 17 |
-| 7 | 2107 | 1 | 40 | 14 |
+| 0 | 1935 | 2 | 36 | 17 |
+| 1 | 2132 | 3 | 12 | 10 |
+| 2 | 1995 | 3 | 58 | 8 |
+| 3 | 1807 | 4 | 20 | 12 |
+| 4 | 1646 | 3 | 16 | 9 |
+| 5 | 2175 | 3 | 4 | 13 |
+| 6 | 1935 | 3 | 24 | 12 |
+| 7 | 1493 | 4 | 18 | 14 |
 
-Total: 15,946 compared gameplay updates and 120 generated enemies. No adapter
+Total: 15,118 compared gameplay updates and 95 generated enemies. No adapter
 or RNG mismatch was found. This expands seed/encounter coverage, not the set
 of implemented game features. The separate two-seed gate below remains
 responsible for upgrade/re-entry and generated-shop traversal.
-The strict eight-seed rerun and unchanged two-seed gate both pass. Logs:
-`/tmp/downwell-route-sweep-verified.log` and
-`/tmp/downwell-route-sweep-original-gates.log`. No production code, assets or
-emulator build options were changed for this test-only addition.
+The corrected strict eight-seed rerun passes. Log:
+`/tmp/downwell-corrected-sweep.log`. No production code, assets or emulator
+build options were changed while revalidating this sweep. The former
+15,946-update / 120-enemy sweep predates the RNG correction and is superseded.
 
-## Exit, upgrade and shop route
+## Historical exit, upgrade and shop route (before choose correction)
 
 Run `make verify-natural-exit`. This host test runs both runtime adapters using
 the decoded room, object and builder packs. It does not run an emulator or

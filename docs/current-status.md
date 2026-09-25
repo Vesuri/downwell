@@ -38,8 +38,8 @@ two ports proves original-game completion. The active parity goal is unfinished.
   Successful naturally funded purchasing remains unverified.
 - `make verify-route-sweep` additionally checks seeds 0–7 with deterministic
   recovery inputs, requiring all eight generated exits alive within 2,500
-  updates each. It compares 15,946 gameplay updates, including full RNG state
-  every update, across 120 generated enemies. This broadens host encounter
+  updates each. The corrected-stream rerun compares 15,118 gameplay updates,
+  including full RNG state every update, across 95 generated enemies. This broadens host encounter
   coverage; it is not a native rendering or original-Windows comparison.
 - The seed-4 native natural-route gate now reaches the generated exit at
   update 1,646, compares 211 upgrade frames and 168 exit-field frames with no
@@ -88,11 +88,12 @@ two ports proves original-game completion. The active parity goal is unfinished.
   all RNG words. The corrected host routes pass at 1,339/1,646 gameplay updates,
   each followed by 211 upgrade updates and 120 re-entry updates. Seed 4 reaches
   its next-level shop after 259 more updates and returns in 45 updates after an
-  insufficient-funds attempt (16 gems, price 300). Previous eight-seed sweep
-  results above remain historical until revalidated for this corrected stream.
+  insufficient-funds attempt (16 gems, price 300). The corrected eight-seed
+  sweep also passes, with unchanged input-only controller and completion limits.
   Garden reconstruction passes an independent VM-call/RNG-state oracle (77
-  Create words). The broader startup test now fails its stale fragment-four
-  assertion after reaching gameplay: the corrected stream selects fragment 2.
+  Create words). The complete startup test now passes with corrected fragment-2
+  entrance and side-room-0 expectations; solid support, recharge, enemy creation,
+  projectile and special-marker checks remain enforced.
   Title RNG order tests pass, but omitted particle visuals remain omitted.
 
 - Complete the seven scene boundaries. All seven now have named Amiga scene
