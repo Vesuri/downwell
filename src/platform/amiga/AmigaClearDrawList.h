@@ -4,6 +4,7 @@
 #include "core/LevelClearLayout.h"
 #include "core/LevelClearTrig.h"
 #include "core/LevelClearRaster.h"
+#include "core/LevelClearHeadingPixels.h"
 
 // Convert the shared source-order layout to offline planar draw commands.
 // Border DMA and the player hardware sprite are separate presenter outputs.
@@ -16,8 +17,17 @@ struct AmigaClearDrawList {
     bool valid = false;
     bool build(const downwell::LevelClearController& room,
                const downwell::LevelClearPresentation::Frame& frame,
-               const downwell::UpgradeInventory& inventory, bool outlined = false) {
-        return build(room, frame, inventory, downwell::LevelClearRaster::floorBinary32, outlined);
+               const downwell::UpgradeInventory& inventory, bool outlined = false, bool fastHeading = false) {
+        if (!fastHeading)
+            return build(room, frame, inventory, downwell::LevelClearRaster::floorBinary32, outlined);
+        downwell::LevelClearHeadingPixels heading;
+        downwell::HudReal sine;
+        { DW_PROFILE_SCOPE(profileClearTrig);
+            if (!heading.compute(downwell::LevelClearTrig::sineQ30(
+                downwell::LevelClearTrig::degreePhase(frame.circle)+0x40000000u))) return false;
+            sine = downwell::LevelClearTrig::absoluteSine(frame.time);
+        }
+        return build(room,frame,inventory,{},sine,downwell::LevelClearRaster::floorBinary32,outlined,&heading);
     }
     template<class Rasterize>
     bool build(const downwell::LevelClearController& room,
@@ -35,7 +45,7 @@ struct AmigaClearDrawList {
                const downwell::LevelClearPresentation::Frame& frame,
                const downwell::UpgradeInventory& inventory,
                downwell::HudReal absoluteCosine, downwell::HudReal absoluteSine,
-               Rasterize pixel, bool outlined = false) {
+               Rasterize pixel, bool outlined = false, const downwell::LevelClearHeadingPixels* heading = nullptr) {
         count = 0; valid = false;
         if (!downwell::levelClearStageLabel(frame.area, frame.level) ||
             room.selection.lastIndex > 3 || room.selection.cursor > room.selection.lastIndex) return false;
@@ -73,7 +83,15 @@ struct AmigaClearDrawList {
                 add(id, 0, px, py, 1);
             }
         } sink{*this, pixel, room.motion.viewY(), outlined};
-        downwell::drawLevelClear(sink, room, frame, inventory, absoluteCosine, absoluteSine);
+        if (heading) {
+            downwell::drawLevelClearWithShadows(sink,room,frame,inventory,absoluteSine,
+                [&](unsigned id,int y) {
+                    if (y!=96 && y!=278) { valid=false; return; }
+                    for (unsigned pass=0;pass<=6;++pass)
+                        sink.add(id,0,110+heading->x(pass),
+                            (y==96?heading->stageY(pass):heading->choiceY(pass))-sink.viewY,pass==6?1:2);
+                });
+        } else downwell::drawLevelClear(sink, room, frame, inventory, absoluteCosine, absoluteSine);
         return valid;
     }
 };

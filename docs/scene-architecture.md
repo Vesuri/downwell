@@ -210,3 +210,31 @@ The bounded A500 regression passes 432 completion frames, 192 exit-field
 frames, both clears, 60 third-level updates and the stack guard after the
 copy change (`/tmp/downwell-bank-copy-native-gdb.log`). Both 68000 instruction
 and helper audits pass.
+
+### Exact heading-pixel specialization
+
+The live upgrade renderer uses `LevelClearHeadingPixels` for the seven red/
+white heading passes. It retains the existing Q30 cosine sampler and exactly
+reproduces the general layout's binary64 arithmetic followed by binary32
+round-to-nearest-even and floor. This is a raster specialization, not a new
+animation rule. The general shared layout remains the SDL/reference path;
+both paths share command ordering and all other layout through
+`drawLevelClearWithShadows`.
+
+For passes 0..6, the products and coordinates are exactly representable in
+binary64. Anchors 80 and 96 remain in the binary32 binade [64,128), while
+278 remains in [256,512). In Q30 units the half-ULP thresholds are therefore
+4096 and 16384. Repeated unsigned addition yields the integer and fractional
+offset; a fractional remainder at or below the threshold rounds back to the
+integer coordinate (ties choose its even mantissa). Larger remainders floor
+one pixel lower. No 64-bit multiplication or general coordinate normalization
+is needed for these heading passes.
+
+Tests compare one million Q30 samples, all 360 angle samples, endpoints and
+rounding-boundary neighbours against an independent double/float expression;
+selected cases also compare the portable `HudReal` implementation. All 360
+animated overlay command lists match the original path. ASan/UBSan pass.
+The bounded native run passes 432 completion-plane comparisons, 192 exit-field
+comparisons, both clears, 60 third-level updates and the stack guard:
+`/tmp/downwell-heading-native-gdb.log`. This establishes equivalence to the
+existing raster policy, not a new claim of Windows GPU pixel-center fidelity.

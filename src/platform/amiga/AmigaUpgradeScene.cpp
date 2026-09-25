@@ -68,7 +68,7 @@ bool AmigaUpgradeScene::render(unsigned back, UBYTE* border, UBYTE* layer,
     const int top=room.motion.viewY(), borderTop=top-snapshot.tileY;
     if (top<0 || borderTop<0 || top>324 || borderTop>324) return false;
     { DW_PROFILE_SCOPE(profileClearDrawList);
-      if (!drawList_.build(room,snapshot,world.upgrades(),true)) return false;
+      if (!drawList_.build(room,snapshot,world.upgrades(),true,true)) return false;
       for(unsigned i=0;i<drawList_.count;++i) {
           drawList_.commands[i].x-=110;
           drawList_.commands[i].y+=top;

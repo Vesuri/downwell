@@ -117,6 +117,11 @@ int main(int argc, char** argv) {
         require(outlined.build(room,frame,inventory,true) &&
             outlined.count + (frame.choices ? 8 : 0) == native.count,
             "two outlined labels replace eight redundant passes without changing other commands");
+        AmigaClearDrawList fastHeading;
+        require(fastHeading.build(room,frame,inventory,true,true) && fastHeading.count==outlined.count,
+            "specialized heading produces the same command count");
+        for(unsigned i=0;i<outlined.count;++i)
+            require(fastHeading.commands[i]==outlined.commands[i],"specialized heading preserves every source-order command");
         AmigaRenderer composed;
         amigaRendererInit(&composed,game.data(),outlinedHud[back].data());
         require(outlinedCaches[back].render(composed,pack.data(),pack.data()+pack.size(),

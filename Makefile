@@ -666,6 +666,13 @@ test: test-amiga-clear-border-cache
 test: test-amiga-clear-overlay
 test: test-level-clear-trig
 test: test-level-clear-raster
+test: test-level-clear-heading-pixels
+.PHONY: test-level-clear-heading-pixels
+build/level-clear-heading-pixels-test: tests/core/LevelClearHeadingPixelsTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-level-clear-heading-pixels: build/level-clear-heading-pixels-test
+	./build/level-clear-heading-pixels-test
 .PHONY: test-level-clear-raster
 build/level-clear-raster-test: tests/core/LevelClearRasterTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

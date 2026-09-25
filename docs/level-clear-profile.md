@@ -264,3 +264,30 @@ reentries. The 480-update profile completed within its 120-second hard limit,
 reported zero clock clamps, and restored normal startup. Evidence:
 `/tmp/downwell-bank-copy-native-gdb.log` and
 `/tmp/downwell-bank-copy-profile.log`.
+
+### Exact heading coordinates
+
+The heading specialization removes repeated general coordinate arithmetic,
+while retaining the existing Q30 sampler and binary32 rounding policy. See
+`scene-architecture.md` for its range proof and independent boundary tests.
+The same 480-update detailed profile now measures:
+
+| Phase | Idle average | Navigation average |
+| --- | ---: | ---: |
+| Layout (excluding nested trig) | 10.28 ms | 13.23 ms |
+| Heading/trig preparation | 1.67 ms | 1.67 ms |
+| Content rendering | 21.35 ms | 21.65 ms |
+| Shared completion step | 6.62 ms | 9.39 ms |
+
+Layout was previously 15.44 / 17.39 ms, with roughly 2.60 ms in trig.
+This saves approximately 6 ms during idle updates without changing command
+pixels. Content rendering remains the largest steady cost, and the complete
+frame still exceeds 20 ms. Detailed-probe throughput is not shipping FPS.
+Initial border painting remains about 164 ms, also unfinished work.
+
+The native pixel/stack regression and sanitizer checks pass. The profile
+finishes within its 120-second deadline, reports zero clock clamps, stops the
+owned emulator and restores all startup skips to zero. Evidence:
+`/tmp/downwell-heading-native-gdb.log`, `/tmp/downwell-heading-profile.log`,
+`/tmp/downwell-heading-final-host.log`, and
+`/tmp/downwell-heading-sanitized.log`.
