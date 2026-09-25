@@ -261,6 +261,11 @@ and the ordinary build was restored after both attempts.
   the legacy helper. The temporary legacy advancement binding was removed
   from `SkeletonTiming`; timeline, frame-track evaluation and GML index-write
   synchronization must be implemented before live skeleton integration.
+  `SequenceTimeline` now preserves the looping branch's signed remainder and
+  intermediate binary32 rounding using integer-only arithmetic. Its 132,000
+  host reference cases and sanitizers pass; 68000 compilation needs no helper
+  symbols. Frame-track evaluation and index/sprite-write synchronization remain
+  unwired, and no new actor is enabled by this arithmetic component.
 
 ## Working evidence
 

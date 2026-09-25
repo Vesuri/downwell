@@ -118,6 +118,14 @@ all: $(TARGET)
 .PHONY: verify-skeleton-timing
 .PHONY: verify-runner-image-value
 .PHONY: verify-legacy-image-animation
+.PHONY: verify-sequence-timeline
+verify-sequence-timeline: build/sequence-timeline-test
+	./build/sequence-timeline-test
+
+build/sequence-timeline-test: tests/core/SequenceTimelineTest.cpp src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/SequenceTimelineTest.cpp
+
 .PHONY: verify-animation-metadata
 verify-animation-metadata:
 	bash tools/export-animation-metadata.sh

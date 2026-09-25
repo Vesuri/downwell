@@ -111,3 +111,28 @@ as explicitly legacy evidence, not used to implement these sequences.
 Next work is the integer timeline/remainder implementation, track evaluation,
 and synchronization when GML writes `image_index` or changes sprites. No
 runtime resource is enabled based on an assumed identity mapping.
+
+## Integer sequence timeline
+
+`SequenceTimeline` now implements the looping timeline arithmetic for unit
+speed/direction multipliers. It first adds the stored speed and rounds to
+binary32. Only a negative position or position at/above sequence length invokes
+the source helper's two-remainder normalization, preserving its intermediate
+binary32 addition of the length. It reports a boundary crossing after updating
+the position; this flag is not itself a dispatched Animation End event.
+
+Remainder is calculated from the 24-bit significand and exponent with bounded
+32-bit shifts/subtractions, not repeated per-cycle wrapping or target floating
+point. Supported lengths are positive integers up to 65,535, matching and
+exceeding the recovered skeleton/bone lengths. Inputs are normal finite values
+or signed zero; unsupported inputs fail without changing position or flags.
+This is not a general implementation of all sequence modes or playback rates.
+
+The test compares 100,000 full-exponent signed remainder/normalization cases
+against host `fmod` with the runner's rounding boundaries, plus 32,000 timeline
+updates across lengths 1/4/6/8 and positive, negative, zero and oversized speeds.
+Signed-zero and atomic rejection cases are checked separately. Normal and
+ASan/UBSan runs pass. The 68000 compile fixture has no undefined helper symbols;
+this is compilation evidence, not a native execution or timing measurement.
+Frame-track evaluation, index-write reconciliation, sprite changes and owner
+integration remain outstanding, so playable builds are unchanged.
