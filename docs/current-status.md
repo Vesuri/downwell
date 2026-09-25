@@ -27,6 +27,17 @@ This queue describes priorities, not a replacement for the full goal. The old
 
 ### Joined skeleton/bone encounter regression
 
+Flash-ball requests now have fixed shared ownership, real Create-time jitter
+and animation/retirement state through `FlashBallEffects`. Its 1,024 seeded
+burst tests compare 6,178 births to scalar arithmetic, including coordinate
+narrowing, creation-phase exclusion, seven-update Animation End and slot reuse.
+Normal/sanitizer and 68000 compilation checks pass. Sprite 96's three unit
+sequence keys are now exported/verified. The live world/renderers remain
+unconnected. Its source RGB 254/7 pixels do not pass the exact four-pen
+exporter; the attempted asset addition was removed pending palette/shader
+verification, leaving current pack selections unchanged. See
+`skeleton-effect-ownership.md` for the precise remaining boundary.
+
 Smoke/flash burst emission now has a shared implementation preserving count,
 Y-before-X sampling and synchronous child Create interleaving. The skeleton's
 two source argument sets pass 6,144 sequence tests with 15,454 child births,

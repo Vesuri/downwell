@@ -16,6 +16,7 @@ sprites = metadata["sprites"]
 assert len(sprites) == 741
 assert [s["id"] for s in sprites] == list(range(741))
 for index, name, frames in (
+    (96,"sprFlashBall",3),
     (205,"sprEnmSkeletonHit",1), (206,"sprSkeletonDead",1),
     (207,"sprEnmSkeletonThrow",8), (208,"sprEnmSkeletonIdle",6),
     (460,"sprSkeletonBone",4),
@@ -38,4 +39,4 @@ for index, name, frames in (
         assert not key["Stretch"] and not key["Disabled"]
         assert key["Channels"] == [{"Channel": 0, "Value": {"Value": frame}}]
 assert [s["id"] for s in sprites if s["playbackSpeedType"] == "FramesPerSecond"] == [399,626,738,739,740]
-print("741 sprite playback records verified; skeleton/bone unit rates and sequence presence pinned")
+print("741 sprite playback records verified; skeleton/bone/flash unit sequence tracks pinned")

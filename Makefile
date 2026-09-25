@@ -130,6 +130,15 @@ build/bone-store-test: tests/core/BoneProjectileStoreTest.cpp src/core/BoneProje
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/GameMakerRandom.cpp
 
 .PHONY: verify-skeleton-actor
+test: verify-flash-effects
+.PHONY: verify-flash-effects
+verify-flash-effects: build/flash-effects-test
+	./build/flash-effects-test
+
+build/flash-effects-test: tests/core/FlashBallEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/GameMakerRandom.cpp
+
 test: verify-skeleton-effect-bursts
 .PHONY: verify-skeleton-effect-bursts
 verify-skeleton-effect-bursts: build/skeleton-effect-bursts-test

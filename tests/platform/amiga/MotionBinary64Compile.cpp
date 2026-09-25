@@ -10,8 +10,14 @@
 #include "core/BoneProjectileStore.h"
 #include "core/SkeletonEffectBursts.h"
 #include "core/GameMakerRandom.h"
+#include "core/FlashBallEffects.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
+extern "C" bool flashEffectsCompile(downwell::FlashBallEffects<16>* effects,
+    downwell::GameMakerRandom* random,downwell::MotionBinary64 x,downwell::MotionBinary64 y) {
+    const auto phase=effects->beginAnimation();
+    return effects->skeletonBurst(x,y,*random) && effects->advanceAnimation(phase);
+}
 extern "C" bool skeletonBurstsCompile(bool flash,downwell::MotionBinary64 x,
     downwell::MotionBinary64 y,downwell::GameMakerRandom* random,unsigned* trace) {
     auto create=[trace](int object,downwell::MotionBinary64 px,downwell::MotionBinary64 py){

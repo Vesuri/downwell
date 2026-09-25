@@ -69,7 +69,22 @@ ranges draw random(1), multiply by width and add the lower bound; the flash
 bounds +/-10 keep that arithmetic exactly representable before position
 addition. This is not a general equivalence claim about x87 expressions.
 
-Smoke/flash child state, corpse physics and debris relocation still
+Flash-ball child state is now owned by `FlashBallEffects`: builtin-coordinate
+binary32 narrowing, X then Y integer jitter, frame-one start, speed 0.3,
+three verified unit sequence keys and Animation End retirement. The fixed pool
+keeps stable handles and phase cutoffs. 1,024 seeded full bursts (6,178 births)
+match scalar positions/RNG/animation, retire after seven animation updates and
+reuse slots without reusing handles. Normal/sanitizer and 68000 compile checks
+pass. Exported sprite-96 sequence metadata is now explicitly verified.
+
+This pool is not yet called by the live world or either renderer. Offline-art
+preparation uncovered noncanonical colors: every opaque pixel in sprite-96
+frames 0/2 is RGB 254 and in frame 1 is RGB 7 (436 opaque pixels per frame).
+The exact four-pen exporter correctly rejects those colors. Its palette rules
+and existing pack selection remain unchanged pending a source shader/palette
+audit; no runtime conversion or guessed quantization was added.
+
+Smoke child state, flash rendering, corpse physics and debris relocation still
 need their own adapters; this audit does not establish those adapters.
 No request may silently succeed when required child storage is exhausted.
 
