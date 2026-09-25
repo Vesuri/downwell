@@ -77,6 +77,25 @@ match scalar positions/RNG/animation, retire after seven animation updates and
 reuse slots without reusing handles. Normal/sanitizer and 68000 compile checks
 pass. Exported sprite-96 sequence metadata is now explicitly verified.
 
+`SmokeBirth` now implements object 225's synchronous Create: builtin float
+coordinate narrowing before xx/yy, nocol=true, speed=random_range(2,4),
+image_speed=float(speed*random_range(0.05,0.13)), direction=random_range(0,359),
+and allSet=false. Its 1,024 seeded skeleton bursts compare 5,180 child births
+and full RNG state to host arithmetic. `MultiplyBinary64` supplies the normal/
+zero nearest-even product using 16-bit limbs and 32-bit intermediates: 100,000
+normal products, signs/zero, halfway cases and unsupported-range rejection are
+tested. Sanitizers and a 68000 compile pass; the compiled birth path's only
+undefined symbol is GameMakerRandom::nextU32, with no FP helpers.
+
+Crucially, fxSmoke Step recomputes the animation rate with a **fourth** random
+draw, after calculating xsp/ysp on its first invocation. The birth state does
+not mark allSet or consume that draw early. Velocity initialization, 0.9 decay,
+the 16-pixel no-collision gate, collision dispatch, animation lifetime and drawFx
+remain to be connected; this is not yet a live smoke owner. Source export pins:
+Create SHA-256 `725336f892c1c024ccb1285545b93f683be5cca16815f0b626c82eaa496a221b`,
+Step SHA-256 `4398d86951dc87ba221561327498a924f5b97e14ba65f13b30c71377206e8263`.
+Those hashes identify the reviewed UTMT assembly, not a Windows execution test.
+
 The pool now resides in shared `RunSession` ownership. Both runtime adapters
 advance it in their pre-Step animation work; room/run retirement clears it
 without a whole-pool stack temporary. Both render paths consume current frames

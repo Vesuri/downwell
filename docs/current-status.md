@@ -27,6 +27,14 @@ This queue describes priorities, not a replacement for the full goal. The old
 
 ### Joined skeleton/bone encounter regression
 
+Smoke Create now has a shared integer-only implementation (`SmokeBirth`),
+verified across 5,180 births/1,024 seeds against scalar coordinates, sampled
+speed/direction/image speed and full RNG state. Its normal binary64 multiplier
+passes 100,000 products and rounding/range tests; sanitizers and 68000 compilation
+pass without FP helpers. First Step's additional animation-rate draw is kept
+separate from Create. Smoke motion/collision/lifetime and live ownership are
+still open; see `skeleton-effect-ownership.md` for exact scope and source hashes.
+
 Flash-ball requests now have fixed shared ownership, real Create-time jitter
 and animation/retirement state through `FlashBallEffects`. Its 1,024 seeded
 burst tests compare 6,178 births to scalar arithmetic, including coordinate
