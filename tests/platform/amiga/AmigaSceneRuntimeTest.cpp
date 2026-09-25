@@ -1205,7 +1205,6 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     "both live adapters grant the source Gem Attractor upgrade");
         }
         bool reported = false;
-        bool playerReported = false;
         unsigned pairedDeadFrames = 0;
         const unsigned combatTicks = std::getenv("DOWNWELL_COMBAT_TICKS")
             ? static_cast<unsigned>(std::atoi(std::getenv("DOWNWELL_COMBAT_TICKS"))) : 600;
@@ -1516,15 +1515,19 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) ==
                         static_cast<unsigned>(reference.mainPlayerImageIndex()),
                     "combat player presentation agrees across adapters, including forced spins");
-            if (!playerReported && std::fabs(176 + gameplay.player().offsetYFixed() / 256.0F - reference.mainPlayerY()) > 3.0F) {
-                playerReported = true;
+            const bool samePlayer = 240 + gameplay.player().offsetXFixed() / 256.0F == reference.mainPlayerX() &&
+                176 + gameplay.player().offsetYFixed() / 256.0F == reference.mainPlayerY() &&
+                gameplay.player().grounded() == reference.mainPlayerGrounded();
+            if (!samePlayer) {
                 std::cout << "COMBAT PLAYER tick=" << gameplay.tick()
+                          << " x=" << 240 + gameplay.player().offsetXFixed() / 256.0F << ',' << reference.mainPlayerX()
                           << " y=" << 176 + gameplay.player().offsetYFixed() / 256.0F << ',' << reference.mainPlayerY()
                           << " ground=" << gameplay.player().grounded() << ',' << reference.mainPlayerGrounded()
                           << " jumps=" << gameplay.player().jumps() << ',' << reference.mainJumps()
                           << " shots=" << gameplay.player().shots() << ',' << reference.mainShotsFired()
                           << " ammo=" << gameplay.player().ammo() << ',' << reference.mainAmmo() << '\n';
             }
+            require(samePlayer, "combat and death preserve identical player position and support every update");
             if (!reported && (gameplay.health() != reference.mainPlayerHealth() ||
                     gameplay.enemiesDefeated() != reference.mainEnemiesDefeated() ||
                     gameplay.currency() != reference.mainCurrencyTotal())) {
@@ -1573,7 +1576,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     gameplay.currency() > 0 && reference.mainCurrencyTotal() > 0,
                 "combat diagnostic actually exercises kills and reward collection on both targets");
         if (std::getenv("DOWNWELL_VERIFY_COMBAT"))
-            require(!reported && !playerReported,
+            require(!reported,
                     "extended combat tape must match movement, health, kills and currency");
         if (std::getenv("DOWNWELL_VERIFY_FROG_MOTION"))
             require(sawPairedFrogHit, "strict combat tape exercises a surviving frog hit on both adapters");

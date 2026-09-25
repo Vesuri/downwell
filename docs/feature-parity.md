@@ -9,6 +9,25 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Exact player state throughout long combat and death
+
+The combat loop now requires equal Q8 player X/Y and grounding on every
+update, including death and results ownership. It previously only reported
+Y differences larger than three pixels; X and support were not directly
+asserted there. This complements the exact entrance/traversal gate below.
+
+The 6,000-update firing-phase-six death route passes, ending at health 0/0,
+seven kills and 74 currency on both backends, with 3,497 paired dead updates,
+active results and recorded statistics. The phase-zero route also retains
+exact player state over 6,000 updates but ends alive at health 2/2; deliberately
+asking it for death coverage fails that coverage assertion. It is not counted
+as a death test. These are host-side adapter comparisons, not native timing
+or original-Windows execution proofs.
+The designated phase-five survival route also passes all 6,000 updates with
+no dead frames, ending at health 2/2, six kills and 76 currency. Both routes
+are reproduced by `make verify-gameplay-death-state`; log:
+`/tmp/downwell-exact-death-survival.log`.
+
 ### Exact entrance/traversal state comparison
 
 The paired scene test no longer permits five-/ten-pixel player drift,
