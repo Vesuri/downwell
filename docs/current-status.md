@@ -64,6 +64,13 @@ A firing-phase-six experiment also failed (4,769 main-room updates, health 4,
 no damage phases) and was reverted. The original full-suite assertions/input
 remain intact; focused flash verification is explicitly separate, not a full
 renderer-suite pass. Diagnose this route before claiming restored full coverage.
+The subsequent full optimized test localizes the missed coverage before combat:
+after 4,769 main-room updates, x=308.70/y=1158.40, health remains 4 and both
+activated/defeated enemy counts are zero. Suppressing grounded fire, with either
+90- or 180-update directional holds, still leaves the player at y=1200 with
+zero activated enemies. Those input experiments were reverted; failure output
+now includes position, grounded state and enemy counters. The next diagnosis
+must inspect entrance traversal/terrain and generation, not damage blink alone.
 
 Smoke/flash burst emission now has a shared implementation preserving count,
 Y-before-X sampling and synchronous child Create interleaving. The skeleton's

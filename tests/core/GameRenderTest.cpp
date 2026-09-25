@@ -500,8 +500,11 @@ int main() {
         else ++flashingVisible;
     }
     if(!(hidden>0 && flashingVisible>0 && recovered))
-        std::fprintf(stderr,"Damage tape: main=%u hidden=%u visible=%u health=%d recovered=%d\n",
-            mainTicks,hidden,flashingVisible,damagedGame.startup().mainPlayerHealth(),int(recovered));
+        std::fprintf(stderr,"Damage tape: main=%u hidden=%u visible=%u health=%d recovered=%d x=%.2f y=%.2f grounded=%d activated=%u defeated=%u\n",
+            mainTicks,hidden,flashingVisible,damagedGame.startup().mainPlayerHealth(),int(recovered),
+            damagedGame.startup().mainPlayerX(),damagedGame.startup().mainPlayerY(),
+            int(damagedGame.startup().mainPlayerGrounded()),damagedGame.startup().mainEnemiesActivated(),
+            damagedGame.startup().mainEnemiesDefeated());
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
     require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");
