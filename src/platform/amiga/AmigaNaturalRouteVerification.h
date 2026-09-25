@@ -12,9 +12,9 @@ struct AmigaNaturalRouteVerification {
     bool done = false;
     static void entry(AmigaAreaOneTerrainBuilder& builder, downwell::GameMakerRandom& random) {
         random.setSeed(4);
-        for (unsigned i = 0; i < 437; ++i) random.nextU32();
+        for (unsigned i = 0; i < 324; ++i) random.nextU32();
         downwell::AreaOneBuilder initial;
-        initial.restoreInitialCheckpoint(240, 704, -30, 8, 13);
+        initial.restoreInitialCheckpoint(240, 704, -30, 8, 4);
         builder.resetFromRoomEntry(initial);
     }
     downwell::Input input(const AmigaPortRuntime& game, AmigaTerrainCollisionContext& collision,
@@ -64,7 +64,9 @@ struct AmigaNaturalRouteVerification {
             if (!shop.menu.active || !game.shops().noControl) ++failures;
         }
         if (menuFrame == 3 && (money != game.currency() || stock != shop.stock.items[0].remaining)) ++failures;
-        if (menuFrame == 5 && (money != 22 || price != 300 || game.currency() != money ||
+        // Preserve the insufficient-funds scenario without pinning incidental
+        // currency/stock values from the superseded two-word choose stream.
+        if (menuFrame == 5 && (money >= price || game.currency() != money ||
                 shop.stock.items[0].remaining != stock)) ++failures;
         if (menuFrame == 7 && game.shops().noControl) ++failures;
         if (returnFrames && 240 + game.player().offsetX() < 280 && game.cameraOffsetX() == 0) done = true;

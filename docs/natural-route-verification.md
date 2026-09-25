@@ -1,5 +1,25 @@
 # Natural cavern route verification
 
+## After the Windows choose correction
+
+The tables and counts below record the earlier, two-word-choose implementation.
+They are historical, not current original-RNG evidence. The corrected two-seed
+host gate passes: seed 99 exits at 1,339 updates and seed 4 at 1,646; each
+compares 211 upgrade and 120 second-level updates. Seed 4 then reaches its
+generated shop after 259 more updates, rejects a 300-gem item with 16 gems,
+and returns to the shaft in 45 updates. Second-level total is 431 updates.
+Decoded entry checkpoints are seed 2: 330 words/rows 8,3 and seed 4:
+324 words/rows 8,4, checked against every RNG state word. See
+`runner-choose.md` for the audit and scope. The eight-seed sweep still needs
+revalidation after these corrections.
+
+The corrected native seed-4 gate also passes: 211 upgrade comparisons,
+168 exit-field comparisons, 51 retained shop-HUD comparisons, 45 return updates,
+zero failure counters and intact stack guard. Its emulator run was time-limited
+and ordinary build options are restored. Current evidence:
+`/tmp/downwell-corrected-native-route.log`,
+`/tmp/downwell-corrected-native-gdb.log`.
+
 ## Eight-seed gameplay sweep
 
 `make verify-route-sweep` runs seeds 0–7, requiring every route to reach its

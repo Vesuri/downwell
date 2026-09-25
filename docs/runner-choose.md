@@ -186,3 +186,42 @@ including the 68000 instruction/helper audits. Evidence:
 Next: regenerate decoded startup checkpoints and rerun affected end-to-end
 routes against the corrected stream, fixing input tapes or actual behavior
 where they fail rather than substituting the former RNG sequence.
+
+## Regenerated startup checkpoints and natural routes
+
+Decoded `StartupRuntime::skipToGameForTesting` now yields:
+
+| Seed | Words consumed | Side-room rows |
+| --- | ---: | --- |
+| 2 (ordinary native entry) | 330 | 8, 3 |
+| 4 (native natural-route fixture) | 324 | 8, 4 |
+
+Both shortcuts are checked against decoded startup for draw count, state index,
+all sixteen state words and the pre-builder entry state. The ordinary native
+entry replaces its obsolete 470-word / rows 3,7 capture; the test entry replaces
+437 words / rows 8,13. These are cached startup snapshots, not compensating
+draws added to gameplay. The live terrain comparison passes with the new seed-2
+checkpoint (`/tmp/downwell-corrected-entry-terrain.log`).
+
+The corrected host natural routes pass: seed 99 takes 1,339 gameplay updates
+and seed 4 takes 1,646, each followed by 211 upgrade updates and 120 second-level
+updates. Seed 4 then reaches the generated shop after 259 more updates,
+has 16 gems against a 300-gem price, retains money/stock on a rejected purchase,
+leaves, and returns to the shaft in 45 updates. Total second-level updates are
+431. The native controller reproduces those host inputs and completes without
+state injection. Its insufficient-funds check now asserts `money < price` and
+unchanged money/stock, not incidental amounts from the former random stream.
+The native debugger's expected counts are updated to these host observations.
+
+`make verify-amiga-natural-route` now passes with the corrected checkpoints:
+1,646 updates to exit, 211 upgrade comparisons, 168 exit-field comparisons,
+431 second-level updates, 51 shop-HUD comparisons and 45 return updates.
+Logic/raster failure counters are zero and the 256-byte task-stack guard is
+intact. This is a bounded A500/68000 emulator run with 512 KiB Chip plus 8 MiB
+Fast RAM, not proof of stock-memory fit or complete original-game fidelity.
+The runner stopped its emulator and restored ordinary build options. Logs:
+`/tmp/downwell-corrected-native-route.log` and
+`/tmp/downwell-corrected-native-gdb.log`.
+
+The broader startup test's geometry-specific expectations and the eight-seed
+sweep remain to be revalidated; this gate does not silently supersede them.

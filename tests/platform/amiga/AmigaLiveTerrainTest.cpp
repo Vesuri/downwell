@@ -162,9 +162,9 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
     std::array<bool, AmigaTerrainIndex::columns * AmigaTerrainIndex::rows> solid{}, landing{};
     downwell::GameMakerRandom nativeRandom, referenceRandom(2);
     native.resetInitialCheckpoint(nativeRandom);
-    for (unsigned i = 0; i < 470; ++i) referenceRandom.nextU32();
+    for (unsigned i = 0; i < 330; ++i) referenceRandom.nextU32();
     downwell::AreaOneBuilder reference;
-    reference.restoreInitialCheckpoint(240, 704, -30, 3, 7);
+    reference.restoreInitialCheckpoint(240, 704, -30, 8, 3);
     Commands commands;
     unsigned ticks = 0, enemyCount = 0, decorationCount = 0;
     while (!native.endReached() && ticks++ < 128) {
@@ -280,7 +280,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
     native.resetInitialCheckpoint(nativeRandom);
     require(native.frontierY() == 704 && native.fragmentCount() == 0 &&
                 native.enemyCount() == 0 && native.decorationCount() == 0 &&
-                nativeRandom.drawCount() == 470 && !native.failed(),
+                nativeRandom.drawCount() == 330 && !native.failed(),
             "restart resets generator and counts without stale records becoming live");
 }
 }

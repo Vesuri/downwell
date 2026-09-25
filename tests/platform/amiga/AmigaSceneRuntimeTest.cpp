@@ -1821,6 +1821,27 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
     downwell::BuilderPatternPack patterns(pb.data(), pb.size());
     downwell::PackedRoom room;
     require(rooms.findRoom(11, room), "natural route has decoded main room");
+    {
+        downwell::StartupRuntime entry(downwell::PlatformProfile::nonDesktop,
+            &rooms, &objects, 2, &patterns);
+        entry.skipToGameForTesting();
+        std::cout << "Decoded seed-2 entry draws=" << entry.randomDrawCount()
+            << " rooms=" << entry.mainBuilderState().rightRoom(0) << ','
+            << entry.mainBuilderState().rightRoom(1) << std::endl;
+        downwell::GameMakerRandom random;
+        AmigaAreaOneTerrainBuilder checkpoint(nullptr, 0);
+        checkpoint.resetInitialCheckpoint(random);
+        require(random.drawCount() == entry.randomDrawCount() &&
+            random.stateIndex() == entry.randomState().stateIndex() &&
+            entry.mainBuilderState().rightRoom(0) == 8 &&
+            entry.mainBuilderState().rightRoom(1) == 3 &&
+            entry.mainBuilderState().generationCount() == -30 &&
+            entry.mainBuilderState().rowsGenerated() == 0,
+            "ordinary native shortcut is the decoded seed-2 entry checkpoint");
+        for (unsigned word = 0; word < 16; ++word)
+            require(random.stateWord(word) == entry.randomState().stateWord(word),
+                    "ordinary entry checkpoint preserves complete decoded RNG state");
+    }
     const bool sweep = std::getenv("DOWNWELL_VERIFY_ROUTE_SWEEP") != nullptr;
     const std::vector<unsigned> seeds = sweep ? std::vector<unsigned>{0, 1, 2, 3, 4, 5, 6, 7}
                                              : std::vector<unsigned>{99, 4};
@@ -1831,13 +1852,16 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         reference.skipToGameForTesting();
         AmigaNaturalRouteVerification nativeRoute;
         if (seed == 4) {
+            std::cout << "Decoded seed-4 entry draws=" << reference.randomDrawCount()
+                << " rooms=" << reference.mainBuilderState().rightRoom(0) << ','
+                << reference.mainBuilderState().rightRoom(1) << std::endl;
             downwell::GameMakerRandom random;
             AmigaAreaOneTerrainBuilder checkpoint(nullptr, 0);
             AmigaNaturalRouteVerification::entry(checkpoint, random);
             require(random.drawCount() == reference.randomDrawCount() &&
                 random.stateIndex() == reference.randomState().stateIndex() &&
                 reference.mainBuilderState().rightRoom(0) == 8 &&
-                reference.mainBuilderState().rightRoom(1) == 13 &&
+                reference.mainBuilderState().rightRoom(1) == 4 &&
                 reference.mainBuilderState().generationCount() == -30 &&
                 reference.mainBuilderState().rowsGenerated() == 0,
                 "native seed-4 shortcut is the decoded startup entry checkpoint");
@@ -2024,7 +2048,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                       << " camera=" << sideCamera << "->" << game.cameraOffsetX() << std::endl;
             require(sideCamera != 0 && returnUpdates < 240 && !game.dead(),
                 "natural shop return releases side camera and reaches main shaft alive");
-            require(nativeRoute.done && secondUpdates == 832 && nativeRoute.returnFrames == 43,
+            require(nativeRoute.done && secondUpdates == 431 && nativeRoute.returnFrames == 45,
                 "native natural route completion matches host timing");
         }
     }

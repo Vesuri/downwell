@@ -25,16 +25,16 @@ two ports proves original-game completion. The active parity goal is unfinished.
   the result room or all level advancement remains unimplemented. The fixture
   injects exits; it does not prove a natural full-level playthrough.
 - `make verify-natural-exit` adds input-only paired host routes for seeds 99
-  and 4: 1,883/1,477 gameplay updates to naturally generated exits, 211 upgrade
+  and 4: 1,339/1,646 gameplay updates to naturally generated exits, 211 upgrade
   updates and 120 second-cavern updates each. Terrain inspection selects
   ordinary movement/fire input; no exit, player position, health or terrain is
   injected. Gameplay state is compared each update, with upgrade effects,
   offers, inventory and RNG checks. This is host adapter evidence, not a
   native rendering gate. Seed 4 additionally reaches an unmodified generated
-  shop in cavern two after 662 updates and compares opening, held fire and
+  shop in cavern two after 259 updates and compares opening, held fire and
   Leave, including menu state and generated stock. No currency or shop items
-  are injected. A purchase with 22 gems against a 300-gem price is rejected;
-  43 subsequent updates return the player and camera to the main shaft.
+  are injected. A purchase with 16 gems against a 300-gem price is rejected;
+  45 subsequent updates return the player and camera to the main shaft.
   Successful naturally funded purchasing remains unverified.
 - `make verify-route-sweep` additionally checks seeds 0–7 with deterministic
   recovery inputs, requiring all eight generated exits alive within 2,500
@@ -42,12 +42,12 @@ two ports proves original-game completion. The active parity goal is unfinished.
   every update, across 120 generated enemies. This broadens host encounter
   coverage; it is not a native rendering or original-Windows comparison.
 - The seed-4 native natural-route gate now reaches the generated exit at
-  update 1,477, compares 211 upgrade frames and 135 exit-field frames with no
+  update 1,646, compares 211 upgrade frames and 168 exit-field frames with no
   failures, and completes 120 second-cavern updates with an intact stack guard.
   `make verify-amiga-natural-route` runs this bounded check and restores the
   ordinary build. The extended gate passes the same natural shop approach,
-  insufficient-funds attempt and return: 832 second-cavern updates, 49 retained
-  shop-HUD comparisons with no failures, and 43 return updates. It does not
+  insufficient-funds attempt and return: 431 second-cavern updates, 51 retained
+  shop-HUD comparisons with no failures, and 45 return updates. It does not
   establish every shop layout or fresh composition of all terrain pixels.
 - Results-menu tests cover all three destinations and 200 final gameplay
   updates, including display-memory reuse and the task-stack guard.
@@ -84,11 +84,12 @@ two ports proves original-game completion. The active parity goal is unfinished.
   audit and coordinated migration, followed by rebuilt checkpoints and route
   verification. See `runner-choose.md`. This takes priority over new-area work;
   earlier paired replays prove adapter agreement, not original RNG equivalence.
-  After the builder correction, seed 99 passes with 1,684 gameplay updates,
-  211 upgrade updates and 120 re-entry updates. The seed-4 host gate currently
-  fails its stale decoded-entry checkpoint assertion before gameplay. Previous
-  native seed-4/sweep results above are historical, not revalidated for this
-  corrected stream. Do not hide the failure by burning compensating RNG words.
+  Regenerated seed-2/seed-4 entry checkpoints now match decoded startup in
+  all RNG words. The corrected host routes pass at 1,339/1,646 gameplay updates,
+  each followed by 211 upgrade updates and 120 re-entry updates. Seed 4 reaches
+  its next-level shop after 259 more updates and returns in 45 updates after an
+  insufficient-funds attempt (16 gems, price 300). Previous eight-seed sweep
+  results above remain historical until revalidated for this corrected stream.
   Garden reconstruction passes an independent VM-call/RNG-state oracle (77
   Create words). The broader startup test now fails its stale fragment-four
   assertion after reaching gameplay: the corrected stream selects fragment 2.
