@@ -148,6 +148,14 @@ build/smoke-world-test: tests/core/SmokeWorldTest.cpp $(filter-out tests/core/St
 test: verify-effect-placement
 test: verify-binary-effects
 .PHONY: verify-binary-effects
+build/smoke-composition-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $(filter %.cpp,$^)
+.PHONY: verify-smoke-composition
+verify-smoke-composition: build/smoke-composition-test generate-amiga-game
+	./build/smoke-composition-test generated/amiga-game.dwap
+test: verify-smoke-composition
+
 verify-binary-effects: build/binary-effects-test generate-amiga-game
 	./build/binary-effects-test generated/amiga-game.dwap
 

@@ -116,6 +116,23 @@ native adapters can use the same offline bytes. The composition regression
 uses these descriptors and independently checks them against the pack directory;
 live scene asset binding remains to be connected.
 
+`SmokeComposition` prepares a read-only snapshot of the smoke owner's published
+builtin coordinates and animation frames. It unions every routed smoke mask
+before subtracting shade coverage, and reports a distinct `direct` or
+`controller` painter boundary. Death/low-spec draws neither require the effect
+surface nor receive shade subtraction. Missing surfaces and strict view-origin
+tests retain the `drawFx` routing contract. The caller enumerates only instances
+whose source Draw invokes `drawShade`, and supplies the verified screen-sampling
+policy; this helper does not establish Windows raster rounding by itself.
+
+No game RNG or simulation state is modified. Empty owners and failed preparation
+clear old coverage; consumers must not publish a failed frame. The ordinary-RAM
+scratch belongs to the persistent scene, not a target task-stack local. The
+retained display's previous damage is still repaid independently by its backend.
+`make verify-smoke-composition` compares complete smoke lifetimes and all routing
+flags with an independent scalar mask oracle. This preparation path is not yet
+connected to live scene rendering.
+
 `BinaryEffectSurface` accumulates offline MSB-first smoke masks with wordwise OR,
 then subtracts shade coverage with AND NOT. All additions precede subtraction;
 interleaving them would allow a later smoke stamp to undo an earlier shade cut.
