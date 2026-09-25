@@ -9,8 +9,8 @@ selected 68000 assembly.
 This repository does not distribute the original game. A locally owned Steam
 build lives under `data/`, which is ignored by Git and treated as immutable.
 
-See the [current completion checklist](docs/current-status.md) for implemented
-coverage, the next playable-system milestone and outstanding original-game work.
+See [remaining work](docs/open-work.md) for the single current work queue.
+Completed changes are recorded in the git log.
 
 ## Startup shortcut
 

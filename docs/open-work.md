@@ -1,138 +1,131 @@
-# Open work
+# Remaining work
 
-This is the early milestone inventory. For the current ordered queue, verified
-scope and remaining work, use [current-status.md](current-status.md). Some
-unchecked entries below have since been partially or fully superseded.
+This is the single work queue for the Downwell port. Keep only unfinished work
+here; remove items when completed. Completed changes belong in the git log.
+Linked technical documents explain source behavior and implementation constraints,
+not separate priority queues.
 
-## Extraction
+Both SDL and Amiga must behave like the original Windows Steam game. VM assembly,
+serialized resources and original-runner evidence are the authority; port-to-port
+agreement alone is insufficient. Target Amiga 500/68000. Let gameplay run slower
+on PAL; do not add 60 Hz catch-up.
 
-- [x] Pin UndertaleModTool/UndertaleModLib 0.9.2.0 at commit `03c7048`.
-- [x] Implement a read-only extraction command with an input-hash guard.
-- [x] Export resource IDs/names, VM assembly, decompiled GML, object-event bindings,
-  rooms, texture metadata, fonts, shaders, and audio metadata.
-- [x] Define the initial versioned manifest and validate core cross-references.
-- [x] Prove a byte-for-byte parser round trip of `data.win`.
-- [x] Export and verify the authoritative runtime object/tile ID boundaries.
-- [x] Export every embedded texture page as a decoded PNG.
-- [x] Recover authoritative room order and document the initial boot/transition
-  behavior slice.
-- Sample difficult code entries and compare decompilation to VM assembly.
-- Expand the manifest with glyph/kerning, collision-mask, shader source, detailed
-  room-layer contents, and extension-function metadata.
+## 1. Finish live skeleton and bone integration
 
-## Host reference
+- Finish reviewing and committing the pending smoke trig work; verify supported
+  inputs/FP-mode assumptions and measure native cost.
+- Give smoke fixed-capacity live ownership, phase-safe creation/retirement,
+  world collision dispatch and both renderers. Export Amiga artwork offline
+  and preserve the original effect-surface composition.
+- Implement remaining blood, corpse, debris and blast effect dependencies.
+  Preserve synchronous child Create, RNG consumption and source mutation order
+  before rewards and retirement.
+- Connect natural death/stomp/hit events to real effect owners, including flash
+  balls; fixture-triggered rendering is not sufficient.
+- Register skeletons and owned bones in shared gameplay. Connect animation,
+  alarms, Step, collision and End Step, player/bullet damage, rewards, capacity
+  failure, out-of-view retirement and both renderers.
+- Verify collision-family ordering, same-object traversal and cross-family
+  painter order against the original runner, not storage-slot order.
+- Verify natural encounters with full state/RNG comparisons, rendered Amiga
+  effect captures and dense-encounter profiles.
 
-- [x] Implement and test the deterministic `rmInit` to `rmMenu` startup model.
-- [x] Define a portable input-replay wire format and stable state digest.
-- [x] Factor and test the fixed-size GameMaker alarm bank used by startup.
-- [x] Add fixed-capacity instance storage and persistent room-transfer behavior.
-- [x] Dispatch Begin Step, implemented alarms, Step, and End Step in fixed phases.
-- [x] Add atomic room entry with serialized creation order and lifecycle phases.
-- [x] Define and generate a deterministic native room-data pack.
-- [x] Add an endian-safe native room-pack reader with complete-pack validation.
-- [x] Bridge packed rooms into complete native instance definitions.
-- [x] Load recovered `rmInit` and all 192 `rmMenu` instances in the SDL startup
-  runtime.
-- [x] Define and generate a deterministic native object/event binding pack.
-- [x] Add an endian-safe object-pack reader with inherited-event lookup.
-- [x] Route implemented startup lifecycle and step handlers through recovered
-  object-event code IDs.
-- [x] Translate `rmInit`/`rmMenu` room creation into deterministic camera,
-  audio, control-lock, and deferred-spawn state.
-- [x] Carry `GEN8.LastObj` in the native room pack and validate its boundary.
-- [x] Add an atomic fixed-capacity deferred instance-creation queue.
-- [x] Apply `rmMenu`'s deferred `ditherFade` creation before Room Start.
-- [x] Translate `ditherFade` PreCreate, Create, and Alarm 0 startup behavior.
-- [x] Define and generate complete native sprite/frame/atlas metadata.
-- [x] Add an endian-safe sprite-pack reader with full reference validation.
-- [x] Load recovered texture atlases in SDL and draw a recovered player frame.
-- [x] Replace the splash-bar placeholder with recovered splash sprites.
-- [x] Define and generate an endian-safe native pack for recovered builder
-  patterns, including all entrance and regular area-one fragments.
-- [x] Select, mirror, interpret, and render the first recovered area-one
-  entrance fragment after the deterministic empty-shaft prelude.
-- [x] Continue into recovered regular area-one fragments with shared row
-  overlap, mirroring, boundary walls, padding pillars, and RNG ordering.
-- [x] Preserve generated-object Create results across deferred insertion,
-  including block variants, scenery orientation, enemy alarms, and activation.
-- [x] Apply usual-gun bullet collision to one-hit breakable blocks while
-  retaining indestructible area walls and opening the resulting terrain cell.
-- [x] Complete the first player landing/gunboots loop with airborne firing,
-  shot gating, recoil state, landing detection, and full charge restoration.
-- [x] Add the recovered downward activation frontier and out-of-view cleanup
-  window for generated area-one geometry, scenery, and enemies.
-- [x] Carry recovered area-one enemy health/reward state and resolve usual-gun
-  damage, turtle immunity, death, and native animation independently per enemy.
-- [x] Make the shared fire/up control jump from solid ground, apply variable
-  jump-height release, then unlock gunboot fire on the next airborne press.
-- [x] Extend the native builder pack with all ten recovered 19-cell-wide
-  area-one right-room layouts and their special doorway/object symbols.
-- [x] Substitute recovered right rooms at their scheduled generation counts,
-  preserving no-repeat selection, mirroring, row overlap, and RNG order.
-- [x] Interpret right-room doorway caps, torches, ambience, time fields,
-  camera lockers, and alternating gem-chunk/gun-module occupants.
-- [x] Preserve both irregular recovered area-one shop patterns and implement
-  their no-mirroring selection path, while retaining the original 1-1 shop
-  suppression for the default play style.
-- [x] Give all six area-one enemies native fractional motion state and their
-  recovered ground, jump, steering, wall-crawl, and initial latch behaviours.
-- [x] Split defeated-enemy rewards into recovered two- and ten-value physical
-  gems with bounce, attraction, collection, expiry, and fixed-capacity state.
-- [x] Switch SDL to the recovered PC 380x284 presentation, centring the
-  unchanged 160x284 playfield and moving health, currency, ammo, and streak
-  presentation into the 4:3 HUD paths.
-- [x] Resolve native player/enemy contacts with recovered stomp kills,
-  gunboot recharge and bounce, contact damage, knockback, and invulnerability.
-- [x] Pack and emit all four recovered area-one endings after the exact 1-1
-  generation length, including the native result-line marker.
-- [x] Preserve synchronous area-one breakable-block Create RNG consumption
-  while native instance creation remains deferred.
-- [x] Reach playable `rmMain` and land the native player on solid geometry
-  generated from the recovered area-one entrance fragment.
-- [x] Implement recovered 16×2 one-way thin-platform collision and correct
-  area-one wall/block rendering and collision to the native 16×16 mask.
-- [x] Trigger the menu title from recovered camera-center alignment so entering
-  either edge of the well cannot deadlock the teleporter sequence.
-- [x] Honor `playerDraw`'s `goalStop` guard so the frozen player is hidden
-  during the menu-well camera transition.
-- [x] Enter the recovered zero-health death state, disable player control,
-  freeze the gameplay camera, and expose the 90+10-frame death-menu gate.
-- [x] Reproduce the damaged player's alternating `dFlash` solely by hiding
-  and showing its hardware sprite during the invulnerability alarm.
-- [x] Animate the grounded standard-style player with the recovered eight-frame
-  run sprite, exact 0.3-frame cadence, and run-entry reset.
-- [x] Advance the four-frame standard-style idle sprite at its recovered
-  0.1-frame cadence on hardware sprite 0.
-- [x] Play and retrigger the four-frame gunboot shooting pose at its recovered
-  0.25-frame cadence, stopping on the final frame.
-- [x] Preserve the recovered one-, two-, four-, and six-frame animation cycles
-  for every native area-one enemy state.
-- [x] Select and animate the recovered five-frame ledge-balancing pose from
-  the player's forward support probe.
-- Replace the smoke-state class with a GameMaker-compatible value/state layer.
-- [x] Recover the Windows runner's WELL512 stream and integer-range semantics
-  from `Downwell.exe`, then pin portable test vectors.
-- Implement object lifecycle and event ordering.
-- Execute recovered object/instance creation logic; implement collision and draw ordering.
-- Add texture/font/audio resource loaders from generated manifests.
-- Bring up the `rmInit` to `rmMenu` startup slice before broad resource coverage.
+References: [skeleton effects](skeleton-effect-ownership.md),
+[phase eligibility](runner-step-eligibility.md), [alarms](runner-alarms.md),
+[animation fields](runner-image-fields.md).
 
-## Amiga
+## 2. Make catacombs playable
 
-- [x] Choose and document the dA JoRMaS framework fork to vendor.
-- [x] Fix display/chipset assumptions for the recovered 380x284 4:3 mode.
-- [x] Link a minimal 68000 executable and run/debug it as an A500 under FS-UAE.
-- [x] Establish the initial Chip RAM budget and asset residency rules.
-- [x] Embed and validate room, object/event, and builder-pattern packs with the
-  shared endian-safe readers.
-- [x] Establish PF1 as a copper-wrapped vertical circular buffer while PF2
-  remains fixed for the HUD.
-- [x] Define the host/Amiga replay-input seam before gameplay code moves.
-- [x] Cross-compile the shared state-digest primitive and pin the initial Amiga
-  port checkpoint against the host result.
-- [x] Move the native player with allocation-free fixed-point state and map
-  grounded fire to jump plus a later airborne press to gunboot recoil.
-- [x] Emit the first native gunboot bullet on a dedicated hardware sprite and
-  update the 4:3 side-panel ammo display when a charge is consumed.
-- [x] Run one canonical replay through the shared native-port runtime on the
-  host and an emulated 68000 A500, and require identical rolling state digests.
+- Connect recovered patterns and symbol dispatch to both live generators,
+  including synchronous actor creation and builder state.
+- Implement skulls, spiders and remaining catacomb hazards: source-specific
+  motion, collisions, alarms, animation and artwork.
+- Implement area transition/entry/exit and verify natural cavern-to-catacomb
+  progression. Do not substitute cavern actors or patterns.
+
+Reference: [area-two recovery](area-two-recovery.md).
+
+## 3. Close original-game fidelity gaps
+
+- Audit remaining random-choice call sites and full RNG state through creation,
+  effects and rewards. Rebuild checkpoints after source-backed corrections.
+- Audit remaining event ordering, fractional collisions, activation boundaries,
+  time-stop/feedback, special camera modes and overlapping camera lockers.
+- Replace approximate live animation where original float/sequence behavior
+  changes observable frames or event timing. Cover relevant sprite/index writes;
+  a legacy animation helper is not the selected GMS2 sequence path.
+- Complete side-room reward objects and omitted title/particle effects.
+- Verify fractional raster positions, draw order, effect surfaces, shaders and
+  alternate palettes against original-game captures.
+- Fill resource/manifest gaps needed by new features: masks, glyph/kerning data,
+  room layers and extension dependencies. Preserve IDs and input/tool hashes;
+  check decompiled code against VM instructions.
+
+References: [behavior audit](original-behavior-audit.md),
+[random choice](runner-choose.md), [activation](activation-fidelity.md),
+[side cameras](side-camera-lockers.md).
+
+## 4. Complete remaining game content
+
+- Remaining areas, enemies, hazards, bosses and ending flow.
+- Remaining weapons, styles, upgrades and their interactions; hard-mode rules.
+- Music and sound on both platforms, including Amiga conversion, mixing,
+  timing and memory residency.
+- Persistence, unlocks, achievements where applicable, settings and complete
+  restart/continue behavior.
+
+Implement shared behavior and connect both backends. A feature absent from both
+ports does not count as parity with the original.
+
+## 5. Meet the Amiga frame budget
+
+- Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
+  Re-profile after integration changes; average FPS is not the criterion.
+- Remove unnecessary terrain recomposition and transfers. Preserve circular
+  hardware scrolling, static terrain backing and incremental restoration.
+- Reduce selection layout/content and transition preparation costs while
+  retaining static layers and pointer-driven movement.
+- Measure new actor/effect costs in dense scenes. Keep a portable reference
+  when introducing selected 68000 assembly optimizations.
+
+References: [gameplay performance](gameplay-performance-current.md),
+[level completion](level-clear-profile.md), [profiling](amiga-profiling.md).
+
+## 6. Finish scene and backend separation
+
+- Move remaining cache-refresh/display coordination and transition orchestration
+  out of `DownwellAmiga.cpp` into scene/backend classes. Consolidate SDL startup
+  orchestration too.
+- Keep publisher, credits, controls, garden, style selection, gameplay and upgrade
+  selection independently owned; share style/upgrade presentation where useful.
+  Keep game rules in `src/core`, not duplicated in platform backends.
+
+Reference: [scene architecture](scene-architecture.md).
+
+## 7. Establish memory fit and failure handling
+
+- Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
+  Establish the A500 memory requirement; expanded-emulator runs do not prove
+  stock-machine fit.
+- Exercise allocation/capacity failures and scene teardown/re-entry. Preserve
+  meaningful nonzero exit codes for startup failures.
+- Maintain reproducible offline assets and 68000 instruction/helper checks
+  across supported build configurations.
+
+## 8. Broaden end-to-end verification
+
+- Cover naturally funded purchases, all shop/side-room layouts and camera
+  transitions, dense combat, uncommon upgrade combinations and repeated runs.
+- Compare new behavior through deterministic host/native replays, including
+  complete RNG and owned-instance state.
+- Compare fresh terrain/HUD composition with retained buffers on natural routes;
+  synthetic geometry alone does not establish rendering fidelity.
+- Compare original Windows behavior/captures with both ports through startup,
+  selection, gameplay, death, upgrades and later-area progression.
+- Run all relevant regression gates before claiming parity. Component tests,
+  CPU replays and screenshots each prove only their respective scope.
+
+Use `SKIP_TO_GAME=1` for gameplay, `SKIP_LEVEL=1` for completion and `SKIP_INTRO=1`
+for style tests. Test full startup when scene/display ownership changes.
+Time-limit emulator runs, stop owned sessions and restore normal builds.
+Never modify `data/` or commit copyrighted exports/generated payloads.
