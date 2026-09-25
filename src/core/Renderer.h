@@ -21,6 +21,16 @@ public:
     virtual void setClipRect(int x, int y, int width, int height) = 0;
     virtual void clearClipRect() = 0;
     virtual void fillRect(int x, int y, int width, int height, Color color) = 0;
+    // MSB-first binary effect coverage. Publish only set bits, never clear the
+    // retained background; target-specific renderers may override word writes.
+    virtual void drawCoverageWord(int x,int y,std::uint16_t bits,Color color) {
+        for(unsigned bit=0;bit<16;){
+            if(!(bits&(0x8000u>>bit))){++bit;continue;}
+            const unsigned first=bit;
+            do{++bit;}while(bit<16 && (bits&(0x8000u>>bit)));
+            fillRect(x+int(first),y,int(bit-first),1,color);
+        }
+    }
     virtual void drawSpriteTiled(std::int32_t spriteId,
                                  std::uint32_t frame,
                                  int x,

@@ -85,6 +85,14 @@ coordinates. Consumers still own retained-background restoration, final painter
 order and publishing pixels to the target buffer. This helper does not allocate
 Chip RAM, rebuild DMA sprites, scroll a framebuffer or consume game RNG.
 
+Publishing uses `Renderer::drawCoverageWord` on the SDL path and
+`amigaRendererDrawCoverageWord` on the native path. Both preserve unset bits.
+The native operation clips a 16-bit span, splits unaligned output over at most
+two destination words, maps Y through the current circular-buffer origin, and
+updates only changed plane words. It does not call the blitter. Owners must
+restore the previous effect damage from retained terrain before publishing the
+new frame; these publishing primitives do not yet schedule live effects.
+
 Reviewed assembly SHA-256 values:
 
 - `gml_GlobalScript_drawFx.asm`: `6e3dceea4db4e2baaf76c5d4103bd4ed930042ae769d209369d98246162b5d92`

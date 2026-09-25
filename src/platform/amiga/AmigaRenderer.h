@@ -49,6 +49,8 @@ void amigaRendererClearClipRect(AmigaRenderer* renderer);
 void amigaRendererFillRect(AmigaRenderer* renderer,
                            int x, int y, int width, int height,
                            unsigned pen);
+/* CPU-only binary coverage, MSB first. Preserves unmasked pixels and padding. */
+void amigaRendererDrawCoverageWord(AmigaRenderer*,int x,int y,UWORD bits,unsigned pen);
 void amigaRendererDrawAsset(AmigaRenderer* renderer,
                             const UBYTE* pack, const UBYTE* packEnd,
                             UWORD sprite, UWORD frame,

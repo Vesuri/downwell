@@ -36,6 +36,41 @@ static void writeWord(UBYTE* data, UWORD value) {
 #endif
 }
 
+void amigaRendererDrawCoverageWord(AmigaRenderer* renderer,int x,int y,UWORD bits,unsigned pen) {
+    int left,right,first,last,column,shift,part;
+    unsigned row;
+    ULONG planeBytes;
+    if(!bits || x<=-16 || x>=downwellVisibleWidth || y<0 || y>=downwellDisplayHeight ||
+       y<renderer->clipY || y>=renderer->clipY+renderer->clipHeight)return;
+    left=renderer->clipX>0?renderer->clipX:0;
+    right=renderer->clipX+renderer->clipWidth;
+    if(right>downwellVisibleWidth)right=downwellVisibleWidth;
+    first=x>left?x:left;last=x+16<right?x+16:right;
+    if(first>=last)return;
+    bits&=(UWORD)(0xffffu>>(first-x));
+    bits&=(UWORD)(0xffffu<<(16-(last-x)));
+    column=x>=0?x/16:-1;shift=x-column*16;
+    row=(unsigned)y;planeBytes=downwellPlaneBytes;
+    if(renderer->target==renderer->game){
+        row=(renderer->gameOrigin+row)%downwellGameRingHeight;
+        planeBytes=downwellGameRingPlaneBytes;
+    }
+    for(part=0;part<(shift?2:1);++part){
+        unsigned plane;
+        const int destination=column+part;
+        const UWORD mask=part?(UWORD)((ULONG)bits<<(16-shift)):(UWORD)(bits>>shift);
+        UBYTE* word;
+        if(!mask || destination<0 || destination>=downwellDmaWidth/16)continue;
+        word=renderer->target+row*downwellBytesPerPlaneLine+destination*2;
+        for(plane=0;plane<2;++plane){
+            const UWORD old=readWord(word);
+            const UWORD value=(pen&(1u<<plane))?(old|mask):(old&(UWORD)~mask);
+            if(value!=old)writeWord(word,value);
+            word+=planeBytes;
+        }
+    }
+}
+
 static void setPixel(AmigaRenderer* renderer, int x, int y, unsigned pen) {
     UBYTE* row;
     UBYTE mask;

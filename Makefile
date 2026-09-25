@@ -507,6 +507,14 @@ build/sdl-flash-raster-test: tests/platform/SDLFlashRasterTest.cpp src/platform/
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
+build/effect-publish-test: tests/platform/EffectPublishTest.cpp src/platform/sdl/PlatformSDL.cpp src/platform/amiga/AmigaRenderer.c src/core/SpritePack.cpp src/core/FontPack.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^) $(LDFLAGS)
+.PHONY: verify-effect-publish
+test: verify-effect-publish
+verify-effect-publish: build/effect-publish-test
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/effect-publish-test
+
 .PHONY: verify-sdl-flash-raster
 verify-sdl-flash-raster: build/sdl-flash-raster-test generate-sprite-pack
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/sdl-flash-raster-test
