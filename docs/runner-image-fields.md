@@ -83,3 +83,31 @@ before the Begin Step type/subtype 3/1 setup at `0x50dc6b` and the alarm-phase
 call at `0x50dce6`. The component test now advances before applying ordinary
 Step's speed/time-stop writes, using the previous stored speed. This phase
 finding is independent of which animation branch each sprite selects.
+
+## Sequence loop recovery (supersedes the tentative legacy binding)
+
+The export now includes full sequence metadata for sprites 205–208 and 460.
+Their sequences have playback mode 1 (loop), unit per-game-frame speed, length
+equal to frame count, no moments or broadcast messages, and one
+`GMSpriteFramesTrack`. Every key has time equal to its frame index, length 1,
+no stretch/disable flag and one channel selecting that frame. The metadata
+verifier checks every key, not merely the presence of a sequence.
+
+In the sequence branch, `0x50ee54` multiplies stored image speed by instance
+direction and sequence playback rate, then adds the result to a separate
+timeline position at offset `0x88`. `0x50f9e0` retains the previous position,
+updates the timeline and calls the sequence bounds helper `0x4e27d0`.
+For playback mode 1, `0x4e2855` tests both negative positions and upper
+overflow; either calls `0x4bbd30` and raises the boundary flag. The latter
+performs a remainder, adds the length with single-precision rounding, then
+takes a second remainder. This differs from the legacy single-subtraction
+path, especially for the bone's negative animation speed. The frame-track
+evaluation at `0x4f8e60` is separate from that timeline update.
+
+The skeleton's temporary `advanceImage` binding to the legacy helper has
+therefore been removed. Its verified alarm and builtin-speed conversion
+behavior remains intact. `LegacyImageAnimation` and its path tests are kept
+as explicitly legacy evidence, not used to implement these sequences.
+Next work is the integer timeline/remainder implementation, track evaluation,
+and synchronization when GML writes `image_index` or changes sprites. No
+runtime resource is enabled based on an assumed identity mapping.

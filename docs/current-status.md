@@ -255,6 +255,12 @@ and the ordinary build was restored after both attempts.
   skeleton/bone sprites have unit per-game-frame speed but also V2 sequences.
   Mapping that sequence data to the runner's selected update branch remains
   necessary; the legacy helper alone is not an original-build parity claim.
+  Full sequence-key verification now proves one unit-length frame key per
+  skeleton/bone frame, looping mode and no moments/messages. Runner inspection
+  shows a separate timeline and two-remainder wrapping for both signs, unlike
+  the legacy helper. The temporary legacy advancement binding was removed
+  from `SkeletonTiming`; timeline, frame-track evaluation and GML index-write
+  synchronization must be implemented before live skeleton integration.
 
 ## Working evidence
 

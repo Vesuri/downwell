@@ -24,5 +24,18 @@ for index, name, frames in (
     assert (s["name"],s["frames"],s["spriteType"]) == (name,frames,"Normal")
     assert s["playbackSpeed"] == 1 and s["playbackSpeedType"] == "FramesPerGameFrame"
     assert s["hasSequence"]  # Do not confuse normal textures with no sequence.
+    sequence = s["sequence"]
+    assert sequence["Playback"] == 1 and sequence["PlaybackSpeed"] == 1
+    assert sequence["PlaybackSpeedType"] == 1 and sequence["Length"] == frames
+    assert not sequence["BroadcastMessages"] and not sequence["Moments"]
+    tracks = sequence["Tracks"]
+    assert len(tracks) == 1 and tracks[0]["ModelName"]["Content"] == "GMSpriteFramesTrack"
+    assert not tracks[0]["Tracks"]
+    keys = tracks[0]["Keyframes"]["List"]
+    assert len(keys) == frames
+    for frame, key in enumerate(keys):
+        assert key["Key"] == frame and key["Length"] == 1
+        assert not key["Stretch"] and not key["Disabled"]
+        assert key["Channels"] == [{"Channel": 0, "Value": {"Value": frame}}]
 assert [s["id"] for s in sprites if s["playbackSpeedType"] == "FramesPerSecond"] == [399,626,738,739,740]
 print("741 sprite playback records verified; skeleton/bone unit rates and sequence presence pinned")
