@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 36.41 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 36.63 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -393,6 +393,35 @@ cleaned up and restored the ordinary non-skip build. Logs use
 Inspection identifies repeated four-corner player-mask queries as a possible
 backend batching target. Any batching must preserve those corner semantics,
 not substitute full rectangle overlap or change source movement order.
+
+### Batch the player's four mask corners
+
+Shared `PlayerMotion` accepts an optional pure four-corner mask resolver;
+without one, it invokes the same four point callbacks in the same order as
+before. Horizontal substeps and upward collision probes use that common
+helper, without changing coordinates, quantization or motion order.
+
+The native terrain callback visits distinct indexed cells occupied by those
+corners. It does not replace the corners with full rectangle overlap. Without
+an index it uses the old four-point query. The runtime wrapper includes the
+same four shop-solid points, preserves the callback when rebound after copies,
+and clears it for next-level reconstruction. Both native entry paths install
+the callback. No extra bitmap or terrain cache is allocated.
+
+19,683 positions compare the batched result against point queries, covering
+every cell alignment and active/inactive breakables. The existing 600-tick
+live-generated side-by-side test now compares both player and bullet batching
+with the point-query runtime. Checkpoints and RNG state remain identical.
+These checks also pass ASan/UBSan, and player/runtime fixtures and bounded
+native cross-target replay retain their digests.
+
+The lightweight tape takes **819 PAL fields / 600 updates = 36.63 FPS**,
+versus 824 / 36.41 FPS before. Maximum gap remains five fields; the overall
+frame budget remains open. Evidence uses `/tmp/downwell-player-mask-` logs
+(`test`, `sanitized`, `fps`, `replay`, `frame`, `suite`). The complete host
+suite passes, native shot pixels match SDL (0/99,968 differences), and both
+68000 audits pass. The ordinary non-skip executable is restored. Emulator
+runs are bounded to 45 seconds.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 

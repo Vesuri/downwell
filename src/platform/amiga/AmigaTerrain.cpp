@@ -475,6 +475,25 @@ bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment&
     return false;
 }
 
+bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY) {
+    const auto& context = *static_cast<const AmigaTerrainCollisionContext*>(opaque);
+    if (!context.index)
+        return amigaResolveTerrainSolid(opaque, offsetX-4, offsetY-4) ||
+            amigaResolveTerrainSolid(opaque, offsetX+3, offsetY-4) ||
+            amigaResolveTerrainSolid(opaque, offsetX-4, offsetY+7) ||
+            amigaResolveTerrainSolid(opaque, offsetX+3, offsetY+7);
+    DW_PROFILE_SCOPE(profileTerrainCollision);
+    const int xs[] = {offsetX+236, offsetX+243};
+    const int ys[] = {offsetY+172, offsetY+183};
+    const unsigned columns = ((xs[0]+8) >> 4) == ((xs[1]+8) >> 4) ? 1 : 2;
+    const unsigned rows = ((ys[0]+8) >> 4) == ((ys[1]+8) >> 4) ? 1 : 2;
+    for (unsigned row = 0; row < rows; ++row)
+        for (unsigned column = 0; column < columns; ++column)
+            if (indexActive(context, indexCell(*context.index, xs[column], ys[row]),
+                            solidCell, xs[column], ys[row])) return true;
+    return false;
+}
+
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
     DW_PROFILE_SCOPE(profileTerrainCollision);
     const AmigaTerrainCollisionContext& context =

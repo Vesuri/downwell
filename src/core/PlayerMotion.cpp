@@ -201,14 +201,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             if (movement > fixedOne) movement = fixedOne;
             const long nextX = x_ + movement;
             const int nextPixelX = fixedToPixel(nextX);
-            if (solidResolver_(solidResolverContext_, nextPixelX - 4,
-                               pixelY_ - 4) ||
-                solidResolver_(solidResolverContext_, nextPixelX + 3,
-                               pixelY_ - 4) ||
-                solidResolver_(solidResolverContext_, nextPixelX - 4,
-                               pixelY_ + 7) ||
-                solidResolver_(solidResolverContext_, nextPixelX + 3,
-                               pixelY_ + 7)) {
+            if (solidMaskAt(nextPixelX, pixelY_)) {
                 speedX_ = 0;
                 horizontalCollision = true;
                 break;
@@ -299,10 +292,7 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
                     // rounding X here alone would disagree with side contacts.
                     const int x = (int)(px / 1280);
                     const int y = (int)(py / 1280);
-                    return solidResolver_(solidResolverContext_, x - 4, y - 4) ||
-                           solidResolver_(solidResolverContext_, x + 3, y - 4) ||
-                           solidResolver_(solidResolverContext_, x - 4, y + 7) ||
-                           solidResolver_(solidResolverContext_, x + 3, y + 7);
+                    return solidMaskAt(x, y);
                 });
             if (hit < 0) {
                 y_ = collisionY / 5;

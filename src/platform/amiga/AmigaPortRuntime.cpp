@@ -62,6 +62,7 @@ bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, uns
     generationSucceeded_ = true;
     solidResolver_ = nullptr; solidResolverContext_ = nullptr;
     segmentResolver_ = nullptr;
+    maskResolver_ = nullptr;
     landingResolver_ = nullptr; landingResolverContext_ = nullptr;
     breakableIndexReady_ = false;
     followCamera_ = true;
@@ -425,7 +426,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
-    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_);
+    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_);
     if (landingResolver_) configureLandingResolver(landingResolver_, landingResolverContext_);
     // The reference dispatches the builder before the camera in rmMain's
     // ordinary Step instance order. Generation observes the previous camera,

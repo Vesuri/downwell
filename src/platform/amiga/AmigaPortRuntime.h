@@ -173,15 +173,25 @@ public:
     // Append a newly generated batch without reviving destroyed earlier blocks.
     // Reject capacity failure before changing any state.
     bool appendBreakables(const int* x, const int* y, unsigned count);
-    void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr) {
+    void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
+                                SolidResolver mask = nullptr) {
         solidResolver_ = resolver;
         segmentResolver_ = segment;
+        maskResolver_ = mask;
         solidResolverContext_ = context;
         player_.configureSolidResolver(resolver ? [](void* opaque, int x, int y) {
             const auto& runtime = *static_cast<AmigaPortRuntime*>(opaque);
             return (runtime.solidResolver_ && runtime.solidResolver_(runtime.solidResolverContext_, x, y)) ||
                 runtime.run_.shops.playerSolidAt(x + 240, y + 176);
-        } : static_cast<SolidResolver>(nullptr), this, -236, 236);
+        } : static_cast<SolidResolver>(nullptr), this, -236, 236,
+        resolver && mask ? [](void* opaque, int x, int y) {
+            const auto& runtime = *static_cast<AmigaPortRuntime*>(opaque);
+            return runtime.maskResolver_(runtime.solidResolverContext_, x, y) ||
+                runtime.run_.shops.playerSolidAt(x+236, y+172) ||
+                runtime.run_.shops.playerSolidAt(x+243, y+172) ||
+                runtime.run_.shops.playerSolidAt(x+236, y+183) ||
+                runtime.run_.shops.playerSolidAt(x+243, y+183);
+        } : static_cast<SolidResolver>(nullptr));
     }
     bool configureEnemy(unsigned index, int objectId, int spriteId,
                         int x, int y, int speedX, int speedY,
@@ -332,6 +342,7 @@ private:
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
     SegmentResolver segmentResolver_ = nullptr;
+    SolidResolver maskResolver_ = nullptr;
     void* solidResolverContext_;
     AmigaPlayer::LandingResolver landingResolver_ = nullptr;
     void* landingResolverContext_ = nullptr;

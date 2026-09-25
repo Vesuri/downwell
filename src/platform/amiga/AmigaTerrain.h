@@ -172,6 +172,7 @@ bool amigaIsLandingTerrainSymbol(char symbol);
 int amigaResolveTerrainLanding(void* opaque, int offsetX,
                                int minimumOffsetY);
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY);
+bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment& path);
 
 #endif

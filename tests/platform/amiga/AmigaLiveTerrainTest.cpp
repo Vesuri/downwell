@@ -28,6 +28,14 @@ void verifyTerrainSegments() {
     for (unsigned state = 0; state < 3; ++state) {
         if (state) context.runtime = &runtime;
         if (state == 2) runtime.configureBreakables(&bx, &by, 0);
+        for (int x = -40; x <= 40; ++x) for (int y = -40; y <= 40; ++y) {
+            const bool corners = amigaResolveTerrainSolid(&context, x-4, y-4) ||
+                amigaResolveTerrainSolid(&context, x+3, y-4) ||
+                amigaResolveTerrainSolid(&context, x-4, y+7) ||
+                amigaResolveTerrainSolid(&context, x+3, y+7);
+            require(amigaResolveTerrainPlayerMask(&context, x, y) == corners,
+                    "batched player mask equals four point queries for every cell alignment");
+        }
         for (int x = -24; x <= 40; x += 4) for (int y = -24; y <= 40; y += 4)
             for (unsigned fraction : {0u, 1u, 524288u, 1048575u})
                 for (int dx : {-8*unit, -unit/3, 0, unit/3, 8*unit})
@@ -127,7 +135,8 @@ struct LiveSimulation {
         port.configureEnemyRandom(random);
         port.configureGenerationStep(generate, this);
         port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
-        port.configureSolidResolver(amigaResolveTerrainSolid, &collision, amigaResolveTerrainSegment);
+        port.configureSolidResolver(amigaResolveTerrainSolid, &collision,
+                                    amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask);
     }
 };
 void compareRandom(const downwell::GameMakerRandom& a,

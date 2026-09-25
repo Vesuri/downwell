@@ -56,8 +56,9 @@ public:
         landingResolverContext_ = context;
     }
     void configureSolidResolver(SolidResolver resolver, void* context,
-                                int leftLimit, int rightLimit) {
+                                int leftLimit, int rightLimit, SolidResolver mask = nullptr) {
         solidResolver_ = resolver;
+        solidMaskResolver_ = mask;
         solidResolverContext_ = context;
         horizontalLeftLimit_ = leftLimit;
         horizontalRightLimit_ = rightLimit;
@@ -125,6 +126,15 @@ private:
     LandingResolver landingResolver_;
     void* landingResolverContext_;
     SolidResolver solidResolver_;
+    // Optional pure backend query for exactly the four corners below.
+    SolidResolver solidMaskResolver_ = nullptr;
+    bool solidMaskAt(int x, int y) const {
+        if (solidMaskResolver_) return solidMaskResolver_(solidResolverContext_, x, y);
+        return solidResolver_(solidResolverContext_, x-4, y-4) ||
+            solidResolver_(solidResolverContext_, x+3, y-4) ||
+            solidResolver_(solidResolverContext_, x-4, y+7) ||
+            solidResolver_(solidResolverContext_, x+3, y+7);
+    }
     BreakBoxResolver breakBoxResolver_ = nullptr;
     void* breakBoxContext_ = nullptr;
     void* solidResolverContext_;
