@@ -40,11 +40,11 @@ void testPhaseAndAlarmOrder() {
                 trace[0].instanceId == 100 && trace[1].instanceId == 200,
             "Begin Step dispatches first in stable order");
     require(trace[2].phase == downwell::StepEventPhase::alarm &&
-                trace[2].instanceId == 100 && trace[2].subtype == 3,
+                trace[2].instanceId == 200 && trace[2].subtype == 1,
             "first alarm dispatches after all Begin Step events");
     require(trace[3].phase == downwell::StepEventPhase::alarm &&
-                trace[3].instanceId == 200 && trace[3].subtype == 1,
-            "second instance alarm follows in stable order");
+                trace[3].instanceId == 100 && trace[3].subtype == 3,
+            "higher alarm index follows across instances");
     require(trace[4].phase == downwell::StepEventPhase::step &&
                 trace[5].phase == downwell::StepEventPhase::step,
             "Step follows alarms");
@@ -71,6 +71,49 @@ void testActiveStateAndMissingAlarmEvent() {
     require(calls == 3, "only active instance receives step phases");
     require(instances.find(2)->alarms.get(5) == 4,
             "alarm without an implemented event does not count down");
+}
+
+void testCrossAlarmWrites() {
+    downwell::InstanceStore<2> instances;
+    instances.create(1, 10, 7, false);
+    instances.create(2, 20, 7, false);
+    instances.find(2)->alarms.set(2, 1);
+    instances.find(1)->alarms.set(3, 1);
+    unsigned fired = 0;
+    downwell::EventScheduler<2>::runStep(instances,
+        [](const downwell::InstanceRecord&) { return downwell::AlarmBank::allEvents; },
+        [&](downwell::InstanceRecord& instance, downwell::StepEvent event) {
+            if (event.phase != downwell::StepEventPhase::alarm) return;
+            ++fired;
+            require(instance.instanceId == 2 && event.subtype == 2, "old higher alarm must not fire");
+            instances.find(1)->alarms.set(3, 15);
+            instances.find(1)->alarms.set(0, 5);
+        });
+    require(fired == 1 && instances.find(1)->alarms.get(3) == 14,
+            "later slot on earlier instance sees write and decrements immediately");
+    require(instances.find(1)->alarms.get(0) == 5, "visited slot waits for next phase");
+}
+
+void testDeletionDuringAlarm() {
+    downwell::InstanceStore<2> instances;
+    instances.create(1, 10, 7, false);
+    instances.create(2, 20, 7, false);
+    instances.find(1)->alarms.set(0, 1);
+    instances.find(1)->alarms.set(1, 1);
+    instances.find(2)->alarms.set(1, 1);
+    unsigned alarms = 0;
+    downwell::EventScheduler<2>::runStep(instances,
+        [](const downwell::InstanceRecord&) { return downwell::AlarmBank::allEvents; },
+        [&](downwell::InstanceRecord& instance, downwell::StepEvent event) {
+            if (event.phase != downwell::StepEventPhase::alarm) return;
+            ++alarms;
+            if (instance.instanceId == 1) {
+                require(event.subtype == 0, "deleted instance cannot receive a later alarm");
+                instances.erase(1);
+            }
+        });
+    require(alarms == 2 && instances.find(1) == nullptr,
+            "alarm deletion preserves survivor dispatch after storage compaction");
 }
 
 void testDeletionAndCreationAcrossPhases() {
@@ -106,6 +149,8 @@ void testDeletionAndCreationAcrossPhases() {
 
 int main() {
     testPhaseAndAlarmOrder();
+    testCrossAlarmWrites();
+    testDeletionDuringAlarm();
     testActiveStateAndMissingAlarmEvent();
     testDeletionAndCreationAcrossPhases();
     std::cout << "event scheduler tests passed\n";

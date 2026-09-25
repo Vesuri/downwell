@@ -22,6 +22,23 @@ two ports proves original-game completion. The active parity goal is unfinished.
 This queue describes priorities, not a replacement for the full goal. The old
 `open-work.md` is an early milestone inventory, not the current ordered queue.
 
+### Latest verification: original alarm ordering
+
+The decoded scheduler and shared gameplay's explicit enemy Alarm 0/1 slots
+now dispatch immediately in global ascending alarm-index order. This corrects
+the frog's Alarm 0-to-1 rearm countdown; see `runner-alarms.md`. Focused
+cross-instance mutation/deletion tests and sanitizers pass. Host natural
+routes still exit at 1,339/1,646 updates, followed by 211 upgrade and 120
+re-entry updates. Seed 4's next-level shop approach remains 518 updates, but
+return is now **42**, superseding the older host 43-update result below.
+Evidence: `/tmp/downwell-alarm-order-natural.log`.
+
+The bounded native CPU replay passes unchanged, including motion and bone
+Create fixtures. The ordinary target build is restored with clean 68000
+instruction/helper audits (`/tmp/downwell-alarm-order-native.log`). This is
+not a rerun of the native rendered natural-shop gate; its older 43-update
+expectation needs rechecking before that gate is cited for this revision.
+
 ## Implemented and checked
 
 - Publisher/credits/controls, garden/well, style selection and first-area

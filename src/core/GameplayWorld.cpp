@@ -416,9 +416,16 @@ void GameplayWorld::advanceEnemyAlarms()
         if (enemy.objectId == 113) enemy.frogHit.advanceFrame();
         if (enemy.objectId == 117) enemy.snailHit.advanceFrame();
         if (enemy.objectId == 116) enemy.batHit.advanceFrame();
+    }
+    // Match the runner's global alarm-index order. Dispatch each event before
+    // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
+    for (unsigned alarm = 0; alarm < 2; ++alarm) {
+      for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
+        EnemyState& enemy = enemies_[enemyIndex];
+        if (!enemy.active) continue;
         const unsigned events = downwell::enemyAlarmEvents(enemy.objectId);
-        const bool alarm0Fired = downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
-        const bool alarm1Fired = downwell::AlarmBank::advanceValue(enemy.alarm1, (events & 2) != 0);
+        const bool alarm0Fired = alarm == 0 && downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
+        const bool alarm1Fired = alarm == 1 && downwell::AlarmBank::advanceValue(enemy.alarm1, (events & 2) != 0);
 
         if (enemy.objectId == 112 && alarm1Fired) {
             enemy.auxiliaryState = -enemy.auxiliaryState;
@@ -440,6 +447,7 @@ void GameplayWorld::advanceEnemyAlarms()
             updateCrawler(enemy, true);
             enemy.alarm0 = 2;
         }
+      }
     }
 }
 

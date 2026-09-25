@@ -44,7 +44,23 @@ all four slots for one instance at a time is not generally equivalent.
 Tests pin the overwritten-expiring-alarm case, restart interval and zero
 retirement. The skeleton remains unregistered pending remaining behavior.
 
-Existing `AlarmBank::advance()` is a snapshot API. This finding does not make
-every existing use wrong, but cross-alarm event writes must be audited before
-claiming complete event-order fidelity. The live enemy owner currently handles
-alarms per enemy; new skeleton admission must not inherit that shortcut.
+`AlarmBank::advance()` remains a snapshot API for non-dispatch uses. The decoded
+`EventScheduler` now instead counts down and dispatches one slot at a time,
+with indices outside instances. Tests cover inter-instance writes to later
+and earlier slots, overwriting an expiring alarm, and deletion during dispatch.
+The existing phase-start ID snapshot still bounds participating instances;
+this change does not claim complete original instance-creation eligibility.
+
+The shared gameplay owner also now visits its explicit Alarm 0/1 slots in
+global index order with immediate dispatch. This fixes an existing frog case:
+Alarm 0 writes Alarm 1 to 60, which must finish that phase at 59, rather than
+60 as before. Provisional queued hit delivery and separate hit-stun timers
+remain; these are not a complete original event system. Skeleton admission
+still requires the additional slots and lifecycle integration.
+
+Validation after owner correction: scheduler tests and sanitizers pass;
+paired host natural routes retain exits at 1,339/1,646 updates and the seed-4
+shop at 518 updates. The return path is now 42 updates, formerly 43.
+The bounded native CPU replay passes with unchanged digests, and restores
+the ordinary 68000 build. These checks do not independently prove original
+instance traversal order or native rendering on the changed return route.

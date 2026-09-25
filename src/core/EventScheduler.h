@@ -68,18 +68,15 @@ private:
                                Handler& handler) {
         std::array<std::uint32_t, Capacity> ids{};
         const std::size_t count = captureActive(instances, ids);
-        for (std::size_t index = 0; index < count; ++index) {
-            InstanceRecord* instance = instances.find(ids[index]);
-            if (instance == nullptr || !instance->active)
-                continue;
-            const AlarmBank::FiredMask fired =
-                instance->alarms.advance(alarmEvents(*instance));
-            for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm) {
-                if (!AlarmBank::fired(fired, alarm))
-                    continue;
-                instance = instances.find(ids[index]);
+        // Original runner 0x509d97: alarm index is the outer loop and each
+        // zero is dispatched immediately. Later alarms observe handler writes.
+        for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm) {
+            for (std::size_t index = 0; index < count; ++index) {
+                InstanceRecord* instance = instances.find(ids[index]);
                 if (instance == nullptr || !instance->active)
-                    break;
+                    continue;
+                const bool hasEvent = (alarmEvents(*instance) & (1u << alarm)) != 0;
+                if (!instance->alarms.advanceOne(alarm, hasEvent)) continue;
                 handler(*instance,
                         StepEvent{StepEventPhase::alarm,
                                   static_cast<std::uint8_t>(alarm)});

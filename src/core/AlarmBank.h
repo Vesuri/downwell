@@ -42,6 +42,10 @@ public:
         return fired;
     }
 
+    bool advanceOne(std::size_t index, bool hasEvent = true) {
+        return advanceValue(values_[index], hasEvent);
+    }
+
     static bool fired(FiredMask mask, std::size_t index) {
         return (mask & static_cast<FiredMask>(1U << index)) != 0;
     }
