@@ -2,6 +2,46 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Laser Sight cost (not a 20 ms success)
+
+`PROFILE_LASER=1 SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh fps`
+grants the real upgrade on entering gameplay in the profiling autorun. It does
+not enable scene verification; `LASER_VERIFY` remains prohibited with probes.
+The upgrade changes firing behavior too, so this is an upgraded gameplay tape,
+not a rendering-only A/B experiment against the unupgraded tape. The script
+prints the fixture setting and executable hash and now explicitly restores
+non-skip, non-fixture settings even when those flags were inherited from the
+environment.
+
+The first 600-update upgraded run took **2,731 PAL fields / 10.98 FPS**, maximum
+gap nine fields. The separate instrumented run attributed 7.115 ms/update to
+endpoint tracing (phase 45), 27.762 ms to retention/restoration (46), and
+24.600 ms to ray drawing plus its preceding blitter drain (47). Nested terrain
+queries are charged to phase 14, not 45; phase 47 is not pure CPU raster time.
+These probe timings are diagnostic, not shipping frame times.
+
+Replacing per-pixel modulo with bounded subtraction in the two overlay row
+paths reduced the upgraded run to **2,057 fields / 14.58 FPS**, maximum gap
+eight. All 320 ring origins times 284 visible rows are exhaustively checked
+against modulo (90,880 cases); existing sparse restoration and sprite tests
+pass. This improvement does not resolve the frame-budget failure.
+
+Checking retention eligibility before scanning dirty rows/overlapping actors
+further reduces the run to **1,896 fields / 15.82 FPS**, maximum gap seven.
+Moved rays or changed ring origins must be restored regardless of overlap,
+so inspecting that overlap first was wasted work. Unchanged-ray retention is
+still checked against pending terrain damage and actor bounds. Logs:
+`/tmp/downwell-laser-retain-{test,fps}.log`.
+
+The optimized native capture still matches SDL with **0/99,968 differing
+pixels**; renderer ASan/UBSan passes. The capture workflow restores the normal
+build and its 68000 instruction/helper audits pass. Evidence:
+`/tmp/downwell-laser-optimized-{frame,sanitized}.log`.
+
+Logs: `/tmp/downwell-laser-{fps,probes}.log` and
+`/tmp/downwell-laser-row-{test,fps}.log`. The ordinary build retains no upgrade
+injection; phases 45–47 compile out without probes.
+
 ### Mutually exclusive builder symbol dispatch
 
 Enemy-symbol selection and terrain-symbol selection now use separate

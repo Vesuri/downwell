@@ -27,9 +27,18 @@ class AmigaLaserSight {
     }
 public:
     unsigned lastByteWrites = 0;
+    // origin is normalized and y is clipped to the visible 284 rows, so their
+    // sum is below twice the 320-row ring. Avoid a 32-bit modulo per pixel.
+    static unsigned physicalRow(unsigned origin, unsigned y) {
+        const unsigned row = origin + y;
+        return row >= downwellGameRingHeight ? row - downwellGameRingHeight : row;
+    }
     bool present() const { return valid_ || pending_; }
     const downwell::LaserSightLine* line() const { return valid_ ? &line_ : nullptr; }
     unsigned origin() const { return origin_; }
+    bool matches(UBYTE* target, unsigned origin, const downwell::LaserSightLine& line) const {
+        return valid_ && target == target_ && origin == origin_ && same(line, line_);
+    }
     // Only when a full display rebuild will replace the old pixels.
     void discard() { count_ = 0; valid_ = pending_ = false; }
     // underlyingChanged includes both already-dirty terrain rows and actors
@@ -43,7 +52,7 @@ public:
             // the old allocation. Caller owns restoration before reusing it.
             count_ = 0; valid_ = false; target_ = target;
         }
-        if (valid_ && line && origin == origin_ && same(*line, line_) && !underlyingChanged) {
+        if (line && matches(target, origin, *line) && !underlyingChanged) {
             pending_ = false;
             return false;
         }
@@ -59,7 +68,7 @@ public:
         line_.draw([&](int x, int y) {
             if (x < downwellPlayfieldX || x >= downwellPlayfieldX + downwellPlayfieldWidth ||
                 y < 0 || y >= downwellDisplayHeight) return;
-            const unsigned row = (origin_ + static_cast<unsigned>(y)) % downwellGameRingHeight;
+            const unsigned row = physicalRow(origin_, static_cast<unsigned>(y));
             Pixel p{static_cast<UWORD>(row * downwellBytesPerPlaneLine + (x >> 3)),
                     static_cast<UBYTE>(0x80u >> (x & 7)), 0};
             p.pen = ((target_[p.offset] & p.mask) ? 1 : 0) |

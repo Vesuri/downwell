@@ -1283,6 +1283,7 @@ static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
     for (unsigned i = 0; i < count; ++i) {
         const GameplayBob& bob = bobs[i];
         if (bob.sprite == gameplayRayMarker) {
+            DW_PROFILE_SCOPE(profileLaserDraw);
             AmigaHardware::blitterDrain();
             gameplayRays[buffer].draw();
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -1929,6 +1930,9 @@ int main(void) {
             else if (scenes.scene() == AmigaScene::menu)
                 liveInput.right = ++profileMenuFrames > 40;
             else if (scenes.scene() == AmigaScene::gameplay) {
+#ifdef DOWNWELL_PROFILE_LASER
+                if (!port.upgrades().levels[12]) port.grantUpgrade(12);
+#endif
                 liveInput.right = ((port.tick() / 120) & 1) == 0;
                 liveInput.left = !liveInput.right;
                 liveInput.fire = (port.tick() % 16) == 0 || (port.tick() % 16) == 3;
@@ -2948,6 +2952,7 @@ int main(void) {
             downwell::LaserSightLine rayLine{};
             const bool rayVisible = port.upgrades().levels[12] && !port.goalStopped();
             if (rayVisible) {
+                DW_PROFILE_SCOPE(profileLaserTrace);
                 using Ray = downwell::LaserSightRay;
                 rayLine = downwell::LaserSightLine::from(
                     Ray::fromQ8(port.player().offsetXFixed(), 240),
@@ -3023,12 +3028,14 @@ int main(void) {
             }
             DW_PROFILE_PHASE(profileCopper);
             if (rayVisible || gameplayRays[back].present()) {
+                DW_PROFILE_SCOPE(profileLaserPrepare);
                 bool changed = false;
-                if (rayVisible) {
+                if (rayVisible && gameplayRays[back].matches(
+                        (UBYTE*)gameDisplay[back].data, port.ringOrigin(), rayLine)) {
                     rayLine.draw([&](int x, int y) {
                         if (x >= downwellPlayfieldX && x < downwellPlayfieldX + downwellPlayfieldWidth &&
                             y >= 0 && y < downwellDisplayHeight &&
-                            (gameDirtyRows[(port.ringOrigin()+y)%downwellGameRingHeight] & (1u << back)))
+                            (gameDirtyRows[AmigaLaserSight::physicalRow(port.ringOrigin(), y)] & (1u << back)))
                             changed = true;
                     });
                     const int left = rayLine.x0 < rayLine.x1 ? rayLine.x0 : rayLine.x1;

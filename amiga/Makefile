@@ -22,6 +22,7 @@ PROBES ?= 0
 FPSCOUNT ?= 0
 PROFILE_AUTORUN ?= 0
 PROFILE_NAVIGATE ?= 0
+PROFILE_LASER ?= 0
 # Keep the measured default; allow controlled compiler comparisons.
 AMIGA_OPTIMIZATION ?= -O3
 ifneq ($(words $(AMIGA_OPTIMIZATION)),1)
@@ -83,6 +84,9 @@ ifeq ($(PROFILE_NAVIGATE),1)
 CFLAGS += -DDOWNWELL_PROFILE_NAVIGATE
 endif
 ifneq ($(filter 1,$(PROBES) $(FPSCOUNT)),)
+ifeq ($(PROFILE_LASER),1)
+CFLAGS += -DDOWNWELL_PROFILE_LASER
+endif
 ifneq ($(filter 1,$(SCENE_VERIFY) $(REPLAY_VERIFY) $(BOB_VERIFY) $(RESULTS_RESTART_VERIFY) $(GEMHIGH_VERIFY) $(LASER_VERIFY)),)
 $(error Profiling must not be combined with verification instrumentation)
 endif
@@ -123,7 +127,7 @@ all: check $(OUT).exe
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' '$(PROFILE_LASER)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options

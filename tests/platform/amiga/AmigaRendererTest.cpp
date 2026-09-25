@@ -119,6 +119,10 @@ int main(int argc, char** argv) {
         for (unsigned i = 0; i < pixels.size(); ++i) pixels[i] = (i*37u + i/11u) & 255u;
         pristine = pixels;
         AmigaLaserSight overlay;
+        for (unsigned origin = 0; origin < 320; ++origin)
+            for (unsigned y = 0; y < 284; ++y)
+                require(AmigaLaserSight::physicalRow(origin,y) == (origin+y)%320,
+                        "bounded ring addressing matches modulo for every visible row and origin");
         for (unsigned origin : {0u, 319u, 103u}) {
             for (const auto& line : {downwell::LaserSightLine{190,-10,190,300},
                  downwell::LaserSightLine{80,0,300,283},
@@ -128,6 +132,10 @@ int main(int argc, char** argv) {
                 require(overlay.prepare(pixels.data(), origin, &line, false), "new ray requires drawing");
                 overlay.draw();
                 auto expected = pristine;
+                require(overlay.matches(pixels.data(), origin, line), "drawn ray is eligible for retention");
+                require(!overlay.matches(pixels.data(), (origin+1)%320, line), "scroll changes physical coverage");
+                auto moved = line; ++moved.x0;
+                require(!overlay.matches(pixels.data(), origin, moved), "moved endpoint cannot retain old coverage");
                 line.draw([&](int x, int y) {
                     if (x < 110 || x >= 270 || y < 0 || y >= 284) return;
                     const unsigned offset = ((origin+y)%320)*48 + x/8;
