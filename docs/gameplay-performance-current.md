@@ -2,6 +2,31 @@
 
 ## Current baseline after original-RNG and cavern-spawn corrections
 
+### Worst-frame span trace
+
+The follow-up probe-only bounded history records at most 16 terrain requests
+for each newly worst frame, including cache/refresh kind and caller category.
+`amiga/profile.gdb` prints that history, with the total request count so
+truncation is visible. Ordinary builds compile the recording calls away.
+
+`/tmp/downwell-terrain-span-probes.log` still identifies frame 279 as worst
+(85.114 instrumented ms). It contains exactly **one** terrain request:
+view X 160, world Y 1207, height 11, clip X 110, width 160, dirty-cache miss,
+ordinary exposure/camera/prefetch caller. There is no generation, shop or
+broken-block forced refresh in this frame. This rules out a full-screen or
+oversized multi-span repaint as the explanation for this measured spike.
+Terrain asset composition still consumes 32.509 ms. The run completed and
+restored the normal executable; 68000 audits pass.
+
+Next candidate is the tile composition path: `drawAssetNormal` has a
+word-wide small-image CPU path restricted to HUD targets. Gameplay's CPU
+fallback still composes destination bytes individually, including per-row
+ring arithmetic. `amigaBlitterDrawPlanarMasked` declines any non-Chip source,
+mask or destination. Extend/test the word path for clipped ring targets and
+measure before retaining it; this trace alone does not establish the frequency
+of blitter fallback or promise a speedup. Preserve cache invalidation and
+source behavior rather than suppressing this legitimate exposed-strip draw.
+
 At `6e1a906`, the unchanged 600-update gameplay input tape with
 `SKIP_TO_GAME=1` takes **873 PAL fields / 34.36 FPS**, maximum four-field gap
 (80 ms). This supersedes the 825-field measurement below as the current

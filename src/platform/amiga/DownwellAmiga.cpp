@@ -9,6 +9,7 @@
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
 #include "AmigaProfile.h"
+#include "AmigaTerrainProfile.h"
 #include "DownwellCopperLists.h"
 #include "AmigaMenu.h"
 #include "AmigaMenuCache.h"
@@ -813,9 +814,10 @@ static void drawMainWorldSpan(
     const AmigaPortRuntime* runtime,
     int viewX, int viewY, int clipY, int clipHeight,
     int clipX = downwellPlayfieldX, int clipWidth = downwellPlayfieldWidth,
-    bool refresh = false) {
+    bool refresh = false, unsigned refreshCause = 0) {
     const int firstWorldY = viewY + clipY;
     const int finalWorldY = firstWorldY + clipHeight;
+    const bool forcedRefresh = refresh;
     if (runtime) invalidateShopRaster(runtime->shops());
     dirtyGameRows(renderer->gameOrigin, clipY, clipHeight);
     const bool cacheable = viewX >= mainViewX - 160 && viewX <= mainViewX + 160 &&
@@ -826,6 +828,7 @@ static void drawMainWorldSpan(
         for (int y = firstWorldY; y < finalWorldY; ++y)
             if (terrainRaster.dirty(column, y)) { refresh = true; break; }
         if (!refresh) {
+            downwellProfileTerrainSpan(viewX, firstWorldY, clipHeight, clipX, clipWidth, 0, refreshCause);
             transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, false);
 #ifdef DOWNWELL_SCENE_VERIFY
             // Compare the cached row transfer against fresh composition at
@@ -861,6 +864,8 @@ static void drawMainWorldSpan(
     }
     if (terrainRaster.ready && !cacheable && !refresh)
         amigaRendererClearGameRows(renderer, clipY, clipHeight, 0);
+    downwellProfileTerrainSpan(viewX, firstWorldY, clipHeight, clipX, clipWidth,
+        forcedRefresh ? 2 : terrainRaster.ready && cacheable ? 1 : 3, refreshCause);
     AmigaTerrainPainter::paint(renderer, rooms, room, terrainCollision.index,
         terrainTiles, decorations, decorationCount, runtime, activeGamePack, activeGamePackEnd,
         viewX, viewY, clipX, clipY, clipWidth, clipHeight);
@@ -2512,7 +2517,7 @@ int main(void) {
                     drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
                         fragments, liveBuilder.fragmentCount(), generatedDecorations,
                         liveBuilder.decorationCount(), &port, worldViewX, worldViewY,
-                        top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true);
+                        top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true, 1);
                 }
             }
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
@@ -2531,7 +2536,7 @@ int main(void) {
                 drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
                     fragments, liveBuilder.fragmentCount(), generatedDecorations,
                     liveBuilder.decorationCount(), &port, worldViewX, worldViewY,
-                    top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true);
+                    top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true, 2);
             }
             if (destroyedBlockCount != 0) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
@@ -2561,7 +2566,7 @@ int main(void) {
                     drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
                         fragments, liveBuilder.fragmentCount(),
                         generatedDecorations, liveBuilder.decorationCount(),
-                        &port, worldViewX, worldViewY, top, bottom - top, left, right - left, true);
+                        &port, worldViewX, worldViewY, top, bottom - top, left, right - left, true, 3);
                 }
             }
             // Prepare a possible side-room view a small strip at a time in

@@ -1,4 +1,5 @@
 #include "AmigaProfile.h"
+#include "AmigaTerrainProfile.h"
 #include <exec/types.h>
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -47,6 +48,8 @@ volatile ULONG gDownwellSectionTicks[7][profilePhaseCount], gDownwellSectionMax[
 volatile unsigned long gDownwellProfileCounters[profileCounterCount];
 volatile ULONG gDownwellProfileWorstTicks[4][profilePhaseCount];
 volatile ULONG gDownwellProfileWorstFrame[4];
+volatile ULONG gDownwellProfileWorstSpanCount[4];
+volatile AmigaTerrainProfileSpan gDownwellProfileWorstSpans[4][16];
 #endif
 __attribute__((noinline, used)) void downwellProfileReady()
 {
@@ -93,6 +96,14 @@ static ULONG startField;
 static unsigned phaseId;
 static ULONG phaseStart, frameStart;
 static ULONG frameTicks[profilePhaseCount];
+static unsigned terrainSpanCount;
+static AmigaTerrainProfileSpan terrainSpans[16];
+void downwellProfileTerrainSpan(int viewX, int firstY, int height,
+    int clipX, int width, unsigned kind, unsigned cause) {
+    const unsigned slot = terrainSpanCount++;
+    if (slot < 16) terrainSpans[slot] = {viewX, firstY, height, clipX, width,
+        static_cast<long>(kind), static_cast<long>(cause)};
+}
 #endif
 
 void downwellProfileBegin(unsigned scene)
@@ -100,6 +111,7 @@ void downwellProfileBegin(unsigned scene)
     sceneId = scene < 4 ? scene : 0;
     startField = gDownwellProfileVbi;
 #ifdef DOWNWELL_PROBES
+    terrainSpanCount = 0;
     for (unsigned phase = 0; phase < profilePhaseCount; ++phase) frameTicks[phase] = 0;
     frameStart = phaseStart = beamTick();
     phaseId = profileOther;
@@ -131,6 +143,14 @@ void downwellProfileEnd()
     if (elapsed > gDownwellProfileFrameMax[sceneId]) {
         gDownwellProfileFrameMax[sceneId] = elapsed;
         gDownwellProfileWorstFrame[sceneId] = gDownwellProfileFrames[sceneId] + 1;
+        gDownwellProfileWorstSpanCount[sceneId] = terrainSpanCount;
+        for (unsigned i = 0; i < terrainSpanCount && i < 16; ++i) {
+            volatile auto& target = gDownwellProfileWorstSpans[sceneId][i];
+            const auto& source = terrainSpans[i];
+            target.viewX = source.viewX; target.firstY = source.firstY;
+            target.height = source.height; target.clipX = source.clipX;
+            target.width = source.width; target.kind = source.kind; target.cause = source.cause;
+        }
         for (unsigned phase = 0; phase < profilePhaseCount; ++phase)
             gDownwellProfileWorstTicks[sceneId][phase] = frameTicks[phase];
     }
@@ -148,6 +168,7 @@ void downwellProfileEnd()
         gDownwellProfileFrameMax[3] = 0;
 #ifdef DOWNWELL_PROBES
         gDownwellProfileWorstFrame[3] = 0;
+        gDownwellProfileWorstSpanCount[3] = 0;
         for (unsigned phase = 0; phase < profilePhaseCount; ++phase)
             gDownwellProfileWorstTicks[3][phase] = 0;
         for (unsigned counter = 0; counter < profileCounterCount; ++counter)
