@@ -264,11 +264,15 @@ unsigned amigaCollectTerrainBreakables(
 
 namespace {
 enum { solidCell = 1, landingCell = 2, breakableCell = 4, roomWallCell = 8, wallCell = 16 };
-bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags) {
-    const int column = (x - AmigaTerrainIndex::minX) / 16;
-    if ((x & 15) || (y & 15) || column < 0 || column >= AmigaTerrainIndex::columns ||
-        y < 0 || y / 16 >= AmigaTerrainIndex::rows) return false;
-    index.cells[(y / 16) * AmigaTerrainIndex::columns + column] |= flags;
+bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags,
+              unsigned* addedCell = nullptr) {
+    if ((x & 15) || (y & 15) || x < AmigaTerrainIndex::minX ||
+        x >= AmigaTerrainIndex::minX + AmigaTerrainIndex::columns * 16 ||
+        y < 0 || y >= AmigaTerrainIndex::rows * 16) return false;
+    const unsigned cell = (unsigned(y) >> 4) * AmigaTerrainIndex::columns +
+        (unsigned(x - AmigaTerrainIndex::minX) >> 4);
+    index.cells[cell] |= flags;
+    if (addedCell) *addedCell = cell;
     return true;
 }
 unsigned indexCell(const AmigaTerrainIndex& index, int x, int y) {
@@ -353,19 +357,21 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
         ? solidCell | landingCell | wallCell | (initialRoomWall ? roomWallCell : 0)
         : objectId == 92 ? breakableCell : objectId == 93 ? landingCell : 0;
     if (!flags) return true;
+    unsigned cell;
     {
         DW_GENERATION_SCOPE(profileGeneratedCell);
-        if (!indexAdd(index, x, y, flags)) return false;
+        if (!indexAdd(index, x, y, flags, &cell)) return false;
     }
     DW_GENERATION_SCOPE(profileGeneratedLanding);
-    const int column = (x - AmigaTerrainIndex::minX) / 16;
-    const int landingRow = y / 16;
+    const std::uint16_t landing = cell / AmigaTerrainIndex::columns + 1;
     // An existing closer landing terminates the update. No clearing, full-map
     // scan or allocation is required when a new section becomes live.
-    for (int row = landingRow; row >= 0; --row) {
-        auto& next = index.nextLanding[row * AmigaTerrainIndex::columns + column];
-        if (next && next <= landingRow + 1) break;
-        next = landingRow + 1;
+    for (;;) {
+        auto& next = index.nextLanding[cell];
+        if (next && next <= landing) break;
+        next = landing;
+        if (cell < AmigaTerrainIndex::columns) break;
+        cell -= AmigaTerrainIndex::columns;
     }
     return true;
 }

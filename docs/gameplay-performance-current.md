@@ -74,6 +74,39 @@ three releases remain covered. Log: `/tmp/downwell-terrain-command-native.log`;
 details saved as `/tmp/downwell-terrain-command-native-gdb.log`. Normal startup
 is restored and both 68000 audits pass.
 
+## Single validated terrain index (after `0ee08af`)
+
+Terrain insertion now validates coordinate bounds before subtraction, computes
+the cell index once, and reuses it for the nearest-landing update. Landing
+values use their actual 16-bit range (1..512), with a guarded unsigned cell
+stride so the loop cannot wrap past the first row. Existing code generation
+already used a pointer stride; this is not presented as removal of a multiply
+per row. Invalid aligned extreme coordinates now reject before potentially
+overflowing signed arithmetic. No new memory, callbacks or timing semantics
+are introduced.
+
+The same low-overhead tape improves from 825 to 822 fields (36.36 to 36.50
+FPS), retaining the four-field worst gap. Treat this as a modest measured
+difference, not a 50 FPS result. The coarse worst frame falls from 130.998 to
+129.107 ms. Its index bracket falls from 25.410 to 23.554 ms, while generation
+and registration remain around 58.840 and 23.505 ms. Logs:
+`/tmp/downwell-index-once-fps.log` and `/tmp/downwell-index-once-coarse.log`.
+
+Incremental terrain tests pass, including full recomputation after each
+generation event, shuffled/duplicate insertions, boundary cells and live
+indexed-versus-reference collision tapes (`/tmp/downwell-index-once-host.log`).
+The expanded tests also pass ASan/UBSan, including extreme coordinates
+(`/tmp/downwell-index-once-sanitized.log`).
+
+Paired SDL/Amiga scenes retain both next-level re-entries
+(`/tmp/downwell-index-once-scenes.log`). The bounded native camera gate passes
+600 updates, seven transitions, 119 terrain comparisons and 14 alternating
+display checks with zero mismatches and an intact stack guard. The six staged
+swaps, forced fallback, four locks and three releases remain covered. Logs:
+`/tmp/downwell-index-once-native.log` and
+`/tmp/downwell-index-once-native-gdb.log`. Normal startup is restored and both
+68000 audits pass. Natural full-level coverage and the 20 ms target remain open.
+
 ## Earlier extraction checkpoint
 
 Measured from `27da653`, A500 / 512 KB Chip / 8 MB Fast, `-O3`, PAL.

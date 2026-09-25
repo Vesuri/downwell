@@ -8,6 +8,7 @@
 #include <vector>
 #include <array>
 #include <algorithm>
+#include <limits>
 
 namespace {
 void require(bool value, const char* message) {
@@ -419,6 +420,12 @@ int main(int argc, char** argv) {
                 amigaAddTerrainObject(boundary.index, 93, 1520, 8176),
             "edge cells and initial-room wall identity are supported");
     const auto snapshot = boundary.index;
+    for (int extreme : {std::numeric_limits<int>::min(),
+                        std::numeric_limits<int>::max() - 15}) {
+        require(!amigaAddTerrainObject(boundary.index, 60, extreme, 0) &&
+                !amigaAddTerrainObject(boundary.index, 93, 0, extreme),
+                "aligned extreme coordinates reject without signed overflow");
+    }
     require(amigaAddTerrainObject(boundary.index, 60, -512, 0, true) &&
                 amigaAddTerrainObject(boundary.index, 113, 5, -9),
             "duplicate terrain and non-terrain Create events are safe");
