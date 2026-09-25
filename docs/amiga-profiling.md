@@ -2,6 +2,37 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Actor presentation breakdown
+
+Additional PROBES-only phases separate gameplay actor collection (42),
+hardware-channel selection (43), and each hardware-sprite update (44).
+Counters 8–10 distinguish header-only updates from copying already-offline
+sprite payloads and count copied 16-bit image words (excluding control words
+and terminators). All new probes/counters compile out of shipping/FPSCOUNT.
+
+The bounded 600-update `-O3` gameplay tape reports:
+
+| Phase | Calls | Total | Mean per game update |
+| --- | ---: | ---: | ---: |
+| Actor collection | 600 | 674.022 ms | 1.123 ms |
+| Channel selection, excluding nested updates | 1577 | 508.925 ms | 0.848 ms |
+| Hardware-sprite update | 977 | 600.478 ms | 1.001 ms |
+
+523 updates changed only the position header; 454 copied payloads totaling
+15,486 words (30,972 bytes). All 977 update calls are accounted for by those
+two counters. These counts do not imply runtime pixel-to-planar conversion:
+the copied data is host-prepared DMA artwork. The whole update phase includes
+lookup, validation, positioning, cache checks and copying, so it does not
+isolate the copy loop's time. Collection plus selection is a larger measured
+target than the update phase; next investigate resolving reusable actor
+metadata once rather than repeating directory work across those stages.
+
+Evidence: `/tmp/downwell-actor-profile.log`. The added brackets introduce
+overhead (1,006 instrumented fields); do not compare their sum directly with
+the older unsplit phase as a runtime regression. The renderer oracle passed
+22,834 offline sprite comparisons, the ordinary executable was restored, and
+both native audits passed. No shipping performance improvement is claimed.
+
 ### Compiler optimization comparison
 
 The current 600-update A500 gameplay tape favors the existing `-O3` setting:

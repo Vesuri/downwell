@@ -18,6 +18,7 @@ printf "Runtime phases: 31=camera 32=generation 33=lifecycle 34=hud_state\n"
 printf "Generation phases: 35=object_registration 36=terrain_index_and_tiles\n"
 printf "HUD detail phases: 37=damage_scan 38=fill_geometry 39=changed_word_publish\n"
 printf "Player detail phases: 40=movement_without_nested_terrain 41=shops_and_keepers\n"
+printf "Actor detail phases: 42=collection 43=channel_selection 44=hardware_sprite_update\n"
 while $i < sizeof(gDownwellProfileTicks[0])/sizeof(gDownwellProfileTicks[0][0])
     printf "%u %lu %.3f %.3f %.3f\n", $i, gDownwellProfileCalls[$s][$i], gDownwellProfileTicks[$s][$i]*20.0/80128.0, gDownwellProfileTicks[$s][$i]*20.0/80128.0/gDownwellProfileFrames[$s], gDownwellProfileMax[$s][$i]*20.0/80128.0
     set $i = $i + 1
@@ -40,6 +41,7 @@ if $sum != gDownwellProfileFrameMax[$s] || gDownwellProfileWorstFrame[$s] == 0
 end
 printf "Collision routes: solid_indexed=%lu solid_fallback=%lu landing_indexed=%lu landing_fallback=%lu breakable_fallback=%lu\n", gDownwellProfileCounters[0], gDownwellProfileCounters[1], gDownwellProfileCounters[2], gDownwellProfileCounters[3], gDownwellProfileCounters[4]
 printf "Terrain segments: indexed=%lu cells=%lu fallback=%lu\n", gDownwellProfileCounters[5], gDownwellProfileCounters[6], gDownwellProfileCounters[7]
+printf "Hardware sprite updates: header_only=%lu payload_copies=%lu payload_words=%lu\n", gDownwellProfileCounters[8], gDownwellProfileCounters[9], gDownwellProfileCounters[10]
 printf "DOWNWELL_PROFILE_READY\n"
 shell touch .run/gdb-ready.marker
 detach

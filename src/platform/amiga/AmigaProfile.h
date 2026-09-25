@@ -13,7 +13,9 @@ enum DownwellProfilePhase {
     profileCamera, profileGeneration, profileLifecycle, profileHudState,
     profileGeneratedRegistration, profileGeneratedIndex,
     profileAmmoDamage, profileAmmoFillGeometry, profileAmmoWordPublish,
-    profilePlayerMotion, profilePlayerShops, profilePhaseCount
+    profilePlayerMotion, profilePlayerShops,
+    profileActorCollect, profileActorChannels, profileHardwareSpriteUpdate,
+    profilePhaseCount
 };
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -51,16 +53,6 @@ public:
 #define DW_PROFILE_PHASE(phase) ((void)0)
 #endif
 
-enum DownwellProfileCounter {
-    counterSolidIndexed, counterSolidFallback, counterLandingIndexed,
-    counterLandingFallback, counterBreakableFallback,
-    counterSegmentIndexed, counterSegmentCells, counterSegmentFallback, profileCounterCount
-};
-#ifdef DOWNWELL_PROBES
-extern "C" volatile unsigned long gDownwellProfileCounters[profileCounterCount];
-#define DW_PROFILE_COUNT(counter) (++gDownwellProfileCounters[counter])
-#else
-#define DW_PROFILE_COUNT(counter) ((void)0)
-#endif
+#include "AmigaProfileCounters.h"
 
 #endif

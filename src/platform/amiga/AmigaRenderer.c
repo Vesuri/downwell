@@ -1,4 +1,5 @@
 #include "AmigaRenderer.h"
+#include "AmigaProfileCounters.h"
 
 extern int amigaBlitterDrawPlanarMasked(
     const UBYTE* source, const UBYTE* mask,
@@ -931,14 +932,18 @@ int amigaRendererBuildHardwareSpritePart(
                     break;
             if (slot < 16) {
                 if (slots[slot].destination == destination &&
-                    slots[slot].source == source && slots[slot].height == visibleHeight)
+                    slots[slot].source == source && slots[slot].height == visibleHeight) {
+                    DW_PROFILE_COUNT(counterSpriteHeaderOnly);
                     return 1; // Only the four-byte position header changed.
+                }
                 slots[slot].destination = destination;
                 slots[slot].source = source;
                 slots[slot].height = visibleHeight;
             }
         }
 #endif
+        DW_PROFILE_COUNT(counterSpritePayloadCopies);
+        DW_PROFILE_ADD(counterSpritePayloadWords, visibleHeight * 2);
         for (y = 0; y < visibleHeight * 2; ++y)
             destination[2 + y] = readWord(data + sourceTop * 4 + y * 2);
         destination[2 + visibleHeight * 2] = destination[3 + visibleHeight * 2] = 0;

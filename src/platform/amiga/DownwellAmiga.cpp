@@ -2887,6 +2887,7 @@ int main(void) {
             }
             DW_PROFILE_PHASE(profileSprite);
             // Shared current painter order: enemies, merchants, player, bullets, gems.
+            DW_PROFILE_PHASE(profileActorCollect);
             static GameplayBob actors[1 + AmigaPortRuntime::bulletCapacity +
                 AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity + 2 * downwell::ShopWorld::capacity];
             unsigned actorCount = 0;
@@ -2942,6 +2943,7 @@ int main(void) {
             }
 #endif
             Sprite* regularSprites = bulletSprites + back * gameplayRegularSpriteCount;
+            DW_PROFILE_PHASE(profileActorChannels);
 #ifdef DOWNWELL_BOB_VERIFY
             AmigaActorChannels channels(0);
 #else
@@ -2963,6 +2965,7 @@ int main(void) {
                 const int first = channels.take(parts);
                 if (first < 0) break;
                 for (unsigned part = 0; part < parts; ++part) {
+                    DW_PROFILE_SCOPE(profileHardwareSpriteUpdate);
                     const unsigned channel = first + part;
                     Sprite& sprite = channel == 0 ? playerSprites[back]
                         : actorSpriteAt(regularSprites, enemySprites[back], channel - 1);
