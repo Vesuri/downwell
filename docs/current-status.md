@@ -25,6 +25,22 @@ This queue describes priorities, not a replacement for the full goal. The old
 
 ### Joined skeleton/bone encounter regression
 
+The skeleton stomp body now preserves `scrEnemyStomped` ordering rather than
+using the cavern adapter's immediate-retirement shortcut: blood, style-dependent
+forced jump, shake, 100 health loss, stomp sound, recharge, hit/stomp flags,
+then optional Exploding Knees blast Create, sound choice and four smoke calls.
+Death/rewards remain deferred to Step. Blast allocation failure is explicit;
+it does not roll back the already executed stomp. Player globals are re-read
+between synchronous smoke calls. Source: the extracted script's VM assembly.
+The shared `PlayerMotion::stompBounce` accepts the style, retaining default
+behavior and using -1.5 instead of -2.5 for Boulder. A 120-case stomp matrix
+uses that real player code and checks callback ordering, all five styles,
+death suppression, all explosion choices and failed child allocation. Normal,
+sanitizer, shared player and joined encounter tests pass; the composed stomp
+fixture compiles for 68000 without floating-point helper references. These
+are event/adapter tests, not live Exploding Knees or skeleton admission: actual
+blood/blast/smoke effect ownership and world phase wiring remain open.
+
 The shared skeleton now exposes its fixed sprite-208 contact rectangle and a
 precise player-contact adapter. Hit/throw artwork does not change that explicit
 mask. Dispatch geometry uses published x/y; the event compares published enemy

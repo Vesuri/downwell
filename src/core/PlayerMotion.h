@@ -102,7 +102,7 @@ public:
     unsigned jumps() const { return jumps_; }
     unsigned shots() const { return shots_; }
     unsigned recharges() const { return recharges_; }
-    void stompBounce();
+    void stompBounce(int playStyle = 0);
     void contactKnockback(int enemyX, int enemyY);
     void appendStateDigest(downwell::StateDigest& digest) const;
 

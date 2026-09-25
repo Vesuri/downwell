@@ -142,9 +142,9 @@ build/skeleton-encounter-test: tests/core/SkeletonEncounterTest.cpp $(wildcard s
 verify-skeleton-actor: build/skeleton-actor-test
 	./build/skeleton-actor-test
 
-build/skeleton-actor-test: tests/core/SkeletonActorTest.cpp src/core/SkeletonActor.h src/core/SkeletonDecisions.h src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/MotionBinary64.h
+build/skeleton-actor-test: tests/core/SkeletonActorTest.cpp src/core/SkeletonActor.h src/core/SkeletonDecisions.h src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/PlayerMotion.cpp src/core/PlayerMotion.h
 	@mkdir -p build
-	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $<
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/PlayerMotion.cpp
 
 .PHONY: verify-skeleton-decisions
 verify-skeleton-decisions: build/skeleton-decisions-test

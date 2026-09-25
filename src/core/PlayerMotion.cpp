@@ -95,10 +95,11 @@ void PlayerMotion::beginSpin()
     spinJumping_ = true;
 }
 
-void PlayerMotion::stompBounce()
+void PlayerMotion::stompBounce(int playStyle)
 {
     beginSpin();
-    speedY_ = -640;
+    // scrEnemyStomped: Boulder (2) uses scrFjump(0,1.5); others use 2.5.
+    speedY_ = playStyle == 2 ? -384 : -640;
     gravityRemainder_ = 0;
     grounded_ = false;
     recharge();

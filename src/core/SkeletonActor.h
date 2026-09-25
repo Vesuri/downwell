@@ -11,7 +11,7 @@ struct SkeletonActor : SkeletonDecisions {
     std::int32_t x=0, y=0;
     int health=60, previousHealth=60, money=10, hitDamage=0;
     MotionBinary64 takenImpact{},hitDirection{},hitAngle{};
-    bool damageStun=false;
+    bool damageStun=false, stomped=false;
     bool grounded=true, alive=true, destroyRequested=false;
     bool timefieldImmune=false;
     ContactBounds collisionBounds() const {
@@ -45,6 +45,33 @@ struct SkeletonActor : SkeletonDecisions {
         return true;
     }
     void collideTimeField() { if(!timefieldImmune) health=0; }
+    // scrEnemyStomped: callbacks are synchronous, including child Create/RNG.
+    // forcedJump implements scrFjump (and its own recharge); the explicit
+    // recharge call below is a second source call, not a duplicate to remove.
+    // No death/reward or storage retirement is performed by this event.
+    template<class Events> bool stompPlayer(Events& events) {
+        if(events.playerDead()) return true;
+        events.blood(3,0);
+        events.forcedJump(0,events.playStyle()==2?15:25); // vertical tenths
+        events.shake(2,10);
+        health-=100;
+        events.stompSound(122);
+        events.recharge(); // scrRecharge ignores its optional argument.
+        hitPending=true;
+        stomped=true;
+        if(events.explodingKnees()) {
+            if(!events.createBlast(276,x,y)) return false;
+            events.explosionSound(91+events.choose(3));
+            // Read current player globals separately for each synchronous call.
+            for(unsigned i=0;i<4;++i) {
+                const int directions[]={0,180,15,165};
+                auto py=events.playerY();
+                if(!py.add(MotionBinary64::fromInteger(4))) return false;
+                events.emitSmoke(events.playerX(),py,directions[i],i<2?4:3);
+            }
+        }
+        return true;
+    }
     // Current machine-gun branch: non-consistent, non-exploding bullet against
     // this non-immune/non-through enemy. Other weapon contracts are not implied.
     // Events owns the bullet's destruction and source point_direction call.

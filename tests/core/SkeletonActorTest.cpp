@@ -1,4 +1,5 @@
 #include "core/SkeletonActor.h"
+#include "core/PlayerMotion.h"
 #include <cstdlib>
 #include <cstdio>
 #include <initializer_list>
@@ -65,7 +66,57 @@ struct PreciseContact {
     void stomp(){++stomps;if(mutation==1) onGround=true;if(mutation==2) y=193;}
     void damage(int a,int b,int c){check(a==1 && b==3 && c==2);++damages;}
 };
+struct StompEvents {
+    downwell::SkeletonActor& actor;
+    bool dead,knees,capacity;
+    int style;
+    unsigned choice,smokes=0;
+    std::vector<int> calls;
+    PlayerMotion player{true,1000};
+    bool playerDead(){return dead;}
+    int playStyle(){return style;}
+    bool explodingKnees(){return knees;}
+    void blood(int n,int speed){check(n==3 && speed==0 && actor.health==60);calls.push_back(1);}
+    void forcedJump(int x,int y){
+        check(x==0 && y==(style==2?15:25));
+        player.stompBounce(style);calls.push_back(2);
+    }
+    void shake(int n,int time){check(n==2 && time==10 && actor.health==60);calls.push_back(3);}
+    void stompSound(int id){check(id==122 && actor.health==-40);calls.push_back(4);}
+    void recharge(){check(!actor.hitPending && !actor.stomped);calls.push_back(5);}
+    bool createBlast(int object,int x,int y){
+        check(actor.hitPending && actor.stomped && object==276 && x==96 && y==192);
+        calls.push_back(6);return capacity;
+    }
+    unsigned choose(unsigned count){check(count==3 && calls.back()==6);calls.push_back(7);return choice;}
+    void explosionSound(int id){check(id==91+int(choice));calls.push_back(8);}
+    downwell::MotionBinary64 playerX(){return number(10.25+smokes);}
+    downwell::MotionBinary64 playerY(){return number(20.5+smokes);}
+    void emitSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int direction,int speed){
+        const int directions[]={0,180,15,165};
+        auto expectedX=number(10.25+smokes),expectedY=number(24.5+smokes);
+        check(x.high==expectedX.high && x.low==expectedX.low && y.high==expectedY.high && y.low==expectedY.low);
+        check(direction==directions[smokes] && speed==(smokes<2?4:3));
+        calls.push_back(9+smokes++);
+    }
+};
 int main() {
+    for(bool dead:{false,true}) for(bool knees:{false,true}) for(bool capacity:{false,true})
+    for(int style:{0,1,2,3,4}) for(unsigned choice:{0u,1u,2u}) {
+        downwell::SkeletonActor actor;check(actor.create(96,192));
+        StompEvents events{actor,dead,knees,capacity,style,choice,0,{}};
+        check(actor.stompPlayer(events)==(dead || !knees || capacity));
+        std::vector<int> expected;
+        if(!dead) {
+            expected={1,2,3,4,5};
+            if(knees) {expected.push_back(6);if(capacity) for(int i=7;i<=12;++i) expected.push_back(i);}
+        }
+        check(events.calls==expected);
+        check(actor.health==(dead?60:-40) && actor.hitPending==!dead && actor.stomped==!dead);
+        check(actor.alive && !actor.destroyRequested && !actor.damageStun);
+        check(events.player.grounded()==dead && events.player.spinJumping()==!dead);
+        check(events.player.speedYFixed()==(dead?0:style==2?-384:-640));
+    }
     for(int pose:{205,207,208}) for(int facing:{-1,1})
     for(int dx=-20;dx<=20;++dx) for(int dy=-20;dy<=20;++dy) {
         downwell::SkeletonActor skeleton;check(skeleton.create(96,192));
@@ -182,5 +233,5 @@ int main() {
     check(ordinary.stomps==1 && ordinary.damageCalls==0);
     Contact mutated; mutated.mutate=true; s.collidePlayer(mutated);
     check(mutated.stomps==1 && mutated.damageCalls==1);
-    std::puts("Skeleton actor movement, time-stop, death order, 10086 mask and 150 precise contact checks passed");
+    std::puts("Skeleton actor: movement, death order, 120 stomps, 10086 masks and 150 precise contacts passed");
 }

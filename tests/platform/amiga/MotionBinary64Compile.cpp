@@ -92,6 +92,19 @@ struct SkeletonDecisionEvents {
     void impactEffect(int sprite,int rate,downwell::MotionBinary64 direction,int depth) {
         trace+=sprite+rate+direction.high+direction.low+depth;
     }
+    bool playerDead(){return false;}
+    int playStyle(){return 0;}
+    void forcedJump(int x,int y){trace+=x+y;}
+    void shake(int a,int b){trace+=a+b;}
+    void stompSound(int sound){trace+=sound;}
+    void recharge(){++trace;}
+    bool explodingKnees(){return true;}
+    bool createBlast(int object,int x,int y){trace+=object+x+y;return true;}
+    unsigned choose(unsigned count){return trace%count;}
+    void explosionSound(int sound){trace+=sound;}
+    downwell::MotionBinary64 playerX(){return {};}
+    downwell::MotionBinary64 playerY(){return {};}
+    void emitSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int angle,int speed){trace+=x.low+y.low+angle+speed;}
 };
 }
 extern "C" unsigned skeletonDecisionsCompile(downwell::SkeletonDecisions* state,
@@ -122,6 +135,11 @@ extern "C" unsigned skeletonBulletCompile(downwell::SkeletonActor* state,int dam
     downwell::MotionBinary64 direction) {
     SkeletonDecisionEvents events;
     if(!state->hitByMachineGun(damage,direction,events)) return 0xffffffffu;
+    return events.trace;
+}
+extern "C" unsigned skeletonStompCompile(downwell::SkeletonActor* state) {
+    SkeletonDecisionEvents events;
+    if(!state->stompPlayer(events)) return 0xffffffffu;
     return events.trace;
 }
 namespace {
