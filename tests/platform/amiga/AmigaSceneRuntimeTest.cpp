@@ -1560,10 +1560,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                             "Laser Sight projectiles retain exact straight-down velocity");
                 }
                 sawHighBullet |= bullet.gemHigh;
-                requireNear(bullet.x + 240, hostBullet.x, 1.0F,
-                            "combat bullet X matches in creation order");
-                requireNear(bullet.y + 176, hostBullet.y, 3.0F,
-                            "combat bullet Y matches in creation order");
+                require(bullet.x + 240 == hostBullet.x && bullet.y + 176 == hostBullet.y,
+                        "combat bullets publish identical pixels in creation order");
             }
             require(gameplay.randomDrawCount() == reference.randomDrawCount() &&
                     gameplay.randomState().stateIndex() == reference.randomState().stateIndex(),

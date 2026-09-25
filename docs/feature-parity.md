@@ -9,6 +9,22 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Exact published combat projectile pixels
+
+The extended combat loop now requires exact equality of both published bullet
+coordinates, replacing its obsolete one-pixel X/three-pixel Y allowance. Exact
+fractional trajectory, velocity, direction, birth state and animation checks
+remain unchanged; no game code or numerical approximation was altered.
+The entrance/re-entry shot helper already required exact published pixels.
+
+The rebuilt full host suite passes all eight combat/upgrade variants and
+22,834 offline sprite comparisons. Both 6,000-update continuations also pass:
+phase 6 ends at health 0, kills 7, currency 74 and combo 2, with 3,502 paired
+dead updates; phase 5 survives at health 2, kills 6, currency 76 and combo 2.
+Each also passes the existing two room re-entry comparisons. Evidence:
+`/tmp/downwell-strict-combat-suite.log`. This strengthens adapter regression
+coverage; it is not independent Windows trajectory/raster proof.
+
 ### Full startup integration gate after retained selection migration
 
 `verify-amiga-scenes` now requires at least 100 style-frame comparisons with
