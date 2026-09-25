@@ -4,6 +4,7 @@
 #include "core/LegacyImageAnimation.h"
 #include "core/SequenceTimeline.h"
 #include "core/UnitSequenceFrames.h"
+#include "core/SkeletonAnimation.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
@@ -52,4 +53,10 @@ extern "C" bool unitSequenceFramesCompile(downwell::RunnerImageValue* position,
     bool* crossed, bool* reconcile) {
     return downwell::UnitSequenceFrames::needsReconcile(*image,*position,*reconcile) &&
         downwell::UnitSequenceFrames::advance(*position,speed,frames,*image,*crossed);
+}
+extern "C" bool skeletonAnimationCompile(downwell::SkeletonAnimation* state,
+    int sprite, bool stopped, bool* crossed) {
+    if (!state->setSprite(sprite) || !state->advanceImage(*crossed)) return false;
+    state->beginStep(stopped);
+    return true;
 }

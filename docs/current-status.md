@@ -271,6 +271,12 @@ and the ordinary build was restored after both attempts.
   subtraction and 0.00001 double threshold. 50,804 host cases, sanitizers and
   helper-free 68000 compilation pass. Inverse index mapping, sprite changes
   and live ownership remain unfinished; the component is not a playable actor.
+  `SkeletonAnimation` now joins timing, sequence advance, frame evaluation and
+  the skeleton's explicit frame-zero writes. Idle/throw/hit sprite changes
+  preserve or reset the frame according to the reviewed setter. 32,000 host
+  updates and sanitizers pass with helper-free 68000 compilation. Arbitrary
+  nonzero frame-write reconciliation remains rejected, and the component is
+  not yet connected to the live enemy pool or throw/presentation decisions.
 
 ## Working evidence
 

@@ -120,6 +120,14 @@ all: $(TARGET)
 .PHONY: verify-legacy-image-animation
 .PHONY: verify-sequence-timeline
 .PHONY: verify-unit-sequence-frames
+.PHONY: verify-skeleton-animation
+verify-skeleton-animation: build/skeleton-animation-test
+	./build/skeleton-animation-test
+
+build/skeleton-animation-test: tests/core/SkeletonAnimationTest.cpp src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/UnitSequenceFrames.h src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h src/core/AlarmBank.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/SkeletonAnimationTest.cpp
+
 verify-unit-sequence-frames: build/unit-sequence-frames-test
 	./build/unit-sequence-frames-test
 

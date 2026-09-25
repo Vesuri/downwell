@@ -161,3 +161,36 @@ ASan/UBSan, with a reverse-timeline-to-frame integration check. The 68000
 fixture has no undefined helper symbols. Native execution and timing remain
 unmeasured for this component. Frame evaluation can now follow timeline advance,
 but live ownership and reconciliation still prevent enabling the new actor.
+
+## Skeleton animation owner
+
+`SkeletonAnimation` now joins the recovered timing state with a separate
+sequence position and the idle/throw/hit sprites 208/207/205 (6/8/1 frames).
+Its default sprite comes from object 120's serialized metadata. Advancement
+belongs before Begin Step/alarms; ordinary Step still updates the stored speed
+after that frame's advancement. This component is not yet registered in the
+live instance pool.
+
+Sprite setter registration `0x430cf6` calls through `0x433550` to `0x46bdf0`.
+The latter returns immediately for the same ID. For a changed sprite it
+truncates the existing image index and compares with the new frame count at
+`0x46be59`. An out-of-range index resets the index to zero and, for the
+unit frame track, resets sequence position to zero. Otherwise it preserves
+the index. The normal-sprite branch of helper `0x46bff0` does not allocate
+the special skeletal-sprite state.
+
+Skeleton VM events write only image index zero. The new component reconciles
+that write at the next animation phase using the recovered difference
+threshold. If a shorter sprite has left the old sequence position outside
+the new track after an explicit zero write, it resolves that reset to zero
+before advancing. The source inverse mapping at `0x50ed87`–`0x50ee2a` reduces
+exactly to zero for this case. Arbitrary nonzero mismatches return failure;
+they are not silently substituted with an identity inverse mapping.
+
+32,000 host updates exercise interleaved resets, repeated and changed sprites,
+rate changes and time-stop against a scalar sequence model. Normal and
+sanitizer runs pass, and the combined 68000 fixture has no undefined helper
+symbols. This does not establish live skeleton behavior: throw/activation/hit
+presentation decisions, damage/death effects, owner lifecycle and rendering
+still need connection. Native execution and timing of this component remain
+unmeasured.
