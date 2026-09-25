@@ -7,6 +7,7 @@
 #include <iterator>
 #include <cassert>
 #include <cstdio>
+extern unsigned selectionBitmapMaskedCalls;
 int amigaBlitterDrawPlanarMasked(const UBYTE*,const UBYTE*,UWORD,UWORD,UWORD,UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD,int) { return 0; }
 int amigaBlitterClearPlanar(UBYTE*,UWORD,UWORD) { return 0; }
 int amigaBlitterSolidRect(UBYTE*,UWORD,UWORD,UWORD,UWORD,UWORD,UWORD) { return 0; }
@@ -179,5 +180,57 @@ int main(int argc,char** argv) {
     }
     assert(outlinedCases==284); // 24 names + 24 descriptions + 23 owned-name variants
     std::printf("%u offline outline/clipping cases match five source-ordered passes\n",outlinedCases);
+    // Repeated heading passes can occupy the same pixels. Compare against
+    // the independent renderer, which executes every original pass. Cover
+    // retained updates, removal, clipping, all angles and all final pens.
+    layer.invalidate();
+    unsigned headingCases = 0;
+    for (unsigned degree=0; degree<360; ++degree) {
+        downwell::LevelClearHeadingPixels heading;
+        assert(heading.compute(downwell::LevelClearTrig::sineQ30(
+            downwell::LevelClearTrig::degreePhase(degree)+0x40000000u)));
+        for (int pen=-1; pen<=3; ++pen) {
+            AmigaSelectionLayer::Command passes[7];
+            for(unsigned pass=0;pass<7;++pass)
+                passes[pass]={64500,0,heading.x(pass)+(pen==0?-80:0),
+                    heading.stageY(pass)+(pen==3?-96:0),pass==6?pen:2};
+            selectionBitmapMaskedCalls=0;
+            assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),passes,7,paint));
+            unsigned unique=1;
+            for(unsigned pass=0;pass<6;++pass)
+                if(passes[pass].x!=passes[pass+1].x || passes[pass].y!=passes[pass+1].y) ++unique;
+            assert(selectionBitmapMaskedCalls <= unique*2);
+            std::fill(expected.begin(),expected.end(),0);
+            AmigaRenderer renderer;
+            amigaRendererInit(&renderer,game.data(),expected.data());
+            renderer.target=renderer.hud; renderer.clipX=110; renderer.clipWidth=160;
+            for(const auto& c:passes) {
+                if(c.pen<0) amigaRendererDrawAsset(&renderer,pack.data(),pack.data()+pack.size(),c.id,c.frame,110+c.x,c.y,0);
+                else amigaRendererDrawAssetPen(&renderer,pack.data(),pack.data()+pack.size(),c.id,c.frame,110+c.x,c.y,0,c.pen);
+            }
+            for(unsigned p=0;p<2;++p) for(unsigned y=0;y<284;++y) for(unsigned x=0;x<160;++x) {
+                const bool actual=canvas[p*AmigaSelectionLayer::planeBytes+y*22+x/8] & (128u>>(x&7));
+                const bool reference=expected[p*downwellPlaneBytes+y*48+(110+x)/8] & (128u>>((110+x)&7));
+                if(actual!=reference) {
+                    std::fprintf(stderr,"heading degree=%u pen=%d p=%u x=%u y=%u actual=%d expected=%d\n",degree,pen,p,x,y,actual,reference);
+                    assert(actual==reference);
+                }
+            }
+            ++headingCases;
+        }
+    }
+    // Exact overlap collapses seven source passes to just the final two-plane
+    // pen operation, not merely to a visually equivalent seven blits.
+    AmigaSelectionLayer::Command repeated[7];
+    for(auto& c:repeated) c={64500,0,80,96,2};
+    repeated[6].pen=1;
+    layer.invalidate(); selectionBitmapMaskedCalls=0;
+    assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),repeated,7,paint));
+    assert(selectionBitmapMaskedCalls==2);
+    const auto validHeading=canvas;
+    repeated[0].pen=4; // would be overwritten, but still must be rejected
+    assert(!layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),repeated,7,paint));
+    assert(canvas==validHeading);
+    std::printf("%u retained heading/pen/clipping cases match all original passes\n",headingCases);
     std::puts("325 selection camera positions match fresh rendering without repainting");
 }

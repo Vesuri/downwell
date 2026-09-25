@@ -82,6 +82,14 @@ bool AmigaSelectionLayer::render(UBYTE* target, const UBYTE* pack, const UBYTE* 
         if (!fresh) destination.solidRect(d.x, d.y, d.width, d.height, 0);
         paintedPixels += unsigned(d.width)*unsigned(d.height);
         for (unsigned j = 0; j < count; ++j) {
+            // Both masked operations replace, rather than blend, every set
+            // mask bit. An immediately following identical mask/position
+            // overwrites this pass completely, including a different pen.
+            // Keep the original commands/bounds for validation and damage.
+            if (j + 1 < count) {
+                const auto& a = commands[j]; const auto& b = commands[j+1];
+                if (a.id == b.id && a.frame == b.frame && a.x == b.x && a.y == b.y) continue;
+            }
             const auto& b = next_[j];
             if (!d.overlaps(b)) continue;
             const auto& c = commands[j]; const auto* r = records[j];

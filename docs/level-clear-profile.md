@@ -291,3 +291,20 @@ owned emulator and restores all startup skips to zero. Evidence:
 `/tmp/downwell-heading-native-gdb.log`, `/tmp/downwell-heading-profile.log`,
 `/tmp/downwell-heading-final-host.log`, and
 `/tmp/downwell-heading-sanitized.log`.
+
+### Immediately overwritten heading passes
+
+The retained selection renderer now omits a masked write when the next
+command completely replaces the same resource/frame at the same position.
+It retains the original commands for validation and damage calculation.
+This reduces average content rendering from 21.35 to 17.79 ms at idle and
+from 21.65 to 19.36 ms during navigation. Layout and simulation are unchanged;
+the complete frame still exceeds 20 ms. Content maxima are 42.93 / 43.76 ms,
+so the improvement is not a worst-case frame-time guarantee.
+
+The same 480-update profile finishes within its 120-second limit with zero
+clock clamps; normal startup is restored. Native two-clear pixel comparisons,
+the stack guard, 1,800 host heading/pen/clipping cases and ASan/UBSan pass.
+Logs: `/tmp/downwell-overwritten-profile.log`,
+`/tmp/downwell-overwritten-native-gdb.log`, and
+`/tmp/downwell-overwritten-sanitized.log`.

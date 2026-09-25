@@ -238,3 +238,31 @@ The bounded native run passes 432 completion-plane comparisons, 192 exit-field
 comparisons, both clears, 60 third-level updates and the stack guard:
 `/tmp/downwell-heading-native-gdb.log`. This establishes equivalence to the
 existing raster policy, not a new claim of Windows GPU pixel-center fidelity.
+
+### Eliding immediately overwritten masked passes
+
+`AmigaSelectionLayer` skips a paint operation when the next command uses the
+same resource, frame and position. Both supported operations (asset-colour
+masked copy and constant-pen masked write) replace every set mask bit in
+both planes. The later operation therefore completely supersedes the earlier
+one even when their pens differ. There is no blending or destination sampling
+that would require the discarded intermediate value. Different positions or
+frames are not combined, and source ordering is otherwise unchanged.
+
+Validation and retained damage still use the complete original command list;
+only submission of the overwritten paint is eliminated. Thus a later change
+or removal still repairs the old area, and an invalid command cannot hide
+behind a valid replacement. This optimization is in the reusable selection
+layer, not an upgrade-specific alternate animation path.
+
+Host tests exercise all 360 heading angles with five final pen modes, clipped
+positions and retained updates against the independent full-pass renderer
+(1,800 cases). They also count masked operations: seven coincident passes
+produce only the final two single-plane pen writes. Existing border, bank
+replacement, outline and camera-only no-repaint tests remain enabled.
+These cases pass ASan/UBSan, including rejection of an invalid overwritten
+command without pixel changes. The 240-second-bounded native comparison
+passes 432 completion frames, 192 exit-field frames, two clears, 60 third-level
+updates and the stack guard. Evidence:
+`/tmp/downwell-overwritten-native-gdb.log` and
+`/tmp/downwell-overwritten-sanitized.log`.

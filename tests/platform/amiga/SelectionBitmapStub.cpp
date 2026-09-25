@@ -1,6 +1,7 @@
 // Scalar framework stand-in for host tests of selection command retention.
 // Native builds link the actual Bitmap implementation and its blitter paths.
 #include "platform/amiga/framework/Bitmap.h"
+unsigned selectionBitmapMaskedCalls = 0;
 Bitmap::Bitmap(void* p, uint16_t w, uint16_t h, uint16_t planes, bool inter,
                bool own, uint16_t dma)
     : data(p), width(w), height(h), bitplanes(planes), dataWidth(dma ? dma : ((w+15)&~15)),
@@ -31,11 +32,13 @@ void Bitmap::solidRect(uint16_t x,uint16_t y,uint16_t w,uint16_t h,uint16_t colo
 }
 void Bitmap::copyWithMask(const Bitmap& s, const Bitmap& m, uint16_t x, uint16_t y,
     uint16_t sx, uint16_t sy, uint16_t mx, uint16_t my, uint16_t w, uint16_t h, bool) {
+    ++selectionBitmapMaskedCalls;
     for(unsigned yy=0;yy<h;++yy) for(unsigned xx=0;xx<w;++xx) if(bit(m,0,mx+xx,my+yy))
         for(unsigned p=0;p<bitplanes;++p) put(*this,p,x+xx,y+yy,bit(s,p,sx+xx,sy+yy));
 }
 void Bitmap::patternWithMask(const Bitmap& m, uint16_t x, uint16_t y, uint16_t mx,
     uint16_t my, uint16_t w, uint16_t h, uint16_t pattern) {
+    ++selectionBitmapMaskedCalls;
     for(unsigned yy=0;yy<h;++yy) for(unsigned xx=0;xx<w;++xx) if(bit(m,0,mx+xx,my+yy))
         put(*this,0,x+xx,y+yy,(pattern & (0x8000u>>(xx&15))) != 0);
 }
