@@ -753,6 +753,14 @@ test-amiga-gameplay-scene: build/amiga-gameplay-scene-test
 	./build/amiga-gameplay-scene-test
 test: test-amiga-gameplay-scene
 
+.PHONY: test-amiga-upgrade-display
+build/amiga-upgrade-display-test: tests/platform/amiga/AmigaUpgradeDisplayTest.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $<
+test-amiga-upgrade-display: build/amiga-upgrade-display-test
+	./build/amiga-upgrade-display-test
+test: test-amiga-upgrade-display
+
 .PHONY: test-generation-probes
 build/generation-probes-off-test: tests/core/ProfileGenerationTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

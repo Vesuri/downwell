@@ -7,6 +7,7 @@ bool AmigaUpgradeScene::enter(GameplayWorld& world, unsigned style,
     const downwell::Input& input, UBYTE* storage, unsigned storageBytes,
     unsigned hudBytes, const UBYTE* art, unsigned artBytes,
     const UBYTE* mask, unsigned maskBytes) {
+    invalidateDisplay();
     if (!world.enterLevelClear(style, heartGoal_) ||
         !assets.prepare(storage, storageBytes, hudBytes, art, artBytes,
             mask, maskBytes, nullptr, 0, world.runStage().area, world.runStage().level))

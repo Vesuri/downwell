@@ -100,10 +100,21 @@ drain outstanding blits before replacing a bank.
 
 `AmigaUpgradeScene` now owns the retained border/content renderers and
 world-space draw commands. `AmigaClearPresenter` remains the independent
-verification oracle, not the live rendering path. Display-buffer binding,
-sprites, Copper publication and next-level transitions still remain in
+verification oracle, not the live rendering path. The scene now owns both
+borrowed selection Copper wrappers and their build/update validity. Entry
+invalidates both lists; a failed patch forces a rebuild on the next attempt.
+Sprites, final Copper publication and next-level transitions still remain in
 `DownwellAmiga.cpp`. Moving these into the scene is unfinished; the extraction
 must not become a wrapper around a permanently monolithic main loop.
+
+The display-owner test covers two entries, 600 alternating frames, mask
+retirement and failure recovery; ordinary and ASan/UBSan runs pass. The bounded
+native gate passes 466 completion frames, 192 exit-field frames and two
+re-entries, including all three upgrade cursors on each entry. Logs:
+`/tmp/downwell-upgrade-owner-host.log`,
+`/tmp/downwell-upgrade-owner-sanitized.log`, and
+`/tmp/downwell-upgrade-owner-native.log`. Ordinary startup was rebuilt afterward;
+both 68000 audits pass. This gate still uses injected exits.
 
 ## Remaining consolidation
 

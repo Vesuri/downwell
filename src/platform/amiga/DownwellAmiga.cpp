@@ -1383,11 +1383,9 @@ int main(void) {
     };
     AmigaGameplayScene gameplayScene(dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
     gameplayScene.setBackingRange(worldViewY, worldViewY + downwellDisplayHeight);
-    DownwellSelectionCopperList selectionLists[2] = {
-        DownwellSelectionCopperList(dynamicCopperWords[0], downwellCopperWords),
-        DownwellSelectionCopperList(dynamicCopperWords[1], downwellCopperWords)
-    };
-    bool selectionListReady[2] = {false, false};
+#ifndef DOWNWELL_REPLAY_VERIFY
+    clear.bindDisplay(dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
+#endif
     static_assert(sceneCacheBytes >= 2 * AmigaSelectionLayer::bytes,
                   "Selection canvases must fit the retired scene cache");
     static_assert(downwellLayerBytes >= AmigaSelectionLayer::bytes,
@@ -2134,7 +2132,6 @@ int main(void) {
                     for (unsigned buffer = 0; buffer < 2; ++buffer) {
                         gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
                         gameplayScene.invalidate(buffer);
-                        selectionListReady[buffer] = false;
                     }
                 } else if (!port.nextLevelRequested()) {
                     DW_PROFILE_SCOPE(profileClearStep);
@@ -2194,9 +2191,8 @@ int main(void) {
                 const UBYTE* mask = port.exitDither().active ? memory.menuForeground() +
                     AmigaExitMask::offset(port.exitDither().y - room.motion.viewY()) /
                     AmigaExitMask::stride * AmigaExitMask::selectionStride : nullptr;
-                if (!ready || !(selectionListReady[back] ? selectionLists[back].update(frame.border, frame.layer, mask) :
-                    selectionLists[back].build(frame.border, frame.layer, mask, playerSprites[back],
-                        bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette))) {
+                if (!ready || !clear.updateDisplay(back, frame, mask, playerSprites[back],
+                        bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette)) {
                     exitCode = 20; break;
                 }
                 DW_PROFILE_PHASE(profileClearDrain);
@@ -2252,9 +2248,8 @@ int main(void) {
                 if (gDownwellClearFrames == 1 || gDownwellClearFrames % 60 == 0)
                     downwellClearProbe();
 #endif
-                selectionListReady[back] = true;
                 DW_PROFILE_PHASE(profileClearPublish);
-                platform.publish(selectionLists[back]); front = back;
+                platform.publish(clear.copper(back)); front = back;
                 continue;
             }
 #endif
