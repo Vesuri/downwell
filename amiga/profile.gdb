@@ -23,6 +23,21 @@ while $i < sizeof(gDownwellProfileTicks[0])/sizeof(gDownwellProfileTicks[0][0])
     set $i = $i + 1
 end
 printf "max_frame_ms=%.3f clock_clamps=%lu\n", gDownwellProfileFrameMax[$s]*20.0/80128.0, gDownwellProfileClockClamps
+printf "Worst whole frame: %lu; exclusive phase milliseconds (includes instrumentation and wait)\n", gDownwellProfileWorstFrame[$s]
+set $sum = 0
+set $i = 0
+while $i < sizeof(gDownwellProfileWorstTicks[0])/sizeof(gDownwellProfileWorstTicks[0][0])
+    set $ticks = gDownwellProfileWorstTicks[$s][$i]
+    set $sum = $sum + $ticks
+    if $ticks != 0
+        printf "worst_phase %u %.3f\n", $i, $ticks*20.0/80128.0
+    end
+    set $i = $i + 1
+end
+if $sum != gDownwellProfileFrameMax[$s] || gDownwellProfileWorstFrame[$s] == 0
+    printf "Worst-frame phase accounting mismatch\n"
+    quit 1
+end
 printf "Collision routes: solid_indexed=%lu solid_fallback=%lu landing_indexed=%lu landing_fallback=%lu breakable_fallback=%lu\n", gDownwellProfileCounters[0], gDownwellProfileCounters[1], gDownwellProfileCounters[2], gDownwellProfileCounters[3], gDownwellProfileCounters[4]
 printf "Terrain segments: indexed=%lu cells=%lu fallback=%lu\n", gDownwellProfileCounters[5], gDownwellProfileCounters[6], gDownwellProfileCounters[7]
 printf "DOWNWELL_PROFILE_READY\n"

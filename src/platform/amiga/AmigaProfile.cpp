@@ -37,6 +37,8 @@ volatile ULONG gDownwellProfileFrozen;
 volatile ULONG gDownwellProfileClockClamps;
 #ifdef DOWNWELL_PROBES
 volatile unsigned long gDownwellProfileCounters[profileCounterCount];
+volatile ULONG gDownwellProfileWorstTicks[4][profilePhaseCount];
+volatile ULONG gDownwellProfileWorstFrame[4];
 #endif
 __attribute__((noinline, used)) void downwellProfileReady()
 {
@@ -82,6 +84,7 @@ static ULONG startField;
 #ifdef DOWNWELL_PROBES
 static unsigned phaseId;
 static ULONG phaseStart, frameStart;
+static ULONG frameTicks[profilePhaseCount];
 #endif
 
 void downwellProfileBegin(unsigned scene)
@@ -89,6 +92,7 @@ void downwellProfileBegin(unsigned scene)
     sceneId = scene < 4 ? scene : 0;
     startField = gDownwellProfileVbi;
 #ifdef DOWNWELL_PROBES
+    for (unsigned phase = 0; phase < profilePhaseCount; ++phase) frameTicks[phase] = 0;
     frameStart = phaseStart = beamTick();
     phaseId = profileOther;
 #endif
@@ -99,6 +103,7 @@ void downwellProfilePhase(unsigned phase)
 #ifdef DOWNWELL_PROBES
     const ULONG now = beamTick();
     const ULONG elapsed = now - phaseStart;
+    frameTicks[phaseId] += elapsed;
     gDownwellProfileTicks[sceneId][phaseId] += elapsed;
     ++gDownwellProfileCalls[sceneId][phaseId];
     if (elapsed > gDownwellProfileMax[sceneId][phaseId])
@@ -115,8 +120,12 @@ void downwellProfileEnd()
 #ifdef DOWNWELL_PROBES
     downwellProfilePhase(profileOther);
     const ULONG elapsed = phaseStart - frameStart;
-    if (elapsed > gDownwellProfileFrameMax[sceneId])
+    if (elapsed > gDownwellProfileFrameMax[sceneId]) {
         gDownwellProfileFrameMax[sceneId] = elapsed;
+        gDownwellProfileWorstFrame[sceneId] = gDownwellProfileFrames[sceneId] + 1;
+        for (unsigned phase = 0; phase < profilePhaseCount; ++phase)
+            gDownwellProfileWorstTicks[sceneId][phase] = frameTicks[phase];
+    }
 #endif
     // The first gameplay frame builds the scene; measure steady-state work
     // separately rather than averaging this one-time setup into frame cost.
@@ -130,6 +139,9 @@ void downwellProfileEnd()
         }
         gDownwellProfileFrameMax[3] = 0;
 #ifdef DOWNWELL_PROBES
+        gDownwellProfileWorstFrame[3] = 0;
+        for (unsigned phase = 0; phase < profilePhaseCount; ++phase)
+            gDownwellProfileWorstTicks[3][phase] = 0;
         for (unsigned counter = 0; counter < profileCounterCount; ++counter)
             gDownwellProfileCounters[counter] = 0;
 #endif

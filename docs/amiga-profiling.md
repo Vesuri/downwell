@@ -423,6 +423,38 @@ suite passes, native shot pixels match SDL (0/99,968 differences), and both
 68000 audits pass. The ordinary non-skip executable is restored. Emulator
 runs are bounded to 45 seconds.
 
+### Attribute the slowest complete frame
+
+Probe builds now retain exclusive phase totals for the slowest complete
+frame, not just the largest individual bracket. The report verifies that
+these integer tick totals sum exactly to the frame duration. Initial gameplay
+setup is excluded as before. Frame accumulators are reset before the starting
+timestamp, and snapshot copies occur after the ending timestamp. All added
+state/work is compiled out without `PROBES=1`.
+
+The 600-update tape's slowest frame is **258**, measuring **150.267 ms** with
+instrumentation. Its largest components are:
+
+| Component | ms in frame 258 |
+| --- | ---: |
+| Builder work excluding nested registration/indexing | 77.885 |
+| Generated-object registration | 22.836 |
+| Terrain index/tile insertion | 25.318 |
+| Vblank waiting | 11.159 |
+| Player movement excluding terrain queries | 2.045 |
+
+Generation's three exclusive components total **126.039 ms**. No ammo HUD
+phase ran in this frame. This identifies the long stall separately from the
+recurring HUD costs: fixing ordinary frames alone cannot eliminate it.
+Preserve original Create ordering and RNG consumption when optimizing or
+preparing generation work; deferring live effects changes behavior.
+
+The native accounting check and both 68000 audits pass. The 45-second bounded
+run cleaned up and restored the ordinary executable. Logs:
+`/tmp/downwell-worst-frame-{profile,restore}.log`. The added probes introduce
+overhead, so 150.267 ms is not an uninstrumented frame-time claim. The latest
+FPSCOUNT baseline remains 36.63 FPS; this diagnostic makes no speedup claim.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in
