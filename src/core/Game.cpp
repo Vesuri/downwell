@@ -10,6 +10,7 @@
 #include "DeathResultsProgressLabels.h"
 #include "ObjectPack.h"
 #include "ShopFixtures.h"
+#include "LaserSightLine.h"
 #include "ShopMenuText.h"
 #include "LevelClearLayout.h"
 #include "../../generated/amiga-shop.text.h"
@@ -311,6 +312,17 @@ void Game::renderMain(Renderer& renderer) const {
             static_cast<std::uint32_t>(startup_.mainPlayerImageIndex()),
             player->x - viewX, player->y - viewY,
             static_cast<float>(startup_.mainPlayerFacing()), 1.0F, 0.0F);
+    // playerDraw places this outside dFlash: damage blinking hides the player
+    // sprite, not the ray. noDraw's Cat interaction is not yet implemented.
+    if (startup_.upgrades().levels[12] && !startup_.goalStopped()) {
+        const auto line = LaserSightLine::from(
+            LaserSightRay::fromQ8(static_cast<std::int32_t>(startup_.mainPlayerX()*256)),
+            LaserSightRay::fromQ8(static_cast<std::int32_t>(startup_.mainPlayerY()*256)),
+            startup_.mainLaserSightEndpoint(), static_cast<int>(viewX), static_cast<int>(viewY));
+        line.draw([&](int x, int y) {
+            renderer.fillRect(x, y, 1, 1, {255, 0, 0, 255});
+        });
+    }
     for (std::size_t index = 0; index < startup_.mainBulletCount(); ++index) {
         const StartupRuntime::MainBulletState& bullet =
             startup_.mainBulletAt(index);

@@ -1,7 +1,8 @@
 # Laser Sight source audit and implementation boundary
 
-Upgrade 12 now has shared machine-gun firing behavior. It is not yet a complete
-upgrade: the visible ray and other weapon types remain unimplemented.
+Upgrade 12 now has shared machine-gun firing behavior and a host-rendered ray.
+It is not yet a complete upgrade: Amiga ray presentation and other weapon
+types remain unimplemented.
 
 ## Original evidence
 
@@ -75,10 +76,9 @@ without auditing its membership. The current rectangle primitive uses the
 port's half-open contact convention; original `collision_line` rounding and
 mask behavior remain an explicit integration gate.
 
-This foundation is **not yet connected to either renderer** and has no
-native timing or pixel-capture claim. The red ray remains a missing visible
-feature until source visibility/order, SDL drawing
-and Amiga draw/restore handling are connected and verified.
+The host renderer now uses this foundation; Amiga presentation remains open.
+There is no native ray timing or pixel-capture claim. Amiga draw/restore
+handling and original-GPU pixel fidelity remain to be verified.
 
 ### Collision-family audit
 
@@ -114,7 +114,7 @@ edges and query side effects. Focused tests and ASan/UBSan pass. The shared
 half-open rectangle convention is retained, not newly certified as Windows
 line-edge behavior. Destructible cases are not yet represented in `ShopWorld`;
 their mask transition must be added to the common visitor with that feature.
-This query is ready for the ray adapters but is not yet called by a renderer.
+The host ray renderer calls this query through its runtime adapter.
 
 ### Live runtime endpoint adapters
 
@@ -156,6 +156,28 @@ branch, but inside `!goalStop && !noDraw`. Therefore presentation must not use
 the existing damage-blink `playerVisible` gate for the ray. The current
 convenience endpoints use zero aim, as does the implemented machine-gun
 control path; they do not claim to implement the original aim controller.
+
+### Host presentation
+
+`Game::renderMain` now draws the owned ray after the player and before bullets,
+independently of damage blinking and suppressed by goalStop. The unimplemented
+Cat/noDraw interaction is not silently equated with the damage-blink flag.
+`LaserSightLine` supplies a shared inclusive integer line rasterizer and the
+source's `(x,y+8)` start anchor. Endpoint rounding uses nearest/even; this is an
+explicit port presentation convention, not verified Windows D3D line coverage.
+The existing renderer clip confines its red pixels to the game area.
+
+The real host render tape compares owned/unowned output during hidden and
+visible damage phases and checks no render-time RNG draws. Line tests cover
+1,089 endpoint differences (all octants, point, horizontal and vertical), pixel
+connectivity, endpoint inclusion, and negative half-pixel anchors. Focused
+tests and line ASan/UBSan pass. Logs: `/tmp/downwell-laser-render-{build,test}.log`.
+
+Amiga integration must preserve painter order: allocating an earlier actor to
+a hardware sprite above a planar ray would violate that order. Restoration
+also needs to avoid turning a thin ray into full terrain-row repaint work or
+clearing an unchanged ray merely to draw it again. Those are implementation
+requirements, not yet completed optimizations.
 
 `playerDraw` traces cumulative lines against `parentWall` and `subparentEnemy`,
 starting at the player origin. Each iteration advances Y by

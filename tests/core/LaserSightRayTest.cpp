@@ -1,4 +1,5 @@
 #include "core/LaserSightRay.h"
+#include "core/LaserSightLine.h"
 #include <cassert>
 #include <cstdio>
 #include <cmath>
@@ -6,6 +7,24 @@
 using namespace downwell;
 int main() {
     using C = LaserSightRay::Coordinate;
+    {
+        const auto line = LaserSightLine::from(C{-2,524288}, C{3,524288},
+            {C{4,524288}, C{-3,524288}}, 10, 20);
+        assert(line.x0 == -12 && line.y0 == -8 && line.x1 == -6 && line.y1 == -22);
+        // Every octant, both endpoint directions, horizontal/vertical/point.
+        for (int dx = -16; dx <= 16; ++dx) for (int dy = -16; dy <= 16; ++dy) {
+            LaserSightLine sample{7,9,7+dx,9+dy};
+            int count = 0, previousX = 7, previousY = 9;
+            sample.draw([&](int x, int y) {
+                if (!count) assert(x == 7 && y == 9);
+                else assert(std::abs(x-previousX) <= 1 && std::abs(y-previousY) <= 1 &&
+                            (x != previousX || y != previousY));
+                previousX = x; previousY = y; ++count;
+            });
+            assert(previousX == 7+dx && previousY == 9+dy);
+            assert(count == (std::abs(dx) > std::abs(dy) ? std::abs(dx) : std::abs(dy)) + 1);
+        }
+    }
     for (int value = -92160; value <= 92160; ++value) {
         const auto expected = static_cast<std::uint32_t>(
             (static_cast<std::int64_t>(value) * 0x100000000LL) / (360*256));

@@ -38,6 +38,7 @@ public:
     }
     void clearClipRect() override { ++clearClipCount; }
     void fillRect(int x, int y, int w, int h, downwell::Color color) override {
+        if (w == 1 && h == 1 && color.r == 255 && !color.g && !color.b) ++redPixels;
         if (x == 110 && y == 0 && w == 160 && h == 284 &&
             color.r == 255 && color.g == 255 && color.b == 255 && color.a == 255)
             ++deathFlashCount;
@@ -65,6 +66,7 @@ public:
         if (sprite == 127) ++triggerDraws;
     }
     unsigned bulletDraws = 0;
+    unsigned redPixels = 0;
     std::vector<float> bulletAngles;
     bool spreadBulletDrawn = false;
     void drawText(std::int32_t, const char* text, float x, float y,
@@ -382,6 +384,7 @@ int main() {
         if (!damaged) continue;
         renderer.targetPlayer = state.mainPlayerSpriteId();
         renderer.playerDraws = 0;
+        renderer.redPixels = 0;
         renderer.bulletAngles.clear();
         damagedGame.render(renderer);
         require(renderer.bulletAngles.size() == state.mainBulletCount(),
@@ -392,6 +395,15 @@ int main() {
                     "artwork receives the retained trajectory direction in creation order");
         require(renderer.playerDraws == (immunity % 2 == 0 ? 1u : 0u),
                 "actual Game render suppresses odd damage phases and draws even phases once");
+        auto& inventory = const_cast<downwell::UpgradeInventory&>(state.upgrades());
+        const auto originalLevel = inventory.levels[12];
+        const auto drawsBefore = state.randomDrawCount();
+        const auto redBefore = renderer.redPixels;
+        inventory.levels[12] = 1; // Presentation-only fixture; do not change the replay's shots.
+        damagedGame.render(renderer);
+        inventory.levels[12] = originalLevel;
+        require(renderer.redPixels - redBefore > redBefore && state.randomDrawCount() == drawsBefore,
+                "Laser Sight renders through damage blink without consuming RNG");
         if (immunity == 0) recovered = true;
         else if (immunity % 2) ++hidden;
         else ++flashingVisible;
