@@ -37,6 +37,39 @@ void putWord(UBYTE* bytes, unsigned offset, unsigned value) {
     bytes[offset + 1] = static_cast<UBYTE>(value);
 }
 
+void verifyDamageEndpoints() {
+    unsigned random = 0x548abc21u;
+    auto next = [&]() { random = random * 1664525u + 1013904223u; return random; };
+    for (unsigned trial = 0; trial < 12000; ++trial) {
+        AmmoHudDamage damage;
+        downwell::AmmoGaugeRows rows;
+        damage.valid = true;
+        damage.ammo = 4; damage.capacity = 8;
+        damage.meter = trial % 4;
+        damage.previous.filled = next() % 185;
+        rows.filled = trial % 2 ? damage.previous.filled : next() % 185;
+        for (unsigned i = 0; i < 184; ++i) {
+            damage.previous.state[i] = next() % 5;
+            rows.state[i] = damage.previous.state[i];
+            if (trial % 3 == 0 || i == trial % 184)
+                rows.state[i] = next() % 5;
+        }
+        int top = 256, bottom = 0;
+        // Previous implementation, deliberately scanning every row.
+        for (unsigned i = 0; i < 184; ++i) {
+            const unsigned a = damage.previous.state[i] < 4 ? damage.previous.state[i] : 3;
+            const unsigned b = rows.state[i] < 4 ? rows.state[i] : 3;
+            if (a != b || (i < damage.previous.filled) != (i < rows.filled)) {
+                const int y = 229 + 4 * damage.meter - static_cast<int>(i);
+                if (y < 232) { if (y < top) top = y; if (y+8 > bottom) bottom = y+8; }
+            }
+        }
+        damage.update(4, 8, 0, damage.meter, &rows);
+        require(damage.top == top && damage.bottom == bottom,
+                "endpoint damage bounds equal the complete row scan");
+    }
+}
+
 void putLong(UBYTE* bytes, unsigned offset, unsigned long value) {
     putWord(bytes, offset, static_cast<unsigned>(value >> 16));
     putWord(bytes, offset + 2, static_cast<unsigned>(value));
@@ -80,6 +113,7 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 } // namespace
 
 int main(int argc, char** argv) {
+    verifyDamageEndpoints();
     {
         std::vector<UBYTE> actual(downwellLayerBytes, 0x5a), expected = actual;
         for (unsigned plane = 0; plane < 2; ++plane)

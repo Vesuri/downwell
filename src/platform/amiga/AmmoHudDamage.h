@@ -28,13 +28,28 @@ struct AmmoHudDamage {
                 include(229 + 4 * nextMeter - static_cast<int>(high) - 2,
                         229 + 4 * nextMeter - static_cast<int>(low) + 10);
             }
-            for (unsigned i = 0; i < 184; ++i) {
-                const unsigned a = previous.state[i] < 4 ? previous.state[i] : 3;
-                const unsigned b = rows->state[i] < 4 ? rows->state[i] : 3;
-                if (a != b || (i < previous.filled) != (i < rows->filled)) {
-                    const int y = 229 + 4 * nextMeter - static_cast<int>(i);
-                    if (y < 232) include(y, y + 8);
-                }
+            const int base = 229 + 4 * nextMeter;
+            const unsigned firstVisible = base >= 232 ? base - 231 : 0;
+            // Sprite-family changes occupy a contiguous interval. Include its
+            // endpoints once, instead of testing the fill boundary per row.
+            unsigned low = previous.filled < rows->filled ? previous.filled : rows->filled;
+            unsigned high = previous.filled > rows->filled ? previous.filled : rows->filled;
+            if (low < firstVisible) low = firstVisible;
+            if (high > 184) high = 184;
+            if (low < high) include(base - static_cast<int>(high) + 1,
+                                    base - static_cast<int>(low) + 8);
+            // Damage is a single bounding strip. Once its first and last
+            // changed frames are known, inspecting the interior cannot alter it.
+            auto changed = [&](unsigned i) {
+                const unsigned a = previous.state[i], b = rows->state[i];
+                return a != b && (a < 3 || b < 3); // states 3 and 4 both draw frame 3
+            };
+            unsigned first = firstVisible;
+            while (first < 184 && !changed(first)) ++first;
+            if (first < 184) {
+                unsigned last = 183;
+                while (last > first && !changed(last)) --last;
+                include(base - static_cast<int>(last), base - static_cast<int>(first) + 8);
             }
         }
         ammo = nextAmmo; capacity = nextCapacity; offset = nextOffset; meter = nextMeter;

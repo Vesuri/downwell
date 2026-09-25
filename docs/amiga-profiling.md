@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 34.92 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 35.42 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -211,6 +211,28 @@ The expanded host renderer suite and both native 68000 audits pass. The
 45-second bounded run cleaned up and the ordinary non-skip executable was
 restored. Logs: `/tmp/downwell-hud-detail-{profile,test,restore}.log`.
 All three added timing scopes compile out without `PROBES=1`.
+
+### Bound damage by changed endpoints
+
+The HUD still requests the same single bounding strip, but now finds the
+first and last changed animation frames without inspecting the interior.
+Fill-family changes are a contiguous interval whose bounds are included
+once, rather than compared at every row. States 3 and 4 continue to share
+frame 3; rows hidden by the original y<232 test remain excluded.
+
+The same probe tape reduces phase 37 from 639.735 to **365.368 ms** over 139
+HUD updates (43% less; 2.628 ms/update). The FPSCOUNT tape takes **847 fields
+for 600 updates = 35.42 FPS**, versus 859 / 34.92 FPS before; maximum gap is
+still five fields. This does not meet the 20 ms budget or remove generation
+spikes.
+
+12,000 dense/sparse state and fill-boundary cases compare exact top/bottom
+bounds against the previous full scan. Existing exhaustive capacity/ammo/
+jiggle pixel comparisons and ASan/UBSan also pass. Evidence logs use
+`/tmp/downwell-damage-endpoints-` with `test`, `sanitized`, `profile`, `fps`
+and `frame` suffixes. The native shot capture matches SDL with 0/99,968
+differing pixels, both 68000 audits pass, and the ordinary non-skip build is
+restored. Every emulator run is bounded to 45 seconds.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 
