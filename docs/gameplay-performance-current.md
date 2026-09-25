@@ -1,5 +1,22 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Current matched measurement after natural-route integration
+
+At `7144495`, the unchanged ordinary gameplay tape takes **828 PAL fields,
+36.23 FPS, maximum four-field gap** over 600 updates. This supersedes the
+822-field current-throughput claim below; the earlier measurements remain
+historical evidence for their particular revisions. Log:
+`/tmp/downwell-rng-shift15-baseline.log`. The profile restores ordinary startup.
+
+A candidate `SWAP; ROR.L #1; ANDI.L #$ffff8000` replacing the RNG's
+15-bit left shift produced exactly the same 828-field / 36.23-FPS result and
+four-field maximum (`/tmp/downwell-rng-shift15-fps.log`). Although the expression
+is bit-equivalent, it yielded no measured end-to-end benefit. It was removed;
+the original portable shift and existing 28-bit-shift implementation remain.
+The host RNG tests pass. No new native RNG-equivalence claim is made for the
+discarded candidate. This experiment does not address the remaining 20 ms
+budget shortfall, and its unchanged result is not an optimization win.
+
 ## Current remeasurement after backing/staging ownership
 
 At `3c5108e`, the same 600-update A500/PAL tape takes **822 fields, 36.50 FPS**,

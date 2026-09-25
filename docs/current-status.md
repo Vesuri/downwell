@@ -78,7 +78,7 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - Meet the worst-case 20 ms budget. The latest style-navigation measurement is
   45.45 FPS over 180 updates, with a maximum three-field gap. Combined upgrade
   content/layout/simulation work and transition preparation also exceed budget.
-  The current 600-update gameplay tape runs at 36.50 FPS, with a four-field
+  The current 600-update gameplay tape runs at 36.23 FPS (828 PAL fields), with a four-field
   maximum gap; reusing plain command defaults reduces the generation burst
   but does not improve average throughput. Generation still dominates the
   largest sampled stall.
