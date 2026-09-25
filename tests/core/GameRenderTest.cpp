@@ -8,6 +8,7 @@
 #include "core/RunSession.h"
 #include "core/StateDigest.h"
 #include <cstring>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -447,6 +448,12 @@ int main() {
             input.right = (mainTicks / 90) % 2 == 0;
             input.left = !input.right;
             input.fire = mainTicks % 10 < 5;
+            // Descend through the destructible centre of the entrance bowl
+            // before sweeping later platforms for combat coverage.
+            if (state.mainPlayerY() < 1264) {
+                input.left = state.mainPlayerX() > 242;
+                input.right = state.mainPlayerX() < 238;
+            }
         }
         damagedGame.update(input);
         if (!state.inMainRoom()) continue;
@@ -505,11 +512,19 @@ int main() {
             damagedGame.startup().mainPlayerX(),damagedGame.startup().mainPlayerY(),
             int(damagedGame.startup().mainPlayerGrounded()),damagedGame.startup().mainEnemiesActivated(),
             damagedGame.startup().mainEnemiesDefeated());
+    if (!recovered) {
+        const auto& state = damagedGame.startup();
+        std::fprintf(stderr,"Builder initialized=%d y=%d rows=%u gen=%d camera=%.2f instances=%zu\n",
+            int(state.mainBuilderInitialized()),state.mainBuilderY(),state.mainBuilderRowsGenerated(),
+            state.mainBuilderGenerationCount(),state.mainCameraViewY(),state.activeInstanceCount());
+    }
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
     require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");
     require(renderer.bulletDraws > 0, "live render tape exercises projectile transforms");
     require(renderer.spreadBulletDrawn, "live rendering actually exercises nonzero spread angles");
+    std::printf("Damage route: %u main updates, %u hidden and %u visible damage frames, recovered\n",
+        mainTicks,hidden,flashingVisible);
     // Renderer fixture only: natural death entry is exercised by the long
     // paired simulation replay. This tape deliberately ends after recovery.
     auto& resultsFixture = const_cast<downwell::DeathResults&>(damagedGame.startup().deathResults());
@@ -587,6 +602,25 @@ int main() {
                     input.left = (combatTicks / 90) % 2 == 0;
                     input.right = !input.left;
                     input.fire = (combatTicks + 5) % 10 < 5;
+                    // Seek a nearby live enemy instead of repeatedly killing
+                    // every reachable threat with the blind firing sweep.
+                    const downwell::InstanceRecord* threat = nullptr;
+                    float nearest = 64;
+                    for (std::size_t i=0;i<runtime.activeInstanceCount();++i) {
+                        const auto& enemy=runtime.instanceAt(i);
+                        const int id=enemy.objectId;
+                        if (!enemy.active || enemy.health<=0 ||
+                            !(id==111 || id==112 || id==113 || id==116 || id==117 || id==119)) continue;
+                        if (std::abs(enemy.y-runtime.mainPlayerY())>8) continue;
+                        const float distance=std::abs(enemy.x-runtime.mainPlayerX())+
+                            std::abs(enemy.y-runtime.mainPlayerY());
+                        if (distance<nearest) {nearest=distance;threat=&enemy;}
+                    }
+                    if (threat) {
+                        input.left=runtime.mainPlayerX()>threat->x;
+                        input.right=runtime.mainPlayerX()<threat->x;
+                        input.fire=false;
+                    }
                     ++combatTicks;
                 }
             }

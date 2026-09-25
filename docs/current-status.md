@@ -56,21 +56,20 @@ CPU replay retains all existing digests and restores ordinary startup with both
 68000 audits clean (`/tmp/downwell-flash-world-native.log`). This native tape
 does not create flashes; rendered Amiga effect capture remains open.
 
-**Existing full renderer-test coverage failure:** `GameRenderTest`'s natural
-input tape no longer reaches damage-blink/recovery coverage. An isolated
-unchanged-HEAD source snapshot fails the same assertion
-(`/tmp/downwell-flash-baseline.log`), so this predates effect integration.
-A firing-phase-six experiment also failed (4,769 main-room updates, health 4,
-no damage phases) and was reverted. The original full-suite assertions/input
-remain intact; focused flash verification is explicitly separate, not a full
-renderer-suite pass. Diagnose this route before claiming restored full coverage.
-The subsequent full optimized test localizes the missed coverage before combat:
-after 4,769 main-room updates, x=308.70/y=1158.40, health remains 4 and both
-activated/defeated enemy counts are zero. Suppressing grounded fire, with either
-90- or 180-update directional holds, still leaves the player at y=1200 with
-zero activated enemies. Those input experiments were reverted; failure output
-now includes position, grounded state and enemy counters. The next diagnosis
-must inspect entrance traversal/terrain and generation, not damage blink alone.
+**Full renderer-test route coverage restored:** the old input sweep repeatedly
+jumped across the entrance opening: after 4,769 updates no enemy had activated.
+Terrain inspection confirmed 55 generated rows and the centre destructible
+blocks already removed; generation had not stalled. The damage controller now
+steers toward x=240 until below the entrance bowl (y=1264), then resumes its
+existing combat sweep. It reaches recovery after 2,402 main-room updates,
+checking 45 hidden and 45 visible invulnerability frames. The subsequent
+natural-death controller now approaches nearby live enemies at matching height
+instead of firing at every threat; unrestricted pursuit was rejected because
+it could stall above terrain. The full optimized `build/game-render-test`
+passes, including real fatal damage, both white flash frames, Retry, shops and
+level transitions. No production logic, terrain, health or damage assertions
+were changed for these routes. This is host renderer evidence, not a Windows
+comparison or a new native-rendered gate; it is not a claim that all tests pass.
 
 Smoke/flash burst emission now has a shared implementation preserving count,
 Y-before-X sampling and synchronous child Create interleaving. The skeleton's
