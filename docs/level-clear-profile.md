@@ -206,3 +206,17 @@ The first 60-second capture reached its report at the deadline but did not
 detach successfully. A repeat completed cleanly with a 120-second hard limit,
 zero clock clamps and normal-build restoration. Complete log:
 `/tmp/downwell-border-rebind-profile-v2.log`.
+
+### Cached border geometry
+
+The following bounded 480-update detailed capture adds the per-display-slot
+area/seam cache. Idle border work falls from 3.33 to 0.19 ms (maximum 0.25 ms).
+The surrounding residual phase falls from 5.30 to 1.76 ms because it no longer
+constructs 76 border commands per frame. Together this removes approximately
+6.7 ms of work per selection update. Navigation border work is also 0.19 ms.
+
+Idle content rendering remains 24.47 ms, layout 15.77 ms, simulation 6.62 ms
+and trig 2.60 ms. This is still not a 20 ms frame. Detailed-probe throughput
+must not be presented as shipping FPS. The run completed within its 120-second
+hard deadline with zero clock clamps and normal-build restoration. Log:
+`/tmp/downwell-border-geometry-profile.log`.

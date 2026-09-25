@@ -4,6 +4,7 @@
 #include "AmigaClearSceneAssets.h"
 #include "core/Input.h"
 #include "AmigaSelectionLayer.h"
+#include "AmigaSelectionBorder.h"
 class GameplayWorld;
 
 // Upgrade-scene lifetime and retained artwork. The application must retire
@@ -15,8 +16,8 @@ class AmigaUpgradeScene {
     bool left_ = false, right_ = false, heartGoal_ = false;
     const UBYTE* sourceArt_ = nullptr;
     unsigned sourceArtBytes_ = 0, area_ = 0, level_ = 0;
-    AmigaSelectionLayer borders_[2], layers_[2];
-    AmigaSelectionLayer::Command borderCommands_[AmigaSelectionLayer::capacity];
+    AmigaSelectionBorder borders_[2];
+    AmigaSelectionLayer layers_[2];
     AmigaClearDrawList drawList_;
 public:
     AmigaClearSceneAssets assets;

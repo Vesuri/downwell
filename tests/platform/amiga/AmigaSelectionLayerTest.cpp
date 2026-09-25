@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaSelectionLayer.h"
 #include "platform/amiga/AmigaClearDrawList.h"
 #include "platform/amiga/AmigaClearBank.h"
+#include "platform/amiga/AmigaSelectionBorder.h"
 #include <vector>
 #include <fstream>
 #include <iterator>
@@ -58,9 +59,12 @@ int main(int argc,char** argv) {
     // Retain the complete source border loops in world space, including the
     // overlapping old/new-area boundary. Scrolling must only change pointers.
     unsigned borderFrames = 0;
+    AmigaSelectionBorder cachedBorder;
+    std::vector<UBYTE> cached(canvas.size());
     for (int area = 1; area <= 3; ++area) {
         downwell::LevelClearPresentation presentation;
         layer.invalidate();
+        cachedBorder.invalidate();
         for (unsigned tick = 0; tick < 120; ++tick) {
             const auto snapshot = presentation.advance(area, 3, 3, true);
             AmigaSelectionLayer::Command borders[AmigaSelectionLayer::capacity];
@@ -70,6 +74,8 @@ int main(int argc,char** argv) {
                 borders[count++] = {downwell::levelBorderSprite(a), unsigned(image), x, y-snapshot.tileY, -1};
             });
             assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),borders,count,paint));
+            assert(cachedBorder.render(cached.data(),pack.data(),pack.data()+pack.size(),snapshot,paint));
+            assert(cached==canvas);
             const unsigned top = 198 + tick % 100;
             const auto* view = layer.view(top - snapshot.tileY);
             assert(view);
@@ -86,6 +92,7 @@ int main(int argc,char** argv) {
                 assert(actual==reference);
             }
             assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),borders,count,paint) && !paint);
+            assert(cachedBorder.render(cached.data(),pack.data(),pack.data()+pack.size(),snapshot,paint) && !paint);
             ++borderFrames;
         }
     }
@@ -107,6 +114,8 @@ int main(int argc,char** argv) {
         assert(bytes);
         layer.invalidate();
         assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint));
+        cachedBorder.invalidate();
+        assert(cachedBorder.render(cached.data(),bank.data(),bank.data()+bytes,snapshot,paint) && cached==canvas);
         const auto preserved = canvas;
         for (unsigned sample = 0; sample < 32; ++sample) {
             unsigned offers[] = {sample%23,(sample+6)%23,(sample+13)%23,100};
@@ -115,10 +124,12 @@ int main(int argc,char** argv) {
             bytes = AmigaClearBank::build(pack.data(),pack.size(),offers,sample%5,bank.data(),bank.size(),area,1,owned);
             assert(bytes);
             layer.rebindEquivalentArtwork(bank.data(),bank.data()+bytes);
+            cachedBorder.rebindEquivalentArtwork(bank.data(),bank.data()+bytes);
+            assert(cachedBorder.render(cached.data(),bank.data(),bank.data()+bytes,snapshot,paint) && !paint);
             assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint) && !paint);
             oracle.invalidate();
             assert(oracle.render(fresh.data(),bank.data(),bank.data()+bytes,borders,count,paint));
-            assert(canvas==preserved && canvas==fresh);
+            assert(canvas==preserved && canvas==fresh && cached==canvas);
             ++replacements;
         }
         borders[0].y += 3;
@@ -127,5 +138,17 @@ int main(int argc,char** argv) {
         assert(oracle.render(fresh.data(),bank.data(),bank.data()+bytes,borders,count,paint) && canvas==fresh);
     }
     std::printf("%u offer-bank replacements retain identical borders without repainting\n",replacements);
+    // Rebinding a display slot must not mistake old geometry for initialized
+    // pixels in a different destination. Bad seam indices are rejected.
+    downwell::LevelClearPresentation::Frame frame;
+    std::fill(cached.begin(),cached.end(),0xa5);
+    assert(cachedBorder.render(cached.data(),pack.data(),pack.data()+pack.size(),frame,paint));
+    auto rebound = cached;
+    std::fill(rebound.begin(),rebound.end(),0xa5);
+    assert(cachedBorder.render(rebound.data(),pack.data(),pack.data()+pack.size(),frame,paint) && rebound==cached);
+    frame.borderRow = 37;
+    assert(!cachedBorder.render(rebound.data(),pack.data(),pack.data()+pack.size(),frame,paint));
+    frame.borderRow = -1;
+    assert(!cachedBorder.render(rebound.data(),pack.data(),pack.data()+pack.size(),frame,paint));
     std::puts("325 selection camera positions match fresh rendering without repainting");
 }

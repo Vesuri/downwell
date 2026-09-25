@@ -136,3 +136,26 @@ against fresh composition. The same cases pass ASan/UBSan.
 The bounded native regression also passes 432 completion frames, 192 exit-field
 frames, two clears, 60 third-level updates and the stack guard after this
 change. Evidence: `/tmp/downwell-border-rebind-native-gdb.log`.
+
+### Border geometry cache
+
+Each alternating upgrade display now owns an `AmigaSelectionBorder`. Its
+world-space commands depend only on area and seam row; `tileY` is removed
+before rasterization and applied through the viewport pointer. With unchanged
+geometry and storage, rendering returns before constructing or comparing the
+76 commands. An area/seam change takes the normal retained-damage path.
+Destination/bank rebinding and explicit invalidation remain part of the key;
+equivalent offer-bank replacement preserves the geometry cache as well.
+
+Host comparisons cover source area seams, bank replacements and rebinding to
+a different destination, with invalid seam rows rejected. This is separate
+from the animated text/icon layer, which still rebuilds its layout each frame.
+The recovered `gml_Object_Result_Draw_0.asm` blocks 1–5 emit these loops using
+only `global.area`, `bordery`, `tileMaxy`, and the common `tiley` translation.
+`gml_Object_Result_Create_0.asm` initializes `tileMaxy` to 36; no other recovered
+Result event assigns it (PlayMenu has its own separate initialization).
+This source evidence, rather than SDL
+output alone, justifies the cache key and its 76-command bound.
+The bounded native run passes 432 completion comparisons, 192 exit-field
+comparisons, both clears, 60 third-level updates and the stack guard with
+this cache live (`/tmp/downwell-border-geometry-native-gdb.log`).

@@ -74,15 +74,9 @@ bool AmigaUpgradeScene::render(unsigned back, UBYTE* border, UBYTE* layer,
           drawList_.commands[i].y+=top;
       }
     }
-    unsigned count=0, pixels=0;
-    bool valid = true;
-    snapshot.borders([&](int area,int image,int x,int y) {
-        if (count == AmigaSelectionLayer::capacity) { valid = false; return; }
-        borderCommands_[count++]={downwell::levelBorderSprite(area),unsigned(image),x,y-snapshot.tileY,-1};
-    });
-    if (!valid) return false;
+    unsigned pixels=0;
     { DW_PROFILE_SCOPE(profileClearBorder);
-      if (!borders_[back].render(border,pack,end,borderCommands_,count,pixels)) return false; }
+      if (!borders_[back].render(border,pack,end,snapshot,pixels)) return false; }
     { DW_PROFILE_SCOPE(profileClearOverlay);
       if (!layers_[back].render(layer,pack,end,drawList_.commands,drawList_.count,pixels)) return false; }
     // Sprite API uses the landscape logical origin, while this scene uses
