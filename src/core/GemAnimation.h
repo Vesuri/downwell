@@ -9,7 +9,7 @@ struct GemAnimation {
     template<class Random>
     void initialize(Random& random) {
         static const int rates[] = {-5, -3, 3, 5};
-        rateTenths = rates[random.irandomSmall(3)];
+        rateTenths = rates[random.chooseIndexSmall(4)];
         phaseTenths = 0;
     }
     void advance() {

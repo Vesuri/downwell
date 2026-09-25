@@ -20,7 +20,7 @@ BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
     if (enemy.objectId == 112) {
         // scrTypicalBulletDamage's immune branch: choose(30,31) before
         // soundPlay. Sound playback itself does not draw random values.
-        return {BulletImpactKind::immune, 30 + static_cast<int>(random.irandomSmall(1))};
+        return {BulletImpactKind::immune, 30 + static_cast<int>(random.chooseIndexSmall(2))};
     }
     if (enemy.objectId == 113) enemy.frogHit.pending = true;
     if (enemy.objectId == 117) enemy.snailHit.pending = true;

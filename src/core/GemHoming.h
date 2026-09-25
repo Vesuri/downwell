@@ -17,7 +17,7 @@ struct GemHoming {
         // VM evaluates choose's second argument before its first.
         const int second = 170 + static_cast<int>(random.irandomSmall(70));
         const int first = static_cast<int>(random.irandomSmall(70)) - 60;
-        direction = normalize((random.irandomSmall(1) ? second : first) * 65536L);
+        direction = normalize((random.chooseIndexSmall(2) ? second : first) * 65536L);
         turnFifths = 25;
         speedEighths = 8;
     }

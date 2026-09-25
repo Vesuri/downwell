@@ -31,7 +31,7 @@ inline MachineGunVerificationResult verifyMachineGun() {
     unsigned count = 0, coverage = 0, hits = 0, defeated = 0;
     bool correct = true;
     struct Random {
-        unsigned irandomSmall(unsigned) { return 0; }
+        unsigned chooseIndexSmall(unsigned) { return 0; }
         std::uint32_t nextU32() { return 0x80000000u; }
     } random;
     GameMakerRandom trajectoryRandom(2);

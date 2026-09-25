@@ -124,3 +124,35 @@ Checks:
 Remaining audit starts with shared gems, player/impact choices and enemy alarm
 callbacks. Native gameplay shortcuts and geometry-dependent test tapes still
 require regeneration after the migration is complete.
+
+## Third migration: shared gems and immune bullet impacts
+
+`objCurrency` Create VM chooses signed image speed from four entries and its
+heading from two already-evaluated integer ranges. `GemAnimation` and
+`GemHoming` now use single-word choices. Both `irandom_range` heading candidates
+still execute first, in reverse argument order, consuming two words each.
+The implemented creation prefix (velocity ranges, animation, heading) therefore
+uses eight words rather than ten. This does not claim completeness of the
+source's subsequent terrain-embedded spawn handling or other area branches.
+
+`scrTypicalBulletDamage`'s immune sound selection now uses one-word
+`choose(30,31)` in the shared `StandardBulletImpact`. The integrated native
+runtime test correctly expects two words for a first-step shot absorbed by a
+turtle: one for spread and one for ricochet. The machine-gun verification fake
+and focused fake RNGs expose `chooseIndexSmall`, preventing an accidental
+return to the integer-range interface.
+
+Independent real-RNG tests cover 1,024 gem creations (values, heading order and
+complete RNG state) and 1,024 immune impacts (sound, stream and no damage or
+reward). RNG tests pass normally and under address/undefined-behavior
+sanitizers; gem-motion, enemy-contact and machine-gun trajectory tests pass.
+Both ordinary builds pass, with clean 68000 instruction/helper audits
+(`/tmp/downwell-gem-choose-{amiga,sdl}.log`). No emulator was launched.
+
+The host gem verification fingerprint is now `e526fc84c6bf6315`, replacing
+`f175194dfba46820`; coverage remains 1023. This records the corrected fixture,
+not an independent Windows or native-emulator capture. Native cross-CPU
+verification and the stale natural-route/startup tests remain outstanding.
+The full host-compiled Amiga port runtime suite passes after this fingerprint
+update (`/tmp/downwell-gem-choose-runtime.log`); weapon coverage remains 16383.
+Player/reward callbacks and enemy alarm RNG are next in the call-site audit.

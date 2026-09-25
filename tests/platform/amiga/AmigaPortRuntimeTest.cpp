@@ -530,8 +530,8 @@ int main() {
         immune.step(4);
         require(immune.enemyAt(0).active && immune.enemyAt(0).health == 20 &&
                     immune.bulletCount() == 0 && immune.enemiesDefeated() == 0 &&
-                    immune.randomDrawCount() == draws + 3,
-                "native immune impact consumes one spread draw and choose's two WELL draws");
+                    immune.randomDrawCount() == draws + 2,
+                "native immune impact consumes one spread draw and one choose word");
     }
     require(combat.configureEnemy(0, 111, 163, -1, 12,
                                   0, 0, 5, 6),
@@ -1144,7 +1144,9 @@ int main() {
     const auto gems = downwell::verifyGemSimulation();
     std::cout << "Gem fixture digest: " << std::hex << gems.digest << std::dec
               << " coverage=" << gems.coverage << '\n';
-    require(gems.coverage == 1023 && gems.digest == 0xf175194dfba46820ULL,
+    // Re-recorded after correcting the two gem choices to one WELL word each;
+    // the old f175194dfba46820 fingerprint encoded the two-word chooser bug.
+    require(gems.coverage == 1023 && gems.digest == 0xe526fc84c6bf6315ULL,
             "gem cross-CPU fixture covers motion, collection/account expiry and both flash phases with a pinned digest");
     const auto weapon = downwell::verifyMachineGun();
     std::cout << "Weapon fixture digest: " << std::hex << weapon.digest << std::dec

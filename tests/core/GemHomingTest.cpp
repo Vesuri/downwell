@@ -30,6 +30,7 @@ int main() {
         struct Random {
             unsigned randomIntegerSmall(unsigned) { return 0; }
             unsigned irandomSmall(unsigned) { return 0; }
+            unsigned chooseIndexSmall(unsigned) { return 0; }
         } random;
         const auto empty = [](int, int) { return false; };
         for (bool upgraded : {false, true}) {
@@ -127,8 +128,8 @@ int main() {
     for (unsigned choice = 0; choice < 4; ++choice) {
         struct Choice {
             unsigned value, calls = 0;
-            unsigned irandomSmall(unsigned upper) {
-                require(upper == 3, "animation uses the recovered four-way choice");
+            unsigned chooseIndexSmall(unsigned count) {
+                require(count == 4, "animation uses the recovered four-way choice");
                 ++calls; return value;
             }
         } choiceRandom{choice};
@@ -167,6 +168,10 @@ int main() {
     struct Random {
         unsigned call = 0;
         unsigned irandomSmall(unsigned) {
+            const unsigned values[] = {0, 10, 60, 1};
+            return values[call++ % 4];
+        }
+        unsigned chooseIndexSmall(unsigned) {
             const unsigned values[] = {0, 10, 60, 1};
             return values[call++ % 4];
         }

@@ -48,8 +48,8 @@ int main() {
         } enemy;
         struct Random {
             unsigned calls = 0, choice = 0;
-            unsigned irandomSmall(unsigned bound) {
-                require(bound == 1, "ricochet selection uses exactly two source sounds");
+            unsigned chooseIndexSmall(unsigned bound) {
+                require(bound == 2, "ricochet selection uses exactly two source sounds");
                 ++calls; return choice;
             }
         } random;

@@ -1,5 +1,10 @@
 #include "core/GameMakerRandom.h"
 #include "core/TitleParticleRandom.h"
+#include "core/GemMotion.h"
+#include "core/StandardBulletImpact.h"
+#include "core/FrogHitState.h"
+#include "core/SnailHitState.h"
+#include "core/BatHitState.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -110,6 +115,51 @@ void testTitleParticleOrder() {
     }
 }
 
+void testGemCreateChoices() {
+    for (unsigned seed = 0; seed < 1024; ++seed) {
+        downwell::GameMakerRandom actual(seed), reference(seed);
+        downwell::GemMotion gem;
+        gem.initialize(10, 20, false, actual);
+        const long vx = static_cast<long>(reference.random(51200)) - 25600;
+        const long vy = static_cast<long>(reference.random(51200)) - 25600;
+        const int rates[] = {-5, -3, 3, 5};
+        const int rate = rates[reference.nextU32() % 4];
+        const int second = 170 + reference.irandom(70);
+        const int first = static_cast<int>(reference.irandom(70)) - 60;
+        const int angle = reference.nextU32() % 2 ? second : first;
+        const long direction = ((angle + 360) % 360) * 65536L;
+        require(gem.vx == vx && gem.vy == vy && gem.animation.rateTenths == rate &&
+                gem.homing.direction == direction,
+                "gem Create preserves VM range/choice order and emitted values");
+        require(actual.drawCount() == 8 && reference.drawCount() == 8 &&
+                actual.stateIndex() == reference.stateIndex(),
+                "gem Create consumes eight words: two real ranges, two choices, two integer ranges");
+        for (unsigned i = 0; i < 16; ++i)
+            require(actual.stateWord(i) == reference.stateWord(i), "gem Create matches all RNG words");
+    }
+}
+
+void testRicochetChoice() {
+    struct Enemy {
+        bool active = true;
+        int health = 15, objectId = 112;
+        downwell::FrogHitState frogHit;
+        downwell::SnailHitState snailHit;
+        downwell::BatHitState batHit;
+    } enemy;
+    downwell::GameMakerRandom actual(2), reference(2);
+    unsigned defeated = 0, rewards = 0;
+    for (unsigned shot = 0; shot < 1024; ++shot) {
+        const int sound = 30 + reference.nextU32() % 2;
+        const auto impact = downwell::applyStandardBulletImpact(enemy, defeated, actual, [&] { ++rewards; });
+        require(impact.sound == sound && impact.kind == downwell::BulletImpactKind::immune &&
+                actual.drawCount() == shot + 1 && enemy.health == 15 && !defeated && !rewards,
+                "immune impacts choose one sound with one word and no damage/reward");
+        for (unsigned i = 0; i < 16; ++i)
+            require(actual.stateWord(i) == reference.stateWord(i), "ricochet preserves exact RNG state");
+    }
+}
+
 void testSmallIntegerPath() {
     constexpr std::uint32_t maxima[] = {
         0, 1, 2, 3, 4, 5, 6, 7, 9, 12, 15, 30, 40, 50, 60,
@@ -166,6 +216,8 @@ int main() {
     testRealRange();
     testChoose();
     testTitleParticleOrder();
+    testGemCreateChoices();
+    testRicochetChoice();
     testSmallIntegerPath();
     testSmallScaledRealPath();
     std::cout << "GameMaker random tests passed\n";
