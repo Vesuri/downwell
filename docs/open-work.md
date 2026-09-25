@@ -12,8 +12,8 @@ on PAL; do not add 60 Hz catch-up.
 
 ## 1. Finish live skeleton and bone integration
 
-- Finish reviewing and committing the pending smoke trig work; verify supported
-  inputs/FP-mode assumptions and measure native cost.
+- Verify original runtime FP-mode assumptions and measure the complete smoke
+  geometry/effect cost on the native target.
 - Give smoke fixed-capacity live ownership, phase-safe creation/retirement,
   world collision dispatch and both renderers. Export Amiga artwork offline
   and preserve the original effect-surface composition.

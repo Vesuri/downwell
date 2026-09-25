@@ -101,11 +101,10 @@ position/velocity bits, 512 distance escapes and 512 early-alarm cases, wall
 events and complete RNG state. Sanitizers and 68000 compilation pass with no
 FP helpers in this component.
 
-Direction is still an explicit callback. The motion test supplies host sin/cos:
-it verifies event sequencing and motion, **not** original-runner transcendental
-identity. The distance callback now has a native implementation as described
-below. Native direction, world collision dispatch and drawFx remain open; this
-is not a live smoke owner. Source export pins:
+Direction remains an explicit interface; the motion test binds the integer
+`SmokeDirection`/`SmokeTrig` implementation and compares a scalar model.
+Distance uses the native predicate below. World collision dispatch and drawFx
+remain separate from this component; it is not a live smoke owner. Source pins:
 Create SHA-256 `725336f892c1c024ccb1285545b93f683be5cca16815f0b626c82eaa496a221b`,
 Step SHA-256 `4398d86951dc87ba221561327498a924f5b97e14ba65f13b30c71377206e8263`.
 Those hashes identify the reviewed UTMT assembly, not a Windows execution test.
@@ -123,17 +122,16 @@ It validates that inputs are exactly promoted builtin floats and explicitly
 rejects unsupported ranges; it is not a general point_distance implementation.
 102,560 coordinate cases and 512 root-boundary floats match the scalar wrapper;
 the integrated 81,920-Step test, sanitizer runs and 68000 compilation pass.
-Only the direction callback and RNG remain external in the native smoke Step
-compile fixture, with no FP helpers.
+The native compile fixture binds both geometry operations directly; it requires
+only RNG, memory and integer arithmetic helpers, not FP or trig library calls.
 
 `verify-runner-smoke-geometry.py` pins the distance wrapper and the direction
 wrappers at 0x53c8e0/0x53c9b0. Direction narrows both arguments, multiplies the
 angle by **float pi** then divides by float 180, promotes for trig, narrows
 the result, multiplies by float length and applies a near-integer adjustment
-with float 1e-4. The original trig/helper callees still need verification before
-connecting native direction. Plain host double sin/cos is only a motion-test
-fixture, not evidence of matching that wrapper. These are read-only executable
-inspection and arithmetic tests, not an executed Windows smoke capture.
+with float 1e-4. The source trig path is described below. Plain host double
+sin/cos is a separate scalar comparison, not evidence of matching the original
+runtime's FP environment. This is not an executed Windows smoke capture.
 
 `SmokeDirection` now transcribes the surrounding lengthdir arithmetic for
 smoke's nonnegative speed <=4 and angle <=359. Integer significand division by
@@ -144,11 +142,22 @@ snaps only when abs(float(fraction)) < float(1e-4), retaining signed zero;
 values just below an integer are not rounded upward. 100,028 scalar cases and
 snap-boundary cases pass, including sanitizers and 68000 compilation. Only
 integer division/modulo helpers and explicit callbacks/RNG are external.
-The double trig callback is deliberately still unresolved: tests use host
-sin/cos on the wrapper's promoted float radians, not evidence of matching the
-original 0x74b5f0/0x74b7b0 routines. Those routines have SSE polynomial paths
-and FP-environment-dependent fallbacks that must be accounted for before
-claiming native direction parity or admitting live smoke.
+`SmokeTrig` evaluates the straight-line SSE polynomial paths from the original
+0x74b5f0/0x74b7b0 routines with integer-only binary64 operations. The exporter
+decodes only the reviewed instruction subset and emits both operations and the
+64-row constant table into ignored `generated/smoke-trig.inc`. Its manifest
+records executable, exporter, path, table and output hashes plus decoder version;
+`--check` verifies reproducibility. The table has static storage, not task-stack
+storage. Evaluation preserves each scalar/packed lane operation and rounding
+boundary; it does not replace the source polynomial with host libm.
+
+The supported contract is nonnegative smoke radians and nearest-even FP mode,
+with explicit zero results. Other tiny/general inputs and the runner's alternate
+FP-environment fallbacks are not implemented. Establishing the original runtime
+FP mode and native execution cost remains necessary before live admission.
+The scalar test evaluates the same exported operations with host doubles and
+separately compares float-rounded output with libm; it is not a Windows runtime
+capture. See the git log for verification results.
 
 `SmokeEffect` now composes motion with the verified sprite-84 nine-key unit
 sequence. The runner constructor initializes image_index at offset 0x94 to

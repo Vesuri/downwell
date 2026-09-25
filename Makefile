@@ -136,6 +136,19 @@ test: verify-smoke-motion
 test: verify-smoke-effect
 test: verify-smoke-distance
 test: verify-smoke-direction
+test: verify-smoke-trig
+.PHONY: verify-smoke-trig
+verify-smoke-trig: build/smoke-trig-test
+	python3 tools/export-smoke-trig.py --check
+	./build/smoke-trig-test
+
+generated/smoke-trig.inc: tools/export-smoke-trig.py
+	python3 tools/export-smoke-trig.py
+
+build/smoke-trig-test: tests/core/SmokeTrigTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeTrigTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-smoke-direction
 verify-smoke-direction: build/smoke-direction-test
 	./build/smoke-direction-test
@@ -164,7 +177,7 @@ build/smoke-effect-test: tests/core/SmokeEffectTest.cpp $(wildcard src/core/*.h)
 verify-smoke-motion: build/smoke-motion-test
 	./build/smoke-motion-test
 
-build/smoke-motion-test: tests/core/SmokeMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+build/smoke-motion-test: tests/core/SmokeMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeMotionTest.cpp src/core/GameMakerRandom.cpp
 

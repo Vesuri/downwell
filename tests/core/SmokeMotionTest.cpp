@@ -1,4 +1,6 @@
 #include "core/SmokeMotion.h"
+#include "core/SmokeDirection.h"
+#include "core/SmokeTrig.h"
 #include "core/GameMakerRandom.h"
 #include <cmath>
 #include <cstring>
@@ -21,13 +23,16 @@ int main(){
         check(smoke.create(number(192.123456),number(-96.123456),rng));
         double speed=oracle.random(2)+2;
         oracle.random(0.13-0.05);
-        const double angle=oracle.random(359),radians=angle*(3.14159265358979323846/180);
-        double vx=std::cos(radians)*speed,vy=-std::sin(radians)*speed,xx=ox,yy=oy;
+        const double angle=oracle.random(359);
+        const float scaled=float(angle)*float(3.14159265358979323846),radians=scaled/180.f;
+        auto snap=[](float value){double integral;const float fraction=float(std::modf(double(value),&integral));return std::abs(fraction)<0.0001f?double(float(integral)):double(value);};
+        double vx=snap(float(std::cos(double(radians)))*float(speed));
+        double vy=snap(-(float(std::sin(double(radians)))*float(speed))),xx=ox,yy=oy;
         bool nocol=true;
         unsigned directions=0,distances=0;
         auto direction=[&](MotionBinary64 s,MotionBinary64 d,MotionBinary64& x,MotionBinary64& y){
             check(same(s,speed) && same(d,angle) && rng.drawCount()==3);
-            ++directions;x=number(vx);y=number(vy);return true;
+            ++directions;return downwell::SmokeDirection::vector(s,d,x,y,downwell::smokeTrig);
         };
         // Count calls while exercising the shared integer-only distance gate.
         auto escaped=[&](MotionBinary64 sx,MotionBinary64 sy,MotionBinary64 x,MotionBinary64 y,bool& outside){
