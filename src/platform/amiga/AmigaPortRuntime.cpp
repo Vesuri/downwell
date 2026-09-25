@@ -61,6 +61,7 @@ bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, uns
     generationStep_ = nullptr; generationContext_ = nullptr;
     generationSucceeded_ = true;
     solidResolver_ = nullptr; solidResolverContext_ = nullptr;
+    segmentResolver_ = nullptr;
     landingResolver_ = nullptr; landingResolverContext_ = nullptr;
     breakableIndexReady_ = false;
     followCamera_ = true;
@@ -424,7 +425,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
-    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_);
+    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_);
     if (landingResolver_) configureLandingResolver(landingResolver_, landingResolverContext_);
     // The reference dispatches the builder before the camera in rmMain's
     // ordinary Step instance order. Generation observes the previous camera,
@@ -646,6 +647,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     }
                     // An ordinary, non-wave bullet also stops at unbreakable walls.
                     if (solidResolver_ != 0) {
+                        if (segmentResolver_) return segmentResolver_(solidResolverContext_, path);
                         const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
                         const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
                         const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;

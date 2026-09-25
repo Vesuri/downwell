@@ -5,7 +5,7 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 35.76 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 36.41 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Separate runtime costs (2026-09-25)
@@ -293,6 +293,35 @@ Logs use `/tmp/downwell-segment-reject-`, `/tmp/downwell-segment-yfirst-` and
 `/tmp/downwell-segment-experiments-` prefixes. Runs were bounded to 45 seconds.
 Further collision work needs attribution within actual hit/miss queries,
 not additional unmeasured broad-phase checks.
+
+### Query bullet terrain by indexed cells
+
+The native terrain backend now supplies an optional segment resolver. Bullet
+terrain collision visits the overlapped 16x16 indexed cells and intersects
+their half-open rectangles once each, rather than resolving every pixel in
+the segment's bounding rectangle. This is exactly the union of the previous
+pixel rectangles. Active breakables still use the runtime's current state;
+enemy and breakable impact order before the wall query is unchanged.
+
+Backends without a segment resolver retain the pixel-query path. A terrain
+context without an index also falls back to pixel queries. Callback rebinding
+preserves the optional resolver, while next-level reset clears it. Both native
+game-entry sites install it; no additional terrain storage is allocated.
+
+86,700 fractional segments compare indexed/pixel results across cell edges,
+corners and active/inactive breakables. A 600-tick live-generated firing and
+movement run compares checkpoints, rolling digests, destroyed-block counts
+and full RNG state on every tick with the pixel-query runtime. Both tests
+also pass ASan/UBSan. Native shot pixels match SDL (0/99,968 differences), and
+the bounded cross-target replay retains all four digests.
+
+The lightweight tape improves from 839 to **824 PAL fields / 600 updates =
+36.41 FPS** (previously 35.76). Maximum gap remains five fields: the 20 ms
+budget and generation stall are still open. Evidence logs use
+`/tmp/downwell-segment-index-` with `test`, `live-test`, `sanitized`, `fps`,
+`frame`, `replay` and `suite` suffixes. The complete host suite and both 68000
+audits pass; the ordinary non-skip executable is restored. Native runs are
+bounded to 45 seconds.
 
 ## Historical gameplay result: 600 frames without a missed PAL field
 

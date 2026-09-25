@@ -1,17 +1,49 @@
 #include "platform/amiga/AmigaTerrain.h"
 #include "platform/amiga/AmigaPortRuntime.h"
+#include "core/Replay.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <vector>
 #include <array>
+#include <algorithm>
 
 namespace {
 void require(bool value, const char* message) {
     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
 }
 using Commands = std::vector<downwell::DeferredCreateInstance>;
+void verifyTerrainSegments() {
+    static AmigaTerrainIndex index;
+    AmigaTerrainCollisionContext context{nullptr, nullptr, nullptr, nullptr, 0, nullptr};
+    require(amigaBuildTerrainIndex(context, index), "segment test index initializes");
+    context.index = &index;
+    require(amigaAddTerrainObject(index, 92, 240, 176) &&
+            amigaAddTerrainObject(index, 60, 256, 192), "segment test tiles register");
+    AmigaPortRuntime runtime(0);
+    int bx = 0, by = 0;
+    runtime.configureBreakables(&bx, &by, 1);
+    constexpr int unit = downwell::MachineGunTrajectory::unit;
+    for (unsigned state = 0; state < 3; ++state) {
+        if (state) context.runtime = &runtime;
+        if (state == 2) runtime.configureBreakables(&bx, &by, 0);
+        for (int x = -24; x <= 40; x += 4) for (int y = -24; y <= 40; y += 4)
+            for (unsigned fraction : {0u, 1u, 524288u, 1048575u})
+                for (int dx : {-8*unit, -unit/3, 0, unit/3, 8*unit})
+                    for (int dy : {-8*unit, -unit/3, 0, unit/3, 8*unit}) {
+                        const downwell::ProjectileSegment path({x,fraction}, {y,fraction}, dx, dy);
+                        const int left = std::min(x, path.endX.pixel), right = std::max(x, path.endX.pixel);
+                        const int top = std::min(y, path.endY.pixel), bottom = std::max(y, path.endY.pixel);
+                        bool pixels = false;
+                        for (int py = top; py <= bottom; ++py)
+                            for (int px = left; px <= right; ++px)
+                                pixels |= amigaResolveTerrainSolid(&context, px, py) && path.intersects(px,px+1,py,py+1);
+                        require(amigaResolveTerrainSegment(&context, path) == pixels,
+                                "indexed segment equals pixel queries including inactive breakables");
+                    }
+    }
+}
 struct ShopCreates {
     downwell::ShopWorld shops;
     downwell::GameMakerRandom& random;
@@ -95,7 +127,7 @@ struct LiveSimulation {
         port.configureEnemyRandom(random);
         port.configureGenerationStep(generate, this);
         port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
-        port.configureSolidResolver(amigaResolveTerrainSolid, &collision);
+        port.configureSolidResolver(amigaResolveTerrainSolid, &collision, amigaResolveTerrainSegment);
     }
 };
 void compareRandom(const downwell::GameMakerRandom& a,
@@ -243,6 +275,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
 }
 
 int main(int argc, char** argv) {
+    verifyTerrainSegments();
     require(argc == 2, "builder pack path required");
     std::ifstream input(argv[1], std::ios::binary);
     const std::vector<std::uint8_t> bytes(
@@ -310,6 +343,26 @@ int main(int argc, char** argv) {
                 live.builder.fragmentCount() < 19 && runtime.enemyCount() > 0 &&
                 runtime.player().grounded(),
             "live simulation generates only the visible prefix and lands on generated terrain");
+    {
+        LiveSimulation indexed(patterns), pixels(patterns);
+        AmigaPortRuntime fast(300, false, 4096-176, true), reference(300, false, 4096-176, true);
+        indexed.bind(fast); pixels.bind(reference);
+        reference.configureSolidResolver(amigaResolveTerrainSolid, &pixels.collision);
+        for (unsigned tick = 0; tick < 600; ++tick) {
+            downwell::Input input;
+            input.fire = tick % 23 < 17;
+            input.left = tick % 180 < 35;
+            input.right = tick % 180 >= 90 && tick % 180 < 125;
+            const auto packed = downwell::packReplayInput(input);
+            fast.step(packed); reference.step(packed);
+            require(fast.checkpoint() == reference.checkpoint() &&
+                    fast.trajectoryDigest() == reference.trajectoryDigest() &&
+                    fast.blocksDestroyed() == reference.blocksDestroyed(),
+                    "indexed bullet terrain preserves live simulation checkpoints");
+            compareRandom(fast.randomState(), reference.randomState());
+        }
+        require(fast.player().shots() > 0, "indexed/pixel live comparison exercises firing");
+    }
     LiveCollision boundary;
     AmigaTerrainCollisionContext empty{nullptr, nullptr, &patterns, nullptr, 0, nullptr};
     require(amigaBuildTerrainIndex(empty, boundary.index), "boundary map initializes");

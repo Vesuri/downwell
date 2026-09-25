@@ -440,6 +440,38 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
     return landing;
 }
 
+bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment& path) {
+    const auto& context = *static_cast<const AmigaTerrainCollisionContext*>(opaque);
+    const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
+    const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
+    const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
+    const int bottom = path.y.pixel > path.endY.pixel ? path.y.pixel : path.endY.pixel;
+    if (!context.index) {
+        for (int y = top; y <= bottom; ++y)
+            for (int x = left; x <= right; ++x)
+                if (amigaResolveTerrainSolid(opaque, x, y) && path.intersects(x, x+1, y, y+1)) return true;
+        return false;
+    }
+    DW_PROFILE_SCOPE(profileTerrainCollision);
+    // Each indexed cell represents the union of its 16x16 half-open pixel
+    // rectangles. Test that union once instead of querying each crossed pixel.
+    int firstColumn = (left + 248 - AmigaTerrainIndex::minX) >> 4;
+    int lastColumn = (right + 248 - AmigaTerrainIndex::minX) >> 4;
+    int firstRow = (top + 184) >> 4, lastRow = (bottom + 184) >> 4;
+    if (firstColumn < 0) firstColumn = 0;
+    if (lastColumn >= AmigaTerrainIndex::columns) lastColumn = AmigaTerrainIndex::columns-1;
+    if (firstRow < 0) firstRow = 0;
+    if (lastRow >= AmigaTerrainIndex::rows) lastRow = AmigaTerrainIndex::rows-1;
+    for (int row = firstRow; row <= lastRow; ++row)
+        for (int column = firstColumn; column <= lastColumn; ++column) {
+            const int x = column*16 + AmigaTerrainIndex::minX, y = row*16;
+            const unsigned cell = context.index->cells[row*AmigaTerrainIndex::columns+column];
+            if (indexActive(context, cell, solidCell, x, y) &&
+                path.intersects(x-248, x-232, y-184, y-168)) return true;
+        }
+    return false;
+}
+
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
     DW_PROFILE_SCOPE(profileTerrainCollision);
     const AmigaTerrainCollisionContext& context =

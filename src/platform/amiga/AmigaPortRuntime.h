@@ -8,6 +8,7 @@
 #include "core/GemMotion.h"
 #include "core/ProjectileAnimation.h"
 #include "core/MachineGunTrajectory.h"
+#include "core/ProjectileSegment.h"
 #include "core/MachineGunEmitter.h"
 #include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
@@ -59,6 +60,7 @@ public:
     static constexpr unsigned enemyCapacity = amigaPortEnemyCapacity;
     static constexpr unsigned gemCapacity = amigaPortGemCapacity;
     typedef bool (*SolidResolver)(void* context, int x, int y);
+    typedef bool (*SegmentResolver)(void* context, const downwell::ProjectileSegment& path);
     // Called once after existing alarms and camera Step, before bullets and
     // enemy motion. Receives the shared RNG and ceil(world-space view bottom).
     // A false return latches generationSucceeded() until explicitly rebound.
@@ -171,8 +173,9 @@ public:
     // Append a newly generated batch without reviving destroyed earlier blocks.
     // Reject capacity failure before changing any state.
     bool appendBreakables(const int* x, const int* y, unsigned count);
-    void configureSolidResolver(SolidResolver resolver, void* context) {
+    void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr) {
         solidResolver_ = resolver;
+        segmentResolver_ = segment;
         solidResolverContext_ = context;
         player_.configureSolidResolver(resolver ? [](void* opaque, int x, int y) {
             const auto& runtime = *static_cast<AmigaPortRuntime*>(opaque);
@@ -328,6 +331,7 @@ private:
     downwell::MachineGunEmitter emitter_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
+    SegmentResolver segmentResolver_ = nullptr;
     void* solidResolverContext_;
     AmigaPlayer::LandingResolver landingResolver_ = nullptr;
     void* landingResolverContext_ = nullptr;

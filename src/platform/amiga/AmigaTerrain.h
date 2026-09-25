@@ -7,6 +7,7 @@
 #include "core/RoomPack.h"
 
 class AmigaPortRuntime;
+namespace downwell { struct ProjectileSegment; }
 
 enum {
     amigaInitialTerrainFragmentCount = 19,
@@ -171,5 +172,6 @@ bool amigaIsLandingTerrainSymbol(char symbol);
 int amigaResolveTerrainLanding(void* opaque, int offsetX,
                                int minimumOffsetY);
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY);
+bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment& path);
 
 #endif

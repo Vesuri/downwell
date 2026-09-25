@@ -1571,7 +1571,7 @@ int main(void) {
         port.configureLandingResolver(amigaResolveTerrainLanding,
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
-                                    &terrainCollision);
+                                    &terrainCollision, amigaResolveTerrainSegment);
         liveBuilder.resetInitialCheckpoint(enemyRandom);
         liveBuilder.setCreateObserver(appendGeneratedTerrain, &liveGeneration);
         port.configureEnemyRandom(enemyRandom);
@@ -2074,7 +2074,7 @@ int main(void) {
                         liveGeneration.dirtyEnd = 0;
                         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
-                        port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision);
+                        port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision, amigaResolveTerrainSegment);
                         terrainRasterReady = false;
                         terrainCopyTarget = nullptr;
                         terrainCopyBacking = nullptr;
