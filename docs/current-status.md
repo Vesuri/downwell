@@ -378,6 +378,16 @@ and the ordinary build was restored after both attempts.
   125 near-equal activation/facing/speed combinations and 84 view-boundary/room
   combinations pass alongside the existing actor/decision tests and sanitizers.
   Full collision/effect ownership and live registration remain outstanding.
+  Inherited skeleton Create now includes subparentEnemy's `move_snap(16,16)`
+  before copying x/y into xx/yy. Runner wrapper 0x52a600 calls 0x4ff4b0, which
+  divides the binary32 coordinate by the snap spacing, uses x87 `fistp` with
+  the runner's nearest-even rounding, then multiplies back. The integer-only
+  path supports integer spawn inputs, including builtin binary32 narrowing;
+  positions outside the published int32 domain fail atomically. 8,193 signed
+  coordinate pairs and large-value/overflow tests pass under sanitizers, as do
+  updated bone-spawn fixtures. Inherited time-field collision now sets health
+  to zero unless immune, leaving death effects to the next ordinary Step.
+  See `tools/verify-runner-move-snap.py` for the pinned disassembly guard.
 
 ## Working evidence
 

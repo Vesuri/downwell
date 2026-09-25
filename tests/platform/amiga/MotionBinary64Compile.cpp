@@ -108,6 +108,9 @@ extern "C" unsigned skeletonCoordinatesCompile(downwell::SkeletonActor* state,
         return 0xffffffffu;
     return ops.trace;
 }
+extern "C" bool skeletonCreateCompile(downwell::SkeletonActor* state,int x,int y) {
+    return state->create(x,y);
+}
 namespace {
 struct BoneStoreCompileRandom {
     unsigned word;

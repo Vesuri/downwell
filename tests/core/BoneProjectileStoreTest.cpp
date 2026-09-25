@@ -33,11 +33,11 @@ int main() {
         check(creation.run(actor.x,actor.y,separated,-1));
         check(actor.shot && sound.calls==1 && creation.child);
         downwell::BoneProjectile expected;
-        check(expected.create(100,190,oracle));
+        check(expected.create(actor.x,actor.y-10,oracle));
         const int vy=-30-int(oracle.chooseIndexSmall(3));
         const int choices[]={10,8,12};
         const int vx=separated?-choices[oracle.chooseIndexSmall(3)]:10;
-        check(expected.motion.launch(100,190,vx,vy));
+        check(expected.motion.launch(actor.x,actor.y-10,vx,vy));
         if(vx>0) expected.sampledAnimationRate.high^=0x80000000u;
         auto* bone=store.get(creation.child);
         unsigned steps=0;

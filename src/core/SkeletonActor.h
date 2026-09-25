@@ -10,10 +10,26 @@ struct SkeletonActor : SkeletonDecisions {
     std::int32_t x=0, y=0;
     int health=60, previousHealth=60, money=10, takenImpact=0;
     bool grounded=true, alive=true, destroyRequested=false;
-    void create(std::int32_t px, std::int32_t py) {
+    bool timefieldImmune=false;
+    void collideTimeField() { if(!timefieldImmune) health=0; }
+    static bool snapCreateCoordinate(std::int32_t value,std::int32_t& snapped) {
+        RunnerImageValue coordinate;
+        if(!coordinate.assign(MotionBinary64::fromInteger(value))) return false;
+        // Native instance x/y are binary32. Division by 16 is an exact exponent
+        // adjustment for these integer inputs; original fistp rounds to even.
+        if(coordinate.bits&0x7fffffffu) coordinate.bits-=4u<<23;
+        std::int32_t grid;
+        if(!coordinate.promoted().roundPixel(grid) || grid>134217727 || grid< -134217728) return false;
+        snapped=grid*16;
+        return true;
+    }
+    bool create(std::int32_t px, std::int32_t py) {
+        std::int32_t snappedX,snappedY;
+        if(!snapCreateCoordinate(px,snappedX) || !snapCreateCoordinate(py,snappedY)) return false;
         *this=SkeletonActor{};
-        x=px; y=py;
-        xx=MotionBinary64::fromInteger(px); yy=MotionBinary64::fromInteger(py);
+        x=snappedX; y=snappedY;
+        xx=MotionBinary64::fromInteger(x); yy=MotionBinary64::fromInteger(y);
+        return true;
     }
     // Live owners pass precise original globals, not rounded player pixels.
     template<class Events>
