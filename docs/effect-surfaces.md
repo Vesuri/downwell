@@ -102,6 +102,20 @@ not a captured execution of Windows rendering.
 
 ## Binary coverage staging
 
+`EffectMaskAssets` borrows the nine sprite-84 frame masks and sprite-117 shade
+mask directly from the immutable offline DWAP pack. It validates the version,
+source-hash prefix, sorted directory, payload boundaries, planar dimensions and
+three-plane record flags before exposing descriptors. Signed cropped origins
+are retained, including the last smoke frame; consumers subtract those origins
+from the source anchor rather than recentering the visible pixels. A failed
+rebind invalidates all accessors. The pack must outlive the descriptors.
+
+This shared reader performs no pixel conversion, allocation or Chip-memory
+copy, and directory validation happens once at binding, not per frame. Host and
+native adapters can use the same offline bytes. The composition regression
+uses these descriptors and independently checks them against the pack directory;
+live scene asset binding remains to be connected.
+
 `BinaryEffectSurface` accumulates offline MSB-first smoke masks with wordwise OR,
 then subtracts shade coverage with AND NOT. All additions precede subtraction;
 interleaving them would allow a later smoke stamp to undo an earlier shade cut.

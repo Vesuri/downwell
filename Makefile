@@ -151,7 +151,7 @@ test: verify-binary-effects
 verify-binary-effects: build/binary-effects-test generate-amiga-game
 	./build/binary-effects-test generated/amiga-game.dwap
 
-build/binary-effects-test: tests/core/BinaryEffectSurfaceTest.cpp src/core/BinaryEffectSurface.h
+build/binary-effects-test: tests/core/BinaryEffectSurfaceTest.cpp src/core/BinaryEffectSurface.h src/core/EffectMaskAssets.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 
@@ -529,6 +529,14 @@ verify-sdl-flash-raster: build/sdl-flash-raster-test generate-sprite-pack
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/sdl-flash-raster-test
 
 .PHONY: verify-flash-render-paths verify-effect-depths
+build/effect-mask-assets-test: tests/core/EffectMaskAssetsTest.cpp src/core/EffectMaskAssets.h src/core/BinaryEffectSurface.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+.PHONY: verify-effect-mask-assets
+verify-effect-mask-assets: build/effect-mask-assets-test
+	./build/effect-mask-assets-test
+test: verify-effect-mask-assets
+
 verify-effect-depths:
 	python3 tools/verify-effect-depths.py
 test: verify-effect-depths

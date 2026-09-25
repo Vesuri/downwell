@@ -1,4 +1,5 @@
 #include "core/BinaryEffectSurface.h"
+#include "core/EffectMaskAssets.h"
 #include <array>
 #include <vector>
 #include <fstream>
@@ -30,6 +31,18 @@ int main(int argc,char**argv){
         std::abort();
     };
     Surface surface;std::array<bool,160*284> expected{};
+    downwell::EffectMaskAssets shared;
+    check(shared.bind(pack.data(),pack.size()));
+    // Keep the independent directory walker above as an oracle for the shared
+    // descriptor's borrowed bytes and signed cropped-frame origins.
+    for(unsigned frame=0;frame<9;++frame){
+        const auto reference=asset(84,frame);const auto* actual=shared.smoke(frame);
+        check(actual && actual->originX==reference.ox && actual->originY==reference.oy &&
+              actual->mask.data==reference.mask.data && actual->mask.bytes==reference.mask.bytes &&
+              actual->mask.width==reference.mask.width && actual->mask.height==reference.mask.height &&
+              actual->mask.stride==reference.mask.stride);
+    }
+    check(!shared.smoke(9));
     auto stamp=[&](const Asset& a,int ax,int ay,bool subtract){
         const int x=ax-a.ox,y=ay-a.oy;
         check(subtract?surface.subtract(a.mask,x,y):surface.add(a.mask,x,y));
@@ -46,10 +59,14 @@ int main(int argc,char**argv){
             for(unsigned b=0;b<16;++b)actual[y*160+x+b]=(bits&(0x8000>>b))!=0;
         });check(actual==expected);
     };
-    const auto shade=asset(117,0);
+    const auto* resolvedShade=shared.shade();const auto referenceShade=asset(117,0);
+    check(resolvedShade && resolvedShade->mask.data==referenceShade.mask.data &&
+          resolvedShade->originX==referenceShade.ox && resolvedShade->originY==referenceShade.oy);
+    const Asset shade{resolvedShade->mask,resolvedShade->originX,resolvedShade->originY};
     for(unsigned tick=0;tick<256;++tick){
         surface.clear();expected.fill(false);verify();
-        for(unsigned i=0;i<9;++i)stamp(asset(84,i),int((tick*7+i*31)%220)-30,int((tick*13+i*47)%340)-28,false);
+        for(unsigned i=0;i<9;++i){const auto* a=shared.smoke(i);
+            stamp({a->mask,a->originX,a->originY},int((tick*7+i*31)%220)-30,int((tick*13+i*47)%340)-28,false);}
         verify();
         for(unsigned i=0;i<5;++i){stamp(shade,int((tick*11+i*29)%220)-30,int((tick*17+i*59)%340)-28,true);verify();}
     }

@@ -1,0 +1,66 @@
+#ifndef DOWNWELL_CORE_EFFECT_MASK_ASSETS_H
+#define DOWNWELL_CORE_EFFECT_MASK_ASSETS_H
+#include "BinaryEffectSurface.h"
+#include <cstddef>
+#include <cstdint>
+
+namespace downwell {
+// Borrowed immutable views of the existing offline DWAP masks. No allocation,
+// texture decoding, pixel conversion or target-specific types. The pack must
+// remain alive and unchanged until these descriptors are discarded.
+class EffectMaskAssets {
+public:
+    struct Asset {
+        BinaryEffectSurface<>::Mask mask{};
+        int originX=0,originY=0;
+    };
+    bool ready()const{return ready_;}
+    const Asset* smoke(unsigned frame)const{return ready_ && frame<9 ? &smoke_[frame] : nullptr;}
+    const Asset* shade()const{return ready_ ? &shade_ : nullptr;}
+    bool bind(const std::uint8_t* pack,std::size_t size){
+        // Failed rebind must not leave a formerly valid, now stale view live.
+        ready_=false;
+        if(!pack || size<20 || u32(pack)!=0x44574150u || u16(pack+4)!=2 || u16(pack+6)!=20)return false;
+        static constexpr std::uint8_t source[8]={0xc0,0x7d,0xaf,0x5f,0xbe,0x94,0x0a,0xe0};
+        for(unsigned i=0;i<8;++i)if(pack[12+i]!=source[i])return false;
+        const std::uint32_t count=u32(pack+8);
+        if(count>(size-20)/24)return false;
+        const std::size_t payload=20+std::size_t(count)*24;
+        // The producer guarantees strict sorted keys. Validate once at bind,
+        // not once per effect/frame. Payloads may alias immutable whole/subblocks.
+        for(std::uint32_t i=1;i<count;++i)
+            if(u32(pack+20+std::size_t(i-1)*24)>=u32(pack+20+std::size_t(i)*24))return false;
+        auto resolve=[&](unsigned id,unsigned frame,Asset& out){
+            const std::uint32_t key=(id<<16)|frame;
+            std::uint32_t first=0,last=count;
+            while(first<last){
+                const auto middle=first+(last-first)/2;
+                const auto* record=pack+20+std::size_t(middle)*24;
+                const auto found=u32(record);
+                if(found<key){first=middle+1;continue;}
+                if(found>key){last=middle;continue;}
+                const unsigned width=u16(record+8),height=u16(record+10),dma=u16(record+12);
+                if(!width || !height || dma<width || dma%16 || u16(record+14)!=3)return false;
+                const std::size_t plane=std::size_t(dma/8)*height;
+                const std::size_t offset=u32(record+16),bytes=u32(record+20);
+                if(offset<payload || offset%2 || offset>size || bytes>size-offset ||
+                   plane>bytes/3 || plane*3!=bytes)return false;
+                out={{pack+offset+2*plane,unsigned(plane),width,height,dma/8},
+                     signedWord(record+4),signedWord(record+6)};
+                return true;
+            }
+            return false;
+        };
+        for(unsigned frame=0;frame<9;++frame)if(!resolve(84,frame,smoke_[frame]))return false;
+        if(!resolve(117,0,shade_))return false;
+        ready_=true;return true;
+    }
+private:
+    static unsigned u16(const std::uint8_t* p){return (unsigned(p[0])<<8)|p[1];}
+    static std::uint32_t u32(const std::uint8_t* p){return (std::uint32_t(u16(p))<<16)|u16(p+2);}
+    static int signedWord(const std::uint8_t* p){const unsigned n=u16(p);return n<32768?int(n):int(n)-65536;}
+    Asset smoke_[9]{},shade_{};
+    bool ready_=false;
+};
+}
+#endif
