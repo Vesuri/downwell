@@ -36,6 +36,11 @@ two ports proves original-game completion. The active parity goal is unfinished.
   are injected. A purchase with 22 gems against a 300-gem price is rejected;
   43 subsequent updates return the player and camera to the main shaft.
   Successful naturally funded purchasing remains unverified.
+- `make verify-route-sweep` additionally checks seeds 0–7 with deterministic
+  recovery inputs, requiring all eight generated exits alive within 2,500
+  updates each. It compares 15,946 gameplay updates, including full RNG state
+  every update, across 120 generated enemies. This broadens host encounter
+  coverage; it is not a native rendering or original-Windows comparison.
 - The seed-4 native natural-route gate now reaches the generated exit at
   update 1,477, compares 211 upgrade frames and 135 exit-field frames with no
   failures, and completes 120 second-cavern updates with an intact stack guard.

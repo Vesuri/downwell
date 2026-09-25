@@ -1,5 +1,45 @@
 # Natural cavern route verification
 
+## Eight-seed gameplay sweep
+
+`make verify-route-sweep` runs seeds 0–7, requiring every route to reach its
+naturally generated first-cavern exit alive within 2,500 updates. It retains
+the per-update actor, player, camera and animation comparisons and additionally
+checks currency, death/exit state, RNG draw count/index and all 16 RNG words
+on every update. This is a host adapter test, not native rendering or Windows
+execution evidence.
+
+The sweep's input controller adds deterministic recovery when no new downward
+progress exceeds eight pixels for 120 updates: alternate horizontal targets
+every 120 updates and press/release jump/fire every 12 updates. This is input
+only; no health, position, terrain, shop stock, currency or RNG injection is
+used. The original two-seed controller and native seed-4 gate are unchanged.
+The first exploration without recovery stalled on seven seeds; those budget
+outcomes were not evidence of successful full-level coverage. The final gate
+fails on death or a budget outcome rather than silently accepting a stall.
+
+| Seed | Updates to exit | Health | Gems | Generated enemies |
+| --- | ---: | ---: | ---: | ---: |
+| 0 | 2401 | 2 | 26 | 22 |
+| 1 | 2086 | 2 | 38 | 18 |
+| 2 | 1763 | 3 | 40 | 10 |
+| 3 | 2104 | 3 | 0 | 12 |
+| 4 | 1477 | 4 | 10 | 13 |
+| 5 | 2076 | 2 | 60 | 14 |
+| 6 | 1932 | 2 | 60 | 17 |
+| 7 | 2107 | 1 | 40 | 14 |
+
+Total: 15,946 compared gameplay updates and 120 generated enemies. No adapter
+or RNG mismatch was found. This expands seed/encounter coverage, not the set
+of implemented game features. The separate two-seed gate below remains
+responsible for upgrade/re-entry and generated-shop traversal.
+The strict eight-seed rerun and unchanged two-seed gate both pass. Logs:
+`/tmp/downwell-route-sweep-verified.log` and
+`/tmp/downwell-route-sweep-original-gates.log`. No production code, assets or
+emulator build options were changed for this test-only addition.
+
+## Exit, upgrade and shop route
+
 Run `make verify-natural-exit`. This host test runs both runtime adapters using
 the decoded room, object and builder packs. It does not run an emulator or
 establish original-runner visual fidelity.

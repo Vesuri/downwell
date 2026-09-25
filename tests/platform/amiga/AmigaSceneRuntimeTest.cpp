@@ -1821,7 +1821,11 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
     downwell::BuilderPatternPack patterns(pb.data(), pb.size());
     downwell::PackedRoom room;
     require(rooms.findRoom(11, room), "natural route has decoded main room");
-    for (unsigned seed : {99u, 4u}) {
+    const bool sweep = std::getenv("DOWNWELL_VERIFY_ROUTE_SWEEP") != nullptr;
+    const std::vector<unsigned> seeds = sweep ? std::vector<unsigned>{0, 1, 2, 3, 4, 5, 6, 7}
+                                             : std::vector<unsigned>{99, 4};
+    for (unsigned seed : seeds) {
+        std::cout << "Natural route seed=" << seed << std::endl;
         downwell::StartupRuntime reference(downwell::PlatformProfile::nonDesktop,
             &rooms, &objects, seed, &patterns);
         reference.skipToGameForTesting();
@@ -1845,6 +1849,8 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         LiveSceneWorld live(patterns, objects);
         live.bind(game, rooms, room, false, &reference);
         int target = 240;
+        int deepestY = 176 + game.player().offsetY();
+        unsigned noDescent = 0;
         unsigned updates = 0;
         for (; updates < 2500 && !game.levelResultRequested() && !game.dead(); ++updates) {
             const int x = 240 + game.player().offsetX(), y = 176 + game.player().offsetY();
@@ -1857,15 +1863,43 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                     if (score > best) { best = score; target = candidate; }
                 }
             }
+            if (sweep) {
+                if (y > deepestY + 8) { deepestY = y; noDescent = 0; }
+                else ++noDescent;
+                if (noDescent >= 120) target = (updates / 120) % 2 ? 180 : 300;
+            }
             downwell::Input input;
             input.left = x > target + 2; input.right = x < target - 2;
             input.fire = updates % 40 == 0 || updates % 40 == 3;
-            if (seed == 4)
+            if (sweep && noDescent >= 120) input.fire = updates % 12 == 0;
+            if (seed == 4 && !sweep)
                 require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision)),
                     "native input controller reproduces host natural route");
             game.step(downwell::packReplayInput(input)); reference.step(input, false);
             parityFrame = updates;
             compareInitialGameplay(game, reference);
+            if (sweep) {
+                require(game.health() == reference.mainPlayerHealth() &&
+                    game.currency() == reference.mainCurrencyTotal() &&
+                    game.dead() == reference.mainDeathSequence().active &&
+                    game.levelResultRequested() == reference.levelResultRequested(),
+                    "route sweep health, currency and exit state agree");
+                require(game.randomDrawCount() == reference.randomDrawCount() &&
+                    game.randomState().stateIndex() == reference.randomState().stateIndex(),
+                    "route sweep RNG cursor agrees");
+                for (unsigned i = 0; i < 16; ++i)
+                    require(game.randomState().stateWord(i) == reference.randomState().stateWord(i),
+                        "route sweep complete RNG state agrees");
+            }
+        }
+        if (sweep) {
+            require(!game.dead() && game.levelResultRequested() && reference.levelResultRequested(),
+                "every pinned sweep route reaches its generated exit alive within budget");
+            std::cout << "Route sweep seed=" << seed << " updates=" << updates
+                << " outcome=" << (game.dead() ? "death" : game.levelResultRequested() ? "exit" : "budget")
+                << " health=" << game.health() << " gems=" << game.currency()
+                << " depth=" << deepestY << " enemies=" << game.enemyCount() << std::endl;
+            continue;
         }
         require(!game.dead() && game.levelResultRequested() && reference.levelResultRequested(),
             "input-only route reaches a naturally generated exit alive on both adapters");
@@ -1997,7 +2031,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
 }
 
 int main(int argc, char** argv) {
-    if (argc >= 4 && std::getenv("DOWNWELL_VERIFY_NATURAL_EXIT")) {
+    if (argc >= 4 && (std::getenv("DOWNWELL_VERIFY_NATURAL_EXIT") || std::getenv("DOWNWELL_VERIFY_ROUTE_SWEEP"))) {
         testNaturalExit(argv[1], argv[2], argv[3]);
         return 0;
     }
