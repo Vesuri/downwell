@@ -348,6 +348,28 @@ up, restored the ordinary non-skip build, and passed both 68000 audits.
 Inspection identifies repeated indexed breakable candidates and a repeated
 selected-hit intersection as a next optimization candidate, not yet changed.
 
+### Avoid repeated indexed breakable candidates
+
+Bullet breakable selection now visits distinct endpoint cells rather than
+always querying all four endpoint combinations. When both endpoints lie in
+one cell, only that cell is queried; corner-crossing segments still consider
+all four cells. Selection still chooses the earliest-created intersecting
+active block. The selected indexed hit is not intersected a second time;
+the general full-scan fallback retains its intersection test.
+
+Eight seeded 120-tick firing/movement comparisons run the indexed path against
+the full-scan fallback with identical nearby geometry and both creation
+orders. They verify checkpoints, rolling digests, RNG draw counts, destroyed
+block notification order and each block's active state; every run destroys
+blocks. Runtime/live-terrain tests, runtime ASan/UBSan and bounded native
+cross-target replay pass. All replay digests remain unchanged, both 68000
+audits pass, and the ordinary non-skip executable is restored.
+
+The FPSCOUNT tape remains **824 PAL fields / 600 updates = 36.41 FPS**, max
+gap five. No measurable FPS improvement is claimed. Logs use
+`/tmp/downwell-breakable-cells-` with `test`, `regression`, `sanitized`, `fps`
+and `replay` suffixes. Native runs are bounded to 45 seconds.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in

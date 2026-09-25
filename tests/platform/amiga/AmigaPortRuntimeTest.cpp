@@ -390,6 +390,37 @@ int main() {
             "source enemy-line intersection retains precedence over the solid wall check");
 
     const int blockX[] = {-1};
+    for (unsigned seed = 1; seed <= 8; ++seed) {
+        int xs[9], ys[9];
+        for (unsigned i = 0; i < 9; ++i) {
+            const unsigned cell = seed & 1 ? 8-i : i;
+            xs[i] = (int(cell % 3)-1)*16; ys[i] = 16 + int(cell/3)*16;
+        }
+        AmigaPortRuntime indexed(300, false, 1000), scanned(300, false, 1000);
+        indexed.configureBreakables(xs, ys, 9); scanned.configureBreakables(xs, ys, 9);
+        // An unreachable non-grid record selects the established full-scan
+        // fallback without changing any nearby collision geometry.
+        const int sentinelX = 30001, sentinelY = 30000;
+        require(scanned.appendBreakables(&sentinelX, &sentinelY, 1), "fallback test sentinel added");
+        downwell::GameMakerRandom random(seed);
+        indexed.configureEnemyRandom(random); scanned.configureEnemyRandom(random);
+        for (unsigned tick = 0; tick < 120; ++tick) {
+            const unsigned input = (tick % 12 < 7 ? 4 : 0) | (tick % 40 < 10 ? 1 : tick % 40 < 20 ? 2 : 0);
+            const auto a = indexed.step(input), b = scanned.step(input);
+            require(indexed.checkpoint() == scanned.checkpoint() &&
+                    indexed.trajectoryDigest() == scanned.trajectoryDigest() &&
+                    indexed.randomDrawCount() == scanned.randomDrawCount() &&
+                    a.destroyedBlockCount == b.destroyedBlockCount,
+                    "deduplicated indexed breakable hits match creation-ordered full scan");
+            for (unsigned i = 0; i < a.destroyedBlockCount; ++i)
+                require(a.blockX[i] == b.blockX[i] && a.blockY[i] == b.blockY[i],
+                        "indexed selection preserves destroyed-block notification order");
+            for (unsigned i = 0; i < 9; ++i)
+                require(indexed.breakableActiveAt(xs[i], ys[i]) == scanned.breakableActiveAt(xs[i], ys[i]),
+                        "same breakable instance is destroyed in each path");
+        }
+        require(indexed.blocksDestroyed() > 0, "comparison exercises actual indexed breakable hits");
+    }
     const int blockY[] = {32};
     destructible.configureBreakables(blockX, blockY, 1);
     destructible.step(4);

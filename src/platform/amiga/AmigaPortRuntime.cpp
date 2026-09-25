@@ -621,8 +621,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                         // containing neither endpoint. Test all candidates.
                         const int xs[] = {path.x.pixel, path.endX.pixel};
                         const int ys[] = {path.y.pixel, path.endY.pixel};
-                        for (int x : xs) for (int y : ys) {
-                            const int next = indexedBreakable(x, y);
+                        const unsigned columns = ((xs[0]+8) >> 4) == ((xs[1]+8) >> 4) ? 1 : 2;
+                        const unsigned rows = ((ys[0]+8) >> 4) == ((ys[1]+8) >> 4) ? 1 : 2;
+                        for (unsigned column = 0; column < columns; ++column)
+                          for (unsigned row = 0; row < rows; ++row) {
+                            const int next = indexedBreakable(xs[column], ys[row]);
                             if (next < 0) continue;
                             const auto& block = breakables_[next];
                             if (block.active && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8) &&
@@ -633,8 +636,9 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                     }
                     for (unsigned blockIndex = firstBlock; blockIndex < endBlock; ++blockIndex) {
                         Breakable& block = breakables_[blockIndex];
-                        if (block.active && path.intersects(block.x - 8, block.x + 8,
-                                                           block.y - 8, block.y + 8)) {
+                        // Indexed selection already proved this exact hit.
+                        if (block.active && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
+                                                           block.y - 8, block.y + 8))) {
                             block.active = false;
                             if (destroyedBlockCount < destroyedCapacity) {
                                 destroyedBlockX[destroyedBlockCount] = block.x;
