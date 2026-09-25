@@ -510,7 +510,8 @@ def build_pack(manifest, extracted, profile, language_path=None):
                     # shopKeeper never changes image_xscale. Keep only the
                     # used planar facing; DMA variants remain independently
                     # generated below and checked against the pixel oracle.
-                    facings = (False,) if bullet or sprite_id in (485, 486, 487, 496, 497) else (False, True)
+                    # fxSmoke also leaves image_xscale at its default +1.
+                    facings = (False,) if bullet or sprite_id in (84, 485, 486, 487, 496, 497) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]
@@ -754,7 +755,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
             left, right = (min(opaque), max(opaque)) if opaque else (0, 0)
             parts = (right - left + 16) // 16
             require(parts <= 4 and height <= 32, "gameplay sprite exceeds DMA slot")
-            for flip in (0, 1):
+            for flip in ((0,) if sprite["id"] == 84 else (0, 1)):
                 lo, hi = (width - 1 - right, width - 1 - left) if flip else (left, right)
                 for part in range(parts):
                     crop = (max(0, min(width - 16, lo - (16 - (hi - lo + 1)) // 2))

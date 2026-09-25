@@ -53,7 +53,10 @@ for ident in (84, 96, 205, 206, 207, 208, 460):
         assert (sprite["originX"], sprite["originY"]) == (12, 12)
     for frame, source_frame in enumerate(sprite["frames"]):
         canvas = pack.frame_canvas(sprite, source_frame, resources["texturePageItems"], pages)
-        for flip in (0, 1):
+        if ident == 84:
+            assert (62084, frame) not in records
+            assert (63084, frame*8+4) not in records
+        for flip in ((0,) if ident == 84 else (0, 1)):
             expected = {}
             for y in range(canvas.height):
                 for x in range(canvas.width):
