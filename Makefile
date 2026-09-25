@@ -113,6 +113,14 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 all: $(TARGET)
 
 .PHONY: generate-area-two-patterns verify-area-two-patterns
+.PHONY: verify-catacomb-symbols
+verify-catacomb-symbols: build/catacomb-symbols-test
+	./build/catacomb-symbols-test
+
+build/catacomb-symbols-test: tests/core/CatacombBuilderSymbolsTest.cpp src/core/CatacombBuilderSymbols.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Wpedantic -Isrc $< -o $@
+
 generate-area-two-patterns:
 	python3 tools/export-area-two-patterns.py
 

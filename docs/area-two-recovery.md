@@ -51,7 +51,30 @@ redundant choice still consumes RNG. The per-character builder dispatches
 to `builderCatacomb`, not `builderCavern`; its symbol/RNG/object rules must
 be implemented before reusing the common pattern traversal.
 
-Remaining work includes source-backed catacomb symbol emission, new actor
+`src/core/CatacombBuilderSymbols.h` now implements the area-specific symbol
+dispatch for levels 1--3, transcribed from VM blocks 17--61. It keeps every
+`choose` argument list, the overwritten `%` `irandom(level)` call, the
+hard-mode override order and synchronous right-then-left paired skull Create
+calls. Common terrain/reward symbols remain the common builder's responsibility.
+An emission failure stops immediately; unsupported levels fail before any
+operation. Coordinates are supplied after the common traversal computes them.
+
+`make verify-catacomb-symbols` checks 306 operation-trace cases: every choice
+index (including duplicate values), all three levels, both hard-mode states,
+both random-threshold outcomes, object IDs/coordinates and emission failures.
+The same cases pass AddressSanitizer/UndefinedBehaviorSanitizer. Pattern export
+verification still passes with the unchanged output hash above.
+
+This is shared semantic code, **not yet connected to either live generator**.
+Its operations interface intentionally does not bind `choose` to WELL words:
+in particular, the singleton `choose(126)` is present in the VM but its runner
+word consumption has not been established here. The operation-trace test proves
+dispatch/call ordering, not historical Windows RNG equivalence. Integration
+also needs concrete synchronous actor creation and any observed builder-instance
+state such as `spawnChance`; this helper currently owns only emission decisions.
+No emulator run or frame-rate improvement is claimed for this isolated change.
+
+Remaining work includes wiring catacomb symbol emission into traversal, new actor
 and hazard behavior, matching offline art and both rendering backends, and
 verified area 1-3 → 2-1 transition ownership. Do not remove the current
 later-area guard or substitute cavern logic merely because these tables are

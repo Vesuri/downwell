@@ -112,7 +112,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   styles/enemies, bosses and ending flow are not complete. Distinguish features
   absent from both ports from actual Amiga-versus-implemented-SDL gaps.
   Area-two pattern recovery now has a VM-backed export/verification target
-  (50 patterns); gameplay remains disabled pending its distinct rules,
+  (50 patterns). Shared catacomb symbol dispatch passes 306 operation-trace
+  cases, retaining exact builtin calls and synchronous emission order, but is
+  not yet wired into either live generator. Historical singleton-choice RNG
+  consumption remains unverified. Gameplay remains disabled pending integration,
   actors/hazards and artwork. See `area-two-recovery.md`.
 
 ## Working evidence
