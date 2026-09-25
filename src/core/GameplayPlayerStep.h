@@ -49,7 +49,7 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     };
     run.shops.keeperAlarms(shopRandom);
     run.shops.step(input, shopPlayerX, shopPlayerY, false, death.active,
-        facing, currency, [&random] { return 1u + random.irandomSmall(2); },
+        facing, currency, [&random] { return 1u + random.chooseIndexSmall(3); },
         [&run, &currency](unsigned id) { run.consumables.grant(id, currency); },
         [](auto&, auto) {});
     player.face(facing);

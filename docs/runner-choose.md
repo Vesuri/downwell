@@ -156,3 +156,33 @@ verification and the stale natural-route/startup tests remain outstanding.
 The full host-compiled Amiga port runtime suite passes after this fingerprint
 update (`/tmp/downwell-gem-choose-runtime.log`); weapon coverage remains 16383.
 Player/reward callbacks and enemy alarm RNG are next in the call-site audit.
+
+## Fourth migration: shop callbacks
+
+`scrShopAssignText` VM selects one of three farewell strings with `choose`.
+`Shop_Step_0` likewise uses `choose(1,2,3)` for its merchant-response branches.
+Both were incorrectly routed through two-word integer draws. Shop creation now
+requires a separate farewell-choice callback; both adapters supply
+`chooseIndexSmall(3)`. Shared player/shop interaction supplies
+`1 + chooseIndexSmall(3)` for the response. Inventory rejection sampling remains
+on `irandom_range`, with the farewell choice invoked synchronously afterward.
+
+The remaining callbacks inspected here are genuine range calls: shopkeeper
+Step/Alarm 1 use `irandom_range(20,60)` and ground-turtle Alarm 1 uses
+`irandom_range(120,300)`. They remain unchanged. Frog alarm behavior does not
+draw RNG; the existing bat and snail motion/hit paths use real-valued random
+draws rather than `choose`. This does not establish completeness of missing
+effect/sound/event behavior elsewhere.
+
+Tests distinguish the stock and farewell callbacks and retain exhaustion's
+no-draw contract. Another 2,048 real-RNG shop creations (128 seeds, two health
+states, eight slots) compare stock, farewell and all RNG words against explicit
+source-order range/rejection/choice operations. RNG sanitizer tests, shop-world
+tests and the host-compiled Amiga runtime suite pass. Both ordinary builds pass,
+including the 68000 instruction/helper audits. Evidence:
+`/tmp/downwell-shop-choose-runtime.log` and
+`/tmp/downwell-shop-choose-{amiga,sdl}.log`.
+
+Next: regenerate decoded startup checkpoints and rerun affected end-to-end
+routes against the corrected stream, fixing input tapes or actual behavior
+where they fail rather than substituting the former RNG sequence.

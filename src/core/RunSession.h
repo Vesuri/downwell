@@ -63,9 +63,9 @@ struct RunSession {
     // Shop Create snapshots prices from run ownership; acquiring a card later
     // does not reprice already-created stock. Other style/difficulty modes
     // remain separate from the current usual-style, normal run adapter.
-    template<class Range>
-    ShopWorld::Instance* createShop(int x, int y, Range random, int health) {
-        return shops.create(x, y, random, health, stage.area > 0 ? stage.area : 1,
+    template<class Range, class Choice>
+    ShopWorld::Instance* createShop(int x, int y, Range random, Choice chooseFarewell, int health) {
+        return shops.create(x, y, random, chooseFarewell, health, stage.area > 0 ? stage.area : 1,
                             false, 0, upgrades.levels[14] != 0);
     }
     LevelExit levelExit;

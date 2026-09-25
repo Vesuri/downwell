@@ -295,7 +295,7 @@ public:
     downwell::ShopWorld::Instance* registerShop(int x, int y) {
         return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
             return lo + enemyRandom_.irandomSmall(hi - lo);
-        }, health_);
+        }, [this] { return enemyRandom_.chooseIndexSmall(3); }, health_);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }

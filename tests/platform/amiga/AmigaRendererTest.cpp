@@ -562,7 +562,7 @@ int main(int argc, char** argv) {
         unsigned rolls = 0;
         auto* shop = shopWorld.create(0, 20, [&](unsigned lo, unsigned) {
             return lo + (++rolls == 2 ? 1 : 0);
-        }, 4, 1);
+        }, [] { return 0u; }, 4, 1);
         const auto draw = [&](AmigaRenderer& target) {
             downwell::drawShopFixtures(shopWorld, [&](int sprite, int frame, int x, int y) {
                 amigaRendererDrawAsset(&target, gamePack.data(), gamePack.data() + gamePack.size(),

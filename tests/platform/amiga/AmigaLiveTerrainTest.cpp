@@ -63,6 +63,7 @@ struct ShopCreates {
         if (command.objectId != 277) return true;
         return self.shops.create(command.x, command.y,
             [&](unsigned lo, unsigned hi) { return lo + self.random.irandomSmall(hi-lo); },
+            [&] { return self.random.chooseIndexSmall(3); },
             4, 1, false, 4, false) != nullptr;
     }
 };

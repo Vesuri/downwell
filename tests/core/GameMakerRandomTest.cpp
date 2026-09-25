@@ -5,6 +5,7 @@
 #include "core/FrogHitState.h"
 #include "core/SnailHitState.h"
 #include "core/BatHitState.h"
+#include "core/ShopWorld.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -160,6 +161,37 @@ void testRicochetChoice() {
     }
 }
 
+void testShopChoiceBoundary() {
+    for (unsigned seed = 0; seed < 128; ++seed) for (int health : {2, 4}) {
+        downwell::GameMakerRandom actual(seed), expected(seed);
+        downwell::ShopWorld shops;
+        for (unsigned slot = 0; slot < shops.capacity; ++slot) {
+            unsigned stock[3];
+            stock[0] = 100 + expected.irandom(1);
+            if (health <= 2) stock[0] = 100;
+            do { stock[1] = 100 + expected.irandom(3); } while (stock[1] == stock[0]);
+            expected.irandom(3); // Source's overwritten third stock draw.
+            do { stock[2] = 102 + expected.irandom(3); }
+            while (stock[2] == stock[0] || stock[2] == stock[1]);
+            const unsigned farewell = expected.nextU32() % 3;
+            auto* shop = shops.create(0, 0,
+                [&](unsigned lo, unsigned hi) { return lo + actual.irandomSmall(hi-lo); },
+                [&] { return actual.chooseIndexSmall(3); }, health, 1);
+            require(shop && shop->farewellVariant == farewell, "shop farewell uses one-word choice after stock ranges");
+            for (unsigned item = 0; item < 3; ++item)
+                require(shop->stock.items[item].upgrade == stock[item], "shop stock keeps original range/rejection sequence");
+            require(actual.drawCount() == expected.drawCount() && actual.stateIndex() == expected.stateIndex(),
+                    "shop mixed RNG calls retain count/index");
+            for (unsigned i = 0; i < 16; ++i)
+                require(actual.stateWord(i) == expected.stateWord(i), "shop mixed RNG calls retain every word");
+        }
+        bool called = false;
+        require(!shops.create(0, 0, [&](unsigned, unsigned) { called = true; return 0u; },
+                [&] { called = true; return 0u; }, health, 1) && !called,
+                "exhausted shop storage consumes neither range nor choice callbacks");
+    }
+}
+
 void testSmallIntegerPath() {
     constexpr std::uint32_t maxima[] = {
         0, 1, 2, 3, 4, 5, 6, 7, 9, 12, 15, 30, 40, 50, 60,
@@ -218,6 +250,7 @@ int main() {
     testTitleParticleOrder();
     testGemCreateChoices();
     testRicochetChoice();
+    testShopChoiceBoundary();
     testSmallIntegerPath();
     testSmallScaledRealPath();
     std::cout << "GameMaker random tests passed\n";

@@ -77,7 +77,8 @@ two ports proves original-game completion. The active parity goal is unfinished.
   `choose` uses one WELL word modulo argument count, whereas existing
   translations often use two-word `irandomSmall`. The distinct shared
   `chooseIndexSmall` primitive is tested. Shared cavern generation and reward
-  choices plus garden tree/grass, host title-event, shared gem and immune-impact
+  choices plus garden tree/grass, host title-event, shared gem, immune-impact
+  and shop farewell/response
   choices are migrated;
   remaining call sites need a VM-backed
   audit and coordinated migration, followed by rebuilt checkpoints and route

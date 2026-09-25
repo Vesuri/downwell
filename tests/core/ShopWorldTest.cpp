@@ -15,7 +15,7 @@ int main() {
         const unsigned choices[] = {100,101,104,105,0};
         auto random = [&](unsigned, unsigned) { return choices[calls++ % 5]; };
         for (unsigned i = 0; i < world.capacity; ++i) {
-            auto* shop = world.create(100+i,200+i,random,4,1);
+            auto* shop = world.create(100+i,200+i,random,[&] { return random(0,2); },4,1);
             require(shop != nullptr, "reset fixture fills every shop slot");
             shop->menu.active = true; shop->menu.cursor = 2;
             shop->feedback.itemPresent[1] = false;
@@ -41,7 +41,7 @@ int main() {
                             shop.feedback.storedItem[item], "slot reset restores inventory defaults");
             }
         }
-        require(calls == before && world.create(0,0,random,4,1) == &world.instances[0],
+        require(calls == before && world.create(0,0,random,[&] { return random(0,2); },4,1) == &world.instances[0],
                 "reset consumes no RNG and reuses the first retired slot");
     }
     {
@@ -58,7 +58,7 @@ int main() {
             const unsigned value = choices[randomCalls++];
             require(value >= lo && value <= hi, "stock setup stays within requested range");
             return value;
-        }, 4, 1);
+        }, [&] { require(randomCalls == 4, "farewell choice follows stock"); ++randomCalls; return 0u; }, 4, 1);
         const unsigned creationCalls = randomCalls;
         // Independently enumerate the source default child rectangles, rather
         // than deriving expected hits from visitPlayerSolids itself.
@@ -119,7 +119,7 @@ int main() {
             require(call < 5 && lo == lower[call] && hi == upper[call],
                 "source stock ranges precede scrShopAssignText's three-way choice");
             return values[call++];
-        }, 4, 1);
+        }, [&] { require(call == 4, "farewell uses a separate choose callback after stock"); ++call; return farewell; }, 4, 1);
         require(call == 5 && created->stock.items[2].upgrade == 105 &&
             created->farewellVariant == farewell, "all three creation-time farewell choices are retained");
     }
@@ -180,7 +180,7 @@ int main() {
     money.currency = 1000;
     unsigned draws = 0;
     auto range = [&](unsigned lo, unsigned) { ++draws; return lo + (draws % 4 == 2 ? 1 : 0); };
-    auto* shop = run.shops.create(5, 0, range, 4, 1);
+    auto* shop = run.shops.create(5, 0, range, [&] { return range(0,2); }, 4, 1);
     require(shop && draws == 5 && shop->farewellVariant == 0,
         "registration consumes stock rolls followed by one farewell choice");
     unsigned fixtures = 0;
@@ -213,7 +213,7 @@ int main() {
         "landing chooses case top before table, skipping tops already above the player");
     for (int shopX : {0, -45}) {
         downwell::ShopWorld fallingWorld;
-        fallingWorld.create(shopX, 100, range, 4, 1);
+        fallingWorld.create(shopX, 100, range, [&] { return range(0,2); }, 4, 1);
         PlayerMotion falling(false, 1000);
         falling.configureLandingResolver([](void* opaque, int x, int minimumY) {
             return static_cast<downwell::ShopWorld*>(opaque)->playerLanding(x, minimumY, 1000);
@@ -280,9 +280,9 @@ int main() {
     run.shops.observePlayer(0, 0, true, 1);
     require(!run.shops.interactable, "horizontal movement disallows interaction");
     for (unsigned i = 1; i < World::capacity; ++i)
-        require(run.shops.create(100, 0, range, 4, 1), "bounded registration succeeds");
+        require(run.shops.create(100, 0, range, [&] { return range(0,2); }, 4, 1), "bounded registration succeeds");
     const unsigned before = draws;
-    require(!run.shops.create(100, 0, range, 4, 1) && draws == before,
+    require(!run.shops.create(100, 0, range, [&] { return range(0,2); }, 4, 1) && draws == before,
         "exhaustion is explicit and consumes no RNG");
     run.shops.endStep(320);
     require(shop->present, "retirement boundary is strict");

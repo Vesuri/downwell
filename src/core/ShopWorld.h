@@ -39,8 +39,10 @@ struct ShopWorld {
         previous = {};
     }
 
-    template<class Range>
-    Instance* create(int x, int y, Range random, int health, unsigned area,
+    // Stock uses irandom_range; scrShopAssignText then chooses one of three
+    // farewell strings with a single-word draw. Keep the callbacks distinct.
+    template<class Range, class Choice>
+    Instance* create(int x, int y, Range random, Choice chooseFarewell, int health, unsigned area,
                      bool hard = false, unsigned style = 0, bool member = false) {
         for (auto& shop : instances) if (!shop.allocated) {
             shop = {};
@@ -50,7 +52,7 @@ struct ShopWorld {
             ++allocatedCount;
             ++fixtureRevision;
             shop.stock.create(random, health, area, hard, style, member);
-            shop.farewellVariant = random(0, 2);
+            shop.farewellVariant = chooseFarewell();
             return &shop;
         }
         return nullptr; // Caller must handle exhaustion; do not consume RNG.

@@ -189,7 +189,7 @@ public:
     ShopWorld::Instance* registerShop(int x, int y) {
         return run_.createShop(x, y, [this](unsigned lo, unsigned hi) {
             return lo + random_.irandomSmall(hi - lo);
-        }, mainPlayerHealth_);
+        }, [this] { return random_.chooseIndexSmall(3); }, mainPlayerHealth_);
     }
     const ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
