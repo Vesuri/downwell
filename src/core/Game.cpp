@@ -273,8 +273,8 @@ void Game::renderMain(Renderer& renderer) const {
                                        1.0F, 1.0F, 0.0F);
     }
 
-    // Generated objects carry their recovered Create-event presentation state
-    // even though their movement and combat Step events are translated later.
+    // Enemy Step has already selected its presentation, including hit/wake
+    // overrides. Drawing must not reconstruct a default pose from object ID.
     for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
         const InstanceRecord& instance = startup_.instanceAt(index);
         if (!instance.active)
@@ -287,9 +287,9 @@ void Game::renderMain(Renderer& renderer) const {
         if (instance.objectId == 296) sprite = 568;
         if (instance.objectId == 109) sprite = 139;
         // objLineToResult (306) is an invisible collision trigger, not art.
-        const int enemySprite = enemyPresentationSprite(instance.objectId,
-                                      instance.grounded, instance.auxiliaryState);
-        if (enemySprite >= 0) sprite = enemySprite;
+        if (enemyPresentationSprite(instance.objectId,
+                instance.grounded, instance.auxiliaryState) >= 0)
+            sprite = instance.spriteId;
         if (sprite >= 0)
             renderer.drawSpriteTransformed(
                 sprite, static_cast<std::uint32_t>(instance.imageIndex),

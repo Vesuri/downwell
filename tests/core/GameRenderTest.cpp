@@ -53,8 +53,12 @@ public:
                 "exit dither is clipped to the room surface, not the side HUD");
         }
     }
-    void drawSpriteTransformed(std::int32_t sprite, std::uint32_t, float, float,
+    struct Transform { int sprite; unsigned frame; float x, y, sx, sy, angle; };
+    bool recordTransforms = false;
+    std::vector<Transform> transforms;
+    void drawSpriteTransformed(std::int32_t sprite, std::uint32_t frame, float x, float y,
                                float sx, float sy, float angle) override {
+        if (recordTransforms) transforms.push_back({sprite, frame, x, y, sx, sy, angle});
         if (sprite == 458 || sprite == 459) {
             require(sx == 1 && sy == 1 && angle >= 267 && angle <= 273,
                     "machine-gun artwork follows the source spread range");
@@ -363,6 +367,43 @@ int main() {
     const downwell::ObjectPack objects(objectBytes.data(), objectBytes.size());
     const downwell::BuilderPatternPack builders(builderBytes.data(), builderBytes.size());
     require(rooms.valid() && objects.valid() && builders.valid(), "damage-render test loads real room/object/builder data");
+    {
+        downwell::Game enemyGame(&rooms, &objects, &builders);
+        auto& runtime = const_cast<downwell::StartupRuntime&>(enemyGame.startup());
+        runtime.skipToGameForTesting();
+        downwell::InstanceRecord* fixture = nullptr;
+        for (unsigned i = 0; i < runtime.activeInstanceCount(); ++i) {
+            auto& instance = const_cast<downwell::InstanceRecord&>(runtime.instanceAt(i));
+            if (instance.active && instance.objectId == 60) { fixture = &instance; break; }
+        }
+        require(fixture != nullptr, "enemy draw fixture has an active instance");
+        fixture->x = static_cast<int>(runtime.mainCameraViewX()) + 37;
+        fixture->y = static_cast<int>(runtime.mainCameraViewY()) + 91;
+        fixture->imageIndex = 1;
+        fixture->scaleX = -1; fixture->scaleY = -1; fixture->rotation = 90;
+        // Published Step selections: defaults, frog stun, bat hit/hang/wake,
+        // snail stun, and crawler. Rendering cannot infer these from grounded.
+        const int selections[][2] = {{111,163},{111,164},{112,186},{112,187},{112,188},
+            {113,166},{113,170},{113,168},{113,173},{116,153},{116,154},{116,157},
+            {116,162},{117,177},{117,178},{119,278}};
+        const auto rngBefore = runtime.randomDrawCount();
+        for (const auto& selection : selections) {
+            fixture->objectId = selection[0]; fixture->spriteId = selection[1];
+            RecordingRenderer capture; capture.recordTransforms = true;
+            enemyGame.render(capture);
+            unsigned matches = 0;
+            for (const auto& draw : capture.transforms)
+                if (draw.x == fixture->x - runtime.mainCameraViewX() + 110 &&
+                    draw.y == fixture->y - runtime.mainCameraViewY()) {
+                    require(draw.sprite == selection[1] && draw.frame == 1 &&
+                            draw.sx == -1 && draw.sy == -1 && draw.angle == 90,
+                            "enemy rendering preserves the runtime-selected sprite and transform");
+                    ++matches;
+                }
+            require(matches == 1, "published enemy pose is drawn exactly once");
+        }
+        require(runtime.randomDrawCount() == rngBefore, "enemy rendering leaves RNG untouched");
+    }
     downwell::Game damagedGame(&rooms, &objects, &builders);
     unsigned mainTicks = 0, hidden = 0, flashingVisible = 0;
     bool damaged = false, recovered = false;

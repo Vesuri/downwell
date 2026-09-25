@@ -9,6 +9,24 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Render the enemy pose selected by Step
+
+The SDL gameplay renderer now consumes each implemented enemy's published
+`spriteId`, like the native actor collector. Previously it recomputed the
+basic grounded/preparation pose, dropping the runtime's special selections:
+frog hit stun (173), bat hit/hang/wake (154/157/162), and snail hit stun (178).
+The corresponding recovered enemy Step instructions select those sprites;
+this corrects SDL against the original behavior rather than changing Amiga
+to reproduce SDL's error.
+
+The real `Game::render` regression covers sixteen published poses across all
+six implemented enemy types, preserving frame, position, flips and rotation
+and leaving RNG unchanged. This establishes renderer consumption of the
+runtime state, not complete original enemy scheduling or all scene coverage.
+The bounded tick-180 A500/SDL Laser Sight capture remains identical at
+0/99,968 differing pixels after this correction; that tape does not exercise
+all sixteen poses. Log: `/tmp/downwell-enemy-pose-frame.log`.
+
 ### Laser Sight machine-gun firing and ray presentation
 
 Upgrade 12 now changes new machine-gun projectiles to zero spread, captured at
