@@ -53,34 +53,45 @@ int main(){
     // without changing the caller's renderer or either pristine allocation.
     amigaRendererInit(&renderer,backing.data(),hud.data());
     downwell::BinaryEffectSurface<> surface;
+    downwell::PaletteEffectSurface<> colors;
     bool owed[2][320]{};
     std::array<UBYTE,8*7> mask{};
+    std::array<UBYTE,8*7> low{},high{};
     for(unsigned tick=0;tick<1024;++tick){
         const unsigned b=tick%2,origin=(tick*7)%320;
         clearCopies(); rows.sync(display[b],source,b);
         unsigned required=0;
         for(unsigned y=0;y<320;++y){assert(copied[y]==owed[b][y]);required+=owed[b][y];owed[b][y]=false;}
         assert(copiedRows==required && pixels[b]==backing);
-        surface.clear();
+        surface.clear();colors.clear();
         // Include empty retirement frames, sparse rows, both horizontal clips,
         // multiple words per row, and shade subtraction removing all coverage.
         for(auto& byte:mask)byte=UBYTE(next()>>24);
+        for(auto& byte:low)byte=UBYTE(next()>>24);
+        for(auto& byte:high)byte=UBYTE(next()>>24);
         const int x=int(next()%180)-20,y=int(next()%294)-7;
         const downwell::BinaryEffectSurface<>::Mask image{mask.data(),unsigned(mask.size()),61,7,8};
+        const downwell::PaletteEffectSurface<>::Asset colorImage{{mask.data(),unsigned(mask.size()),61,7,8},low.data(),high.data()};
         if(tick%5){assert(surface.add(image,x,y));assert(surface.add(image,120,280));}
+        if(tick%5){assert(colors.add(colorImage,x,y));assert(colors.add(colorImage,120,280));}
         if(tick%11==0){assert(surface.subtract(image,x,y));assert(surface.subtract(image,120,280));}
+        if(tick%11==0){assert(colors.subtract(colorImage.alpha,x,y));assert(colors.subtract(colorImage.alpha,120,280));}
         expected=backing;
         bool visible=false;
-        surface.visit([&](unsigned sx,unsigned sy,std::uint16_t bits){
+        auto expectedWord=[&](unsigned sx,unsigned sy,std::uint16_t bits,std::uint16_t lo,std::uint16_t hi){
             visible=true;const unsigned row=(origin+sy)%320;owed[b][row]=true;
             for(unsigned bit=0;bit<16;++bit)if(bits&(0x8000u>>bit)){
                 const unsigned dx=110+sx+bit,at=row*48+dx/8;
                 const auto value=UBYTE(0x80u>>(dx%8));
-                expected[at]|=value;expected[at+15360]&=UBYTE(~value);
+                expected[at]=UBYTE((expected[at]&~value)|((lo&(0x8000u>>bit))?value:0));
+                expected[at+15360]=UBYTE((expected[at+15360]&~value)|((hi&(0x8000u>>bit))?value:0));
             }
-        });
+        };
+        if(tick%3)colors.visit(expectedWord);
+        else surface.visit([&](unsigned sx,unsigned sy,std::uint16_t bits){expectedWord(sx,sy,bits,bits,0);});
         const auto other=pixels[1-b];const unsigned before=drains;
-        AmigaGameplayEffects::draw(renderer,display[b],b,origin,surface,rows);
+        if(tick%3)AmigaGameplayEffects::draw(renderer,display[b],b,origin,colors,rows);
+        else AmigaGameplayEffects::draw(renderer,display[b],b,origin,surface,rows);
         assert(drains-before==unsigned(visible));
         assert(pixels[b]==expected && pixels[1-b]==other && backing==pristine);
         for(unsigned yrow=0;yrow<320;++yrow)for(unsigned slot=0;slot<2;++slot)

@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_GAMEPLAY_EFFECTS_H
 #include "AmigaRenderer.h"
 #include "core/BinaryEffectSurface.h"
+#include "core/PaletteEffectSurface.h"
 class Bitmap;
 class AmigaGameplayRows;
 
@@ -11,6 +12,9 @@ class AmigaGameplayEffects {
 public:
     static void draw(AmigaRenderer renderer, Bitmap& display, unsigned buffer,
                      unsigned origin, const downwell::BinaryEffectSurface<>& surface,
+                     AmigaGameplayRows& rows);
+    static void draw(AmigaRenderer renderer, Bitmap& display, unsigned buffer,
+                     unsigned origin, const downwell::PaletteEffectSurface<>& surface,
                      AmigaGameplayRows& rows);
 };
 #endif

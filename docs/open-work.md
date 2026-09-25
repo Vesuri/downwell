@@ -24,6 +24,8 @@ throughout integration, not only after content is complete.
 - Finish smoke world collision dispatch and connect its compositor to both
   live renderers, preserving the original effect-surface composition and
   restoring previous effect damage from retained terrain on Amiga.
+  Migrate currency's `drawFx` path alongside smoke: retain gem colors and apply
+  shade to their combined surface, not to a smoke-only overlay above direct gems.
 - Implement remaining blood, corpse, debris and blast effect dependencies.
   Preserve synchronous child Create, RNG consumption and source mutation order
   before rewards and retirement.

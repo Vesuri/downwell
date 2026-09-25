@@ -1,4 +1,9 @@
 #include "core/BinaryEffectSurface.h"
+#include "core/PaletteEffectSurface.h"
+bool compilePaletteEffect(downwell::PaletteEffectSurface<>& surface,
+    const downwell::PaletteEffectSurface<>::Asset& asset,int x,int y) {
+    surface.clear();return surface.add(asset,x,y) && surface.subtract(asset.alpha,x-32,y-16);
+}
 #include "core/EffectMaskAssets.h"
 #include "core/SmokeComposition.h"
 #include "core/SmokeEffects.h"

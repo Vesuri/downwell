@@ -41,6 +41,15 @@ Therefore an ordinary smoke overlay is not a faithful replacement. Global draw
 ordering, sampling and surface ownership still need live verification; routing
 tests alone do not prove pixels.
 
+Currency is also a `drawFx` producer, not an independent direct sprite in the
+normal path. `objCurrency_Draw_0` selects sprite 133/134 for small/large gems,
+updates its collision mask, and calls `drawFx` only when `dflash` is false.
+Its compatibility depth 10000 precedes smoke at 1000, so smoke can replace gem
+pixels on the surface before the controller subtracts shade. A smoke-only
+overlay above directly drawn gems would incorrectly leave gem pixels visible
+inside shade holes. Live integration must migrate both producers together.
+The currency Draw assembly is pinned by `verify-effect-depths.py`.
+
 ### Compatibility depths
 
 Do not use the zero `Depth` fields in the GMS2 object records as draw order.
@@ -101,6 +110,23 @@ shader, filtering or surface-recreation cases. It is static binary/API evidence,
 not a captured execution of Windows rendering.
 
 ## Binary coverage staging
+
+`PaletteEffectSurface` extends the opaque/binary-alpha composition to colored
+producers such as currency. It keeps separate alpha and two color planes in
+ordinary RAM (at most 18,200 bytes including dirty-row bounds). An incoming
+mask replaces the old colors under that mask; colors are not ORed together.
+Opaque black is distinct from transparent coverage. Shade removes alpha only,
+and publication exposes color bits only under surviving alpha. Mask, low and
+high source planes share dimensions/stride and must each have the supplied
+mask byte length available. No source payload is mutated or converted.
+
+`AmigaGameplayEffects` accepts both white-only and palette coverage. Its palette
+path divides a word into disjoint pen masks and uses the same CPU masked-word
+publisher and per-buffer physical-row debt. It preserves terrain backing,
+HUD and untouched pixels; neither variant changes display pointers or allocates
+Chip RAM. `verify-palette-effects` exercises original gem/smoke/shade art and
+all pens, including opaque-black overlap. The live scene still needs joint
+currency/smoke binding, source visibility and painter-boundary integration.
 
 `EffectMaskAssets` borrows the nine sprite-84 frame masks and sprite-117 shade
 mask directly from the immutable offline DWAP pack. It validates the version,

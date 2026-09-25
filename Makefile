@@ -148,6 +148,14 @@ build/smoke-world-test: tests/core/SmokeWorldTest.cpp $(filter-out tests/core/St
 test: verify-effect-placement
 test: verify-binary-effects
 .PHONY: verify-binary-effects
+build/palette-effects-test: tests/core/PaletteEffectSurfaceTest.cpp src/core/PaletteEffectSurface.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
+.PHONY: verify-palette-effects
+verify-palette-effects: build/palette-effects-test generate-amiga-game
+	./build/palette-effects-test generated/amiga-game.dwap
+test: verify-palette-effects
+
 build/smoke-composition-test: tests/core/SmokeCompositionTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $(filter %.cpp,$^)
