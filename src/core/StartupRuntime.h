@@ -9,6 +9,7 @@
 #include "GemMotion.h"
 #include "ProjectileAnimation.h"
 #include "ProjectileSegment.h"
+#include "LaserSightRay.h"
 #include "MachineGunEmitter.h"
 #include "CurrencyAccount.h"
 #include "MainCameraMotion.h"
@@ -147,6 +148,9 @@ public:
     float playMenuPlayerDescent() const { return playMenuPlayerDescent_; }
     float playMenuVerticalDitherY() const { return playMenuVerticalDitherY_; }
     float mainPlayerX() const { return mainPlayerX_; }
+    // Pure query of the implemented area-one collision snapshot, room coordinates.
+    LaserSightRay traceLaserSight(LaserSightRay::Coordinate x, LaserSightRay::Coordinate y,
+        LaserSightRay::Coordinate bottom, std::uint32_t speedTurns, std::uint32_t aimTurns = 0) const;
     float mainPlayerY() const { return mainPlayerY_; }
     float mainPlayerSpeedX() const { return mainPlayerSpeedX_; }
     float mainPlayerSpeedY() const { return mainPlayerSpeedY_; }

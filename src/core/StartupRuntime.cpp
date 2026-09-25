@@ -499,6 +499,33 @@ void StartupRuntime::updateMenuPlayer(InstanceRecord& instance) {
     instance.imageSpeed = menuPlayerImageSpeed_;
 }
 
+LaserSightRay StartupRuntime::traceLaserSight(LaserSightRay::Coordinate x,
+    LaserSightRay::Coordinate y, LaserSightRay::Coordinate bottom,
+    std::uint32_t speedTurns, std::uint32_t aimTurns) const {
+    return LaserSightRay::trace(x, y, bottom, speedTurns,
+        [&](const ProjectileSegment& path) {
+            if (run_.shops.rayWallIntersects(path)) return true;
+            for (std::size_t i = 0; i < instances_.size(); ++i) {
+                const auto& wall = instances_.at(i);
+                if (wall.active && (wall.objectId == 60 || wall.objectId == 92) &&
+                    path.intersects(wall.x-8, wall.x+8, wall.y-8, wall.y+8)) return true;
+            }
+            return false;
+        }, [&](const ProjectileSegment& path) {
+            for (std::size_t i = 0; i < instances_.size(); ++i) {
+                const auto& enemy = instances_.at(i);
+                const int id = enemy.objectId;
+                if (!enemy.active || !(id == 111 || id == 112 || id == 113 ||
+                                      id == 116 || id == 117 || id == 119)) continue;
+                const ContactActor contact{enemy.x*256L, enemy.y*256L,
+                    enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
+                    enemyContactMask(id, enemy.spriteId)};
+                if (path.intersects(contact)) return true;
+            }
+            return false;
+        }, aimTurns);
+}
+
 bool StartupRuntime::mainSolidAt(float x, float y) const {
     // A solid tile covers all sixteen pixel cells. Testing fractional
     // coordinates against inclusive integer bounds left subpixel cracks

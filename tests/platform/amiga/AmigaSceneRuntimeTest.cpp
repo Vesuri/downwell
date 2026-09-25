@@ -1254,6 +1254,23 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const unsigned nativeJumps = gameplay.player().jumps(), hostJumps = reference.mainJumps();
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
+            if (laserFixture && tick % 30 == 0) {
+                using C = downwell::LaserSightRay::Coordinate;
+                const C x{static_cast<int>(reference.mainPlayerX()), 12345};
+                const C y{static_cast<int>(reference.mainPlayerY()), 54321};
+                const C bottom{static_cast<int>(reference.mainCameraViewY()) + 284, 0};
+                const auto nativeDraws = gameplay.randomDrawCount();
+                const auto hostDraws = reference.randomDrawCount();
+                for (std::uint32_t aim : {0u, 0x0aaaaaaau, 0xf5555556u}) {
+                    const auto native = gameplay.traceLaserSight(x, y, bottom, 0, aim);
+                    const auto host = reference.traceLaserSight(x, y, bottom, 0, aim);
+                    require(native.x.pixel == host.x.pixel && native.x.fraction == host.x.fraction &&
+                            native.y.pixel == host.y.pixel && native.y.fraction == host.y.fraction,
+                            "live Laser Sight adapters agree on room-coordinate endpoints");
+                }
+                require(nativeDraws == gameplay.randomDrawCount() && hostDraws == reference.randomDrawCount(),
+                        "live Laser Sight queries leave RNG untouched");
+            }
             if (160 + gameplay.cameraOffsetX() != reference.mainCameraRenderViewX() ||
                     34 + gameplay.cameraOffsetY() != reference.mainCameraRenderViewY())
                 std::cerr << "COMBAT CAMERA tick=" << gameplay.tick()

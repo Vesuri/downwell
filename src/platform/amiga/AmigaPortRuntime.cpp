@@ -289,6 +289,49 @@ int AmigaPortRuntime::bulletY() const
     return 0;
 }
 
+downwell::LaserSightRay AmigaPortRuntime::traceLaserSight(
+    downwell::LaserSightRay::Coordinate x, downwell::LaserSightRay::Coordinate y,
+    downwell::LaserSightRay::Coordinate bottom, std::uint32_t speedTurns,
+    std::uint32_t aimTurns) const {
+    using downwell::ProjectileSegment;
+    const auto local = [](const ProjectileSegment& path) {
+        auto x = path.x, y = path.y;
+        x.pixel -= 240; y.pixel -= 176;
+        return ProjectileSegment(x, y, path.dx, path.dy);
+    };
+    return downwell::LaserSightRay::trace(x, y, bottom, speedTurns,
+        [&](const ProjectileSegment& roomPath) {
+            if (run_.shops.rayWallIntersects(roomPath)) return true;
+            const auto path = local(roomPath);
+            for (unsigned i = 0; i < breakableCount_; ++i) {
+                const auto& block = breakables_[i];
+                if (block.active && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8))
+                    return true;
+            }
+            if (segmentResolver_) return segmentResolver_(solidResolverContext_, path);
+            if (!solidResolver_) return false;
+            const int left = path.x.pixel < path.endX.pixel ? path.x.pixel : path.endX.pixel;
+            const int right = path.x.pixel > path.endX.pixel ? path.x.pixel : path.endX.pixel;
+            const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
+            const int bottom = path.y.pixel > path.endY.pixel ? path.y.pixel : path.endY.pixel;
+            for (int y = top; y <= bottom; ++y) for (int x = left; x <= right; ++x)
+                if (solidResolver_(solidResolverContext_, x, y) && path.intersects(x,x+1,y,y+1))
+                    return true;
+            return false;
+        }, [&](const ProjectileSegment& roomPath) {
+            const auto path = local(roomPath);
+            for (unsigned i = 0; i < enemyCount_; ++i) {
+                const auto& enemy = enemies_[i];
+                if (!enemy.active) continue;
+                const downwell::ContactActor contact{enemy.x*256L, enemy.y*256L,
+                    enemy.objectId == 117 ? enemy.motionState : enemy.facing,
+                    enemy.imageScaleY(), downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
+                if (path.intersects(contact)) return true;
+            }
+            return false;
+        }, aimTurns);
+}
+
 void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
                                             unsigned count)
 {

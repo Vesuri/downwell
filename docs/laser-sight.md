@@ -77,7 +77,7 @@ mask behavior remain an explicit integration gate.
 
 This foundation is **not yet connected to either renderer** and has no
 native timing or pixel-capture claim. The red ray remains a missing visible
-feature until shared wall/enemy adapters, source visibility/order, SDL drawing
+feature until source visibility/order, SDL drawing
 and Amiga draw/restore handling are connected and verified.
 
 ### Collision-family audit
@@ -115,6 +115,31 @@ half-open rectangle convention is retained, not newly certified as Windows
 line-edge behavior. Destructible cases are not yet represented in `ShopWorld`;
 their mask transition must be added to the common visitor with that feature.
 This query is ready for the ray adapters but is not yet called by a renderer.
+
+### Live runtime endpoint adapters
+
+Both `StartupRuntime` and `AmigaPortRuntime` now expose `traceLaserSight` with
+the same explicit room-coordinate origin/view-bottom and Q32 angle inputs.
+They query the implemented area-one walls, active breakables, shared shop
+fixtures, and active area-one enemies. Native local coordinates are translated
+without dropping the Q20 fractional part. Unlike bullet impact callbacks,
+these queries do not damage, deactivate, reward, or advance actors. Enemy
+membership is based on active instances, not a new health-based filter.
+
+The existing 600-tick upgraded combat replay compares endpoints every 30 ticks
+for straight, +15-degree and -15-degree rays with fractional origins. Both
+adapters agree and leave RNG draw counts unchanged; the replay retains health
+4, kills 3, currency 24 and best combo 1 on both targets. The ordinary Amiga
+build passes its 68000 instruction and 64-bit-helper audits. Logs are
+`/tmp/downwell-ray-adapters-{build,test,amiga}.log`.
+
+These APIs deliberately do not decide whether to draw: upgrade ownership,
+goalStop/noDraw gating, actual player aim/speed conversion, red-line rasterizing,
+draw order and Amiga dirty-row restoration still belong to the pending
+presentation integration. This is coverage of currently modeled area-one
+instances, not all 23 wall-family objects or the hostile shopkeeper. Crates,
+other unimplemented wall types, destructive shop state and exact Windows
+collision-line edges remain fidelity gaps, not implied support.
 
 `playerDraw` traces cumulative lines against `parentWall` and `subparentEnemy`,
 starting at the player origin. Each iteration advances Y by

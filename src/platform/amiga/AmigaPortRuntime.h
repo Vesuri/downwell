@@ -9,6 +9,7 @@
 #include "core/ProjectileAnimation.h"
 #include "core/MachineGunTrajectory.h"
 #include "core/ProjectileSegment.h"
+#include "core/LaserSightRay.h"
 #include "core/MachineGunEmitter.h"
 #include "core/CurrencyAccount.h"
 #include "core/MainCameraMotion.h"
@@ -207,6 +208,10 @@ public:
     std::uint64_t randomDrawCount() const { return enemyRandom_.drawCount(); }
     const downwell::GameMakerRandom& randomState() const { return enemyRandom_; }
 
+    // Pure query of the implemented area-one snapshot, in room coordinates.
+    downwell::LaserSightRay traceLaserSight(downwell::LaserSightRay::Coordinate x,
+        downwell::LaserSightRay::Coordinate y, downwell::LaserSightRay::Coordinate bottom,
+        std::uint32_t speedTurns, std::uint32_t aimTurns = 0) const;
     const AmigaPlayer& player() const { return player_; }
     unsigned tick() const { return tick_; }
     unsigned ringOrigin() const { return ringOrigin_; }
