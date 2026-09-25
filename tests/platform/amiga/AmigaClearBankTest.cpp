@@ -149,6 +149,23 @@ int main(int argc, char** argv) {
     }
     require(!AmigaClearBank::build(unordered.data(),unordered.size(),fallback,4,target,32140) && storage==validBank,
         "unordered directory rejected transactionally");
+    std::vector<std::uint8_t> expectedCopy(31756);
+    const unsigned copyBytes = AmigaClearBank::build(source.data(),source.size(),fallback,4,
+        expectedCopy.data(),expectedCopy.size(),1,1,nullptr,true);
+    require(copyBytes != 0,"copy alignment oracle builds");
+    for(unsigned srcOffset=0;srcOffset<4;++srcOffset) for(unsigned dstOffset=0;dstOffset<4;++dstOffset) {
+        std::vector<std::uint8_t> shifted(source.size()+4,0xa5), copied(31756+8,0xa5);
+        std::memcpy(shifted.data()+srcOffset,source.data(),source.size());
+        const auto unchangedSource=shifted;
+        auto* destination=copied.data()+4+dstOffset;
+        const unsigned bytes=AmigaClearBank::build(shifted.data()+srcOffset,source.size(),fallback,4,
+            destination,31756,1,1,nullptr,true);
+        require(bytes==copyBytes && std::memcmp(destination,expectedCopy.data(),bytes)==0,
+            "all source/destination byte alignments preserve bank payload");
+        for(unsigned i=0;i<4+dstOffset;++i) require(copied[i]==0xa5,"prefix guard intact");
+        for(unsigned i=4+dstOffset+bytes;i<copied.size();++i) require(copied[i]==0xa5,"suffix guard intact");
+        require(shifted==unchangedSource,"copy source untouched");
+    }
     for (unsigned j = 0; j < AmigaClearBank::longword(source.data() + 8); ++j) {
         auto* record = source.data() + 20 + j * 24;
         if (AmigaClearBank::word(record) == 64500) {

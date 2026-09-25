@@ -192,3 +192,21 @@ destination write. Selected metadata/payloads and guard bytes are independently
 checked, including under ASan/UBSan.
 The game-profile export remains byte-identical (`--profile game --check`),
 so the shared outline helper has not altered credits/style/gameplay assets.
+
+### Bank payload copies
+
+The bank builder now uses standard `memcpy` for the validated header,
+directory records and already-planar payloads. Inspection of the 68000 output
+showed the former indexed payload loop using one `move.b` per iteration;
+the new call reaches the existing runtime's aligned `move.l (a0)+,(a1)+`
+loop, with byte handling for other alignments/tails. No new assembly or
+AmigaOS call was introduced, and validation still precedes destination writes.
+
+Host tests exercise all 16 combinations of source/destination byte alignment,
+compare complete bank bytes, require unchanged source data and intact prefix/
+suffix guards, and also pass ASan/UBSan. Existing selected-payload, malformed
+directory and bank-capacity tests remain in place.
+The bounded A500 regression passes 432 completion frames, 192 exit-field
+frames, both clears, 60 third-level updates and the stack guard after the
+copy change (`/tmp/downwell-bank-copy-native-gdb.log`). Both 68000 instruction
+and helper audits pass.

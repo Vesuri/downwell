@@ -248,3 +248,19 @@ third-level updates and the stack guard. The final profile completes within
 its 120-second hard limit, reports zero clock clamps, and restores normal
 startup. Logs: `/tmp/downwell-outlined-merge-native-gdb.log` and
 `/tmp/downwell-outlined-merge-profile.log`.
+
+### Native bank bulk copy
+
+Replacing the bank's indexed byte-copy loops with standard `memcpy` selects
+the existing runtime's aligned 68000 longword loop. The same detailed profile
+reduces peak offer-bank preparation from 167.98 to 45.30 ms. This is a
+transition-cost improvement, not a 123 ms per-frame saving. Initial border
+painting and the animated content/layout costs are unchanged and still need
+work; the 20 ms frame target is not achieved.
+
+All alignment/guard/source-preservation tests pass, including ASan/UBSan.
+The bounded native comparison again passes 432 completion frames and both
+reentries. The 480-update profile completed within its 120-second hard limit,
+reported zero clock clamps, and restored normal startup. Evidence:
+`/tmp/downwell-bank-copy-native-gdb.log` and
+`/tmp/downwell-bank-copy-profile.log`.

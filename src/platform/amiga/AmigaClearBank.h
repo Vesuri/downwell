@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_AMIGA_CLEAR_BANK_H
 #define DOWNWELL_AMIGA_CLEAR_BANK_H
 #include <cstdint>
+#include <cstring>
 #include "core/LevelUpgradeArt.h"
 // Copy selected already-planar records from the Fast/host pack to a bounded
 // Chip bank. Caller owns DMA/blitter retirement; source and target must not
@@ -78,16 +79,16 @@ struct AmigaClearBank {
                 length > capacity - bytes) return 0;
             bytes += length;
         }
-        for (unsigned i = 0; i < 20; ++i) target[i] = source[i];
+        std::memcpy(target, source, 20);
         putLong(target + 8, count);
         unsigned cursor = 20 + count * 24;
         for (unsigned i = 0; i < count; ++i) {
             const auto* record = records[i];
             auto* output = target + 20 + i * 24;
-            for (unsigned j = 0; j < 24; ++j) output[j] = record[j];
+            std::memcpy(output, record, 24);
             const unsigned offset = longword(record + 16), length = longword(record + 20);
             putLong(output + 16, cursor);
-            for (unsigned j = 0; j < length; ++j) target[cursor + j] = source[offset + j];
+            std::memcpy(target + cursor, source + offset, length);
             cursor += length;
         }
         return bytes;
