@@ -2,6 +2,15 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Rejected immutable-input snapshots in the ray painter
+
+Copying the destination pointer, normalized ring origin and line endpoints to
+locals before the draw loop passed the renderer regression, but the upgraded
+FPSCOUNT tape measured **1,506 fields / 19.92 FPS**, versus the retained
+**1,503 / 19.96 FPS**. This small difference does not establish a useful gain
+or isolate a compiler cause. The experiment was removed; no source-level
+snapshot optimization remains. Logs: `/tmp/downwell-ray-snapshot-{test,fps}.log`.
+
 ### Keep ray save/restore bookkeeping local
 
 Drawing now appends through a local damage-entry pointer and publishes the
