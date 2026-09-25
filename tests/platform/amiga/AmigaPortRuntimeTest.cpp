@@ -89,15 +89,40 @@ int main() {
                     const auto angle = Ray::turnsFromQ8Degrees(aim*256);
                     const auto speed = Ray::turnsFromQ8Degrees((x%5)*256);
                     const Ray::Coordinate px{x+240, 524287}, py{y+176, 524289};
-                    const auto a = indexed.traceLaserSight(px,py,{476,0},speed,angle);
-                    const auto b = fallback.traceLaserSight(px,py,{476,0},speed,angle);
-                    require(a.x.pixel == b.x.pixel && a.x.fraction == b.x.fraction &&
-                            a.y.pixel == b.y.pixel && a.y.fraction == b.y.fraction,
-                            "ray hits are independent of index availability across boundaries and angles");
+                    for (const Ray::Coordinate bottom : {Ray::Coordinate{476,0},
+                            Ray::Coordinate{py.pixel,0}, Ray::Coordinate{py.pixel-8,0}}) {
+                        const auto a = indexed.traceLaserSight(px,py,bottom,speed,angle);
+                        const auto b = fallback.traceLaserSight(px,py,bottom,speed,angle);
+                        const auto reference = Ray::trace(px,py,bottom,speed,
+                            [&](const downwell::ProjectileSegment& path) {
+                                for (unsigned i = 0; i < 128; ++i)
+                                    if (path.intersects(xs[i]+240-8,xs[i]+240+8,
+                                                        ys[i]+176-8,ys[i]+176+8)) return true;
+                                return false;
+                            }, [](const downwell::ProjectileSegment&) { return false; }, angle);
+                        require(a.x.pixel == reference.x.pixel && a.x.fraction == reference.x.fraction &&
+                                a.y.pixel == reference.y.pixel && a.y.fraction == reference.y.fraction,
+                                "runtime ray matches unfiltered masks including origins below view bottom");
+                        require(a.x.pixel == b.x.pixel && a.x.fraction == b.x.fraction &&
+                                a.y.pixel == b.y.pixel && a.y.fraction == b.y.fraction,
+                                "ray hits are independent of index availability across boundaries and angles");
+                    }
                 }
         require(indexed.randomDrawCount() == fallback.randomDrawCount() &&
                 indexed.blocksDestroyed() == 0 && fallback.blocksDestroyed() == 0,
                 "ray lookup preserves RNG and block lifetime");
+    }
+    {
+        // The last slot is the only hit; lookup must preserve the entire
+        // runtime capacity even with many duplicate nonintersecting masks.
+        AmigaPortRuntime runtime(0);
+        int xs[512], ys[512];
+        for (unsigned i = 0; i < 512; ++i) { xs[i] = 100; ys[i] = 32; }
+        xs[511] = 0;
+        runtime.configureBreakables(xs,ys,512);
+        const auto ray = runtime.traceLaserSight({240,0},{176,0},{476,0},0);
+        require(ray.x.pixel == 240 && ray.y.pixel == 200 && !ray.y.fraction,
+                "ray lookup retains the final block at full capacity");
     }
     {
         AmigaPortRuntime pool(0);

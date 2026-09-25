@@ -2,6 +2,20 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Rejected per-ray vertical candidate list
+
+Filtering active breakable masks by the ray's queried Y range once per ray
+measured **1,498 PAL fields / 20.03 FPS** for 600 upgraded gameplay updates,
+versus the retained **1,503 / 19.96 FPS** (both maximum gap six fields).
+This does not establish a worthwhile gain for a 512-pointer temporary list
+(2,048 additional stack bytes on the target). The production change was
+removed. Log: `/tmp/downwell-ray-candidates-fps.log`.
+
+Retained regressions compare runtime endpoints to an unfiltered mask oracle
+for 9,639 fractional-position/angle/view-bottom combinations, including a
+view bottom above the origin. A full 512-block fixture puts the only hit in
+the final slot. These test lookup equivalence, not Windows GPU line coverage.
+
 ### Rejected immutable-input snapshots in the ray painter
 
 Copying the destination pointer, normalized ring origin and line endpoints to
