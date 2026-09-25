@@ -30,11 +30,51 @@ three, with exact adapter comparisons and active-enemy coverage retained.
 Those changed populations are not a reason to preserve the previously missing
 Draw side effect. Log: `/tmp/downwell-field-draw-focused.log`.
 
-Circle rasterization is still absent from both live renderers, and wind
-audio/associated RNG remains unimplemented. This connects the modeled Draw
-state update, not complete field presentation or global VM Draw ordering.
+Both live renderers now use `GoalFieldOutline` for the white radius/radius-1
+and red radius+1 outlines. Wind audio/associated RNG remains unimplemented;
+this does not establish complete field presentation or global VM Draw ordering.
 
-The 60-second-bounded A500 transition check passes two clears, 432 planar
+### Retained circle presentation
+
+The shared outline uses 24 segments, the documented default circle precision
+(the recovered game has no `draw_set_circle_precision` call). Reference:
+[GameMaker circle precision](https://manual.gamemaker.io/lts/en/GameMaker_Language/GML_Reference/Drawing/Basic_Forms/draw_set_circle_precision.htm).
+Q8 radii, Q15 unit vectors and integer line rasterization are a portable
+adaptation; exact Windows GPU edge coverage and same-depth object ordering
+remain unverified. Both backends currently place the field above static
+terrain/shop fixtures and below moving actors.
+
+The Amiga overlay retains sparse words separately for the two display rings.
+Unchanged geometry on unchanged underlying rows performs zero framebuffer
+writes. Changed geometry restores only departing coverage and directly
+publishes changed final words; it does not clear continuing coverage first.
+Dirty terrain/BOB rows are restored before the normal backing-row transfer,
+then the outline is reapplied. The pristine terrain backing is never painted.
+The caches and shared scratch require roughly 60 KB of Fast memory, no added
+Chip allocation, and no large stack-local arrays.
+
+The renderer fixture compares 512 changing-radius, horizontal-camera and
+circular-origin cases against fresh scalar rendering, including dirty rows,
+retirement and preservation of unrelated pixels. It explicitly requires zero
+writes for unchanged frames. Address/undefined-behavior sanitizers pass this
+fixture and the existing 22,834 offline sprite comparisons
+(`/tmp/downwell-circle-sanitized.log`). The native clear verifier additionally
+requires visible field frames and compares them before BOB drawing; host
+comparisons alone are not proof that the live native path executes.
+
+The final 90-second-bounded A500 check passes 192 visible field comparisons,
+432 clear-screen comparisons, two clears and 60 third-level updates, with
+zero pixel failures and the stack guard intact. Log:
+`/tmp/downwell-field-final-clean-native.log`. Earlier instrumented runs timed
+out in the byte-by-byte full-ring comparison; testing row damage once and
+using the existing aligned comparison helper removes its per-byte division
+cost. This is verifier overhead, not a claimed gameplay frame-time gain.
+The full host suite and SDL build pass (`/tmp/downwell-field-final-tests.log`,
+`/tmp/downwell-field-final-sdl.log`). Normal startup is restored after native
+verification, with clean 68000 instruction and 64-bit-helper audits.
+
+For the preceding Draw-RNG-only change, the 60-second-bounded A500 transition
+check passed two clears, 432 planar
 comparisons and 60 third-level updates with this corrected stream. The normal
 build is restored and both 68000 audits pass. Logs:
 `/tmp/downwell-field-draw-native.log`, `/tmp/downwell-field-draw-restore.log`.
@@ -60,7 +100,8 @@ checks and no floating-point, square root, repaint or runtime conversion.
 The player-phase test exhaustively compares 83,521 positions against the raw
 mask, and checks timer behavior while crossing the mask and after retiring
 the field. This corrects the implemented timer guard only: the field's wind
-audio/associated RNG and Draw behavior still need original-game integration.
+audio/associated RNG still needs original-game integration; Draw integration
+is described above.
 
 The focused test also passes address/undefined-behavior sanitizers. The bounded
 60-second A500 clear/reentry check passes two clears, 432 planar comparisons

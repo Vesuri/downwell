@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "GoalFieldOutline.h"
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
 #include "AmmoDividers.h"
@@ -273,12 +274,29 @@ void Game::renderMain(Renderer& renderer) const {
                                        1.0F, 1.0F, 0.0F);
     }
 
+    GoalFieldOutline field;
+    field.set(startup_.goalField(), startup_.levelExitPresent(),
+              static_cast<int>(viewX), static_cast<int>(viewY));
+
     // Enemy Step has already selected its presentation, including hit/wake
     // overrides. Drawing must not reconstruct a default pose from object ID.
-    for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
+    for (unsigned pass = 0; pass < 2; ++pass) {
+      if (pass == 1) {
+        drawShopFixtures(startup_.shops(), [&](int sprite, int frame, int x, int y) {
+            renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
+        });
+        field.draw([&](int x, int y, int pen) {
+            if (x >= 0 && x < 160 && y >= 0 && y < 284)
+                renderer.fillRect(x, y, 1, 1, pen == 1 ? Color{255,255,255,255} : Color{255,0,0,255});
+        });
+      }
+      for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
         const InstanceRecord& instance = startup_.instanceAt(index);
         if (!instance.active)
             continue;
+        const bool enemy = enemyPresentationSprite(instance.objectId,
+            instance.grounded, instance.auxiliaryState) >= 0;
+        if (enemy != (pass == 1)) continue;
         std::int32_t sprite = -1;
         if (instance.objectId == 93) sprite = 51;
         if (instance.objectId == 92) sprite = 51;
@@ -287,19 +305,15 @@ void Game::renderMain(Renderer& renderer) const {
         if (instance.objectId == 296) sprite = 568;
         if (instance.objectId == 109) sprite = 139;
         // objLineToResult (306) is an invisible collision trigger, not art.
-        if (enemyPresentationSprite(instance.objectId,
-                instance.grounded, instance.auxiliaryState) >= 0)
+        if (enemy)
             sprite = instance.spriteId;
         if (sprite >= 0)
             renderer.drawSpriteTransformed(
                 sprite, static_cast<std::uint32_t>(instance.imageIndex),
                 instance.x - viewX, instance.y - viewY,
                 instance.scaleX, instance.scaleY, instance.rotation);
+      }
     }
-
-    drawShopFixtures(startup_.shops(), [&](int sprite, int frame, int x, int y) {
-        renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
-    });
     drawShopKeepers(startup_.shops(), [&](int sprite, int frame, int x, int y) {
         renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
     });

@@ -5,6 +5,7 @@ break downwellClearProbe
 commands
 silent
 printf "Clear phase=%lu frames=%lu choices=%lu failures=%lu reentries=%lu\n", gDownwellClearPhase, gDownwellClearFrames, gDownwellClearChoices, gDownwellClearFailures, gDownwellClearReentries
+printf "Gameplay tick=%lu field frames=%lu pixel failures=%lu\n", gDownwellClearTick, gDownwellClearFieldFrames, gDownwellGameBufferFailures
 if gDownwellClearFailures != 0
     dump binary memory .run/clear-actual-hud.bin gDownwellClearActualHud gDownwellClearActualHud+27264
     dump binary memory .run/clear-expected-hud.bin gDownwellClearExpectedHud gDownwellClearExpectedHud+27264
@@ -27,6 +28,11 @@ if gDownwellClearReentries != 2 || gDownwellClearGameplayUpdates != 60
     printf "Clear departure did not resume gameplay\n"
     quit 1
 end
+if gDownwellClearFieldFrames < 180 || gDownwellGameBufferFailures != 0
+    printf "Exit field coverage failed: frames=%lu pixel failures=%lu\n", gDownwellClearFieldFrames, gDownwellGameBufferFailures
+    quit 1
+end
+printf "Exit field: %lu retained planar frames compared\n", gDownwellClearFieldFrames
 if gDownwellStackGuardReady != 1
     quit 1
 end

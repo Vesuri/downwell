@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/AmigaAmmoHud.h"
 #include "platform/amiga/AmigaLaserSight.h"
+#include "platform/amiga/AmigaGoalField.h"
 #include "platform/amiga/AmigaBufferCompare.h"
 #include "platform/amiga/GameplaySceneStorage.h"
 #include "platform/amiga/AmigaExitMask.h"
@@ -115,6 +116,53 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 } // namespace
 
 int main(int argc, char** argv) {
+    {
+        std::vector<UBYTE> base(downwellGameRingBytes), actual(base.size()), expected(base.size());
+        for (unsigned i = 0; i < base.size(); ++i) base[i] = i * 71 + 13;
+        AmigaGoalField retained;
+        downwell::GoalTimeField field;
+        field.x = 240; field.y = 4000;
+        actual = base;
+        for (unsigned trial = 0; trial < 512; ++trial) {
+            field.radius = downwell::HudReal::ratio(128 * 256 + trial, 256);
+            const unsigned origin = (trial * 23) % downwellGameRingHeight;
+            downwell::GoalFieldOutline shape;
+            shape.set(field, true, 81 + (trial % 159), 3800 + (trial % 320), downwellPlayfieldX);
+            require(retained.prepare(actual.data(), origin, shape, false, [](unsigned) { return false; }), "field fits sparse storage");
+            retained.draw();
+            expected = base;
+            AmigaRenderer oracle;
+            amigaRendererInit(&oracle, expected.data(), nullptr);
+            amigaRendererSetGameOrigin(&oracle, origin);
+            amigaRendererSetClipRect(&oracle, downwellPlayfieldX, 0, downwellPlayfieldWidth, downwellDisplayHeight);
+            shape.draw([&](int x, int y, int pen) { amigaRendererFillRect(&oracle, x, y, 1, 1, pen); });
+            require(actual == expected, "retained field equals fresh scalar circle composition through ring wrap");
+            require(retained.prepare(actual.data(), origin, shape, false, [](unsigned) { return false; }), "unchanged field fits");
+            retained.draw();
+            require(retained.lastWordWrites == 0 && actual == expected,
+                    "unchanged circle geometry performs no plane writes");
+            const unsigned dirty = (origin + 140) % downwellGameRingHeight;
+            require(retained.prepare(actual.data(), origin, shape, true,
+                    [dirty](unsigned row) { return row == dirty; }), "dirty-row field fits");
+            for (unsigned plane = 0; plane < 2; ++plane)
+                for (unsigned x = 0; x < downwellBytesPerPlaneLine; ++x) {
+                    const unsigned at = plane * downwellGameRingPlaneBytes + dirty * downwellBytesPerPlaneLine + x;
+                    base[at] ^= 0x51;
+                    actual[at] = base[at];
+                }
+            retained.draw();
+            expected = base;
+            shape.draw([&](int x, int y, int pen) { amigaRendererFillRect(&oracle, x, y, 1, 1, pen); });
+            require(actual == expected, "terrain repair beneath a retained field refreshes only affected rows");
+            actual[0] ^= 1; base[0] ^= 1;
+            if ((trial & 15) == 15) {
+                downwell::GoalFieldOutline absent;
+                require(retained.prepare(actual.data(), origin, absent, false, [](unsigned) { return false; }), "field retirement fits");
+                require(actual == base, "circle retirement restores only its changed bits, including outline overlaps");
+            }
+        }
+        std::cout << "512 retained goal-field radius/ring comparisons passed\n";
+    }
     {
         alignas(4) unsigned char a[68], b[68];
         for (unsigned offset : {0u, 2u}) for (unsigned length = 0; length <= 64; ++length) {

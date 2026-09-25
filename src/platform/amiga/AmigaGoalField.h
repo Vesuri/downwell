@@ -1,0 +1,100 @@
+#ifndef DOWNWELL_AMIGA_GOAL_FIELD_H
+#define DOWNWELL_AMIGA_GOAL_FIELD_H
+#include "AmigaRenderer.h"
+#include "core/GoalFieldOutline.h"
+
+// Per-display sparse word overlay. Restore only departing coverage; publish
+// final colours directly, never clearing continuing pixels. Drain DMA first.
+// Shared scratch lives only inside prepare(), so pending draws are independent.
+class AmigaGoalField {
+    struct Word { UWORD offset, mask, under[2], paint[2], kept; };
+    static constexpr unsigned capacity = 1024;
+    Word saved_[capacity];
+    unsigned count_ = 0, origin_ = 0;
+    UBYTE* target_ = nullptr;
+    bool valid_ = false, pending_ = false;
+    downwell::GoalFieldOutline shape_;
+    struct Scratch {
+        Word words[capacity];
+        UWORD index[downwellGameRingPlaneBytes / 2] = {};
+        unsigned count = 0;
+    };
+    static Scratch& scratch() { static Scratch value{}; return value; }
+    static UWORD read(const UBYTE* p) { return (UWORD(p[0]) << 8) | p[1]; }
+    void publish(unsigned offset, UWORD value) {
+        UBYTE* p = target_ + offset;
+        if (read(p) == value) return;
+        p[0] = value >> 8; p[1] = value;
+        ++lastWordWrites;
+    }
+public:
+    unsigned lastWordWrites = 0;
+    bool present() const { return valid_ || pending_; }
+    bool matches(UBYTE* target, unsigned origin, const downwell::GoalFieldOutline& shape) const {
+        return valid_ && target == target_ && origin == origin_ && shape.same(shape_);
+    }
+    void discard() { count_ = 0; valid_ = pending_ = false; }
+    template<class DirtyRow>
+    bool prepare(UBYTE* target, unsigned origin, const downwell::GoalFieldOutline& shape,
+                 bool underlyingChanged, DirtyRow dirtyRow) {
+        lastWordWrites = 0;
+        if (target != target_) { discard(); target_ = target; }
+        if (matches(target, origin, shape) && !underlyingChanged) return true;
+        auto& next = scratch();
+        for (unsigned i = 0; i < next.count; ++i) next.index[next.words[i].offset / 2] = 0;
+        next.count = 0;
+        bool overflow = false;
+        shape.draw([&](int x, int y, int pen) {
+            if (x < downwellPlayfieldX || x >= downwellPlayfieldX + downwellPlayfieldWidth ||
+                y < 0 || y >= downwellDisplayHeight) return;
+            unsigned row = origin + static_cast<unsigned>(y);
+            if (row >= downwellGameRingHeight) row -= downwellGameRingHeight;
+            const unsigned offset = row * downwellBytesPerPlaneLine + (x / 16) * 2;
+            auto& slot = next.index[offset / 2];
+            if (!slot) {
+                if (next.count == capacity) { overflow = true; return; }
+                slot = ++next.count;
+                next.words[slot - 1] = {static_cast<UWORD>(offset),0,{0,0},{0,0},0};
+            }
+            auto& word = next.words[slot - 1];
+            const UWORD mask = 0x8000u >> (x & 15);
+            word.mask |= mask;
+            for (unsigned plane = 0; plane < 2; ++plane)
+                word.paint[plane] = (pen & (1u << plane)) ? word.paint[plane] | mask
+                    : word.paint[plane] & static_cast<UWORD>(~mask);
+        });
+        if (overflow) return false;
+        for (unsigned i = 0; i < count_; ++i) {
+            const auto& old = saved_[i];
+            const unsigned slot = next.index[old.offset / 2];
+            const UWORD keep = slot && !dirtyRow(old.offset / downwellBytesPerPlaneLine)
+                ? old.mask & next.words[slot - 1].mask : 0;
+            const UWORD restore = old.mask & static_cast<UWORD>(~keep);
+            for (unsigned plane = 0; plane < 2; ++plane) {
+                const unsigned offset = old.offset + plane * downwellGameRingPlaneBytes;
+                if (restore) publish(offset, (read(target_ + offset) & static_cast<UWORD>(~restore)) |
+                                            (old.under[plane] & restore));
+                if (keep) next.words[slot - 1].under[plane] |= old.under[plane] & keep;
+            }
+            if (keep) next.words[slot - 1].kept = keep;
+        }
+        count_ = next.count;
+        for (unsigned i = 0; i < count_; ++i) saved_[i] = next.words[i];
+        shape_ = shape; origin_ = origin; valid_ = false; pending_ = shape.visible;
+        return true;
+    }
+    void draw() {
+        if (!pending_) return;
+        for (unsigned i = 0; i < count_; ++i) {
+            auto& word = saved_[i];
+            for (unsigned plane = 0; plane < 2; ++plane) {
+                const unsigned offset = word.offset + plane * downwellGameRingPlaneBytes;
+                const UWORD actual = read(target_ + offset);
+                word.under[plane] |= actual & word.mask & static_cast<UWORD>(~word.kept);
+                publish(offset, (actual & static_cast<UWORD>(~word.mask)) | word.paint[plane]);
+            }
+        }
+        pending_ = false; valid_ = true;
+    }
+};
+#endif
