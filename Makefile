@@ -121,6 +121,14 @@ all: $(TARGET)
 .PHONY: verify-sequence-timeline
 .PHONY: verify-unit-sequence-frames
 .PHONY: verify-skeleton-animation
+.PHONY: verify-skeleton-decisions
+verify-skeleton-decisions: build/skeleton-decisions-test
+	./build/skeleton-decisions-test
+
+build/skeleton-decisions-test: tests/core/SkeletonDecisionsTest.cpp src/core/SkeletonDecisions.h src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/UnitSequenceFrames.h src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h src/core/AlarmBank.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/SkeletonDecisionsTest.cpp
+
 verify-skeleton-animation: build/skeleton-animation-test
 	./build/skeleton-animation-test
 

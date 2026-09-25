@@ -277,6 +277,11 @@ and the ordinary build was restored after both attempts.
   updates and sanitizers pass with helper-free 68000 compilation. Arbitrary
   nonzero frame-write reconciliation remains rejected, and the component is
   not yet connected to the live enemy pool or throw/presentation decisions.
+  `SkeletonDecisions` now connects activation, hit, facing and throw gates to
+  that animation state, retaining the final hit-stun override after the owner's
+  motion/death work. 4,608 scalar cases, sanitizers and existing animation/throw
+  regressions pass; 68000 compilation needs no helpers. Live projectile/actor
+  ownership and near-equal VM comparison semantics remain integration work.
 
 ## Working evidence
 

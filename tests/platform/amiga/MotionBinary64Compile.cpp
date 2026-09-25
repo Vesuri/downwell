@@ -5,6 +5,7 @@
 #include "core/SequenceTimeline.h"
 #include "core/UnitSequenceFrames.h"
 #include "core/SkeletonAnimation.h"
+#include "core/SkeletonDecisions.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
@@ -59,4 +60,18 @@ extern "C" bool skeletonAnimationCompile(downwell::SkeletonAnimation* state,
     if (!state->setSprite(sprite) || !state->advanceImage(*crossed)) return false;
     state->beginStep(stopped);
     return true;
+}
+namespace {
+struct SkeletonDecisionEvents {
+    unsigned trace = 0;
+    void hurtSound(int sound) { trace = (trace << 8) ^ unsigned(sound); }
+    bool throwBone(int facing) { trace = (trace << 2) ^ unsigned(facing); return true; }
+};
+}
+extern "C" unsigned skeletonDecisionsCompile(downwell::SkeletonDecisions* state,
+    bool stopped, bool below, bool left, int movement) {
+    SkeletonDecisionEvents ops;
+    if (!state->stepDecisions(stopped,below,left,movement,ops) || !state->finishPresentation())
+        return 0xffffffffu;
+    return ops.trace;
 }

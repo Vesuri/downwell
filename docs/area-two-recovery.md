@@ -117,6 +117,29 @@ replaced with cavern behavior just to make the new patterns run.
 
 ### Skeleton throw orchestration
 
+`SkeletonDecisions` now joins `SkeletonAnimation` with the recovered Step
+activation, hit, sprite, facing and throw gates. The owner supplies precise
+coordinate comparisons rather than rounding player coordinates into this
+component. Initial activity is true, as in Create. A hit activates the actor,
+extends Alarm 1, resets the image, emits sound 133 before stopping `imgSp`,
+arms Alarm 3 and clears the hit flag. Idle-to-throw entry can subsequently
+restore `imgSp=0.3` in that same Step; this order is intentional.
+
+The throw callback runs only above frame 4 with an unset shot latch, before
+horizontal velocity can override facing. Above frame 6, nonzero desired speed
+stops and arms Alarm 2 once. Time-stop skips these decisions but not the final
+hit-stun sprite override. That override is exposed separately so the owner
+can preserve motion/death/effect processing before it, rather than moving it
+earlier for convenience. Callback capacity failure returns failure without
+setting the shot latch. These callbacks still need the live projectile owner.
+
+4,608 scalar decision cases cover sprites, threshold sides, activity, hits,
+time-stop, latch state, player comparisons and motion sign. Sanitizers and
+animation/throw regressions pass; the combined 68000 compile has no undefined
+helper symbols. This is component evidence, not a complete source-runner frame
+trace: VM numeric-comparison tolerance at near-equal frame boundaries still
+needs checking, along with live allocation, motion, death and collision order.
+
 `SkeletonTiming.h` now owns the four alarm values and the timing writes from
 the skeleton's Alarm 0–3 and Step events. Alarm 0 clears `edamaged`; Alarm 1
 clears `hitStun`; Alarm 2 resets `image_index` and `eShotDelay` and writes 15
