@@ -82,9 +82,16 @@ struct SkeletonDecisionEvents {
     void flash(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b,int c) { trace^=x.high+y.high+a+b+c; }
     void currency(int a) { trace+=a; }
     void deathSound(int a) { trace+=a; }
-    void deadBody(int a,int b,int c) { trace+=a+b+c; }
+    void deadBody(int a,downwell::MotionBinary64 b,int c) { trace+=a+b.high+b.low+c; }
     void debris(int a,int b) { trace+=a+b; }
     void destroy() { ++trace; }
+    void destroyBullet() { ++trace; }
+    downwell::MotionBinary64 impactAngle(int x,int y) { trace+=x+y; return {}; }
+    void momentDelay() { ++trace; }
+    void bulletHitSound(int sound) { trace+=sound; }
+    void impactEffect(int sprite,int rate,downwell::MotionBinary64 direction,int depth) {
+        trace+=sprite+rate+direction.high+direction.low+depth;
+    }
 };
 }
 extern "C" unsigned skeletonDecisionsCompile(downwell::SkeletonDecisions* state,
@@ -110,6 +117,12 @@ extern "C" unsigned skeletonCoordinatesCompile(downwell::SkeletonActor* state,
 }
 extern "C" bool skeletonCreateCompile(downwell::SkeletonActor* state,int x,int y) {
     return state->create(x,y);
+}
+extern "C" unsigned skeletonBulletCompile(downwell::SkeletonActor* state,int damage,
+    downwell::MotionBinary64 direction) {
+    SkeletonDecisionEvents events;
+    if(!state->hitByMachineGun(damage,direction,events)) return 0xffffffffu;
+    return events.trace;
 }
 namespace {
 struct BoneStoreCompileRandom {

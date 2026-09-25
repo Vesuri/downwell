@@ -388,6 +388,18 @@ and the ordinary build was restored after both attempts.
   updated bone-spawn fixtures. Inherited time-field collision now sets health
   to zero unless immune, leaving death effects to the next ordinary Step.
   See `tools/verify-runner-move-snap.py` for the pinned disassembly guard.
+  The skeleton's machine-gun damage branch now preserves source hit writes and
+  callback order: bullet destruction, hit direction/angle/damage, health loss,
+  damage stun and moment delay, sound, fractional impact, effect, then the
+  additional delay only when not hit-stunned. Lethal health does not retire the
+  enemy or pay rewards in the collision callback; ordinary Step owns death.
+  `takenImpact` is now binary64: nine damage gives 1.8, not integer 1. Tests
+  cover 48 health/damage/stun/activation combinations, unsupported weapon
+  rejection, seven-shot lethality and exact fractional impact reaching the
+  later corpse callback. Normal/sanitizer and 68000 compilation checks pass.
+  This branch is deliberately scoped to the current non-consistent,
+  non-exploding 9/15-damage machine-gun bullets; live collision/effect sinks
+  and skeleton admission are still unfinished.
 
 ## Working evidence
 

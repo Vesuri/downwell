@@ -8,10 +8,33 @@ namespace downwell {
 struct SkeletonActor : SkeletonDecisions {
     MotionBinary64 xx{}, yy{}, xsp{}, ysp{};
     std::int32_t x=0, y=0;
-    int health=60, previousHealth=60, money=10, takenImpact=0;
+    int health=60, previousHealth=60, money=10, hitDamage=0;
+    MotionBinary64 takenImpact{},hitDirection{},hitAngle{};
+    bool damageStun=false;
     bool grounded=true, alive=true, destroyRequested=false;
     bool timefieldImmune=false;
     void collideTimeField() { if(!timefieldImmune) health=0; }
+    // Current machine-gun branch: non-consistent, non-exploding bullet against
+    // this non-immune/non-through enemy. Other weapon contracts are not implied.
+    // Events owns the bullet's destruction and source point_direction call.
+    template<class Events>
+    bool hitByMachineGun(int damage,MotionBinary64 direction,Events& events) {
+        if(damage!=9 && damage!=15) return false;
+        if(health<=0) return true; // Source leaves the bullet alive in this case.
+        events.destroyBullet();
+        hitPending=true;
+        hitDirection=direction;
+        hitAngle=events.impactAngle(x,y);
+        hitDamage+=damage;
+        health-=damage;
+        damageStun=true;
+        events.momentDelay(); // scrDamageEnemy, even when already hit-stunned.
+        events.bulletHitSound(29);
+        takenImpact=damage==9?MotionBinary64{0x3ffcccccu,0xcccccccdu}:MotionBinary64{0x40080000u,0};
+        events.impactEffect(605,4,direction,0); // 0.4 speed, no rounding to pixels.
+        if(!hitStun) events.momentDelay();
+        return true;
+    }
     static bool snapCreateCoordinate(std::int32_t value,std::int32_t& snapped) {
         RunnerImageValue coordinate;
         if(!coordinate.assign(MotionBinary64::fromInteger(value))) return false;
@@ -83,7 +106,7 @@ struct SkeletonActor : SkeletonDecisions {
             destroyRequested=true;
             events.destroy();
         }
-        takenImpact=0;
+        takenImpact={};
         return finishPresentation();
     }
     // Predicates must be evaluated from the current source values with the
