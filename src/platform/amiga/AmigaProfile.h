@@ -16,6 +16,7 @@ enum DownwellProfilePhase {
     profilePlayerMotion, profilePlayerShops,
     profileActorCollect, profileActorChannels, profileHardwareSpriteUpdate,
     profileLaserTrace, profileLaserPrepare, profileLaserDraw,
+    profileLaserDrawDrain, profileGameplayBobs, profileLaserRestore, profileLaserPrepareDrain,
     profilePhaseCount
 };
 

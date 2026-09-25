@@ -2,6 +2,30 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Separate ray CPU loops from blitter waits and main's register pressure
+
+The refined instrumented upgraded tape measures **11.741 ms/update** in CPU
+ray drawing (47), **10.887 ms** in restoration (50), **0.145 ms** in each of
+the draw/prepare blitter waits (48/51), **2.615 ms** in planar actor drawing
+(49), and **0.417 ms** in retention checks (46). Endpoint tracing (45) is
+7.217 ms excluding nested terrain queries. These are exclusive PROBES costs,
+not shipping FPS. The large combined ray cost was not mainly a blitter wait.
+
+The ordinary 68000 disassembly showed both ray loops inlined into `main`,
+repeatedly spilling pixel state into its large stack frame. Target-only
+`noinline` on `AmigaLaserSight::prepare` and `draw` keeps their algorithms
+unchanged while reducing register pressure. The resulting ordinary routines
+are 448 and 484 bytes respectively. The upgraded FPSCOUNT tape improves from
+**1,874 fields / 16.01 FPS** to **1,657 fields / 18.11 FPS**, maximum gap seven.
+This remains far below the target. No assembly implementation was added.
+
+Logs: `/tmp/downwell-laser-split-probes.log` and
+`/tmp/downwell-laser-noinline-fps.log`. New scopes compile out of normal and
+FPSCOUNT-only builds.
+The bounded native capture remains pixel-identical to SDL (0/99,968), and
+the restored ordinary build passes both 68000 audits. Evidence:
+`/tmp/downwell-laser-noinline-frame.log`.
+
 ### Direct changed-plane ray publication
 
 The ray painter now reuses the two bytes it just read to save the underlying

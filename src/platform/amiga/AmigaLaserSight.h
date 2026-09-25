@@ -43,6 +43,11 @@ public:
     void discard() { count_ = 0; valid_ = pending_ = false; }
     // underlyingChanged includes both already-dirty terrain rows and actors
     // about to overlap the ray. False is valid only for an untouched backing.
+    // Keep the target's hot loops out of the very large main function. LTO
+    // otherwise spills their pixel state to main's stack on almost every step.
+#ifdef DOWNWELL_FREESTANDING
+    __attribute__((noinline))
+#endif
     bool prepare(UBYTE* target, unsigned origin, const downwell::LaserSightLine* line,
                  bool underlyingChanged) {
         lastByteWrites = 0;
@@ -63,6 +68,9 @@ public:
         if (line) line_ = *line;
         return pending_;
     }
+#ifdef DOWNWELL_FREESTANDING
+    __attribute__((noinline))
+#endif
     void draw() {
         if (!pending_) return;
         line_.draw([&](int x, int y) {

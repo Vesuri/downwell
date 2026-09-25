@@ -177,7 +177,7 @@ The Amiga actor list now contains a ray marker after the player. Hardware
 allocation stops at that marker: earlier actors use the masked planar pass,
 while later bullets/gems may still use hardware sprites. This keeps earlier
 hardware sprites from incorrectly covering the planar ray. That extra BOB
-work is a performance cost. The upgraded profiling tape remains slow (16.01
+work is a performance cost. The upgraded profiling tape remains slow (18.11
 FPS at the latest measured checkpoint); see `amiga-profiling.md` for the
 separate tracing, restoration and drawing phases and measured optimizations.
 

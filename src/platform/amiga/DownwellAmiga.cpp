@@ -1284,13 +1284,14 @@ static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
         const GameplayBob& bob = bobs[i];
         if (bob.sprite == gameplayRayMarker) {
             DW_PROFILE_SCOPE(profileLaserDraw);
-            AmigaHardware::blitterDrain();
+            { DW_PROFILE_SCOPE(profileLaserDrawDrain); AmigaHardware::blitterDrain(); }
             gameplayRays[buffer].draw();
 #ifdef DOWNWELL_SCENE_VERIFY
             if (ray) ray->draw([&](int x, int y) { amigaRendererFillRect(&oracle, x, y, 1, 1, 2); });
 #endif
             continue;
         }
+        DW_PROFILE_SCOPE(profileGameplayBobs);
         int x, y, width, height;
         if (!amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
                 bob.sprite, bob.frame, bob.x, bob.y, bob.flip,
@@ -3051,9 +3052,12 @@ int main(void) {
                             x <= right && x+w > left && y <= bottom && y+h > top) changed = true;
                     }
                 }
-                AmigaHardware::blitterDrain();
-                gameplayRays[back].prepare((UBYTE*)gameDisplay[back].data, port.ringOrigin(),
-                    rayVisible ? &rayLine : nullptr, changed);
+                { DW_PROFILE_SCOPE(profileLaserPrepareDrain); AmigaHardware::blitterDrain(); }
+                {
+                    DW_PROFILE_SCOPE(profileLaserRestore);
+                    gameplayRays[back].prepare((UBYTE*)gameDisplay[back].data, port.ringOrigin(),
+                        rayVisible ? &rayLine : nullptr, changed);
+                }
             }
             syncGameRows(gameDisplay[back], gameBitmap, back);
             if (bobCount)
