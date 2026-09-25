@@ -4,6 +4,7 @@
 #include "AmigaMenuScroll.h"
 #include "AmigaSplashCache.h"
 #include "AmigaStyleRenderer.h"
+#include "AmigaSelectionLayer.h"
 #include "DownwellCopperLists.h"
 #include "framework/AmigaHardware.h"
 #include "framework/Bitmap.h"
@@ -85,6 +86,29 @@ static bool buildNarrow(CopperList& list, const UBYTE* frame,
 DownwellStyleCopperList::DownwellStyleCopperList(UWORD* words, unsigned capacityWords)
     : CopperList(words, capacityWords), frame0Offset_(0), frame1Offset_(0), maskOffset_(0), border0Offset_(0), border1Offset_(0), modeOffset_(0)
 {
+}
+
+bool DownwellSelectionCopperList::build(const UBYTE* border,const UBYTE* layer,const UBYTE* mask,
+    const Sprite& player,const Sprite* actors,unsigned count,const Sprite& overflow,const Palette& palette) {
+    if (!border || !layer || !beginNarrowDisplay(*this,true) ||
+        !move(bplcon0,mask ? 0x6401 : 0x4401) || !move(bplcon1,0) || !move(bplcon2,0x0044) ||
+        !move(bpl1mod,AmigaSelectionLayer::stride-20) || !move(bpl2mod,AmigaSelectionLayer::stride-20)) return false;
+    modeOffset_=moveOffset(bplcon0);
+    borderOffset_=size();
+    if (!pointer(bpl1pth,border) || !pointer(bpl3pth,border+AmigaSelectionLayer::planeBytes)) return false;
+    layerOffset_=size();
+    if (!pointer(bpl2pth,layer) || !pointer(bpl4pth,layer+AmigaSelectionLayer::planeBytes)) return false;
+    maskOffset_=size();
+    if (!pointer(bpl5pth,mask) || !pointer(bpl6pth,mask) || !showSprite(0,player)) return false;
+    for(unsigned i=0;i<count;++i) if(!showSprite(i+1,actors[i])) return false;
+    return showSprite(7,overflow) && setPalette(palette) && finish();
+}
+bool DownwellSelectionCopperList::update(const UBYTE* border,const UBYTE* layer,const UBYTE* mask) {
+    return valid() && border && layer && patchPointer(borderOffset_,border) &&
+        patchPointer(borderOffset_+4,border+AmigaSelectionLayer::planeBytes) &&
+        patchPointer(layerOffset_,layer) && patchPointer(layerOffset_+4,layer+AmigaSelectionLayer::planeBytes) &&
+        patchPointer(maskOffset_,mask) && patchPointer(maskOffset_+4,mask) &&
+        patchMove(modeOffset_,mask ? 0x6401 : 0x4401);
 }
 
 bool DownwellStyleCopperList::build(const UBYTE* frame, const UBYTE* mask,

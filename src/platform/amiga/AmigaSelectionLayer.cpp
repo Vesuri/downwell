@@ -24,6 +24,13 @@ bool AmigaSelectionLayer::render(UBYTE* target, const UBYTE* pack, const UBYTE* 
     const Command* commands, unsigned count, unsigned& paintedPixels) {
     paintedPixels = 0;
     if (!target || count > capacity || (count && !commands)) return false;
+    // Banks are immutable between explicit invalidations. Camera-only frames
+    // must not repeat asset-directory lookups or reconstruct Bitmap wrappers.
+    if (initialized_ && target_ == target && pack_ == pack && end_ == end && count_ == count) {
+        unsigned i = 0;
+        while (i < count && previous_[i] == commands[i]) ++i;
+        if (i == count) return true;
+    }
     const UBYTE* records[capacity];
     for (unsigned i = 0; i < count; ++i) {
         const auto& c = commands[i];

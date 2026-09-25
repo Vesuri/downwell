@@ -683,10 +683,13 @@ test: test-amiga-clear-scene-assets
 build/amiga-clear-scene-assets-test: tests/platform/amiga/AmigaClearSceneAssetsTest.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
-test-amiga-clear-scene-assets: generate-amiga-clear generated/amiga-game.exit-mask build/amiga-clear-scene-assets-test
+test-amiga-clear-scene-assets: generate-amiga-clear generated/amiga-game.exit-mask generated/amiga-game.selection-mask build/amiga-clear-scene-assets-test
 	./build/amiga-clear-scene-assets-test generated/amiga-clear.dwap generated/amiga-game.exit-mask
+	./build/amiga-clear-scene-assets-test generated/amiga-clear.dwap generated/amiga-game.selection-mask
 generated/amiga-game.exit-mask: tools/generate-amiga-hud.py
 	tools/generate-amiga-hud.py --profile game
+generated/amiga-game.selection-mask: generated/amiga-game.exit-mask
+	@test -f $@ || tools/generate-amiga-hud.py --profile game
 test: test-amiga-pen-blit
 .PHONY: test-amiga-pen-blit
 build/amiga-pen-blit-test: tests/platform/amiga/AmigaPenBlitTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)

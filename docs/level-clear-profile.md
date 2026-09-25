@@ -25,6 +25,10 @@ Never describe probe-build throughput as shipping FPS. The section label
 
 ## Measurements
 
+The tables immediately below are the original baseline. See **Retained
+upgrade layers** at the end for the subsequently integrated hardware-scrolled
+content path and its remaining costs.
+
 Frame-count-only results (first complete 480-update capture):
 
 | Section | Updates | PAL fields | FPS / stall |
@@ -143,3 +147,42 @@ Regression checks after adding timing brackets: 360 alternating overlay
 frames and 2,880 circular-border frames match fresh rendering. Native builds
 retain the 68000 instruction/helper audits. This profile is not a Windows
 presentation-equivalence proof or evidence that the broader parity goal is done.
+
+## Retained upgrade layers
+
+The live upgrade scene now retains finite world-space border and content
+canvases. Camera/tile translation patches Copper pointers, with independent
+icon/shadow animation using damage rectangles. See `scene-architecture.md`
+for geometry, memory ownership and native pixel verification. The older
+320-row ring and viewport-overlay description above is the baseline path,
+now retained only as the clear-scene verification oracle.
+
+The same bounded 480-update detailed profile reports these idle averages:
+
+| Work | ms |
+|---|---:|
+| Overlay validation, damage and painting combined | 24.43 |
+| Draw-list/layout | 15.78 |
+| Trig sampling | 2.57 |
+| Shared clear simulation | 6.62 |
+| Border render/cache | 4.96 |
+| Sprites | 0.82 |
+| Copper patches | 0.54 |
+
+The overlay total replaces the baseline's 16.68 + 31.12 ms phases; this new
+renderer does not split bookkeeping from painting yet. Border timing includes
+bank invalidation spikes up to 165 ms; steady navigation averages 3.34 ms.
+Border command construction remains in the residual phase, so the cache
+figure is not its complete CPU cost. Instrumentation reported zero clock clamps.
+
+This is not a 20 ms result. Remaining work includes avoiding identical border
+repainting after offer-bank replacements, reducing animated heading/outline
+composition, and proving cheaper equivalents for repeated source-derived
+layout calculations. Do not remove original animation to satisfy the budget.
+Detailed log: `/tmp/downwell-retained-probes.log`.
+
+The separate frame-count-only run (`/tmp/downwell-retained-fps.log`) measured
+20.98 FPS reveal, 14.73 FPS idle selection, 13.70 FPS navigation and 22.93 FPS
+departure. Clear entry took 14 fields (280 ms). Next-level setup still reached
+a 119-field gap (2.38 s); that path was not optimized here. Both profile runs
+completed within their 60-second hard limits and restored ordinary startup.

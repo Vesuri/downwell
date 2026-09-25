@@ -67,6 +67,8 @@ extern const UBYTE amiga_game_pack_end[];
 extern const UBYTE amiga_results_pack[];
 extern const UBYTE amiga_exit_mask[];
 extern const UBYTE amiga_exit_mask_end[];
+extern const UBYTE amiga_selection_mask[];
+extern const UBYTE amiga_selection_mask_end[];
 extern const UBYTE amiga_results_pack_end[];
 extern const UBYTE amiga_shop_pack[];
 extern const UBYTE amiga_shop_pack_end[];
@@ -1675,6 +1677,15 @@ int main(void) {
         DownwellStyleCopperList(dynamicCopperWords[1], downwellCopperWords)
     };
     bool styleListBuilt[2] = {false, false};
+    DownwellSelectionCopperList selectionLists[2] = {
+        DownwellSelectionCopperList(dynamicCopperWords[0], downwellCopperWords),
+        DownwellSelectionCopperList(dynamicCopperWords[1], downwellCopperWords)
+    };
+    bool selectionListReady[2] = {false, false};
+    static_assert(sceneCacheBytes >= 2 * AmigaSelectionLayer::bytes,
+                  "Selection canvases must fit the retired scene cache");
+    static_assert(downwellLayerBytes >= AmigaSelectionLayer::bytes,
+                  "Selection borders must fit the smaller retired HUD buffer");
     AmigaStyleFrameState styleFrameState[2];
     DownwellSplashCopperList splashBlankList(
         memory.copper() + downwellCopperWords * 2, downwellCopperWords);
@@ -2479,13 +2490,14 @@ int main(void) {
                     if (!clear.enter(port, scenes.styleCursor(), liveInput,
                             memory.menuForeground(), menuPlaneBytes * 2 + amigaMenuEntryPlaneBytes,
                             amiga_hud_pack_end - amiga_hud_pack, amiga_clear_pack, amiga_clear_pack_end - amiga_clear_pack,
-                            amiga_exit_mask, amiga_exit_mask_end - amiga_exit_mask)) { exitCode = 20; break; }
+                            amiga_selection_mask, amiga_selection_mask_end - amiga_selection_mask)) { exitCode = 20; break; }
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 2;
 #endif
                     for (unsigned buffer = 0; buffer < 2; ++buffer) {
                         gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
                         gameListReady[buffer] = false;
+                        selectionListReady[buffer] = false;
                     }
                 } else if (!port.nextLevelRequested()) {
                     DW_PROFILE_SCOPE(profileClearStep);
@@ -2520,12 +2532,12 @@ int main(void) {
 #ifdef DOWNWELL_CLEAR_VERIFY
                 gDownwellClearPhase = 3;
 #endif
-                target.game = (UBYTE*)gameDisplay[back].data;
-                target.hud = back ? memory.game() : memory.hud();
+                target.game = back ? memory.game() : memory.hud();
+                target.hud = memory.sceneCache() + back * AmigaSelectionLayer::bytes;
                 const UBYTE* bank = memory.menuForeground() + clear.assets.layout.resultsOffset;
-                AmigaClearPresenter::Frame frame;
-                if (!clear.presenter.render(back, target, bank, bank + clear.assets.bankBytes,
-                        room, snapshot, port.upgrades(), frame)) { exitCode = 20; break; }
+                AmigaUpgradeScene::Frame frame;
+                if (!clear.render(back, target.game, target.hud, bank,
+                        bank + clear.assets.bankBytes, port, frame)) { exitCode = 20; break; }
                 DW_PROFILE_PHASE(profileClearSprites);
                 for (unsigned channel = 0; channel < 8; ++channel) {
                     Sprite& sprite = channel == 0 ? playerSprites[back] :
@@ -2541,14 +2553,13 @@ int main(void) {
                     ready = amigaRendererBuildHardwareSpritePart(amiga_game_pack, amiga_game_pack_end, playerId, playerFrame, part,
                         frame.playerX, frame.playerY, port.player().facing() < 0, sprite.data(), playerSpriteHeight) != 0;
                 }
-                Bitmap overlay(target.hud, downwellVisibleWidth, downwellDisplayHeight, 2, false, false, downwellDmaWidth);
                 DW_PROFILE_PHASE(profileClearCopper);
-                if (!ready || !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], frame.origin) :
-                    gameplayCopperLists[back].build(gameDisplay[back], overlay, playerSprites[back],
-                        bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette, frame.origin)) ||
-                    !gameplayCopperLists[back].updateOverlay(overlay) ||
-                    !gameplayCopperLists[back].updateExitMask(port.exitDither().active ?
-                        memory.menuForeground() + AmigaExitMask::offset(port.exitDither().y - room.motion.viewY()) : nullptr)) {
+                const UBYTE* mask = port.exitDither().active ? memory.menuForeground() +
+                    AmigaExitMask::offset(port.exitDither().y - room.motion.viewY()) /
+                    AmigaExitMask::stride * AmigaExitMask::selectionStride : nullptr;
+                if (!ready || !(selectionListReady[back] ? selectionLists[back].update(frame.border, frame.layer, mask) :
+                    selectionLists[back].build(frame.border, frame.layer, mask, playerSprites[back],
+                        bulletSprites + back * gameplayRegularSpriteCount, gameplayRegularSpriteCount, enemySprites[back], palette))) {
                     exitCode = 20; break;
                 }
                 DW_PROFILE_PHASE(profileClearDrain);
@@ -2561,21 +2572,44 @@ int main(void) {
                 AmigaRenderer reference;
                 amigaRendererInit(&reference, expectedGame[back], expectedHud[back]);
                 AmigaClearPresenter::Frame expected;
-                gDownwellClearActualHud = target.hud; gDownwellClearExpectedHud = expectedHud[back];
-                gDownwellClearActualGame = target.game; gDownwellClearExpectedGame = expectedGame[back];
-                if (!oracle.render(back, reference, bank, bank + clear.assets.bankBytes, room, snapshot, port.upgrades(), expected) ||
-                    expected.origin != frame.origin) ++gDownwellClearFailures;
-                gDownwellClearFailures += amigaBufferDifferences(target.game, expectedGame[back], downwellGameRingBytes);
-                gDownwellClearFailures += amigaBufferDifferences(target.hud, expectedHud[back], downwellLayerBytes);
+                alignas(2) static UBYTE actualGame[downwellGameRingBytes], actualHud[downwellLayerBytes];
+                gDownwellClearActualHud = actualHud; gDownwellClearExpectedHud = expectedHud[back];
+                gDownwellClearActualGame = actualGame; gDownwellClearExpectedGame = expectedGame[back];
+                if (!oracle.render(back, reference, bank, bank + clear.assets.bankBytes, room, snapshot, port.upgrades(), expected))
+                    ++gDownwellClearFailures;
+                // Compare visible pixels, not storage: the new canvases are
+                // world-space narrow planes, the oracle uses a wide ring.
+                for (unsigned layer = 0; layer < 2; ++layer) {
+                    const UBYTE* compact = layer ? frame.layer : frame.border;
+                    const UBYTE* wide = layer ? expectedHud[back] : expectedGame[back];
+                    UBYTE* actual = layer ? actualHud : actualGame;
+                    const unsigned size = layer ? downwellLayerBytes : downwellGameRingBytes;
+                    for (unsigned i = 0; i < size; ++i) actual[i] = wide[i];
+                    for (unsigned plane = 0; plane < 2; ++plane)
+                        for (unsigned y = 0; y < downwellDisplayHeight; ++y) {
+                            const unsigned row = layer ? y : (expected.origin + y) % downwellGameRingHeight;
+                            for (unsigned word = 0; word < 10; ++word) {
+                                const unsigned index = plane * (size / 2) + row * 48 + 13 + word * 2;
+                                const UBYTE* src = compact + plane * AmigaSelectionLayer::planeBytes + y * 22 + word * 2;
+                                const unsigned value = (unsigned(src[0]) << 8) | src[1];
+                                const unsigned expectedWord = ((unsigned(wide[index]) << 14) |
+                                    (unsigned(wide[index+1]) << 6) | (wide[index+2] >> 2)) & 0xffff;
+                                if (value != expectedWord) ++gDownwellClearFailures;
+                                actual[index] = (actual[index] & 0xfc) | (value >> 14);
+                                actual[index+1] = value >> 6;
+                                actual[index+2] = (actual[index+2] & 3) | (value << 2);
+                            }
+                        }
+                }
                 ++gDownwellClearFrames;
                 if (snapshot.choices) ++gDownwellClearChoices;
                 gDownwellClearPhase = 4;
                 if (gDownwellClearFrames == 1 || gDownwellClearFrames % 60 == 0)
                     downwellClearProbe();
 #endif
-                gameListReady[back] = true;
+                selectionListReady[back] = true;
                 DW_PROFILE_PHASE(profileClearPublish);
-                platform.publish(gameplayCopperLists[back]); front = back;
+                platform.publish(selectionLists[back]); front = back;
                 continue;
             }
 #endif

@@ -54,5 +54,40 @@ int main(int argc,char** argv) {
     }
     assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),nullptr,0,paint));
     for(auto value:canvas) assert(value==0);
+    // Retain the complete source border loops in world space, including the
+    // overlapping old/new-area boundary. Scrolling must only change pointers.
+    unsigned borderFrames = 0;
+    for (int area = 1; area <= 3; ++area) {
+        downwell::LevelClearPresentation presentation;
+        layer.invalidate();
+        for (unsigned tick = 0; tick < 120; ++tick) {
+            const auto snapshot = presentation.advance(area, 3, 3, true);
+            AmigaSelectionLayer::Command borders[AmigaSelectionLayer::capacity];
+            unsigned count = 0;
+            snapshot.borders([&](int a, int image, int x, int y) {
+                assert(count < AmigaSelectionLayer::capacity);
+                borders[count++] = {downwell::levelBorderSprite(a), unsigned(image), x, y-snapshot.tileY, -1};
+            });
+            assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),borders,count,paint));
+            const unsigned top = 198 + tick % 100;
+            const auto* view = layer.view(top - snapshot.tileY);
+            assert(view);
+            std::fill(expected.begin(),expected.end(),0);
+            AmigaRenderer renderer;
+            amigaRendererInit(&renderer,game.data(),expected.data());
+            renderer.target=renderer.hud; renderer.clipX=110; renderer.clipWidth=160;
+            snapshot.borders([&](int a, int image, int x, int y) {
+                amigaRendererDrawAsset(&renderer,pack.data(),pack.data()+pack.size(),downwell::levelBorderSprite(a),image,110+x,y-int(top),0);
+            });
+            for(unsigned p=0;p<2;++p) for(unsigned y=0;y<284;++y) for(unsigned x=0;x<160;++x) {
+                const bool actual = view[p*AmigaSelectionLayer::planeBytes+y*22+x/8] & (128u>>(x&7));
+                const bool reference = expected[p*downwellPlaneBytes+y*48+(110+x)/8] & (128u>>((110+x)&7));
+                assert(actual==reference);
+            }
+            assert(layer.render(canvas.data(),pack.data(),pack.data()+pack.size(),borders,count,paint) && !paint);
+            ++borderFrames;
+        }
+    }
+    std::printf("%u retained border frames match source-order fresh rendering\n",borderFrames);
     std::puts("325 selection camera positions match fresh rendering without repainting");
 }

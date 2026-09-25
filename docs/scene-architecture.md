@@ -14,15 +14,16 @@ second upgrade algorithm. Long-lived state remains in static storage, not the
 small AmigaDOS stack. The main loop must retire DMA before scene entry and
 drain outstanding blits before replacing a bank.
 
-Drawing helpers are still `AmigaClearPresenter`, `AmigaClearOverlay` and the
-border renderer. Display-buffer binding, sprites, Copper publication and
-next-level transitions remain in `DownwellAmiga.cpp`. Moving these into the
-scene is unfinished; the extraction must not become a wrapper around a
-permanently monolithic main loop.
+`AmigaUpgradeScene` now owns the retained border/content renderers and
+world-space draw commands. `AmigaClearPresenter` remains the independent
+verification oracle, not the live rendering path. Display-buffer binding,
+sprites, Copper publication and next-level transitions still remain in
+`DownwellAmiga.cpp`. Moving these into the scene is unfinished; the extraction
+must not become a wrapper around a permanently monolithic main loop.
 
 ## Remaining consolidation
 
-### Retained selection canvas (prepared, not yet connected to live scenes)
+### Retained selection canvas (live upgrade path; style migration pending)
 
 `AmigaSelectionLayer.h/.cpp` supplies a reusable 160-pixel content canvas with
 176-pixel DMA rows and 608 world-space rows. Two planes occupy 26,752 bytes,
@@ -49,9 +50,21 @@ manifest: the same source exit cover at 22-byte stride, prepared on the host.
 All 114,048 bits match the existing gameplay mask's shaft, the padding is zero,
 and all 365 cover offsets fit the bank. The original gameplay export is unchanged.
 
-Live style/upgrade routing and Copper support for these taller planes are still
-pending. Compiling this translation unit for 68000 and passing host/sanitizer
-tests do not establish live integration or a frame-time improvement.
+The upgrade path now uses two border canvases in the retired game/HUD buffers
+and two content canvases in the scene cache, without additional Chip allocation.
+The complete finite source border loops are retained, including area seams;
+tile phase and camera position select a viewport by pointer offset. Common
+content translation also changes only pointers. Independent icon/shadow motion
+still damages its old/new rectangles. Identical command lists skip asset
+lookups, Bitmap construction and pixel writes.
+
+`DownwellSelectionCopperList` uses the same centered 160-pixel window as style
+selection, a ten-word fetch, 22-byte rows and modulo 2. PF1 holds borders;
+PF2 holds content above player sprites. The offline cover supplies BPL5/6
+during the wipe. Lists are built once per alternating slot, then only pointer
+and plane-count words are patched. The narrow window starts two beam pixels
+right of the landscape shaft; the player sprite receives the same translation.
+Style selection has not yet migrated to the shared retained layer.
 
 - Publisher, credits and controls currently share splash cache/runtime paths.
   They need distinct scene controllers, sharing prepared-screen machinery.
@@ -67,8 +80,8 @@ tests do not establish live integration or a frame-time improvement.
 - Gameplay logic lives in core `GameplayWorld.cpp`, but the separate SDL
   `StartupRuntime` world loop and Amiga display orchestration still need work.
 
-The scrolling completion-border fast path is live; hardware pointer scrolling
-for the completion overlay and full scene-class separation are not yet done.
+Hardware pointer scrolling is now wired for both completion layers. Full
+scene-class separation and sharing this backend with style selection remain.
 
 ## Verification of the first extraction
 
@@ -81,3 +94,24 @@ The expanded border oracle passes 3,840 frames, including under address and
 undefined-behavior sanitizers. The preceding full host suite also passes
 (`/tmp/downwell-contact-pass-suite.log`). These are regression checks, not
 proof of full Windows presentation fidelity or completion of this migration.
+
+## Retained upgrade integration verification
+
+The live retained path passes two clears, 432 visible-plane comparisons with
+the old presenter, 192 exit-field comparisons and 60 third-level updates on
+the A500 configuration. The stack guard and 68000 instruction/helper audits
+pass. Unlike the former whole-buffer comparison, the clear check compares
+all 160x284 visible pixels in both two-plane layers: unused storage differs
+by design. Debug failure dumps expand the compact view into the old geometry.
+It does not verify physical display placement or claim Windows pixel parity.
+
+The first 150-second attempt stopped at its deadline after the first clear,
+with zero mismatches. The updated fast path passed with a 240-second hard
+deadline; the emulator was stopped and the ordinary startup build restored.
+Evidence: `/tmp/downwell-retained-native-gdb.log` and
+`/tmp/downwell-retained-native-v2.log`.
+
+Host/sanitizer checks cover 325 camera positions with no pixel writes and
+360 border frames crossing area seams. Both compact and wide cover banks
+pass 256 artwork selections with allocation/HUD/mask guards intact. Existing
+completion motion, selection, session, layout, trig and raster tests pass.

@@ -104,6 +104,7 @@ LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
 AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
+AMIGA_SELECTION_MASK := $(REPO)/generated/amiga-game.selection-mask
 AMIGA_RESULTS := $(REPO)/generated/amiga-results.dwap
 AMIGA_SHOP := $(REPO)/generated/amiga-shop.dwap
 AMIGA_CLEAR := $(REPO)/generated/amiga-clear.dwap
@@ -338,7 +339,10 @@ $(BUILDER_PACK):
 $(AMIGA_EXIT_MASK): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) \
+$(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
+	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
+
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_SELECTION_MASK) \
 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<

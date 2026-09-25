@@ -14,7 +14,7 @@ public:
     static constexpr unsigned bytes = planeBytes * 2;
     using Command = AmigaClearOverlay::Command;
     using Rect = AmigaClearOverlay::Rect;
-    static constexpr unsigned capacity = AmigaClearOverlay::capacity;
+    static constexpr unsigned capacity = 80; // includes both border loops (76 commands)
     void invalidate() { initialized_ = false; }
     const UBYTE* view(unsigned top) const {
         return target_ && top <= height - 284 ? target_ + top * stride : nullptr;

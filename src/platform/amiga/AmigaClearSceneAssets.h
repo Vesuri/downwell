@@ -24,7 +24,8 @@ struct AmigaClearSceneAssets {
                  const unsigned* offers, unsigned offerCount, unsigned area, unsigned level,
                  const unsigned char* owned = nullptr) {
         const auto proposed = partition(retiredBytes, hudBytes);
-        if (!retiredStorage || !proposed.valid || !mask || maskBytes != AmigaExitMask::bytes) return false;
+        if (!retiredStorage || !proposed.valid || !mask ||
+            (maskBytes != AmigaExitMask::bytes && maskBytes != AmigaExitMask::selectionBytes)) return false;
         const unsigned bytes = AmigaClearBank::build(art, artBytes, offers, offerCount,
             retiredStorage + proposed.resultsOffset, proposed.resultsCapacity, area, level, owned);
         if (!bytes) return false;

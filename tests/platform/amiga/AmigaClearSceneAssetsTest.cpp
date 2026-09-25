@@ -15,7 +15,8 @@ static std::vector<std::uint8_t> read(const char* path) {
 int main(int argc, char** argv) {
     require(argc == 3, "clear artwork and mask required");
     auto art = read(argv[1]), mask = read(argv[2]);
-    require(!art.empty() && mask.size() == AmigaExitMask::bytes, "read offline assets");
+    require(!art.empty() && (mask.size() == AmigaExitMask::bytes ||
+        mask.size() == AmigaExitMask::selectionBytes), "read offline assets");
     const auto artOriginal = art, maskOriginal = mask;
     const auto layout = AmigaClearSceneAssets::partition(76800, 13940);
     require(layout.valid && layout.resultsOffset == 31104 && layout.resultsCapacity == 31756 &&

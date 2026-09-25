@@ -1,5 +1,7 @@
 #include "AmigaUpgradeScene.h"
 #include "core/GameplayWorld.h"
+#include "AmigaMenuScroll.h"
+#include "core/Profile.h"
 
 bool AmigaUpgradeScene::enter(GameplayWorld& world, unsigned style,
     const downwell::Input& input, UBYTE* storage, unsigned storageBytes,
@@ -9,7 +11,8 @@ bool AmigaUpgradeScene::enter(GameplayWorld& world, unsigned style,
         !assets.prepare(storage, storageBytes, hudBytes, art, artBytes,
             mask, maskBytes, nullptr, 0, world.runStage().area, world.runStage().level))
         return false;
-    presenter.reset(); offerCount_ = 0;
+    offerCount_ = 0;
+    for (unsigned i=0;i<2;++i) { borders_[i].invalidate(); layers_[i].invalidate(); }
     left_ = input.left; right_ = input.right;
     for (unsigned i = 0; i < 23; ++i) owned_[i] = world.upgrades().levels[i];
     presented = true;
@@ -42,6 +45,38 @@ bool AmigaUpgradeScene::refreshArtwork(const GameplayWorld& world, UBYTE* storag
     offerCount_ = count;
     for (unsigned i = 0; i < count; ++i) offers_[i] = room.offers.ids[i];
     for (unsigned i = 0; i < 23; ++i) owned_[i] = world.upgrades().levels[i];
-    presenter.artworkChanged();
+    for (unsigned i=0;i<2;++i) { borders_[i].invalidate(); layers_[i].invalidate(); }
     return true;
+}
+
+bool AmigaUpgradeScene::render(unsigned back, UBYTE* border, UBYTE* layer,
+    const UBYTE* pack, const UBYTE* end, const GameplayWorld& world, Frame& frame) {
+    if (back >= 2) return false;
+    const auto& room=world.levelClear(); const auto& snapshot=world.levelClearFrame();
+    const int top=room.motion.viewY(), borderTop=top-snapshot.tileY;
+    if (top<0 || borderTop<0 || top>324 || borderTop>324) return false;
+    { DW_PROFILE_SCOPE(profileClearDrawList);
+      if (!drawList_.build(room,snapshot,world.upgrades())) return false;
+      for(unsigned i=0;i<drawList_.count;++i) {
+          drawList_.commands[i].x-=110;
+          drawList_.commands[i].y+=top;
+      }
+    }
+    unsigned count=0, pixels=0;
+    bool valid = true;
+    snapshot.borders([&](int area,int image,int x,int y) {
+        if (count == AmigaSelectionLayer::capacity) { valid = false; return; }
+        borderCommands_[count++]={downwell::levelBorderSprite(area),unsigned(image),x,y-snapshot.tileY,-1};
+    });
+    if (!valid) return false;
+    { DW_PROFILE_SCOPE(profileClearBorder);
+      if (!borders_[back].render(border,pack,end,borderCommands_,count,pixels)) return false; }
+    { DW_PROFILE_SCOPE(profileClearOverlay);
+      if (!layers_[back].render(layer,pack,end,drawList_.commands,drawList_.count,pixels)) return false; }
+    // Sprite API uses the landscape logical origin, while this scene uses
+    // the same centered narrow window as garden/style selection.
+    constexpr int spriteOffset = amigaMenuDisplayHStart - downwellDisplayHStart - 110;
+    frame={borders_[back].view(unsigned(borderTop)),layers_[back].view(unsigned(top)),
+           drawList_.playerX+spriteOffset,drawList_.playerY};
+    return frame.border && frame.layer;
 }

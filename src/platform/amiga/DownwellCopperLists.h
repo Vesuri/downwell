@@ -70,6 +70,17 @@ private:
     unsigned skyWaitOffset_, skyColorOffset_, skyLateWaitOffset_;
 };
 
+// Narrow dual-playfield selection display, using retained world-space planes.
+// PF1 borders, PF2 text/icons above sprites; common high-bit wipe covers both.
+class DownwellSelectionCopperList : public CopperList {
+    unsigned borderOffset_=0, layerOffset_=0, maskOffset_=0, modeOffset_=0;
+public:
+    DownwellSelectionCopperList(UWORD* words,unsigned capacityWords) : CopperList(words,capacityWords) {}
+    bool build(const UBYTE* border,const UBYTE* layer,const UBYTE* mask,
+        const Sprite& player,const Sprite* actors,unsigned count,const Sprite& overflow,const Palette& palette);
+    bool update(const UBYTE* border,const UBYTE* layer,const UBYTE* mask);
+};
+
 class DownwellSplashCopperList : public CopperList {
 public:
     DownwellSplashCopperList(UWORD* words, unsigned capacityWords);
