@@ -72,7 +72,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
   classes; gameplay's owner controls its Copper lifecycle and backing/staging
   validity ranges. Transfer execution remains in the application loop.
   Terrain composition now belongs to `AmigaTerrainPainter`, with actors and
-  raster storage already separate. Cache-refresh/display coordination and
+  raster storage already separate. `AmigaGameplayGeneration` owns synchronous
+  generated-object registration, index/tile insertion and damage bounds; the
+  paired host tests use that same native component. Cache-refresh/display coordination and
   much transition orchestration remain in `DownwellAmiga.cpp`; SDL startup
   orchestration also needs consolidation.
 - Meet the worst-case 20 ms budget. The latest style-navigation measurement is

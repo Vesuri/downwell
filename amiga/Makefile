@@ -130,7 +130,7 @@ BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
 	obj/DownwellCopperLists.o \
-	obj/AmigaTerrain.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
+	obj/AmigaTerrain.o obj/AmigaGameplayGeneration.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
 	obj/AmigaMenuCache.o obj/AmigaGardenScene.o obj/AmigaSplashCache.o obj/AmigaPublisherScene.o obj/AmigaCreditsScene.o obj/AmigaControlsScene.o obj/AmigaStyleRenderer.o obj/AmigaStyleScene.o obj/AmigaUpgradeScene.o obj/AmigaSelectionLayer.o \
 	obj/AmigaRenderer.o obj/AmigaBlitter.o obj/AmigaGameplayRows.o obj/AmigaGameplayScene.o obj/AmigaGameplayActors.o obj/AmigaGameplaySpriteAssignment.o obj/AmigaGameplayDrawList.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
@@ -208,6 +208,10 @@ obj/DownwellCopperLists.o: $(AMIGA_SRC)/DownwellCopperLists.cpp \
 
 obj/AmigaTerrain.o: $(AMIGA_SRC)/AmigaTerrain.cpp \
 		$(AMIGA_SRC)/AmigaTerrain.h $(AMIGA_SRC)/AmigaPortRuntime.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+obj/AmigaGameplayGeneration.o: $(AMIGA_SRC)/AmigaGameplayGeneration.cpp
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

@@ -5,6 +5,36 @@ publisher, credits, controls, garden, style selection, gameplay and upgrade
 selection. Platform rendering is separate from shared, source-backed game
 rules. This document is a migration inventory, not a claim of completion.
 
+## Gameplay generation registration owner
+
+`AmigaGameplayGeneration` moves recovered Create registration out of the
+application loop into its own translation unit. It owns the synchronous
+builder observer, terrain index/tile insertion and clipped generation-damage
+range. Game rules, actor state and shop/exit RNG effects remain in
+`GameplayWorld`; the application retains only diagnostics and raster
+invalidation around the generation callback. No Create command is queued,
+reordered or moved to another update, and no Chip allocation is introduced.
+
+The host scene fixture now uses this production component instead of its
+former index-only registration callback. Thus paired routes exercise native
+tile insertion as well as shared actor/terrain behavior. Additional assertions
+cover rejecting unbound generation without RNG effects, retiring old damage
+on room binding and keeping emitted damage within the backing raster. Both
+natural host routes pass unchanged, including upgrades and the second-level
+shop. Evidence: `/tmp/downwell-generation-owner-host.log` and the host phase
+of `/tmp/downwell-generation-owner-native.log`.
+
+The bounded native route passes the same exit at update 1,477, 211 upgrade
+frames, 135 exit-field frames, 49 retained shop-HUD comparisons and 43 return
+updates, with zero failures and the task-stack guard intact. The ordinary
+build is restored with clean 68000 instruction/helper audits; the emulator
+is stopped. Detailed evidence: `/tmp/downwell-generation-owner-native-gdb.log`.
+
+This completes another gameplay boundary, not the full scene migration:
+cache-refresh/display transfers and transition orchestration still have
+application-loop responsibilities. It is not a new original-game behavior
+claim or a performance optimization.
+
 ## Current ownership at a glance
 
 All seven Amiga scene classes below have separate `.h` / `.cpp` files in

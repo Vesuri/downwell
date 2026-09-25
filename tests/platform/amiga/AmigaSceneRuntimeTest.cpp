@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaSceneRuntime.h"
 #include "platform/amiga/AmigaPortRuntime.h"
 #include "platform/amiga/AmigaTerrain.h"
+#include "platform/amiga/AmigaGameplayGeneration.h"
 #include "platform/amiga/AmigaNaturalRouteVerification.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
@@ -41,29 +42,33 @@ struct LiveSceneWorld {
     const downwell::BuilderPatternPack& patterns;
     const downwell::ObjectPack& objects;
     AmigaPortRuntime* runtime = nullptr;
+    AmigaTerrainTiles tiles;
+    AmigaGameplayGeneration generation;
 
     LiveSceneWorld(const downwell::BuilderPatternPack& pack,
                    const downwell::ObjectPack& definitions)
         : collision{nullptr, nullptr, &pack, nullptr, 0, nullptr},
-          patterns(pack), objects(definitions) {}
-
-    static bool create(void* opaque, const downwell::DeferredCreateInstance& command) {
-        auto& world = *static_cast<LiveSceneWorld*>(opaque);
-        return world.runtime->createGeneratedInstance(command, world.objects,
-            [&world](const downwell::DeferredCreateInstance& command) {
-                return amigaAddTerrainObject(world.index, command.objectId, command.x, command.y);
-            });
+          patterns(pack), objects(definitions), generation(builder, pack, definitions, index, tiles) {
+        downwell::GameMakerRandom random(31);
+        require(!generation.step(random, 8192) && random.drawCount() == 0 &&
+            builder.fragmentCount() == 0, "unbound generation rejects without RNG or terrain effects");
     }
     static bool generate(void* opaque, AmigaPortRuntime&,
                          downwell::GameMakerRandom& random, int bottom) {
         auto& world = *static_cast<LiveSceneWorld*>(opaque);
-        downwell::AreaOneBuilderStep result;
-        return world.builder.stepVisible(world.patterns, random, bottom, result);
+        const bool ok = world.generation.step(random, bottom);
+        require(world.generation.dirtyFirst >= 0 &&
+            world.generation.dirtyFirst <= AmigaGameplayGeneration::worldRows &&
+            world.generation.dirtyEnd >= 0 &&
+            world.generation.dirtyEnd <= AmigaGameplayGeneration::worldRows,
+            "generation damage stays within the backing raster");
+        return ok;
     }
     void bind(AmigaPortRuntime& port, const downwell::RoomPack& rooms,
               const downwell::PackedRoom& room, bool continuing = false,
               const downwell::StartupRuntime* entry = nullptr) {
         runtime = &port;
+        tiles.clear();
         collision.index = nullptr; collision.runtime = nullptr; collision.fragmentCount = 0;
         require(amigaBuildTerrainIndex(collision, index), "live scene index initializes empty");
         for (unsigned i = 0; i < room.instanceCount; ++i) {
@@ -88,7 +93,10 @@ struct LiveSceneWorld {
             builder.resetInitialCheckpoint(random);
             port.configureEnemyRandom(random);
         }
-        builder.setCreateObserver(create, this);
+        generation.dirtyFirst = 0; generation.dirtyEnd = AmigaGameplayGeneration::worldRows;
+        generation.bind(port);
+        require(generation.dirtyFirst == AmigaGameplayGeneration::worldRows && generation.dirtyEnd == 0,
+            "room binding retires previous generation damage");
         port.configureGenerationStep(generate, this);
         port.configureLandingResolver(amigaResolveTerrainLanding, &collision);
         port.configureSolidResolver(amigaResolveTerrainSolid, &collision);

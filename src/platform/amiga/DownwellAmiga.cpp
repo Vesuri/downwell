@@ -15,6 +15,7 @@
 #include "AmigaGardenScene.h"
 #include "AmigaGameplayRows.h"
 #include "AmigaGameplayScene.h"
+#include "AmigaGameplayGeneration.h"
 #include "AmigaGameplayActors.h"
 #include "AmigaGameplayDrawList.h"
 #include "AmigaTerrainRaster.h"
@@ -140,14 +141,6 @@ static AmigaTerrainCollisionContext terrainCollision;
 static AmigaTerrainIndex terrainIndex;
 static AmigaTerrainTiles terrainTiles;
 
-struct LiveGenerationContext {
-    AmigaAreaOneTerrainBuilder* builder;
-    const downwell::BuilderPatternPack* patterns;
-    const downwell::ObjectPack* objects;
-    AmigaPortRuntime* runtime;
-    int dirtyFirst = 8192;
-    int dirtyEnd = 0;
-};
 extern "C" {
 volatile ULONG gDownwellLiveFragments = 0;
 volatile ULONG gDownwellLiveEnemies = 0;
@@ -156,27 +149,6 @@ volatile ULONG gDownwellLiveGenerationFailed = 0;
 }
 static bool generateLiveTerrain(void*, AmigaPortRuntime&,
     downwell::GameMakerRandom&, int);
-
-static bool appendGeneratedTerrain(void* opaque,
-    const downwell::DeferredCreateInstance& command) {
-    DW_PROFILE_SCOPE(profileGeneratedRegistration);
-    auto& live = *static_cast<LiveGenerationContext*>(opaque);
-    return live.runtime->createGeneratedInstance(command, *live.objects,
-        [&live](const downwell::DeferredCreateInstance& command) {
-            {
-                DW_PROFILE_SCOPE(profileGeneratedIndex);
-                if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
-                    !terrainTiles.append(command)) return false;
-            }
-            if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||
-                command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
-                command.objectId == 109) {
-                if (command.y - 24 < live.dirtyFirst) live.dirtyFirst = command.y - 24;
-                if (command.y + 24 > live.dirtyEnd) live.dirtyEnd = command.y + 24;
-            }
-            return true;
-        });
-}
 
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;
 static volatile unsigned long long lastPortCheckpoint;
@@ -804,17 +776,12 @@ static void invalidateShopRaster(const downwell::ShopWorld& shops) {
 
 static bool generateLiveTerrain(void* opaque, AmigaPortRuntime& runtime,
     downwell::GameMakerRandom& random, int bottom) {
-    auto& live = *static_cast<LiveGenerationContext*>(opaque);
-    live.dirtyFirst = terrainRasterRows;
-    live.dirtyEnd = 0;
-    downwell::AreaOneBuilderStep result;
-    const bool ok = live.builder->stepVisible(*live.patterns, random, bottom, result);
-    gDownwellLiveFragments = live.builder->fragmentCount();
+    auto& live = *static_cast<AmigaGameplayGeneration*>(opaque);
+    const bool ok = live.step(random, bottom);
+    gDownwellLiveFragments = live.fragmentCount();
     gDownwellLiveEnemies = runtime.enemyCount();
     gDownwellLiveRandomDraws = static_cast<ULONG>(random.drawCount());
     if (!ok) gDownwellLiveGenerationFailed = 1;
-    if (live.dirtyFirst < 0) live.dirtyFirst = 0;
-    if (live.dirtyEnd > terrainRasterRows) live.dirtyEnd = terrainRasterRows;
     terrainRaster.invalidate(live.dirtyFirst, live.dirtyEnd);
     return ok;
 }
@@ -1281,7 +1248,7 @@ int main(void) {
     auto& liveBuilder = *new (liveBuilderStorage) AmigaAreaOneTerrainBuilder(fragments,
         amigaInitialTerrainFragmentCount, nullptr, 0,
         generatedDecorations, amigaTerrainDecorationCapacity);
-    LiveGenerationContext liveGeneration{&liveBuilder, &builders, &objects, &port};
+    AmigaGameplayGeneration liveGeneration{liveBuilder, builders, objects, terrainIndex, terrainTiles};
     downwell::GameMakerRandom enemyRandom(2);
     downwell::PackedRoom mainRoom;
     const AmigaTerrainCollisionContext emptyTerrain{0, 0, &builders, 0, 0, 0};
@@ -1333,7 +1300,7 @@ int main(void) {
 #ifdef DOWNWELL_NATURAL_VERIFY
         AmigaNaturalRouteVerification::entry(liveBuilder, enemyRandom);
 #endif
-        liveBuilder.setCreateObserver(appendGeneratedTerrain, &liveGeneration);
+        liveGeneration.bind(port);
         port.configureEnemyRandom(enemyRandom);
         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
     }
@@ -1830,9 +1797,7 @@ int main(void) {
                         if (!roomReady) break;
                         port.confirmFirstStage();
                         if (!port.initializeAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
-                        liveBuilder.setCreateObserver(appendGeneratedTerrain, &liveGeneration);
-                        liveGeneration.dirtyFirst = terrainRasterRows;
-                        liveGeneration.dirtyEnd = 0;
+                        liveGeneration.bind(port);
                         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
                         port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision,
