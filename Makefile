@@ -761,6 +761,14 @@ test-amiga-gameplay-actors: build/amiga-gameplay-actors-test
 	./build/amiga-gameplay-actors-test
 test: test-amiga-gameplay-actors
 
+.PHONY: test-amiga-gameplay-sprite-assignment
+build/amiga-gameplay-sprite-assignment-test: tests/platform/amiga/AmigaGameplaySpriteAssignmentTest.cpp src/platform/amiga/AmigaGameplaySpriteAssignment.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-amiga-gameplay-sprite-assignment: build/amiga-gameplay-sprite-assignment-test
+	./build/amiga-gameplay-sprite-assignment-test
+test: test-amiga-gameplay-sprite-assignment
+
 .PHONY: test-amiga-style-retained
 build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build

@@ -136,8 +136,8 @@ the original border stride and palette rules.
   incremental boundaries, not a completed gameplay scene extraction.
   Overflow BOB rasterization now lives in `AmigaGameplayActors.h/.cpp` with
   explicit artwork, retired display, dirty-row and laser inputs. Actor
-  collection/hardware-channel assignment and terrain composition remain in
-  the main loop. The move preserves painter order, clipping, circular row
+  collection and terrain composition remain in the main loop; hardware-channel
+  assignment now lives alongside the actor renderer. The move preserves painter order, clipping, circular row
   addressing and the native scalar verification oracle.
 
 Hardware pointer scrolling is wired for both completion layers and the style
@@ -164,6 +164,36 @@ window with SDL at the same simulation tick. All 99,968 pixels match
 (`/tmp/downwell-gameplay-actors-laser.log` and
 `/tmp/downwell-gameplay-actors-laser-gdb.log`). This is a deterministic
 cross-port frame check, not proof of Windows GPU line rasterization.
+
+### Hardware actor assignment boundary
+
+`AmigaGameplaySpriteAssignment.cpp` implements `AmigaGameplayActors::assign`.
+It resolves offline multipart sprites from front to back, assigns channels
+0..7, stops at the first failed fit or planar laser marker, and hides unused
+channels. It never clips hardware sprites or generates their pixels. The
+remaining prefix stays in original painter order for the BOB renderer.
+The live application retains the six regular slot / player / overflow mapping
+with a compile-time agreement check. Resolution and draw failures propagate
+to the existing no-publication failure path; later-part failures now also
+report the responsible sprite/frame instead of leaving stale diagnostics.
+
+Host tests exhaust 11,520 combinations of multipart widths, channel limits
+0..8 and laser-marker positions. They check exact channel contents and hidden
+slots, no backfilling behind a failed fit, unchanged out-of-viewport anchors,
+empty lists and initial/later resolution or draw failures. ASan/UBSan pass.
+Evidence: `/tmp/downwell-sprite-assignment-host.log` and
+`/tmp/downwell-sprite-assignment-sanitized.log`.
+The 45-second-bounded Laser Sight capture again matches all 99,968 visible
+SDL pixels at tick 180, now through the extracted assignment path
+(`/tmp/downwell-sprite-assignment-laser.log`). The normal build is restored
+and both 68000 audits pass.
+
+The assignment extraction also passes the separate 120-second-bounded
+ordinary gameplay gate: 600 ticks, 101 fresh-terrain comparisons, no display
+or terrain mismatches, and the 256-byte stack guard intact
+(`/tmp/downwell-sprite-assignment-cache-gdb.log`). This fixture has no BOB
+comparisons; the preceding BOB-specific gate and actor tests remain separate
+evidence rather than implied coverage from this run.
 
 ### Gameplay Copper lifecycle
 

@@ -8,7 +8,6 @@
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
 #include "AmigaInput.h"
-#include "AmigaActorChannels.h"
 #include "AmigaProfile.h"
 #include "DownwellCopperLists.h"
 #include "AmigaMenu.h"
@@ -2830,49 +2829,24 @@ int main(void) {
                     frameReady = false;
             }
 #endif
-            Sprite* regularSprites = bulletSprites + back * gameplayRegularSpriteCount;
+            static_assert(gameplayRegularSpriteCount == AmigaGameplayActors::regularChannels,
+                          "Gameplay Copper and sprite slots must agree");
             DW_PROFILE_PHASE(profileActorChannels);
+            const auto assignment = AmigaGameplayActors::assign(actors, actorCount,
+                amiga_game_pack, amiga_game_pack_end, playerSprites[back],
+                bulletSprites + back * gameplayRegularSpriteCount, enemySprites[back],
+                enemySpriteHeight,
 #ifdef DOWNWELL_BOB_VERIFY
-            AmigaActorChannels channels(0);
+                0
 #else
-            AmigaActorChannels channels;
+                8
 #endif
-            unsigned bobCount = actorCount;
-            // Assign frontmost actors first. Any remaining prefix is painted
-            // back-to-front into PF1, below every allocated hardware sprite.
-            while (bobCount > 0) {
-                const GameplayBob& actor = actors[bobCount - 1];
-                // The planar ray must cover every earlier actor. Stop assigning
-                // hardware sprites here; later bullets/gems may still use DMA.
-                if (actor.sprite == gameplayRayMarker) break;
-                AmigaResolvedSpritePart prepared;
-                if (!amigaRendererResolveSpritePart(&prepared, amiga_game_pack,
-                        amiga_game_pack_end, actor.sprite, actor.frame, 0, actor.flip)) {
-                    gDownwellActorFailureSprite = actor.sprite;
-                    gDownwellActorFailureFrame = actor.frame;
-                    frameReady = false;
-                    break;
-                }
-                const unsigned parts = prepared.partCount;
-                const int first = channels.take(parts);
-                if (first < 0) break;
-                for (unsigned part = 0; part < parts; ++part) {
-                    DW_PROFILE_SCOPE(profileHardwareSpriteUpdate);
-                    const unsigned channel = first + part;
-                    Sprite& sprite = channel == 0 ? playerSprites[back]
-                        : actorSpriteAt(regularSprites, enemySprites[back], channel - 1);
-                    if ((part && !amigaRendererResolveSpritePart(&prepared, amiga_game_pack,
-                            amiga_game_pack_end, actor.sprite, actor.frame, part, actor.flip)) ||
-                        !amigaRendererDrawResolvedSpritePart(&prepared,
-                            actor.x, actor.y, sprite.data(), enemySpriteHeight))
-                        frameReady = false;
-                }
-                --bobCount;
-            }
-            for (unsigned channel = channels.used(); channel < 8; ++channel) {
-                Sprite& sprite = channel == 0 ? playerSprites[back]
-                    : actorSpriteAt(regularSprites, enemySprites[back], channel - 1);
-                sprite.hide();
+            );
+            const unsigned bobCount = assignment.bobCount;
+            if (!assignment.ready) {
+                gDownwellActorFailureSprite = assignment.failedSprite;
+                gDownwellActorFailureFrame = assignment.failedFrame;
+                frameReady = false;
             }
             DW_PROFILE_PHASE(profileCopper);
             if (rayVisible || gameplayRays[back].present()) {
