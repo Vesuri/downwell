@@ -1,5 +1,6 @@
 #include "core/BoneProjectile.h"
 #include "core/BoneProjectileReference.h"
+#include "core/GameMakerRandom.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -19,6 +20,26 @@ static bool same(downwell::MotionBinary64 actual, double expected) {
 int main() {
     using downwell::BoneProjectile;
     unsigned cases = 0;
+    for (unsigned seed = 0; seed < 1024; ++seed) {
+        BoneProjectile target;
+        downwell::BoneProjectileReference source;
+        downwell::GameMakerRandom random(seed), oracle(seed);
+        check(target.create(240,990,random)); source.create(240,990,oracle);
+        check(same(target.motion.xsp,source.xsp) && same(target.motion.ysp,source.ysp) &&
+              same(target.sampledAnimationRate,source.imgSp) && target.animation == BoneProjectile::Animation::instanceDefault &&
+              target.health == source.health && target.active == source.active && !target.hit && !target.hitEffect);
+        check(random.drawCount() == 3 && random.stateIndex() == oracle.stateIndex());
+        for (unsigned i = 0; i < 16; ++i) check(random.stateWord(i) == oracle.stateWord(i));
+        // The same motion component also handles the unmodified Create ranges.
+        Events a,b;
+        for (unsigned frame = 0; frame < 100; ++frame) {
+            const bool stopped = frame%7 == 0;
+            check(target.step(stopped,[](int,int) { return true; },a));
+            source.step(stopped,-10000,-10000,20000,20000,b);
+            check(same(target.motion.xx,source.xx) && same(target.motion.yy,source.yy) &&
+                  target.motion.x == source.x && target.motion.y == source.y && a.calls == b.calls);
+        }
+    }
     for (int x : {0,1,80,159,160}) for (int y : {0,1,100,283,284})
         for (int vx : {-12,-10,-8,0,8,10,12}) for (int vy : {-30,-31,-32})
             for (bool active : {false,true}) for (bool stopped : {false,true})

@@ -174,6 +174,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
   collision and deferred destruction requests; 6,300 reference cases and
   sanitizers pass, and 68000 code generation needs no helpers. Instance owner,
   animation, real collision dispatch and presentation remain unwired.
+  Target-side bone Create now retains the exact sampled binary64 ranges using
+  integer-only conversion, with 600,000 conversion tests and full Create/RNG/
+  motion comparisons passing. It remains a component, not live spawning.
 
 ## Working evidence
 

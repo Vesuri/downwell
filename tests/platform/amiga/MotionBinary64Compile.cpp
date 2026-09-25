@@ -24,3 +24,7 @@ extern "C" unsigned boneProjectileCompile(downwell::BoneProjectile* bone,
     if (wallCollision) bone->collideWall(events);
     return events.trace;
 }
+extern "C" bool randomBinary64Compile(unsigned word, downwell::MotionBinary64 scale,
+    downwell::MotionBinary64* result) {
+    return downwell::randomBinary64(word,scale,*result);
+}

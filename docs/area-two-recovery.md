@@ -304,3 +304,26 @@ instances, run mask collisions, apply player damage or render effects itself.
 Those belong to the forthcoming shared projectile owner/backend integration;
 the callbacks must be wired rather than dropped. It is not registered in live
 skeleton spawning yet, and no new frame-time claim is made.
+
+### Exact target-side bone Create ranges
+
+`RandomBinary64` now computes the Windows `random` scale operation
+`(uint32 / 2^32) * positiveScale` using three 32-bit product limbs and one
+ties-to-even rounding. Its partial products are 16x16-bit multiplies; no
+64-bit arithmetic or target floating point is required. It is restricted to
+finite nonnegative scales with normal results (or zero), not a general
+floating-point multiplier. Invalid/unsupported inputs preserve the output.
+
+`BoneProjectile::create` uses it for all three explicit random-range calls,
+then applies the lower-bound additions with `MotionBinary64`. Inherited
+parent flags and default animation selection are reset, and the sampled rate
+is retained without converting to Q8 or decimal tenths. Skeleton overrides
+must still occur afterward, without removing the two overwritten draws.
+
+Tests pass 600,000 exact scaled-word cases, 1,024 complete Create values and
+full RNG states, 102,400 subsequent two-axis/time-stop updates with unmodified
+random velocities, and the existing 6,300 event cases. ASan/UBSan also pass.
+The conversion fixture cross-compiles for 68000 without undefined helper
+symbols. This change has no native execution/timing claim yet and is not
+connected to playable spawning. Animation advancement, shared instance owner,
+collision dispatch and presentation remain integration work.
