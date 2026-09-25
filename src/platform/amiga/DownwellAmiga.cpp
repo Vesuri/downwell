@@ -224,6 +224,7 @@ __attribute__((noinline, used)) void downwellExitWipeReady() { __asm__ volatile(
 static AmigaShopMenu shopMenuOverlay;
 #ifdef DOWNWELL_CLEAR_VERIFY
 volatile ULONG gDownwellClearFrames, gDownwellClearChoices, gDownwellClearFailures;
+volatile ULONG gDownwellClearChoiceInputFrames, gDownwellClearCursorMasks[2];
 volatile ULONG gDownwellClearReentries, gDownwellClearGameplayUpdates;
 volatile ULONG gDownwellClearFieldFrames;
 volatile ULONG gDownwellClearTick;
@@ -1627,8 +1628,12 @@ int main(void) {
 #ifdef DOWNWELL_CLEAR_VERIFY
             if (port.levelClearActive()) {
                 liveInput = {};
-                liveInput.right = gDownwellClearFrames == 80;
-                liveInput.fire = gDownwellClearFrames >= 100;
+                const unsigned frame = gDownwellClearChoiceInputFrames;
+                // Each room independently exercises all three choices and
+                // held-key edge filtering before confirmation is allowed.
+                liveInput.right = frame == 12 || frame == 13 || frame == 36 || frame == 37;
+                liveInput.left = frame == 20 || frame == 21 || frame == 28 || frame == 29;
+                liveInput.fire = frame >= 52;
             }
 #endif
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
@@ -2107,6 +2112,7 @@ int main(void) {
 #endif
 #ifdef DOWNWELL_CLEAR_VERIFY
                     gDownwellClearPhase = 1; downwellClearProbe();
+                    gDownwellClearChoiceInputFrames = 0;
 #endif
                     // A staging ring can itself be displayed from garden RAM.
                     // Retire every DMA consumer before repartitioning it.
@@ -2234,6 +2240,14 @@ int main(void) {
                 }
                 ++gDownwellClearFrames;
                 if (snapshot.choices) ++gDownwellClearChoices;
+                if (snapshot.choices && room.selection.visible && gDownwellClearReentries < 2) {
+                    ++gDownwellClearChoiceInputFrames;
+                    gDownwellClearCursorMasks[gDownwellClearReentries] |= 1u << room.selection.cursor;
+                    const unsigned frame = gDownwellClearChoiceInputFrames;
+                    const unsigned expectedCursor = frame >= 13 && frame <= 20 ? 2 :
+                        frame >= 29 && frame <= 36 ? 0 : 1;
+                    if (room.selection.cursor != expectedCursor) ++gDownwellClearFailures;
+                }
                 gDownwellClearPhase = 4;
                 if (gDownwellClearFrames == 1 || gDownwellClearFrames % 60 == 0)
                     downwellClearProbe();

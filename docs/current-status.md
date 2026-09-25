@@ -18,8 +18,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   See `original-behavior-audit.md` and `shared-simulation-migration.md` for the
   exact scope and original-source caveats.
 - The live Amiga loop implements level exit, upgrade selection and subsequent
-  cavern levels. Two-clear verification compares 432 completion frames,
-  192 exit-field frames and both re-entries. This supersedes the old claim that
+  cavern levels. Two-clear verification compares 466 completion frames,
+  192 exit-field frames and both re-entries. Both upgrade entries exercise
+  cursors 0–2 and held-key edge filtering; see `upgrade-navigation-verification.md`.
+  This supersedes the old claim that
   the result room or all level advancement remains unimplemented. The fixture
   injects exits; it does not prove a natural full-level playthrough.
 - Results-menu tests cover all three destinations and 200 final gameplay
