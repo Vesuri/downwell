@@ -41,6 +41,36 @@ Therefore an ordinary smoke overlay is not a faithful replacement. Global draw
 ordering, sampling and surface ownership still need live verification; routing
 tests alone do not prove pixels.
 
+### Compatibility depths
+
+Do not use the zero `Depth` fields in the GMS2 object records as draw order.
+`__global_object_depths` builds parallel depth/name arrays, resolves names with
+`asset_get_index`, and writes the resource-indexed `__objectID2Depth` table.
+The compatibility `instance_create` calls `object_get_depth` and then
+`instance_create_depth`. The controller's persistent rmInit instance also has
+its serialized layer at -300000. Lower depths draw in front:
+
+| Object | Compatibility depth |
+|---|---:|
+| enmSkeleton | 14000 |
+| objCurrency | 10000 |
+| fxSmoke (direct fallback) | 1000 |
+| bulletStandard / bulletEnmBone | 0 |
+| objPlayer_n | -50000 |
+| fxFlashBall | -200000 |
+| objControlerN (surface publication) | -300000 |
+
+Flash balls have no parent or Draw override and their Create does not change
+depth. Their default sprite draw belongs ahead of the player and ordinary
+actors, but behind the controller's surface publication. Both port draw lists
+place flashes at that boundary. This does not establish equal-depth instance
+ordering or fix every existing actor family ordering. Smoke's death/low-spec
+direct fallback has a different boundary from controller-composited smoke.
+
+`make verify-effect-depths` checks the 342 table entries from VM assembly,
+pins the reviewed compatibility functions and flash Create, and checks the
+controller's room-layer depth and persistence against the extraction manifest.
+
 ## Pinned Windows blend path
 
 `verify-runner-effect-blend.py` pins the executable hash, registration at

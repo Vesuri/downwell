@@ -528,8 +528,11 @@ verify-effect-publish: build/effect-publish-test
 verify-sdl-flash-raster: build/sdl-flash-raster-test generate-sprite-pack
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/sdl-flash-raster-test
 
-.PHONY: verify-flash-render-paths
-verify-flash-render-paths: build/game-render-test test-amiga-gameplay-draw-list verify-sdl-flash-raster
+.PHONY: verify-flash-render-paths verify-effect-depths
+verify-effect-depths:
+	python3 tools/verify-effect-depths.py
+test: verify-effect-depths
+verify-flash-render-paths: verify-effect-depths build/game-render-test test-amiga-gameplay-draw-list verify-sdl-flash-raster
 	DOWNWELL_FLASH_RENDER_ONLY=1 ./build/game-render-test
 
 build/skip-intro-test: tests/core/SkipIntroTest.cpp $(filter-out tests/core/GameRenderTest.cpp,$(GAME_RENDER_TEST_SOURCES)) src/platform/amiga/AmigaSceneRuntime.cpp

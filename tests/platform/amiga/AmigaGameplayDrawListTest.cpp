@@ -32,9 +32,6 @@ int main() {
                 expected.push_back({UWORD(sprite),UWORD(frame),x,y,flip});
         };
 #ifndef DOWNWELL_REPLAY_VERIFY
-        world.flashEffects().visitNewest([&](const downwell::FlashBallEffect& effect){
-            emit(96,effect.drawFrame(),110+effect.pixelX()-vx,effect.pixelY()-vy);++flashDraws;
-        });
         for(unsigned i=0;i<world.enemyCount();++i) {
             const auto& e=world.enemyAt(i);
             if(e.active && e.awake) emit(e.spriteId,e.drawFrame(),190+e.x-world.cameraOffsetX(),
@@ -65,6 +62,11 @@ int main() {
             if(g.active && g.motion.lifetime.visible()) emit(g.large?134:133,g.motion.animation.frame(),
                 190+g.x-world.cameraOffsetX(),142+g.y-world.cameraOffsetY());
         }
+#endif
+#ifndef DOWNWELL_REPLAY_VERIFY
+        world.flashEffects().visitNewest([&](const downwell::FlashBallEffect& effect){
+            emit(96,effect.drawFrame(),110+effect.pixelX()-vx,effect.pixelY()-vy);++flashDraws;
+        });
 #endif
         assert(list.count==expected.size());
         for(unsigned i=0;i<list.count;++i) {

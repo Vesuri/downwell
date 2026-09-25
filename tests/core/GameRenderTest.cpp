@@ -46,6 +46,7 @@ public:
     }
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
     void drawSprite(std::int32_t id, std::uint32_t frame, int x, int y) override {
+        spriteOrder.push_back(id);
         if(id==96) flashDraws.push_back({id,frame,float(x),float(y),1,1,0});
         if (id == 133 || id == 134) ++gemDraws;
         require(id != 458 && id != 459, "projectiles must use their firing angle, not unrotated artwork");
@@ -60,8 +61,10 @@ public:
     bool recordTransforms = false;
     std::vector<Transform> transforms;
     std::vector<Transform> flashDraws;
+    std::vector<int> spriteOrder;
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t frame, float x, float y,
                                float sx, float sy, float angle) override {
+        spriteOrder.push_back(sprite);
         if (recordTransforms) transforms.push_back({sprite, frame, x, y, sx, sy, angle});
         if (sprite == 458 || sprite == 459) {
             require(sx == 1 && sy == 1 && angle >= 267 && angle <= 273,
@@ -392,6 +395,20 @@ int main() {
             });
             require(count==capture.flashDraws.size() && (frame<7?count>=4:count==0),
                     "host world animation retires flash effects on seventh update");
+            if(count){
+                bool playerSeen=false,flashSeen=false;
+                for(int sprite:capture.spriteOrder){
+                    if(sprite==runtime.mainPlayerSpriteId()){
+                        require(!flashSeen,"source player depth precedes flash balls");
+                        playerSeen=true;
+                    }
+                    if(sprite==96){
+                        require(playerSeen,"flash balls are in front of the live player");
+                        flashSeen=true;
+                    }
+                }
+                require(playerSeen && flashSeen,"painter-order fixture covers player and flash");
+            }
             runtime.step(false);
         }
         if(std::getenv("DOWNWELL_FLASH_RENDER_ONLY")) {

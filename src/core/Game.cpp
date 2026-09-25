@@ -294,10 +294,6 @@ void Game::renderMain(Renderer& renderer) const {
             if (x >= 0 && x < 160 && y >= 0 && y < 284)
                 renderer.fillRect(x, y, 1, 1, pen == 1 ? Color{255,255,255,255} : Color{255,0,0,255});
         });
-        startup_.flashEffects().visitNewest([&](const FlashBallEffect& effect) {
-            renderer.drawSprite(96,effect.drawFrame(),effect.pixelX()-static_cast<int>(viewX),
-                                effect.pixelY()-static_cast<int>(viewY));
-        });
       }
       for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
         const InstanceRecord& instance = startup_.instanceAt(index);
@@ -363,6 +359,13 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<int>(gem.x - viewX),
                             static_cast<int>(gem.y - viewY));
     }
+    // __global_object_depths: fxFlashBall is -200000, in front of the
+    // player (-50000), ordinary projectiles (0) and currency (10000).
+    // It draws directly; the controller's effect surfaces follow at -300000.
+    startup_.flashEffects().visitNewest([&](const FlashBallEffect& effect) {
+        renderer.drawSprite(96,effect.drawFrame(),effect.pixelX()-static_cast<int>(viewX),
+                            effect.pixelY()-static_cast<int>(viewY));
+    });
     if (startup_.mainDeathSequence().flashVisible())
         renderer.fillRect(0, 0, 160, logicalHeight, {255, 255, 255, 255});
     else if (!startup_.deathResults().active) {
