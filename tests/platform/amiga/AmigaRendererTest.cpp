@@ -542,6 +542,52 @@ int main(int argc, char** argv) {
     std::vector<UBYTE> actualGame(downwellGameRingBytes), expectedGame(downwellGameRingBytes);
     std::vector<UBYTE> actualHud(downwellLayerBytes), expectedHud(downwellLayerBytes);
     AmigaRenderer actualRenderer, expectedRenderer;
+    unsigned tileComparisons = 0;
+    for (unsigned i = 0; i < records; ++i) {
+        const auto* r = gamePack.data() + 20 + i * 24;
+        if (word(r) != 51) continue;
+        const int ox = static_cast<short>(word(r+4)), oy = static_cast<short>(word(r+6));
+        const int width = word(r+8), height = word(r+10), stride = word(r+12)/8;
+        const auto* data = gamePack.data() + (word(r+16)*65536u + word(r+18));
+        for (unsigned origin : {0u, 311u, downwellGameRingHeight-1u})
+            for (int shift = 0; shift < 16; ++shift)
+                for (int clipped : {0, 1, 2}) {
+                    std::fill(actualGame.begin(), actualGame.end(), 0x5a);
+                    expectedGame = actualGame;
+                    amigaRendererInit(&actualRenderer, actualGame.data(), actualHud.data());
+                    amigaRendererSetGameOrigin(&actualRenderer, origin);
+                    const int x = 110 + shift, y = 8;
+                    const int cx = clipped ? x-3 : 0, cy = clipped == 2 ? 7 : 0;
+                    const int cw = clipped ? 9 : downwellVisibleWidth;
+                    const int ch = clipped == 2 ? 3 : downwellDisplayHeight;
+                    amigaRendererSetClipRect(&actualRenderer, cx, cy, cw, ch);
+                    amigaRendererDrawAsset(&actualRenderer, gamePack.data(), gamePack.data()+gamePack.size(),
+                        51, word(r+2), x, y, 0);
+                    for (int sy = 0; sy < height; ++sy)
+                        for (int sx = 0; sx < width; ++sx) {
+                            const int dx = x-ox+sx, dy = y-oy+sy;
+                            if (dx < cx || dx >= cx+cw || dy < cy || dy >= cy+ch ||
+                                dx < 0 || dx >= downwellVisibleWidth || dy < 0 || dy >= downwellDisplayHeight) continue;
+                            const unsigned bit = 0x80u >> (sx&7);
+                            const unsigned offset = sy*stride + sx/8;
+                            const unsigned pen = ((data[offset]&bit) ? 1 : 0) |
+                                ((data[offset+stride*height]&bit) ? 2 : 0);
+                            if (!pen) continue;
+                            for (unsigned plane = 0; plane < 2; ++plane) {
+                                auto& dest = expectedGame[plane*downwellGameRingPlaneBytes +
+                                    ((origin+dy)%downwellGameRingHeight)*downwellBytesPerPlaneLine + dx/8];
+                                const unsigned mask = 0x80u >> (dx&7);
+                                dest = (dest & ~mask) | ((pen&(1u<<plane)) ? mask : 0);
+                            }
+                        }
+                    require(actualGame == expectedGame, "tile word composition matches scalar clipping and ring-wrap oracle");
+                    ++tileComparisons;
+                }
+    }
+    require(tileComparisons > 1000, "terrain tile oracle exercises all frames and word shifts");
+    std::cout << tileComparisons << " terrain tile scalar comparisons\n";
+    std::fill(actualGame.begin(), actualGame.end(), 0);
+    std::fill(expectedGame.begin(), expectedGame.end(), 0);
     amigaRendererInit(&actualRenderer, actualGame.data(), actualHud.data());
     amigaRendererInit(&expectedRenderer, expectedGame.data(), expectedHud.data());
     amigaRendererSetGameOrigin(&actualRenderer, 311);

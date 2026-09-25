@@ -1,5 +1,39 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Word-wide small gameplay tile composition
+
+The existing clipped word compositor now also handles gameplay targets for
+small assets (up to 32 pixels wide; at most 24 visible rows when blitting is
+enabled). It resolves the ring row once and advances/wraps destination pointers,
+using the correct ring plane size. Transparent pixels, color replacement,
+asset origins and edge masks are unchanged. Larger images retain their prior
+blitter/fallback paths. No cache invalidation or simulation rule changes.
+
+The matched shipping tape improves from **873 to 855 PAL fields** over 600
+updates: **34.36 to 35.09 FPS**, maximum gap **four to three fields** (80 to
+60 ms). This is a modest measured gain, not achievement of the 20 ms target.
+Log: `/tmp/downwell-tile-word-fps.log`.
+
+With probes, frame 279 remains worst and requests the same 160x11 strip at
+world Y 1207. Asset composition on that frame decreases from 32.509 to
+30.516 ms, while its total measured duration changes from 85.114 to 83.172 ms.
+Across the tape, the asset phase totals 478.438 ms. Instrumented field count
+is 1,181 (versus 1,179 before); that perturbed run must not be substituted
+for the shipping throughput measurement. No clock clamps occur.
+Log: `/tmp/downwell-tile-word-probes.log`.
+
+An independent scalar oracle compares all 26 terrain frames over 16 X
+alignments, three clips and three ring origins: 3,744 full-buffer comparisons,
+including untouched bytes. The entire renderer suite and ASan/UBSan pass,
+including retained shop/HUD comparisons and 22,834 offline sprite cases.
+Logs: `/tmp/downwell-tile-word-test.log`, `/tmp/downwell-tile-word-sanitized.log`.
+
+The bounded native natural-route gate also passes: 211 clear and 168 exit-field
+comparisons, 49 retained HUD comparisons, 43 shop-return updates and intact
+stack guard, with unchanged route timing and zero failure counters. All runs
+stop their emulator and restore the ordinary build; 68000 instruction/helper
+audits pass. Evidence: `/tmp/downwell-tile-word-native.log`.
+
 ## Current baseline after original-RNG and cavern-spawn corrections
 
 ### Worst-frame span trace

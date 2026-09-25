@@ -166,13 +166,21 @@ static void drawAssetNormal(AmigaRenderer* renderer,
         }
         return;
     }
-    if (renderer->target == renderer->hud && width <= 32 &&
+    /* Small tiles use the same clipped word compositor as HUD artwork.
+       Resolve the circular row once, then advance/wrap pointers; no per-byte
+       ring arithmetic or blitter setup is needed for a short exposed strip. */
+    if (width <= 32 &&
         (!renderer->blitterEnabled || lastY-firstY <= 24) && !(planeBytes & 1)) {
         const int firstWord = clipLeft >> 4, lastWord = (clipRight-1) >> 4;
         const UWORD firstMask = (UWORD)(0xffffu >> (clipLeft & 15));
         const UWORD lastMask = (UWORD)(0xffffu << (15 - ((clipRight-1) & 15)));
         const ULONG sourcePlaneBytes = (ULONG)planeBytes * height;
-        UBYTE* targetRow = renderer->hud + firstY * downwellBytesPerPlaneLine;
+        const unsigned targetHeight = renderer->target == renderer->game
+            ? downwellGameRingHeight : downwellDisplayHeight;
+        unsigned targetY = firstY;
+        if (renderer->target == renderer->game)
+            targetY = (renderer->gameOrigin + targetY) % targetHeight;
+        UBYTE* targetRow = renderer->target + targetY * downwellBytesPerPlaneLine;
         const UBYTE* source = data + (firstY-top)*planeBytes;
         for (y = firstY; y < lastY; ++y) {
             int word;
@@ -186,10 +194,14 @@ static void drawAssetNormal(AmigaRenderer* renderer,
                 if (!mask) continue;
                 if (outputPen >= 0) { low = outputPen & 1 ? 0xffff : 0; high = outputPen & 2 ? 0xffff : 0; }
                 writeWord(target, (readWord(target) & (UWORD)~mask) | (low & mask));
-                writeWord(target+downwellPlaneBytes,
-                    (readWord(target+downwellPlaneBytes) & (UWORD)~mask) | (high & mask));
+                writeWord(target+destinationPlaneBytes,
+                    (readWord(target+destinationPlaneBytes) & (UWORD)~mask) | (high & mask));
             }
             source += planeBytes; targetRow += downwellBytesPerPlaneLine;
+            if (++targetY == targetHeight) {
+                targetY = 0;
+                targetRow = renderer->target;
+            }
         }
         return;
     }

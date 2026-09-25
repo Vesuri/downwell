@@ -115,8 +115,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - Meet the worst-case 20 ms budget. The latest style-navigation measurement is
   45.45 FPS over 180 updates, with a maximum three-field gap. Combined upgrade
   content/layout/simulation work and transition preparation also exceed budget.
-  After the RNG and cavern-spawn corrections, the current 600-update gameplay
-  tape runs at 34.36 FPS (873 PAL fields), with a four-field maximum gap.
+  After the RNG/cavern-spawn corrections and word-wide tile composition, the
+  current 600-update gameplay tape runs at 35.09 FPS (855 PAL fields), with a
+  three-field maximum gap (60 ms), improved from 34.36 FPS / four fields.
   The separate instrumented run identifies terrain recomposition as the
   dominant cost in its worst frame, not generation. The older 36.36-FPS
   measurement describes a different generated layout and is superseded.
