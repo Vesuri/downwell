@@ -18,6 +18,29 @@ The fixed-point world now lives in core, but SDL's live `StartupRuntime` still
 owns a separate world loop. Extracting the class does not complete that switch.
 Rendering/storage optimizations do not justify separate gameplay rules.
 
+## First-room generator state handoff
+
+`StartupRuntime::mainBuilderState()` exposes the actual shared generator at
+the room boundary. `AmigaAreaOneTerrainBuilder::resetFromRoomEntry()` imports
+that state without replaying Create events or consuming random draws; callers
+transfer the matching `randomState()` separately. Import is rejected after
+terrain generation begins, without clearing the existing backend storage.
+This is a pre-generation handoff, not a save-state loader for a populated room.
+
+The live-scene test now exercises this path for seeds 2, 42 and 1234567,
+comparing player/enemy state and all 16 RNG words plus cursor/draw count on
+240 successive updates per seed, through entrance landing. It also verifies
+that a late import fails without losing generated fragments. The independent
+native seed-2 checkpoint test remains in place: importing SDL state must not
+hide regressions in the existing native startup route.
+
+This prepares a real state boundary for migration; it does not yet replace
+SDL's live gameplay loop or the native intro's fixed initial checkpoint.
+Focused evidence: `/tmp/downwell-entry-test.log`.
+The bounded 45-second cross-target replay passes with unchanged digests
+(`/tmp/downwell-entry-replay.log`). The ordinary Amiga executable is restored
+and both 68000 audits pass (`/tmp/downwell-entry-restore.log`).
+
 ## Generated-instance world handoff
 
 `GameplayWorld::createGeneratedInstance` now owns synchronous shop/exit

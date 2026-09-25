@@ -124,6 +124,16 @@ void AmigaAreaOneTerrainBuilder::resetInitialCheckpoint(
     failed_ = false;
 }
 
+bool AmigaAreaOneTerrainBuilder::resetFromRoomEntry(
+    const downwell::AreaOneBuilder& builder) {
+    if (builder.rowsGenerated() != 0 || builder.spawnerMade() ||
+        builder.endReached()) return false;
+    builder_ = builder;
+    fragmentCount_ = enemyCount_ = decorationCount_ = 0;
+    failed_ = false;
+    return true;
+}
+
 void AmigaAreaOneTerrainBuilder::resetRoom(int x, int y,
         downwell::GameMakerRandom& random) {
     resetRoom(x, y, random, downwell::AreaOneBuilder::Setup{});

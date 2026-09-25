@@ -59,7 +59,8 @@ struct LiveSceneWorld {
         return world.builder.stepVisible(world.patterns, random, bottom, result);
     }
     void bind(AmigaPortRuntime& port, const downwell::RoomPack& rooms,
-              const downwell::PackedRoom& room, bool continuing = false) {
+              const downwell::PackedRoom& room, bool continuing = false,
+              const downwell::StartupRuntime* entry = nullptr) {
         runtime = &port;
         collision.index = nullptr; collision.runtime = nullptr; collision.fragmentCount = 0;
         require(amigaBuildTerrainIndex(collision, index), "live scene index initializes empty");
@@ -74,7 +75,11 @@ struct LiveSceneWorld {
         collision.runtime = &port;
         const int emptyBlock = 0;
         port.configureBreakables(&emptyBlock, &emptyBlock, 0);
-        if (continuing) {
+        if (entry) {
+            require(builder.resetFromRoomEntry(entry->mainBuilderState()),
+                    "live room entry imports generator before any terrain emission");
+            port.configureEnemyRandom(entry->randomState());
+        } else if (continuing) {
             require(port.initializeAreaOneBuilder(builder, -16, 704), "native continuation initializes the current level on its owned RNG");
         } else {
             downwell::GameMakerRandom random;
@@ -628,6 +633,39 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(restarted.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 42),
                     "host returns from garden directly to fresh gameplay");
         }
+    }
+
+    // Exercise a real room-entry handoff, not only the seed-2 capture used by
+    // the native intro. Create and garden RNG consumption belongs to startup;
+    // importing it must neither reconstruct nor consume those draws again.
+    for (const std::uint32_t seed : {2U, 42U, 1234567U}) {
+        downwell::StartupRuntime entry(
+            downwell::PlatformProfile::nonDesktop, &rooms, &objects, seed, &patterns);
+        entry.skipToGameForTesting();
+        AmigaPortRuntime imported(300, false, 1201 - 176, true);
+        imported.initializeEntryInput(false);
+        downwell::PackedRoom room;
+        require(rooms.findRoom(11, room), "handoff room metadata exists");
+        LiveSceneWorld liveEntry(patterns, objects);
+        liveEntry.bind(imported, rooms, room, false, &entry);
+        for (unsigned tick = 0; tick < 240; ++tick) {
+            parityFrame = static_cast<int>(tick);
+            compareInitialGameplay(imported, entry);
+            require(imported.randomDrawCount() == entry.randomDrawCount() &&
+                    imported.randomState().stateIndex() == entry.randomState().stateIndex(),
+                    "room-entry RNG cursor remains exact across seeds");
+            for (unsigned word = 0; word < 16; ++word)
+                require(imported.randomState().stateWord(word) == entry.randomState().stateWord(word),
+                        "room-entry RNG words remain exact across seeds");
+            imported.step(0);
+            entry.step(downwell::Input{}, false);
+        }
+        require(imported.player().grounded() && entry.mainPlayerGrounded(),
+                "imported room entry reaches the source entrance floor across seeds");
+        const auto oldCount = liveEntry.builder.fragmentCount();
+        require(oldCount > 0 && !liveEntry.builder.resetFromRoomEntry(entry.mainBuilderState()) &&
+                liveEntry.builder.fragmentCount() == oldCount,
+                "late handoff is rejected without discarding generated terrain");
     }
 
     downwell::StartupRuntime reference(

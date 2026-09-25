@@ -283,6 +283,8 @@ public:
     std::uint32_t randomSeed() const { return random_.seed(); }
     std::uint64_t randomDrawCount() const { return random_.drawCount(); }
     const GameMakerRandom& randomState() const { return random_; }
+    // Room-entry handoff: pair with randomState() before the first builder Step.
+    const AreaOneBuilder& mainBuilderState() const { return areaOneBuilder_; }
     long mainEnemyTargetX() const { return mainPlayerMotion_.frameStartXFixed(); }
     long mainEnemyTargetY() const { return mainPlayerMotion_.frameStartYFixed(); }
     std::uint64_t stateDigest() const;

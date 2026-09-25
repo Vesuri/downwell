@@ -85,6 +85,10 @@ public:
         observerContext_ = context;
     }
     void resetInitialCheckpoint(downwell::GameMakerRandom& random);
+    // Import simulation state without replaying Create or consuming RNG.
+    // The caller transfers the matching RNG separately. Existing terrain is
+    // not imported; use only before the first generated pattern in a room.
+    bool resetFromRoomEntry(const downwell::AreaOneBuilder& builder);
     // New-run entry uses the source Create logic, not the seed-2 startup capture.
     void resetRoom(int x, int y, downwell::GameMakerRandom& random);
     void resetRoom(int x, int y, downwell::GameMakerRandom& random,
