@@ -104,10 +104,6 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 7. Establish memory fit and failure handling
 
-- Restore the resident-art budget gate: the game pack currently needs 281,664
-  Chip bytes against the 278,000-byte test cap (already 280,254 before smoke).
-  Reduce residency or bank scene/effect assets, then verify bounded native
-  allocation and rendering; do not simply raise the cap.
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit.

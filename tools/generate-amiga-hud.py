@@ -250,6 +250,27 @@ def flash_palette_canvas(canvas):
     return mapped
 
 
+def intern_planar(data, payload, blocks):
+    """Share only word-aligned immutable regions, never writable DMA records."""
+    if data in blocks:
+        return blocks[data]
+    for previous, offset in blocks.items():
+        at = previous.find(data)
+        while at >= 0:
+            if at % 2 == 0:
+                return offset + at
+            at = previous.find(data, at + 1)
+    # All calls precede writable DMA payloads. Reuse a matching tail while
+    # keeping each asset's complete planar/mask stream contiguous.
+    overlap = min(len(payload), len(data)) & ~1
+    while overlap and payload[-overlap:] != data[:overlap]:
+        overlap -= 2
+    offset = len(payload) - overlap
+    payload.extend(data[overlap:])
+    blocks[data] = offset
+    return offset
+
+
 def frame_canvas(sprite, frame, items, pages):
     item = items[frame["texturePageItemId"]]
     source = pages[item["texturePageId"]].crop((
@@ -827,17 +848,18 @@ def build_pack(manifest, extracted, profile, language_path=None):
     # Gameplay DMA words are copied into channel slots, not read by DMA here.
     # Keep them at the end so the target can leave this tail in Fast RAM.
     for sprite, frame_index, dma_width, planar in sorted(
-            encoded, key=lambda item: bool(item[0].get("hardwareParts"))):
+            encoded, key=lambda item: (
+                2 if item[0].get("hardwareParts") else 1 if item[0].get("hardware") else 0,
+                0 if item[0].get("hardware") else -len(item[3]))):
         # Planar art/masks are immutable. Identical frames and symmetric
         # variants can share bytes without changing any resource/frame ID.
         # Garden DMA records contain writable position headers: never alias
         # those, or one animation buffer could modify the displayed sprite.
-        offset = None if sprite.get("hardware") else immutable_payloads.get(planar)
-        if offset is None:
+        if sprite.get("hardware"):
             offset = payload_offset + len(payload)
             payload.extend(planar)
-            if not sprite.get("hardware"):
-                immutable_payloads[planar] = offset
+        else:
+            offset = payload_offset + intern_planar(planar, payload, immutable_payloads)
         offsets[(sprite["id"], frame_index)] = offset
     for sprite, frame_index, dma_width, planar in encoded:
         records.append(RECORD.pack(

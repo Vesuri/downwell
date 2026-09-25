@@ -17,10 +17,17 @@ memory requirement.
 | Two channel-seven sprite buffers | 272 |
 | Null sprite | 8 |
 | Shared splash/style cache | 66,704 |
-| Resident game-art pack (directory, planar art, garden sprites) | 277,320 |
-| **Total** | **485,792** |
+| Resident game-art pack (directory, planar art, garden sprites) | 269,582 |
+| **Total** | **478,054** |
 
 A temporary 16-byte startup copper list is also allocated during initialization.
+Immutable planar/mask payloads may share byte-identical word-aligned subregions
+and matching tails. Every record still describes one contiguous stream with its
+original length, origin and pixels. Writable garden DMA records are appended
+separately and must not overlap any other record. Gameplay DMA source records
+remain in the ordinary-memory tail. This is offline layout only: the target
+does not decompress or rebuild assets.
+
 Gameplay reuses the retired splash/style cache for its two display rings and
 garden memory for side-view staging and the HUD pack. These are not additional
 allocations. Scrolling changes copper bitplane pointers; the private terrain
