@@ -28,8 +28,7 @@ struct BoneProjectile {
     }
     bool meetsPlayer(const ContactActor& player) const {
         const auto a=collisionBounds(), b=contactWorldBounds(player);
-        return a.left<a.right && a.top<a.bottom && b.left<b.right && b.top<b.bottom &&
-            a.left<b.right && b.left<a.right && a.top<b.bottom && b.top<a.bottom;
+        return contactBoundsOverlap(a,b);
     }
     // The owner supplies the spatial index's rectangle query, not a per-pixel
     // scan. It dispatches each collision family in original engine order.

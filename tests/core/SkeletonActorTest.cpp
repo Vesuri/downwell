@@ -54,7 +54,41 @@ struct BulletEvents {
         calls.push_back(5);
     }
 };
+struct PreciseContact {
+    double y,speed;
+    bool onGround;
+    int mutation;
+    unsigned stomps=0,damages=0;
+    downwell::MotionBinary64 globalY(){return number(y);}
+    downwell::MotionBinary64 verticalSpeed(){return number(speed);}
+    bool grounded(){return onGround;}
+    void stomp(){++stomps;if(mutation==1) onGround=true;if(mutation==2) y=193;}
+    void damage(int a,int b,int c){check(a==1 && b==3 && c==2);++damages;}
+};
 int main() {
+    for(int pose:{205,207,208}) for(int facing:{-1,1})
+    for(int dx=-20;dx<=20;++dx) for(int dy=-20;dy<=20;++dy) {
+        downwell::SkeletonActor skeleton;check(skeleton.create(96,192));
+        skeleton.sprite=pose;skeleton.facing=facing;
+        skeleton.xx=number(1000);skeleton.yy=number(1000);
+        check(downwell::enemyContactMask(120,pose)==208);
+        const downwell::ContactActor player{(96+dx)*256L,(192+dy)*256L,1,1,31};
+        // Metadata: skeleton [-10,10)x[-7,8), player [-4,4)x[-4,8).
+        const bool overlap=dx-4<10 && dx+4> -10 && dy-4<8 && dy+8> -7;
+        check(skeleton.meetsPlayer(player)==overlap);
+    }
+    for(double offset:{-0.00002,-0.000001,0.0,0.000001,0.00002})
+    for(double speed:{-0.00002,-0.000001,0.0,0.000001,0.00002})
+    for(bool grounded:{false,true}) for(int mutation:{0,1,2}) {
+        downwell::SkeletonActor skeleton;check(skeleton.create(96,192));
+        skeleton.yy=number(1000); // Collision uses y, not precise yy.
+        PreciseContact player{192+offset,speed,grounded,mutation};
+        const bool stomp=192-player.y>0.00001 && !grounded && speed>0.00001;
+        const bool damage=grounded || (stomp && mutation==1) ||
+            ((stomp && mutation==2?193:player.y)-192>0.00001);
+        check(skeleton.collidePlayerAt(player));
+        check(player.stomps==unsigned(stomp) && player.damages==unsigned(damage));
+    }
     for(int health:{-1,0,1,9,15,60}) for(int damage:{9,15})
     for(bool stunned:{false,true}) for(bool active:{false,true}) {
         downwell::SkeletonActor s; check(s.create(96,192));
@@ -148,5 +182,5 @@ int main() {
     check(ordinary.stomps==1 && ordinary.damageCalls==0);
     Contact mutated; mutated.mutate=true; s.collidePlayer(mutated);
     check(mutated.stomps==1 && mutated.damageCalls==1);
-    std::puts("Skeleton actor movement, time-stop, death order and collision mutation checks passed");
+    std::puts("Skeleton actor movement, time-stop, death order, 10086 mask and 150 precise contact checks passed");
 }

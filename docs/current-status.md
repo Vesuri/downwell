@@ -25,6 +25,18 @@ This queue describes priorities, not a replacement for the full goal. The old
 
 ### Joined skeleton/bone encounter regression
 
+The shared skeleton now exposes its fixed sprite-208 contact rectangle and a
+precise player-contact adapter. Hit/throw artwork does not change that explicit
+mask. Dispatch geometry uses published x/y; the event compares published enemy
+y to precise global.ply and player ysp with runner tolerance, then re-reads
+player grounding/Y after stomp. It deliberately has no added time-stop guard.
+The metadata verifier also pins the Collision event's full instruction sequence.
+10,086 pose/facing/edge cases and 150 precise/mutation cases pass, including
+sanitizers; the joined encounter, bone and existing enemy-contact tests pass.
+The composed 68000 fixture compiles without floating-point helpers. Actual
+stomp/damage effects and global collision scheduling still belong to the live
+owner integration; this adapter does not enable skeleton spawning.
+
 `make verify-skeleton-encounter` now runs the actor and owned projectiles through
 animation, global alarm slots, ordinary Step, synchronous throws and deferred
 projectile retirement together. Its separate host float/double model compares

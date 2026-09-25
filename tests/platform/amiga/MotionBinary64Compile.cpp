@@ -125,6 +125,26 @@ extern "C" unsigned skeletonBulletCompile(downwell::SkeletonActor* state,int dam
     return events.trace;
 }
 namespace {
+struct SkeletonPlayerCompile {
+    downwell::MotionBinary64 y,speed;
+    bool onGround;
+    unsigned trace=0;
+    downwell::MotionBinary64 globalY(){return y;}
+    downwell::MotionBinary64 verticalSpeed(){return speed;}
+    bool grounded(){return onGround;}
+    void stomp(){++trace;speed={};}
+    void damage(int a,int b,int c){trace+=a+b+c;}
+};
+}
+extern "C" unsigned skeletonContactCompile(downwell::SkeletonActor* state,
+    downwell::ContactActor player,downwell::MotionBinary64 y,
+    downwell::MotionBinary64 speed,bool grounded) {
+    SkeletonPlayerCompile contact{y,speed,grounded};
+    if(!state->meetsPlayer(player)) return 0;
+    if(!state->collidePlayerAt(contact)) return 0xffffffffu;
+    return contact.trace;
+}
+namespace {
 struct BoneStoreCompileRandom {
     unsigned word;
     unsigned nextU32() { return word++; }

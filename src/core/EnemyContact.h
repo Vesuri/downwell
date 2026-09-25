@@ -22,6 +22,7 @@ inline ContactBounds contactSpriteBounds(int sprite) {
         case 166: return {-6, 6, -5, 8};
         case 177: return {-7, 7, -6, 7};
         case 186: return {-8, 8, -4, 8};
+        case 208: return {-10, 10, -7, 8};
         case 278: return {-5, 5, -5, 5};
         case 460: return {-5, 5, -4, 5};
         default: return {0, 0, 0, 0};
@@ -35,6 +36,7 @@ inline int enemyContactMask(int object, int sprite) {
         case 113: return 166; // serialized explicit mask
         case 117: return 177;
         case 119: return 278;
+        case 120: return 208; // Explicit mask: unchanged by throw/hit artwork.
         default: return -1;
     }
 }
@@ -44,6 +46,11 @@ struct ContactActor {
     int scaleX, scaleY; // supported active states use unit flips only
     int mask;
 };
+
+inline bool contactBoundsOverlap(const ContactBounds& a,const ContactBounds& b) {
+    return a.left<a.right && a.top<a.bottom && b.left<b.right && b.top<b.bottom &&
+        a.left<b.right && b.left<a.right && a.top<b.bottom && b.top<a.bottom;
+}
 
 inline ContactBounds contactWorldBounds(const ContactActor& actor) {
     ContactBounds bounds = contactSpriteBounds(actor.mask);

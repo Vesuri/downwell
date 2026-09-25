@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_SKELETON_ACTOR_H
 #define DOWNWELL_CORE_SKELETON_ACTOR_H
 #include "SkeletonDecisions.h"
+#include "EnemyContact.h"
 namespace downwell {
 // Shared object-120 event body. Owner runs pre-Step animation and global alarm
 // phases separately, supplies synchronous effect/child calls, and defers removal
@@ -13,6 +14,36 @@ struct SkeletonActor : SkeletonDecisions {
     bool damageStun=false;
     bool grounded=true, alive=true, destroyRequested=false;
     bool timefieldImmune=false;
+    ContactBounds collisionBounds() const {
+        auto bounds=contactSpriteBounds(208);
+        // The explicit mask is horizontally symmetric; image_xscale cannot
+        // change these bounds. Use published x/y, never the xx/yy accumulators.
+        bounds.left+=x; bounds.right+=x; bounds.top+=y; bounds.bottom+=y;
+        return bounds;
+    }
+    bool meetsPlayer(const ContactActor& player) const {
+        return contactBoundsOverlap(collisionBounds(),contactWorldBounds(player));
+    }
+    // Precise player globals for the source Collision event, independently of
+    // the published geometry used to decide whether that event is dispatched.
+    // Player exposes current globalY(), grounded(), verticalSpeed(), stomp()
+    // and damage(). Re-read after stomp: it may modify those player values.
+    // No time-stop early return: the source event does not have that guard.
+    template<class Player> bool collidePlayerAt(Player& player) {
+        const auto publishedY=MotionBinary64::fromInteger(y);
+        int order;
+        if(!compareRunnerReal(publishedY,player.globalY(),order)) return false;
+        if(order>0 && !player.grounded()) {
+            if(!compareRunnerReal(player.verticalSpeed(),{},order)) return false;
+            if(order>0) player.stomp();
+        }
+        if(player.grounded()) player.damage(1,3,2);
+        else {
+            if(!compareRunnerReal(player.globalY(),publishedY,order)) return false;
+            if(order>0) player.damage(1,3,2);
+        }
+        return true;
+    }
     void collideTimeField() { if(!timefieldImmune) health=0; }
     // Current machine-gun branch: non-consistent, non-exploding bullet against
     // this non-immune/non-through enemy. Other weapon contracts are not implied.
