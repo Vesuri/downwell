@@ -1,5 +1,6 @@
 #include "core/AreaOneBuilder.h"
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -8,6 +9,36 @@
 namespace {
 using namespace downwell;
 using Commands = std::vector<DeferredCreateInstance>;
+
+// Hash fields, not structure padding; pin ordered Create output plus RNG state.
+std::uint64_t emissionDigest = 14695981039346656037ULL;
+void mix(std::uint32_t value) {
+    for (unsigned byte = 0; byte < 4; ++byte) {
+        emissionDigest = (emissionDigest ^ (value & 255u)) * 1099511628211ULL;
+        value >>= 8;
+    }
+}
+void capture(const Commands& commands, const GameMakerRandom& random) {
+    mix(static_cast<std::uint32_t>(commands.size()));
+    for (const auto& c : commands) {
+        for (std::int32_t value : {c.objectId, c.x, c.y, c.integerScaleX,
+             c.integerImageIndex, c.integerVelocityX, c.integerVelocityY,
+             c.integerDirection, c.integerMoveSpeed, c.motionState, c.auxiliaryState}) mix(value);
+        for (float value : {c.scaleX, c.scaleY, c.imageSpeed, c.imageIndex,
+             c.velocityX, c.velocityY, c.direction, c.moveSpeed}) {
+            std::uint32_t bits;
+            static_assert(sizeof bits == sizeof value, "32-bit float fixture");
+            std::memcpy(&bits, &value, sizeof bits);
+            mix(bits);
+        }
+        mix(c.motionInitialized); mix(c.grounded); mix(c.active);
+        for (unsigned alarm = 0; alarm < AlarmBank::count; ++alarm) mix(c.alarms.get(alarm));
+    }
+    mix(random.stateIndex());
+    mix(static_cast<std::uint32_t>(random.drawCount()));
+    mix(static_cast<std::uint32_t>(random.drawCount() >> 32));
+    for (unsigned word = 0; word < 16; ++word) mix(random.stateWord(word));
+}
 
 void require(bool condition, const char* message) {
     if (!condition) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
@@ -74,6 +105,7 @@ int main(int argc, char** argv) {
         for (const auto& command : emitted) if (command.objectId == 277) ++shops;
         require(configured.endReached() && configured.shopsGenerated() == 1 && shops == 1,
             "member source branch emits exactly one actual Shop object through pattern traversal");
+        capture(emitted, configuredRandom);
         configuredRandom.setSeed(seed);
         configured.reset(240, 704, configuredRandom, {1,4,false,true});
         emitted.clear();
@@ -86,7 +118,13 @@ int main(int argc, char** argv) {
         }
         require(configured.endReached() && configured.shopsGenerated() == 1,
             "style four permits exactly one shop even on first level");
+        capture(emitted, configuredRandom);
     }
+    std::cout << "ordered emission digest " << std::hex << emissionDigest << std::dec << '\n';
+    // Captured independently with c1f968f's pre-symbol-dispatch implementation.
+    // A refactoring oracle, not a claim of independent Windows-runner capture.
+    require(emissionDigest == 0xffcdfc23dc638be7ULL,
+        "64 seeded levels preserve ordered Create fields and complete RNG state");
     GameMakerRandom random(2);
     AreaOneBuilder builder;
     builder.reset(240, 704, random);

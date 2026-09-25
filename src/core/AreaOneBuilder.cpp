@@ -198,33 +198,37 @@ bool AreaOneBuilder::emitPattern(
                 return false;
             if (random.nextU32() <= 0x55555555U) {
                 std::int32_t enemyId = -1;
-                if (symbol == 'a') enemyId = 111;
-                if (symbol == 'b') enemyId = 116;
-                if (symbol == 'd') enemyId = 113;
-                if (symbol == 'e') enemyId = 117;
-                if (symbol == 't') enemyId = 112;
-                if (symbol == '%') {
+                switch (symbol) {
+                case 'a': enemyId = 111; break;
+                case 'b': enemyId = 116; break;
+                case 'd': enemyId = 113; break;
+                case 'e': enemyId = 117; break;
+                case 't': enemyId = 112; break;
+                case '%': {
                     const std::int32_t enemies[] = {113, 111, 119, 112};
                     enemyId = enemies[random.irandomSmall(3)];
+                    break;
+                }
+                default: break;
                 }
                 if (enemyId >= 0 &&
                     !emitObject(enemyId, buildX, rowY, random, emit, context))
                     return false;
             }
             std::int32_t objectId = -1;
-            if (symbol == '1') objectId = 60;
-            if (symbol == '2' && random.irandomSmall(1) != 0) objectId = 60;
-            if (symbol == '-') objectId = 93;
-            if (symbol == 'B') objectId = 92;
-            if (symbol == '3' && random.irandomSmall(1) != 0) objectId = 92;
-            if (symbol == '|') objectId = 60;
-            if (symbol == 'v') objectId = 376;
-            if (symbol == 'O') objectId = 82;
-            if (symbol == '_') objectId = 62;
-            if (symbol == '$') objectId = 277;
-            if (symbol == '\\') objectId = 285;
-            if (symbol == '=') objectId = 306;
-            if (symbol == '@') {
+            switch (symbol) {
+            case '1': case '|': objectId = 60; break;
+            case '2': if (random.irandomSmall(1) != 0) objectId = 60; break;
+            case '-': objectId = 93; break;
+            case 'B': objectId = 92; break;
+            case '3': if (random.irandomSmall(1) != 0) objectId = 92; break;
+            case 'v': objectId = 376; break;
+            case 'O': objectId = 82; break;
+            case '_': objectId = 62; break;
+            case '$': objectId = 277; break;
+            case '\\': objectId = 285; break;
+            case '=': objectId = 306; break;
+            case '@': {
                 if (chunkOrCrate_ == 0) {
                     const std::int32_t choices[] = {293, 109};
                     chunkOrCrate_ = choices[random.irandomSmall(1)];
@@ -232,13 +236,16 @@ bool AreaOneBuilder::emitPattern(
                     chunkOrCrate_ = chunkOrCrate_ == 109 ? 293 : 109;
                 }
                 objectId = chunkOrCrate_;
+                break;
             }
-            if (symbol == '{' || symbol == '}') {
+            case '{': case '}': {
                 if (!emitObject(60, reversed ? 16 : 464, rowY,
                                 random, emit, context))
                     return false;
                 ++specialObjectsGenerated_;
-                objectId = -1;
+                break;
+            }
+            default: break;
             }
             if (objectId >= 0 &&
                 !emitObject(objectId, buildX, rowY, random, emit, context))

@@ -2,6 +2,33 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Mutually exclusive builder symbol dispatch
+
+Enemy-symbol selection and terrain-symbol selection now use separate
+switches. The unconditional per-cell WELL512 draw, decoration Create order,
+conditional random choices, chunk/crate alternation, special-object counts
+and synchronous callbacks retain their original positions. This is another
+shared-core dispatch change, not a changed generation algorithm.
+
+A new host regression digest covers every emitted Create field (including
+float bit patterns and all twelve alarms), command order, RNG draw count,
+state index and all sixteen WELL words across 64 seeded level traversals.
+The pre-change implementation from `c1f968f` and the new code independently
+produce **ffcdfc23dc638be7**, now pinned by the test. This is a refactoring
+oracle, not an independent Windows gameplay capture.
+
+Worst instrumented frame 258 falls from **145.317 to 141.875 ms**; builder
+phase 32 falls from **72.897 to 69.172 ms**. Registration/index phases remain
+22.379 / 25.577 ms. FPSCOUNT measures **811 fields / 600 updates = 36.99 FPS**,
+versus 815 before, with maximum gap still five. The gain is modest and the
+generation stall remains far outside 20 ms; probe times include overhead.
+
+Builder/live terrain tests, the pinned digest under sanitizers, native replay
+and both 68000 audits pass. The ordinary non-skip build was restored. Logs:
+`/tmp/downwell-symbol-dispatch-{test,profile,fps,replay}.log`,
+`/tmp/downwell-symbol-{before,golden,sanitized,final-test}.log`. Native runs
+used the same 45-second bound.
+
 ### Mutually exclusive builder Create dispatch
 
 `AreaOneBuilder::emitObject` now dispatches its distinct object IDs with a
@@ -130,7 +157,7 @@ or feature-parity improvement.
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 36.95 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 36.99 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
 
 ### Exact WELL512 shift on 68000
