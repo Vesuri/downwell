@@ -37,6 +37,7 @@ while $word < 64
 end
 printf "Natural exit and reentry passed: %lu clear frames, %lu exit field frames\n", gDownwellClearFrames, gDownwellClearFieldFrames
 printf "Natural shop and return: %lu HUD comparisons, %lu return updates\n", gDownwellShopLiveFrames, gDownwellNaturalReturnFrames
+printf "Natural route totals: exit=%lu second-level updates=%lu\n", gDownwellNaturalExitTick, gDownwellClearGameplayUpdates
 printf "DOWNWELL_NATURAL_READY\n"
 shell touch .run/gdb-ready.marker
 detach

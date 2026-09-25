@@ -2044,7 +2044,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                 if (240 + game.player().offsetX() < 280 && game.cameraOffsetX() == 0) break;
             }
             std::cout << "Natural shop seed=4 approach=" << shopUpdates << " affordable=" << affordable
-                      << " gems=" << money << " price=" << originalStock.price << " return=" << returnUpdates
+                      << " gems=" << money << " price=" << originalStock.price << " return=" << nativeRoute.returnFrames
                       << " camera=" << sideCamera << "->" << game.cameraOffsetX() << std::endl;
             require(sideCamera != 0 && returnUpdates < 240 && !game.dead(),
                 "natural shop return releases side camera and reaches main shaft alive");

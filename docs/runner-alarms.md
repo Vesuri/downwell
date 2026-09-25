@@ -60,7 +60,12 @@ still requires the additional slots and lifecycle integration.
 
 Validation after owner correction: scheduler tests and sanitizers pass;
 paired host natural routes retain exits at 1,339/1,646 updates and the seed-4
-shop at 518 updates. The return path is now 42 updates, formerly 43.
-The bounded native CPU replay passes with unchanged digests, and restores
-the ordinary 68000 build. These checks do not independently prove original
-instance traversal order or native rendering on the changed return route.
+shop at 518 updates. The return path remains 43 executed updates; its previous
+log printed the zero-based loop index 42, not a changed route duration.
+The bounded native CPU replay passes with unchanged digests. The separate
+rendered natural gate also passes: 211 clear frames, 168 exit-field frames,
+49 shop-HUD comparisons, 43 return updates and 688 total second-level updates,
+with an intact stack guard and ordinary 68000 build restored. An initial
+attempt incorrectly expected 687/42 based on the misleading host log and
+failed; the final run retains the original 688/43 assertions. These checks
+do not independently prove the original runner's instance traversal order.

@@ -29,15 +29,23 @@ now dispatch immediately in global ascending alarm-index order. This corrects
 the frog's Alarm 0-to-1 rearm countdown; see `runner-alarms.md`. Focused
 cross-instance mutation/deletion tests and sanitizers pass. Host natural
 routes still exit at 1,339/1,646 updates, followed by 211 upgrade and 120
-re-entry updates. Seed 4's next-level shop approach remains 518 updates, but
-return is now **42**, superseding the older host 43-update result below.
+re-entry updates. Seed 4's next-level shop approach remains 518 updates and
+return remains **43**. The earlier report of 42 mistakenly read the zero-based
+loop index printed by the test; its completion assertion required 43 executed
+updates throughout. The log now prints the actual route counter.
 Evidence: `/tmp/downwell-alarm-order-natural.log`.
 
 The bounded native CPU replay passes unchanged, including motion and bone
 Create fixtures. The ordinary target build is restored with clean 68000
 instruction/helper audits (`/tmp/downwell-alarm-order-native.log`). This is
-not a rerun of the native rendered natural-shop gate; its older 43-update
-expectation needs rechecking before that gate is cited for this revision.
+followed by a separate passing rendered natural-shop gate: 211 clear frames,
+168 exit-field frames, 49 shop-HUD comparisons and 43 return updates, with
+688 second-level updates total and the task-stack guard intact. The first
+attempt used the mistaken 42-update expectation and failed that assertion;
+the corrected bounded run restores the original expectations, not relaxed
+comparisons. Evidence: `/tmp/downwell-alarm-order-natural-corrected-native.log`
+and `/tmp/downwell-alarm-order-natural-corrected-gdb.log`. The emulator stopped
+and the ordinary build was restored after both attempts.
 
 ## Implemented and checked
 
