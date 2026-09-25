@@ -8,9 +8,12 @@
 // The pristine terrain backing is never modified. All CPU access requires DMA
 // blits to this display to have drained before calling either method.
 class AmigaLaserSight {
-    struct Pixel { UWORD offset; UBYTE mask, pen; };
+    struct ByteChange { UWORD offset; UBYTE mask, bits; };
+    static_assert(sizeof(ByteChange) == 4, "ray damage entries must stay compact");
     // A monotonic integer line clipped to 160x284 visits at most 443 pixels.
-    Pixel saved_[downwellPlayfieldWidth + downwellDisplayHeight];
+    // At most two changed plane bytes per pixel. Retain actual bits and an
+    // absolute plane offset, so restoration does not decode colours/planes.
+    ByteChange saved_[2 * (downwellPlayfieldWidth + downwellDisplayHeight)];
     unsigned count_ = 0, origin_ = 0;
     UBYTE* target_ = nullptr;
     downwell::LaserSightLine line_{};
@@ -18,12 +21,10 @@ class AmigaLaserSight {
     static bool same(const downwell::LaserSightLine& a, const downwell::LaserSightLine& b) {
         return a.x0 == b.x0 && a.y0 == b.y0 && a.x1 == b.x1 && a.y1 == b.y1;
     }
-    void write(const Pixel& p, unsigned pen) {
-        for (unsigned plane = 0; plane < 2; ++plane) {
-            UBYTE& byte = target_[p.offset + plane * downwellGameRingPlaneBytes];
-            const UBYTE value = (byte & (UBYTE)~p.mask) | ((pen & (1u << plane)) ? p.mask : 0);
-            if (byte != value) { byte = value; ++lastByteWrites; }
-        }
+    void restore(const ByteChange& p) {
+        UBYTE& byte = target_[p.offset];
+        const UBYTE value = (byte & (UBYTE)~p.mask) | p.bits;
+        if (byte != value) { byte = value; ++lastByteWrites; }
     }
 public:
     unsigned lastByteWrites = 0;
@@ -61,7 +62,7 @@ public:
             pending_ = false;
             return false;
         }
-        for (unsigned i = 0; i < count_; ++i) write(saved_[i], saved_[i].pen);
+        for (unsigned i = 0; i < count_; ++i) restore(saved_[i]);
         count_ = 0; valid_ = false;
         origin_ = origin;
         pending_ = line != nullptr;
@@ -77,20 +78,22 @@ public:
             if (x < downwellPlayfieldX || x >= downwellPlayfieldX + downwellPlayfieldWidth ||
                 y < 0 || y >= downwellDisplayHeight) return;
             const unsigned row = physicalRow(origin_, static_cast<unsigned>(y));
-            Pixel p{static_cast<UWORD>(row * downwellBytesPerPlaneLine + (x >> 3)),
-                    static_cast<UBYTE>(0x80u >> (x & 7)), 0};
-            UBYTE& low = target_[p.offset];
-            UBYTE& high = target_[p.offset + downwellGameRingPlaneBytes];
+            const UWORD offset = row * downwellBytesPerPlaneLine + (x >> 3);
+            const UBYTE mask = 0x80u >> (x & 7);
+            UBYTE& low = target_[offset];
+            UBYTE& high = target_[offset + downwellGameRingPlaneBytes];
             const UBYTE previousLow = low, previousHigh = high;
-            p.pen = ((previousLow & p.mask) ? 1 : 0) |
-                    ((previousHigh & p.mask) ? 2 : 0);
-            if (p.pen == 2) return; // Already red: neither save nor overwrite.
-            saved_[count_++] = p;
             // These bytes were just read to save the original pen. Red is 10:
             // publish each changed plane directly, without rereading it or
             // composing a generic two-plane colour a second time.
-            if (p.pen & 1u) { low = previousLow & (UBYTE)~p.mask; ++lastByteWrites; }
-            if (!(p.pen & 2u)) { high = previousHigh | p.mask; ++lastByteWrites; }
+            if (previousLow & mask) {
+                saved_[count_++] = {offset, mask, mask};
+                low = previousLow & (UBYTE)~mask; ++lastByteWrites;
+            }
+            if (!(previousHigh & mask)) {
+                saved_[count_++] = {static_cast<UWORD>(offset + downwellGameRingPlaneBytes), mask, 0};
+                high = previousHigh | mask; ++lastByteWrites;
+            }
         });
         pending_ = false; valid_ = true;
     }

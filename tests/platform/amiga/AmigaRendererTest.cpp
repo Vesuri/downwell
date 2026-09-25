@@ -132,6 +132,13 @@ int main(int argc, char** argv) {
             single.prepare(solid.data(), 319, nullptr, false);
             require(single.lastByteWrites == changedPlanes && solid == before,
                     "each source pen restores with exactly its changed-plane writes");
+            const downwell::LaserSightLine diagonal{110,0,269,283};
+            single.prepare(solid.data(), 319, &diagonal, false); single.draw();
+            require(single.lastByteWrites == 284*changedPlanes,
+                    "full-height ray saves both changed planes without truncation");
+            single.prepare(solid.data(), 319, nullptr, false);
+            require(single.lastByteWrites == 284*changedPlanes && solid == before,
+                    "full-height two-plane restoration preserves every original byte");
         }
         for (unsigned origin = 0; origin < 320; ++origin)
             for (unsigned y = 0; y < 284; ++y)

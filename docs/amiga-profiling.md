@@ -2,6 +2,24 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Store actual changed bytes for ray restoration
+
+Ray damage entries now hold an absolute plane-byte offset, bit mask and saved
+bits rather than a pixel colour requiring a two-plane decode during restore.
+Only changed planes create entries. The representation retains adjacent pixels
+and zero-write behavior for existing red and untouched retained rays. Storage
+increases from 1,776 to 3,552 bytes per display buffer (3,552 extra bytes total).
+
+Four source-pen cases now cover both a single pixel and a 284-pixel diagonal
+across ring wrap, checking exact write counts and complete byte restoration.
+The renderer suite and ASan/UBSan pass. The upgraded FPSCOUNT tape improves
+from **1,657 fields / 18.11 FPS** to **1,604 fields / 18.70 FPS**, maximum gap
+seven. This remains well short of 50 FPS. Logs:
+`/tmp/downwell-ray-byte-{test,sanitized,fps}.log`.
+The bounded native capture matches SDL at 0/99,968 differing pixels, and the
+restored ordinary build passes both 68000 audits:
+`/tmp/downwell-ray-byte-frame.log`.
+
 ### Separate ray CPU loops from blitter waits and main's register pressure
 
 The refined instrumented upgraded tape measures **11.741 ms/update** in CPU
