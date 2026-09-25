@@ -10,6 +10,9 @@ assert region(0x7FE3CC, 12) == b"image_index\0"
 assert region(0x7FE47C, 12) == b"image_speed\0"
 assert struct.unpack("<d", region(0x8A6C28,8))[0] == 0.00001
 for start, end, digest in (
+    (0x53CCC0, 0x53CCD8, "429bfb329e7c3020ceb72c0ae7086ce28e549e0de21e88bb5d4c09dd42c2feb0"),
+    (0x5783D6, 0x578436, "97cb4491399d353d32a0548944e463abc7f7ca40b80f3c296e75c26e15e2b2c6"),
+    (0x5797E0, 0x5797F8, "810c7264c1db450267c25e5b4de5857c26c0d535d5046183c5734d33de2c172a"),
     (0x430D0C, 0x430D22, "dfd0255b5282e2fc5ca46c4826e10ff4ff839c2f5d5bab168e923331a441b187"),
     (0x430E0E, 0x430E24, "88a8f4957a1aef678da7b40e03bfa06b2796bbd211a2bc7deb0b77e270ac5c70"),
     (0x432170, 0x4321AF, "3f6cd2270d083f86b2c714d83cdde1a214caff6308d7d3892394a05a8f2e622f"),

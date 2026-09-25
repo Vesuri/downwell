@@ -281,7 +281,12 @@ and the ordinary build was restored after both attempts.
   that animation state, retaining the final hit-stun override after the owner's
   motion/death work. 4,608 scalar cases, sanitizers and existing animation/throw
   regressions pass; 68000 compilation needs no helpers. Live projectile/actor
-  ownership and near-equal VM comparison semantics remain integration work.
+  ownership remain integration work. The frame-gate comparison audit now
+  proves strict comparisons against +/-0.00001 in the real/integer runner
+  path. The corrected gates pass 387 adjacent-float boundary checks and the
+  twenty-versus-twenty-one animation-advance regression; see
+  `runner-frame-comparisons.md`. Owner activation/facing comparisons still
+  need this same source-backed treatment when wired to live coordinates.
 
 ## Working evidence
 

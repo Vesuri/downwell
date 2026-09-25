@@ -44,9 +44,9 @@ int main() {
             else {
                 if (expectedSprite==208) { index=0; rate=0.3; }
                 change(207,8);
-                if (index<3) facing=left?-1:1;
-                if (index>4 && !shot) { throws=1; direction=facing; shot=true; }
-                if (index>6 && rate!=0) { rate=0; alarm2=30; }
+                if (index-3 < -0.00001) facing=left?-1:1;
+                if (index-4 > 0.00001 && !shot) { throws=1; direction=facing; shot=true; }
+                if (index-6 > 0.00001 && rate!=0) { rate=0; alarm2=30; }
             }
             if (movement) facing=movement;
         }
@@ -61,6 +61,29 @@ int main() {
         check(s.sprite==(stun?205:expectedSprite) && same(s.imageIndex,stun?0:index));
         ++cases;
     }
+    // Every adjacent binary32 value in a band around all three source gates.
+    for (unsigned gate : {3u,4u,6u}) {
+        float centre=float(gate); std::uint32_t bits;
+        std::memcpy(&bits,&centre,4);
+        for (int offset=-64; offset<=64; ++offset) {
+            const std::uint32_t raw=bits+offset;
+            float frame; std::memcpy(&frame,&raw,4);
+            downwell::SkeletonDecisions s; s.imageIndex=number(double(frame));
+            check(s.frameBelow(gate)==(double(frame)-gate < -0.00001));
+            check(s.frameAbove(gate)==(double(frame)-gate > 0.00001));
+        }
+    }
+    // The twentieth 0.3f advance is slightly ABOVE six, but not past the
+    // runner's GT gate. Stopping here would shorten the original animation.
+    downwell::SkeletonDecisions sequence; sequence.sprite=207;
+    sequence.rate=sequence.throwRate(); sequence.shot=true;
+    for (int tick=0; tick<20; ++tick) {
+        sequence.beginStep(false); bool crossed=false;
+        check(sequence.advanceImage(crossed) && !crossed);
+    }
+    check(!sequence.frameAbove(6));
+    bool crossed=false; check(sequence.advanceImage(crossed));
+    check(sequence.frameAbove(6));
     downwell::SkeletonDecisions failed;
     failed.sprite=207; failed.imageIndex=number(5);
     Ops failure{failed}; failure.allocated=false;
