@@ -15,6 +15,33 @@ struct SkeletonActor : SkeletonDecisions {
         x=px; y=py;
         xx=MotionBinary64::fromInteger(px); yy=MotionBinary64::fromInteger(py);
     }
+    // Live owners pass precise original globals, not rounded player pixels.
+    template<class Events>
+    bool stepAtPlayer(bool stopped,MotionBinary64 playerX,MotionBinary64 playerY,Events& events) {
+        if(stopped) return step(true,false,false,0,events);
+        auto activation=yy;
+        int vertical,horizontal,movement;
+        if(!activation.add(MotionBinary64::fromInteger(-96)) ||
+           !compareRunnerReal(playerY,activation,vertical) ||
+           !compareRunnerReal(MotionBinary64::fromInteger(x),playerX,horizontal) ||
+           !compareRunnerReal(xsp,{},movement)) return false;
+        return step(false,vertical>0,horizontal>0,movement,events);
+    }
+    // scrOutofview runs in End Step, including time-stop. It removes only in
+    // rmMain and does not invoke enemy death, currency or hit effects.
+    template<class Events>
+    bool endStep(bool mainRoom,MotionBinary64 viewY,Events& events) {
+        if(!mainRoom) return true;
+        auto top=viewY,bottom=viewY;
+        int before,after;
+        const auto publishedY=MotionBinary64::fromInteger(y);
+        if(!top.add(MotionBinary64::fromInteger(-160)) ||
+           !bottom.add(MotionBinary64::fromInteger(3000)) ||
+           !compareRunnerReal(publishedY,top,before) ||
+           !compareRunnerReal(publishedY,bottom,after)) return false;
+        if(before<0 || after>0) { destroyRequested=true; events.destroy(); }
+        return true;
+    }
     template<class Events>
     bool step(bool stopped, bool playerBelowActivation, bool playerToLeft,
               int horizontalSpeedSign, Events& events) {

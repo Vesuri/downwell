@@ -39,6 +39,30 @@ struct Contact {
     void damage(int a,int b,int c) { check(a==1 && b==3 && c==2); ++damageCalls; }
 };
 int main() {
+    for(double dx:{-0.00002,-0.000001,0.0,0.000001,0.00002})
+    for(double dy:{-0.00002,-0.000001,0.0,0.000001,0.00002})
+    for(double vx:{-0.00002,-0.000001,0.0,0.000001,0.00002}) {
+        downwell::SkeletonActor s; s.create(100,200); s.active=false; s.xsp=number(vx);
+        Events e{s}; check(s.stepAtPlayer(false,number(100+dx),number(104+dy),e));
+        const bool active=(104+dy)-104>0.00001;
+        int facing=active && 100-(100+dx)>0.00001?-1:1;
+        if(std::abs(vx)>0.00001) facing=vx<0?-1:1;
+        check(s.active==active && s.facing==facing);
+    }
+    struct Retirement { unsigned calls=0; void destroy(){++calls;} };
+    for(int y:{-100,200,300000}) for(bool mainRoom:{false,true})
+    for(bool upper:{false,true}) for(double delta:{-1.0,-0.00002,-0.000001,0.0,0.000001,0.00002,1.0}) {
+        downwell::SkeletonActor s; s.create(100,y); Retirement events;
+        const double view=y+(upper?160.0:-3000.0)+delta;
+        const bool outside=double(y)-(view-160)<-0.00001 || double(y)-(view+3000)>0.00001;
+        check(s.endStep(mainRoom,number(view),events));
+        check(s.destroyRequested==(mainRoom && outside) && events.calls==unsigned(mainRoom && outside));
+        check(s.alive && s.health==60); // Culling is not a kill/reward event.
+    }
+    {
+        int result=7;
+        check(!downwell::compareRunnerReal({0x7ff00000u,0},{},result) && result==7);
+    }
     for (double vx : {-1.2,-0.8,0.0,0.8,1.2}) for (double vy : {-0.2,0.0,0.2}) {
         downwell::SkeletonActor s; s.create(100,200); s.xsp=number(vx); s.ysp=number(vy);
         double x=100,y=200; Events e{s};

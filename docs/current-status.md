@@ -371,6 +371,13 @@ and the ordinary build was restored after both attempts.
   and completes with the larger pack; ordinary build restoration and 68000
   audits pass. No live skeleton rendering is claimed until the actors are wired.
   Logs: `/tmp/downwell-skeleton-assets.log`, `/tmp/downwell-skeleton-assets-native.log`.
+  Skeleton activation/facing now accept precise binary64 player globals through
+  `stepAtPlayer`, using the runner epsilon rather than rounded pixel predicates.
+  End Step implements source `scrOutofview`: strict viewY-160/viewY+3000 bounds,
+  main-room-only deferred destruction without enemy death/reward callbacks.
+  125 near-equal activation/facing/speed combinations and 84 view-boundary/room
+  combinations pass alongside the existing actor/decision tests and sanitizers.
+  Full collision/effect ownership and live registration remain outstanding.
 
 ## Working evidence
 

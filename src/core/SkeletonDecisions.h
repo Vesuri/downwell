@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_SKELETON_DECISIONS_H
 #define DOWNWELL_CORE_SKELETON_DECISIONS_H
 #include "SkeletonAnimation.h"
+#include "RunnerRealComparison.h"
 namespace downwell {
 // enmSkeleton Step decisions around motion/death, not a substitute for them.
 // Owner derives activation/facing comparisons from precise global coordinates.
@@ -10,12 +11,9 @@ struct SkeletonDecisions : SkeletonAnimation {
     // Original finite real/integer CMP uses (lhs-rhs) against +/-epsilon,
     // not an exact ordered comparison. See runner-frame-comparisons.md.
     bool frameCompared(unsigned threshold, bool below) const {
-        auto delta = imageIndex;
-        if (!delta.add(MotionBinary64::fromInteger(-static_cast<int>(threshold)))) return false;
-        if (bool(delta.high & 0x80000000u) != below) return false;
-        const auto magnitude = delta.high & 0x7fffffffu;
-        return magnitude > 0x3ee4f8b5u ||
-            (magnitude == 0x3ee4f8b5u && delta.low > 0x88e368f1u);
+        int order;
+        return compareRunnerReal(imageIndex,MotionBinary64::fromInteger(threshold),order) &&
+            order==(below?-1:1);
     }
     bool frameBelow(unsigned threshold) const { return frameCompared(threshold, true); }
     bool frameAbove(unsigned threshold) const { return frameCompared(threshold, false); }

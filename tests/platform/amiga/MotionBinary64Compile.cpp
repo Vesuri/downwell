@@ -100,6 +100,14 @@ extern "C" unsigned skeletonActorCompile(downwell::SkeletonActor* state,
     if (!state->step(stopped,below,left,movement,ops)) return 0xffffffffu;
     return ops.trace;
 }
+extern "C" unsigned skeletonCoordinatesCompile(downwell::SkeletonActor* state,
+    bool stopped,bool mainRoom,downwell::MotionBinary64 px,downwell::MotionBinary64 py,
+    downwell::MotionBinary64 viewY) {
+    SkeletonDecisionEvents ops;
+    if(!state->stepAtPlayer(stopped,px,py,ops) || !state->endStep(mainRoom,viewY,ops))
+        return 0xffffffffu;
+    return ops.trace;
+}
 namespace {
 struct BoneStoreCompileRandom {
     unsigned word;
