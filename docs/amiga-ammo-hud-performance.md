@@ -13,6 +13,28 @@ recharge jiggle can genuinely change rim pixels; those changes are preserved.
 
 ## Work retained or avoided
 
+### Rejected high-plane-only background experiment (2026-09-25)
+
+A guarded interior path verified that every row/divider overlay retained
+the low-plane bits, then wrote only the high plane when restoring black or
+white background spans. This removed redundant low-plane background writes,
+but still required the subsequent row/divider composition passes.
+
+The retained-HUD oracle, 22,834 sprite comparisons and sanitized renderer
+passed. A bounded native firing capture matched SDL (0/99,968 differing
+pixels), and the native audits passed. Nevertheless the same FPSCOUNT tape
+took 816 PAL fields / 600 updates (36.76 FPS), versus 812 fields (36.95 FPS)
+beforehand, with the same five-field maximum gap. There is no demonstrated
+net performance improvement, so the code and helper were removed. This does
+not disprove single-plane updates; it rejects this particular extra dispatch
+path. The next composition experiment should eliminate overlapping passes,
+not just one store within them.
+
+Evidence: `/tmp/downwell-hud-high-{test,sanitized,fps,frame}.log`. Native
+runs used a 45-second timeout and started directly in gameplay.
+
+### Retained implementation
+
 - Original binary64 divider-loop geometry is cached by capacity for the
   current one-charge weapon, including all four recharge offsets. Visibility
   still depends on ammo. Capacities above 64 and other consumption values
