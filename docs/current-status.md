@@ -7,9 +7,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
 ## Immediate queue
 
 - **Now:** integrate recovered catacomb skeleton/bone behavior into the shared
-  runtime. Numeric Create/motion and lifecycle components are tested, but are
-  not live actors. Next implement source-backed animation/event scheduling,
-  instance ownership and collision dispatch, then connect both renderers.
+  runtime. `SkeletonActor` now composes animation/attack decisions with movement,
+  ordered death callbacks and player contact. It is not in the live enemy pool.
+  Next connect instance/projectile ownership and global phase scheduling,
+  precise contact predicates and actual effect sinks, then both renderers.
 - **Next:** connect the catacomb builder and remaining actors/hazards, with
   original-source checks and bounded cross-target route verification. Do not
   enable incomplete actors merely to advance the area counter.
@@ -287,6 +288,16 @@ and the ordinary build was restored after both attempts.
   twenty-versus-twenty-one animation-advance regression; see
   `runner-frame-comparisons.md`. Owner activation/facing comparisons still
   need this same source-backed treatment when wired to live coordinates.
+  `SkeletonActor` joins those decisions to the remaining ordinary Step body:
+  grounded skips X integration only; Y integration remains unconditional when
+  not time-stopped. Death runs even during time-stop, emits the source callback
+  order and defers storage removal until after final impact/hit presentation.
+  Player contact re-queries grounded state after the stomp callback, matching
+  the two independent VM IFs. 4,500 fractional movement updates, death/order
+  fixtures and contact-mutation checks pass normally and under sanitizers;
+  the composed event compiles for 68000 without external arithmetic helpers.
+  This is still an event component, not live registration: End Step out-of-view,
+  inherited setup/effects, phase ownership and precise predicate adapters remain.
 
 ## Working evidence
 

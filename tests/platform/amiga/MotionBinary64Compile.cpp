@@ -6,6 +6,7 @@
 #include "core/UnitSequenceFrames.h"
 #include "core/SkeletonAnimation.h"
 #include "core/SkeletonDecisions.h"
+#include "core/SkeletonActor.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
@@ -66,6 +67,15 @@ struct SkeletonDecisionEvents {
     unsigned trace = 0;
     void hurtSound(int sound) { trace = (trace << 8) ^ unsigned(sound); }
     bool throwBone(int facing) { trace = (trace << 2) ^ unsigned(facing); return true; }
+    void enemyDeath() { ++trace; }
+    void blood(int a,int b) { trace+=a+b; }
+    void smoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b) { trace^=x.low+y.low+a+b; }
+    void flash(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b,int c) { trace^=x.high+y.high+a+b+c; }
+    void currency(int a) { trace+=a; }
+    void deathSound(int a) { trace+=a; }
+    void deadBody(int a,int b,int c) { trace+=a+b+c; }
+    void debris(int a,int b) { trace+=a+b; }
+    void destroy() { ++trace; }
 };
 }
 extern "C" unsigned skeletonDecisionsCompile(downwell::SkeletonDecisions* state,
@@ -73,5 +83,11 @@ extern "C" unsigned skeletonDecisionsCompile(downwell::SkeletonDecisions* state,
     SkeletonDecisionEvents ops;
     if (!state->stepDecisions(stopped,below,left,movement,ops) || !state->finishPresentation())
         return 0xffffffffu;
+    return ops.trace;
+}
+extern "C" unsigned skeletonActorCompile(downwell::SkeletonActor* state,
+    bool stopped, bool below, bool left, int movement) {
+    SkeletonDecisionEvents ops;
+    if (!state->step(stopped,below,left,movement,ops)) return 0xffffffffu;
     return ops.trace;
 }
