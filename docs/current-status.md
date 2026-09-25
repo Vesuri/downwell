@@ -33,18 +33,22 @@ burst tests compare 6,178 births to scalar arithmetic, including coordinate
 narrowing, creation-phase exclusion, seven-update Animation End and slot reuse.
 Normal/sanitizer and 68000 compilation checks pass. Sprite 96's three unit
 sequence keys are now exported/verified. The live world/renderers remain
-unconnected. Its source RGB 254/7 pixels do not pass the exact four-pen
-exporter; the attempted asset addition was removed pending palette/shader
-verification, leaving current pack selections unchanged. See
-`skeleton-effect-ownership.md` for the precise remaining boundary.
+unconnected. The source RGB 254/7 palette issue is resolved for offline art:
+the pinned embedded default shader maps those colors to light/dark, now
+converted to our existing white/opaque-black pens for sprite 96 only. All 90
+skeleton/bone/flash planar/DMA facings and pack reproducibility checks pass.
+The pack is 323,118 bytes (+2,160); the ordinary Amiga build passes both 68000
+audits. This preserves color classes, not exact Windows shader output RGB.
+See `skeleton-effect-ownership.md` for the precise remaining boundary.
 
 Smoke/flash burst emission now has a shared implementation preserving count,
 Y-before-X sampling and synchronous child Create interleaving. The skeleton's
 two source argument sets pass 6,144 sequence tests with 15,454 child births,
 complete RNG comparison and partial-capacity failure coverage. Sanitizers and
 68000 compilation pass, and original range wrappers are pinned by
-`verify-runner-effect-ranges.py`. Child effect lifetime/motion/rendering remains
-unimplemented; the test's child callback models draw consumption only. See
+`verify-runner-effect-ranges.py`. The burst-only test's child callback models
+draw consumption only; flash ownership is tested separately above, while smoke
+state and live effect rendering remain unfinished. See
 `skeleton-effect-ownership.md`; skeleton admission remains off.
 
 After the shared player bounce signature change, the bounded native CPU replay

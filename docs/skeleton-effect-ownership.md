@@ -80,9 +80,32 @@ pass. Exported sprite-96 sequence metadata is now explicitly verified.
 This pool is not yet called by the live world or either renderer. Offline-art
 preparation uncovered noncanonical colors: every opaque pixel in sprite-96
 frames 0/2 is RGB 254 and in frame 1 is RGB 7 (436 opaque pixels per frame).
-The exact four-pen exporter correctly rejects those colors. Its palette rules
-and existing pack selection remain unchanged pending a source shader/palette
-audit; no runtime conversion or guessed quantization was added.
+The exact four-pen exporter initially rejected those colors. Follow-up export
+of shader 0 (`shaderTemplate`, selected by the default DOWNWELL palette) now
+resolves their color classes. The embedded GLSL thresholds red/blue at 0.5,
+classifies light using green >= 0.8, and dark using the remaining low-channel
+sum. Thus opaque gray 254 maps to light, and gray 7 maps to dark. This is not
+a general grayscale threshold: intermediate gray can map to the special blue
+class. The generator only accepts the two reviewed opaque colors for sprite 96;
+its general four-pen guard remains unchanged. Transparent pixels stay
+transparent; dark flash pixels use opaque black pen 3, not transparent pen 0.
+
+`export-default-shader.sh` records tool version/commit and source hash in ignored
+generated JSON; `verify-default-shader.py` pins the reviewed GLSL and the VM's
+default palette selection. This is embedded shader evidence, not execution of
+the Windows D3D shader. The default shader's final light/dark RGB values are
+250/256 and 5/256; our existing white/black Amiga pens preserve the classes,
+not exact final Windows RGB. Full alternate palettes and SDL postprocessing
+remain separate work.
+
+All three flash frames now have offline planar, mirrored and DMA records.
+The independent artwork test evaluates the source shader classes and checks
+90 skeleton/bone/flash facings, including rejection of unreviewed colors and
+semi-transparent inputs. Pack reproducibility and existing garden/exit-mask
+checks pass. The game pack grows from 320,958 to 323,118 bytes (+2,160), SHA-256
+`d029f6b121ad7761f496887dba2491d0ac821f26055f4e4af63523c853355de9`.
+No runtime asset conversion is added. Live effect collection/drawing remains
+unconnected, so this is asset readiness rather than visible gameplay completion.
 
 Smoke child state, flash rendering, corpse physics and debris relocation still
 need their own adapters; this audit does not establish those adapters.

@@ -33,7 +33,20 @@ def planar_pixels(row):
             for y in range(height) for x in range(width) if pixels[y*width+x]}
 
 checked = 0
-for ident in (205, 206, 207, 208, 460):
+for pixel in ((128,128,128,255), (254,254,254,127), (255,255,255,255)):
+    try:
+        pack.flash_palette_canvas(pack.Image.new("RGBA", (1,1), pixel))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(("unreviewed flash palette accepted", pixel))
+try:
+    pack.pixel_to_pen((254,254,254,255))
+except ValueError:
+    pass
+else:
+    raise AssertionError("general palette guard was weakened")
+for ident in (96, 205, 206, 207, 208, 460):
     sprite = resources["sprites"][ident]
     for frame, source_frame in enumerate(sprite["frames"]):
         canvas = pack.frame_canvas(sprite, source_frame, resources["texturePageItems"], pages)
@@ -41,7 +54,19 @@ for ident in (205, 206, 207, 208, 460):
             expected = {}
             for y in range(canvas.height):
                 for x in range(canvas.width):
-                    pen = pack.pixel_to_pen(canvas.getpixel((x,y)))
+                    pixel = canvas.getpixel((x,y))
+                    if ident == 96 and pixel[3]:
+                        # Independent evaluation of the embedded default
+                        # shader's light/dark classification for opaque gray.
+                        r,g,b,_ = (v/255 for v in pixel)
+                        r = int(r >= 0.5)
+                        b = int(b >= 0.5)
+                        light = g >= 0.8
+                        dark = 1-r-g-b >= 0.5
+                        assert light != dark
+                        pen = 1 if light else 3
+                    else:
+                        pen = pack.pixel_to_pen(pixel)
                     if pen:
                         wx = sprite["originX"]-1-x if flip else x-sprite["originX"]
                         expected[wx, y-sprite["originY"]] = pen
@@ -69,4 +94,4 @@ for ident in (205, 206, 207, 208, 460):
                             actual[key] = pen
             assert actual == expected, (ident,frame,flip,"DMA")
             checked += 1
-print(f"Skeleton/bone artwork: {checked} anchored planar/DMA facings match original pixels")
+print(f"Skeleton/bone/flash artwork: {checked} anchored planar/DMA facings match source color classes")

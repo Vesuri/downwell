@@ -1008,7 +1008,14 @@ build/amiga-clear-border-cache-test: tests/platform/amiga/AmigaClearBorderCacheT
 test-amiga-clear-border-cache: generate-amiga-clear build/amiga-clear-border-cache-test
 	./build/amiga-clear-border-cache-test generated/amiga-clear.dwap
 
-verify-amiga-game: generate-amiga-game
+generated/default-shader.json: tools/export-default-shader.sh tools/export-default-shader.csx data/data.win
+	bash tools/export-default-shader.sh
+
+.PHONY: verify-default-shader
+verify-default-shader: generated/default-shader.json
+	python3 tools/verify-default-shader.py
+
+verify-amiga-game: generate-amiga-game verify-default-shader
 	python3 tools/verify-amiga-menu-sprites.py
 	tools/generate-amiga-hud.py --profile game --check
 	python3 tests/exit-mask-test.py

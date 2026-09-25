@@ -75,6 +75,7 @@ SELECTIONS = {
         44: None,    # sprSelectArrow
         51: None,    # sprTile1
         76: None,    # sprTileSurface
+        96: None,    # sprFlashBall: source shader light/dark classes
         127: None,   # sprTouchWide (generated wide trigger presentation)
         133: None,   # sprGemSmall
         134: None,   # sprGemLarge
@@ -230,6 +231,22 @@ def pixel_to_pen(pixel):
     if (red, green, blue) == (0, 0, 0):
         return 3
     raise ValueError(f"HUD pixel is outside the exact four-pen palette: {pixel}")
+
+
+def flash_palette_canvas(canvas):
+    # Resource-96-only mapping, audited against shaderTemplate. This is not
+    # arbitrary grayscale quantization: intermediate shades may map to blue.
+    # Preserve opaque dark pixels as pen 3, never transparent pen 0.
+    mapped = canvas.copy()
+    for y in range(canvas.height):
+        for x in range(canvas.width):
+            pixel = canvas.getpixel((x, y))
+            if pixel[3] == 0:
+                continue
+            require(pixel in ((254,254,254,255), (7,7,7,255)),
+                    "unreviewed flash-ball color")
+            mapped.putpixel((x,y), (255,255,255,255) if pixel[0] == 254 else (0,0,0,255))
+    return mapped
 
 
 def frame_canvas(sprite, frame, items, pages):
@@ -439,7 +456,9 @@ def build_pack(manifest, extracted, profile, language_path=None):
             if selected_frames is not None and frame_index not in selected_frames:
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
-            if profile == "game" and sprite_id in (153, 154, 157, 162, 163, 164,
+            if profile == "game" and sprite_id == 96:
+                canvas = flash_palette_canvas(canvas)
+            if profile == "game" and sprite_id in (96, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278,
                     458, 459, 460, 485, 486, 487, 496, 497):
                 # Prepare snail Y flips and crawler quarter turns on the host.
@@ -713,7 +732,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
     # Gameplay DMA words, including mirrored multi-channel actors, are host work.
     if profile == "game":
         hardware = []
-        actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 157, 162, 163, 164,
+        actors = (0, 1, 3, 12, 15, 27, 31, 37, 96, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460,
                   485, 486, 487, 496, 497, 707)
         for sprite, frame_index, dma_width, planar in encoded:
