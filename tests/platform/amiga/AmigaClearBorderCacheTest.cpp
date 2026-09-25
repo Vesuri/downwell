@@ -31,18 +31,28 @@ int main(int argc, char** argv) {
         downwell::LevelClearPresentation presentation;
         downwell::LevelClearMotion motion;
         unsigned painted = 0;
-        for (unsigned tick = 0; tick < 240; ++tick) {
+        for (unsigned tick = 0; tick < 320; ++tick) {
             if (tick == 60) motion.showChoices();
             motion.step(false);
-            const int viewY = motion.viewY();
+            // Include backward/large jumps and returning from nonuniform
+            // finite ends after the normal reveal/selection tape.
+            const int viewY = tick < 240 ? motion.viewY() :
+                tick < 260 ? 100 - int(tick - 240) * 3 :
+                tick < 280 ? 480 : tick < 300 ? -32 : 150;
             const auto frame = presentation.advance(area, level, tick < 60 ? 0 : 4, tick >= 60);
             unsigned changed = 0;
             require(amigaRenderClearBorder(cached, cache, pack.data(), pack.data() + pack.size(), frame, viewY, changed),
                 "production border renderer accepts recovered assets");
             painted += changed;
-            require(tick == 0 || changed < 40, "scroll update never repaints the visible border playfield");
+            if (level < 3 && tick > 120 && tick < 240)
+                require(cache.examinedRows <= 6,
+                    "settled repeating strip checks only exposed rows, not the viewport");
+            require(tick == 0 || tick >= 240 || changed < 40, "scroll update never repaints the visible border playfield");
             require(amigaRenderClearBorder(cached, cache, pack.data(), pack.data() + pack.size(), frame, viewY, changed) &&
                 changed == 0, "repeated presentation does not redraw or scroll");
+            if (level < 3 && tick > 120 && tick < 240)
+                require(cache.examinedRows == 0,
+                    "unchanged repeating strip performs no row checks");
             std::memset(fresh.data(), 0, fresh.size());
             amigaRendererSetClipRect(&reference, 110, 0, 160, 284);
             frame.borders([&](int selectedArea, int subimage, int x, int y) {
@@ -57,7 +67,7 @@ int main(int argc, char** argv) {
             }
             ++comparisons;
         }
-        require(painted < 240 * 284 / 10, "border cache avoids over ninety percent of full-frame row repaints");
+        require(painted < 320 * 284 / 10, "border cache avoids over ninety percent of full-frame row repaints");
         const auto pixelsBefore = retained;
         const auto cacheBefore = cache;
         unsigned changed = 99;

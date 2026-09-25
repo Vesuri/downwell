@@ -68,6 +68,24 @@ not isolated benchmarks or promised savings.
 
 ## Current implementation
 
+### First follow-up: repeating-border scan
+
+The retained circular border now checks only newly exposed rows when both
+frames lie strictly inside the same repeating area's strip. Repainting the
+same snapshot examines zero rows. Finite ends, changing areas and transition
+seams retain the general signature path. This adds no buffer or allocation.
+
+The same detailed A500 tape measures idle border work at **2.64 ms**, versus
+**27.33 ms** above; navigation is **2.36 ms**, versus **27.33 ms**. Border
+painting remains zero during those sections. These are probe-build costs,
+not a new shipping-FPS claim. The baseline table above is intentionally kept.
+Log: `/tmp/downwell-clear-strip-profile.log`, detailed output in
+`amiga/.run/profile-probes.log` (replaced by subsequent profile runs).
+The expanded 3,840-frame host oracle includes reverse/large camera jumps,
+finite ends and all area transitions. Native verification is recorded with
+the scene extraction below once completed. Overlay pointer scrolling and
+shared style/upgrade presentation are still unfinished.
+
 - Source-derived clear state, camera/player easing and carousel logic run in
   the shared core. `HudReal` preserves binary64-style arithmetic with integer
   operations; coordinates are then narrowed using the shared raster policy.

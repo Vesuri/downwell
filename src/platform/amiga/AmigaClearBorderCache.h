@@ -11,20 +11,39 @@ struct AmigaClearBorderCache {
     unsigned origin = 0;
     int previousViewY = 0, previousTileY = 0;
     bool initialized = false;
+    bool previousUniform = false;
+    int previousArea = 0;
+    unsigned examinedRows = 0;
     template<class Paint>
     unsigned update(const downwell::LevelClearPresentation::Frame& frame, int viewY, Paint paint) {
+        int movement = 0;
+        const int firstSource = viewY - frame.tileY;
+        const int lastSource = firstSource + 283;
+        // Strictly inside one repeating area's strip: neither finite end nor
+        // the current/incoming seam can alter a retained interior scanline.
+        const bool uniform = firstSource >= 0 && lastSource >= 0 &&
+            lastSource / 16 + 1 < frame.borderRow;
+        const bool retainedStrip = initialized && previousUniform && uniform &&
+            previousArea == frame.area;
         if (initialized) {
             // Row textures repeat every 16 pixels. State signatures also
             // detect missed frames and moving current/incoming-area seams.
-            int movement = viewY - previousViewY + (previousTileY - frame.tileY + 16) % 16;
+            movement = viewY - previousViewY + (previousTileY - frame.tileY + 16) % 16;
             int nextOrigin = int(origin) + movement;
             while (nextOrigin < 0) nextOrigin += 320;
             while (nextOrigin >= 320) nextOrigin -= 320;
             origin = unsigned(nextOrigin);
         }
         previousViewY = viewY; previousTileY = frame.tileY; initialized = true;
-        unsigned changed = 0, physical = origin;
-        for (int y = 0; y < 284; ++y) {
+        previousUniform = uniform; previousArea = frame.area;
+        int first = 0, end = 284;
+        if (retainedStrip && movement > -284 && movement < 284) {
+            if (movement >= 0) first = 284 - movement;
+            else end = -movement;
+        }
+        examinedRows = unsigned(end - first);
+        unsigned changed = 0, physical = (origin + unsigned(first)) % 320;
+        for (int y = first; y < end; ++y) {
             // Anchors are spaced 16 pixels. Limbo's centered 32-pixel art
             // overlaps two anchors; other areas use centered 16-pixel art.
             const int source = viewY + y - frame.tileY;
