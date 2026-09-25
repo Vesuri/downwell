@@ -1,6 +1,7 @@
 #include "platform/amiga/AmigaGameplayScene.h"
 #include <cassert>
 #include <cstdio>
+#include <cstdint>
 // Lifecycle doubles. Native gates exercise actual Copper/ring behavior.
 class Bitmap {};
 class Sprite {};
@@ -66,5 +67,45 @@ int main() {
     before=builds;
     assert(update(0) && update(1) && builds==before+2);
     assert(!scene.mask(2,mask));
+    // Model the actual retained row contents independently of interval math.
+    // Include reversals, column switches, failed copies and ring wraparound.
+    int storedY[320], storedX[320];
+    for (unsigned i=0;i<320;++i) storedY[i]=storedX[i]=-10000;
+    scene.resetStage();
+    assert(!scene.stageCovers(160,0,284));
+    std::uint32_t random=42;
+    int x=160, y=0;
+    unsigned covered=0, failed=0, upward=0;
+    for (unsigned tick=0;tick<20000;++tick) {
+        random=random*1664525U+1013904223U;
+        if (tick%137==0) x=(int((random>>16)%3))*160;
+        y+=int((random>>8)%7)-3;
+        if (y<0) y=0;
+        if (tick%191==0) y+=340;
+        const auto span=scene.stageSpan(x,y,284);
+        assert(span.count>=0 && span.count<=48);
+        if (span.first<scene.stageFirst()) ++upward;
+        if (tick%53==0) {
+            scene.invalidateStage(); ++failed;
+            assert(!scene.stageCovers(x,y,284));
+            continue;
+        }
+        for (int row=span.first;row<span.first+span.count;++row) {
+            storedY[row%320]=row; storedX[row%320]=x;
+        }
+        scene.staged(span,320);
+        assert(scene.stageEnd()-scene.stageFirst()<=320);
+        if (scene.stageCovers(x,y,284)) {
+            ++covered;
+            for (int row=y;row<y+284;++row)
+                assert(storedY[row%320]==row && storedX[row%320]==x);
+        }
+    }
+    assert(covered>10000 && failed>300 && upward>100);
+    scene.resetStage();
+    assert(scene.stageFirst()==0 && scene.stageEnd()==0);
+    assert(!scene.stageCovers(x,y,284));
+    std::printf("Staging: 20000 updates, %u covered views, %u failed copies, %u upward strips\n",
+                covered,failed,upward);
     std::puts("Gameplay scene: retired-slot rebuilds, 600 patched frames, exit masks and failure recovery");
 }

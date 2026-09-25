@@ -1,5 +1,29 @@
 #include "AmigaGameplayScene.h"
 
+AmigaGameplayScene::StageSpan AmigaGameplayScene::stageSpan(int x, int y, int visibleHeight) {
+    if (x != stagedX_) {
+        stagedX_ = x;
+        stagedFirst_ = stagedEnd_ = y;
+    }
+    int first = stagedEnd_, count = y + visibleHeight + 16 - stagedEnd_;
+    if (y < stagedFirst_) {
+        count = stagedFirst_ - y;
+        if (count > 48) count = 48;
+        first = stagedFirst_ - count;
+    } else if (count > 48) count = 48;
+    return {first, count > 0 ? count : 0};
+}
+
+void AmigaGameplayScene::staged(StageSpan span, int ringHeight) {
+    if (span.count <= 0) return;
+    if (span.first < stagedFirst_) stagedFirst_ = span.first;
+    if (span.first + span.count > stagedEnd_) stagedEnd_ = span.first + span.count;
+    if (stagedEnd_ - stagedFirst_ > ringHeight) {
+        if (span.first == stagedFirst_) stagedEnd_ = stagedFirst_ + ringHeight;
+        else stagedFirst_ = stagedEnd_ - ringHeight;
+    }
+}
+
 AmigaGameplayScene::AmigaGameplayScene(UWORD* first, UWORD* second, unsigned capacity)
     : lists_{DownwellGameplayCopperList(first, capacity),
              DownwellGameplayCopperList(second, capacity)} {}

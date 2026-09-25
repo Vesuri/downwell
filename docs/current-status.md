@@ -47,7 +47,8 @@ two ports proves original-game completion. The active parity goal is unfinished.
 ## Remaining work — do not mark complete
 
 - Complete the seven scene boundaries. All seven now have named Amiga scene
-  classes, but gameplay's owner currently controls only its Copper lifecycle.
+  classes; gameplay's owner controls its Copper lifecycle and side-view staging
+  ranges, while active backing-cache refresh remains in the application loop.
   Terrain composition now belongs to `AmigaTerrainPainter`, with actors and
   raster storage already separate. Cache-refresh/display coordination and
   much transition orchestration remain in `DownwellAmiga.cpp`; SDL startup

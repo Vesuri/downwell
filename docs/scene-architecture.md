@@ -18,7 +18,7 @@ has already moved out of the application loop.
 | Controls | `AmigaControlsScene` | Shared startup timing and application publication |
 | Garden | `AmigaGardenScene` | DMA retirement, publication and transition orchestration |
 | Style selection | `AmigaStyleScene` | Shared startup rules and application publication |
-| Gameplay | `AmigaGameplayScene` plus dedicated terrain/actor components | Scene owner currently manages Copper lifecycle; cache-refresh/display coordination still needs consolidation |
+| Gameplay | `AmigaGameplayScene` plus dedicated terrain/actor components | Scene owns Copper lifecycle and side-view staging ranges; backing-cache refresh/display coordination still needs consolidation |
 | Upgrade selection | `AmigaUpgradeScene` | Display binding, sprites, publication and next-level transition |
 
 Style and upgrade selection share `AmigaSelectionLayer` for retained content,
@@ -30,6 +30,33 @@ This is an Amiga presentation split, not yet a symmetrical seven-scene split
 across both backends. SDL still uses the broad `StartupRuntime` path. Further
 consolidation must share behavior in `src/core`, not duplicate it inside the
 new platform-specific scene classes.
+
+### Gameplay side-view staging ownership
+
+`AmigaGameplayScene` now owns the staged column and retained world-row interval.
+It plans at most 48 rows per update, with the existing 16-row lookahead, and
+commits validity only after a clean terrain transfer. Column changes, dirty
+terrain, shop art changes, destroyed blocks and completed swaps invalidate
+the same scene-owned state. Room entry resets the range separately from Copper
+slot invalidation: rebuilding a list does not itself change retained pixels.
+The main loop still performs transfers and owns the active backing interval;
+those remaining responsibilities have not been disguised as completed work.
+
+The host test models the actual row/column stored in every circular-buffer row
+over 20,000 updates. It checks 15,897 covered views, 378 failed-copy invalidations
+and 2,069 upward strips, alongside the existing 600-frame Copper lifecycle
+test. Both the normal test and ASan/UBSan pass. Logs:
+`/tmp/downwell-scene-staging-host.log` and
+`/tmp/downwell-scene-staging-sanitized.log`.
+
+The 120-second-bounded native camera gate passes 600 updates, seven transitions
+(six staged swaps and one forced fallback), four camera locks and three
+releases. All 119 terrain comparisons and 14 alternating-display checks pass,
+with the stack guard intact. Logs: `/tmp/downwell-scene-staging-native.log`
+and `/tmp/downwell-scene-staging-native-gdb.log`. The wrapper restores ordinary
+startup, and both 68000 audits pass. This verifies the ownership refactor on
+the synthetic camera fixture, not natural side-room traversal or a new FPS
+measurement.
 
 ## Upgrade scene: first extraction
 

@@ -1147,7 +1147,6 @@ int main(void) {
     int worldViewY = mainInitialViewY;
     int cachedWorldFirst = worldViewY;
     int cachedWorldEnd = worldViewY + downwellDisplayHeight;
-    int stagedViewX = -10000, stagedFirst = 0, stagedEnd = 0;
     unsigned oldShopArt[downwell::ShopWorld::capacity] = {};
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
@@ -1831,8 +1830,7 @@ int main(void) {
                         gameplayRows.reset();
                         worldViewX = mainViewX + port.cameraOffsetX();
                         worldViewY = mainInitialViewY + port.cameraOffsetY();
-                        stagedViewX = -10000;
-                        stagedFirst = stagedEnd = 0;
+                        gameplayScene.resetStage();
                         newRunWorldPending = false;
                     }
                     const unsigned hudBytes = amiga_hud_pack_end - amiga_hud_pack;
@@ -2292,7 +2290,7 @@ int main(void) {
             // Invalidate before selecting a precomposed side-room ring.
             invalidateShopRaster(port.shops());
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i)
-                if (oldShopArt[i] != port.shops().instances[i].artRevision) stagedViewX = -10000;
+                if (oldShopArt[i] != port.shops().instances[i].artRevision) gameplayScene.invalidateStage();
             const auto resultsAction = port.deathResults().inputEffects.action;
             if (resultsAction != downwell::DeathMenuSequence::Action::None) {
                 // An entropy boundary, separate from the gameplay RNG stream.
@@ -2407,7 +2405,7 @@ int main(void) {
             DW_PROFILE_PHASE(profileScroll);
             worldViewY += scrollDelta;
             if (liveGeneration.dirtyFirst < liveGeneration.dirtyEnd) {
-                stagedViewX = -10000;
+                gameplayScene.invalidateStage();
                 // Discard dirty retained rows outside the current view. Visible
                 // intersections are refreshed below, after any camera swap.
                 if (liveGeneration.dirtyFirst < worldViewY &&
@@ -2428,10 +2426,9 @@ int main(void) {
                 worldViewX = mainViewX + port.cameraOffsetX();
 #ifdef DOWNWELL_CAMERA_VERIFY
                 // Force exactly one absent-prefetch case as well as real hits.
-                if (gDownwellCameraTransitions == 1) stagedViewX = -10000;
+                if (gDownwellCameraTransitions == 1) gameplayScene.invalidateStage();
 #endif
-                if (stagedViewX == worldViewX && stagedFirst <= worldViewY &&
-                    stagedEnd >= worldViewY + downwellDisplayHeight) {
+                if (gameplayScene.stageCovers(worldViewX, worldViewY, downwellDisplayHeight)) {
 #ifdef DOWNWELL_CAMERA_VERIFY
                     ++gDownwellCameraStaged;
 #endif
@@ -2452,8 +2449,8 @@ int main(void) {
                     backingCopyPending = true;
                     dirtyGameRows(0, 0, downwellGameRingHeight);
                     gameplayRows.copied(0, downwellGameRingHeight, back);
-                    cachedWorldFirst = stagedFirst;
-                    cachedWorldEnd = stagedEnd;
+                    cachedWorldFirst = gameplayScene.stageFirst();
+                    cachedWorldEnd = gameplayScene.stageEnd();
 #ifdef DOWNWELL_SCENE_VERIFY
                     AmigaHardware::blitterDrain();
                     const unsigned column = (worldViewX - mainViewX + 160) / 160;
@@ -2477,7 +2474,7 @@ int main(void) {
                 ++gDownwellCameraFallback;
 #endif
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
-                gDownwellProfileStageShortfall = worldViewY + downwellDisplayHeight - stagedEnd;
+                gDownwellProfileStageShortfall = worldViewY + downwellDisplayHeight - gameplayScene.stageEnd();
 #endif
                 amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
                 if (!terrainRaster.ready)
@@ -2494,7 +2491,7 @@ int main(void) {
                 cachedWorldFirst = worldViewY;
                 cachedWorldEnd = worldViewY + downwellDisplayHeight + gameplayPrefetchLines;
                 }
-                stagedViewX = -10000;
+                gameplayScene.invalidateStage();
             }
             // Keep both ends of the actual cached interval. A jumping camera
             // can reverse into retained rows without repainting either edge.
@@ -2543,7 +2540,7 @@ int main(void) {
                 const auto& shop = port.shops().instances[i];
                 if (!shop.allocated || shop.artRevision == oldShopArt[i]) continue;
                 if (backingCopyPending) AmigaHardware::blitterDrain();
-                stagedViewX = -10000;
+                gameplayScene.invalidateStage();
                 const int first = shop.y - 21, end = shop.y + 12;
                 int below = first > worldViewY + downwellDisplayHeight ? first : worldViewY + downwellDisplayHeight;
                 if (end > below && cachedWorldEnd > below) cachedWorldEnd = below;
@@ -2562,7 +2559,7 @@ int main(void) {
             }
             if (destroyedBlockCount != 0) {
                 if (backingCopyPending) AmigaHardware::blitterDrain();
-                stagedViewX = -10000;
+                gameplayScene.invalidateStage();
                 for (unsigned block = 0;
                      block < destroyedBlockCount; ++block) {
                     const int centerY = 176 + destroyedBlockY[block];
@@ -2611,16 +2608,8 @@ int main(void) {
                 const int targetY = wanted != 10000 ? port.previewCameraViewY(wanted) : -1;
                 if (targetY >= 0 && targetY + downwellGameRingHeight <= terrainRasterRows) {
                     const int targetX = mainViewX + wanted;
-                    if (targetX != stagedViewX) {
-                        stagedViewX = targetX;
-                        stagedFirst = stagedEnd = targetY;
-                    }
-                    int first = stagedEnd, count = targetY + downwellDisplayHeight + 16 - stagedEnd;
-                    if (targetY < stagedFirst) {
-                        count = stagedFirst - targetY;
-                        if (count > 48) count = 48;
-                        first = stagedFirst - count;
-                    } else if (count > 48) count = 48;
+                    const auto span = gameplayScene.stageSpan(targetX, targetY, downwellDisplayHeight);
+                    const int first = span.first, count = span.count;
                     if (count > 0) {
                         bool clean = true;
                         const unsigned column = (targetX - mainViewX + 160) / 160;
@@ -2633,13 +2622,8 @@ int main(void) {
                             while (origin < 0) origin += downwellGameRingHeight;
                             stage.gameOrigin = origin % downwellGameRingHeight;
                             transferTerrainRows(&stage, targetX, first, 0, count, false);
-                            if (first < stagedFirst) stagedFirst = first;
-                            if (first + count > stagedEnd) stagedEnd = first + count;
-                            if (stagedEnd - stagedFirst > downwellGameRingHeight) {
-                                if (first == stagedFirst) stagedEnd = stagedFirst + downwellGameRingHeight;
-                                else stagedFirst = stagedEnd - downwellGameRingHeight;
-                            }
-                        } else stagedViewX = -10000;
+                            gameplayScene.staged(span, downwellGameRingHeight);
+                        } else gameplayScene.invalidateStage();
                     }
                 }
             }
