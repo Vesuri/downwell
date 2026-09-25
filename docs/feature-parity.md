@@ -9,7 +9,7 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
-### Laser Sight machine-gun firing rules
+### Laser Sight machine-gun firing and ray presentation
 
 Upgrade 12 now changes new machine-gun projectiles to zero spread, captured at
 birth, while retaining one first-Step RNG draw. Shared `MachineGunEmitter`
@@ -30,10 +30,25 @@ Startup digest schema 45 is `30a2c11706f2ba35`.
 The full host suite, focused address/undefined-behavior sanitizer tests and
 normal SDL build pass.
 
-This is partial upgrade support, not completion: the red ray, aim variations,
-other gun emission patterns and ranged-projectile lifetime changes remain
-open. The Q20 trajectory retains its documented numerical approximation and
-does not newly establish original runner collision rounding or a 20 ms budget.
+The red ray is now implemented in both backends, using the shared stepped
+endpoint tracer and integer line presentation. Paired live tests compare
+actual player position/speed/camera inputs without consuming RNG. The host
+draw order and damage-blink test are covered; native rendering uses a sparse
+per-buffer overlay and preserves painter order with earlier planar actors.
+Unchanged, unobstructed rays perform zero writes. Native captures at ticks
+180 and 203 match SDL at 0/99,968 differing pixels; subsequent optimizations
+retain the tick-180 comparison. See `laser-sight.md` for the precise scope.
+
+This is still partial upgrade support, not completion: original GPU line
+coverage, collision-line edge rounding, full wall/enemy families, destructible
+shop cases, Cat/noDraw, other guns' aim control/emission patterns and
+ranged-projectile lifetime changes remain open. The Q20 trajectory retains
+its documented numerical approximation. The upgraded A500 profiling tape is
+19.96 FPS (1,503 PAL fields for 600 updates), not a 20 ms success; its costs
+and rejected experiments are recorded in `amiga-profiling.md`.
+The implemented machine gun's zero aim is source-correct at both levels:
+their aim-limit table entries are zero, and the original controller clamps
+to that limit. The source verifier checks this separately from other weapons.
 
 ### Machine-gun artwork follows retained spread without new Amiga assets
 

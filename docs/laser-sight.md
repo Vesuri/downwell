@@ -152,8 +152,12 @@ collision-line edges remain fidelity gaps, not implied support.
 The original `playerDraw` places the ray outside the `!dFlash` player-sprite
 branch, but inside `!goalStop && !noDraw`. Therefore presentation must not use
 the existing damage-blink `playerVisible` gate for the ray. The current
-convenience endpoints use zero aim, as does the implemented machine-gun
-control path; they do not claim to implement the original aim controller.
+convenience endpoints use zero aim. This is source-correct for both machine-gun
+levels: `bStatInitLevel1` sets acceleration 5, deceleration 2, but **limit 0**,
+and `bStatUpdate` publishes that limit. `scrAimControl` clamps any nonzero
+angle to `limit * sign(angle)`. The verifier pins those six profile writes and
+the clamp. This does not implement aiming for other weapons with nonzero
+limits; that remains part of their weapon-specific work.
 
 ### Host presentation
 

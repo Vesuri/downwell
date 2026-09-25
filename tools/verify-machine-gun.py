@@ -39,6 +39,20 @@ for row in rows:
     expected = [table[("bStat" + field, level)] for field in fields]
     assert actual == expected, (level, dict(zip(fields, actual)), dict(zip(fields, expected)))
 print("Both machine-gun profiles match 34 selected VM table assignments")
+for level in (0, 1):
+    assert table[("bStatAimAngleAccl", level)] == 5
+    assert table[("bStatAimAngleDccl", level)] == 2
+    assert table[("bStatAimAngleLimit", level)] == 0
+aim = (export / "Assembly/gml_GlobalScript_scrAimControl.asm").read_text()
+assert "push.v self.aimAngle\ncall.i abs(argc=1)\npushglb.v global.aimAngleLimit\ncmp.v.v GT" in aim
+assert "pushglb.v global.aimAngleLimit\npush.v self.aimAngle\ncall.i sign(argc=1)\nmul.v.v\npop.v.v self.aimAngle" in aim
+update = (export / "Assembly/gml_GlobalScript_bStatUpdate.asm").read_text()
+assert ("pushi.e -5\npush.v self.bnum\nconv.v.i\n"
+        "push.v [arraypushaf]self.bStatAimAngleLimit\npush.v self.blvl\n"
+        "conv.v.i\npushaf.e\npop.v.v global.aimAngleLimit") in update
+player_step = (export / "Assembly/gml_Object_objPlayer_n_Step_0.asm").read_text()
+assert "call.i gml_Script_scrAimControl(argc=0)\npopz.v" in player_step
+print("Both machine-gun levels clamp player aim to zero; other weapons need their own aim rules")
 
 # Rendering must follow the firing direction even before the remaining spread
 # and fractional-motion work is connected. Do not mistake frame-zero artwork
