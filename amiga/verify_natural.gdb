@@ -12,8 +12,12 @@ continue
 end
 break downwellNaturalReady
 continue
-if gDownwellNaturalExitTick != 1477 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 120
+if gDownwellNaturalExitTick != 1477 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 832
     printf "Natural route timing/reentry mismatch: exit=%lu entries=%lu updates=%lu\n", gDownwellNaturalExitTick, gDownwellClearReentries, gDownwellClearGameplayUpdates
+    quit 1
+end
+if gDownwellNaturalFailures != 0 || gDownwellNaturalReturnFrames != 43 || gDownwellShopLiveFailures != 0 || gDownwellShopLivePixelFailures != 0 || gDownwellShopLiveFrames < 7
+    printf "Natural shop/return failed: logic=%lu return=%lu frames=%lu raster=%lu\n", gDownwellNaturalFailures, gDownwellNaturalReturnFrames, gDownwellShopLiveFrames, gDownwellShopLivePixelFailures
     quit 1
 end
 if gDownwellClearFrames < 200 || gDownwellClearFailures != 0 || gDownwellGameBufferFailures != 0 || gDownwellClearFieldFrames == 0
@@ -32,6 +36,7 @@ while $word < 64
     set $word = $word + 1
 end
 printf "Natural exit and reentry passed: %lu clear frames, %lu exit field frames\n", gDownwellClearFrames, gDownwellClearFieldFrames
+printf "Natural shop and return: %lu HUD comparisons, %lu return updates\n", gDownwellShopLiveFrames, gDownwellNaturalReturnFrames
 printf "DOWNWELL_NATURAL_READY\n"
 shell touch .run/gdb-ready.marker
 detach

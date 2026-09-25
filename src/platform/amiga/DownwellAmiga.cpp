@@ -43,6 +43,8 @@
 #ifdef DOWNWELL_SHOP_VERIFY
 #include "AmigaShopVerification.h"
 static AmigaShopVerification shopVerification;
+#endif
+#if defined(DOWNWELL_SHOP_VERIFY) || defined(DOWNWELL_NATURAL_VERIFY)
 extern "C" {
 volatile ULONG gDownwellShopLiveCoverage, gDownwellShopLiveFailures;
 volatile ULONG gDownwellShopLiveFrames, gDownwellShopLivePixelFailures;
@@ -226,6 +228,7 @@ static AmigaShopMenu shopMenuOverlay;
 #include "AmigaNaturalRouteVerification.h"
 static AmigaNaturalRouteVerification naturalRoute;
 volatile ULONG gDownwellNaturalExitTick;
+volatile ULONG gDownwellNaturalFailures, gDownwellNaturalReturnFrames;
 __attribute__((noinline, used)) void downwellNaturalReady() { __asm__ volatile("" ::: "memory"); }
 #endif
 #ifdef DOWNWELL_CLEAR_VERIFY
@@ -1645,8 +1648,7 @@ int main(void) {
 #endif
 #ifdef DOWNWELL_NATURAL_VERIFY
             if (scenes.scene() == AmigaScene::gameplay)
-                liveInput = naturalRoute.input(port, terrainCollision);
-            if (gDownwellClearReentries) liveInput.fire = gDownwellClearGameplayUpdates < 4;
+                liveInput = naturalRoute.input(port, terrainCollision, gDownwellClearGameplayUpdates);
 #endif
 #ifdef DOWNWELL_RESULTS_RESTART_VERIFY
             // Inject only results readiness. Confirmation, reset, room changes,
@@ -2312,7 +2314,9 @@ int main(void) {
             if (gDownwellClearReentries) {
                 ++gDownwellClearGameplayUpdates;
 #ifdef DOWNWELL_NATURAL_VERIFY
-                if (gDownwellClearReentries == 1 && gDownwellClearGameplayUpdates == 120) downwellNaturalReady();
+                naturalRoute.check(port);
+                gDownwellNaturalFailures = naturalRoute.failures;
+                gDownwellNaturalReturnFrames = naturalRoute.returnFrames;
 #else
                 if (gDownwellClearReentries == 2 && gDownwellClearGameplayUpdates == 60) downwellClearReady();
 #endif
@@ -2389,8 +2393,8 @@ int main(void) {
                             composeStreak(target, *static_cast<unsigned*>(context));
                         }, &streak)) { exitCode = 20; break; }
             } else shopMenuOverlay.reset();
-#ifdef DOWNWELL_SHOP_VERIFY
-            if (shopVerification.shop && gDownwellShopPack) {
+#if defined(DOWNWELL_SHOP_VERIFY) || defined(DOWNWELL_NATURAL_VERIFY)
+            if (port.shops().allocatedCount && gDownwellShopPack) {
                 alignas(2) static UBYTE expected[downwellLayerBytes];
                 AmigaHardware::blitterDrain();
                 for (unsigned i = 0; i < downwellLayerBytes; ++i) expected[i] = renderer.hud[i];
@@ -2750,6 +2754,9 @@ int main(void) {
             /* AmigaPlatform makes the published list live at next VBlank. */
             DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayScene.copper(back));
+#ifdef DOWNWELL_NATURAL_VERIFY
+            if (naturalRoute.done) { platform.waitVblank(); downwellNaturalReady(); }
+#endif
 #ifdef DOWNWELL_EXIT_WIPE_VERIFY
             if (exitMask) {
                 ++gDownwellExitWipeFrames;

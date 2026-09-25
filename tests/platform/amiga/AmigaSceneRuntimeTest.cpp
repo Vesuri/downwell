@@ -1888,6 +1888,8 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         for (unsigned tick = 0; tick < 120; ++tick) {
             downwell::Input input;
             input.fire = tick < 4;
+            if (seed == 4) require(downwell::packReplayInput(input) ==
+                downwell::packReplayInput(nativeRoute.input(game, live.collision, tick)), "native reentry inputs match");
             game.step(downwell::packReplayInput(input)); reference.step(input, false);
             parityFrame = tick;
             compareInitialGameplay(game, reference);
@@ -1914,15 +1916,22 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                 downwell::Input input;
                 input.left = x > target + 2; input.right = x < target - 2;
                 input.fire = tick % 40 == 0 || tick % 40 == 3;
+                require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision, tick + 120)),
+                    "native natural shop approach inputs match");
                 game.step(downwell::packReplayInput(input)); reference.step(input, false);
                 parityFrame = tick;
                 compareInitialGameplay(game, reference);
                 if (game.shops().interactable) { reached = true; ++shopUpdates; break; }
             }
             require(reached && reference.shops().interactable, "ordinary input reaches the generated second-level shop");
+            unsigned secondUpdates = 120 + shopUpdates;
             auto shopTick = [&](bool fire, bool left = false) {
                 downwell::Input input; input.fire = fire; input.left = left;
+                require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision, secondUpdates++)),
+                    "native natural shop and return inputs match");
                 game.step(downwell::packReplayInput(input)); reference.step(input, false);
+                nativeRoute.check(game);
+                require(nativeRoute.failures == 0, "native natural shop assertions pass on host");
                 compareInitialGameplay(game, reference);
                 require(game.shops().noControl == reference.shops().noControl &&
                     game.shops().allocatedCount == reference.shops().allocatedCount, "natural shop ownership agrees");
@@ -1967,6 +1976,8 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                       << " camera=" << sideCamera << "->" << game.cameraOffsetX() << std::endl;
             require(sideCamera != 0 && returnUpdates < 240 && !game.dead(),
                 "natural shop return releases side camera and reaches main shaft alive");
+            require(nativeRoute.done && secondUpdates == 832 && nativeRoute.returnFrames == 43,
+                "native natural route completion matches host timing");
         }
     }
 }

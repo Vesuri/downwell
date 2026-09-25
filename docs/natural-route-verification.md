@@ -28,24 +28,36 @@ Successful naturally funded purchasing remains unverified.
 
 `make verify-amiga-natural-route` first runs the paired host test, then builds
 `SKIP_TO_GAME=1 NATURAL_VERIFY=1`. The test-only native controller follows the
-seed-4 first-cavern route, confirms the default upgrade and runs 120 updates
-in cavern two. It does not inject an exit. The seed-4 entry checkpoint (437
+seed-4 first-cavern route, confirms the default upgrade and runs 120 entrance
+updates in cavern two, then approaches the shop, opens it, attempts the
+unfunded purchase, selects Leave and walks back. It does not inject an exit.
+The seed-4 entry checkpoint (437
 RNG draws and side-room indices 8/13) is checked against decoded startup,
 including all 16 RNG words; each first-cavern input is checked against the host
-policy. This deliberately skips startup presentation, not generator gameplay.
+policy. Shop and return inputs are also checked individually against the host
+route. This deliberately skips startup presentation, not generator gameplay.
 
 The native debugger gate requires the natural exit at update 1,477, one
 re-entry, upgrade/exit-field pixel comparisons with zero failures, and an
-intact task-stack guard. It has a 360-second emulator deadline and restores
-the ordinary build on success or failure. The native gate currently stops
-before shop traversal; the host shop checks above are separate evidence.
+intact task-stack guard. It additionally requires 832 second-cavern updates,
+43 return updates, no shop-state failures and retained shop HUD frames matching
+fresh scalar composition. It has a 360-second emulator deadline and restores
+the ordinary build on success or failure.
 
-Native result: passed at exit update 1,477, with 211 upgrade frames, 135
+Previous native result (before extending into the shop): passed at exit update 1,477, with 211 upgrade frames, 135
 exit-field frames, one re-entry and 120 second-cavern updates. Both pixel
 failure counters are zero and the stack guard is intact. Evidence:
 `/tmp/downwell-natural-native.log` and
 `/tmp/downwell-natural-native-gdb.log`. These are renderer/adapter checks,
 not original Windows screenshots and not a 20 ms performance claim.
+
+The extended native gate also passes: 832 updates in cavern two, 49 retained
+shop-HUD comparisons with zero pixel failures, and a 43-update return to the
+main shaft. Natural shop logic checks and the task-stack guard pass. Evidence:
+`/tmp/downwell-natural-shop-native.log` and
+`/tmp/downwell-natural-shop-native-gdb.log`. Normal startup is restored and
+both 68000 audits pass. This verifies the generated shop route, not a funded
+purchase, all shop layouts, or fresh composition of every terrain pixel.
 
 The original `scrLevelPat1` VM assembly sets `shopMade=1` and
 `rightRoomAmt=2` when area=1, level=1 and playStyle!=4. This explains why the
