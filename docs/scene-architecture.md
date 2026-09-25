@@ -137,12 +137,39 @@ the original border stride and palette rules.
   Overflow BOB rasterization now lives in `AmigaGameplayActors.h/.cpp` with
   explicit artwork, retired display, dirty-row and laser inputs. Actor
   collection now lives in `AmigaGameplayDrawList`; terrain composition remains
-  in the main loop. Hardware-channel assignment lives alongside the actor
+  in the main loop, while its raster storage/transfer/invalidation now belongs
+  to `AmigaTerrainRaster`. Hardware-channel assignment lives alongside the actor
   renderer. The move preserves painter order, clipping, circular row
   addressing and the native scalar verification oracle.
 
 Hardware pointer scrolling is wired for both completion layers and the style
 reveal. Full seven-scene class separation remains unfinished.
+
+### Terrain raster boundary
+
+`AmigaTerrainRaster.h/.cpp` owns the three-column Fast-RAM raster, dirty rows,
+shop-art revisions and ring transfer. The native load path retains the existing
+68000 assembly, 22-byte strips and 48-byte Chip row stride. Long loads still
+pipeline disjoint completed spans of at most 128 rows into the retired display
+and acknowledge only that display's row debts. There is no new framebuffer,
+asset conversion or per-frame terrain repaint. The application still composes
+terrain and decides when to refresh it; this is not full terrain-scene extraction.
+
+A portable transfer counterpart enables byte-exact host tests across all 320
+origins, three columns and five heights (4,800 cases), covering both sides of
+the 96-row pipeline threshold. Tests require correct stored/loaded planes,
+untouched allocation guards and side margins, exact pipeline copy counts and
+independent display debts. Shop invalidation tests cover top/bottom clipping,
+off-raster rows and unchanged revisions producing no new damage. ASan/UBSan
+pass (`/tmp/downwell-terrain-raster-host.log` and
+`/tmp/downwell-terrain-raster-sanitized.log`). These tests exercise the portable
+copy; native cache comparison is required separately for the assembly twin.
+The final 120-second-bounded native cache gate passes 600 ticks and 101
+fresh-composition comparisons with no terrain/display mismatches and an intact
+256-byte stack guard (`/tmp/downwell-terrain-raster-final-native-gdb.log`).
+This run includes the final invalidation extraction. The compiler defines
+`__m68k__`, selecting the assembly load path. Normal startup is restored and
+the 68000 instruction/helper audits pass; no 20 ms performance claim is made.
 
 ### Actor collection boundary
 

@@ -782,6 +782,14 @@ test-amiga-gameplay-draw-list: build/amiga-gameplay-draw-list-test build/amiga-g
 	./build/amiga-gameplay-draw-list-replay-test
 test: test-amiga-gameplay-draw-list
 
+.PHONY: test-amiga-terrain-raster
+build/amiga-terrain-raster-test: tests/platform/amiga/AmigaTerrainRasterTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaTerrainRaster.cpp src/platform/amiga/AmigaGameplayRows.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-amiga-terrain-raster: build/amiga-terrain-raster-test
+	./build/amiga-terrain-raster-test
+test: test-amiga-terrain-raster
+
 .PHONY: test-amiga-style-retained
 build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build

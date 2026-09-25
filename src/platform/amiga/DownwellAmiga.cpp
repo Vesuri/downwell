@@ -17,6 +17,7 @@
 #include "AmigaGameplayScene.h"
 #include "AmigaGameplayActors.h"
 #include "AmigaGameplayDrawList.h"
+#include "AmigaTerrainRaster.h"
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
@@ -801,22 +802,9 @@ static unsigned terrainCopyBuffer;
 // the Chip-RAM rings. Keep the original compositor as the cache oracle.
 enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrainWords,
        terrainRasterX = AmigaGameplayRows::terrainX };
-static UWORD terrainRaster[3][terrainRasterRows][2][terrainRasterWords];
-static bool terrainRasterDirty[3][terrainRasterRows];
-static bool terrainRasterReady;
-static unsigned terrainShopArtRevision[downwell::ShopWorld::capacity];
+static AmigaTerrainRaster terrainRaster{};
 static void invalidateShopRaster(const downwell::ShopWorld& shops) {
-    for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
-        const auto& shop = shops.instances[i];
-        if (shop.artRevision == terrainShopArtRevision[i]) continue;
-        terrainShopArtRevision[i] = shop.artRevision;
-        if (!shop.allocated) continue;
-        int first = shop.y - 21, end = shop.y + 12;
-        if (first < 0) first = 0;
-        if (end > terrainRasterRows) end = terrainRasterRows;
-        for (unsigned column = 0; column < 3; ++column)
-            for (int y = first; y < end; ++y) terrainRasterDirty[column][y] = true;
-    }
+    terrainRaster.invalidateShops(shops);
 }
 
 static bool generateLiveTerrain(void* opaque, AmigaPortRuntime& runtime,
@@ -832,82 +820,14 @@ static bool generateLiveTerrain(void* opaque, AmigaPortRuntime& runtime,
     if (!ok) gDownwellLiveGenerationFailed = 1;
     if (live.dirtyFirst < 0) live.dirtyFirst = 0;
     if (live.dirtyEnd > terrainRasterRows) live.dirtyEnd = terrainRasterRows;
-    for (unsigned column = 0; column < 3; ++column)
-        for (int y = live.dirtyFirst; y < live.dirtyEnd; ++y)
-            terrainRasterDirty[column][y] = true;
+    terrainRaster.invalidate(live.dirtyFirst, live.dirtyEnd);
     return ok;
 }
-typedef ULONG RasterLong __attribute__((may_alias));
-
-static void copyTerrainRows68000(const UWORD* sourceWords, UBYTE* plane0,
-                                UBYTE* plane1, unsigned rows) {
-    if (!rows) return;
-    register const UWORD* source __asm("a0") = sourceWords;
-    register UBYTE* destination0 __asm("a1") = plane0;
-    register UBYTE* destination1 __asm("a2") = plane1;
-    register unsigned count __asm("d5") = rows - 1;
-    // Assembly twin of the 22-byte planar row transfer below. Each row in
-    // Fast RAM contains PF1's two planes; Chip RAM retains its 48-byte stride.
-    __asm__ volatile(
-        "1: movem.l (%0)+,%%d0-%%d4\n\t"
-        "movem.l %%d0-%%d4,(%1)\n\t"
-        "move.w (%0)+,20(%1)\n\t"
-        "movem.l (%0)+,%%d0-%%d4\n\t"
-        "movem.l %%d0-%%d4,(%2)\n\t"
-        "move.w (%0)+,20(%2)\n\t"
-        "lea 48(%1),%1\n\t"
-        "lea 48(%2),%2\n\t"
-        "dbra %3,1b"
-        : "+a"(source), "+a"(destination0), "+a"(destination1), "+d"(count)
-        : : "d0", "d1", "d2", "d3", "d4", "cc", "memory");
-}
-
 static void transferTerrainRows(AmigaRenderer* renderer, int viewX,
                                int worldY, int screenY, int height, bool store) {
-    const int column = (viewX - mainViewX + 160) / 160;
-    UWORD* cachedRow = &terrainRaster[column][worldY][0][0];
-    unsigned physical = renderer->gameOrigin + screenY;
-    if (physical >= downwellGameRingHeight) physical -= downwellGameRingHeight;
-    if (!store) {
-        const bool pipeline = height > 96 && terrainCopyTarget;
-        unsigned remaining = height;
-        while (remaining) {
-            unsigned count = downwellGameRingHeight - physical;
-            if (count > remaining) count = remaining;
-            if (pipeline && count > 128) count = 128;
-            UBYTE* row = renderer->game + physical * downwellBytesPerPlaneLine + terrainRasterX / 8;
-            copyTerrainRows68000(cachedRow, row, row + downwellGameRingPlaneBytes, count);
-            if (pipeline) {
-                // These completed rows are immutable while the CPU prepares
-                // the next disjoint chunk. DMA copies them concurrently.
-                terrainCopyTarget->copy(*terrainCopyBacking, terrainRasterX, physical,
-                    terrainRasterX, physical, terrainRasterWords * 16, count);
-                gameplayRows.copied(physical, count, terrainCopyBuffer);
-            }
-            remaining -= count;
-            cachedRow += count * terrainRasterWords * 2;
-            physical += count;
-            if (physical == downwellGameRingHeight) physical = 0;
-        }
-        return;
-    }
-    for (int y = 0; y < height; ++y) {
-        for (unsigned plane = 0; plane < 2; ++plane) {
-            UWORD* chip = (UWORD*)(renderer->game + plane * downwellGameRingPlaneBytes +
-                physical * downwellBytesPerPlaneLine + terrainRasterX / 8);
-            UWORD* cached = cachedRow + plane * terrainRasterWords;
-            RasterLong* destination = (RasterLong*)(store ? cached : chip);
-            const RasterLong* source = (const RasterLong*)(store ? chip : cached);
-            // Native 68000 long moves require only word alignment. This
-            // bounded 22-byte row avoids byte/word loops and runtime multiplies.
-            destination[0] = source[0]; destination[1] = source[1];
-            destination[2] = source[2]; destination[3] = source[3];
-            destination[4] = source[4];
-            ((UWORD*)destination)[10] = ((const UWORD*)source)[10];
-        }
-        cachedRow += terrainRasterWords * 2;
-        if (++physical == downwellGameRingHeight) physical = 0;
-    }
+    terrainRaster.transfer(renderer, (viewX - mainViewX + 160) / 160,
+        worldY, screenY, height, store, terrainCopyTarget, terrainCopyBacking,
+        terrainCopyBuffer, gameplayRows);
 }
 
 static void dirtyGameRows(unsigned origin, unsigned y, unsigned height, UBYTE buffers = 3) {
@@ -951,10 +871,10 @@ static void drawMainWorldSpan(
     const bool cacheable = viewX >= mainViewX - 160 && viewX <= mainViewX + 160 &&
         (viewX - mainViewX) % 160 == 0 && firstWorldY >= 0 &&
         finalWorldY <= terrainRasterRows;
-    if (terrainRasterReady && cacheable && !refresh) {
+    if (terrainRaster.ready && cacheable && !refresh) {
         const int column = (viewX - mainViewX + 160) / 160;
         for (int y = firstWorldY; y < finalWorldY; ++y)
-            if (terrainRasterDirty[column][y]) { refresh = true; break; }
+            if (terrainRaster.dirty(column, y)) { refresh = true; break; }
         if (!refresh) {
             transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, false);
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -969,12 +889,12 @@ static void drawMainWorldSpan(
                     for (unsigned word = 0; word < terrainRasterWords; ++word)
                         expected[y][plane][word] = chip[word];
                 }
-            terrainRasterReady = false;
+            terrainRaster.ready = false;
             amigaRendererClearGameRows(renderer, clipY, clipHeight, 0);
             drawMainWorldSpan(renderer, rooms, room, builders, fragments, fragmentCount,
                 decorations, decorationCount, runtime, viewX, viewY, clipY, clipHeight, clipX, clipWidth);
             AmigaHardware::blitterDrain();
-            terrainRasterReady = true;
+            terrainRaster.ready = true;
             for (int y = 0; y < clipHeight; ++y)
                 for (unsigned plane = 0; plane < 2; ++plane) {
                     const unsigned physical = (renderer->gameOrigin + clipY + y) % downwellGameRingHeight;
@@ -989,7 +909,7 @@ static void drawMainWorldSpan(
         }
         amigaRendererClearGameRows(renderer, clipY, clipHeight, 0);
     }
-    if (terrainRasterReady && !cacheable && !refresh)
+    if (terrainRaster.ready && !cacheable && !refresh)
         amigaRendererClearGameRows(renderer, clipY, clipHeight, 0);
     amigaRendererSetClipRect(renderer, clipX, clipY, clipWidth, clipHeight);
     {
@@ -1041,12 +961,12 @@ static void drawMainWorldSpan(
             drawGameAsset(renderer, sprite, frame, downwellPlayfieldX + x - viewX, y - viewY, 0);
     });
     amigaRendererClearClipRect(renderer);
-    if (terrainRasterReady && cacheable && refresh) {
+    if (terrainRaster.ready && cacheable && refresh) {
         AmigaHardware::blitterDrain();
         transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, true);
         const int column = (viewX - mainViewX + 160) / 160;
         for (int y = firstWorldY; y < finalWorldY; ++y)
-            terrainRasterDirty[column][y] = false;
+            terrainRaster.dirty(column, y) = false;
     }
 }
 
@@ -1080,7 +1000,7 @@ static void prepareTerrainRaster(AmigaRenderer* renderer,
             AmigaHardware::blitterDrain();
             transferTerrainRows(renderer, x, y, 0, height, true);
         }
-    terrainRasterReady = true;
+    terrainRaster.ready = true;
 }
 
 static void drawMainWorld(
@@ -1164,7 +1084,7 @@ static void drawFutureGameBlock(
         (ringOrigin + gameplayPrefetchLines) % downwellGameRingHeight;
     const int futureViewY = viewY + gameplayPrefetchLines;
     amigaRendererSetGameOrigin(renderer, futureOrigin);
-    if (!terrainRasterReady)
+    if (!terrainRaster.ready)
         amigaRendererClearGameRows(renderer, gameplayPrefetchScreenY,
                                    gameplayPrefetchLines, 0);
     drawMainWorldSpan(renderer, rooms, room, builders,
@@ -1960,7 +1880,7 @@ int main(void) {
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
                         port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision,
                             amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask);
-                        terrainRasterReady = false;
+                        terrainRaster.ready = false;
                         terrainCopyTarget = nullptr;
                         terrainCopyBacking = nullptr;
                         stagedBuffer = memory.menuForeground();
@@ -2007,7 +1927,7 @@ int main(void) {
                         downwellGameRingHeight, 2, false, false, downwellDmaWidth);
                     stageClear.clear();
                     AmigaHardware::blitterDrain();
-                    if (!terrainRasterReady)
+                    if (!terrainRaster.ready)
                         prepareTerrainRaster(&renderer, rooms, mainRoom, builders,
                             fragments, liveBuilder.fragmentCount(),
                             generatedDecorations, liveBuilder.decorationCount(), &port);
@@ -2553,7 +2473,7 @@ int main(void) {
                             const UWORD* displayed = (const UWORD*)((const UBYTE*)gameDisplay[back].data +
                                 plane * downwellGameRingPlaneBytes + physical * downwellBytesPerPlaneLine + terrainRasterX / 8);
                             for (unsigned word = 0; word < terrainRasterWords; ++word)
-                                if (displayed[word] != terrainRaster[column][worldViewY + y][plane][word])
+                                if (displayed[word] != terrainRaster.row(column, worldViewY + y)[plane * terrainRasterWords + word])
                                     ++gDownwellTerrainRasterFailures;
                         }
                     }
@@ -2567,7 +2487,7 @@ int main(void) {
                 gDownwellProfileStageShortfall = worldViewY + downwellDisplayHeight - stagedEnd;
 #endif
                 amigaRendererSetGameOrigin(&renderer, port.ringOrigin());
-                if (!terrainRasterReady)
+                if (!terrainRaster.ready)
                     amigaRendererClearGameRows(&renderer, 0, downwellDisplayHeight, 0);
                 drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
                     fragments, liveBuilder.fragmentCount(),
@@ -2604,7 +2524,7 @@ int main(void) {
                 int origin = (int)port.ringOrigin() + missingFirst - worldViewY;
                 while (origin < 0) origin += downwellGameRingHeight;
                 amigaRendererSetGameOrigin(&renderer, origin % downwellGameRingHeight);
-                if (!terrainRasterReady)
+                if (!terrainRaster.ready)
                     amigaRendererClearGameRows(&renderer, 0, missingHeight, 0);
                 drawMainWorldSpan(&renderer, rooms, mainRoom, builders,
                     fragments, liveBuilder.fragmentCount(),
@@ -2653,10 +2573,7 @@ int main(void) {
                 for (unsigned block = 0;
                      block < destroyedBlockCount; ++block) {
                     const int centerY = 176 + destroyedBlockY[block];
-                    for (unsigned column = 0; column < 3; ++column)
-                        for (int y = centerY - 8; y < centerY + 8; ++y)
-                            if (y >= 0 && y < terrainRasterRows)
-                                terrainRasterDirty[column][y] = true;
+                    terrainRaster.invalidate(centerY - 8, centerY + 8);
                     // Bullets can change rows retained just outside the view.
                     // Exclude those rows from the ring's valid interval so
                     // they are refreshed before the camera exposes them.
@@ -2691,7 +2608,7 @@ int main(void) {
             // Prepare a possible side-room view a small strip at a time in
             // retired garden memory. The actual camera jump then needs only
             // Chip-to-Chip DMA, not an entire Fast-to-Chip raster transfer.
-            if (!cameraXChanged && missingHeight == 0 && destroyedBlockCount == 0 && terrainRasterReady) {
+            if (!cameraXChanged && missingHeight == 0 && destroyedBlockCount == 0 && terrainRaster.ready) {
                 const int playerX = port.player().offsetX();
                 const int cameraX = port.cameraOffsetX();
                 const int wanted = cameraX == 0
@@ -2715,7 +2632,7 @@ int main(void) {
                         bool clean = true;
                         const unsigned column = (targetX - mainViewX + 160) / 160;
                         for (int row = first; row < first + count; ++row)
-                            if (terrainRasterDirty[column][row]) clean = false;
+                            if (terrainRaster.dirty(column, row)) clean = false;
                         if (clean) {
                             AmigaRenderer stage = renderer;
                             stage.game = stagedBuffer;
