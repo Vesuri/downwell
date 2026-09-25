@@ -145,3 +145,31 @@ verified area 1-3 → 2-1 transition ownership. Do not remove the current
 later-area guard or substitute cavern logic merely because these tables are
 now available. No new Amiga performance or Windows visual-fidelity claim is
 made by this data-export gate.
+
+### Bone projectile numeric/event reference
+
+Manifest object 269 (`bulletEnmBone`, sprite 460) inherits object 90
+(`parentShootableThing`). The parent's Create sets health/hit flags and has no
+random calls. Bone Create explicitly draws horizontal speed, vertical speed,
+then animation speed. `BoneProjectileReference` preserves these double-valued
+operations as a host oracle, not a deployed 68000 implementation. Compile this
+reference with `-ffp-contract=off`: the initial test exposed host fused
+multiply-add differences compared with separate VM instructions.
+
+Step follows VM order: restore animation rate, apply gravity, accumulate
+position, round, handle health destruction, then perform strict anchor-based
+`scrInView(0,0,0)` culling. Time-stop pauses motion/health cleanup, but not
+culling. Wall collision destroys before emitting effect 85 at speed 0.3;
+active player collision applies `scrTypicalDamage(1,3,2)` only when not
+time-stopped, then emits the effect and destroys even during time-stop.
+Callbacks preserve the source's continued execution after instance_destroy;
+the eventual instance owner must defer storage retirement appropriately.
+
+`make verify-bone-reference` passes 1,024 full Create RNG-state cases,
+102,400 motion/time-stop updates and collision, health, rounding and strict
+viewport-boundary cases, normally and under ASan/UBSan with FP contraction
+disabled. These tests establish the reference and event contract, not an
+independent Windows execution trace. Draw (`drawShade`, `draw_self`), animation
+advancement, masks, live collision dispatch and damage/effect implementations
+remain external. A target motion representation still needs comparison against
+this oracle before enabling bone actors in either playable backend.

@@ -115,6 +115,14 @@ all: $(TARGET)
 .PHONY: generate-area-two-patterns verify-area-two-patterns
 .PHONY: verify-catacomb-symbols
 .PHONY: verify-skeleton-throw
+.PHONY: verify-bone-reference
+verify-bone-reference: build/bone-reference-test
+	./build/bone-reference-test
+
+build/bone-reference-test: tests/core/BoneProjectileReferenceTest.cpp src/core/BoneProjectileReference.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h src/core/GameMakerRounding.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/BoneProjectileReferenceTest.cpp src/core/GameMakerRandom.cpp
+
 verify-skeleton-throw: build/skeleton-throw-test
 	./build/skeleton-throw-test
 

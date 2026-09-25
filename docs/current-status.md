@@ -157,6 +157,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   conditional RNG choices and velocity overrides in VM order; 9,216 state/trace
   cases and sanitizers pass. Bone lifecycle and live skeleton integration are
   still outstanding; the helper does not enable a new actor.
+  Bone Create/Step/collision behavior now has a host numeric/event reference,
+  with 1,024 RNG cases and 102,400 motion updates passing plus sanitizer checks.
+  It deliberately retains VM-style doubles; target arithmetic, animation and
+  live collision/damage dispatch remain integration work, not completed parity.
 
 ## Working evidence
 
