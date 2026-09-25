@@ -31,6 +31,7 @@ on PAL; do not add 60 Hz catch-up.
   effect captures and dense-encounter profiles.
 
 References: [skeleton effects](skeleton-effect-ownership.md),
+[effect surfaces](effect-surfaces.md),
 [phase eligibility](runner-step-eligibility.md), [alarms](runner-alarms.md),
 [animation fields](runner-image-fields.md).
 

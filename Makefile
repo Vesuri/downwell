@@ -138,6 +138,15 @@ test: verify-smoke-distance
 test: verify-smoke-direction
 test: verify-smoke-trig
 test: verify-smoke-owner
+test: verify-effect-placement
+.PHONY: verify-effect-placement
+verify-effect-placement: build/effect-placement-test
+	./build/effect-placement-test
+
+build/effect-placement-test: tests/core/EffectSurfacePlacementTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $<
+
 .PHONY: verify-smoke-owner
 verify-smoke-owner: build/smoke-owner-test
 	./build/smoke-owner-test
