@@ -134,9 +134,36 @@ the original border stride and palette rules.
   `AmigaGameplayScene.h/.cpp` owns both Copper programs and their readiness.
   Terrain/actor presentation still remains in the application; these are
   incremental boundaries, not a completed gameplay scene extraction.
+  Overflow BOB rasterization now lives in `AmigaGameplayActors.h/.cpp` with
+  explicit artwork, retired display, dirty-row and laser inputs. Actor
+  collection/hardware-channel assignment and terrain composition remain in
+  the main loop. The move preserves painter order, clipping, circular row
+  addressing and the native scalar verification oracle.
 
 Hardware pointer scrolling is wired for both completion layers and the style
 reveal. Full seven-scene class separation remains unfinished.
+
+### Overflow actor renderer boundary
+
+The host actor test uses synthetic planar artwork and an independent pixel
+loop to check 576 combinations of clipped anchors, three ring origins, both
+display slots and laser-before/after-actor order. It requires byte-exact display
+pixels including guard bytes, unchanged terrain backing/HUD and only the
+drawn display's actor rows marked dirty. Pre-existing damage in the other
+buffer survives. ASan/UBSan pass. Evidence:
+`/tmp/downwell-gameplay-actors-host.log` and
+`/tmp/downwell-gameplay-actors-sanitized.log`.
+The 120-second-bounded native overflow fixture passes 100 scalar comparisons
+with no BOB, display-buffer or terrain mismatches
+(`/tmp/downwell-gameplay-actors-native-gdb.log`). Normal startup is restored
+and both 68000 audits pass. The synthetic host tests use the scalar renderer;
+the native fixture supplies the actual blitter-path check.
+The separate Laser Sight fixture uses a 45-second-bounded native run from
+`SKIP_TO_GAME=1`, captures tick 180, and compares the decoded 352x284 DMA
+window with SDL at the same simulation tick. All 99,968 pixels match
+(`/tmp/downwell-gameplay-actors-laser.log` and
+`/tmp/downwell-gameplay-actors-laser-gdb.log`). This is a deterministic
+cross-port frame check, not proof of Windows GPU line rasterization.
 
 ### Gameplay Copper lifecycle
 

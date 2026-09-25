@@ -16,6 +16,7 @@
 #include "AmigaGardenScene.h"
 #include "AmigaGameplayRows.h"
 #include "AmigaGameplayScene.h"
+#include "AmigaGameplayActors.h"
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
@@ -1179,12 +1180,6 @@ static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                ? regular[index] : overflow;
 }
 
-// Marker in painter order; never looked up as a packed sprite.
-static constexpr UWORD gameplayRayMarker = 65535;
-struct GameplayBob {
-    UWORD sprite, frame;
-    int x, y, flip;
-};
 
 extern "C" __attribute__((noinline, used)) void downwellStartupFailed() {
     __asm__ volatile("" ::: "memory");
@@ -1217,68 +1212,6 @@ extern "C" __attribute__((noinline)) void downwellGameplayBobsReady() {
     __asm__ volatile("" ::: "memory");
 }
 #endif
-
-// Overflow actors are ordinary masked planar blits into the inactive display,
-// never into the pristine terrain backing. Only their touched rows are restored
-// before this display buffer is reused.
-static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
-                             unsigned buffer, unsigned origin, const GameplayBob* bobs,
-                             unsigned count, const downwell::LaserSightLine* ray = nullptr) {
-    renderer.game = (UBYTE*)display.data;
-    renderer.target = renderer.game;
-    amigaRendererSetGameOrigin(&renderer, origin);
-    amigaRendererSetClipRect(&renderer, downwellPlayfieldX, 0,
-                             downwellPlayfieldWidth, downwellDisplayHeight);
-#ifdef DOWNWELL_SCENE_VERIFY
-    alignas(2) static UBYTE expected[downwellGameRingBytes];
-    for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
-        expected[byte] = renderer.game[byte];
-    AmigaRenderer oracle = renderer;
-    oracle.game = oracle.target = expected;
-    oracle.blitterEnabled = 0;
-#endif
-    for (unsigned i = 0; i < count; ++i) {
-        const GameplayBob& bob = bobs[i];
-        if (bob.sprite == gameplayRayMarker) {
-            DW_PROFILE_SCOPE(profileLaserDraw);
-            { DW_PROFILE_SCOPE(profileLaserDrawDrain); AmigaHardware::blitterDrain(); }
-            gameplayRays[buffer].draw();
-#ifdef DOWNWELL_SCENE_VERIFY
-            if (ray) ray->draw([&](int x, int y) { amigaRendererFillRect(&oracle, x, y, 1, 1, 2); });
-#endif
-            continue;
-        }
-        DW_PROFILE_SCOPE(profileGameplayBobs);
-        int x, y, width, height;
-        if (!amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
-                bob.sprite, bob.frame, bob.x, bob.y, bob.flip,
-                &x, &y, &width, &height)) continue;
-        if (x >= downwellPlayfieldX + downwellPlayfieldWidth ||
-            x + width <= downwellPlayfieldX || y >= downwellDisplayHeight ||
-            y + height <= 0) continue;
-        amigaRendererDrawAsset(&renderer, activeGamePack, activeGamePackEnd,
-                               bob.sprite, bob.frame, bob.x, bob.y, bob.flip);
-#ifdef DOWNWELL_SCENE_VERIFY
-        amigaRendererDrawAsset(&oracle, activeGamePack, activeGamePackEnd,
-                               bob.sprite, bob.frame, bob.x, bob.y, bob.flip);
-        ++gDownwellGameplayBobChecks;
-#endif
-        int bottom = y + height;
-        if (y < 0) y = 0;
-        if (bottom > downwellDisplayHeight) bottom = downwellDisplayHeight;
-        // Only this display contains the BOB. Preserve pending terrain damage
-        // in either buffer, but do not invalidate the untouched other display.
-        dirtyGameRows(origin, y, bottom - y, (UBYTE)(1u << buffer));
-    }
-    AmigaHardware::blitterDrain();
-#ifdef DOWNWELL_SCENE_VERIFY
-    for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
-        if (expected[byte] != renderer.game[byte]) ++gDownwellGameplayBobFailures;
-#ifdef DOWNWELL_BOB_VERIFY
-    if (gDownwellGameplayBobChecks >= 100) downwellGameplayBobsReady();
-#endif
-#endif
-}
 
 #ifdef DOWNWELL_SCENE_VERIFY
 extern "C" { volatile ULONG gDownwellOverlayCopperChecks, gDownwellOverlayCopperFailures; }
@@ -2994,7 +2927,8 @@ int main(void) {
 #endif
             }
             if (bobCount)
-                drawGameplayBobs(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount,
+                AmigaGameplayActors::draw(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount,
+                    activeGamePack, activeGamePackEnd, gameplayRows, gameplayRays[back],
                     rayVisible ? &rayLine : nullptr);
             if (frameReady &&
                 !gameplayScene.update(back,
