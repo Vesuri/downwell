@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaSelectionLayer.h"
 #include "platform/amiga/AmigaClearDrawList.h"
+#include "platform/amiga/AmigaClearBank.h"
 #include <vector>
 #include <fstream>
 #include <iterator>
@@ -89,5 +90,42 @@ int main(int argc,char** argv) {
         }
     }
     std::printf("%u retained border frames match source-order fresh rendering\n",borderFrames);
+    // Real offer-bank replacements move directory/payload offsets but never
+    // change a stage's border geometry or pixels. Rebinding must retain the
+    // canvas, while a later seam change must read the NEW directory correctly.
+    std::vector<UBYTE> bank(64000);
+    unsigned replacements = 0;
+    for (unsigned area = 1; area <= 4; ++area) {
+        downwell::LevelClearPresentation::Frame snapshot;
+        snapshot.area = area; snapshot.borderRow = 18;
+        AmigaSelectionLayer::Command borders[AmigaSelectionLayer::capacity];
+        unsigned count = 0;
+        snapshot.borders([&](int a, int image, int x, int y) {
+            borders[count++] = {downwell::levelBorderSprite(a), unsigned(image), x, y, -1};
+        });
+        unsigned bytes = AmigaClearBank::build(pack.data(),pack.size(),nullptr,0,bank.data(),bank.size(),area,1);
+        assert(bytes);
+        layer.invalidate();
+        assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint));
+        const auto preserved = canvas;
+        for (unsigned sample = 0; sample < 32; ++sample) {
+            unsigned offers[] = {sample%23,(sample+6)%23,(sample+13)%23,100};
+            unsigned char owned[23];
+            for (auto& item : owned) item = sample%2;
+            bytes = AmigaClearBank::build(pack.data(),pack.size(),offers,sample%5,bank.data(),bank.size(),area,1,owned);
+            assert(bytes);
+            layer.rebindEquivalentArtwork(bank.data(),bank.data()+bytes);
+            assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint) && !paint);
+            oracle.invalidate();
+            assert(oracle.render(fresh.data(),bank.data(),bank.data()+bytes,borders,count,paint));
+            assert(canvas==preserved && canvas==fresh);
+            ++replacements;
+        }
+        borders[0].y += 3;
+        assert(layer.render(canvas.data(),bank.data(),bank.data()+bytes,borders,count,paint) && paint);
+        oracle.invalidate();
+        assert(oracle.render(fresh.data(),bank.data(),bank.data()+bytes,borders,count,paint) && canvas==fresh);
+    }
+    std::printf("%u offer-bank replacements retain identical borders without repainting\n",replacements);
     std::puts("325 selection camera positions match fresh rendering without repainting");
 }

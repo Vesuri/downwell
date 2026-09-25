@@ -13,6 +13,8 @@ class AmigaUpgradeScene {
     unsigned offerCount_ = 0, offers_[4] = {};
     unsigned char owned_[23] = {};
     bool left_ = false, right_ = false, heartGoal_ = false;
+    const UBYTE* sourceArt_ = nullptr;
+    unsigned sourceArtBytes_ = 0, area_ = 0, level_ = 0;
     AmigaSelectionLayer borders_[2], layers_[2];
     AmigaSelectionLayer::Command borderCommands_[AmigaSelectionLayer::capacity];
     AmigaClearDrawList drawList_;

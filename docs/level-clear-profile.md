@@ -186,3 +186,23 @@ The separate frame-count-only run (`/tmp/downwell-retained-fps.log`) measured
 departure. Clear entry took 14 fields (280 ms). Next-level setup still reached
 a 119-field gap (2.38 s); that path was not optimized here. Both profile runs
 completed within their 60-second hard limits and restored ordinary startup.
+
+### Equivalent border-bank retention
+
+Keeping the existing border canvases across offer/inventory-bank replacement
+removes their rebuild spikes. In a subsequent complete detailed 480-update
+capture, idle border work averaged 3.33 ms and peaked at 3.56 ms (previously
+4.96 / 165.30 ms). Departure border work averaged 3.38 ms and peaked at
+3.66 ms (previously 5.99 / 162.49 ms). Initial scene painting is still needed.
+These are border-phase times, not complete-frame times or shipping FPS.
+
+Idle overlay work remains 24.43 ms and layout 15.78 ms. Reconstructing and
+comparing unchanged border commands is also still work to remove. Thus this
+change eliminates intermittent redundant painting, not the entire frame-budget
+problem. The native 432-frame pixel comparison and host/sanitizer replacement
+tests pass; see `scene-architecture.md` for the equivalence constraint.
+
+The first 60-second capture reached its report at the deadline but did not
+detach successfully. A repeat completed cleanly with a 120-second hard limit,
+zero clock clamps and normal-build restoration. Complete log:
+`/tmp/downwell-border-rebind-profile-v2.log`.

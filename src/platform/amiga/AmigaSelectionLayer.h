@@ -16,6 +16,12 @@ public:
     using Rect = AmigaClearOverlay::Rect;
     static constexpr unsigned capacity = 80; // includes both border loops (76 commands)
     void invalidate() { initialized_ = false; }
+    // Caller has proved every resource referenced by this layer has identical
+    // geometry and pixels in the replacement bank. Directory offsets may
+    // change: no record/payload pointers are retained across render() calls.
+    void rebindEquivalentArtwork(const UBYTE* pack, const UBYTE* end) {
+        pack_ = pack; end_ = end;
+    }
     const UBYTE* view(unsigned top) const {
         return target_ && top <= height - 284 ? target_ + top * stride : nullptr;
     }

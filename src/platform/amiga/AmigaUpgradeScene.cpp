@@ -12,6 +12,8 @@ bool AmigaUpgradeScene::enter(GameplayWorld& world, unsigned style,
             mask, maskBytes, nullptr, 0, world.runStage().area, world.runStage().level))
         return false;
     offerCount_ = 0;
+    sourceArt_ = art; sourceArtBytes_ = artBytes;
+    area_ = world.runStage().area; level_ = world.runStage().level;
     for (unsigned i=0;i<2;++i) { borders_[i].invalidate(); layers_[i].invalidate(); }
     left_ = input.left; right_ = input.right;
     for (unsigned i = 0; i < 23; ++i) owned_[i] = world.upgrades().levels[i];
@@ -38,6 +40,10 @@ bool AmigaUpgradeScene::needsArtwork(const GameplayWorld& world) const {
 
 bool AmigaUpgradeScene::refreshArtwork(const GameplayWorld& world, UBYTE* storage,
     const UBYTE* art, unsigned artBytes) {
+    // Offer changes only reselect records from this immutable source. A new
+    // stage/source must enter a new scene instead of preserving old pixels.
+    if (art != sourceArt_ || artBytes != sourceArtBytes_ ||
+        world.runStage().area != area_ || world.runStage().level != level_) return false;
     const auto& room = world.levelClear();
     const unsigned count = world.levelClearFrame().choices ? room.selection.lastIndex + 1 : 0;
     if (!assets.changeOffers(storage, art, artBytes, room.offers.ids, count,
@@ -45,7 +51,13 @@ bool AmigaUpgradeScene::refreshArtwork(const GameplayWorld& world, UBYTE* storag
     offerCount_ = count;
     for (unsigned i = 0; i < count; ++i) offers_[i] = room.offers.ids[i];
     for (unsigned i = 0; i < 23; ++i) owned_[i] = world.upgrades().levels[i];
-    for (unsigned i=0;i<2;++i) { borders_[i].invalidate(); layers_[i].invalidate(); }
+    const UBYTE* bank = storage + assets.layout.resultsOffset;
+    for (unsigned i = 0; i < 2; ++i) {
+        // AmigaClearBank always copies the same four border resources for
+        // this area, independent of offers and inventory. Keep their pixels.
+        borders_[i].rebindEquivalentArtwork(bank, bank + assets.bankBytes);
+        layers_[i].invalidate();
+    }
     return true;
 }
 

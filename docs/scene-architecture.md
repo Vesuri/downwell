@@ -37,7 +37,8 @@ without touching pixels for every top row 0..324; a separate plane stride
 remains 13,376 bytes. Changed commands still cause local old/new damage,
 including intersecting retained commands in original order. Callers must
 provide Chip-resident buffers/art, drain before publication or bank replacement,
-and invalidate after an in-place artwork replacement.
+and invalidate after an in-place artwork replacement unless every referenced
+resource is proven equivalent and the layer is explicitly rebound (see below).
 
 The host test compares all 325 visible windows with the old renderer, requires
 zero repaint and byte-identical storage during camera-only movement, checks
@@ -115,3 +116,23 @@ Host/sanitizer checks cover 325 camera positions with no pixel writes and
 360 border frames crossing area seams. Both compact and wide cover banks
 pass 256 artwork selections with allocation/HUD/mask guards intact. Existing
 completion motion, selection, session, layout, trig and raster tests pass.
+
+### Retaining borders across offer-bank replacement
+
+Offer/inventory changes rebuild the selected artwork bank, moving resource
+directory and payload offsets. This does not change the four border resources
+selected for the current area. The upgrade scene now retains those canvases
+and rebinds their bank bounds instead of invalidating them. The layer stores
+commands and rectangles, not pointers into individual records, so subsequent
+damage resolves artwork through the new directory. Content layers still
+invalidate because their selected resources really can change.
+
+This optimization requires the same immutable source pack, size, area and
+level as scene entry; a different stage/source must enter a new scene. The
+host test builds 128 real replacement banks across all four areas and requires
+byte-identical canvases with zero repaint, then verifies subsequent damage
+against fresh composition. The same cases pass ASan/UBSan.
+
+The bounded native regression also passes 432 completion frames, 192 exit-field
+frames, two clears, 60 third-level updates and the stack guard after this
+change. Evidence: `/tmp/downwell-border-rebind-native-gdb.log`.
