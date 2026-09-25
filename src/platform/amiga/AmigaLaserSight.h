@@ -21,10 +21,12 @@ class AmigaLaserSight {
     static bool same(const downwell::LaserSightLine& a, const downwell::LaserSightLine& b) {
         return a.x0 == b.x0 && a.y0 == b.y0 && a.x1 == b.x1 && a.y1 == b.y1;
     }
-    void restore(const ByteChange& p) {
+    unsigned restore(const ByteChange& p) {
         UBYTE& byte = target_[p.offset];
         const UBYTE value = (byte & (UBYTE)~p.mask) | p.bits;
-        if (byte != value) { byte = value; ++lastByteWrites; }
+        if (byte == value) return 0;
+        byte = value;
+        return 1;
     }
 public:
     unsigned lastByteWrites = 0;
@@ -62,7 +64,10 @@ public:
             pending_ = false;
             return false;
         }
-        for (unsigned i = 0; i < count_; ++i) restore(saved_[i]);
+        unsigned writes = 0;
+        const auto* end = saved_ + count_;
+        for (const auto* entry = saved_; entry != end; ++entry) writes += restore(*entry);
+        lastByteWrites = writes;
         count_ = 0; valid_ = false;
         origin_ = origin;
         pending_ = line != nullptr;
@@ -74,6 +79,8 @@ public:
 #endif
     void draw() {
         if (!pending_) return;
+        auto* const begin = saved_ + count_;
+        auto* next = begin;
         line_.draw([&](int x, int y) {
             if (x < downwellPlayfieldX || x >= downwellPlayfieldX + downwellPlayfieldWidth ||
                 y < 0 || y >= downwellDisplayHeight) return;
@@ -87,14 +94,18 @@ public:
             // publish each changed plane directly, without rereading it or
             // composing a generic two-plane colour a second time.
             if (previousLow & mask) {
-                saved_[count_++] = {offset, mask, mask};
-                low = previousLow & (UBYTE)~mask; ++lastByteWrites;
+                *next++ = {offset, mask, mask};
+                low = previousLow & (UBYTE)~mask;
             }
             if (!(previousHigh & mask)) {
-                saved_[count_++] = {static_cast<UWORD>(offset + downwellGameRingPlaneBytes), mask, 0};
-                high = previousHigh | mask; ++lastByteWrites;
+                *next++ = {static_cast<UWORD>(offset + downwellGameRingPlaneBytes), mask, 0};
+                high = previousHigh | mask;
             }
         });
+        // Every newly saved entry corresponds to exactly one changed-byte
+        // publication. Publish bookkeeping once, not for every plane/pixel.
+        count_ = static_cast<unsigned>(next - saved_);
+        lastByteWrites += static_cast<unsigned>(next - begin);
         pending_ = false; valid_ = true;
     }
 };

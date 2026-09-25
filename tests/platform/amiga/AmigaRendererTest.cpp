@@ -136,6 +136,10 @@ int main(int argc, char** argv) {
             single.prepare(solid.data(), 319, &diagonal, false); single.draw();
             require(single.lastByteWrites == 284*changedPlanes,
                     "full-height ray saves both changed planes without truncation");
+            const auto painted = solid;
+            single.draw();
+            require(single.lastByteWrites == 284*changedPlanes && solid == painted,
+                    "repeated draw without prepare neither republishes nor duplicates saved bytes");
             single.prepare(solid.data(), 319, nullptr, false);
             require(single.lastByteWrites == 284*changedPlanes && solid == before,
                     "full-height two-plane restoration preserves every original byte");

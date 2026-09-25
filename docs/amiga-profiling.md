@@ -2,6 +2,23 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Keep ray save/restore bookkeeping local
+
+Drawing now appends through a local damage-entry pointer and publishes the
+entry count/write count once afterward. Restoration walks a local pointer/end
+pair and accumulates writes locally. This removes repeated object-field loads
+and stores without changing pixel masks, storage capacity or draw order.
+The renderer suite and ASan/UBSan pass, including a new repeated-draw assertion
+that catches duplicate entries/publication without a new prepare call.
+
+The upgraded FPSCOUNT run improves from **1,604 fields / 18.70 FPS** to
+**1,503 fields / 19.96 FPS** for 600 updates; maximum gap falls from seven to
+six fields. This is approximately 50.1 ms/update, **not** a 20 ms frame-budget
+success. Logs: `/tmp/downwell-ray-cursor-{test,sanitized,fps}.log`.
+The bounded native capture remains at 0/99,968 differing pixels versus SDL.
+The restored ordinary build passes both 68000 audits; see
+`/tmp/downwell-ray-cursor-frame.log`.
+
 ### Store actual changed bytes for ray restoration
 
 Ray damage entries now hold an absolute plane-byte offset, bit mask and saved
