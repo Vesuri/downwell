@@ -5,7 +5,7 @@
 #include "GameMakerRandom.h"
 #include "VerificationDigest.h"
 namespace downwell {
-constexpr unsigned gemVerificationCoverage = 255;
+constexpr unsigned gemVerificationCoverage = 1023;
 struct GemVerificationResult {
     std::uint64_t digest;
     unsigned coverage;
@@ -22,7 +22,7 @@ inline GemVerificationResult verifyGemSimulation() {
     bool alive[3] = {true, true, true};
     VerificationDigest digest;
     unsigned coverage = 0;
-    digest.addU32(4); // Also exercises creation-time Gem Attractor configuration.
+    digest.addU32(5); // Includes both visible/hidden disappearing-gem phases.
     for (unsigned tick = 0; tick < 400; ++tick) {
         digest.addU32(tick);
         for (unsigned i = 0; i < 3; ++i) {
@@ -43,6 +43,9 @@ inline GemVerificationResult verifyGemSimulation() {
                 digest.addBool(gems[i].collectible(targetX, targetY, i == 1));
             }
             digest.addBool(alive[i]);
+            digest.addBool(gems[i].lifetime.visible());
+            if (alive[i] && gems[i].lifetime.disappearing())
+                coverage |= gems[i].lifetime.visible() ? 256 : 512;
             digest.addI32(gems[i].x); digest.addI32(gems[i].y);
             digest.addI32(gems[i].vx); digest.addI32(gems[i].vy);
             digest.addBool(gems[i].attracted);

@@ -348,6 +348,7 @@ void Game::renderMain(Renderer& renderer) const {
     for (std::size_t index = 0; index < startup_.mainCurrencyCount(); ++index) {
         const StartupRuntime::MainCurrencyState& gem =
             startup_.mainCurrencyAt(index);
+        if (!gem.motion.lifetime.visible()) continue;
         renderer.drawSprite(gem.large ? 134 : 133,
                             gem.motion.animation.frame(),
                             static_cast<int>(gem.x - viewX),

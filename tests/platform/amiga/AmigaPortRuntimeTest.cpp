@@ -1113,8 +1113,8 @@ int main() {
     const auto gems = downwell::verifyGemSimulation();
     std::cout << "Gem fixture digest: " << std::hex << gems.digest << std::dec
               << " coverage=" << gems.coverage << '\n';
-    require(gems.coverage == 255 && gems.digest == 0x7e82f060aa3fcbf9ULL,
-            "gem cross-CPU fixture covers motion plus collection/account expiry with a pinned digest");
+    require(gems.coverage == 1023 && gems.digest == 0xf175194dfba46820ULL,
+            "gem cross-CPU fixture covers motion, collection/account expiry and both flash phases with a pinned digest");
     const auto weapon = downwell::verifyMachineGun();
     std::cout << "Weapon fixture digest: " << std::hex << weapon.digest << std::dec
               << " coverage=" << weapon.coverage << '\n';

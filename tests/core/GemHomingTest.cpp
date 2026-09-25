@@ -86,6 +86,13 @@ int main() {
         result = stepCurrency(small, false, 2, 1000 * 256L, 0, 9 * 256L, 0, account, solid, random);
         require(result == CurrencyStepResult::alive && account.currency == 12,
                 "small gem cannot collect through the large-only fringe");
+        GemMotion flashing;
+        CurrencyAccount flashingAccount;
+        flashing.lifetime.age = 189;
+        result = stepCurrency(flashing, false, 2, 1000 * 256L, 0, 0, 0, flashingAccount, solid, random);
+        require(result == CurrencyStepResult::collected && !flashing.lifetime.visible() &&
+                    flashingAccount.currency == 2,
+                "hidden flash phases remain collectible and credit the same currency");
         GemMotion homing;
         homing.attracted = true;
         homing.lifetime.age = 309;
@@ -139,8 +146,13 @@ int main() {
         }
     }
     downwell::GemLifetime loose, attracted;
+    int dflash = -1;
+    require(attracted.visible(), "new currency draws with source dflash=-1");
     for (unsigned age = 1; age <= 400; ++age) {
         require(attracted.advance(true), "attracted gem survives its source expiry alarm");
+        if (age >= 190) dflash *= -1;
+        require(attracted.visible() == (dflash < 0),
+                "gem visibility follows source Alarm 1 then Step negation, including attracted expiry");
         require(attracted.obtainable() == (age >= 10) &&
                 attracted.suckable() == (age >= 15) &&
                 attracted.disappearing() == (age >= 190),

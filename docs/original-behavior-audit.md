@@ -7,6 +7,43 @@ not equivalence with Windows. Historical SDL-parity notes do not supersede this.
 See also [activation lifecycle findings](activation-fidelity.md) for the
 source-backed frontier/phase correction and remaining region-boundary gaps.
 
+## Currency disappearing flash
+
+Both renderers now consume `GemLifetime::visible()` instead of drawing every
+live gem unconditionally. The original `objCurrency` Create sets `dflash=-1`;
+Alarm 1 sets `dissapearing=1`; Step blocks 75–76 negate `dflash` while that
+flag is set; Draw blocks 7–8 call `drawFx` only when the numeric flag converts
+to false. Negative one is false under GameMaker's conversion, not C++'s
+nonzero truth rule. With the currently modeled default alarms, age 190 is
+the first hidden frame and age 191 is visible. Attracted gems that survive
+Alarm 2 continue alternating. Repeated rendering never advances the phase.
+
+This is a draw-only predicate. Hidden gems still move, attract and collect;
+the fixture explicitly collects one on its first hidden update. Unit tests
+compare against an independently toggled signed flag through 400 updates.
+The real SDL renderer test uses a spawned gem and checks ages 0, 189, 190,
+191, 309, 310, 311 and 65536, preserves other gems, and checks that repainting
+changes neither lifetime nor RNG.
+
+The shared gem CPU fixture is now schema 5 and includes visibility in its
+digest, requiring both visible and hidden disappearing gems to remain alive.
+Expected digest: `f175194dfba46820`, coverage `3ff`; the movement replay digest
+is unchanged. The bounded 45-second cross-CPU replay passes on A500, including
+both flash phases (`/tmp/downwell-gem-flash-replay.log`); the focused currency
+tests also pass address/undefined-behavior sanitizers
+(`/tmp/downwell-gem-flash-sanitized.log`). This does not establish Windows-exact currency movement,
+general time-stop/event scheduling, drawFx palette effects or audio fidelity.
+
+The 45-second-bounded native gameplay regression passes 600 updates, 101
+fresh-composition checks, seven shop/streak overlay checks and the stack
+guard (`/tmp/downwell-gem-flash-cache.log`). This is a surrounding-renderer
+regression, not a dedicated Windows-versus-Amiga gem screenshot oracle.
+The ordinary startup build is restored with clean 68000 instruction/helper
+audits (`/tmp/downwell-gem-flash-cache-restore.log`).
+The full host suite and SDL rebuild pass (`/tmp/downwell-gem-flash-suite.log`,
+`/tmp/downwell-gem-flash-sdl.log`), including the live gem-render fixture and
+the existing combat/upgrade/reentry tapes.
+
 ## Exit-field timer guard
 
 ### Live Draw RNG

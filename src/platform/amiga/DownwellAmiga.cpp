@@ -2989,7 +2989,7 @@ int main(void) {
 #ifndef DOWNWELL_REPLAY_VERIFY
             for (unsigned index = 0; index < port.gemSlotEnd(); ++index) {
                 const auto& gem = port.gemAt(index);
-                if (gem.active && !appendGameplayActor(actors, actorCount,
+                if (gem.active && gem.motion.lifetime.visible() && !appendGameplayActor(actors, actorCount,
                         (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),
                         downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
                         gameplayPlayerStartY + gem.y - port.cameraOffsetY(), 0))

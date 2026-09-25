@@ -45,6 +45,7 @@ public:
     }
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
     void drawSprite(std::int32_t id, std::uint32_t, int x, int y) override {
+        if (id == 133 || id == 134) ++gemDraws;
         require(id != 458 && id != 459, "projectiles must use their firing angle, not unrotated artwork");
         if (id == 489 && x == 110 && y == 57) ++shopPanels;
         if (id == 128) {
@@ -102,6 +103,7 @@ public:
     downwell::Color clearColor{};
     int clearCount = 0;
     unsigned deathFlashCount = 0;
+    unsigned gemDraws = 0;
     unsigned shopPanels = 0, shopNameCenters = 0;
     unsigned clearTitleDraws = 0, clearChoiceDraws = 0;
     unsigned triggerDraws = 0;
@@ -406,7 +408,7 @@ int main() {
     }
     downwell::Game damagedGame(&rooms, &objects, &builders);
     unsigned mainTicks = 0, hidden = 0, flashingVisible = 0;
-    bool damaged = false, recovered = false;
+    bool damaged = false, recovered = false, gemFlashChecked = false;
     for (unsigned tick = 0; tick < 6000 && !recovered; ++tick) {
         const auto& state = damagedGame.startup();
         input = {};
@@ -420,6 +422,25 @@ int main() {
         damagedGame.update(input);
         if (!state.inMainRoom()) continue;
         ++mainTicks;
+        if (!gemFlashChecked && state.mainCurrencyCount()) {
+            auto& gem = const_cast<downwell::StartupRuntime::MainCurrencyState&>(state.mainCurrencyAt(0));
+            const unsigned oldAge = gem.motion.lifetime.age;
+            const auto rng = state.randomDrawCount();
+            unsigned baseline = 0;
+            for (std::size_t i = 1; i < state.mainCurrencyCount(); ++i)
+                baseline += state.mainCurrencyAt(i).motion.lifetime.visible();
+            for (unsigned age : {0u, 189u, 190u, 191u, 309u, 310u, 311u, 65536u}) {
+                gem.motion.lifetime.age = age;
+                RecordingRenderer capture;
+                damagedGame.render(capture);
+                require(capture.gemDraws == baseline + (age < 190 || (age & 1u)),
+                        "live renderer omits flashing currency without changing other gems");
+                require(gem.motion.lifetime.age == age && state.randomDrawCount() == rng,
+                        "repainting a flashing gem changes neither lifetime nor RNG");
+            }
+            gem.motion.lifetime.age = oldAge;
+            gemFlashChecked = true;
+        }
         const int immunity = state.mainPlayerInvulnerability();
         if (immunity > 0) damaged = true;
         if (!damaged) continue;
@@ -451,6 +472,7 @@ int main() {
     }
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
+    require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");
     require(renderer.bulletDraws > 0, "live render tape exercises projectile transforms");
     require(renderer.spreadBulletDrawn, "live rendering actually exercises nonzero spread angles");
     // Renderer fixture only: natural death entry is exercised by the long
