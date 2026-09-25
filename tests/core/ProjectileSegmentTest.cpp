@@ -69,6 +69,15 @@ int main() {
     require(Segment({2,0}, {1,0}, -unit, 0).intersects(1,2,0,2), "starting at excluded edge can move inside");
     require(!Segment({2,0}, {1,0}, unit, 0).intersects(1,2,0,2), "starting at excluded edge and leaving misses");
     const Segment shifted({100000,524288}, {-100000,524288}, unit/3, 8*unit);
+    for (int dy : {-8*unit, 0, 8*unit}) {
+        const Segment vertical({0,524288}, {0,524288}, 0, dy);
+        require(!vertical.intersects(0, 1, 100000, 100016),
+                "vertical separation rejects despite horizontal overlap");
+        require(!vertical.intersects(0, 1, -100016, -100000),
+                "negative vertical separation rejects despite horizontal overlap");
+        require(!vertical.intersects(0, 0, -1, 1), "empty horizontal interval stays empty");
+        require(!vertical.intersects(0, 1, 1, 0), "reversed vertical interval stays empty");
+    }
     require(shifted.intersects(100000,100001,-99999,-99998), "large signed world coordinates retain subpixel intersections");
     const downwell::ContactActor snake{20*256L,20*256L,1,1,163};
     require(Segment({20,0},{10,0},0,8*unit).intersects(snake), "shared segment uses recovered contact masks");

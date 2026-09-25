@@ -274,6 +274,26 @@ gain. This small arithmetic simplification does not resolve the frame budget
 or generation stall. Logs: `/tmp/downwell-fraction-compare-{test,sanitized,
 fps,replay}.log`; emulator runs are bounded to 45 seconds.
 
+### Rejected projectile rejection experiments
+
+Two follow-ups passed the independent intersection oracle, sanitizers,
+runtime fixtures and bounded native cross-target replay, but were not kept:
+
+- A preliminary two-axis bounding rejection duplicated the existing clipping
+  checks and slowed the tape to 858 fields / 34.97 FPS (baseline 839 / 35.76).
+- Doing the existing y clipping before x took 838 fields / 35.80 FPS, only one
+  field different from baseline. This is not sufficient evidence to favor
+  that order for the game generally.
+
+The production intersection code is unchanged. Additional regressions cover
+positive/negative vertical separation despite horizontal overlap, zero-width
+and reversed rectangles. The restored host test passes all 490,000 slab
+oracle cases; the ordinary non-skip native build and 68000 audits pass.
+Logs use `/tmp/downwell-segment-reject-`, `/tmp/downwell-segment-yfirst-` and
+`/tmp/downwell-segment-experiments-` prefixes. Runs were bounded to 45 seconds.
+Further collision work needs attribution within actual hit/miss queries,
+not additional unmeasured broad-phase checks.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in
