@@ -184,6 +184,19 @@ bool AreaOneBuilder::emitPattern(
     const BuilderPatternPack& patterns, const PackedBuilderPattern& pattern,
     bool reversed, bool appendPillars, GameMakerRandom& random,
     EmitFunction emit, void* context, std::uint32_t& advancedRows) {
+    // Plain wall/platform Create commands have identical defaults and no
+    // local RNG effects. Initialize their actor-sized payload once per pattern,
+    // retaining synchronous callbacks and the exact emitted field values.
+    // Local storage also keeps nested builder calls independent.
+    DeferredCreateInstance terrainCommand{60, 0, 0};
+    auto emitCell = [&](std::int32_t object, int x, int y) {
+        if (object != 60 && object != 93)
+            return emitObject(object, x, y, random, emit, context);
+        terrainCommand.objectId = object;
+        terrainCommand.x = x;
+        terrainCommand.y = y;
+        return emit != nullptr && emit(context, terrainCommand);
+    };
     for (std::uint16_t row = 0; row < pattern.rowCount; ++row) {
         const int rowY = y_ + row * 16;
         std::uint32_t width = 0;
@@ -244,8 +257,7 @@ bool AreaOneBuilder::emitPattern(
                 break;
             }
             case '{': case '}': {
-                if (!emitObject(60, reversed ? 16 : 464, rowY,
-                                random, emit, context))
+                if (!emitCell(60, reversed ? 16 : 464, rowY))
                     return false;
                 ++specialObjectsGenerated_;
                 break;
@@ -253,7 +265,7 @@ bool AreaOneBuilder::emitPattern(
             default: break;
             }
             if (objectId >= 0 &&
-                !emitObject(objectId, buildX, rowY, random, emit, context))
+                !emitCell(objectId, buildX, rowY))
                 return false;
             if (symbol == 'I' || symbol == 'J' || symbol == 'v' ||
                 symbol == 'O' || symbol == '_' || symbol == '$' ||
@@ -268,8 +280,7 @@ bool AreaOneBuilder::emitPattern(
             const int firstX = sideRoom ? (reversed ? 0 : 480)
                                         : (reversed ? 160 : 320);
             const int secondX = reversed ? 320 : 160;
-            if (!emitObject(60, firstX, rowY, random, emit, context) ||
-                !emitObject(60, secondX, rowY, random, emit, context))
+            if (!emitCell(60, firstX, rowY) || !emitCell(60, secondX, rowY))
                 return false;
         }
     }
@@ -279,8 +290,7 @@ bool AreaOneBuilder::emitPattern(
         const int firstX = reversed ? 160 : 320;
         const int secondX = reversed ? 320 : 160;
         for (int padding = 0; padding < 3; ++padding) {
-            if (!emitObject(60, firstX, y_, random, emit, context) ||
-                !emitObject(60, secondX, y_, random, emit, context))
+            if (!emitCell(60, firstX, y_) || !emitCell(60, secondX, y_))
                 return false;
             y_ += 16;
             ++advancedRows;

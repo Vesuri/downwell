@@ -186,6 +186,16 @@ int main(int argc, char** argv) {
     for (const auto& command : directCommands)
         emittedTorch = emittedTorch || command.objectId == 296;
     require(emittedTorch, "standalone builder tape retains I/J torch emission coverage");
+    unsigned plainWalls = 0, plainPlatforms = 0;
+    for (const auto& command : directCommands) {
+        if (command.objectId != 60 && command.objectId != 93) continue;
+        const DeferredCreateInstance expected(command.objectId, command.x, command.y);
+        require(sameCommand(command, expected),
+            "reused plain terrain commands retain fresh defaults including all alarms");
+        if (command.objectId == 60) ++plainWalls; else ++plainPlatforms;
+    }
+    require(plainWalls > 100 && plainPlatforms > 0,
+        "default-command reuse covers walls and platforms interleaved with actors");
     for (std::size_t i = 0; i < directCommands.size(); ++i)
         require(sameCommand(directCommands[i], incrementalCommands[i]),
                 "ordered emissions preserve every Create-event field including alarms");

@@ -40,7 +40,41 @@ RNG consumption and painting are unchanged by this instrumentation switch.
 Next optimize generation with these coarse brackets as the timing comparison;
 do not treat the heavily instrumented inner brackets as removable game cost.
 
-## Earlier baseline
+## Plain terrain command initialization (after `aa2e2b0`)
+
+The shared pattern emitter now initializes one default wall/platform command
+per pattern, updates only object/x/y, and invokes each callback synchronously.
+Objects 60 and 93 previously rebuilt the entire actor-sized payload for every
+cell despite using identical defaults. Other objects keep their existing
+Create initialization. The temporary remains local to each pattern invocation;
+there is no shared mutable singleton, delayed callback or RNG rescheduling.
+
+The same low-overhead tape takes 825 fields (36.36 FPS), versus 822 (36.50 FPS)
+before the change. **Average throughput did not improve.** The maximum gap
+falls from five fields to four. The matched coarse worst frame (sample 258)
+falls from 141.681 to 130.998 ms; its generation bracket falls from 69.329 to
+58.858 ms, while registration/indexing remain approximately unchanged at
+23.400/25.410 ms. The change is retained for reduced generation-burst cost,
+not as a claim of 50 FPS or improved average throughput. Instrumented timing
+remains perturbed by probes; the four-field low-overhead gap still misses 20 ms.
+
+Evidence: `/tmp/downwell-terrain-command-fps.log` and
+`/tmp/downwell-terrain-command-coarse.log`. Sixty-four seeded levels retain
+the complete ordered Create-field/RNG digest `ffcdfc23dc638be7`; explicit tests
+also compare emitted walls/platforms against freshly initialized commands.
+The builder passes ASan/UBSan (`/tmp/downwell-terrain-command-sanitized.log`).
+Incremental terrain tests and paired SDL/Amiga scene tests pass, including
+both next-level re-entries (`/tmp/downwell-terrain-command-live.log`). These
+prove preservation of the modeled generator, not a new Windows-runner audit.
+
+The bounded native camera gate passes 600 updates, seven transitions, six
+staged swaps/one forced fallback, 119 fresh terrain comparisons and 14 display
+checks with zero mismatches and an intact stack guard. Four camera locks and
+three releases remain covered. Log: `/tmp/downwell-terrain-command-native.log`;
+details saved as `/tmp/downwell-terrain-command-native-gdb.log`. Normal startup
+is restored and both 68000 audits pass.
+
+## Earlier extraction checkpoint
 
 Measured from `27da653`, A500 / 512 KB Chip / 8 MB Fast, `-O3`, PAL.
 Both runs start with `SKIP_TO_GAME=1`, use the existing 600-update deterministic
