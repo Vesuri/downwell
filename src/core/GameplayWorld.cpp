@@ -887,7 +887,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     run_.shops.endStep(34 + downwell::floorQ8Coordinate(viewCameraYQ8()));
     GameplayFrame frame = {};
-    run_.results.presentationStep();
+    run_.gameplayPresentationStep(enemyRandom_);
     frame.playerMotion = motion;
     DW_PROFILE_PHASE(profileHudState);
     const bool ammoMotionChanged = run_.ammoHud.step(player_.shots(), player_.recharges());

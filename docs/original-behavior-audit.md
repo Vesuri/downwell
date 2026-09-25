@@ -9,6 +9,39 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 
 ## Exit-field timer guard
 
+### Live Draw RNG
+
+The field's once-per-update Draw RNG is now connected in both live adapters
+through `RunSession::gameplayPresentationStep`. VM Draw blocks 0–1 update
+`radius` unless `pTimeStop`; blocks 2–5 check the strict camera bounds only
+after that random draw. Goal-stop is not time-stop. An absent/retired field
+does not draw RNG, and the explicit time-stop input preserves the radius.
+
+`GoalTimeField::drawSnapshot` is now const and has no RNG argument: repeated
+buffer repairs or host paints cannot change simulation. The existing 10,000
+event test still checks exact binary64 radius, outline order, camera bounds
+and every RNG word, now also testing repeated snapshot paints. A live world
+fixture independently checks 100 updates against one expected RNG draw per
+update; paired gameplay tests compare field lifetime and radius as well.
+
+The corrected RNG stream changes post-clear generation. The focused tape now
+reaches seven enemies/15 shots in level two and two enemies/15 shots in level
+three, with exact adapter comparisons and active-enemy coverage retained.
+Those changed populations are not a reason to preserve the previously missing
+Draw side effect. Log: `/tmp/downwell-field-draw-focused.log`.
+
+Circle rasterization is still absent from both live renderers, and wind
+audio/associated RNG remains unimplemented. This connects the modeled Draw
+state update, not complete field presentation or global VM Draw ordering.
+
+The 60-second-bounded A500 transition check passes two clears, 432 planar
+comparisons and 60 third-level updates with this corrected stream. The normal
+build is restored and both 68000 audits pass. Logs:
+`/tmp/downwell-field-draw-native.log`, `/tmp/downwell-field-draw-restore.log`.
+The exact-radius/snapshot test also passes address/undefined-behavior sanitizers.
+
+### Precise collision and timer
+
 The shared live player phase now supplies the missing `goalTimeField`
 overlap guard to the run clock on both SDL and Amiga. Original
 `objPlayer_n` Begin Step tests `place_meeting(x,y,goalTimeField)` before

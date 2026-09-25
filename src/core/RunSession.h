@@ -76,6 +76,13 @@ struct RunSession {
     LevelClearPresentation::Frame levelClearFrame;
     bool levelClearActive = false, nextLevelRequested = false;
 
+    // One logical Draw phase per gameplay update, not per renderer repaint.
+    // The source consumes field RNG even outside its camera drawing bounds.
+    void gameplayPresentationStep(GameMakerRandom& random, bool timeStopped = false) {
+        if (levelExitPresent) goalField.advanceDraw(timeStopped, random);
+        results.presentationStep();
+    }
+
     // Called only after the backend retires the old room's display/DMA.
     // No run reset: upgrades, currency, records and stage survive this boundary.
     bool enterLevelClear(unsigned style, bool heartGoal, int health,

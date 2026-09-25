@@ -335,6 +335,11 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             const downwell::StartupRuntime& reference) {
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
+    require(amiga.levelExitPresent() == reference.levelExitPresent(),
+            "both adapters retain the same exit-field lifetime");
+    if (amiga.levelExitPresent())
+        require(amiga.goalField().radius.equal(reference.goalField().radius),
+                "both live adapters publish the same once-per-update field radius");
     verifyFrogMotion(amiga, reference);
     require(amiga.generationSucceeded(),
             "live terrain generation succeeds throughout the comparison tape");
@@ -523,6 +528,23 @@ void compareGameplayShot(const AmigaPortRuntime& amiga,
 }
 
 void testGeneratedWorldHandoff(const downwell::ObjectPack& objects) {
+    {
+        GameplayWorld presentation(0);
+        downwell::GameMakerRandom oracle(presentation.randomState());
+        presentation.registerLevelExit(4000);
+        downwell::GoalTimeField::nextRadius(oracle); // Synchronous Create.
+        for (unsigned frame = 0; frame < 100; ++frame) {
+            const auto radius = downwell::GoalTimeField::nextRadius(oracle);
+            presentation.step(0);
+            require(presentation.goalField().radius.equal(radius) &&
+                    presentation.randomDrawCount() == oracle.drawCount() &&
+                    presentation.randomState().stateIndex() == oracle.stateIndex(),
+                    "live world consumes exactly one exit-field Draw value per update");
+            for (unsigned word = 0; word < 16; ++word)
+                require(presentation.randomState().stateWord(word) == oracle.stateWord(word),
+                        "live field Draw preserves the exact RNG stream");
+        }
+    }
     GameplayWorld world(0), direct(0);
     unsigned terrainCalls = 0;
     const auto terrain = [&](const downwell::DeferredCreateInstance&) { ++terrainCalls; return true; };

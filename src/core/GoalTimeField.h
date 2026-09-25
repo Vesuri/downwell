@@ -4,8 +4,8 @@
 #include "HudReal.h"
 #include "../../generated/downwell-goal-mask.h"
 namespace downwell {
-// goalTimeField Create/Draw, audited against the VM assembly. Call draw once
-// per original Draw event, not once per dirty rectangle or buffer repair.
+// goalTimeField Create/Draw, audited against the VM assembly. Advance once
+// per original Draw event; snapshot painting never consumes random values.
 struct GoalTimeField {
     int x = 0, y = 0;
     HudReal radius;
@@ -35,11 +35,12 @@ struct GoalTimeField {
         x = positionX; y = positionY;
         radius = nextRadius(random);
     }
-    template<class Circle>
-    void draw(bool timeStopped, int cameraX, int roomWidth,
-              GameMakerRandom& random, Circle circle) {
+    void advanceDraw(bool timeStopped, GameMakerRandom& random) {
         // Source updates radius before checking the camera bounds.
         if (!timeStopped) radius = nextRadius(random);
+    }
+    template<class Circle>
+    void drawSnapshot(int cameraX, int roomWidth, Circle circle) const {
         if (cameraX <= 160 || cameraX >= roomWidth - 160) return;
         circle(x, y, radius, false);
         circle(x, y, radius.subtract(HudReal::integer(1)), false);

@@ -384,7 +384,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         run_.shops.endStep(mainCameraRenderViewY());
         run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
-        run_.results.presentationStep();
+        run_.gameplayPresentationStep(random_);
     }
 }
 

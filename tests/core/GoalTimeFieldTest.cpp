@@ -1,4 +1,5 @@
 #include "core/GoalTimeField.h"
+#include "core/RunSession.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -12,6 +13,21 @@ static bool exact(downwell::HudReal actual, double expected) {
         actual.mantissa == ((bits & 0xfffffffffffffULL) | (1ULL << 52));
 }
 int main() {
+    downwell::RunSession session;
+    downwell::GameMakerRandom sessionRandom(42);
+    session.gameplayPresentationStep(sessionRandom);
+    require(sessionRandom.drawCount() == 0, "absent field consumes no Draw RNG");
+    session.levelExitPresent = true;
+    session.goalStopped = true;
+    session.gameplayPresentationStep(sessionRandom);
+    require(sessionRandom.drawCount() == 1, "goal stop is not the source pTimeStop guard");
+    const auto stoppedRadius = session.goalField.radius;
+    session.gameplayPresentationStep(sessionRandom, true);
+    require(sessionRandom.drawCount() == 1 && session.goalField.radius.equal(stoppedRadius),
+            "explicit time stop retains the Draw radius");
+    session.levelExitPresent = false;
+    session.gameplayPresentationStep(sessionRandom);
+    require(sessionRandom.drawCount() == 1, "retired field consumes no Draw RNG");
     downwell::GameMakerRandom random(42), oracle(42);
     downwell::GoalTimeField field;
     field.create(240, 4032, random);
@@ -23,7 +39,8 @@ int main() {
         const int camera = cameras[tick % 4];
         if (!stopped) radius = 128 + oracle.random(2);
         unsigned circles = 0;
-        field.draw(stopped, camera, 480, random,
+        field.advanceDraw(stopped, random);
+        field.drawSnapshot(camera, 480,
             [&](int x, int y, downwell::HudReal r, bool red) {
                 require(x == 240 && y == 4032, "circle uses world coordinates");
                 require(red == (circles == 2), "two white outlines precede red outline");
@@ -38,6 +55,11 @@ int main() {
         require(random.stateIndex() == oracle.stateIndex(), "RNG index matches");
         for (unsigned i = 0; i < 16; ++i)
             require(random.stateWord(i) == oracle.stateWord(i), "RNG state matches");
+        const auto snapshot = field.radius;
+        for (unsigned repaint = 0; repaint < 3; ++repaint)
+            field.drawSnapshot(camera, 480, [](int, int, downwell::HudReal, bool) {});
+        require(field.radius.equal(snapshot) && random.drawCount() == oracle.drawCount(),
+                "repainting a snapshot does not change radius or consume RNG");
     }
     std::puts("Goal time-field radius, outline order and Draw RNG tests passed");
 }
