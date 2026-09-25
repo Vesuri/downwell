@@ -51,6 +51,23 @@ whole-frame comparison. Do not repeat per-draw uniformity detection without
 measuring that overhead or reusing already-computed run information.
 Logs: `/tmp/downwell-hud-opaque-{test,sanitized,fps,frame}.log`.
 
+A third experiment retained the three published gauge columns in 3,408 bytes
+of Fast RAM, comparing new words with that cache rather than reading Chip
+RAM. Scene invalidation refreshed the cache, wide-label fallback refreshed
+it after publication, and each changed plane still wrote independently.
+Direct tests covered all column spans and changed-plane combinations,
+including zero writes on repeated publication. The full renderer oracle,
+sanitizers and native firing captures passed (0/99,968 differing pixels).
+
+The generic paired-plane loop measured **820 fields / 36.59 FPS**; a
+specialized one-column pointer-walking loop measured **825 / 36.36 FPS**.
+Both used the same 600-update, 45-second-bounded tape and retained a five-field
+maximum gap. Neither improved the 812-field / 36.95 FPS baseline, so both
+were removed, including the extra cache allocation. These whole-frame
+measurements do not isolate the cost of Chip-RAM reads or prove a general
+claim about caching. Evidence prefixes: `/tmp/downwell-hud-published-` and
+`/tmp/downwell-hud-published-narrow-` (`test`, `sanitized`, `fps`, `frame`).
+
 - Original binary64 divider-loop geometry is cached by capacity for the
   current one-charge weapon, including all four recharge offsets. Visibility
   still depends on ammo. Capacities above 64 and other consumption values
