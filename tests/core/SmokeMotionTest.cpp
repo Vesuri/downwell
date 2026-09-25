@@ -7,8 +7,11 @@
 using downwell::MotionBinary64;
 static void check(bool ok){if(!ok)std::abort();}
 static MotionBinary64 number(double x){std::uint64_t b;std::memcpy(&b,&x,8);return {std::uint32_t(b>>32),std::uint32_t(b)};}
-static double real(MotionBinary64 x){const std::uint64_t b=(std::uint64_t(x.high)<<32)|x.low;double d;std::memcpy(&d,&b,8);return d;}
 static bool same(MotionBinary64 x,double y){auto n=number(y);return x.high==n.high && x.low==n.low;}
+static bool outside(double sx,double sy,double x,double y){
+    const float dx=float(x-sx),dy=float(y-sy),xx=dx*dx,yy=dy*dy,total=xx+yy;
+    return double(float(std::sqrt(double(total))))-16>1e-5;
+}
 int main(){
     unsigned steps=0,escapes=0;
     for(unsigned seed=0;seed<1024;++seed){
@@ -26,11 +29,10 @@ int main(){
             check(same(s,speed) && same(d,angle) && rng.drawCount()==3);
             ++directions;x=number(vx);y=number(vy);return true;
         };
-        // Scalar geometry callback is intentional: it tests event placement,
-        // not original-runner libm or a native trig/distance implementation.
+        // Count calls while exercising the shared integer-only distance gate.
         auto escaped=[&](MotionBinary64 sx,MotionBinary64 sy,MotionBinary64 x,MotionBinary64 y,bool& outside){
             ++distances;check(same(sx,ox) && same(sy,oy));
-            outside=std::hypot(real(x)-ox,real(y)-oy)-16>1e-5;return true;
+            return downwell::smokeEscapedDistance(sx,sy,x,y,outside);
         };
         const float rate=float(speed*(oracle.random(0.13-0.05)+0.05));
         check(smoke.collideWall() && same(smoke.speed,speed)); // no-collision gate
@@ -44,7 +46,7 @@ int main(){
             check(same(smoke.x.promoted(),px) && same(smoke.y.promoted(),py));
             check(same(smoke.imageSpeed.promoted(),double(rate)));
             check(distances==priorDistances+unsigned(nocol));
-            if(nocol && std::hypot(px-ox,py-oy)-16>1e-5){nocol=false;++escapes;}
+            if(nocol && outside(ox,oy,px,py)){nocol=false;++escapes;}
             check(smoke.noCollision==nocol && smoke.allSet && directions==1);
             if(frame==30){
                 check(smoke.collideWall());if(!nocol)speed*=0.2;

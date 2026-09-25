@@ -1,10 +1,11 @@
 #ifndef DOWNWELL_CORE_SMOKE_MOTION_H
 #define DOWNWELL_CORE_SMOKE_MOTION_H
 #include "SmokeBirth.h"
+#include "SmokeDistance.h"
 namespace downwell {
 // fxSmoke's Step and collision state. The owner supplies runner-compatible
-// lengthdir and point_distance/real comparison; no approximate trig or distance
-// predicate is silently substituted here. Animation/Draw remain owner phases.
+// lengthdir; the native distance gate follows the float-rounded source wrapper.
+// Animation/Draw remain owner phases.
 struct SmokeMotion : SmokeBirth {
     MotionBinary64 xstart{},ystart{},xsp{},ysp{};
     RunnerImageValue x{},y{};
@@ -17,6 +18,10 @@ struct SmokeMotion : SmokeBirth {
     }
     // direction(speed,angle,vx,vy) returns success. escaped(xstart,ystart,x,y,
     // bool&) evaluates the source point_distance(...) > 16 comparison.
+    template<class Random,class Direction>
+    bool step(Random& random,Direction directionVector) {
+        return step(random,directionVector,smokeEscapedDistance);
+    }
     template<class Random,class Direction,class Escaped>
     bool step(Random& random,Direction directionVector,Escaped escaped) {
         if (!allSet) {

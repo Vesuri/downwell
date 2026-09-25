@@ -101,13 +101,39 @@ position/velocity bits, 512 distance escapes and 512 early-alarm cases, wall
 events and complete RNG state. Sanitizers and 68000 compilation pass with no
 FP helpers in this component.
 
-Direction and the point_distance/epsilon predicate are explicit callbacks.
-The test supplies host sin/cos/hypot: it verifies event sequencing and motion,
-**not** original-runner transcendental identity. Native geometry, world collision
-dispatch and drawFx remain open; this is not a live smoke owner. Source export pins:
+Direction is still an explicit callback. The motion test supplies host sin/cos:
+it verifies event sequencing and motion, **not** original-runner transcendental
+identity. The distance callback now has a native implementation as described
+below. Native direction, world collision dispatch and drawFx remain open; this
+is not a live smoke owner. Source export pins:
 Create SHA-256 `725336f892c1c024ccb1285545b93f683be5cca16815f0b626c82eaa496a221b`,
 Step SHA-256 `4398d86951dc87ba221561327498a924f5b97e14ba65f13b30c71377206e8263`.
 Those hashes identify the reviewed UTMT assembly, not a Windows execution test.
+
+### Native smoke distance gate
+
+`point_distance` at 0x53d5b0 rounds coordinate differences, squares and their sum
+to binary32, computes double sqrt, then rounds that result to binary32 before
+returning a promoted VM real. For smoke's builtin-coordinate inputs and fixed
+`> 16` comparison (epsilon 1e-5), the first accepted root is 16+6*2^-19.
+Its lower rounding midpoint squared lies strictly between squared-distance
+floats 0x4380000b and 0x4380000c. `SmokeDistance` therefore preserves the float
+arithmetic and tests the sum against 0x4380000c without calculating a square root.
+It validates that inputs are exactly promoted builtin floats and explicitly
+rejects unsupported ranges; it is not a general point_distance implementation.
+102,560 coordinate cases and 512 root-boundary floats match the scalar wrapper;
+the integrated 81,920-Step test, sanitizer runs and 68000 compilation pass.
+Only the direction callback and RNG remain external in the native smoke Step
+compile fixture, with no FP helpers.
+
+`verify-runner-smoke-geometry.py` pins the distance wrapper and the direction
+wrappers at 0x53c8e0/0x53c9b0. Direction narrows both arguments, multiplies the
+angle by **float pi** then divides by float 180, promotes for trig, narrows
+the result, multiplies by float length and applies a near-integer adjustment
+with float 1e-4. The original trig/helper callees still need verification before
+connecting native direction. Plain host double sin/cos is only a motion-test
+fixture, not evidence of matching that wrapper. These are read-only executable
+inspection and arithmetic tests, not an executed Windows smoke capture.
 
 `SmokeEffect` now composes motion with the verified sprite-84 nine-key unit
 sequence. The runner constructor initializes image_index at offset 0x94 to

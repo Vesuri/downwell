@@ -8,9 +8,7 @@ bool compileSmokeBirth(downwell::SmokeBirth& state,downwell::GameMakerRandom& ra
 }
 extern bool smokeDirection(downwell::MotionBinary64,downwell::MotionBinary64,
                            downwell::MotionBinary64&,downwell::MotionBinary64&);
-extern bool smokeEscaped(downwell::MotionBinary64,downwell::MotionBinary64,
-                         downwell::MotionBinary64,downwell::MotionBinary64,bool&);
 bool compileSmokeMotion(downwell::SmokeMotion& smoke,downwell::GameMakerRandom& random) {
-    return smoke.step(random,smokeDirection,smokeEscaped) && smoke.collideWall();
+    return smoke.step(random,smokeDirection) && smoke.collideWall();
 }
 bool compileSmokeAnimation(downwell::SmokeEffect& smoke) {return smoke.advanceImage();}

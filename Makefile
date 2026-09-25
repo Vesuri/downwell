@@ -134,6 +134,15 @@ test: verify-flash-effects
 test: verify-smoke-birth
 test: verify-smoke-motion
 test: verify-smoke-effect
+test: verify-smoke-distance
+.PHONY: verify-smoke-distance
+verify-smoke-distance: build/smoke-distance-test
+	./build/smoke-distance-test
+
+build/smoke-distance-test: tests/core/SmokeDistanceTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeDistanceTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-smoke-effect
 verify-smoke-effect: build/smoke-effect-test
 	./build/smoke-effect-test

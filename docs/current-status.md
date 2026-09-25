@@ -34,9 +34,13 @@ passes 100,000 products and rounding/range tests; sanitizers and 68000 compilati
 pass without FP helpers. First Step's additional animation-rate draw is kept
 separate from Create. `SmokeMotion` now covers Step integration/rounding/decay,
 the first-Step sample, wall and alarm state changes across 81,920 scalar-matched
-Steps. Sanitizers/68000 compilation pass. Native direction/distance callbacks,
+Steps. Sanitizers/68000 compilation pass. Native direction,
 world collision dispatch, drawing and live ownership are still open;
 the host geometry callbacks are not original-runner transcendental evidence.
+The distance callback now uses the source float-rounded arithmetic and an exact
+fixed-threshold comparison without sqrt: 102,560 coordinate cases and 512
+boundary floats pass, together with the integrated motion and sanitizer tests.
+Original direction wrappers have been located/pinned but not yet implemented.
 See `skeleton-effect-ownership.md` for exact scope and source hashes.
 Smoke animation/lifetime now composes with motion in `SmokeEffect`: verified
 sprite-84 unit keys, frame-zero constructor state, first-update Create rate,
