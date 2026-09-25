@@ -24,9 +24,11 @@ death/result state, input suppression, reward motion, HUD state and combat
 outcomes throughout, not just those final totals.
 
 `make verify-gameplay-death-state` runs both cadences. The combat loop also
-requires exact equality of the published integer camera view on every update,
-including death; the earlier short approach-to-gameplay comparisons retain
-their independently documented tolerances. No combat tolerance was relaxed.
+requires exact equality of the published integer camera view, Q8 player
+position and grounded state on every update, including death. Entrance and
+traversal comparisons now require exact published positions as well; actor
+subpixel adapter projections allow only 1/256 pixel. The old multi-pixel
+allowances and asymmetric-landing skip have been removed, not widened.
 
 This is host execution of both adapters, not a new native CPU replay or a
 Windows recording. It establishes broader implemented-feature agreement,
@@ -56,7 +58,12 @@ The bounded 45-second A500 cross-target verifier passed all 64 frames with
 that digest. Native player and port-runtime tests pass; the live entrance
 comparison passes with the current in-progress collision changes present.
 
-## Remaining confirmed gaps
+## Historical gaps at the initial combat checkpoint
+
+This list records the initial investigation, not the current implementation.
+Subsequent shared movement, collision-mask, bat/frog and animation work
+supersedes several entries; use the current checkpoint and linked migration
+notes above to assess remaining work.
 
 - Player collision uses a landing resolver and corner probes rather than
   `scrCheckCollisionWith`'s rounded/ceil swept mask tests, including diagonal
@@ -71,7 +78,8 @@ comparison passes with the current in-progress collision changes present.
 - Exact animation rates and sprite resource cycles are useful corrections but
   do not establish animation scheduling or all hit-state presentation.
 
-The extended combat comparison remains a failing gate, not proof of fidelity.
+At that checkpoint the extended combat comparison was a failing gate, not
+proof of fidelity. Its current status is recorded at the top of this document.
 
 ## Fractional downward contact
 

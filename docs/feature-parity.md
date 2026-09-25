@@ -9,12 +9,20 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
-### Bounded clear-scene verification: partial, not a new full pass
+### Bounded clear-scene verification completed
 
-The current `verify-amiga-clear-scene` run with a 45-second limit timed out
+The complete gate now passes with an explicit 60-second emulator limit:
+two clears, 432 planar-frame comparisons with no mismatches, both reentries,
+60 third-level gameplay updates and an intact stack guard. No coverage
+assertion was removed. Reproduce with
+`VERIFY_TIMEOUT_SECONDS=60 make verify-amiga-clear-scene`; log:
+`/tmp/downwell-clear-complete-regression.log`. The emulator stopped and the
+ordinary build was restored with clean 68000 instruction/helper audits.
+
+The initial run with a 45-second limit timed out
 after reporting 120 clear frames and 40 choice frames, with no pixel failures
-and no completed reentry. This does not revalidate the full two-clear gate
-after the shop-reset change.
+and no completed reentry. That partial run alone did not revalidate the
+two-clear gate after the shop-reset change.
 
 The verifier now compares aligned buffers in unrolled longword groups rather
 than byte by byte. It still compares every byte and preserves the exact
@@ -26,8 +34,8 @@ helper is used only in the verification build, not ordinary game rendering.
 
 Under the same 45-second bound, single-word comparison reached 300 frames;
 unrolled comparison reached 420 frames, 70 choice frames and one completed
-reentry, all with zero reported mismatches. The second reentry and 60 third-
-level updates remain unverified in this run. Logs:
+reentry, all with zero reported mismatches. Those 45-second runs did not
+reach the second reentry and 60 third-level updates. Logs:
 `/tmp/downwell-clear-reset-regression.log`,
 `/tmp/downwell-clear-word-compare.log`,
 `/tmp/downwell-clear-block-compare.log`. Ordinary builds are restored after
