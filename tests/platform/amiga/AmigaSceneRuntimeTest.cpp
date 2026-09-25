@@ -343,10 +343,7 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
 }
 
 void compareInitialGameplay(const AmigaPortRuntime& amiga,
-                            const downwell::StartupRuntime& reference,
-                            float playerYTolerance = 0.0F,
-                            float cameraYTolerance = 2.0F,
-                            bool allowGroundingPhase = false) {
+                            const downwell::StartupRuntime& reference) {
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
     verifyFrogMotion(amiga, reference);
@@ -422,10 +419,14 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                 sawPairedFrogGround = sawPairedFrogGround || enemy.grounded;
                 sawPairedFrogAir = sawPairedFrogAir || !enemy.grounded;
             }
-            requireNear(240 + native.preciseX / 256.0F, enemy.preciseX, 1.0F,
+            // Native public subpixel coordinates project fifth-Q8/Q16 state
+            // into Q8. Permit only that projection error, never a whole pixel.
+            requireNear(240 + native.preciseX / 256.0F, enemy.preciseX, 1.0F / 256,
                         "paired actor horizontal trajectory agrees across targets");
-            requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F,
-                        "paired actor vertical trajectory agrees within Q8 integration error");
+            requireNear(176 + native.preciseY / 256.0F, enemy.preciseY, 1.0F / 256,
+                        "paired actor vertical trajectory agrees within Q8 projection error");
+            require(240 + native.x == enemy.x && 176 + native.y == enemy.y,
+                    "paired actors publish identical pixel positions");
             if (enemy.objectId == 113 && enemy.active && enemy.frogHit.remaining != 0)
                 require(enemy.spriteId == 173, "frog hit stun takes priority over flight presentation");
             else if (enemy.objectId == 113 && enemy.active && !enemy.grounded)
@@ -459,14 +460,13 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                 reference.mainPlayerX(), 0.0F,
                 "both backends execute identical fixed-point horizontal player state");
     requireNear(176.0F + amiga.player().offsetYFixed() / 256.0F,
-                reference.mainPlayerY(), playerYTolerance,
+                reference.mainPlayerY(), 0.0F,
                 "gameplay player Y follows decoded runtime");
     requireNear(static_cast<float>(160 + amiga.cameraOffsetX()),
-                reference.mainCameraViewX(), 1.0F,
+                reference.mainCameraViewX(), 0.0F,
                 "gameplay camera X follows decoded runtime");
     const float amigaCameraY = static_cast<float>(34 + amiga.cameraOffsetY());
-    if (std::fabs(amigaCameraY - reference.mainCameraViewY()) >
-        cameraYTolerance) {
+    if (amigaCameraY != reference.mainCameraViewY()) {
         std::cerr << "FAILED: gameplay camera Y follows decoded runtime "
                   << "(Amiga camera " << amigaCameraY << ", reference camera "
                   << reference.mainCameraViewY() << ", Amiga player "
@@ -477,10 +477,7 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
     }
     require(amiga.player().facing() == reference.mainPlayerFacing(),
             "gameplay facing follows decoded runtime");
-    if (amiga.player().grounded() != reference.mainPlayerGrounded() &&
-        !(allowGroundingPhase &&
-          std::fabs(static_cast<float>(176 + amiga.player().offsetY()) -
-                    reference.mainPlayerY()) <= playerYTolerance)) {
+    if (amiga.player().grounded() != reference.mainPlayerGrounded()) {
         std::cerr << "FAILED: gameplay grounded state follows decoded runtime "
                   << "(Amiga " << amiga.player().grounded()
                   << " at " << 240 + amiga.player().offsetX() << ","
@@ -1086,18 +1083,15 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         parityFrame = 755 + tick;
         gameplay.step(0);
         reference.step(released, false);
+        compareInitialGameplay(gameplay, reference);
+        compareGameplayShot(gameplay, reference);
         if (gameplay.player().grounded() &&
             reference.mainPlayerGrounded())
             break;
-        if (!gameplay.player().grounded() &&
-            !reference.mainPlayerGrounded()) {
-            compareInitialGameplay(gameplay, reference, 5.0F, 4.0F);
-            compareGameplayShot(gameplay, reference);
-        }
     }
     require(gameplay.player().grounded() && reference.mainPlayerGrounded(),
             "both runtimes land on recovered terrain after gunboot fire");
-    compareInitialGameplay(gameplay, reference, 5.0F, 4.0F);
+    compareInitialGameplay(gameplay, reference);
     compareGameplayShot(gameplay, reference);
     require(gameplay.player().ammo() == 8 && reference.mainAmmo() == 8,
             "landing recharges both runtimes to eight shots");
@@ -1107,7 +1101,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         parityFrame += 1;
         gameplay.step(downwell::packReplayInput(left));
         reference.step(left, false);
-        compareInitialGameplay(gameplay, reference, 5.0F, 4.0F);
+        compareInitialGameplay(gameplay, reference);
     }
     require(gameplay.player().offsetX() < groundedStartX,
             "native player traverses solid ground without floor snagging");
@@ -1129,7 +1123,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         gameplay.step(downwell::packReplayInput(traverse));
         reference.step(traverse, traverse.fire && !traverseFire);
         traverseFire = traverse.fire;
-        compareInitialGameplay(gameplay, reference, 10.0F, 10.0F, true);
+        compareInitialGameplay(gameplay, reference);
         for (unsigned enemy = 0; enemy < gameplay.enemyCount(); ++enemy)
             sawAwakeEnemy = sawAwakeEnemy || gameplay.enemyAt(enemy).awake;
         if (sawAwakeEnemy && sawExtendedEnemyAnimation && sawPairedFrogAir && sawPairedFrogGround &&

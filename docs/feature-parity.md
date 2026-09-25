@@ -9,6 +9,23 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Exact entrance/traversal state comparison
+
+The paired scene test no longer permits five-/ten-pixel player drift,
+four-/ten-pixel camera drift, or a grounded-state disagreement on its
+entrance, gunboot landing and scrolling traversal tape. Player Q8 positions,
+published camera coordinates, grounding and enemy pixel positions must match
+exactly. Enemy subpixel adapter projections permit at most 1/256 pixel,
+replacing the old one-pixel allowance; shared raw enemy-motion checks remain.
+The landing loop also compares every frame before stopping, instead of
+skipping a frame when only one backend reports grounding. The focused
+combat/frog-motion and unconditional-landing runs pass
+(`/tmp/downwell-exact-scene-parity.log`, `/tmp/downwell-exact-landing-parity.log`).
+The complete host suite, including all eight paired combat/upgrade tapes,
+also passes (`/tmp/downwell-exact-parity-full.log`).
+This tightens the gate for those finite routes; it does not prove all routes
+or establish agreement with the original runner's entire event schedule.
+
 ### Render the enemy pose selected by Step
 
 The SDL gameplay renderer now consumes each implemented enemy's published
