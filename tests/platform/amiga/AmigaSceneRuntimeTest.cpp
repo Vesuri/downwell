@@ -47,26 +47,10 @@ struct LiveSceneWorld {
 
     static bool create(void* opaque, const downwell::DeferredCreateInstance& command) {
         auto& world = *static_cast<LiveSceneWorld*>(opaque);
-        if (command.objectId == 277) return world.runtime->registerShop(command.x, command.y) != nullptr;
-        if (command.objectId == 306) world.runtime->registerLevelExit(command.y);
-        if (!amigaAddTerrainObject(world.index, command.objectId, command.x, command.y)) return false;
-        if (command.objectId == 92) {
-            const int x = command.x - 240, y = command.y - 176;
-            return world.runtime->appendBreakables(&x, &y, 1);
-        }
-        if (amigaEnemyHealth(command.objectId)) {
-            downwell::PackedObject object;
-            return world.objects.findObject(command.objectId, object) &&
-                world.runtime->configureEnemy(world.runtime->enemyCount(), command.objectId,
-                    object.spriteId, command.x - 240, command.y - 176,
-                    command.integerVelocityX, command.integerVelocityY,
-                    amigaEnemyHealth(command.objectId), amigaEnemyReward(command.objectId),
-                    command.motionState, command.auxiliaryState,
-                    command.alarms.get(0), command.alarms.get(1),
-                    command.integerDirection, command.integerMoveSpeed,
-                    command.active, command.grounded, true);
-        }
-        return true;
+        return world.runtime->createGeneratedInstance(command, world.objects,
+            [&world](const downwell::DeferredCreateInstance& command) {
+                return amigaAddTerrainObject(world.index, command.objectId, command.x, command.y);
+            });
     }
     static bool generate(void* opaque, AmigaPortRuntime&,
                          downwell::GameMakerRandom& random, int bottom) {
@@ -533,6 +517,60 @@ void compareGameplayShot(const AmigaPortRuntime& amiga,
     }
 }
 
+void testGeneratedWorldHandoff(const downwell::ObjectPack& objects) {
+    GameplayWorld world(0), direct(0);
+    unsigned terrainCalls = 0;
+    const auto terrain = [&](const downwell::DeferredCreateInstance&) { ++terrainCalls; return true; };
+    downwell::DeferredCreateInstance rejected{111, 248, 192};
+    require(!world.createGeneratedInstance(rejected, objects,
+                [](const downwell::DeferredCreateInstance&) { return false; }) && world.enemyCount() == 0,
+            "terrain-registration failure prevents actor creation");
+    const downwell::ObjectPack empty(nullptr, 0);
+    require(!world.createGeneratedInstance(rejected, empty, terrain) && world.enemyCount() == 0,
+            "missing actor metadata fails without registering a partial actor");
+    for (int id : {111, 112, 113, 116, 117, 119}) {
+        downwell::DeferredCreateInstance command{id, 248, 192};
+        command.integerVelocityX = 64; command.integerVelocityY = -26;
+        command.velocityX = 99; command.velocityY = 99; // Must use target-neutral integer payload.
+        command.integerDirection = 27; command.integerMoveSpeed = 320;
+        command.motionState = -1; command.auxiliaryState = 1;
+        command.alarms.set(0, 3); command.alarms.set(1, 17);
+        command.active = id != 116; command.grounded = id == 111 || id == 112;
+        const unsigned slot = world.enemyCount();
+        require(world.createGeneratedInstance(command, objects, terrain), "core handoff accepts supported enemy birth");
+        downwell::PackedObject definition;
+        require(objects.findObject(id, definition), "generated enemy metadata exists");
+        const auto& actor = world.enemyAt(slot);
+        const auto profile = downwell::enemyCreateProfile(id);
+        require(actor.objectId == id && actor.spriteId == definition.spriteId && actor.x == 8 && actor.y == 16 &&
+                actor.health == profile.health && actor.reward == profile.reward && actor.imageSpeed == profile.animationRate &&
+                actor.speedX == 64 && actor.speedY == -26 && actor.direction == 27 && actor.moveSpeed == 320 &&
+                actor.motionState == -1 && actor.auxiliaryState == 1 && actor.alarm0 == 3 && actor.alarm1 == 17 &&
+                actor.active == command.active && actor.grounded == command.grounded && actor.awake &&
+                actor.activationPending == !command.active,
+                "core birth preserves coordinates, metadata, motion, alarms and activation state");
+    }
+    require(world.randomDrawCount() == direct.randomDrawCount(), "actor handoff does not repeat builder RNG draws");
+    require(world.createGeneratedInstance({92, 248, 192}, objects, terrain) && world.breakableActiveAt(8, 16),
+            "breakable births use the same world-origin mapping");
+    const unsigned beforeShop = terrainCalls;
+    require(world.createGeneratedInstance({277, 384, 1024}, objects, terrain) &&
+            direct.registerShop(384, 1024) && terrainCalls == beforeShop,
+            "shop Create is synchronous and bypasses plain terrain registration");
+    require(world.createGeneratedInstance({306, 480, 2000}, objects,
+                [&](const downwell::DeferredCreateInstance&) { return world.levelExitPresent(); }),
+            "exit Create precedes its terrain callback");
+    direct.registerLevelExit(2000);
+    require(world.randomDrawCount() == direct.randomDrawCount() &&
+            world.randomState().stateIndex() == direct.randomState().stateIndex(), "handoff retains synchronous Create RNG consumption");
+    for (unsigned i = 0; i < 16; ++i)
+        require(world.randomState().stateWord(i) == direct.randomState().stateWord(i), "handoff retains all Create RNG words");
+    while (world.enemyCount() < world.enemyCapacity)
+        require(world.createGeneratedInstance(rejected, objects, terrain), "birth fills remaining actor slots");
+    require(!world.createGeneratedInstance(rejected, objects, terrain) && world.enemyCount() == world.enemyCapacity,
+            "full world reports failed generation rather than dropping a birth silently");
+}
+
 void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                             const char* builderPatternPath, bool shopFixture = false) {
     const std::vector<std::uint8_t> roomBytes = readFile(roomPath);
@@ -540,6 +578,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     const std::vector<std::uint8_t> patternBytes = readFile(builderPatternPath);
     const downwell::RoomPack rooms(roomBytes.data(), roomBytes.size());
     const downwell::ObjectPack objects(objectBytes.data(), objectBytes.size());
+    testGeneratedWorldHandoff(objects);
     for (int object : {111, 112, 113, 116, 117, 119}) {
         unsigned mask = 0;
         for (int alarm = 0; alarm < 12; ++alarm) {

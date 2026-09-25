@@ -137,39 +137,21 @@ static bool appendGeneratedTerrain(void* opaque,
     const downwell::DeferredCreateInstance& command) {
     DW_PROFILE_SCOPE(profileGeneratedRegistration);
     auto& live = *static_cast<LiveGenerationContext*>(opaque);
-    // The live builder is stepping on this runtime's RNG stream. Register
-    // synchronously so stock/farewell draws precede the next pattern cell.
-    if (command.objectId == 277)
-        return live.runtime->registerShop(command.x, command.y) != nullptr;
-    if (command.objectId == 306) live.runtime->registerLevelExit(command.y);
-    {
-        DW_PROFILE_SCOPE(profileGeneratedIndex);
-        if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
-            !terrainTiles.append(command)) return false;
-    }
-    if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||
-        command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
-        command.objectId == 109) {
-        if (command.y - 24 < live.dirtyFirst) live.dirtyFirst = command.y - 24;
-        if (command.y + 24 > live.dirtyEnd) live.dirtyEnd = command.y + 24;
-    }
-    if (command.objectId == 92) {
-        const int x = command.x - 240, y = command.y - 176;
-        return live.runtime->appendBreakables(&x, &y, 1);
-    }
-    if (amigaEnemyHealth(command.objectId)) {
-        downwell::PackedObject object;
-        return live.objects->findObject(command.objectId, object) &&
-            live.runtime->configureEnemy(live.runtime->enemyCount(), command.objectId,
-                object.spriteId, command.x - 240, command.y - 176,
-                command.integerVelocityX, command.integerVelocityY,
-                amigaEnemyHealth(command.objectId), amigaEnemyReward(command.objectId),
-                command.motionState, command.auxiliaryState,
-                command.alarms.get(0), command.alarms.get(1),
-                command.integerDirection, command.integerMoveSpeed,
-                command.active, command.grounded, true);
-    }
-    return true;
+    return live.runtime->createGeneratedInstance(command, *live.objects,
+        [&live](const downwell::DeferredCreateInstance& command) {
+            {
+                DW_PROFILE_SCOPE(profileGeneratedIndex);
+                if (!amigaAddTerrainObject(terrainIndex, command.objectId, command.x, command.y) ||
+                    !terrainTiles.append(command)) return false;
+            }
+            if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||
+                command.objectId == 289 || command.objectId == 293 || command.objectId == 296 ||
+                command.objectId == 109) {
+                if (command.y - 24 < live.dirtyFirst) live.dirtyFirst = command.y - 24;
+                if (command.y + 24 > live.dirtyEnd) live.dirtyEnd = command.y + 24;
+            }
+            return true;
+        });
 }
 
 static volatile UBYTE* const ciaaPra = (volatile UBYTE*)0xbfe001;

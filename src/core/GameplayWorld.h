@@ -16,6 +16,8 @@
 #include "core/PlayerDeathSequence.h"
 #include "core/RunSession.h"
 #include "core/AreaOneBuilder.h"
+#include "core/EnemyCreateProfile.h"
+#include "core/ObjectPack.h"
 #include "core/PlayerLifeRules.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
@@ -207,6 +209,31 @@ public:
                         bool awake = false);
     void configureEnemyRandom(const downwell::GameMakerRandom& random) {
         enemyRandom_ = random;
+    }
+    // Synchronous builder handoff. Shop/exit Create effects must occur before
+    // the next pattern cell draws RNG. The backend owns terrain representation;
+    // this world owns breakable and actor registration and coordinate mapping.
+    template<class Terrain>
+    bool createGeneratedInstance(const downwell::DeferredCreateInstance& command,
+                                 const downwell::ObjectPack& objects, Terrain terrain) {
+        if (command.objectId == 277) return registerShop(command.x, command.y) != nullptr;
+        if (command.objectId == 306) registerLevelExit(command.y);
+        if (!terrain(command)) return false;
+        if (command.objectId == 92) {
+            const int x = command.x - 240, y = command.y - 176;
+            return appendBreakables(&x, &y, 1);
+        }
+        const auto profile = downwell::enemyCreateProfile(command.objectId);
+        if (!profile.health) return true;
+        downwell::PackedObject object;
+        return objects.findObject(command.objectId, object) &&
+            configureEnemy(enemyCount_, command.objectId, object.spriteId,
+                command.x - 240, command.y - 176,
+                command.integerVelocityX, command.integerVelocityY, profile.health, profile.reward,
+                command.motionState, command.auxiliaryState,
+                command.alarms.get(0), command.alarms.get(1),
+                command.integerDirection, command.integerMoveSpeed,
+                command.active, command.grounded, true);
     }
     std::uint64_t randomDrawCount() const { return enemyRandom_.drawCount(); }
     const downwell::GameMakerRandom& randomState() const { return enemyRandom_; }

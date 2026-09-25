@@ -18,6 +18,36 @@ The fixed-point world now lives in core, but SDL's live `StartupRuntime` still
 owns a separate world loop. Extracting the class does not complete that switch.
 Rendering/storage optimizations do not justify separate gameplay rules.
 
+## Generated-instance world handoff
+
+`GameplayWorld::createGeneratedInstance` now owns synchronous shop/exit
+creation, breakable registration and enemy admission from builder commands.
+It resolves source sprite metadata and shared birth profiles, translates room
+coordinates once, and preserves integer movement, alarm and activation state.
+The native application callback only maintains its terrain index, retained
+tile store and dirty ranges. The host live-scene adapter uses the same core
+handoff, replacing its copied admission rules.
+
+The terrain callback remains between exit creation and actor admission, with
+shops bypassing plain terrain registration, preserving the existing ordering
+and RNG effects. Failure still propagates to the generator instead of silently
+discarding births. Focused tests cover all six enemies, breakables, failed
+terrain registration, missing metadata, full actor storage, shop/exit callback
+order and all RNG words. Both extended reentry tapes pass through this entry
+point (`/tmp/downwell-world-birth-focused.log`).
+
+The bounded 45-second A500 gameplay-cache run passes 600 simulation ticks and
+101 fresh-composition comparisons, with six generated fragments, four enemies
+and 2,338 RNG draws at the last builder step. The 256-byte stack guard remains
+intact. The ordinary executable is restored with clean 68000 audits. Logs:
+`/tmp/downwell-world-birth-native.log`, `/tmp/downwell-world-birth-restore.log`.
+The full host suite passes all eight combat/upgrade variants, both extended
+reentries and 22,834 offline sprite comparisons. SDL rebuilds successfully
+(`/tmp/downwell-world-birth-suite.log`, `/tmp/downwell-world-birth-sdl.log`).
+
+This is the portable admission interface for the SDL world migration; SDL's
+live instance store has not yet switched to `GameplayWorld` ownership.
+
 ## Remove the superseded SDL builder
 
 The room-boundary audit found 322 unreachable lines after the unconditional
