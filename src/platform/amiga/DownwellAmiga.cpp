@@ -356,6 +356,7 @@ volatile ULONG gDownwellConsumableChecks, gDownwellConsumableFailures;
 volatile ULONG gDownwellCameraColumns, gDownwellCameraTransitions;
 volatile ULONG gDownwellCameraStaged, gDownwellCameraFallback;
 volatile ULONG gDownwellCameraFrameChecks;
+volatile ULONG gDownwellCameraLocks, gDownwellCameraReleases;
 #endif
 volatile ULONG gDownwellCaptureTick;
 #ifdef DOWNWELL_GEMHIGH_VERIFY
@@ -2264,8 +2265,15 @@ int main(void) {
             // Bind through the world: step() rebinds the player's callbacks.
             port.configureLandingResolver([](void*, int, int) { return 0; }, nullptr);
             port.configureSolidResolver([](void*, int, int) { return false; }, nullptr);
+            if (!port.tick() && (!port.registerSideCameraLocker(385, 256) ||
+                                 !port.registerSideCameraLocker(95, 288))) return 20;
+            const bool wasSideLocked = port.cameraSideLocked();
 #endif
             const AmigaPortFrame result = port.step(packedInput);
+#ifdef DOWNWELL_CAMERA_VERIFY
+            if (!wasSideLocked && port.cameraSideLocked()) ++gDownwellCameraLocks;
+            if (wasSideLocked && !port.cameraSideLocked()) ++gDownwellCameraReleases;
+#endif
 #ifdef DOWNWELL_SHOP_VERIFY
             shopVerification.check(port);
             gDownwellShopLiveCoverage = shopVerification.coverage;
@@ -2600,16 +2608,16 @@ int main(void) {
                     ? (playerX < -16 ? -160 : playerX > 16 ? 160 : 10000)
                     : (cameraX < 0 ? (playerX > -144 ? 0 : 10000)
                                    : (playerX < 144 ? 0 : 10000));
-                if (wanted != 10000 && worldViewY >= 0 &&
-                    worldViewY + downwellGameRingHeight <= terrainRasterRows) {
+                const int targetY = wanted != 10000 ? port.previewCameraViewY(wanted) : -1;
+                if (targetY >= 0 && targetY + downwellGameRingHeight <= terrainRasterRows) {
                     const int targetX = mainViewX + wanted;
                     if (targetX != stagedViewX) {
                         stagedViewX = targetX;
-                        stagedFirst = stagedEnd = worldViewY;
+                        stagedFirst = stagedEnd = targetY;
                     }
-                    int first = stagedEnd, count = worldViewY + downwellDisplayHeight + 16 - stagedEnd;
-                    if (worldViewY < stagedFirst) {
-                        count = stagedFirst - worldViewY;
+                    int first = stagedEnd, count = targetY + downwellDisplayHeight + 16 - stagedEnd;
+                    if (targetY < stagedFirst) {
+                        count = stagedFirst - targetY;
                         if (count > 48) count = 48;
                         first = stagedFirst - count;
                     } else if (count > 48) count = 48;

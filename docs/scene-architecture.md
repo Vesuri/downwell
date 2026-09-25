@@ -191,6 +191,14 @@ the stack guard must remain clean. This is a rendering regression fixture,
 not a natural shop playthrough, complete actor-composition oracle, performance
 measurement or comparison with a new Windows capture.
 
+The fixture now also registers two source-normalized side-camera lockers at
+different heights. It requires at least three collision locks and releases.
+The final integrated run observes four locks/three releases with the same
+six staged swaps and one forced fallback. Prefetch predicts the destination
+height through a read-only shared camera copy; the old same-height assumption
+missed all seven transitions once real locker snaps were enabled. See
+`side-camera-lockers.md` for integration evidence and scope.
+
 The native run passes with seven transitions (six staged, one fallback),
 119 fresh-terrain comparisons and 14 display checks, zero raster/display
 mismatches and an intact stack guard. The shared `main-camera-test` also

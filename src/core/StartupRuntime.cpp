@@ -381,6 +381,19 @@ void StartupRuntime::stepInternal(bool advancePressed,
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
         updateMainCurrency();
         updateMainLifecycle();
+        // Camera Collision follows ordinary Step/retirement, before shop End
+        // Step and Draw. Earlier actors/generation keep their Step-time view.
+        run_.sideCameraLockers.collide(mainCameraMotion_);
+        mainCameraX_ = mainCameraMotion_.x / 4096.0F;
+        mainCameraY_ = mainCameraMotion_.y / 4096.0F;
+        mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
+        for (std::size_t i = 0; i < instances_.size(); ++i) {
+            auto& camera = instances_.at(i);
+            if (camera.active && camera.objectId == 64) {
+                camera.x = mainCameraMotion_.pixelX();
+                camera.y = mainCameraMotion_.pixelY();
+            }
+        }
         run_.shops.endStep(mainCameraRenderViewY());
         run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
@@ -954,6 +967,13 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 return runtime->registerShop(command.x, command.y) != nullptr;
             if (command.objectId == 306)
                 runtime->registerLevelExit(command.y);
+            if (command.objectId == 62) {
+                // Materialize Create before the later camera Step, retaining
+                // prior queued instances' creation order and the real record.
+                if (!runtime->deferredInstances_.enqueueCreate(command)) return false;
+                runtime->flushDeferredInstances(runtime->instances_, runtime->roomId_);
+                return runtime->deferredCommandsSucceeded_;
+            }
             return runtime->deferredInstances_.enqueueCreate(command);
         },
         this, result);
@@ -1056,7 +1076,8 @@ void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     if (!mainCameraInitialized_ || !mainPlayerInitialized_)
         return;
     mainCameraMotion_.step(static_cast<long>(std::round(mainPlayerX_ * 256.0F)),
-                           static_cast<long>(std::round(mainPlayerY_ * 256.0F)), mainDeath_.active);
+                           static_cast<long>(std::round(mainPlayerY_ * 256.0F)), mainDeath_.active,
+                           run_.sideCameraLockers.overlaps(mainCameraMotion_));
     mainCameraX_ = mainCameraMotion_.x / 4096.0F;
     mainCameraY_ = mainCameraMotion_.y / 4096.0F;
     mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
@@ -1514,6 +1535,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->y = static_cast<std::int32_t>(std::round(enterSequenceY_));
         }
         return;
+    case 994: // gml_Object_sideCamLocker_Create_0
+        ++implementedCodeCalls_;
+        if (instance != nullptr && instance->roomId == mainRoomId) {
+            instance->x = SideCameraLocker::createdX(instance->x);
+            if (!registerSideCameraLocker(instance->x, instance->y)) deferredCommandsSucceeded_ = false;
+        }
+        return;
     case 997: // gml_Object_camMain_Create_0 (menu/rmMain camera subsets)
         ++implementedCodeCalls_;
         if (menuPlayerInitialized_) {
@@ -1720,6 +1748,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
         run_.stage.area != 1 || run_.stage.level >= 3 || !roomPack_ || !objectPack_) return false;
     if (!run_.advanceAfterLevelClear()) return false;
     run_.shops.reset();
+    run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};
     inputFire_ = input.fire;
@@ -1954,6 +1983,10 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainCameraMotion_.targetY);
     digest.addI32(mainCameraMotion_.slowdownX);
     digest.addI32(mainCameraMotion_.slowdownY);
+    if (run_.sideCameraLockers.count || mainCameraMotion_.sideLocked) {
+        digest.addU32(0x534c4f43); // Optional SLOC extension; unchanged empty-room hashes.
+        digest.addU64(sideCameraDigest());
+    }
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);

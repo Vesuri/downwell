@@ -50,6 +50,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
     run_.shops.reset();
+    run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);
     emitter_.reset(run_.upgrades.levels[12] != 0);
     run_.ammoHud.previousShots = run_.ammoHud.previousRecharges = 0;
@@ -564,7 +565,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         DW_PROFILE_SCOPE(profileCamera);
         const int oldCameraPixelY = cameraPixelY_;
         cameraMotion_.step(240L * 256 + player_.offsetXFixed(),
-                           176L * 256 + player_.offsetYFixed(), dead());
+                           176L * 256 + player_.offsetYFixed(), dead(),
+                           run_.sideCameraLockers.overlaps(cameraMotion_));
         cameraPixelX_ = cameraMotion_.pixelX() - 240;
         cameraXDelta = cameraPixelX_ - oldCameraPixelX;
         cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
@@ -873,11 +875,34 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         },
         [this](unsigned i) { breakables_[i].active = false; });
 
+    // Collision phase follows ordinary actor/generation/retirement work.
+    // Its snap contributes to this frame's final display delta, not the view
+    // those earlier Step events observed.
+    if (followCamera_ && run_.sideCameraLockers.count) {
+        run_.sideCameraLockers.collide(cameraMotion_);
+        const int collisionScroll = cameraMotion_.pixelY() - 176 - cameraPixelY_;
+        cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
+        cameraPixelY_ += collisionScroll;
+        scrollDelta += collisionScroll;
+        motion.deltaY -= collisionScroll;
+        if (collisionScroll) {
+            int origin = (int(ringOrigin_) + collisionScroll) % int(ringHeight);
+            if (origin < 0) origin += int(ringHeight);
+            ringOrigin_ = unsigned(origin);
+        }
+    }
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
     checkpoint_ = downwell::portCheckpointDigest(
         tick_, packedInput, player_, ringOrigin_, firstBulletActive,
         bulletX(), bulletY());
+    if (run_.sideCameraLockers.count || cameraMotion_.sideLocked) {
+        downwell::StateDigest extended;
+        extended.addU64(checkpoint_);
+        extended.addU32(0x534c4f43);
+        extended.addU64(sideCameraDigest());
+        checkpoint_ = extended.value();
+    }
     trajectory_.addU64(checkpoint_);
 #endif
 

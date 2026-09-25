@@ -336,6 +336,8 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             const downwell::StartupRuntime& reference) {
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
+    require(amiga.sideCameraDigest() == reference.sideCameraDigest(),
+            "camera easing, side-lock state and room registrations match exactly");
     require(amiga.levelExitPresent() == reference.levelExitPresent(),
             "both adapters retain the same exit-field lifetime");
     if (amiga.levelExitPresent())
@@ -582,6 +584,10 @@ void testGeneratedWorldHandoff(const downwell::ObjectPack& objects) {
     require(world.createGeneratedInstance({92, 248, 192}, objects, terrain) && world.breakableActiveAt(8, 16),
             "breakable births use the same world-origin mapping");
     const unsigned beforeShop = terrainCalls;
+    require(world.createGeneratedInstance({62, 385, 1024}, objects, terrain) &&
+            direct.registerSideCameraLocker(385, 1024) && terrainCalls == beforeShop &&
+            world.sideCameraDigest() == direct.sideCameraDigest(),
+            "locker Create registers its normalized position synchronously without terrain or RNG work");
     require(world.createGeneratedInstance({277, 384, 1024}, objects, terrain) &&
             direct.registerShop(384, 1024) && terrainCalls == beforeShop,
             "shop Create is synchronous and bypasses plain terrain registration");
@@ -661,7 +667,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     // Exercise a real room-entry handoff, not only the seed-2 capture used by
     // the native intro. Create and garden RNG consumption belongs to startup;
     // importing it must neither reconstruct nor consume those draws again.
-    for (const std::uint32_t seed : {2U, 42U, 1234567U}) {
+    for (const std::uint32_t seed : {2U, 42U, 1234567U, 99U}) {
         downwell::StartupRuntime entry(
             downwell::PlatformProfile::nonDesktop, &rooms, &objects, seed, &patterns);
         entry.skipToGameForTesting();
@@ -671,9 +677,18 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         require(rooms.findRoom(11, room), "handoff room metadata exists");
         LiveSceneWorld liveEntry(patterns, objects);
         liveEntry.bind(imported, rooms, room, false, &entry);
+        bool sawLock = false, sawRelease = false;
+        if (seed == 99) {
+            // Synthetic central locker isolates Collision timing from side
+            // room traversal. Native camera gate separately walks both sides.
+            require(imported.registerSideCameraLocker(240, 240) &&
+                entry.registerSideCameraLocker(240, 240), "paired locker registration");
+        }
         for (unsigned tick = 0; tick < 240; ++tick) {
             parityFrame = static_cast<int>(tick);
             compareInitialGameplay(imported, entry);
+            if (imported.cameraSideLocked()) sawLock = true;
+            if (sawLock && !imported.cameraSideLocked()) sawRelease = true;
             require(imported.randomDrawCount() == entry.randomDrawCount() &&
                     imported.randomState().stateIndex() == entry.randomState().stateIndex(),
                     "room-entry RNG cursor remains exact across seeds");
@@ -683,6 +698,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             imported.step(0);
             entry.step(downwell::Input{}, false);
         }
+        if (seed == 99) require(sawLock && sawRelease,
+            "paired collision fixture enters and releases the source camera lock");
         require(imported.player().grounded() && entry.mainPlayerGrounded(),
                 "imported room entry reaches the source entrance floor across seeds");
         const auto oldCount = liveEntry.builder.fragmentCount();

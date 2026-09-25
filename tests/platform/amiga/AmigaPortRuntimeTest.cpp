@@ -1077,6 +1077,25 @@ int main() {
                 sideCamera.cameraOffsetX() == 160 &&
                 sideFrame.cameraXChanged && sideFrame.cameraXDelta == 160,
             "crossing the recovered shaft edge snaps to the right-room camera");
+    require(sideCamera.registerSideCameraLocker(385, 256), "register source-normalized side locker");
+    const auto beforePreview = sideCamera.sideCameraDigest();
+    const auto beforePreviewRng = sideCamera.randomDrawCount();
+    require(sideCamera.previewCameraViewY(160) == 114 &&
+        sideCamera.sideCameraDigest() == beforePreview && sideCamera.randomDrawCount() == beforePreviewRng,
+        "side-column prefetch predicts collision snap without mutating camera or RNG");
+    const int beforeLockY = sideCamera.cameraOffsetY();
+    sideFrame = sideCamera.step(downwell::packReplayInput(walkRight));
+    require(sideCamera.cameraSideLocked() && sideCamera.cameraOffsetY() == 80 &&
+        sideFrame.scrollDelta == 80 - beforeLockY && sideCamera.ringOrigin() == 60,
+        "collision-phase camera snap reaches the same frame's circular-buffer delta");
+    downwell::Input leaveSide; leaveSide.left = true;
+    for (unsigned frame = 0; frame < 180 &&
+            (sideCamera.cameraOffsetX() != 0 || sideCamera.cameraSideLocked()); ++frame)
+        sideCamera.step(downwell::packReplayInput(leaveSide));
+    require(!sideCamera.cameraSideLocked() && sideCamera.cameraOffsetX() == 0,
+        "walking out of the side mask releases the lock through normal Step");
+    sideCamera.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 2, 300);
+    require(!sideCamera.cameraSideLocked(), "restart discards room-owned camera lock");
 
     AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
     int accumulatedScroll = fallingRuntime.cameraOffsetY();

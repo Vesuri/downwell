@@ -222,6 +222,7 @@ public:
             return registerShop(command.x, command.y) != nullptr;
         }
         if (command.objectId == 306) registerLevelExit(command.y);
+        if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
         if (!terrain(command)) return false;
         if (command.objectId == 92) {
             DW_PROFILE_SCOPE(profileGeneratedBreakable);
@@ -297,6 +298,18 @@ public:
         }, health_);
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
+    bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
+    bool cameraSideLocked() const { return cameraMotion_.sideLocked; }
+    std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(cameraMotion_); }
+    // Read-only rendering hint: entering a camera column may collide with a
+    // locker at a different height. No RNG or live camera state is changed.
+    int previewCameraViewY(int horizontalOffset) const {
+        auto camera = cameraMotion_;
+        camera.step((240L + horizontalOffset) * 256, 176L * 256 + player_.offsetYFixed(),
+                    dead(), run_.sideCameraLockers.overlaps(camera));
+        run_.sideCameraLockers.collide(camera);
+        return camera.pixelY() - 142;
+    }
     void registerLevelExit(int y) { run_.createLevelExit(480, y, enemyRandom_, cameraMotion_); }
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const downwell::LevelExit& levelExit() const { return run_.levelExit; }

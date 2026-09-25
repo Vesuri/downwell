@@ -192,6 +192,9 @@ public:
         }, mainPlayerHealth_);
     }
     const ShopWorld& shops() const { return run_.shops; }
+    bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
+    bool cameraSideLocked() const { return mainCameraMotion_.sideLocked; }
+    std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(mainCameraMotion_); }
     void registerLevelExit(int y) { run_.createLevelExit(480, y, random_, mainCameraMotion_); }
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const LevelExit& levelExit() const { return run_.levelExit; }

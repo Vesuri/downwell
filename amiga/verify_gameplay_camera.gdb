@@ -3,6 +3,10 @@ set confirm off
 target remote 127.0.0.1:2345
 break downwellGameplayLongRunReady
 continue
+if gDownwellCameraLocks < 3 || gDownwellCameraReleases < 3
+    printf "Side-lock collision/release coverage missing: locks=%lu releases=%lu\n", gDownwellCameraLocks, gDownwellCameraReleases
+    quit 1
+end
 if gDownwellCameraColumns != 7 || gDownwellCameraTransitions < 6 || gDownwellCameraStaged == 0 || gDownwellCameraFallback == 0
     printf "Camera coverage missing: columns=%lu transitions=%lu staged=%lu fallback=%lu\n", gDownwellCameraColumns, gDownwellCameraTransitions, gDownwellCameraStaged, gDownwellCameraFallback
     quit 1
@@ -30,6 +34,7 @@ while $i < 64
 end
 printf "Camera fixture: 600 updates, columns=%lu transitions=%lu staged=%lu fallback=%lu fresh_comparisons=%lu display_checks=%lu; zero raster/display mismatches and stack intact\n", gDownwellCameraColumns, gDownwellCameraTransitions, gDownwellCameraStaged, gDownwellCameraFallback, gDownwellTerrainRasterChecks, gDownwellCameraFrameChecks
 printf "DOWNWELL_GAMEPLAY_CAMERA_READY\n"
+printf "Side-camera collision locks=%lu releases=%lu\n", gDownwellCameraLocks, gDownwellCameraReleases
 shell touch .run/gdb-ready.marker
 detach
 quit

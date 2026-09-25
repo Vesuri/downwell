@@ -10,6 +10,7 @@
 #include "AmmoGaugeRows.h"
 #include "Consumables.h"
 #include "ShopWorld.h"
+#include "SideCameraLocker.h"
 #include "LevelExit.h"
 #include "GoalTimeField.h"
 #include "ExitDither.h"
@@ -41,6 +42,7 @@ struct RunSession {
     Consumables consumables;
     UpgradeInventory upgrades;
     ShopWorld shops;
+    SideCameraLockers sideCameraLockers;
     bool gemHigh = false;
     void selectWeaponLevel(const CurrencyAccount& currency) {
         gemHigh = machineGunProfileForStreak(currency.streak).level != 0;
@@ -178,6 +180,7 @@ struct RunSession {
         consumables = {};
         upgrades = {};
         shops.reset();
+        sideCameraLockers.clear();
         gemHigh = false;
         levelExit = {};
         goalField = {};

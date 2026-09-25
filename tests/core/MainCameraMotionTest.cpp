@@ -50,6 +50,15 @@ int main() {
         require(camera.y == 100 * 4096L, "Collision does not run Step's top clamp");
         camera.reset(240, 176);
         require(!camera.sideLocked, "room reset clears side-lock state");
+        downwell::SideCameraLockers lockers;
+        const auto empty = lockers.digest(camera);
+        for (unsigned i = 0; i < lockers.capacity; ++i)
+            require(lockers.create(0, 1024 + int(i) * 16), "bounded locker registration");
+        const auto full = lockers.digest(camera);
+        require(!lockers.create(400, 2000) && lockers.digest(camera) == full,
+            "capacity failure does not partially append or change state");
+        lockers.clear();
+        require(lockers.digest(camera) == empty, "room reset discards all locker registrations");
     }
     {
         downwell::MainCameraMotion capped;
