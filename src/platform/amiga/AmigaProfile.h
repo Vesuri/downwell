@@ -11,7 +11,8 @@ enum DownwellProfilePhase {
     profileTerrainDecorations, profileTerrainAsset, profileWallFrame,
     profileAmmoBase, profileAmmoRows, profileAmmoDividers, profileAmmoLabel,
     profileCamera, profileGeneration, profileLifecycle, profileHudState,
-    profileGeneratedRegistration, profileGeneratedIndex, profilePhaseCount
+    profileGeneratedRegistration, profileGeneratedIndex,
+    profileAmmoDamage, profileAmmoFillGeometry, profileAmmoWordPublish, profilePhaseCount
 };
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)

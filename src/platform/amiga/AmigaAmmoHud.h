@@ -41,7 +41,10 @@ public:
         const unsigned previousMeter = damage_.meter;
         const bool initialize = !damage_.valid;
         const unsigned previousAmmo = damage_.ammo, previousOffset = damage_.offset;
-        damage_.update(ammo, capacity, offset, meter, rows);
+        {
+            DW_PROFILE_SCOPE(profileAmmoDamage);
+            damage_.update(ammo, capacity, offset, meter, rows);
+        }
         if (stampPack_ != pack) {
             dividerAmmo_ = dividerCapacity_ = ~0u;
             stampsReady_ = true;
@@ -96,6 +99,7 @@ public:
             }
         }
         if (ammo != fillAmmo_ || capacity != fillCapacity_) {
+            DW_PROFILE_SCOPE(profileAmmoFillGeometry);
             const auto fill = downwell::AmmoFill::geometry(ammo, capacity);
             fillTop_ = fill.top.floor(); fillHeight_ = fill.height.floor();
             fillAmmo_ = ammo; fillCapacity_ = capacity;
@@ -197,7 +201,10 @@ public:
                 else downwell::drawAmmoNumberLayers(290 + offset, 239 + offset, ammo,
                     [&](unsigned frame, int x, int y) { asset(413, frame, x, y); });
             }
-            lastWordWrites += amigaRendererCopyHudWords(display->hud, working_, stripLeft, top, stripRight, bottom, 1);
+            {
+                DW_PROFILE_SCOPE(profileAmmoWordPublish);
+                lastWordWrites += amigaRendererCopyHudWords(display->hud, working_, stripLeft, top, stripRight, bottom, 1);
+            }
             DW_PROFILE_PHASE(profileAmmoBase);
         };
         auto strip = [&](int top, int bottom) {

@@ -189,6 +189,29 @@ fps,profile,restore}.log`. Native runs are limited to 45 seconds and the
 ordinary non-skip executable is restored. These tests preserve the existing
 source-derived rendering; they do not independently prove Windows fidelity.
 
+### Separate HUD damage detection and publication
+
+New probe-only phases isolate work formerly charged to base/fill and
+rim/label. The same bounded 600-update tape reports:
+
+| Phase | Calls | Total ms | ms/call | Maximum bracket ms |
+| --- | ---: | ---: | ---: | ---: |
+| 37: damage detection | 139 | 639.735 | 4.602 | 6.148 |
+| 38: changed fill geometry | 41 | 16.532 | 0.403 | 0.421 |
+| 39: changed-word publication | 324 | 459.612 | 1.419 | 6.074 |
+
+Thus rebuilding fill geometry is not the primary remaining base-phase cost.
+Damage detection scans all 184 animation states and copies the previous row
+state; it is the next optimization target. Publication still matters, but a
+previous shadow-buffer experiment did not improve it. These are exclusive
+instrumented brackets, including probe overhead, not shipping CPU timings.
+Instrumented fields are 1,112; no new shipping-FPS claim is made.
+
+The expanded host renderer suite and both native 68000 audits pass. The
+45-second bounded run cleaned up and the ordinary non-skip executable was
+restored. Logs: `/tmp/downwell-hud-detail-{profile,test,restore}.log`.
+All three added timing scopes compile out without `PROBES=1`.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in
