@@ -161,6 +161,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
   with 1,024 RNG cases and 102,400 motion updates passing plus sanitizer checks.
   It deliberately retains VM-style doubles; target arithmetic, animation and
   live collision/damage dispatch remain integration work, not completed parity.
+  An integer-only binary64 addition/pixel-rounding candidate now matches the
+  host numeric reference and cross-compiles to 68000 without library helpers.
+  It is not deployed yet: native replay and timing evidence remain required.
 
 ## Working evidence
 

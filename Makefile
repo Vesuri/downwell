@@ -116,6 +116,14 @@ all: $(TARGET)
 .PHONY: verify-catacomb-symbols
 .PHONY: verify-skeleton-throw
 .PHONY: verify-bone-reference
+.PHONY: verify-motion-binary64
+verify-motion-binary64: build/motion-binary64-test
+	./build/motion-binary64-test
+
+build/motion-binary64-test: tests/core/MotionBinary64Test.cpp src/core/MotionBinary64.h src/core/GameMakerRounding.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/MotionBinary64Test.cpp
+
 verify-bone-reference: build/bone-reference-test
 	./build/bone-reference-test
 

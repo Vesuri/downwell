@@ -199,3 +199,27 @@ or rounding-mode change was introduced to hide them. Native integration
 must either preserve the relevant floating-add rounding or establish a
 source-backed bounded domain where a cheaper representation produces the
 same observable positions. A simple tenths implementation is not yet accepted.
+
+### Integer-only binary64 motion arithmetic
+
+`MotionBinary64` provides the narrow alternative: normal finite binary64
+addition and ties-to-even signed pixel rounding, implemented with pairs of
+32-bit words. It uses explicit guard/round/sticky bits and preserves cancellation,
+signs and rounding carries. It rejects subnormal operands/results, NaN,
+infinity and overflow rather than silently approximating them. No multiply,
+divide, host double or 64-bit integer operation appears in the implementation.
+
+`make verify-motion-binary64` checks 200,000 mixed-sign/magnitude additions
+against host double bits, plus 24,000 bone-trajectory updates (velocity bits,
+position bits and rounded pixels), signed zeros, cancellation, halfway cases,
+and rejection without mutation. Normal and ASan/UBSan runs pass. The fixture
+`tests/platform/amiga/MotionBinary64Compile.cpp` cross-compiles at `-O3
+-m68000 -msoft-float` to a self-contained 2,398-byte function with no undefined
+symbols: no floating-point or 64-bit arithmetic helpers. Disassembly is saved
+at `/tmp/downwell-motion-binary64-68000.s`.
+
+This is not yet linked into live projectiles. It still needs native execution
+comparison and frame-cost measurement before selecting it for the bone owner;
+code-generation success alone does not prove a 20 ms budget. The skeleton's
+fixed choice constants can be supplied as reviewed binary64 words; converting
+random animation speed and the remaining lifecycle is separate work.
