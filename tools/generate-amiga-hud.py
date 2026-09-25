@@ -100,10 +100,15 @@ SELECTIONS = {
         186: None,   # sprGroundedTurtle
         187: None,   # sprGroundedTurtleFall
         188: None,   # sprGroundedTurtleWalk
+        205: None,   # sprEnmSkeletonHit
+        206: None,   # sprSkeletonDead (planar; corpse motion is not DMA-owned)
+        207: None,   # sprEnmSkeletonThrow
+        208: None,   # sprEnmSkeletonIdle
         278: None,   # sprCrawler
         369: None,   # bgNightsky
         458: None,   # sprBulScatter2 (six-frame gem-high projectile)
         459: None,   # sprBulScatter1 (six-frame usual gunboot projectile)
+        460: None,   # sprSkeletonBone
         480: [0],    # sprShopCounter
         481: [0],    # sprShopTable
         482: [0],    # sprShopCase, intact fixture (sold cases stay intact)
@@ -435,8 +440,8 @@ def build_pack(manifest, extracted, profile, language_path=None):
                 continue
             canvas = frame_canvas(sprite, frame, items, pages)
             if profile == "game" and sprite_id in (153, 154, 157, 162, 163, 164,
-                    166, 168, 170, 173, 177, 178, 186, 187, 188, 278,
-                    458, 459, 485, 486, 487, 496, 497):
+                    166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278,
+                    458, 459, 460, 485, 486, 487, 496, 497):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
@@ -515,7 +520,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
                 encoded.append((metadata, 768 + frame_index, stride, data))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
-                    153, 154, 163, 164, 166, 168, 170, 173, 177, 186, 187, 188, 278):
+                    153, 154, 163, 164, 166, 168, 170, 173, 177, 186, 187, 188, 206, 278):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
                 stride, data = encode_planar(pixels, mirrored.width, mirrored.height)
@@ -709,7 +714,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
     if profile == "game":
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 133, 134, 153, 154, 157, 162, 163, 164,
-                  166, 168, 170, 173, 177, 178, 186, 187, 188, 278, 458, 459,
+                  166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460,
                   485, 486, 487, 496, 497, 707)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:

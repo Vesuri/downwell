@@ -1,5 +1,20 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Latest run after phase corrections and skeleton asset preparation
+
+The bounded `SKIP_TO_GAME=1` shipping FPS run completes 600 updates in 862 PAL
+fields: **34.80 FPS**, with a maximum four-field gap (80 ms). It starts with
+the gameplay pack enlarged from 309,390 to 320,958 bytes by offline skeleton/
+bone artwork. This also includes the intervening live enemy creation/animation
+phase fixes, so it is not a controlled measurement of the new assets alone.
+Skeletons are not yet instantiated in the tape. The prior 35.09 FPS figure
+below is historical, not the current measurement. The 20 ms target is unmet.
+
+The emulator exited after the bounded profile, and the ordinary build was
+restored with clean 68000 instruction/helper audits. Evidence:
+`/tmp/downwell-skeleton-assets-native.log`, `amiga/.run/gdb-startup.log`,
+`amiga/.run/profile-restore.log`.
+
 ## Word-wide small gameplay tile composition
 
 The existing clipped word compositor now also handles gameplay targets for

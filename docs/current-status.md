@@ -184,8 +184,11 @@ and the ordinary build was restored after both attempts.
   45.45 FPS over 180 updates, with a maximum three-field gap. Combined upgrade
   content/layout/simulation work and transition preparation also exceed budget.
   After the RNG/cavern-spawn corrections and word-wide tile composition, the
-  current 600-update gameplay tape runs at 35.09 FPS (855 PAL fields), with a
+  earlier 600-update gameplay tape ran at 35.09 FPS (855 PAL fields), with a
   three-field maximum gap (60 ms), improved from 34.36 FPS / four fields.
+  After the creation/animation-phase corrections and offline skeleton asset
+  addition, the latest run is 34.80 FPS (862 fields), maximum four fields
+  (80 ms). This is not an isolated asset-cost comparison.
   The separate instrumented run identifies terrain recomposition as the
   dominant cost in its worst frame, not generation. The older 36.36-FPS
   measurement describes a different generated layout and is superseded.
@@ -358,6 +361,16 @@ and the ordinary build was restored after both attempts.
   empty-mask checks, ordered wall effects and existing lifecycle/ownership
   tests pass normally and with sanitizers. This does not choose collision-family
   order or connect damage/effect sinks to the live world yet.
+  Skeleton hit/idle/throw, corpse and bone artwork is now included in the
+  offline gameplay pack. Living skeleton/bone frames include cropped planar,
+  mirrored planar and split DMA variants; the corpse is planar-only. All 78
+  anchored planar/DMA facings match the recovered source pixels, and full pack
+  reproducibility, garden sprite and transition-mask checks pass. The addition
+  is 98 records (2,352 directory bytes) plus 9,216 payload bytes: 11,568 bytes
+  total, raising the pack to 320,958 bytes. A bounded SKIP_TO_GAME profile starts
+  and completes with the larger pack; ordinary build restoration and 68000
+  audits pass. No live skeleton rendering is claimed until the actors are wired.
+  Logs: `/tmp/downwell-skeleton-assets.log`, `/tmp/downwell-skeleton-assets-native.log`.
 
 ## Working evidence
 
