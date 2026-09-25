@@ -111,6 +111,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - Audio, complete persistence/unlocks/settings, later areas, remaining weapons/
   styles/enemies, bosses and ending flow are not complete. Distinguish features
   absent from both ports from actual Amiga-versus-implemented-SDL gaps.
+  Area-two pattern recovery now has a VM-backed export/verification target
+  (50 patterns); gameplay remains disabled pending its distinct rules,
+  actors/hazards and artwork. See `area-two-recovery.md`.
 
 ## Working evidence
 

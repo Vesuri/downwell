@@ -112,6 +112,14 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 
 all: $(TARGET)
 
+.PHONY: generate-area-two-patterns verify-area-two-patterns
+generate-area-two-patterns:
+	python3 tools/export-area-two-patterns.py
+
+verify-area-two-patterns: generate-area-two-patterns
+	python3 tests/area-two-patterns-test.py
+	python3 tools/export-area-two-patterns.py --check
+
 .PHONY: verify-natural-exit verify-route-sweep verify-gameplay-death-state
 verify-route-sweep: generate-room-pack generate-object-pack generate-builder-pattern-pack $(AMIGA_SCENE_TEST_TARGET)
 	DOWNWELL_VERIFY_ROUTE_SWEEP=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
