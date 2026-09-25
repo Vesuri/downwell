@@ -7,6 +7,10 @@ not equivalence with Windows. Historical SDL-parity notes do not supersede this.
 See also [activation lifecycle findings](activation-fidelity.md) for the
 source-backed frontier/phase correction and remaining region-boundary gaps.
 
+[Side-camera locker findings](side-camera-lockers.md) identify another shared
+missing behavior. VM-backed latch/release primitives now exist, but generated
+locker registration and collision-phase integration remain unfinished.
+
 ## Currency disappearing flash
 
 Both renderers now consume `GemLifetime::visible()` instead of drawing every

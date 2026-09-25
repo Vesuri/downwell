@@ -65,6 +65,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - Audit original event order, special camera modes, fractional collisions,
   time-stop/feedback effects and Windows rasterization. Resolve disagreements
   using VM/resources or original-runner captures, not SDL alone.
+  Side-camera lockers are a confirmed missing behavior on both adapters;
+  shared latch/release rules are tested but not yet integrated. See
+  `side-camera-lockers.md` for source evidence and required event ordering.
 - Audio, complete persistence/unlocks/settings, later areas, remaining weapons/
   styles/enemies, bosses and ending flow are not complete. Distinguish features
   absent from both ports from actual Amiga-versus-implemented-SDL gaps.

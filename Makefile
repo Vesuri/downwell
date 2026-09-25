@@ -192,7 +192,7 @@ build/machine-gun-trajectory-test: tests/core/MachineGunTrajectoryTest.cpp src/c
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MachineGunTrajectoryTest.cpp src/core/GameMakerRandom.cpp
 
-build/main-camera-test: tests/core/MainCameraMotionTest.cpp src/core/MainCameraMotion.h
+build/main-camera-test: tests/core/MainCameraMotionTest.cpp src/core/MainCameraMotion.h src/core/SideCameraLocker.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/MainCameraMotionTest.cpp
 

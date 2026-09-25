@@ -1,4 +1,5 @@
 #include "core/MainCameraMotion.h"
+#include "core/SideCameraLocker.h"
 #include "core/StandardBulletStep.h"
 #include <cmath>
 #include <cstdlib>
@@ -7,6 +8,49 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    {
+        using downwell::SideCameraLocker;
+        require(SideCameraLocker::createdX(159) == 80 &&
+            SideCameraLocker::createdX(160) == 160 &&
+            SideCameraLocker::createdX(320) == 320 &&
+            SideCameraLocker::createdX(321) == 400,
+            "locker Create uses strict side boundaries");
+        for (int x : {80, 160, 400}) {
+            const SideCameraLocker locker{x, 1024};
+            for (int dx = -132; dx <= 132; ++dx)
+                for (int dy = -224; dy <= 224; ++dy)
+                    require(locker.overlaps(x + dx, 1024 + dy) ==
+                        (dx >= -129 && dx <= 129 && dy >= -221 && dy <= 221),
+                        "full camera mask intersects the locker at inclusive pixel edges");
+        }
+        downwell::MainCameraMotion camera;
+        camera.reset(400, 1000);
+        camera.collideSideLocker(1000);
+        require(!camera.sideLocked, "equal target does not latch a side lock");
+        camera.collideSideLocker(1024);
+        require(camera.sideLocked && camera.y == 1024 * 4096L &&
+            camera.targetY == camera.y && camera.x == 400 * 4096L,
+            "first collision snaps vertical state without moving horizontal state");
+        camera.collideSideLocker(1040);
+        require(camera.y == 1024 * 4096L && camera.targetY == 1040 * 4096L,
+            "another locker updates target without a second snap");
+        camera.step(400 * 256L, 1500 * 256L, false, true);
+        require(camera.sideLocked && camera.y > 1024 * 4096L &&
+            camera.y < 1040 * 4096L, "overlap retains the lock while target eases");
+        camera.step(400 * 256L, 1500 * 256L, true, false);
+        require(!camera.sideLocked && camera.x == 240 * 4096L &&
+            camera.y == 1524 * 4096L && camera.slowdownX == 1 && camera.slowdownY == 1,
+            "release branch also runs during death and snaps to the shaft/player target");
+        camera.collideSideLocker(1600);
+        camera.setLevelExit(1376);
+        camera.step(400 * 256L, 1500 * 256L, false, false);
+        require(camera.y == 1200 * 4096L && camera.targetY == camera.y,
+            "exit cap applies after side-lock release");
+        camera.collideSideLocker(100);
+        require(camera.y == 100 * 4096L, "Collision does not run Step's top clamp");
+        camera.reset(240, 176);
+        require(!camera.sideLocked, "room reset clears side-lock state");
+    }
     {
         downwell::MainCameraMotion capped;
         capped.reset(240, 1000);
