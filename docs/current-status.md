@@ -153,6 +153,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   rates for the skull's 0.175 while preserving existing actor state and passing
   both natural host routes; new actors remain unregistered until their behavior
   is implemented. See `area-two-recovery.md`.
+  Shared skeleton throw orchestration now preserves synchronous child Create,
+  conditional RNG choices and velocity overrides in VM order; 9,216 state/trace
+  cases and sanitizers pass. Bone lifecycle and live skeleton integration are
+  still outstanding; the helper does not enable a new actor.
 
 ## Working evidence
 

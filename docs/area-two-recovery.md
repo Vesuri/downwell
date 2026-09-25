@@ -115,6 +115,30 @@ alarm fields of the current shared enemy state. Spider Create makes ordered
 line-collision queries to decide and shorten its hanging web. These cannot be
 replaced with cavern behavior just to make the new patterns run.
 
+### Skeleton throw orchestration
+
+`SkeletonThrow.h` implements `enmSkeleton_Step_0` VM blocks 21–26 as a shared
+operation sequence: synchronously create object 269 at `(x,y-10)`, emit sound
+134, choose vertical speed from -3/-3.1/-3.2, conditionally choose horizontal
+speed from 1/0.8/1.2 times current facing, assign velocity, reverse animation
+according to horizontal direction, then latch the shot. Exact alignment with
+the player skips the horizontal choice and sets +1 regardless of facing.
+The helper exposes velocities as integer tenths so these constants do not
+acquire Q8 rounding before a projectile representation is selected.
+
+`make verify-skeleton-throw` compares operation order and all RNG words for
+9,216 seeded/alignment/facing combinations, plus allocation failure. Its
+Create callback consumes the three explicit bone-Create random-range draws
+before either throw choice. The tests pass normally and under ASan/UBSan.
+This is a contract test for synchronous creation, not an implementation or
+verification of the bone's complete inherited Create or lifecycle. The sound
+adapter must preserve `soundPlayOL(134,50,0,1,"enemymove")` at the callback.
+
+This helper is not yet wired into live enemies. Active/image-frame/shot-delay
+gating, bone storage and motion/collisions, alarms, hit/death effects and actor
+registration remain necessary. No new playable actor, native timing result,
+or original-runner playback comparison is claimed by these unit tests.
+
 Remaining work includes wiring catacomb symbol emission into traversal, new actor
 and hazard behavior, matching offline art and both rendering backends, and
 verified area 1-3 → 2-1 transition ownership. Do not remove the current

@@ -114,6 +114,14 @@ all: $(TARGET)
 
 .PHONY: generate-area-two-patterns verify-area-two-patterns
 .PHONY: verify-catacomb-symbols
+.PHONY: verify-skeleton-throw
+verify-skeleton-throw: build/skeleton-throw-test
+	./build/skeleton-throw-test
+
+build/skeleton-throw-test: tests/core/SkeletonThrowTest.cpp src/core/SkeletonThrow.h src/core/GameMakerRandom.cpp src/core/GameMakerRandom.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/SkeletonThrowTest.cpp src/core/GameMakerRandom.cpp
+
 verify-catacomb-symbols: build/catacomb-symbols-test
 	./build/catacomb-symbols-test
 
