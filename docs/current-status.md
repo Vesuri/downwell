@@ -115,10 +115,11 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - Meet the worst-case 20 ms budget. The latest style-navigation measurement is
   45.45 FPS over 180 updates, with a maximum three-field gap. Combined upgrade
   content/layout/simulation work and transition preparation also exceed budget.
-  The current 600-update gameplay tape runs at 36.36 FPS (825 PAL fields), with a four-field
-  maximum gap; reusing plain command defaults reduces the generation burst
-  but does not improve average throughput. Generation still dominates the
-  largest sampled stall.
+  After the RNG and cavern-spawn corrections, the current 600-update gameplay
+  tape runs at 34.36 FPS (873 PAL fields), with a four-field maximum gap.
+  The separate instrumented run identifies terrain recomposition as the
+  dominant cost in its worst frame, not generation. The older 36.36-FPS
+  measurement describes a different generated layout and is superseded.
   See `gameplay-performance-current.md` for scope, costs and next work.
   Keep hardware scrolling, retained terrain and incremental damage intact.
 - Broaden end-to-end play coverage: natural exits, shops and side-room entry/

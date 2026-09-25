@@ -27,6 +27,13 @@ of the original runner or a general claim about other GameMaker versions.
 
 ## Shared primitive and outstanding migration
 
+Current follow-up: `resultRandomizeUg` block 5, `enmBat_Create` heading and
+`Scattered16_Create` frame selection explicitly call `irandom` in the VM.
+These remaining integer-range sites must not be migrated to `choose`.
+The later-cavern spawn correction is now implemented separately (see
+`original-behavior-audit.md`); historical migration fingerprints below predate
+that correction. This audit does not establish completeness of omitted events.
+
 `GameMakerRandom::chooseIndexSmall` now implements this behavior for nonempty
 lists of up to 65,535 entries. The RNG unit test covers all those counts over
 32 seeds, comparing selection, draw count, index and all sixteen state words.

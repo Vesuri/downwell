@@ -1,5 +1,52 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Current baseline after original-RNG and cavern-spawn corrections
+
+At `6e1a906`, the unchanged 600-update gameplay input tape with
+`SKIP_TO_GAME=1` takes **873 PAL fields / 34.36 FPS**, maximum four-field gap
+(80 ms). This supersedes the 825-field measurement below as the current
+baseline. It is not a controlled regression comparison: corrected RNG changes
+terrain and actors encountered by the tape. There are no staged camera swaps.
+
+Both runs use `amiga/profile.sh`, with a 120-second emulator deadline,
+automatic emulator cleanup and restoration of the ordinary startup build.
+Logs: `/tmp/downwell-post-fidelity-fps.log` and
+`/tmp/downwell-post-fidelity-probes.log`. Both restored-build 68000 audits pass.
+
+The separate coarse-probe run takes 1,179 fields; do not report that as shipping
+FPS or subtract its timings directly from the uninstrumented result. It has
+zero clock clamps. Selected exclusive phase totals per update:
+
+| Work | Instrumented ms/update |
+| --- | ---: |
+| Enemy motion | 3.784 |
+| Terrain collision queries | 2.004 |
+| Player phase / movement subphase | 1.761 / 1.706 |
+| Scroll coordination | 1.605 |
+| Actor collection / channel selection / sprite update | 0.950 / 0.985 / 1.037 |
+| Ammo base / rows / dividers / rim-label | 0.915 / 0.985 / 0.451 / 0.588 |
+| HUD damage scan / changed-word publication | 0.888 / 0.869 |
+| Generation / registration / terrain index and tiles | 0.566 / 0.069 / 0.067 |
+
+Worst instrumented frame is **279, 84.977 ms**, including 15.477 ms waiting.
+Terrain asset drawing accounts for 32.455 ms; wall traversal/frame lookup,
+tiles and decorations account for another 10.828 ms. Enemy motion takes
+6.564 ms. Generation itself is only 0.300 ms on this frame. Thus the previous
+claim that generation dominates the current worst sampled stall is obsolete.
+
+All measured collision and terrain-segment queries use indexed paths (zero
+fallbacks). Sprite counters show 826 header-only updates and 648 copies of
+offline payloads (26,218 words), not runtime sprite conversion.
+
+Next investigation: correlate repaint rectangles/cache invalidations with
+frame 279. `drawMainWorldSpan` recomposes an entire requested span if any row
+is dirty, and live generation/shop changes can explicitly request refresh.
+The current counters do not establish which path caused this particular
+stall. Add evidence before narrowing invalidation or changing retained-row
+ownership; preserve fresh-composition comparisons, circular scrolling and
+original synchronous generation/RNG ordering. No renderer optimization or
+50-FPS claim is made by this measurement checkpoint.
+
 ## Fuse retained divider composition with interior publication
 
 For the gauge's stable one-word interior, the ordered divider overlay and
