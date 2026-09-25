@@ -127,9 +127,43 @@ the original border stride and palette rules.
   cursor changes still repair local retained damage.
 - Gameplay logic lives in core `GameplayWorld.cpp`, but the separate SDL
   `StartupRuntime` world loop and Amiga display orchestration still need work.
+  `AmigaGameplayRows.h/.cpp` now owns the two display rings' independent
+  dirty-row debts, initialized margins, conservative pending ranges and
+  backing-copy synchronization. Terrain staging, BOB restoration, laser/goal
+  field repair and verification query this owner instead of global arrays.
+  This is a gameplay-scene component, not a completed gameplay scene owner.
 
 Hardware pointer scrolling is wired for both completion layers and the style
 reveal. Full seven-scene class separation remains unfinished.
+
+### Gameplay ring synchronization boundary
+
+The extracted row component preserves the existing geometry and DMA policy:
+first synchronization initializes the full 384-pixel row; subsequent terrain
+repairs copy only the 176-pixel strip at x=96. Each display ring independently
+owes changed backing rows. Wrapped damage is split into physical runs by the
+same scan, and acknowledged pipelined copies are not copied again. A clean
+ring returns without any copy or blitter drain. Reset still requires world
+preparation to mark its completed rows before synchronization.
+
+The focused host test independently tracks row debts and expected two-plane
+pixels through 10,000 damage/wrap/pipeline cases and repeated re-entry. It
+checks exactly which rows are copied, untouched side margins, full-width
+initialization and zero DMA for repeated unchanged syncs. ASan/UBSan pass.
+Native results-restart passes all three destinations, 640 overlay Copper
+checks, mismatch counters, the stack guard and 200 subsequent gameplay updates.
+Evidence: `/tmp/downwell-gameplay-rows-host.log`,
+`/tmp/downwell-gameplay-rows-sanitized.log`, and
+`/tmp/downwell-gameplay-rows-native-gdb.log`. These checks establish extraction
+equivalence, not full original-game parity or a new 20 ms performance claim.
+The separate 120-second-bounded `SKIP_TO_GAME=1` cache gate reaches 600 ticks
+with 101 fresh-terrain comparisons, zero terrain/display mismatches and an
+intact stack guard (`/tmp/downwell-gameplay-rows-cache-gdb.log`). This fixture
+has zero overflow-actor comparisons; it must not be cited as BOB coverage.
+The dedicated 120-second-bounded BOB fixture separately passes 100 scalar
+comparisons with zero BOB, display-buffer or terrain mismatches
+(`/tmp/downwell-gameplay-rows-bobs-gdb.log`). Normal startup is restored after
+both tests; the 68000 instruction and helper audits pass.
 
 ### Garden ownership verification
 

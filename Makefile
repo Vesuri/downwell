@@ -737,6 +737,14 @@ test-amiga-garden-scene: build/amiga-garden-scene-test
 	./build/amiga-garden-scene-test
 test: test-amiga-garden-scene
 
+.PHONY: test-amiga-gameplay-rows
+build/amiga-gameplay-rows-test: tests/platform/amiga/AmigaGameplayRowsTest.cpp src/platform/amiga/AmigaGameplayRows.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-amiga-gameplay-rows: build/amiga-gameplay-rows-test
+	./build/amiga-gameplay-rows-test
+test: test-amiga-gameplay-rows
+
 .PHONY: test-amiga-style-retained
 build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build

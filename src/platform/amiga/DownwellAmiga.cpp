@@ -14,6 +14,7 @@
 #include "AmigaMenu.h"
 #include "AmigaMenuCache.h"
 #include "AmigaGardenScene.h"
+#include "AmigaGameplayRows.h"
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
@@ -786,11 +787,7 @@ static UWORD mainWallFrame(const downwell::RoomPack& rooms,
 
 
 // Each display ring independently owes modified rows of the private backing.
-static UBYTE gameDirtyRows[downwellGameRingHeight];
-static bool gameRowsPending[2];
-static unsigned gameDirtyFirst[2] = {downwellGameRingHeight, downwellGameRingHeight};
-static unsigned gameDirtyEnd[2];
-static bool gameRingInitialized[2];
+static AmigaGameplayRows gameplayRows;
 static AmigaLaserSight gameplayRays[2];
 static AmigaGoalField gameplayFields[2];
 static Bitmap* terrainCopyTarget;
@@ -800,7 +797,8 @@ static unsigned terrainCopyBuffer;
 // Three camera columns (left room, well, right room), word-aligned around
 // logical x=110..269. The level raster is Fast RAM; only exposed rows enter
 // the Chip-RAM rings. Keep the original compositor as the cache oracle.
-enum { terrainRasterRows = 8192, terrainRasterWords = 11, terrainRasterX = 96 };
+enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrainWords,
+       terrainRasterX = AmigaGameplayRows::terrainX };
 static UWORD terrainRaster[3][terrainRasterRows][2][terrainRasterWords];
 static bool terrainRasterDirty[3][terrainRasterRows];
 static bool terrainRasterReady;
@@ -882,9 +880,7 @@ static void transferTerrainRows(AmigaRenderer* renderer, int viewX,
                 // the next disjoint chunk. DMA copies them concurrently.
                 terrainCopyTarget->copy(*terrainCopyBacking, terrainRasterX, physical,
                     terrainRasterX, physical, terrainRasterWords * 16, count);
-                const UBYTE bit = (UBYTE)~(1u << terrainCopyBuffer);
-                for (unsigned y = physical; y < physical + count; ++y)
-                    gameDirtyRows[y] &= bit;
+                gameplayRows.copied(physical, count, terrainCopyBuffer);
             }
             remaining -= count;
             cachedRow += count * terrainRasterWords * 2;
@@ -913,46 +909,11 @@ static void transferTerrainRows(AmigaRenderer* renderer, int viewX,
 }
 
 static void dirtyGameRows(unsigned origin, unsigned y, unsigned height, UBYTE buffers = 3) {
-    unsigned first = (origin + y) % downwellGameRingHeight;
-    unsigned end = first + height;
-    if (end > downwellGameRingHeight) { first = 0; end = downwellGameRingHeight; }
-    for (unsigned buffer = 0; buffer < 2; ++buffer) {
-        if (!(buffers & (1u << buffer))) continue;
-        gameRowsPending[buffer] = true;
-        if (first < gameDirtyFirst[buffer]) gameDirtyFirst[buffer] = first;
-        if (end > gameDirtyEnd[buffer]) gameDirtyEnd[buffer] = end;
-    }
-    unsigned physical = (origin + y) % downwellGameRingHeight;
-    for (unsigned row = 0; row < height; ++row) {
-        gameDirtyRows[physical] |= buffers;
-        if (++physical == downwellGameRingHeight) physical = 0;
-    }
+    gameplayRows.damage(origin, y, height, buffers);
 }
 
 static void syncGameRows(Bitmap& destination, const Bitmap& backing, unsigned buffer) {
-    DW_PROFILE_SCOPE(profileGameCopy);
-    if (!gameRowsPending[buffer]) return;
-    gameRowsPending[buffer] = false;
-    const UBYTE bit = (UBYTE)(1u << buffer);
-    unsigned row = gameDirtyFirst[buffer];
-    const unsigned end = gameDirtyEnd[buffer];
-    gameDirtyFirst[buffer] = downwellGameRingHeight;
-    gameDirtyEnd[buffer] = 0;
-    while (row < end) {
-        if (!(gameDirtyRows[row] & bit)) { ++row; continue; }
-        const unsigned first = row;
-        while (row < end && (gameDirtyRows[row] & bit))
-            gameDirtyRows[row++] &= (UBYTE)~bit;
-        const unsigned x = gameRingInitialized[buffer] ? terrainRasterX : 0;
-        const unsigned width = gameRingInitialized[buffer] ? terrainRasterWords * 16 : downwellDmaWidth;
-        destination.copy(backing, x, first, x, first, width, row - first);
-    }
-    // There is no CPU work left to overlap here. Give the queued DMA copy
-    // the slots that a busy-waiting CPU would otherwise steal.
-    AmigaHardware::setBlitterNasty(true);
-    AmigaHardware::blitterDrain();
-    AmigaHardware::setBlitterNasty(false);
-    gameRingInitialized[buffer] = true;
+    gameplayRows.sync(destination, backing, buffer);
 }
 
 static void drawIndexedWalls(AmigaRenderer* renderer,
@@ -1386,7 +1347,7 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
     // Test damage once per row, not two software divisions per plane byte.
     // Dirty rows include deliberately drawn BOBs, unlike pristine backing.
     for (unsigned row = 0; row < downwellGameRingHeight; ++row) {
-        if (gameDirtyRows[row] & (1u << buffer)) continue;
+        if (gameplayRows.dirty(row, buffer)) continue;
         for (unsigned plane = 0; plane < 2; ++plane) {
             const unsigned offset = plane * downwellGameRingPlaneBytes + row * downwellBytesPerPlaneLine;
             gDownwellGameBufferFailures += amigaBufferDifferences(
@@ -2092,13 +2053,9 @@ int main(void) {
                         stagedBuffer = memory.menuForeground();
                         for (unsigned buffer = 0; buffer < 2; ++buffer) {
                             gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
-                            gameRingInitialized[buffer] = false;
-                            gameRowsPending[buffer] = false;
-                            gameDirtyFirst[buffer] = downwellGameRingHeight;
-                            gameDirtyEnd[buffer] = 0;
                             gameListReady[buffer] = false;
                         }
-                        for (unsigned row = 0; row < downwellGameRingHeight; ++row) gameDirtyRows[row] = 3;
+                        gameplayRows.reset();
                         worldViewX = mainViewX + port.cameraOffsetX();
                         worldViewY = mainInitialViewY + port.cameraOffsetY();
                         stagedViewX = -10000;
@@ -2672,9 +2629,7 @@ int main(void) {
                     // or at the normal final synchronization boundary.
                     backingCopyPending = true;
                     dirtyGameRows(0, 0, downwellGameRingHeight);
-                    const UBYTE keep = (UBYTE)~(1u << back);
-                    for (unsigned row = 0; row < downwellGameRingHeight; ++row)
-                        gameDirtyRows[row] &= keep;
+                    gameplayRows.copied(0, downwellGameRingHeight, back);
                     cachedWorldFirst = stagedFirst;
                     cachedWorldEnd = stagedEnd;
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -2875,7 +2830,7 @@ int main(void) {
                 fieldShape.draw([&](int x, int y, int) {
                     if (x >= downwellPlayfieldX && x < downwellPlayfieldX + downwellPlayfieldWidth &&
                         y >= 0 && y < downwellDisplayHeight &&
-                        (gameDirtyRows[AmigaLaserSight::physicalRow(port.ringOrigin(), y)] & (1u << back)))
+                        gameplayRows.dirty(AmigaLaserSight::physicalRow(port.ringOrigin(), y), back))
                         fieldChanged = true;
                 });
             // Shared current painter order: field, enemies, merchants, player, bullets, gems.
@@ -2998,7 +2953,7 @@ int main(void) {
                     rayLine.draw([&](int x, int y) {
                         if (x >= downwellPlayfieldX && x < downwellPlayfieldX + downwellPlayfieldWidth &&
                             y >= 0 && y < downwellDisplayHeight &&
-                            (gameDirtyRows[AmigaLaserSight::physicalRow(port.ringOrigin(), y)] & (1u << back)))
+                            gameplayRows.dirty(AmigaLaserSight::physicalRow(port.ringOrigin(), y), back))
                             changed = true;
                     });
                     const int left = rayLine.x0 < rayLine.x1 ? rayLine.x0 : rayLine.x1;
@@ -3025,7 +2980,7 @@ int main(void) {
                 DW_PROFILE_SCOPE(profileGoalFieldPrepare);
                 AmigaHardware::blitterDrain();
                 if (!gameplayFields[back].prepare((UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape, fieldChanged,
-                        [&](unsigned row) { return (gameDirtyRows[row] & (1u << back)) != 0; })) {
+                        [&](unsigned row) { return gameplayRows.dirty(row, back); })) {
                     exitCode = 20; break;
                 }
             }
