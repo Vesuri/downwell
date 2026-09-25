@@ -447,12 +447,14 @@ bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment&
     const int top = path.y.pixel < path.endY.pixel ? path.y.pixel : path.endY.pixel;
     const int bottom = path.y.pixel > path.endY.pixel ? path.y.pixel : path.endY.pixel;
     if (!context.index) {
+        DW_PROFILE_COUNT(counterSegmentFallback);
         for (int y = top; y <= bottom; ++y)
             for (int x = left; x <= right; ++x)
                 if (amigaResolveTerrainSolid(opaque, x, y) && path.intersects(x, x+1, y, y+1)) return true;
         return false;
     }
     DW_PROFILE_SCOPE(profileTerrainCollision);
+    DW_PROFILE_COUNT(counterSegmentIndexed);
     // Each indexed cell represents the union of its 16x16 half-open pixel
     // rectangles. Test that union once instead of querying each crossed pixel.
     int firstColumn = (left + 248 - AmigaTerrainIndex::minX) >> 4;
@@ -464,6 +466,7 @@ bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment&
     if (lastRow >= AmigaTerrainIndex::rows) lastRow = AmigaTerrainIndex::rows-1;
     for (int row = firstRow; row <= lastRow; ++row)
         for (int column = firstColumn; column <= lastColumn; ++column) {
+            DW_PROFILE_COUNT(counterSegmentCells);
             const int x = column*16 + AmigaTerrainIndex::minX, y = row*16;
             const unsigned cell = context.index->cells[row*AmigaTerrainIndex::columns+column];
             if (indexActive(context, cell, solidCell, x, y) &&

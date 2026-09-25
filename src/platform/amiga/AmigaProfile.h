@@ -52,7 +52,8 @@ public:
 
 enum DownwellProfileCounter {
     counterSolidIndexed, counterSolidFallback, counterLandingIndexed,
-    counterLandingFallback, counterBreakableFallback, profileCounterCount
+    counterLandingFallback, counterBreakableFallback,
+    counterSegmentIndexed, counterSegmentCells, counterSegmentFallback, profileCounterCount
 };
 #ifdef DOWNWELL_PROBES
 extern "C" volatile unsigned long gDownwellProfileCounters[profileCounterCount];

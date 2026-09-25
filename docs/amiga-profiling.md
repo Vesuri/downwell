@@ -323,6 +323,31 @@ budget and generation stall are still open. Evidence logs use
 audits pass; the ordinary non-skip executable is restored. Native runs are
 bounded to 45 seconds.
 
+### Refreshed indexed-query profile
+
+Probe-only counters now distinguish segment queries, visited cells and the
+segment fallback. The 600-update tape reports **464 indexed segments, 719
+visited cells, zero segment fallbacks**, alongside 5,923 indexed solid-point
+queries, 600 indexed landing queries and no point/landing/breakable fallbacks.
+The segment backend is being used, not silently falling back to pixel walks.
+
+Selected exclusive instrumented costs (ms per game update): player 3.807,
+actor presentation 2.512, terrain collision 1.869, enemy movement 1.575,
+scroll 1.388, bullet work outside terrain queries 0.941. HUD phases
+27..30,37..39 total about 3.87 ms/update. Maximum instrumented frame is still
+147.551 ms; the generation spike remains unresolved.
+
+There are fewer nested timing brackets now that bullets no longer call the
+point resolver repeatedly. Do not interpret the instrumented timing reduction
+as pure shipping CPU savings: probe overhead changed too. The authoritative
+FPSCOUNT measurement remains 36.41 FPS. The new counters compile out of
+ordinary builds; no new frame-rate gain is claimed here.
+
+Evidence: `/tmp/downwell-indexed-query-profile.log`; the bounded run cleaned
+up, restored the ordinary non-skip build, and passed both 68000 audits.
+Inspection identifies repeated indexed breakable candidates and a repeated
+selected-hit intersection as a next optimization candidate, not yet changed.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in
