@@ -4,6 +4,7 @@
 #include "MotionBinary64.h"
 #include "AlarmBank.h"
 #include "RunnerImageValue.h"
+#include "LegacyImageAnimation.h"
 
 namespace downwell {
 // enmSkeleton's four Alarm events and the timing writes in Step_0.
@@ -16,6 +17,14 @@ struct SkeletonTiming {
     bool damaged = false, hitStun = false, shot = false;
 
     static MotionBinary64 throwRate() { return {0x3fd33333u, 0x33333333u}; }
+
+    bool advanceImage(unsigned frames, bool& ended) {
+        RunnerImageValue index, speed;
+        if (!index.assign(imageIndex) || !speed.assign(imageSpeed) ||
+            !advanceLegacyImage(index, speed, frames, ended)) return false;
+        imageIndex = index.promoted();
+        return true;
+    }
 
     // The runner visits alarm indices globally, then instances within each
     // index. The owner must call this in that order, not run all slots for

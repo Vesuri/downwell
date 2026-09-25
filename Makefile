@@ -117,6 +117,14 @@ all: $(TARGET)
 .PHONY: verify-skeleton-throw
 .PHONY: verify-skeleton-timing
 .PHONY: verify-runner-image-value
+.PHONY: verify-legacy-image-animation
+verify-legacy-image-animation: build/legacy-image-animation-test
+	./build/legacy-image-animation-test
+
+build/legacy-image-animation-test: tests/core/LegacyImageAnimationTest.cpp src/core/LegacyImageAnimation.h src/core/RunnerImageValue.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/LegacyImageAnimationTest.cpp
+
 verify-runner-image-value: build/runner-image-value-test
 	./build/runner-image-value-test
 
@@ -127,7 +135,7 @@ build/runner-image-value-test: tests/core/RunnerImageValueTest.cpp src/core/Runn
 verify-skeleton-timing: build/skeleton-timing-test
 	./build/skeleton-timing-test
 
-build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/AlarmBank.h src/core/RunnerImageValue.h
+build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/AlarmBank.h src/core/RunnerImageValue.h src/core/LegacyImageAnimation.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/SkeletonTimingTest.cpp
 

@@ -1,6 +1,7 @@
 #include "core/MotionBinary64.h"
 #include "core/BoneProjectile.h"
 #include "core/RunnerImageValue.h"
+#include "core/LegacyImageAnimation.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
@@ -35,4 +36,8 @@ extern "C" bool runnerImageValueCompile(downwell::MotionBinary64 input,
     if (!stored.assign(input)) return false;
     *output = stored.promoted();
     return true;
+}
+extern "C" bool legacyImageAnimationCompile(downwell::RunnerImageValue* index,
+    downwell::RunnerImageValue speed, unsigned frames, bool* ended) {
+    return downwell::advanceLegacyImage(*index, speed, frames, *ended);
 }

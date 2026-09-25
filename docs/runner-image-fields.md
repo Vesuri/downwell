@@ -33,3 +33,31 @@ expectations. This is not yet a complete animation implementation: advancement,
 wrapping, Animation End events and sprite-type-specific getter behavior still
 require recovery. Existing live actor animation remains unchanged; its rational
 rate approximations must not be described as bit-exact runner animation.
+
+## Legacy update path
+
+The branch at `0x50ec00` selects `0x50ef0c` when global byte `0xb57f18`
+is zero. The latter calls the index getter, adds stored single-precision speed
+with x87 `fadd` and rounds back to single at `0x50ef19`. It then compares the
+stored index with `image_number` (`0x468ee0`). For ordinary sprites this getter
+returns the sprite's frame count. When index is below count, `0x50ef40` jumps
+directly to return, including negative indices. On upper overflow it subtracts
+count once, stores at `0x50efac`, then dispatches event type/subtype 7/7
+(Animation End) via `0x444910`. There is no repeat-until-in-range loop.
+
+`LegacyImageAnimation` transcribes that ordinary path with integer arithmetic,
+including single-rounding after addition and subtraction. The caller receives
+the event flag only after the new index is stored. Forty thousand scalar
+comparisons cover positive/negative/zero speeds, five frame counts and speeds
+exceeding a whole animation; normal and sanitizer runs pass. Skeleton timing
+now exposes this advancement and checks 100 updates with interleaved time-stop.
+
+Scope: the helper admits positive integer frame counts up to 65,535 and normal
+finite/zero fields. It does not implement skeletal sprites, dynamic frame-count
+rescaling, GMS2 playback-rate branches, drawing negative frame indices or the
+phase in which the owner calls advancement. The source byte selecting this
+path is assigned at `0x4979ec` from a loaded-field comparison against 2;
+tracing that field all the way to the serialized version is still needed
+before calling path selection independently proven for every resource.
+Thus these are source-path tests, not original-runner execution or live actor
+parity. The region hashes now also guard the branch and legacy update body.

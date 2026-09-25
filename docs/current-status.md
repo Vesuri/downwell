@@ -244,6 +244,12 @@ and the ordinary build was restored after both attempts.
   passes 100,000 host cases and sanitizers, and a 68000 compile has no helper
   references. Advancement/wrapping and live actor animation fidelity remain
   unfinished; see `runner-image-fields.md`.
+  The ordinary legacy animation update path is now recovered and implemented
+  as an integer-only helper: single-rounded advancement, one upper-wrap
+  subtraction and post-store Animation End indication. Its 40,000 scalar
+  comparisons and skeleton's 100 time-stop/advance updates pass. Live phase
+  ownership, resource-path selection and negative-frame rendering remain
+  integration work; this does not enable skeletons or change live animation.
 
 ## Working evidence
 
