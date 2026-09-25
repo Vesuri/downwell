@@ -52,8 +52,25 @@ stream, even when the final list of visible particles looks identical.
   debris sprite. Its two instance-count branches currently assign identical
   alarms; that does not remove the terrain-dependent work earlier in Create.
 
-The smoke/flash range-call arithmetic, corpse physics and debris relocation
-need their own exact adapters; this audit does not establish those adapters.
+`SkeletonEffectBursts.h` now implements the skeleton's smoke/flash count and
+birth-coordinate arithmetic, calling the child creator synchronously per birth.
+The scope is exactly the skeleton's (5,1) smoke and (6,2,10) flash parameters;
+it is not a general particle engine. Across 1,024 seeds, two burst types and
+three capacity limits, 6,144 sequences compare 15,454 child births and the
+complete RNG state against host arithmetic. Child Create is a draw-order probe
+in this test, not an implemented smoke/flash actor. Sanitizers and 68000
+compilation pass without floating-point helpers. The regression is part of
+`make test` and available as `make verify-skeleton-effect-bursts`.
+
+`verify-runner-effect-ranges.py` pins the original `irandom_range` wrapper at
+0x53c2e0 and its 63-bit/two-word modulo helper at 0x5410c0, plus `random_range`
+at 0x53d840. Integer bounds use inclusive width plus the lower bound. Real
+ranges draw random(1), multiply by width and add the lower bound; the flash
+bounds +/-10 keep that arithmetic exactly representable before position
+addition. This is not a general equivalence claim about x87 expressions.
+
+Smoke/flash child state, corpse physics and debris relocation still
+need their own adapters; this audit does not establish those adapters.
 No request may silently succeed when required child storage is exhausted.
 
 ## Integration boundary

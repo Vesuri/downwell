@@ -8,8 +8,18 @@
 #include "core/SkeletonDecisions.h"
 #include "core/SkeletonActor.h"
 #include "core/BoneProjectileStore.h"
+#include "core/SkeletonEffectBursts.h"
+#include "core/GameMakerRandom.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
+extern "C" bool skeletonBurstsCompile(bool flash,downwell::MotionBinary64 x,
+    downwell::MotionBinary64 y,downwell::GameMakerRandom* random,unsigned* trace) {
+    auto create=[trace](int object,downwell::MotionBinary64 px,downwell::MotionBinary64 py){
+        *trace^=object+px.high+px.low+py.high+py.low;return true;
+    };
+    return flash?downwell::skeletonFlashBurst(x,y,*random,create):
+                 downwell::skeletonSmokeBurst(x,y,*random,create);
+}
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
     downwell::MotionBinary64* velocity, std::int32_t* pixel) {
     return velocity->add({0x3fb99999u, 0x9999999au}) &&

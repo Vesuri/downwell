@@ -27,6 +27,15 @@ This queue describes priorities, not a replacement for the full goal. The old
 
 ### Joined skeleton/bone encounter regression
 
+Smoke/flash burst emission now has a shared implementation preserving count,
+Y-before-X sampling and synchronous child Create interleaving. The skeleton's
+two source argument sets pass 6,144 sequence tests with 15,454 child births,
+complete RNG comparison and partial-capacity failure coverage. Sanitizers and
+68000 compilation pass, and original range wrappers are pinned by
+`verify-runner-effect-ranges.py`. Child effect lifetime/motion/rendering remains
+unimplemented; the test's child callback models draw consumption only. See
+`skeleton-effect-ownership.md`; skeleton admission remains off.
+
 After the shared player bounce signature change, the bounded native CPU replay
 passes unchanged gameplay/weapon digests and all motion/bone lines, including
 `BONE_ANIMATION 1024 7376a886 0`. The 180-second-limited verifier completed and
