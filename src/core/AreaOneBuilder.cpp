@@ -1,4 +1,5 @@
 #include "AreaOneBuilder.h"
+#include "BuilderRewardChoice.h"
 #include "EnemyCreateProfile.h"
 #include "Profile.h"
 
@@ -247,12 +248,7 @@ bool AreaOneBuilder::emitPattern(
             case '\\': objectId = 285; break;
             case '=': objectId = 306; break;
             case '@': {
-                if (chunkOrCrate_ == 0) {
-                    const std::int32_t choices[] = {293, 109};
-                    chunkOrCrate_ = choices[random.irandomSmall(1)];
-                } else {
-                    chunkOrCrate_ = chunkOrCrate_ == 109 ? 293 : 109;
-                }
+                chunkOrCrate_ = builderRewardChoice(chunkOrCrate_, playerHealth_, style_, random);
                 objectId = chunkOrCrate_;
                 break;
             }

@@ -32,6 +32,7 @@ bool AmigaGameplayGeneration::create(void* opaque,
 bool AmigaGameplayGeneration::step(downwell::GameMakerRandom& random, int viewBottom) {
     dirtyFirst = worldRows; dirtyEnd = 0;
     if (!runtime_) return false;
+    builder_.setPlayerHealth(runtime_->health());
     downwell::AreaOneBuilderStep result;
     const bool ok = builder_.stepVisible(patterns_, random, viewBottom, result);
     if (dirtyFirst < 0) dirtyFirst = 0;

@@ -957,6 +957,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
         return;
 
     AreaOneBuilderStep result;
+    areaOneBuilder_.setPlayerHealth(mainPlayerHealth_);
     const bool generated = areaOneBuilder_.stepVisible(
         *builderPatternPack_, random_, static_cast<int>(std::ceil(viewBottom)),
         [](void* opaque, const DeferredCreateInstance& command) {

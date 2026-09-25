@@ -105,6 +105,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
   source activation rectangle instead of centre Y alone. Natural native and
   extended host combat gates pass; historical-runner boundary/transform
   details remain unverified. See `activation-fidelity.md`.
+  The shared side-room reward choice now includes the VM's low-health crate
+  bias and style-1 override in the original RNG order; see
+  `original-behavior-audit.md`. Full reward-object behavior remains separate.
 - Audio, complete persistence/unlocks/settings, later areas, remaining weapons/
   styles/enemies, bosses and ending flow are not complete. Distinguish features
   absent from both ports from actual Amiga-versus-implemented-SDL gaps.

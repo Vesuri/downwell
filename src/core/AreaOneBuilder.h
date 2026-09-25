@@ -44,6 +44,7 @@ public:
                      AreaOneBuilderStep& result);
 
     int y() const { return y_; }
+    void setPlayerHealth(int health) { playerHealth_ = health; }
     int generationCount() const { return generationCount_; }
     std::uint32_t rowsGenerated() const { return rowsGenerated_; }
     int rightRoom(unsigned index) const {
@@ -106,6 +107,7 @@ private:
     bool endReached_ = false;
     int endPattern_ = -1;
     int chunkOrCrate_ = 0;
+    int playerHealth_ = 4;
     std::uint32_t specialObjectsGenerated_ = 0;
 };
 

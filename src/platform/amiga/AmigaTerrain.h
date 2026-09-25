@@ -97,6 +97,7 @@ public:
                      downwell::GameMakerRandom& random, int viewBottomCeiling,
                      downwell::AreaOneBuilderStep& result);
     unsigned fragmentCount() const { return fragmentCount_; }
+    void setPlayerHealth(int health) { builder_.setPlayerHealth(health); }
     unsigned enemyCount() const { return enemyCount_; }
     unsigned decorationCount() const { return decorationCount_; }
     int frontierY() const { return builder_.y(); }

@@ -1,4 +1,5 @@
 #include "core/AreaOneBuilder.h"
+#include "core/BuilderRewardChoice.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -76,6 +77,27 @@ bool sameCommand(const DeferredCreateInstance& a, const DeferredCreateInstance& 
 }
 
 int main(int argc, char** argv) {
+    for (unsigned seed = 0; seed < 128; ++seed)
+        for (int health : {-1, 0, 1, 2, 3, 4})
+            for (unsigned style = 0; style < 5; ++style) {
+                GameMakerRandom actual(seed), expected(seed);
+                int a = 0, b = 0;
+                for (unsigned item = 0; item < 16; ++item) {
+                    // Source-order oracle uses the general 63-bit chooser.
+                    if (!b) b = expected.irandom(1) ? 109 : 293;
+                    else b = b == 109 ? 293 : 109;
+                    if (health <= 2 && b != 109) {
+                        const unsigned choices[] = {0, 1, 1, 1, 1, 1};
+                        if (choices[expected.irandom(5)]) b = 109;
+                    }
+                    if (style == 1) b = 109;
+                    a = builderRewardChoice(a, health, style, actual);
+                    require(a == b && actual.drawCount() == expected.drawCount() &&
+                        actual.stateIndex() == expected.stateIndex(), "reward choice preserves VM branch and RNG ordering");
+                    for (unsigned i = 0; i < 16; ++i)
+                        require(actual.stateWord(i) == expected.stateWord(i), "reward choice preserves all RNG words");
+                }
+            }
     require(argc == 2, "builder pack path required");
     std::ifstream input(argv[1], std::ios::binary);
     const std::vector<std::uint8_t> bytes(

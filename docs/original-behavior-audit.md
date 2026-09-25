@@ -11,6 +11,42 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 VM-backed registration, latch/release and collision-phase camera snaps on both
 adapters, plus the remaining original-runner and achievement caveats.
 
+## Side-room reward selection at low health
+
+`gml_GlobalScript_scrBuilder.asm`, blocks 141–152, first chooses/alternates
+resource 293 (gem chunk) and 109 (crate). At `global.playerHp <= 2`, a selected
+non-crate consumes `choose(0,1,1,1,1,1)` and switches to a crate on nonzero.
+Only afterward does style 1 force a crate. The low-health random draw must
+still occur for that style; suppressing it changes all subsequent generation.
+The chosen result, including overrides, remains the next alternation state.
+
+The previous shared builder omitted both overrides. `BuilderRewardChoice`
+now preserves this VM branch order; both live adapters supply current health
+before the synchronous builder Step. No health is changed by the choice,
+and rendering does not draw RNG. Unit tests compare 61,440 choices across
+seeds, health thresholds, styles and successive retained selections against
+an independent general-63-bit-choice oracle, including every RNG word.
+The existing 64-level high-health ordered generation digest remains
+`ffcdfc23dc638be7`. Unit and ASan/UBSan logs:
+`/tmp/downwell-reward-bias-unit.log` and
+`/tmp/downwell-reward-bias-sanitized.log`.
+
+The eight input-only routes retain their existing outcomes with exact adapter
+and RNG comparisons (`/tmp/downwell-reward-bias-sweep.log`). The bounded native
+route passes 211 upgrade frames, 135 exit-field frames, 49 shop-HUD comparisons
+and 43 return updates, with zero failures and an intact stack guard. Normal
+startup is restored, both 68000 audits pass, and SDL is rebuilt. Evidence:
+`/tmp/downwell-reward-bias-native.log`,
+`/tmp/downwell-reward-bias-native-gdb.log` and
+`/tmp/downwell-reward-bias-sdl.log`. These live routes are surrounding
+regressions, not dedicated coverage of every low-health reward branch.
+
+This verifies which reward object is created, not complete crate contents,
+pickup effects or original-runner presentation. The discrepancy was found
+while auditing the shared builder ahead of area-two implementation; the
+later-area transition remains deliberately disabled until its own builder,
+actors, hazards and artwork exist.
+
 ## Currency disappearing flash
 
 Both renderers now consume `GemLifetime::visible()` instead of drawing every
