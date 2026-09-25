@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaRenderer.h"
 #include "platform/amiga/AmigaAmmoHud.h"
+#include "platform/amiga/AmigaLaserSight.h"
 #include "platform/amiga/GameplaySceneStorage.h"
 #include "platform/amiga/AmigaExitMask.h"
 #include "core/ShopFixtures.h"
@@ -113,6 +114,53 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 } // namespace
 
 int main(int argc, char** argv) {
+    {
+        std::vector<UBYTE> pixels(downwellGameRingBytes), pristine;
+        for (unsigned i = 0; i < pixels.size(); ++i) pixels[i] = (i*37u + i/11u) & 255u;
+        pristine = pixels;
+        AmigaLaserSight overlay;
+        for (unsigned origin : {0u, 319u, 103u}) {
+            for (const auto& line : {downwell::LaserSightLine{190,-10,190,300},
+                 downwell::LaserSightLine{80,0,300,283},
+                 downwell::LaserSightLine{300,283,80,0},
+                 downwell::LaserSightLine{100,150,280,150},
+                 downwell::LaserSightLine{190,100,190,100}}) {
+                require(overlay.prepare(pixels.data(), origin, &line, false), "new ray requires drawing");
+                overlay.draw();
+                auto expected = pristine;
+                line.draw([&](int x, int y) {
+                    if (x < 110 || x >= 270 || y < 0 || y >= 284) return;
+                    const unsigned offset = ((origin+y)%320)*48 + x/8;
+                    const unsigned mask = 128u >> (x%8);
+                    expected[offset] &= ~mask;
+                    expected[offset+15360] |= mask;
+                });
+                require(pixels == expected, "sparse ray equals clipped planar red-line composition across ring wrap");
+                require(!overlay.prepare(pixels.data(), origin, &line, false), "unchanged ray is retained");
+                overlay.draw();
+                require(overlay.lastByteWrites == 0 && pixels == expected,
+                        "unchanged ray performs no clearing or drawing writes");
+                overlay.prepare(pixels.data(), origin, nullptr, false);
+                require(pixels == pristine, "ray removal restores both planes without damaging neighbors");
+            }
+        }
+        const downwell::LaserSightLine line{190,0,190,283};
+        overlay.prepare(pixels.data(), 319, &line, false); overlay.draw();
+        overlay.prepare(pixels.data(), 319, &line, true);
+        require(pixels == pristine, "underlying updates see the original pixels before painting");
+        // Simulate new terrain arriving after restoration, before ray draw.
+        pixels[319*48+190/8] ^= 0xff;
+        pristine = pixels;
+        overlay.draw();
+        overlay.prepare(pixels.data(), 319, nullptr, false);
+        require(pixels == pristine, "removing ray preserves the newly painted terrain, not stale backing");
+        std::vector<UBYTE> red(downwellGameRingBytes, 0);
+        std::fill(red.begin()+downwellGameRingPlaneBytes, red.end(), 255);
+        overlay.prepare(red.data(), 0, &line, false); overlay.draw();
+        require(overlay.lastByteWrites == 0, "already-red pixels are never rewritten");
+        overlay.prepare(red.data(), 0, nullptr, false);
+        require(overlay.lastByteWrites == 0, "already-red pixels need no restoration");
+    }
     verifyDamageEndpoints();
     {
         std::vector<UBYTE> source(downwellLayerBytes), actual(downwellLayerBytes), expected;

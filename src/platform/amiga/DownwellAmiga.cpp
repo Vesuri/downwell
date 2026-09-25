@@ -19,6 +19,7 @@
 #include "core/ShopFixtures.h"
 #include "AmigaRenderer.h"
 #include "AmigaAmmoHud.h"
+#include "AmigaLaserSight.h"
 #include "AmigaSceneRuntime.h"
 #include "GameplaySceneStorage.h"
 #include "AmigaExitMask.h"
@@ -797,6 +798,7 @@ static bool gameRowsPending[2];
 static unsigned gameDirtyFirst[2] = {downwellGameRingHeight, downwellGameRingHeight};
 static unsigned gameDirtyEnd[2];
 static bool gameRingInitialized[2];
+static AmigaLaserSight gameplayRays[2];
 static Bitmap* terrainCopyTarget;
 static const Bitmap* terrainCopyBacking;
 static unsigned terrainCopyBuffer;
@@ -1155,6 +1157,7 @@ static void buildReferencePicture(
 
     amigaRendererClear(renderer, 0);
     ammoHud.invalidate();
+    for (auto& ray : gameplayRays) ray.discard();
     dirtyGameRows(0, 0, downwellGameRingHeight);
     drawMainWorld(renderer, rooms, room, builders,
                   fragments, fragmentCount,
@@ -1219,6 +1222,8 @@ static Sprite& actorSpriteAt(Sprite* regular, Sprite& overflow,
                ? regular[index] : overflow;
 }
 
+// Marker in painter order; never looked up as a packed sprite.
+static constexpr UWORD gameplayRayMarker = 65535;
 struct GameplayBob {
     UWORD sprite, frame;
     int x, y, flip;
@@ -1261,7 +1266,7 @@ extern "C" __attribute__((noinline)) void downwellGameplayBobsReady() {
 // before this display buffer is reused.
 static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
                              unsigned buffer, unsigned origin, const GameplayBob* bobs,
-                             unsigned count) {
+                             unsigned count, const downwell::LaserSightLine* ray = nullptr) {
     renderer.game = (UBYTE*)display.data;
     renderer.target = renderer.game;
     amigaRendererSetGameOrigin(&renderer, origin);
@@ -1277,6 +1282,14 @@ static void drawGameplayBobs(AmigaRenderer renderer, Bitmap& display,
 #endif
     for (unsigned i = 0; i < count; ++i) {
         const GameplayBob& bob = bobs[i];
+        if (bob.sprite == gameplayRayMarker) {
+            AmigaHardware::blitterDrain();
+            gameplayRays[buffer].draw();
+#ifdef DOWNWELL_SCENE_VERIFY
+            if (ray) ray->draw([&](int x, int y) { amigaRendererFillRect(&oracle, x, y, 1, 1, 2); });
+#endif
+            continue;
+        }
         int x, y, width, height;
         if (!amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
                 bob.sprite, bob.frame, bob.x, bob.y, bob.flip,
@@ -1354,11 +1367,20 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
     gDownwellCaptureViewX = 160 + port.cameraOffsetX();
     gDownwellCaptureViewY = 34 + port.cameraOffsetY();
     gDownwellGameplayGame = (const UBYTE*)display.data;
+    static UBYTE expected[downwellGameRingBytes];
+    for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte) expected[byte] = memory.game()[byte];
+    if (const auto* line = gameplayRays[buffer].line()) {
+        AmigaRenderer oracle;
+        amigaRendererInit(&oracle, expected, nullptr);
+        amigaRendererSetGameOrigin(&oracle, gameplayRays[buffer].origin());
+        amigaRendererSetClipRect(&oracle, downwellPlayfieldX, 0, downwellPlayfieldWidth, downwellDisplayHeight);
+        line->draw([&](int x, int y) { amigaRendererFillRect(&oracle, x, y, 1, 1, 2); });
+    }
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte)
         // Dirty rows include deliberately drawn BOBs, unlike pristine backing.
         if (!(gameDirtyRows[(byte % downwellGameRingPlaneBytes) /
                            downwellBytesPerPlaneLine] & (1u << buffer)) &&
-            gDownwellGameplayGame[byte] != memory.game()[byte])
+            gDownwellGameplayGame[byte] != expected[byte])
             ++gDownwellGameBufferFailures;
     gDownwellGameplayHud = memory.hud();
     gDownwellGameplayPlayerSprite = memory.playerSprite(buffer);
@@ -1861,6 +1883,9 @@ int main(void) {
                 scenes, sceneStyleFrameReported,
                 sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
+#ifdef DOWNWELL_LASER_VERIFY
+            if (sceneGameplayLandedReported && !port.upgrades().levels[12]) port.grantUpgrade(12);
+#endif
             if (gDownwellGemHighCapture == 1 && sceneGameplayLandedReported) {
                 // Synthetic accumulated combo only; normal landing rewards,
                 // controller selection, firing and rendering do the rest.
@@ -2888,7 +2913,7 @@ int main(void) {
             DW_PROFILE_PHASE(profileSprite);
             // Shared current painter order: enemies, merchants, player, bullets, gems.
             DW_PROFILE_PHASE(profileActorCollect);
-            static GameplayBob actors[1 + AmigaPortRuntime::bulletCapacity +
+            static GameplayBob actors[2 + AmigaPortRuntime::bulletCapacity +
                 AmigaPortRuntime::enemyCapacity + AmigaPortRuntime::gemCapacity + 2 * downwell::ShopWorld::capacity];
             unsigned actorCount = 0;
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -2920,6 +2945,16 @@ int main(void) {
                     gameplayPlayerStartY + downwell::roundGameMakerQ8(port.player().offsetYFixed()) - port.cameraOffsetY(),
 #endif
                     port.player().facing() < 0)) frameReady = false;
+            downwell::LaserSightLine rayLine{};
+            const bool rayVisible = port.upgrades().levels[12] && !port.goalStopped();
+            if (rayVisible) {
+                using Ray = downwell::LaserSightRay;
+                rayLine = downwell::LaserSightLine::from(
+                    Ray::fromQ8(port.player().offsetXFixed(), 240),
+                    Ray::fromQ8(port.player().offsetYFixed(), 176), port.laserSightEndpoint(),
+                    worldViewX - downwellPlayfieldX, worldViewY);
+                actors[actorCount++] = {gameplayRayMarker, 0, 0, 0, 0};
+            }
             for (unsigned index = 0; index < port.bulletSlotEnd(); ++index) {
                 const auto& bullet = port.bulletAt(index);
                 // The pack generator checks every possible nearest-pixel
@@ -2954,6 +2989,9 @@ int main(void) {
             // back-to-front into PF1, below every allocated hardware sprite.
             while (bobCount > 0) {
                 const GameplayBob& actor = actors[bobCount - 1];
+                // The planar ray must cover every earlier actor. Stop assigning
+                // hardware sprites here; later bullets/gems may still use DMA.
+                if (actor.sprite == gameplayRayMarker) break;
                 AmigaResolvedSpritePart prepared;
                 if (!amigaRendererResolveSpritePart(&prepared, amiga_game_pack,
                         amiga_game_pack_end, actor.sprite, actor.frame, 0, actor.flip)) {
@@ -2984,9 +3022,36 @@ int main(void) {
                 sprite.hide();
             }
             DW_PROFILE_PHASE(profileCopper);
+            if (rayVisible || gameplayRays[back].present()) {
+                bool changed = false;
+                if (rayVisible) {
+                    rayLine.draw([&](int x, int y) {
+                        if (x >= downwellPlayfieldX && x < downwellPlayfieldX + downwellPlayfieldWidth &&
+                            y >= 0 && y < downwellDisplayHeight &&
+                            (gameDirtyRows[(port.ringOrigin()+y)%downwellGameRingHeight] & (1u << back)))
+                            changed = true;
+                    });
+                    const int left = rayLine.x0 < rayLine.x1 ? rayLine.x0 : rayLine.x1;
+                    const int right = rayLine.x0 > rayLine.x1 ? rayLine.x0 : rayLine.x1;
+                    const int top = rayLine.y0 < rayLine.y1 ? rayLine.y0 : rayLine.y1;
+                    const int bottom = rayLine.y0 > rayLine.y1 ? rayLine.y0 : rayLine.y1;
+                    for (unsigned i = 0; !changed && i < bobCount; ++i) {
+                        const auto& actor = actors[i];
+                        if (actor.sprite == gameplayRayMarker) continue;
+                        int x, y, w, h;
+                        if (amigaRendererAssetBounds(activeGamePack, activeGamePackEnd,
+                            actor.sprite, actor.frame, actor.x, actor.y, actor.flip, &x,&y,&w,&h) &&
+                            x <= right && x+w > left && y <= bottom && y+h > top) changed = true;
+                    }
+                }
+                AmigaHardware::blitterDrain();
+                gameplayRays[back].prepare((UBYTE*)gameDisplay[back].data, port.ringOrigin(),
+                    rayVisible ? &rayLine : nullptr, changed);
+            }
             syncGameRows(gameDisplay[back], gameBitmap, back);
             if (bobCount)
-                drawGameplayBobs(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount);
+                drawGameplayBobs(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount,
+                    rayVisible ? &rayLine : nullptr);
             if (frameReady &&
                 !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], port.ringOrigin()) :
                   gameplayCopperLists[back].build(

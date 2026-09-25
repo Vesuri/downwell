@@ -11,6 +11,7 @@ AMIGA_SRC := $(REPO)/src/platform/amiga
 REPLAY_VERIFY ?= 0
 SCENE_VERIFY ?= 0
 GEMHIGH_VERIFY ?= 0
+LASER_VERIFY ?= 0
 RESULTS_RESTART_VERIFY ?= 0
 BOB_VERIFY ?= 0
 EXIT_WIPE_VERIFY ?= 0
@@ -54,6 +55,9 @@ endif
 ifeq ($(GEMHIGH_VERIFY),1)
 CFLAGS += -DDOWNWELL_GEMHIGH_VERIFY -DDOWNWELL_SCENE_VERIFY
 endif
+ifeq ($(LASER_VERIFY),1)
+CFLAGS += -DDOWNWELL_LASER_VERIFY -DDOWNWELL_SCENE_VERIFY
+endif
 ifeq ($(RESULTS_RESTART_VERIFY),1)
 CFLAGS += -DDOWNWELL_RESULTS_RESTART_VERIFY -DDOWNWELL_SCENE_VERIFY
 endif
@@ -79,7 +83,7 @@ ifeq ($(PROFILE_NAVIGATE),1)
 CFLAGS += -DDOWNWELL_PROFILE_NAVIGATE
 endif
 ifneq ($(filter 1,$(PROBES) $(FPSCOUNT)),)
-ifneq ($(filter 1,$(SCENE_VERIFY) $(REPLAY_VERIFY) $(BOB_VERIFY) $(RESULTS_RESTART_VERIFY) $(GEMHIGH_VERIFY)),)
+ifneq ($(filter 1,$(SCENE_VERIFY) $(REPLAY_VERIFY) $(BOB_VERIFY) $(RESULTS_RESTART_VERIFY) $(GEMHIGH_VERIFY) $(LASER_VERIFY)),)
 $(error Profiling must not be combined with verification instrumentation)
 endif
 endif
@@ -119,7 +123,7 @@ all: check $(OUT).exe
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(AMIGA_OPTIMIZATION)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(AMIGA_OPTIMIZATION)' '$(LASER_VERIFY)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options

@@ -1,8 +1,8 @@
 # Laser Sight source audit and implementation boundary
 
-Upgrade 12 now has shared machine-gun firing behavior and a host-rendered ray.
-It is not yet a complete upgrade: Amiga ray presentation and other weapon
-types remain unimplemented.
+Upgrade 12 now has shared machine-gun firing behavior and a ray rendered by
+both backends. It is not yet a complete upgrade: other weapons, full collision
+families and original GPU line coverage still need implementation/validation.
 
 ## Original evidence
 
@@ -76,9 +76,8 @@ without auditing its membership. The current rectangle primitive uses the
 port's half-open contact convention; original `collision_line` rounding and
 mask behavior remain an explicit integration gate.
 
-The host renderer now uses this foundation; Amiga presentation remains open.
-There is no native ray timing or pixel-capture claim. Amiga draw/restore
-handling and original-GPU pixel fidelity remain to be verified.
+Both renderers now use this foundation. Two native captures match the host
+as described below; original-GPU pixel fidelity and native timing remain open.
 
 ### Collision-family audit
 
@@ -143,10 +142,9 @@ live replay also compares these actual-player endpoints (not just injected
 origins). Focused and sanitizer tests pass, as does the ordinary native build.
 Logs: `/tmp/downwell-ray-input-{build,test,amiga}.log`.
 
-These APIs deliberately do not decide whether to draw: upgrade ownership,
-goalStop/noDraw gating, actual player aim control, red-line rasterizing,
-draw order and Amiga dirty-row restoration still belong to the pending
-presentation integration. This is coverage of currently modeled area-one
+These endpoint APIs deliberately do not decide whether to draw. The renderers
+handle ownership, goalStop, line rasterizing and painter order; noDraw/Cat and
+actual player aim control are still missing. This covers currently modeled area-one
 instances, not all 23 wall-family objects or the hostile shopkeeper. Crates,
 other unimplemented wall types, destructive shop state and exact Windows
 collision-line edges remain fidelity gaps, not implied support.
@@ -173,11 +171,39 @@ visible damage phases and checks no render-time RNG draws. Line tests cover
 connectivity, endpoint inclusion, and negative half-pixel anchors. Focused
 tests and line ASan/UBSan pass. Logs: `/tmp/downwell-laser-render-{build,test}.log`.
 
-Amiga integration must preserve painter order: allocating an earlier actor to
-a hardware sprite above a planar ray would violate that order. Restoration
-also needs to avoid turning a thin ray into full terrain-row repaint work or
-clearing an unchanged ray merely to draw it again. Those are implementation
-requirements, not yet completed optimizations.
+### Amiga presentation and sparse restoration
+
+The Amiga actor list now contains a ray marker after the player. Hardware
+allocation stops at that marker: earlier actors use the masked planar pass,
+while later bullets/gems may still use hardware sprites. This keeps earlier
+hardware sprites from incorrectly covering the planar ray. That extra BOB
+work is a performance cost which has not yet been profiled with the upgrade.
+
+Each display buffer owns an `AmigaLaserSight` sparse overlay (1,776 bytes of
+pixel-save storage). It saves only changed pixel bits, never edits the pristine
+terrain backing, restores before terrain/actor painting, and draws at the
+marker after draining pending blits. Ray pixels do not dirty entire terrain
+rows. An identical ray with untouched underlying pixels performs zero writes;
+already-red pixels are neither saved nor rewritten. Pending dirty rows and
+overlapping BOB bounds invalidate retention. Full scene rebuilds discard old
+overlay history rather than restoring stale pixels over a new scene.
+
+Renderer tests cover both directions, clipping, point/horizontal/vertical
+lines, ring origins 0/103/319, byte-exact restoration, newly changed underlying
+terrain, unchanged-ray zero writes and already-red zero writes. The complete
+renderer test and ASan/UBSan pass, including 22,834 existing offline-sprite
+comparisons. The ordinary native build passes its 68000 audits.
+
+`LASER_VERIFY=1` grants the upgrade after the initial landing in the native
+scene fixture. `DOWNWELL_CAPTURE_LASER=1` does the same in the host capture.
+Two 45-second-bounded A500 runs captured ticks 180 and 203; both compare with
+**0 differing pixels out of 99,968** against SDL. Normal build settings were
+restored afterward. `make verify-amiga-gameplay-laser-frame` reproduces the
+first comparison and restores the ordinary build on success. Logs:
+`/tmp/downwell-laser-native-check.log`, `/tmp/downwell-laser-recharge-native.log`,
+`/tmp/downwell-ray-overlay-{build,test,sanitized}.log` and
+`/tmp/downwell-laser-restored.log`. These are host/native parity captures,
+not Windows GPU oracle captures or proof that frames fit in 20 ms.
 
 `playerDraw` traces cumulative lines against `parentWall` and `subparentEnemy`,
 starting at the player origin. Each iteration advances Y by

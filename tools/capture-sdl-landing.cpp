@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
     downwell::Game game(&rooms, &objects, &builders);
     bool styleSeen = false, lockedSeen = false, landed = false;
     const bool gemHighFixture = std::getenv("DOWNWELL_CAPTURE_GEM_HIGH") != nullptr;
+    const bool laserFixture = std::getenv("DOWNWELL_CAPTURE_LASER") != nullptr;
     bool gemHighInjected = false;
     unsigned mainTicks = 0;
 #ifdef DOWNWELL_SKIP_TO_GAME
@@ -69,6 +70,8 @@ int main(int argc, char** argv) {
             const unsigned firePhase = simulationTick % 16u;
             input.fire = firePhase == 0 || firePhase == 3;
         }
+        if (laserFixture && landed && !state.upgrades().levels[12])
+            const_cast<downwell::StartupRuntime&>(state).grantUpgrade(12);
         if (gemHighFixture && landed && !gemHighInjected) {
             const_cast<downwell::RunCombo&>(state.runCombo()).state.count = 8;
             input = {};
