@@ -32,6 +32,30 @@ applicable and a 45-second emulator limit.
 
 ### Separate runtime costs (2026-09-25)
 
+#### Rejected direct DIVU range-reduction variants
+
+Two exact replacements for the non-power-of-two `irandomSmall` modulus
+reduced the positive 63-bit value four words at a time. Every partial
+dividend was below divisor*65536, so each 68000 DIVU quotient fit a word;
+the existing mask path handled divisor 65536. Both original RNG draws
+remained in place. One variant extracted each remainder; the other kept it
+in the high word between DIVU instructions and replaced only the quotient
+word with the next input word.
+
+Host tests covering all bounds 0..65535 and native cross-target replays
+passed; both native audits passed. FPSCOUNT measured **818 fields / 36.67
+FPS** and **816 / 36.76 FPS** respectively for 600 updates (maximum gap five),
+versus the repeated unchanged baseline of 812–813 fields. The first variant's
+worst instrumented frame measured 149.074 ms, builder phase 76.815 ms versus
+the earlier 77.054 ms. This small phase reduction did not establish an
+overall improvement. Both implementations were removed.
+
+Evidence prefixes: `/tmp/downwell-divu-` (`test`, `fps`, `replay`, `profile`)
+and `/tmp/downwell-divu-packed-` (`test`, `fps`, `replay`). Emulator runs were
+bounded to 45 seconds and the ordinary build restored. Do not infer a net
+win from avoiding generic remainder helpers without measuring the complete
+compiled runtime.
+
 #### Baseline repeatability and rejected landing-entry-width experiment
 
 Two fresh runs of the unchanged implementation measured 812 and 813 PAL
