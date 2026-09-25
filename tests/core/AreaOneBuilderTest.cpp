@@ -1,5 +1,6 @@
 #include "core/AreaOneBuilder.h"
 #include "core/BuilderRewardChoice.h"
+#include "core/CavernEnemyChoice.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -77,6 +78,47 @@ bool sameCommand(const DeferredCreateInstance& a, const DeferredCreateInstance& 
 }
 
 int main(int argc, char** argv) {
+    // Independent floating-point transcription of the normal-mode VM branch.
+    for (unsigned level = 1; level <= 3; ++level)
+        for (unsigned seed = 0; seed < 128; ++seed) {
+            GameMakerRandom actual(seed), expected(seed);
+            for (unsigned repeat = 0; repeat < 32; ++repeat)
+                for (char symbol : {'a', 'b', 'c', 'd', 'e', 't', '%', '.', '1'}) {
+                    int enemy = -1;
+                    if ((expected.nextU32() / 4294967296.0) * (level + 2) <= level) {
+                        switch (symbol) {
+                        case 'a': enemy = 111; break;
+                        case 'b': enemy = 116; break;
+                        case 'c': if (level >= 2 && expected.nextU32() % 2) enemy = 119; break;
+                        case 'd': enemy = 113; break;
+                        case 'e': enemy = 117; break;
+                        case 't': enemy = 112; break;
+                        case '%': {
+                            const int choices[] = {113, 111, 119, 112};
+                            enemy = choices[expected.nextU32() % 4]; break;
+                        }
+                        default: break;
+                        }
+                    }
+                    require(cavernEnemyChoice(symbol, level, actual) == enemy &&
+                            sameRandom(actual, expected), "cavern enemy rules preserve VM values and RNG order");
+                }
+        }
+    struct BoundaryRandom {
+        std::uint32_t word;
+        unsigned draws = 0;
+        std::uint32_t nextU32() { ++draws; return word; }
+        unsigned chooseIndexSmall(unsigned n) { return nextU32() % n; }
+    };
+    for (unsigned level = 1; level <= 3; ++level) {
+        const std::uint32_t cutoff = static_cast<std::uint32_t>(4294967296.0 * level / (level + 2));
+        for (std::uint32_t word : {0U, cutoff - 1, cutoff, cutoff + 1, 0xffffffffU}) {
+            BoundaryRandom random{word};
+            const bool allowed = (word / 4294967296.0) * (level + 2) <= level;
+            require(cavernEnemyChoice('a', level, random) == (allowed ? 111 : -1) && random.draws == 1,
+                    "inclusive cavern probability boundaries match runner doubles");
+        }
+    }
     for (unsigned seed = 0; seed < 128; ++seed) {
         AreaOneBuilder builder;
         GameMakerRandom actual(seed), expected(seed);
@@ -165,10 +207,10 @@ int main(int argc, char** argv) {
         capture(emitted, configuredRandom);
     }
     std::cout << "ordered emission digest " << std::hex << emissionDigest << std::dec << '\n';
-    // Re-recorded after VM-audited choose migration; the old ffcdfc23dc638be7
-    // included an incorrect two-word draw per choose. This is a regression
+    // Re-recorded after VM-audited level-dependent enemy spawning; the previous
+    // 1fd36f0408435e8b kept level-one odds and omitted crawler cells. This is a regression
     // fingerprint, not an independent Windows-runner capture.
-    require(emissionDigest == 0x1fd36f0408435e8bULL,
+    require(emissionDigest == 0x970b28efcbf63992ULL,
         "64 seeded levels preserve ordered Create fields and complete RNG state");
     GameMakerRandom random(2);
     AreaOneBuilder builder;

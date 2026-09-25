@@ -1,5 +1,24 @@
 # Natural cavern route verification
 
+## After the cavern level-dependent spawning correction
+
+The shared builder now applies the original level-two/three spawn probability
+and crawler-cell choice. First-level exits remain 1,339/1,646 updates for seeds
+99/4, with 211 upgrade and 120 second-level updates compared for each. The
+unchanged seed-4 input controller now takes 518 additional updates to reach
+the naturally generated shop, rejects an item priced at 150 with 18 gems,
+and takes 43 return updates (the host diagnostic's zero-based last index is
+42). The total second-level route is 688 updates. All paired state checks pass.
+
+The bounded native gate passes those timings, 211 clear-frame comparisons,
+168 exit-field comparisons, 49 retained HUD comparisons and the stack guard,
+with zero failure counters. The emulator was stopped and the ordinary build
+restored by the gate. Evidence: `/tmp/downwell-cavern-spawn-native.log` and
+`/tmp/downwell-cavern-spawn-native-gdb.log`. SDL and native builds and the
+68000 audits pass; shared generation also passes ASan/UBSan. These are
+correctness checks, not fresh frame-time measurements or Windows captures.
+The earlier timings below are historical and superseded for cavern two.
+
 ## After the Windows choose correction
 
 The corrected two-seed host gate passes: seed 99 exits at 1,339 updates and

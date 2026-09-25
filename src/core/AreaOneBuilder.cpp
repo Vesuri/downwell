@@ -1,5 +1,6 @@
 #include "AreaOneBuilder.h"
 #include "BuilderRewardChoice.h"
+#include "CavernEnemyChoice.h"
 #include "EnemyCreateProfile.h"
 #include "Profile.h"
 
@@ -218,21 +219,8 @@ bool AreaOneBuilder::emitPattern(
             if (symbol == '^' && random.chooseIndexSmall(5) != 0 &&
                 !emitObject(289, buildX, rowY, random, emit, context))
                 return false;
-            if (random.nextU32() <= 0x55555555U) {
-                std::int32_t enemyId = -1;
-                switch (symbol) {
-                case 'a': enemyId = 111; break;
-                case 'b': enemyId = 116; break;
-                case 'd': enemyId = 113; break;
-                case 'e': enemyId = 117; break;
-                case 't': enemyId = 112; break;
-                case '%': {
-                    const std::int32_t enemies[] = {113, 111, 119, 112};
-                    enemyId = enemies[random.chooseIndexSmall(4)];
-                    break;
-                }
-                default: break;
-                }
+            {
+                const int enemyId = cavernEnemyChoice(symbol, levelLength_ - 15, random);
                 if (enemyId >= 0 &&
                     !emitObject(enemyId, buildX, rowY, random, emit, context))
                     return false;

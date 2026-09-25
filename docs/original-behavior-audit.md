@@ -11,6 +11,27 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 VM-backed registration, latch/release and collision-phase camera snaps on both
 adapters, plus the remaining original-runner and achievement caveats.
 
+## Cavern level-dependent enemy spawning
+
+`gml_GlobalScript_builderCavern.asm`, blocks 12–38, consumes
+`random(global.level + 2) <= global.level` for every pattern cell. Normal
+cavern levels 1–3 therefore use inclusive uint32 cutoffs `55555555`,
+`80000000`, `99999999`, respectively. The former implementation used the
+level-one cutoff throughout. Symbol `c` additionally consumes `choose(0,1)`
+only after passing that gate and only at level >= 2; nonzero creates crawler
+119 synchronously, including its Create-event RNG consumption.
+
+The shared builder now uses `CavernEnemyChoice` for both platforms. Tests
+compare 110,592 cell decisions and complete RNG state against an independent
+floating-point transcription, plus exact cutoff boundary cases. The 64-level
+emission regression fingerprint is now `970b28efcbf63992`; it is not an
+original-runner capture. First-level entry checkpoints are unchanged.
+
+This implements the supported normal-mode path. The VM's short-circuited
+hard-mode fallback (`random(5) > 1` after a failed primary gate) remains
+unimplemented, along with live hard-mode selection; this change does not
+claim hard-mode fidelity.
+
 ## Side-room reward selection at low health
 
 `gml_GlobalScript_scrBuilder.asm`, blocks 141–152, first chooses/alternates

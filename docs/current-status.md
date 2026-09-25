@@ -31,10 +31,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   injected. Gameplay state is compared each update, with upgrade effects,
   offers, inventory and RNG checks. This is host adapter evidence, not a
   native rendering gate. Seed 4 additionally reaches an unmodified generated
-  shop in cavern two after 259 updates and compares opening, held fire and
+  shop in cavern two after 518 updates and compares opening, held fire and
   Leave, including menu state and generated stock. No currency or shop items
-  are injected. A purchase with 16 gems against a 300-gem price is rejected;
-  45 subsequent updates return the player and camera to the main shaft.
+  are injected. A purchase with 18 gems against a 150-gem price is rejected;
+  43 subsequent updates return the player and camera to the main shaft.
   Successful naturally funded purchasing remains unverified.
 - `make verify-route-sweep` additionally checks seeds 0–7 with deterministic
   recovery inputs, requiring all eight generated exits alive within 2,500
@@ -46,8 +46,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
   failures, and completes 120 second-cavern updates with an intact stack guard.
   `make verify-amiga-natural-route` runs this bounded check and restores the
   ordinary build. The extended gate passes the same natural shop approach,
-  insufficient-funds attempt and return: 431 second-cavern updates, 51 retained
-  shop-HUD comparisons with no failures, and 45 return updates. It does not
+  insufficient-funds attempt and return after the level-dependent spawn fix:
+  688 second-cavern updates, 49 retained shop-HUD comparisons with no failures,
+  and 43 return updates. It does not
   establish every shop layout or fresh composition of all terrain pixels.
 - Results-menu tests cover all three destinations and 200 final gameplay
   updates, including display-memory reuse and the task-stack guard.
@@ -86,15 +87,21 @@ two ports proves original-game completion. The active parity goal is unfinished.
   earlier paired replays prove adapter agreement, not original RNG equivalence.
   Regenerated seed-2/seed-4 entry checkpoints now match decoded startup in
   all RNG words. The corrected host routes pass at 1,339/1,646 gameplay updates,
-  each followed by 211 upgrade updates and 120 re-entry updates. Seed 4 reaches
-  its next-level shop after 259 more updates and returns in 45 updates after an
-  insufficient-funds attempt (16 gems, price 300). The corrected eight-seed
+  each followed by 211 upgrade updates and 120 re-entry updates. After the
+  additional level-dependent spawn correction, seed 4 reaches its next-level
+  shop after 518 more updates and returns in 43 updates after an
+  insufficient-funds attempt (18 gems, price 150). The corrected eight-seed
   sweep also passes, with unchanged input-only controller and completion limits.
   Garden reconstruction passes an independent VM-call/RNG-state oracle (77
   Create words). The complete startup test now passes with corrected fragment-2
   entrance and side-room-0 expectations; solid support, recharge, enemy creation,
   projectile and special-marker checks remain enforced.
   Title RNG order tests pass, but omitted particle visuals remain omitted.
+
+- Normal cavern spawning now uses the VM's level-dependent probability and
+  level-two/three crawler-cell choice, shared by both adapters. Independent
+  RNG-state/boundary tests and sanitized 64-level generation pass. Hard-mode
+  spawning remains unsupported; see `original-behavior-audit.md`.
 
 - Complete the seven scene boundaries. All seven now have named Amiga scene
   classes; gameplay's owner controls its Copper lifecycle and backing/staging

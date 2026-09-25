@@ -2048,7 +2048,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                       << " camera=" << sideCamera << "->" << game.cameraOffsetX() << std::endl;
             require(sideCamera != 0 && returnUpdates < 240 && !game.dead(),
                 "natural shop return releases side camera and reaches main shaft alive");
-            require(nativeRoute.done && secondUpdates == 431 && nativeRoute.returnFrames == 45,
+            require(nativeRoute.done && secondUpdates == 688 && nativeRoute.returnFrames == 43,
                 "native natural route completion matches host timing");
         }
     }
