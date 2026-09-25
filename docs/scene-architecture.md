@@ -5,6 +5,32 @@ publisher, credits, controls, garden, style selection, gameplay and upgrade
 selection. Platform rendering is separate from shared, source-backed game
 rules. This document is a migration inventory, not a claim of completion.
 
+## Current ownership at a glance
+
+All seven Amiga scene classes below have separate `.h` / `.cpp` files in
+`src/platform/amiga`. A class existing does not imply that every responsibility
+has already moved out of the application loop.
+
+| Scene | Owner | Remaining boundary |
+| --- | --- | --- |
+| Publisher logo | `AmigaPublisherScene` | Shared startup timing and application publication |
+| Credits | `AmigaCreditsScene` | Shared startup timing and application publication |
+| Controls | `AmigaControlsScene` | Shared startup timing and application publication |
+| Garden | `AmigaGardenScene` | DMA retirement, publication and transition orchestration |
+| Style selection | `AmigaStyleScene` | Shared startup rules and application publication |
+| Gameplay | `AmigaGameplayScene` plus dedicated terrain/actor components | Scene owner currently manages Copper lifecycle; composition and coordination still need consolidation |
+| Upgrade selection | `AmigaUpgradeScene` | Display binding, sprites, publication and next-level transition |
+
+Style and upgrade selection share `AmigaSelectionLayer` for retained content,
+local damage repair and pointer-based reveal scrolling. They retain separate
+source-backed selection trajectories rather than forcing identical animation.
+Splash scenes share `AmigaSplashCache` and the splash Copper implementation.
+
+This is an Amiga presentation split, not yet a symmetrical seven-scene split
+across both backends. SDL still uses the broad `StartupRuntime` path. Further
+consolidation must share behavior in `src/core`, not duplicate it inside the
+new platform-specific scene classes.
+
 ## Upgrade scene: first extraction
 
 `AmigaUpgradeScene.h/.cpp` owns completion entry, input edge retention,
