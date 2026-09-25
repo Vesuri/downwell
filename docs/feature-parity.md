@@ -9,6 +9,21 @@ AmigaPortRuntime implement identical behavior.
 
 ## Current evidence and remaining work
 
+### Full startup integration gate after retained selection migration
+
+`verify-amiga-scenes` now requires at least 100 style-frame comparisons with
+zero mismatches and verifies the 256-byte task-stack guard, in addition to
+the existing splash publication durations and garden Copper checks. Merely
+reaching gameplay could previously pass this gate despite a nonzero style
+mismatch counter; the focused style gate checked that counter separately.
+
+The strengthened full-sequence run passes 138 style comparisons, the expected
+180 logo/180 credits/240 controls/60 fade-out/60 fade-in updates, garden
+Copper checks and the stack guard before reporting active gameplay. It uses
+a 180-second hard emulator limit and restores ordinary startup. Evidence:
+`/tmp/downwell-strict-sequence-gdb.log`. This is integration verification of
+the native path and its scalar comparison, not an original Windows capture.
+
 ### Gameplay after both clear-room reentries
 
 The host adapter comparison now runs 720 gameplay updates after each clear,

@@ -9,8 +9,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - Publisher/credits/controls, garden/well, style selection and first-area
   gameplay have native presentation paths. The full startup sequence reaches
   scrolling gameplay after the shared selection-renderer changes; splash
-  publication durations and garden Copper patches pass the bounded gate
-  (`/tmp/downwell-selection-sequence-gdb.log`). This is not a Windows capture.
+  publication durations, garden Copper patches, 138 style comparisons and
+  the task-stack guard pass the bounded gate
+  (`/tmp/downwell-strict-sequence-gdb.log`). This is not a Windows capture.
 - `GameplayWorld` supplies shared player, supported actors, projectiles, gems,
   combat, shop/result state and run ownership. Adapter tests cover deterministic
   movement, combat/upgrade variants, death/survival and next-room re-entry.
