@@ -48,8 +48,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
 
 - Complete the seven scene boundaries. All seven now have named Amiga scene
   classes, but gameplay's owner currently controls only its Copper lifecycle.
-  Terrain/actor presentation and much transition orchestration remain in
-  `DownwellAmiga.cpp`; SDL startup orchestration also needs consolidation.
+  Terrain composition now belongs to `AmigaTerrainPainter`, with actors and
+  raster storage already separate. Cache-refresh/display coordination and
+  much transition orchestration remain in `DownwellAmiga.cpp`; SDL startup
+  orchestration also needs consolidation.
 - Meet the worst-case 20 ms budget. The latest style-navigation measurement is
   45.45 FPS over 180 updates, with a maximum three-field gap. Combined upgrade
   content/layout/simulation work and transition preparation also exceed budget.

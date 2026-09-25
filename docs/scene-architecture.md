@@ -18,7 +18,7 @@ has already moved out of the application loop.
 | Controls | `AmigaControlsScene` | Shared startup timing and application publication |
 | Garden | `AmigaGardenScene` | DMA retirement, publication and transition orchestration |
 | Style selection | `AmigaStyleScene` | Shared startup rules and application publication |
-| Gameplay | `AmigaGameplayScene` plus dedicated terrain/actor components | Scene owner currently manages Copper lifecycle; composition and coordination still need consolidation |
+| Gameplay | `AmigaGameplayScene` plus dedicated terrain/actor components | Scene owner currently manages Copper lifecycle; cache-refresh/display coordination still needs consolidation |
 | Upgrade selection | `AmigaUpgradeScene` | Display binding, sprites, publication and next-level transition |
 
 Style and upgrade selection share `AmigaSelectionLayer` for retained content,
@@ -162,8 +162,8 @@ the original border stride and palette rules.
   incremental boundaries, not a completed gameplay scene extraction.
   Overflow BOB rasterization now lives in `AmigaGameplayActors.h/.cpp` with
   explicit artwork, retired display, dirty-row and laser inputs. Actor
-  collection now lives in `AmigaGameplayDrawList`; terrain composition remains
-  in the main loop, while its raster storage/transfer/invalidation now belongs
+  collection now lives in `AmigaGameplayDrawList`; terrain composition now lives
+  in `AmigaTerrainPainter`, while raster storage/transfer/invalidation belongs
   to `AmigaTerrainRaster`. Hardware-channel assignment lives alongside the actor
   renderer. The move preserves painter order, clipping, circular row
   addressing and the native scalar verification oracle.
@@ -225,13 +225,32 @@ or a frame-time result.
 
 ### Terrain raster boundary
 
+`AmigaTerrainPainter.h/.cpp` now owns fresh composition: indexed or serialized
+room walls, source wall-neighbor frame selection, row-indexed tiles with
+destroyed-block suppression, decorations and shop fixtures in the existing
+order. Renderer, room/index/tile data, world, artwork bounds and clipping/view
+coordinates are explicit inputs. It does not allocate, step simulation, own
+the raster, choose dirty spans, publish Copper programs or schedule DMA.
+The cache wrapper still marks damage and selects refresh versus transfer;
+this extraction does not add any repaint or change circular-buffer behavior.
+
+The bounded native camera gate passes seven transitions, 119 fresh comparisons
+and 14 display checks with zero failures. A separate bounded Laser Sight
+capture matches all 99,968 SDL pixels at its verification frame. These are
+regressions against the current representation, not original Windows proof
+or a performance improvement claim. Evidence:
+`/tmp/downwell-terrain-painter-camera.log`,
+`/tmp/downwell-terrain-painter-camera-gdb.log`, and
+`/tmp/downwell-terrain-painter-laser.log`.
+
 `AmigaTerrainRaster.h/.cpp` owns the three-column Fast-RAM raster, dirty rows,
 shop-art revisions and ring transfer. The native load path retains the existing
 68000 assembly, 22-byte strips and 48-byte Chip row stride. Long loads still
 pipeline disjoint completed spans of at most 128 rows into the retired display
 and acknowledge only that display's row debts. There is no new framebuffer,
-asset conversion or per-frame terrain repaint. The application still composes
-terrain and decides when to refresh it; this is not full terrain-scene extraction.
+asset conversion or per-frame terrain repaint. The application calls the
+separate `AmigaTerrainPainter` and decides when to refresh the cache; this is
+not full terrain-scene extraction.
 
 A portable transfer counterpart enables byte-exact host tests across all 320
 origins, three columns and five heights (4,800 cases), covering both sides of
