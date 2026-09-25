@@ -43,6 +43,9 @@ two ports proves original-game completion. The active parity goal is unfinished.
 - Meet the worst-case 20 ms budget. The latest style-navigation measurement is
   45.45 FPS over 180 updates, with a maximum three-field gap. Combined upgrade
   content/layout/simulation work and transition preparation also exceed budget.
+  The current 600-update gameplay tape runs at 36.81 FPS, with a five-field
+  maximum gap; instrumented generation dominates the largest sampled stall.
+  See `gameplay-performance-current.md` for scope, costs and next work.
   Keep hardware scrolling, retained terrain and incremental damage intact.
 - Broaden end-to-end play coverage: natural exits, shops and side-room entry/
   exit, dense encounters, less common upgrade states and repeated room/run
