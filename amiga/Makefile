@@ -21,6 +21,14 @@ PROBES ?= 0
 FPSCOUNT ?= 0
 PROFILE_AUTORUN ?= 0
 PROFILE_NAVIGATE ?= 0
+# Keep the measured default; allow controlled compiler comparisons.
+AMIGA_OPTIMIZATION ?= -O3
+ifneq ($(words $(AMIGA_OPTIMIZATION)),1)
+$(error AMIGA_OPTIMIZATION must be -O2, -O3 or -Os)
+endif
+ifneq ($(filter-out -O2 -O3 -Os,$(AMIGA_OPTIMIZATION)),)
+$(error AMIGA_OPTIMIZATION must be -O2, -O3 or -Os)
+endif
 ifeq ($(PROBES)$(FPSCOUNT),11)
 $(error Use PROBES or FPSCOUNT separately)
 endif
@@ -28,7 +36,7 @@ ifeq ($(PROFILE_AUTORUN)$(PROBES)$(FPSCOUNT),100)
 $(error PROFILE_AUTORUN requires PROBES=1 or FPSCOUNT=1)
 endif
 
-CFLAGS := -g -O3 -flto -m68000 -msoft-float -nostdlib -MP -MMD \
+CFLAGS := -g $(AMIGA_OPTIMIZATION) -flto -m68000 -msoft-float -nostdlib -MP -MMD \
 	-fno-tree-loop-distribution -ffunction-sections -fdata-sections \
 	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA
 ifeq ($(EXIT_WIPE_VERIFY),1)
@@ -111,7 +119,7 @@ all: check $(OUT).exe
 .PHONY: FORCE_STARTUP_OPTIONS
 obj/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p obj
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(AMIGA_OPTIMIZATION)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options

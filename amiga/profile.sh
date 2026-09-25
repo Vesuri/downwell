@@ -17,6 +17,8 @@ mkdir -p .run
 trap restore EXIT
 make clean
 make -j4 "$flags" PROFILE_AUTORUN=1
+printf 'Profile optimization: %s\n' "${AMIGA_OPTIMIZATION:--O3}"
+shasum -a 256 out/Downwell.exe
 VERIFY_TIMEOUT_SECONDS="${VERIFY_TIMEOUT_SECONDS:-60}" \
 GDB_SOURCE="$script" READY_MARKER=DOWNWELL_PROFILE_READY \
 READY_DESCRIPTION="bounded scene profile" bash verify_startup.sh

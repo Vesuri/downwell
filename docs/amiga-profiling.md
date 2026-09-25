@@ -2,6 +2,31 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Compiler optimization comparison
+
+The current 600-update A500 gameplay tape favors the existing `-O3` setting:
+
+| Optimization | PAL fields | FPS | Maximum gap |
+| --- | ---: | ---: | ---: |
+| `-O3` (two baseline repeats) | 812–813 | 36.90–36.95 | 5 fields |
+| `-O2` | 901 | 33.30 | 6 fields |
+| `-Os` | 1158 | 25.91 | 8 fields |
+
+Only the optimization level changed; LTO, 68000/soft-float target flags and
+the deterministic autorun tape stayed the same. Both experimental builds
+passed the instruction/helper audits and completed the bounded gameplay
+profile, but they were not subjected to full replay/pixel acceptance because
+neither was retained as the default. Logs: `/tmp/downwell-opt-{o2,os}-fps.log`.
+The ordinary non-skip `-O3` executable was restored and audited afterward.
+
+Use `AMIGA_OPTIMIZATION=-O2` or `AMIGA_OPTIMIZATION=-Os` with
+`SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=45 bash amiga/profile.sh fps` to repeat
+the comparison. The Makefile accepts only `-O2`, `-O3`, or `-Os`, defaults to
+`-O3`, and includes the selected value in the object-rebuild options stamp.
+The profiler records the selected optimization and tested executable SHA-256
+before launching UAE. This is a reproducibility control, not a performance
+or feature-parity improvement.
+
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
