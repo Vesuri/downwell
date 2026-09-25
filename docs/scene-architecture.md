@@ -337,3 +337,30 @@ passes 432 completion frames, 192 exit-field frames, two clears, 60 third-level
 updates and the stack guard. Evidence:
 `/tmp/downwell-overwritten-native-gdb.log` and
 `/tmp/downwell-overwritten-sanitized.log`.
+
+### Individual retained style labels
+
+Style content no longer submits the precomposed 160x128 text panel. It uses
+the existing individual title/name/description assets at their original
+anchors, after the actors in the original full-redraw order. The standard
+description keeps its forced white pen; title/name retain their exported red
+shadows. No assets change. Independent bounding rectangles keep ordinary
+actor damage from intersecting the panel's empty interior, and changing the
+style name no longer invalidates the full panel area.
+
+The 364-frame host comparison across all five cursors and its sanitizer run
+pass. The bounded native comparison matches 105 frames across reveal,
+locked-style navigation and confirmation. Evidence:
+`/tmp/downwell-style-labels-host.log`,
+`/tmp/downwell-style-labels-sanitized.log`, and
+`/tmp/downwell-style-labels-native-gdb.log`.
+
+Under the same 180-update navigation script, low-overhead throughput improves
+from 43.48 to 45.45 FPS (198 PAL fields). Detailed retained drawing averages
+8.64 ms, down from 9.51 ms; its peak falls from 27.78 to 26.04 ms. Drain
+averages 0.34 ms, peak 5.84 ms. The low-overhead maximum gap is three fields
+(previously two), so this is not a worst-case deadline improvement or a
+50 FPS result. All three saved frame hashes remain unchanged. Both bounded
+profiles finish, report readiness, and restore normal startup. Evidence:
+`/tmp/downwell-style-labels-profile.log` and
+`/tmp/downwell-style-labels-fps.log`.
