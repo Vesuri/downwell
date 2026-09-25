@@ -825,6 +825,10 @@ verify-cross-replay: $(PORT_REPLAY_REFERENCE_TARGET)
 
 .PHONY: verify-amiga-gameplay-cache
 .PHONY: verify-amiga-gameplay-camera
+.PHONY: verify-amiga-gameplay-shop
+verify-amiga-gameplay-shop:
+	bash amiga/verify_gameplay_shop.sh
+
 verify-amiga-gameplay-camera:
 	bash amiga/verify_gameplay_camera.sh
 

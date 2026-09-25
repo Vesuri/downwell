@@ -39,6 +39,15 @@
 #include "AmigaCreditsScene.h"
 #include "AmigaControlsScene.h"
 #include "AmigaShopMenu.h"
+#ifdef DOWNWELL_SHOP_VERIFY
+#include "AmigaShopVerification.h"
+static AmigaShopVerification shopVerification;
+extern "C" {
+volatile ULONG gDownwellShopLiveCoverage, gDownwellShopLiveFailures;
+volatile ULONG gDownwellShopLiveFrames, gDownwellShopLivePixelFailures;
+__attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile("" ::: "memory"); }
+}
+#endif
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
 #include "core/GameMakerRounding.h"
@@ -1681,6 +1690,10 @@ int main(void) {
                 scenes, sceneStyleFrameReported,
                 sceneLockedStyleFrameReported,
                 sceneGameplayLandedReported, port);
+#ifdef DOWNWELL_SHOP_VERIFY
+            if (scenes.scene() == AmigaScene::gameplay)
+                liveInput = shopVerification.input(port);
+#endif
 #ifdef DOWNWELL_CAMERA_VERIFY
             // Synthetic flat collision fixture, not a natural shop traversal.
             // Real movement/camera and all display staging/publication still run.
@@ -2342,6 +2355,11 @@ int main(void) {
             port.configureSolidResolver([](void*, int, int) { return false; }, nullptr);
 #endif
             const AmigaPortFrame result = port.step(packedInput);
+#ifdef DOWNWELL_SHOP_VERIFY
+            shopVerification.check(port);
+            gDownwellShopLiveCoverage = shopVerification.coverage;
+            gDownwellShopLiveFailures = shopVerification.failures;
+#endif
 #ifdef DOWNWELL_CLEAR_VERIFY
             gDownwellClearTick = port.tick();
             if (port.tick() % 60 == 0) downwellClearProbe();
@@ -2421,6 +2439,28 @@ int main(void) {
                             composeStreak(target, *static_cast<unsigned*>(context));
                         }, &streak)) { exitCode = 20; break; }
             } else shopMenuOverlay.reset();
+#ifdef DOWNWELL_SHOP_VERIFY
+            if (shopVerification.shop && gDownwellShopPack) {
+                alignas(2) static UBYTE expected[downwellLayerBytes];
+                AmigaHardware::blitterDrain();
+                for (unsigned i = 0; i < downwellLayerBytes; ++i) expected[i] = renderer.hud[i];
+                AmigaRenderer oracle = renderer;
+                oracle.hud = oracle.target = expected;
+                oracle.blitterEnabled = 0;
+                amigaRendererClearClipRect(&oracle);
+                amigaRendererFillRect(&oracle, downwellPlayfieldX, 0, 160, 284, 0);
+                static AmigaShopMenu fresh;
+                fresh.reset();
+                if (!fresh.draw(&oracle, gDownwellShopPack,
+                        gDownwellShopPack + gDownwellShopAssetBytes, activeShop,
+                        mainViewX + port.cameraOffsetX(), mainInitialViewY + port.cameraOffsetY(),
+                        port.currency())) ++gDownwellShopLiveFailures;
+                composeStreak(&oracle, port.dead() ? 0 : port.gemStreak());
+                for (unsigned i = 0; i < downwellLayerBytes; ++i)
+                    if (expected[i] != renderer.hud[i]) ++gDownwellShopLivePixelFailures;
+                ++gDownwellShopLiveFrames;
+            }
+#endif
             if (port.deathResults().active && !port.exitDither().active) {
                 if (!selectOverlayAssetBank(false)) { exitCode = 20; break; }
                 const bool backdropChanged = redrawResultsBackdrop(&renderer, port,
@@ -2835,6 +2875,9 @@ int main(void) {
 #endif
             DW_PROFILE_PHASE(profileOther);
             front = back;
+#ifdef DOWNWELL_SHOP_VERIFY
+            if (shopVerification.frame == 14) downwellShopLiveReady();
+#endif
 #ifdef DOWNWELL_SCENE_VERIFY
 #ifdef DOWNWELL_CAMERA_VERIFY
             static unsigned cameraFramesToCheck = 0;

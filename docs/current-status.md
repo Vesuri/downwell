@@ -29,6 +29,11 @@ two ports proves original-game completion. The active parity goal is unfinished.
   It passes 119 fresh-terrain comparisons and 14 alternating-display checks
   with no mismatches. This uses synthetic flat collision geometry, not natural
   side-room/shop traversal; that end-to-end coverage is still outstanding.
+- A live native shop fixture passes opening/held fire, insufficient funds,
+  purchasing, next-update battery grant, leaving and reopening sold stock.
+  All 13 retained HUD frames match fresh scalar composition. The corresponding
+  paired host scene/shop test passes. Placement and a free test item are
+  injected; this does not establish a naturally generated shop playthrough.
 - Style and upgrade selection share `AmigaSelectionLayer`. Static content is
   retained; common vertical movement changes bitplane pointers. Style content
   borrows retired game/HUD buffers without another Chip allocation. Its

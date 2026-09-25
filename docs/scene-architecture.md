@@ -201,6 +201,28 @@ by the world, then because every transition found a prepared buffer. The
 final fixture binds collision through the world and explicitly exercises the
 missing-prefetch case.
 
+### Live shop interaction verification
+
+`make verify-amiga-gameplay-shop` builds `SHOP_VERIFY=1` with direct gameplay
+entry and a 120-second emulator deadline, restoring the normal build on exit.
+`AmigaShopVerification` creates a shop beside the grounded player and sends
+ordinary input edges through the live world. It checks opening, held-confirm
+debouncing, an unfunded purchase, a test-only free battery purchase, deferred
+grant on the next controller update, leaving, reopening sold stock and leaving
+again. The free price isolates purchase timing from gem collection, as in the
+existing paired SDL/Amiga shop fixture. No test code is enabled in shipping.
+
+The native loop compares its actual retained shop HUD against fresh scalar
+composition every frame after the shop artwork bank is loaded, preserving
+the surrounding HUD and restoring the foreground streak in source draw order.
+The passing run covers all eight state checkpoints and 13 whole-HUD comparisons
+with zero mismatches and an intact task-stack guard. Evidence:
+`/tmp/downwell-live-shop.log`, `/tmp/downwell-live-shop-gdb.log`. The paired host
+scene/shop test also passes, including both subsequent cavern-level reentries
+(`/tmp/downwell-live-shop-host.log`). This is live native interaction coverage,
+not a natural generated-shop approach, independent Windows raster oracle,
+or a frame-time result.
+
 ### Terrain raster boundary
 
 `AmigaTerrainRaster.h/.cpp` owns the three-column Fast-RAM raster, dirty rows,
