@@ -115,6 +115,14 @@ all: $(TARGET)
 .PHONY: generate-area-two-patterns verify-area-two-patterns
 .PHONY: verify-catacomb-symbols
 .PHONY: verify-skeleton-throw
+.PHONY: verify-skeleton-timing
+verify-skeleton-timing: build/skeleton-timing-test
+	./build/skeleton-timing-test
+
+build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonTiming.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/SkeletonTimingTest.cpp
+
 .PHONY: verify-bone-reference
 .PHONY: verify-motion-binary64
 .PHONY: verify-bone-motion

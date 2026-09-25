@@ -205,6 +205,10 @@ This queue describes priorities, not a replacement for the full goal. The old
   Evidence: `/tmp/downwell-bone-create-native.log` and `amiga/.run/gdb-out.log`
   (the latter is overwritten by subsequent runs). This does not verify live
   projectile ownership, animation advancement, collision dispatch or drawing.
+  `SkeletonTiming` now implements the four recovered alarm bodies and Step's
+  hit/throw-stop/time-stop timing writes. The 64-case host matrix and sanitizers
+  pass; animation advancement and same-phase cross-alarm countdown ordering
+  remain unverified against the original runner, so live admission stays off.
 
 ## Working evidence
 

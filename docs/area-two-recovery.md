@@ -117,6 +117,26 @@ replaced with cavern behavior just to make the new patterns run.
 
 ### Skeleton throw orchestration
 
+`SkeletonTiming.h` now owns the four alarm values and the timing writes from
+the skeleton's Alarm 0–3 and Step events. Alarm 0 clears `edamaged`; Alarm 1
+clears `hitStun`; Alarm 2 resets `image_index` and `eShotDelay` and writes 15
+to Alarm 3; Alarm 3 assigns the exact binary64 0.3 to `imgSp`. These bodies
+are present in the exported VM assembly, including Alarms 2 and 3.
+
+Step copies `imgSp` to `image_speed` before processing a hit or stopping a
+completed throw. Those later writes therefore do not change the current
+Step's image speed. A hit adds five to Alarm 1 (including -1 becoming 4),
+resets the image index, stops the desired rate and writes 30 to Alarm 3.
+Time-stop sets image speed to zero and compensates only positive Alarm 0;
+it does not freeze the other alarms. Tests cover 64 combinations and the
+throw/restart sequence, including repeated hits and delayed speed changes.
+
+The component does not advance images or choose an alarm countdown/dispatch
+policy. In particular, whether Alarm 2's write to Alarm 3 gets decremented
+in the same phase requires original-runner evidence before live integration;
+the event bodies alone cannot answer that question. No skeleton is enabled
+by this component, and no native frame-time claim is made.
+
 `SkeletonThrow.h` implements `enmSkeleton_Step_0` VM blocks 21–26 as a shared
 operation sequence: synchronously create object 269 at `(x,y-10)`, emit sound
 134, choose vertical speed from -3/-3.1/-3.2, conditionally choose horizontal
