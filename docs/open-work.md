@@ -10,13 +10,20 @@ serialized resources and original-runner evidence are the authority; port-to-por
 agreement alone is insufficient. Target Amiga 500/68000. Let gameplay run slower
 on PAL; do not add 60 Hz catch-up.
 
+## Next integration milestone: live skeleton encounters
+
+Finish section 1 before broadening into catacombs. Supporting helpers alone do
+not close this milestone: natural encounters must execute the recovered rules
+and render correctly on both targets. Performance work in section 5 applies
+throughout integration, not only after content is complete.
+
 ## 1. Finish live skeleton and bone integration
 
 - Verify original runtime FP-mode assumptions and measure the complete smoke
   geometry/effect cost on the native target.
 - Finish smoke world collision dispatch and connect its compositor to both
-  live renderers, preserving the original
-  effect-surface composition.
+  live renderers, preserving the original effect-surface composition and
+  restoring previous effect damage from retained terrain on Amiga.
 - Implement remaining blood, corpse, debris and blast effect dependencies.
   Preserve synchronous child Create, RNG consumption and source mutation order
   before rewards and retirement.
@@ -100,6 +107,9 @@ References: [gameplay performance](gameplay-performance-current.md),
 - Keep publisher, credits, controls, garden, style selection, gameplay and upgrade
   selection independently owned; share style/upgrade presentation where useful.
   Keep game rules in `src/core`, not duplicated in platform backends.
+- Consolidate remaining world scheduling and state adapters so both platforms
+  invoke the same simulation. Remove replaced rule branches rather than
+  retaining alternative platform-specific implementations.
 
 Reference: [scene architecture](scene-architecture.md).
 
@@ -125,6 +135,14 @@ Reference: [scene architecture](scene-architecture.md).
   selection, gameplay, death, upgrades and later-area progression.
 - Run all relevant regression gates before claiming parity. Component tests,
   CPU replays and screenshots each prove only their respective scope.
+
+## Closing work
+
+Remove an item only when its shared behavior, both backend integrations and
+relevant verification are complete. Record implementation and test results in
+the cohesive commit, not a second status document or a completed-items section.
+Keep format specifications, source audits and reproducible test instructions in
+the linked technical references; keep priorities and remaining work here.
 
 Use `SKIP_TO_GAME=1` for gameplay, `SKIP_LEVEL=1` for completion and `SKIP_INTRO=1`
 for style tests. Test full startup when scene/display ownership changes.

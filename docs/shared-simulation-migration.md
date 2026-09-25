@@ -274,19 +274,10 @@ ceiling omission remains unresolved and must be fixed in shared collision code,
 including consistent rounding, masks and event order. It must not be lost from
 the backlog merely because the separate experiment was discarded.
 
-## Remaining migration
+## Work queue
 
-1. Consolidate player state, vertical integration, jump/gun state and collision
-   ordering in core; provide adapters for existing presentation consumers.
-2. Consolidate enemy, bullet and reward state/update code, retaining original
-   event timing, masks and deterministic RNG consumption.
-3. Make SDL and Amiga invoke the same world update. Remove the replaced
-   simulation branches, rather than leaving two permanent selectable modes.
-4. Keep the Amiga terrain cache, circular DMA scrolling, Copper lists, blitter,
-   offline sprites, audio and input translation in its backend. SDL retains its
-   own rendering/audio/input backend, not different gameplay.
-5. Replace port-versus-port gameplay agreement tests with shared-core rule tests
-   against VM evidence, plus cross-CPU replay and backend presentation tests.
+Remaining migration work is tracked only in [open-work.md](open-work.md).
+The chronological notes here are implementation evidence, not a current task list.
 
 Cross-target execution checks remain useful during migration. Their passing
 status does not imply that this migration or original-game fidelity is complete.

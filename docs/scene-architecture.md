@@ -146,7 +146,7 @@ re-entries, including all three upgrade cursors on each entry. Logs:
 `/tmp/downwell-upgrade-owner-native.log`. Ordinary startup was rebuilt afterward;
 both 68000 audits pass. This gate still uses injected exits.
 
-## Remaining consolidation
+## Scene implementation contracts
 
 ### Publisher, credits and controls owners
 

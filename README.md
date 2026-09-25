@@ -98,51 +98,12 @@ gate. With the Amiga toolchain and FS-UAE installed, run
 `make verify-cross-replay`; both targets must produce the pinned 64-frame
 trajectory digest before the normal interactive Amiga executable is rebuilt.
 
-The current executable runs a fixed 60 Hz model of the recovered startup path:
-the true `rmInit` entry room, desktop splash timing, and deterministic
-transition to `rmMenu`. `make run` regenerates the native room pack and loads
-the recovered room definitions, so the transition creates all 192 serialized
-`rmMenu` instances alongside the persistent controller, then applies the room
-code's runtime-created `ditherFade` as instance 105186. Most object event logic
-is not translated yet. The program renders at GameMaker's native 160x284
-application-surface size and now draws the recovered `sprPlayerIdle` frame
-directly from its original texture atlas in the diagnostic menu view. Placement
-remains centered until the recovered camera-spawn/follow behavior is translated.
+Use Left/Right or A/D to move, Space or Z to jump/fire and confirm selections,
+and Escape to quit. Use the startup shortcuts above for focused testing.
 
-Space or Z advances the splash sequence and confirms the unlocked style; the
-recovered falling-dither transition then enters `rmMain`. Escape quits.
-The first gameplay-room frame renders the recovered player and the room's
-authoritative wall layout, including its derived four-neighbour tile frames.
-The initial gameplay slice applies recovered subpixel gravity, airborne left
-and right acceleration, wall collision bounds, fall animation, and camera bias.
-Space or Z now fires the default eight-charge machine gun while airborne, with
-the recovered seven-tick cadence, recoil, shoot pose, downward bullets, and
-on-screen charge gauge.
-The first-run `objBuilder` prelude now extends the recovered shaft walls ahead
-of the descending camera; randomized room templates are not selected yet.
-`make test` checks the automatic 731-tick desktop transition, input-driven
-skipping, the non-desktop path, key recovered initialization state, alarms,
-instance lifecycle, event phases, replay validation, and the state oracle
-without SDL.
-Room-entry tests also pin serialized creation order, persistence, lifecycle
-phases, and atomic failure behavior.
-
-Splash stages 2 through 6 now draw their recovered Devolver logo, full 4:3
-credits composition, controls, and dither sprites. The Amiga credits are
-precomposed once into the fixed HUD planes before presentation and displayed
-with the wide fetch; they do not invoke a glyph compositor or repaint during
-their three-second hold. The controls transition uses the recovered fractional
-dither-frame sequence as a third hardware bitplane: the copper repeats one
-8-line mask tile over the narrow display, so animation only swaps copper lists
-and never repaints the controls raster.
-
-The three nonblank native splash rasters have independent emulator-backed
-regression gates. `make verify-amiga-splash-frame` pins the complete Devolver
-publisher frame, `make verify-amiga-credits-frame` pins the wide credits, and
-`make verify-amiga-controls-frame` pins the recovered controller/keyboard
-instructions. In this Steam data, dither frame 11 is transparent, so the first
-stage-5 frame is identical to stage 4 before the recovered frame index begins
-to change.
+Remaining behavior, rendering, performance and verification work is tracked only
+in [the work queue](docs/open-work.md). Implementation history and past test
+results belong in the git log, not this build guide.
 
 The cross-target replay and state-comparison contract is documented in
 [docs/replay-format.md](docs/replay-format.md). Confirmed and still-provisional
@@ -219,8 +180,6 @@ the complete room-to-object-to-code routing path.
 make -C amiga
 ```
 
-Or use `make amiga` from the repository root. The initial Amiga target checks
-the shared cross-toolchain only; it intentionally does not claim that a native
-game binary exists yet.
+Or use `make amiga` from the repository root to build the native executable.
 
 The project architecture and phase gates are in [PROJECT.md](PROJECT.md).

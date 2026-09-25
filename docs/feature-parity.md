@@ -1,5 +1,9 @@
 # SDL / Amiga feature parity
 
+This document contains historical implementation evidence, not an active work
+queue. Some entries are superseded. Use [open-work.md](open-work.md) for all
+remaining work; do not append further progress reports here.
+
 Both ports must reproduce the original Windows game; SDL is not the oracle.
 See [the source-backed audit](original-behavior-audit.md) for current fidelity
 findings and combat results; the chronological notes below include superseded
