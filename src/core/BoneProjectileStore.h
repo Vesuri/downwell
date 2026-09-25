@@ -12,7 +12,18 @@ template<unsigned Capacity> class BoneProjectileStore {
 public:
     using Handle=std::uint32_t;
     struct Slot { Handle handle=0; BoneProjectile projectile; };
+    struct Phase { Handle newest; };
     static constexpr unsigned capacity=Capacity;
+    // Capture BEFORE invoking any actor in the phase, not immediately before
+    // processing bones. Children created by a skeleton's ordinary Step must
+    // not receive ordinary Step until next update. A later phase captures anew.
+    Phase beginPhase() const { return {nextHandle_?nextHandle_-1u:0xffffffffu}; }
+    template<class Visit> void visitPhase(Phase phase,Visit visit) {
+        for(auto& slot:slots_) {
+            const Handle handle=slot.handle;
+            if(handle && handle<=phase.newest) visit(handle,slot.projectile);
+        }
+    }
     template<class Random> Handle create(int x,int y,Random& random) {
         if (!nextHandle_) return 0; // Do not alias stale handles on wrap.
         for (unsigned i=0;i<Capacity;++i) if (!slots_[i].handle) {

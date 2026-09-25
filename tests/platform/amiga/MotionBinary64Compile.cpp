@@ -108,3 +108,9 @@ extern "C" unsigned boneStoreCompile(downwell::BoneProjectileStore<8>* store,
     if (!creation.run(100,200,separated,1)) return 0;
     return creation.child;
 }
+extern "C" unsigned bonePhaseCompile(downwell::BoneProjectileStore<8>* store,
+    downwell::BoneProjectileStore<8>::Phase phase) {
+    unsigned count=0;
+    store->visitPhase(phase,[&](std::uint32_t,downwell::BoneProjectile&){++count;});
+    return count;
+}

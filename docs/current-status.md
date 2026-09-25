@@ -320,6 +320,12 @@ and the ordinary build was restored after both attempts.
   Existing replay digests and task-stack guard also pass. Evidence:
   `/tmp/downwell-bone-animation-native.log`. This is CPU/state evidence, not
   live projectile rendering or an encounter-performance claim.
+  Original Step creation eligibility is now audited: the dispatcher snapshots
+  the creation counter and increments it before events, excluding children
+  created during that phase; later phases take independent cutoffs. The bone
+  store exposes explicit phase snapshots with tests for creation and slot
+  reuse during dispatch. See `runner-step-eligibility.md`; collision traversal
+  and original same-object list ordering remain outside this proof.
 
 ## Working evidence
 

@@ -27,6 +27,7 @@ int main() {
         Store store; downwell::GameMakerRandom random(seed),oracle(seed);
         downwell::SkeletonActor actor; actor.create(100,200);
         Sound sound{store,random,actor.shot};
+        const auto stepPhase=store.beginPhase();
         downwell::SkeletonBoneCreation<Store,downwell::GameMakerRandom,Sound>
             creation{store,random,sound,actor.shot};
         check(creation.run(actor.x,actor.y,separated,-1));
@@ -39,6 +40,13 @@ int main() {
         check(expected.motion.launch(100,190,vx,vy));
         if(vx>0) expected.sampledAnimationRate.high^=0x80000000u;
         auto* bone=store.get(creation.child);
+        unsigned steps=0;
+        store.visitPhase(stepPhase,[&](Store::Handle,downwell::BoneProjectile&){++steps;});
+        check(steps==0); // Synchronous Create does not imply same-phase Step.
+        store.visitPhase(store.beginPhase(),[&](Store::Handle h,downwell::BoneProjectile& p){
+            check(h==creation.child && &p==bone); ++steps;
+        });
+        check(steps==1); // A later phase is independently eligible.
         check(bone && bone->motion.xsp.high==expected.motion.xsp.high &&
               bone->motion.xsp.low==expected.motion.xsp.low &&
               bone->motion.ysp.high==expected.motion.ysp.high &&
@@ -65,5 +73,19 @@ int main() {
         check(replacement && replacement!=creation.child && store.get(second));
         check(!store.retire(creation.child));
     }
+    // Reusing a later slot during a dispatch must not accidentally Step the
+    // newly created projectile just because traversal has not reached it yet.
+    Store store; downwell::GameMakerRandom random(5);
+    auto first=store.create(1,2,random),second=store.create(3,4,random);
+    unsigned visited=0; Store::Handle replacement=0;
+    store.visitPhase(store.beginPhase(),[&](Store::Handle h,downwell::BoneProjectile&){
+        ++visited; check(h==first);
+        store.get(second)->destroyRequested=true; check(store.retire(second));
+        replacement=store.create(5,6,random); check(replacement);
+    });
+    check(visited==1);
+    visited=0;
+    store.visitPhase(store.beginPhase(),[&](Store::Handle,downwell::BoneProjectile&){++visited;});
+    check(visited==2);
     std::puts("Owned skeleton bone creation: 2048 RNG/velocity/deferred-retirement cases passed");
 }
