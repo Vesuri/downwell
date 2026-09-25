@@ -14,7 +14,7 @@ on PAL; do not add 60 Hz catch-up.
 
 - Verify original runtime FP-mode assumptions and measure the complete smoke
   geometry/effect cost on the native target.
-- Give smoke fixed-capacity live ownership, phase-safe creation/retirement,
+- Connect the fixed-capacity smoke owner to live global phases,
   world collision dispatch and both renderers. Export Amiga artwork offline
   and preserve the original effect-surface composition.
 - Implement remaining blood, corpse, debris and blast effect dependencies.

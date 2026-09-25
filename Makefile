@@ -137,6 +137,15 @@ test: verify-smoke-effect
 test: verify-smoke-distance
 test: verify-smoke-direction
 test: verify-smoke-trig
+test: verify-smoke-owner
+.PHONY: verify-smoke-owner
+verify-smoke-owner: build/smoke-owner-test
+	./build/smoke-owner-test
+
+build/smoke-owner-test: tests/core/SmokeEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeEffectsTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-smoke-trig
 verify-smoke-trig: build/smoke-trig-test
 	python3 tools/export-smoke-trig.py --check
