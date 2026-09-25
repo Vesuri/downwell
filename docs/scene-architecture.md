@@ -105,8 +105,10 @@ the original border stride and palette rules.
   controls owner manages its held list and both alternating dither slots.
   Startup timing/input remains in the existing controller. Application-level
   blanking and final platform publication remain in the main loop.
-- Garden has menu renderer/cache/scroll translation units, but lifecycle and
-  presentation orchestration remain in the main loop.
+- Garden now has `AmigaGardenScene.h/.cpp`, owning prepared parallax artwork,
+  cached title frame, offline sprite selection and both Copper patch states.
+  It delegates to the existing menu cache/scroll helpers. DMA retirement,
+  publication and verification captures remain application responsibilities.
 - Style selection now has `AmigaStyleScene.h/.cpp`, owning both alternating
   frame states, preparation/re-entry reset and Copper build-versus-patch
   state. It delegates drawing to `AmigaSelectionLayer`. The application
@@ -128,6 +130,31 @@ the original border stride and palette rules.
 
 Hardware pointer scrolling is wired for both completion layers and the style
 reveal. Full seven-scene class separation remains unfinished.
+
+### Garden ownership verification
+
+The garden owner borrows the existing three canvases and two alternating
+Copper slots; it allocates no additional Chip memory and preserves the
+existing scrolling arithmetic. Preparing after gameplay invalidates both
+lists and the cached title. Returning to the same presentation only invalidates
+the retired Copper slots. Ordinary frames select offline player sprites and
+patch pointers/scroll words; title artwork changes only when its frame changes.
+
+The host lifecycle test checks 240 unchanged frames with one artwork
+preparation, one title update and two initial list builds, followed by pointer
+patches. It covers well-entry canvas selection, re-entry and preparation/
+title/sprite/Copper failures. ASan/UBSan pass. Native startup passes all three
+splash hashes and original durations, the garden patched-versus-fresh Copper
+oracle, 138 style comparisons and the 256-byte stack guard. Evidence:
+`/tmp/downwell-garden-scene-host.log`,
+`/tmp/downwell-garden-scene-sanitized.log`,
+`/tmp/downwell-garden-scenes-native.log`, and
+`/tmp/downwell-garden-scenes-native-gdb.log`.
+The separate 180-second-bounded results-restart gate passes all three
+destinations, including surface/garden re-entry, and reaches 200 subsequent
+gameplay updates. It checks 640 overlay Copper updates, scene mismatch
+counters and the stack guard (`/tmp/downwell-garden-reentry-native-gdb.log`).
+Both gates restore ordinary startup and pass the 68000 audits.
 
 ### Retained style content
 

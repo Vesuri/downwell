@@ -36,9 +36,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
 
 ## Remaining work — do not mark complete
 
-- Complete the seven scene boundaries. Publisher, credits, controls, style
-  and upgrade have dedicated scene owners. Garden and gameplay still have
-  substantial orchestration in `DownwellAmiga.cpp`.
+- Complete the seven scene boundaries. Publisher, credits, controls, garden,
+  style and upgrade have dedicated scene owners. Gameplay still has substantial
+  presentation orchestration in `DownwellAmiga.cpp`; SDL startup scene
+  orchestration also remains to be consolidated.
 - Meet the worst-case 20 ms budget. The latest style-navigation measurement is
   45.45 FPS over 180 updates, with a maximum three-field gap. Combined upgrade
   content/layout/simulation work and transition preparation also exceed budget.

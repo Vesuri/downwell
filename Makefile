@@ -729,6 +729,14 @@ test-amiga-splash-scenes: build/amiga-splash-scenes-test
 	./build/amiga-splash-scenes-test
 test: test-amiga-splash-scenes
 
+.PHONY: test-amiga-garden-scene
+build/amiga-garden-scene-test: tests/platform/amiga/AmigaGardenSceneTest.cpp src/platform/amiga/AmigaGardenScene.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaMenuScroll.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-amiga-garden-scene: build/amiga-garden-scene-test
+	./build/amiga-garden-scene-test
+test: test-amiga-garden-scene
+
 .PHONY: test-amiga-style-retained
 build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build

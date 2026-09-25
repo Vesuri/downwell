@@ -13,6 +13,7 @@
 #include "DownwellCopperLists.h"
 #include "AmigaMenu.h"
 #include "AmigaMenuCache.h"
+#include "AmigaGardenScene.h"
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
@@ -1462,8 +1463,6 @@ int main(void) {
     bool skipLevelPending = true;
 #endif
     unsigned menuSpriteFrameCount = 0;
-    int renderedMenuTitleFrame = -1;
-    int menuCopperMode[2] = {-1, -1};
     bool sceneResetRequested = false;
     bool newRunWorldPending = false;
     std::uint32_t newRunSeed = 2;
@@ -1610,17 +1609,16 @@ int main(void) {
         memory.assets()[byte] = amiga_game_pack[byte];
     activeGamePack = memory.assets();
     activeGamePackEnd = activeGamePack + gamePackBytes;
+    AmigaGardenScene gardenScene(memory.menuForeground(), memory.menuBackground(),
+        memory.menuEntry(), memory.copper(), memory.copper() + downwellCopperWords,
+        downwellCopperWords);
 #ifndef DOWNWELL_REPLAY_VERIFY
     /*
      * Compose the garden completely while the startup display is still
      * blank.  Once presented, these two one-bit planes are immutable: the
      * copper scrolls them solely through pointers and BPLCON1.
      */
-    if (!amigaRenderMenuCache(menuDrawList, activeGamePack,
-                              activeGamePackEnd,
-                              memory.menuForeground(),
-                              memory.menuBackground(),
-                              memory.menuEntry())) {
+    if (!gardenScene.prepare(menuDrawList, activeGamePack, activeGamePackEnd)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1667,10 +1665,6 @@ int main(void) {
                                    downwellCopperWords),
         DownwellGameplayCopperList(dynamicCopperWords[1],
                                    downwellCopperWords)
-    };
-    DownwellMenuCopperList menuCopperLists[2] = {
-        DownwellMenuCopperList(dynamicCopperWords[0], downwellCopperWords),
-        DownwellMenuCopperList(dynamicCopperWords[1], downwellCopperWords)
     };
     DownwellSelectionCopperList selectionLists[2] = {
         DownwellSelectionCopperList(dynamicCopperWords[0], downwellCopperWords),
@@ -1994,11 +1988,8 @@ int main(void) {
                     platform.waitVblank();
                     AmigaHardware::blitterDrain();
                     if (presentedScene == AmigaScene::menu &&
-                        !amigaRenderMenuCache(menuDrawList, activeGamePack, activeGamePackEnd,
-                            memory.menuForeground(), memory.menuBackground(), memory.menuEntry()))
+                        !gardenScene.prepare(menuDrawList, activeGamePack, activeGamePackEnd))
                         break;
-                    renderedMenuTitleFrame = -1;
-                    menuCopperMode[0] = menuCopperMode[1] = -1;
                     gameListReady[0] = gameListReady[1] = false;
                 }
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
@@ -2173,56 +2164,13 @@ int main(void) {
                     }
                 }
                 if (presentedScene == AmigaScene::menu) {
-                    bool menuFrameReady = true;
-                    UWORD* menuPlayerData = memory.nullSprite();
                     if (presentationChanged)
-                        menuCopperMode[0] = menuCopperMode[1] = -1;
-                    AmigaMenuScrollState menuScroll = {0, 0, 0};
-                    DW_PROFILE_PHASE(profileTitle);
-                    if (renderedMenuTitleFrame != scenes.menuTitleFrame()) {
-                        menuFrameReady = amigaRenderMenuTitle(
-                            (UWORD)scenes.menuTitleFrame(),
-                            activeGamePack, activeGamePackEnd,
-                            memory.menuForeground(), memory.menuEntry());
-                        if (menuFrameReady)
-                            renderedMenuTitleFrame = scenes.menuTitleFrame();
-                    }
-                    DW_PROFILE_PHASE(profileSprite);
-                    if (scenes.menuPlayerVisible()) {
-                        menuPlayerData = amigaMenuHardwareSprite(
-                            activeGamePack, activeGamePackEnd,
-                            (UWORD)scenes.menuPlayerSprite(),
-                            (UWORD)scenes.menuPlayerFrame(),
-                            scenes.menuPlayerFacing() < 0, back,
-                            downwellPlayfieldX + scenes.menuPlayerX() -
-                                (scenes.menuCameraX() - 80),
-                            scenes.menuPlayerY() -
-                                (scenes.menuCameraY() - 142));
-                        menuFrameReady = menuFrameReady && menuPlayerData;
-                    }
-                    if (menuFrameReady) {
-                        DW_PROFILE_PHASE(profileCopper);
-                        DW_PROFILE_PHASE(profileScroll);
-                        menuScroll = menuEntry
-                            ? amigaMenuEntryScrollState(scenes.menuCameraX() - 80,
-                                                        scenes.menuCameraY() - 142)
-                            : amigaMenuScrollState(scenes.menuCameraX() - 80,
-                                                   scenes.menuCameraY() - 142);
-                        const UBYTE* foreground = menuEntry
-                            ? memory.menuEntry() : memory.menuForeground();
-                        DW_PROFILE_PHASE(profileCopper);
-                        if (menuCopperMode[back] != 0)
-                            menuFrameReady = menuCopperLists[back].buildScroll(
-                                foreground, memory.menuBackground(), nullSprite,
-                                nullSprite, palette, menuScroll, menuEntry);
-                        menuFrameReady = menuFrameReady &&
-                            menuCopperLists[back].updateScroll(
-                                foreground, memory.menuBackground(),
-                                menuPlayerData, menuScroll, menuEntry);
-                        menuCopperMode[back] = 0;
-                    }
-                    if (!menuFrameReady)
+                        gardenScene.enter();
+                    AmigaGardenScene::Frame garden;
+                    if (!gardenScene.render(back, scenes, menuEntry, nullSprite, palette, garden))
                         break;
+                    const auto& menuScroll = garden.scroll;
+                    UWORD* menuPlayerData = garden.player;
 #ifdef DOWNWELL_SCENE_VERIFY
                     // Test the patched program against a freshly emitted oracle.
                     // Verification scratch is not nested/reentrant. Keep it
@@ -2234,14 +2182,14 @@ int main(void) {
                                              menuEntry ? memory.menuEntry() : memory.menuForeground(),
                                              memory.menuBackground(), oraclePlayer,
                                              nullSprite, palette, menuScroll, menuEntry);
-                    if (!oracleReady || oracle.size() != menuCopperLists[back].size())
+                    if (!oracleReady || oracle.size() != gardenScene.copper(back).size())
                         ++gDownwellMenuCopperPatchFailures;
                     else for (unsigned word = 0; word < oracle.size(); ++word)
-                        if (oracleWords[word] != menuCopperLists[back].data()[word])
+                        if (oracleWords[word] != gardenScene.copper(back).data()[word])
                             ++gDownwellMenuCopperPatchFailures;
 #endif
                     DW_PROFILE_PHASE(profilePublish);
-                    platform.publish(menuCopperLists[back]);
+                    platform.publish(gardenScene.copper(back));
 #ifdef DOWNWELL_SCENE_VERIFY
                     if (menuEntry && menuScroll.backgroundVisibleLines == 0)
                         downwellMenuSkyCovered();
