@@ -132,7 +132,7 @@ OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlay
 	obj/DownwellCopperLists.o \
 	obj/AmigaTerrain.o obj/AmigaGameplayGeneration.o obj/AmigaTerrainRaster.o obj/AmigaTerrainPainter.o obj/AmigaMenu.o obj/AmigaMenuScroll.o \
 	obj/AmigaMenuCache.o obj/AmigaGardenScene.o obj/AmigaSplashCache.o obj/AmigaPublisherScene.o obj/AmigaCreditsScene.o obj/AmigaControlsScene.o obj/AmigaStyleRenderer.o obj/AmigaStyleScene.o obj/AmigaUpgradeScene.o obj/AmigaSelectionLayer.o \
-	obj/AmigaRenderer.o obj/AmigaBlitter.o obj/AmigaGameplayRows.o obj/AmigaGameplayScene.o obj/AmigaGameplayActors.o obj/AmigaGameplaySpriteAssignment.o obj/AmigaGameplayDrawList.o \
+	obj/AmigaRenderer.o obj/AmigaBlitter.o obj/AmigaGameplayRows.o obj/AmigaGameplayEffects.o obj/AmigaGameplayScene.o obj/AmigaGameplayActors.o obj/AmigaGameplaySpriteAssignment.o obj/AmigaGameplayDrawList.o \
 	obj/AmigaHardware.o obj/Bitmap.o obj/Palette.o obj/Sprite.o obj/Util.o \
 	obj/GCCRuntime.o obj/AmigaPlatform.o \
 	obj/AmigaMemory.o obj/CopperList.o obj/RoomPack.o obj/ObjectPack.o \
@@ -255,6 +255,10 @@ obj/AmigaPublisherScene.o: $(AMIGA_SRC)/AmigaPublisherScene.cpp $(AMIGA_SRC)/Ami
 obj/AmigaGardenScene.o: $(AMIGA_SRC)/AmigaGardenScene.cpp $(AMIGA_SRC)/AmigaGardenScene.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
+obj/AmigaGameplayEffects.o: $(AMIGA_SRC)/AmigaGameplayEffects.cpp $(AMIGA_SRC)/AmigaGameplayEffects.h
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
 obj/AmigaGameplayRows.o: $(AMIGA_SRC)/AmigaGameplayRows.cpp $(AMIGA_SRC)/AmigaGameplayRows.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<

@@ -93,6 +93,17 @@ updates only changed plane words. It does not call the blitter. Owners must
 restore the previous effect damage from retained terrain before publishing the
 new frame; these publishing primitives do not yet schedule live effects.
 
+`AmigaGameplayEffects::draw` binds a copy of the renderer to the retired display
+ring and publishes white coverage at the shaft offset. It drains outstanding
+blits once before the first CPU write, then records contiguous touched-row runs
+in `AmigaGameplayRows` for that buffer only. An empty surface neither drains nor
+adds damage. Before that buffer is reused, its normal terrain sync restores the
+previous physical rows, independent of the new camera origin or effect lifetime.
+The backing and HUD remain untouched. The caller must place this operation at
+the source controller's painter-order boundary; it is not yet called by the
+live scene. `make test-amiga-gameplay-effects` exercises publication followed by
+restoration across alternating rings, clipping, wrapping and effect retirement.
+
 Reviewed assembly SHA-256 values:
 
 - `gml_GlobalScript_drawFx.asm`: `6e3dceea4db4e2baaf76c5d4103bd4ed930042ae769d209369d98246162b5d92`

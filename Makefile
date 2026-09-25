@@ -1026,6 +1026,14 @@ test-amiga-garden-scene: build/amiga-garden-scene-test
 test: test-amiga-garden-scene
 
 .PHONY: test-amiga-gameplay-rows
+build/amiga-gameplay-effects-test: tests/platform/amiga/AmigaGameplayEffectsTest.cpp src/platform/amiga/AmigaGameplayEffects.cpp src/platform/amiga/AmigaGameplayRows.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp %.c,$^)
+.PHONY: test-amiga-gameplay-effects
+test-amiga-gameplay-effects: build/amiga-gameplay-effects-test
+	./build/amiga-gameplay-effects-test
+test: test-amiga-gameplay-effects
+
 build/amiga-gameplay-rows-test: tests/platform/amiga/AmigaGameplayRowsTest.cpp src/platform/amiga/AmigaGameplayRows.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
