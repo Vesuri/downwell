@@ -104,6 +104,18 @@ keep using its resource-default case rectangle after that transition.
 These metadata checks do not resolve the Windows runner's line-edge rounding
 or constitute a rendered-ray verification.
 
+`ShopWorld::rayWallIntersects` supplies a pure shared segment query for the
+currently modeled shop children, in room coordinates. It reuses their live
+rectangle visitor, excludes the counter/friendly keeper, respects invisible
+wall retirement, and retains table/case masks after purchase or counter
+retirement. Tests independently enumerate 6,000 point positions, trace rays
+into a case and through the one-pixel gap to the table, and check fractional
+edges and query side effects. Focused tests and ASan/UBSan pass. The shared
+half-open rectangle convention is retained, not newly certified as Windows
+line-edge behavior. Destructible cases are not yet represented in `ShopWorld`;
+their mask transition must be added to the common visitor with that feature.
+This query is ready for the ray adapters but is not yet called by a renderer.
+
 `playerDraw` traces cumulative lines against `parentWall` and `subparentEnemy`,
 starting at the player origin. Each iteration advances Y by
 `lengthdir_y(8,270+aimAngle)` but X by

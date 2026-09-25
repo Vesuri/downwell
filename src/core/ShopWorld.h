@@ -5,6 +5,7 @@
 #include "ShopKeeper.h"
 #include "InteractionPrompt.h"
 #include "Input.h"
+#include "ProjectileSegment.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
 // Coordinates passed here are integer mask-query positions. Full fractional
@@ -75,6 +76,19 @@ struct ShopWorld {
         bool hit = false;
         visitPlayerSolids([&](Rectangle r) {
             if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = true;
+        });
+        return hit;
+    }
+    // Current shop children all belong to parentWall (57). The counter and
+    // friendly keeper do not. Pure query in room coordinates, suitable for
+    // each <=8-pixel LaserSightRay step; never dispatch damage or consume RNG.
+    // Destructible-case behavior is not yet modeled by ShopWorld: when added,
+    // its noMask transition must also remove that case from the visitor above.
+    bool rayWallIntersects(const ProjectileSegment& path) const {
+        bool hit = false;
+        visitPlayerSolids([&](Rectangle r) {
+            if (!hit && path.intersects(r.left, r.right + 1, r.top, r.bottom + 1))
+                hit = true;
         });
         return hit;
     }

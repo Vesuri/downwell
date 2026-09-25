@@ -1,6 +1,7 @@
 #include "core/RunSession.h"
 #include "core/PlayerMotion.h"
 #include "core/ShopFixtures.h"
+#include "core/LaserSightRay.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -8,6 +9,51 @@ static void require(bool ok, const char* message) {
     if (!ok) { std::fprintf(stderr, "%s\n", message); std::abort(); }
 }
 int main() {
+    {
+        downwell::ShopWorld world;
+        using C = downwell::LaserSightRay::Coordinate;
+        using Segment = downwell::ProjectileSegment;
+        constexpr auto unit = downwell::MachineGunTrajectory::unit;
+        require(!world.rayWallIntersects(Segment(C{45,0}, C{-20,0}, 0, 8*unit)),
+                "unallocated shop supplies no ray targets");
+        unsigned randomCalls = 0;
+        const unsigned choices[] = {100, 101, 104, 105, 0};
+        auto* shop = world.create(0, 0, [&](unsigned lo, unsigned hi) {
+            require(randomCalls < 5, "bounded stock setup");
+            const unsigned value = choices[randomCalls++];
+            require(value >= lo && value <= hi, "stock setup stays within requested range");
+            return value;
+        }, 4, 1);
+        const unsigned creationCalls = randomCalls;
+        // Independently enumerate the source default child rectangles, rather
+        // than deriving expected hits from visitPlayerSolids itself.
+        for (int y = -25; y < 25; ++y) for (int x = -15; x < 105; ++x) {
+            bool expected = (x >= -8 && x <= 7 && y >= 0 && y <= 15) ||
+                            (x >= 34 && x <= 93 && y >= 0 && y <= 7);
+            for (int i = 0; i < 3; ++i)
+                expected |= x >= 36+19*i && x <= 53+19*i && y >= -18 && y <= -1;
+            require(world.rayWallIntersects(Segment(C{x,0}, C{y,0}, 0, 0)) == expected,
+                    "ray zero-length queries match source shop child rectangles");
+        }
+        auto walls = [&](const Segment& s) { return world.rayWallIntersects(s); };
+        auto noEnemy = [](const Segment&) { return false; };
+        auto ray = downwell::LaserSightRay::trace(C{45,0}, C{-30,0}, C{40,0}, 0, walls, noEnemy);
+        require(ray.y.pixel == -14, "ray stops on case at stepped endpoint, not table below");
+        ray = downwell::LaserSightRay::trace(C{54,0}, C{-30,0}, C{40,0}, 0, walls, noEnemy);
+        require(ray.y.pixel == 2, "ray passes between cases and hits table");
+        shop->feedback.itemPresent[0] = false;
+        shop->present = shop->maskEnabled = false;
+        require(world.rayWallIntersects(Segment(C{45,0}, C{-20,0}, 0, 8*unit)),
+                "sold contents and retired counter do not remove case masks");
+        shop->wallPresent = false;
+        require(!world.rayWallIntersects(Segment(C{0,0}, C{-2,0}, 0, 8*unit)),
+                "retired invisible wall is absent from ray targets");
+        require(world.rayWallIntersects(Segment(C{34,0}, C{7,unit-1}, 0, 0)) &&
+                !world.rayWallIntersects(Segment(C{34,0}, C{8,0}, 0, 0)),
+                "shop ray uses the shared half-open subpixel rectangle convention");
+        require(randomCalls == creationCalls && world.allocatedCount == 1 && shop->artRevision == 1,
+                "ray queries neither consume random values nor change shop revision");
+    }
     downwell::InteractionPrompt prompt;
     double sourcePhase = 0;
     for (unsigned tick = 0; tick < 10000; ++tick) {
