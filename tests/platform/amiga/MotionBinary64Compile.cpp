@@ -7,6 +7,7 @@
 #include "core/SkeletonAnimation.h"
 #include "core/SkeletonDecisions.h"
 #include "core/SkeletonActor.h"
+#include "core/BoneProjectileStore.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
@@ -90,4 +91,20 @@ extern "C" unsigned skeletonActorCompile(downwell::SkeletonActor* state,
     SkeletonDecisionEvents ops;
     if (!state->step(stopped,below,left,movement,ops)) return 0xffffffffu;
     return ops.trace;
+}
+namespace {
+struct BoneStoreCompileRandom {
+    unsigned word;
+    unsigned nextU32() { return word++; }
+    unsigned chooseIndexSmall(unsigned count) { return nextU32()%count; }
+};
+struct BoneStoreCompileSound { unsigned value=0; void operator()(int n) { value=n; } };
+}
+extern "C" unsigned boneStoreCompile(downwell::BoneProjectileStore<8>* store,
+    unsigned randomWord,bool separated,bool* shot) {
+    BoneStoreCompileRandom random{randomWord}; BoneStoreCompileSound sound;
+    downwell::SkeletonBoneCreation<downwell::BoneProjectileStore<8>,BoneStoreCompileRandom,BoneStoreCompileSound>
+        creation{*store,random,sound,*shot};
+    if (!creation.run(100,200,separated,1)) return 0;
+    return creation.child;
 }

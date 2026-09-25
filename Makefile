@@ -121,6 +121,14 @@ all: $(TARGET)
 .PHONY: verify-sequence-timeline
 .PHONY: verify-unit-sequence-frames
 .PHONY: verify-skeleton-animation
+.PHONY: verify-bone-store
+verify-bone-store: build/bone-store-test
+	./build/bone-store-test
+
+build/bone-store-test: tests/core/BoneProjectileStoreTest.cpp src/core/BoneProjectileStore.h src/core/BoneProjectile.h src/core/SkeletonThrow.h src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ $< src/core/GameMakerRandom.cpp
+
 .PHONY: verify-skeleton-actor
 verify-skeleton-actor: build/skeleton-actor-test
 	./build/skeleton-actor-test

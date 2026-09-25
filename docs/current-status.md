@@ -298,6 +298,18 @@ and the ordinary build was restored after both attempts.
   the composed event compiles for 68000 without external arithmetic helpers.
   This is still an event component, not live registration: End Step out-of-view,
   inherited setup/effects, phase ownership and precise predicate adapters remain.
+  `BoneProjectileStore` now supplies fixed-capacity child ownership, stable
+  handles and explicit event-boundary retirement. `SkeletonBoneCreation`
+  connects the throw helper to real stored child state: Create completes before
+  sound, then choice RNG, velocity/spin overrides and the shot latch. Its live
+  entry accepts a precise horizontal-separation predicate, avoiding integer
+  rounding of the player merely to choose the RNG branch. 2,048 seed/alignment
+  cases cover child state/RNG, exhaustion without draws/latching, deferred slot
+  reuse and stale handles; sanitizers and the existing 9,216 throw cases pass.
+  The composed 68000 fixture compiles without floating-point helpers, but does
+  reference memcpy and integer multiply/modulo helpers. No timing improvement
+  or live gameplay is claimed: creation-frame eligibility, animation, collision
+  scheduling and presentation still need connection to GameplayWorld.
 
 ## Working evidence
 
