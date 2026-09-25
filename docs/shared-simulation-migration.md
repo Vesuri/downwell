@@ -18,6 +18,27 @@ The fixed-point world now lives in core, but SDL's live `StartupRuntime` still
 owns a separate world loop. Extracting the class does not complete that switch.
 Rendering/storage optimizations do not justify separate gameplay rules.
 
+## Remove the superseded SDL builder
+
+The room-boundary audit found 322 unreachable lines after the unconditional
+return following `AreaOneBuilder::stepVisible` and its state synchronization.
+This was a complete older builder implementation, including separate enemy
+birth rules and pattern/RNG selection. It has been removed, not migrated or
+enabled. SDL continues using the same shared builder it used before this edit.
+
+The core-boundary verification now also compiles `StartupRuntime.cpp` with
+unreachable-code diagnostics treated as errors, so another abandoned
+implementation cannot silently remain behind an unconditional return.
+As a negative control, the same compiler command rejects the previous source
+at the start of that obsolete block; it accepts the cleaned runtime.
+This cleanup reduces the code to audit for the live-world switch; it does not
+claim that `StartupRuntime` has started delegating its world Step to
+`GameplayWorld`.
+The full host suite passes all eight combat/upgrade variants, both extended
+reentries and the renderer checks; SDL rebuilds successfully. Logs:
+`/tmp/downwell-live-builder-suite.log`, `/tmp/downwell-live-builder-sdl.log`.
+No native source or executable was changed by this cleanup.
+
 ## Portable fixed-point world extraction
 
 `GameplayWorld.{h,cpp}` now owns the formerly backend-local world simulation.
