@@ -17,6 +17,26 @@ reward orchestration, special camera modes and menus still need consolidation. N
 world classes contain domain logic that does not belong under `src/platform`.
 Rendering/storage optimizations do not justify separate gameplay rules.
 
+## Shared projectile lifecycle
+
+Both adapters now call `stepMachineGunProjectile` for the complete implemented
+per-shot lifecycle: animation, first-Step initialization and collision queries,
+motion, published position and view expiry. Their separate implementations of
+that ordering are removed. World-specific collision lookup and compact/live-slot
+storage remain adapters; the existing enemy-first scheduling is preserved,
+not claimed to be a complete reconstruction of the VM event scheduler.
+
+Focused tests cover both absolute and origin-relative coordinates, enemy-hit,
+wall-hit and surviving shots, animation/RNG before queries, finishing movement
+for consumed shots, and strict expiry after crossing the lower view margin.
+They pass under address/undefined-behavior sanitizers. The bounded 45-second
+68000 replay passes with unchanged digests; the ordinary build is restored and
+both target audits are clean (`/tmp/downwell-projectile-lifecycle-native.log`).
+The full host suite passes all eight combat/upgrade variants and both extended
+level reentries, followed by 22,834 offline sprite comparisons. SDL rebuilds
+successfully. Logs: `/tmp/downwell-projectile-lifecycle-suite.log` and
+`/tmp/downwell-projectile-lifecycle-sdl.log`.
+
 ## Shared enemy creation profiles
 
 `EnemyCreateProfile.h` is the single definition of health, reward and initial

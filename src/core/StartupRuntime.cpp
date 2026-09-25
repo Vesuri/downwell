@@ -610,8 +610,7 @@ void StartupRuntime::updateMainBullets() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
-        bullet.animation.advance();
-        bool alive = stepMachineGunBullet(bullet.trajectory, random_,
+        const bool alive = stepMachineGunProjectile(bullet, random_,
           [this, &bullet](const ProjectileSegment& path) {
             InstanceRecord* enemy = mainBulletEnemyCollision(path);
             if (enemy != nullptr) {
@@ -640,13 +639,7 @@ void StartupRuntime::updateMainBullets() {
                 return true;
             }
             return false;
-          });
-        bullet.x = static_cast<float>(bullet.trajectory.x.pixel);
-        bullet.y = static_cast<float>(bullet.trajectory.y.pixel);
-        if (fractionalBulletOutsideView(bullet.trajectory.y, 0,
-                                      mainCameraMotion_.viewTopQ12(),
-                                      surfaceHeight))
-            alive = false;
+          }, 0, mainCameraMotion_.viewTopQ12(), surfaceHeight);
         if (alive)
             mainBullets_[write++] = bullet;
     }

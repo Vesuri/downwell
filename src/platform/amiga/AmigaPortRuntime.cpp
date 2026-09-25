@@ -636,8 +636,8 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
             if (!bullet.active)
                 continue;
             bulletChanged = true;
-            bullet.animation.advance();
-            bullet.active = downwell::stepMachineGunBullet(bullet.trajectory, enemyRandom_,
+            const long cameraCentreQ12 = 176L * 4096 + viewCameraYQ8() * 16;
+            bullet.active = downwell::stepMachineGunProjectile(bullet, enemyRandom_,
                 [this, &bullet](const downwell::ProjectileSegment& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
                         EnemyState& enemy = enemies_[enemyIndex];
@@ -707,13 +707,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
                                     return true;
                     }
                     return false;
-                });
-            bullet.x = bullet.trajectory.x.pixel;
-            bullet.y = bullet.trajectory.y.pixel;
-            const long cameraCentreQ12 = 176L * 4096 + viewCameraYQ8() * 16;
-            if (downwell::fractionalBulletOutsideView(bullet.trajectory.y, 176,
-                                                    cameraCentreQ12 - 142L * 4096))
-                bullet.active = false;
+                }, 176, cameraCentreQ12 - 142L * 4096);
         }
     }
 

@@ -38,6 +38,47 @@ int main() {
             fractionalBulletOutsideView({-67,1048575},0,34*4096L),
             "negative fractional coordinates expire strictly above the upper margin");
     struct Random { unsigned draws = 0; unsigned nextU32() { ++draws; return 0x80000000u; } } random;
+    for (int origin : {0, 176}) for (int impact : {0, 1, 2}) {
+        struct Bullet {
+            int x = -1, y = -1;
+            downwell::ProjectileAnimation animation;
+            downwell::MachineGunTrajectory trajectory;
+        } bullet;
+        bullet.trajectory.reset(20, 342 - origin, true);
+        Random rng;
+        unsigned enemies = 0, walls = 0;
+        downwell::ProjectileAnimation expected;
+        expected.advance();
+        const auto enemy = [&](const downwell::ProjectileSegment&) {
+            ++enemies;
+            require(bullet.animation.index.equal(expected.index) && rng.draws == 1,
+                    "projectile animation and first-Step RNG precede impact queries");
+            require(bullet.trajectory.y.pixel == 342 - origin,
+                    "collision queries observe pre-movement coordinates");
+            return impact == 1;
+        };
+        const auto wall = [&](const downwell::ProjectileSegment&) {
+            ++walls;
+            require(enemies == 1, "enemy arbitration precedes terrain arbitration");
+            return impact == 2;
+        };
+        const bool alive = downwell::stepMachineGunProjectile(bullet, rng, enemy, wall,
+                                                             origin, 34 * 4096L);
+        require(alive == (impact == 0) && enemies == 1 && walls == (impact == 1 ? 0u : 1u),
+                "shared projectile lifecycle preserves non-piercing impact arbitration");
+        require(bullet.x == 20 && bullet.y + origin == 350 &&
+                bullet.animation.index.equal(expected.index),
+                "even consumed shots finish motion and publish position before retirement");
+        if (alive) {
+            expected.advance();
+            require(!downwell::stepMachineGunProjectile(bullet, rng,
+                    [](const downwell::ProjectileSegment&) { return false; },
+                    [](const downwell::ProjectileSegment&) { return false; }, origin, 34 * 4096L),
+                    "next update expires after movement crosses the strict lower margin");
+            require(rng.draws == 1 && bullet.y + origin == 358 && bullet.animation.index.equal(expected.index),
+                    "later updates preserve initialization RNG and advance animation through expiry");
+        }
+    }
     downwell::MachineGunTrajectory motion; motion.reset(20,10);
     unsigned wallQueries = 0;
     require(!downwell::stepMachineGunBullet(motion, random,
