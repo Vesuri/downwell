@@ -119,6 +119,20 @@ int main(int argc, char** argv) {
         for (unsigned i = 0; i < pixels.size(); ++i) pixels[i] = (i*37u + i/11u) & 255u;
         pristine = pixels;
         AmigaLaserSight overlay;
+        for (unsigned pen = 0; pen < 4; ++pen) {
+            std::vector<UBYTE> solid(downwellGameRingBytes, (pen & 1) ? 255 : 0);
+            std::fill(solid.begin()+downwellGameRingPlaneBytes, solid.end(), (pen & 2) ? 255 : 0);
+            const auto before = solid;
+            const downwell::LaserSightLine point{191,283,191,283};
+            AmigaLaserSight single;
+            single.prepare(solid.data(), 319, &point, false);
+            single.draw();
+            const unsigned changedPlanes = (pen & 1 ? 1 : 0) + (pen & 2 ? 0 : 1);
+            require(single.lastByteWrites == changedPlanes, "red pixel writes only planes whose bits change");
+            single.prepare(solid.data(), 319, nullptr, false);
+            require(single.lastByteWrites == changedPlanes && solid == before,
+                    "each source pen restores with exactly its changed-plane writes");
+        }
         for (unsigned origin = 0; origin < 320; ++origin)
             for (unsigned y = 0; y < 284; ++y)
                 require(AmigaLaserSight::physicalRow(origin,y) == (origin+y)%320,

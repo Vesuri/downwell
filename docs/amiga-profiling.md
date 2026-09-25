@@ -2,6 +2,23 @@
 
 ## Current checkpoint (2026-09-25)
 
+### Direct changed-plane ray publication
+
+The ray painter now reuses the two bytes it just read to save the underlying
+pixel, publishing only the changed low/high plane bits directly. It no longer
+rereads those bytes through the generic colour writer. Restoration retains
+the existing neighbor-preserving path. Four explicit source-pen cases assert
+exact changed-plane write counts in both directions, including zero writes
+for existing red. Renderer regression and ASan/UBSan pass.
+
+The same upgraded 600-update FPSCOUNT tape improves modestly from **1,896
+fields / 15.82 FPS** to **1,874 fields / 16.01 FPS**, maximum gap still seven.
+This is not a frame-budget fix. Logs:
+`/tmp/downwell-ray-direct-{test,sanitized,fps}.log`.
+The bounded native capture still matches SDL at 0/99,968 differing pixels;
+the ordinary build was restored and both 68000 audits pass. Capture/build
+evidence: `/tmp/downwell-ray-direct-frame.log`.
+
 ### Rejected indexed Laser Sight breakable lookup
 
 An experiment reused the existing breakable-cell index to test at most four

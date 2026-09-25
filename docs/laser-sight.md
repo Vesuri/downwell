@@ -77,7 +77,7 @@ port's half-open contact convention; original `collision_line` rounding and
 mask behavior remain an explicit integration gate.
 
 Both renderers now use this foundation. Two native captures match the host
-as described below; original-GPU pixel fidelity and native timing remain open.
+as described below; original-GPU pixel fidelity and the native frame budget remain open.
 
 ### Collision-family audit
 
@@ -177,7 +177,9 @@ The Amiga actor list now contains a ray marker after the player. Hardware
 allocation stops at that marker: earlier actors use the masked planar pass,
 while later bullets/gems may still use hardware sprites. This keeps earlier
 hardware sprites from incorrectly covering the planar ray. That extra BOB
-work is a performance cost which has not yet been profiled with the upgrade.
+work is a performance cost. The upgraded profiling tape remains slow (16.01
+FPS at the latest measured checkpoint); see `amiga-profiling.md` for the
+separate tracing, restoration and drawing phases and measured optimizations.
 
 Each display buffer owns an `AmigaLaserSight` sparse overlay (1,776 bytes of
 pixel-save storage). It saves only changed pixel bits, never edits the pristine

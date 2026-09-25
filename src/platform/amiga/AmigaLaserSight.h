@@ -71,11 +71,18 @@ public:
             const unsigned row = physicalRow(origin_, static_cast<unsigned>(y));
             Pixel p{static_cast<UWORD>(row * downwellBytesPerPlaneLine + (x >> 3)),
                     static_cast<UBYTE>(0x80u >> (x & 7)), 0};
-            p.pen = ((target_[p.offset] & p.mask) ? 1 : 0) |
-                    ((target_[p.offset + downwellGameRingPlaneBytes] & p.mask) ? 2 : 0);
+            UBYTE& low = target_[p.offset];
+            UBYTE& high = target_[p.offset + downwellGameRingPlaneBytes];
+            const UBYTE previousLow = low, previousHigh = high;
+            p.pen = ((previousLow & p.mask) ? 1 : 0) |
+                    ((previousHigh & p.mask) ? 2 : 0);
             if (p.pen == 2) return; // Already red: neither save nor overwrite.
             saved_[count_++] = p;
-            write(p, 2);
+            // These bytes were just read to save the original pen. Red is 10:
+            // publish each changed plane directly, without rereading it or
+            // composing a generic two-plane colour a second time.
+            if (p.pen & 1u) { low = previousLow & (UBYTE)~p.mask; ++lastByteWrites; }
+            if (!(p.pen & 2u)) { high = previousHigh | p.mask; ++lastByteWrites; }
         });
         pending_ = false; valid_ = true;
     }
