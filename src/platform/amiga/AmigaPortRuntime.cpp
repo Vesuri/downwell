@@ -496,8 +496,10 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         auto& runtime = *static_cast<AmigaPortRuntime*>(context);
         runtime.run_.gems.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
+    DW_PROFILE_PHASE(profilePlayerMotion);
     AmigaPlayerMotion motion = player_.step(input, run_.shops.noControl || run_.exitControlsLocked,
         death_.movementDead(), run_.shops.interactable, run_.goalStopped, run_.gemHigh);
+    DW_PROFILE_PHASE(profilePlayerShops);
     const int shopPlayerX = 240 + downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int shopPlayerY = 176 + downwell::roundGameMakerQ8(player_.offsetYFixed());
     run_.shops.observePlayer(shopPlayerX, shopPlayerY, player_.grounded(), player_.speedXFixed());
@@ -510,6 +512,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     player_.face(shopFacing);
     run_.shops.advanceKeepers(shopPlayerX, false, run_.stage.area, shopRandom);
     run_.shops.advancePresentation();
+    DW_PROFILE_PHASE(profilePlayer);
     player_.configureComboCompletion(nullptr, nullptr);
     player_.configureMovementBoundary(nullptr, nullptr);
     // Goal-field overlap and boss completion remain separate source guards.

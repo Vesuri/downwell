@@ -370,6 +370,30 @@ gap five. No measurable FPS improvement is claimed. Logs use
 `/tmp/downwell-breakable-cells-` with `test`, `regression`, `sanitized`, `fps`
 and `replay` suffixes. Native runs are bounded to 45 seconds.
 
+### Split player movement from shop and setup work
+
+Probe-only phases 40 and 41 separate the call to `player_.step` and the shop/
+keeper sequence from phase 16. The current 600-update tape reports:
+
+| Phase | Total ms | ms/update |
+| --- | ---: | ---: |
+| 40: movement, excluding nested terrain queries | 1,325.580 | 2.209 |
+| 41: shops and keepers | 242.634 | 0.404 |
+| 16: remaining setup/player work | 897.329 | 1.496 |
+
+Movement has 4,865 timing brackets because nested terrain queries split the
+parent scope. Its 1.017 ms maximum bracket is **not** a maximum whole movement
+call. All values include instrumentation overhead. This is diagnostic only;
+the shipping baseline remains 36.41 FPS, and the maximum instrumented whole
+frame remains 147.067 ms.
+
+Runtime fixture digests and both native 68000 audits pass. The bounded run
+cleaned up and restored the ordinary non-skip build. Logs use
+`/tmp/downwell-player-detail-{profile,test,restore}.log`.
+Inspection identifies repeated four-corner player-mask queries as a possible
+backend batching target. Any batching must preserve those corner semantics,
+not substitute full rectangle overlap or change source movement order.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in
