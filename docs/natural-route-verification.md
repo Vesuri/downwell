@@ -16,9 +16,13 @@ Upgrade effects, offers, inventory and full RNG state are compared. The first
 
 Seed 4 continues another 662 updates to its generated shop at (368, 2208).
 The controller approaches the counter using its generated position. Opening,
-holding fire and selecting Leave compare menu/control ownership and all three
-stock entries, without replacing items or granting test funds. The shop test
-does not yet purchase anything or walk back into the main shaft.
+holding fire, attempting purchase and selecting Leave compare menu/control
+ownership and all three stock entries, without replacing items or granting
+test funds. This route has 22 gems versus a 300-gem price: the attempted purchase
+is rejected with unchanged stock/currency. Held opening input is independently
+checked not to spend or buy. Returning left takes 43 updates and moves the
+camera from offset 160 to 0; gameplay/camera parity is checked throughout.
+Successful naturally funded purchasing remains unverified.
 
 The original `scrLevelPat1` VM assembly sets `shopMade=1` and
 `rightRoomAmt=2` when area=1, level=1 and playStyle!=4. This explains why the
@@ -26,7 +30,7 @@ usual-style shop route starts in cavern two, rather than forcing a shop into
 the first level. Source: local UTMT 0.9.2.0 export,
 `Assembly/gml_GlobalScript_scrLevelPat1.asm`, branches 6–11.
 
-Evidence: `/tmp/downwell-natural-shop-test.log`. Both routes and natural shop
+Evidence: `/tmp/downwell-natural-shop-return.log`. Both routes and natural shop
 interaction pass. The seed-99 second-level exploratory policy stalled against
 terrain; it was not promoted into a passing shop test. This is bounded route
 coverage, not proof of all generated layouts or all original game behavior.

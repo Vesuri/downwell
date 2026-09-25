@@ -33,7 +33,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   native rendering gate. Seed 4 additionally reaches an unmodified generated
   shop in cavern two after 662 updates and compares opening, held fire and
   Leave, including menu state and generated stock. No currency or shop items
-  are injected. Natural purchasing and traversal back out remain unverified.
+  are injected. A purchase with 22 gems against a 300-gem price is rejected;
+  43 subsequent updates return the player and camera to the main shaft.
+  Successful naturally funded purchasing and native route rendering remain
+  unverified.
 - Results-menu tests cover all three destinations and 200 final gameplay
   updates, including display-memory reuse and the task-stack guard.
 - A dedicated native horizontal-camera fixture covers all three columns and

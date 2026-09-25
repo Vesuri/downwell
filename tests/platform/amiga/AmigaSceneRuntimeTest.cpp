@@ -1920,11 +1920,34 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             };
             shopTick(false); shopTick(true);
             require(game.shops().noControl, "natural counter opens shop instead of jumping");
+            const downwell::ShopWorld::Instance* activeShop = nullptr;
+            for (const auto& shop : game.shops().instances) if (shop.menu.active) activeShop = &shop;
+            require(activeShop != nullptr, "generated shop owns active menu");
+            const auto originalStock = activeShop->stock.items[0];
+            const unsigned money = game.currency();
             shopTick(true); // Held opening input must remain filtered.
+            require(activeShop->stock.items[0].remaining == originalStock.remaining && game.currency() == money,
+                "held opening input neither purchases nor spends naturally collected gems");
+            shopTick(false); shopTick(true);
+            const bool affordable = money >= originalStock.price;
+            require(activeShop->stock.items[0].remaining == originalStock.remaining - unsigned(affordable) &&
+                game.currency() == money - (affordable ? originalStock.price : 0),
+                "natural purchase response preserves or deducts actual price and stock");
             shopTick(false, true); // Cursor 1 -> Leave.
             shopTick(true);
             require(!game.shops().noControl, "natural shop Leave returns movement ownership");
-            std::cout << "Natural shop seed=4 approach=" << shopUpdates << " open/hold/leave passed\n";
+            const int sideCamera = game.cameraOffsetX();
+            unsigned returnUpdates = 0;
+            for (; returnUpdates < 240; ++returnUpdates) {
+                const int x = 240 + game.player().offsetX();
+                shopTick(returnUpdates % 40 == 0, x > 240);
+                if (240 + game.player().offsetX() < 280 && game.cameraOffsetX() == 0) break;
+            }
+            std::cout << "Natural shop seed=4 approach=" << shopUpdates << " affordable=" << affordable
+                      << " gems=" << money << " price=" << originalStock.price << " return=" << returnUpdates
+                      << " camera=" << sideCamera << "->" << game.cameraOffsetX() << std::endl;
+            require(sideCamera != 0 && returnUpdates < 240 && !game.dead(),
+                "natural shop return releases side camera and reaches main shaft alive");
         }
     }
 }
