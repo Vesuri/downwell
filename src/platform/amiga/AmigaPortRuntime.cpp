@@ -6,6 +6,7 @@
 #include "core/PortCheckpoint.h"
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
+#include "core/EnemyCreateProfile.h"
 #include "core/EnemyStepPresentation.h"
 #include "core/EnemyContact.h"
 #include "core/EnemyContactResponse.h"
@@ -233,11 +234,7 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     enemy.moveSpeed = moveSpeed;
     enemy.imagePhase = 0;
     enemy.imageRemainder = 0;
-    enemy.imageSpeed = objectId == 111 ? 5u
-                       : objectId == 112 ? 3u
-                       : objectId == 116 ? 4u
-                       : objectId == 117 || objectId == 119 ? 2u
-                       : 0u;
+    enemy.imageSpeed = downwell::enemyCreateProfile(objectId).animationRate;
     enemy.imageFrame = 0;
     enemy.active = active;
     enemy.awake = awake;

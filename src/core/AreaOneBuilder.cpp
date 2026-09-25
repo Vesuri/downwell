@@ -1,4 +1,5 @@
 #include "AreaOneBuilder.h"
+#include "EnemyCreateProfile.h"
 
 namespace downwell {
 
@@ -83,7 +84,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     break;
     case 111: {
-        command.imageSpeed = 0.25F;
+        command.imageSpeed = enemyCreateProfile(111).animationRate / 20.0F;
         command.velocityX = 0.5F;
         command.integerVelocityX = 128;
         command.motionInitialized = true;
@@ -91,7 +92,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     break;
     case 112: {
-        command.imageSpeed = 0.15F;
+        command.imageSpeed = enemyCreateProfile(112).animationRate / 20.0F;
         command.velocityX = 0.25F;
         command.integerVelocityX = 64;
         command.auxiliaryState = random.irandomSmall(1) == 0 ? 1 : -1;
@@ -101,14 +102,14 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     break;
     case 113: {
-        command.imageSpeed = 0.0F;
+        command.imageSpeed = enemyCreateProfile(113).animationRate / 20.0F;
         command.motionInitialized = true;
         command.alarms.set(1,
             60 + static_cast<int>(random.randomIntegerSmall(60)));
     }
     break;
     case 116: {
-        command.imageSpeed = 0.2F;
+        command.imageSpeed = enemyCreateProfile(116).animationRate / 20.0F;
         random.nextU32();
         command.integerDirection = random.irandomSmall(359);
 #ifndef DOWNWELL_FREESTANDING
@@ -121,7 +122,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     break;
     case 117: {
-        command.imageSpeed = 0.1F;
+        command.imageSpeed = enemyCreateProfile(117).animationRate / 20.0F;
         command.integerVelocityY = random.irandomSmall(1) == 0 ? 26 : -26;
         command.velocityY = command.integerVelocityY > 0 ? 0.1F : -0.1F;
         command.motionInitialized = true;
@@ -129,7 +130,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     break;
     case 119: {
-        command.imageSpeed = 0.1F;
+        command.imageSpeed = enemyCreateProfile(119).animationRate / 20.0F;
         command.motionState = random.irandomSmall(1) == 0 ? 1 : -1;
         command.moveSpeed = 1.0F;
         command.integerMoveSpeed = 256;

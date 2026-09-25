@@ -4,6 +4,7 @@
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
+#include "EnemyCreateProfile.h"
 #include "EnemyStepPresentation.h"
 #include "EnemyContact.h"
 #include "EnemyContactResponse.h"
@@ -1651,9 +1652,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1193: // gml_Object_enmSnake_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            instance->imageSpeed = 0.25F;
-            instance->health = 5;
-            instance->reward = 6;
+            applyEnemyCreateStats(*instance, 111);
             if (!instance->motionInitialized) {
                 instance->preciseX = static_cast<float>(instance->x);
                 instance->preciseY = static_cast<float>(instance->y);
@@ -1666,9 +1665,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1198: // gml_Object_enmGroundTurtle_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            instance->imageSpeed = 0.15F;
-            instance->health = 5;
-            instance->reward = 14;
+            applyEnemyCreateStats(*instance, 112);
             if (!instance->motionInitialized) {
                 instance->preciseX = static_cast<float>(instance->x);
                 instance->preciseY = static_cast<float>(instance->y);
@@ -1681,9 +1678,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1204: // gml_Object_enmFrog_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            instance->imageSpeed = 0.0F;
-            instance->health = 35;
-            instance->reward = 20;
+            applyEnemyCreateStats(*instance, 113);
             if (!instance->motionInitialized) {
                 instance->preciseX = static_cast<float>(instance->x);
                 instance->preciseY = static_cast<float>(instance->y);
@@ -1694,9 +1689,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1230: // gml_Object_enmBat_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            instance->imageSpeed = 0.2F;
-            instance->health = 15;
-            instance->reward = 12;
+            applyEnemyCreateStats(*instance, 116);
             if (!instance->motionInitialized) {
                 instance->preciseX = static_cast<float>(instance->x);
                 instance->preciseY = static_cast<float>(instance->y);
@@ -1708,9 +1701,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1237: // gml_Object_enmSnail_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            instance->imageSpeed = 0.1F;
-            instance->health = 20;
-            instance->reward = 24;
+            applyEnemyCreateStats(*instance, 117);
             if (!instance->motionInitialized) {
                 instance->preciseX = static_cast<float>(instance->x);
                 instance->preciseY = static_cast<float>(instance->y);
@@ -1722,9 +1713,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1252: // gml_Object_enmCrawler_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr) {
-            instance->imageSpeed = 0.1F;
-            instance->health = 3;
-            instance->reward = 6;
+            applyEnemyCreateStats(*instance, 119);
             if (!instance->motionInitialized) {
                 instance->preciseX = static_cast<float>(instance->x);
                 instance->preciseY = static_cast<float>(instance->y);

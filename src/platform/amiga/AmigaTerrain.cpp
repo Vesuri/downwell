@@ -5,6 +5,7 @@
 #include "core/AreaOneBuilder.h"
 #include "core/GameMakerRandom.h"
 #include "core/GameplayLimits.h"
+#include "core/EnemyCreateProfile.h"
 
 void AmigaTerrainTiles::clear() {
     for (unsigned row = 0; row < rows; ++row) heads_[row] = tails_[row] = 0;
@@ -160,21 +161,11 @@ bool AmigaAreaOneTerrainBuilder::stepVisible(
 }
 
 int amigaEnemyHealth(int objectId) {
-    if (objectId == 111 || objectId == 112) return 5;
-    if (objectId == 113) return 35;
-    if (objectId == 116) return 15;
-    if (objectId == 117) return 20;
-    if (objectId == 119) return 3;
-    return 0;
+    return downwell::enemyCreateProfile(objectId).health;
 }
 
 int amigaEnemyReward(int objectId) {
-    if (objectId == 111 || objectId == 119) return 6;
-    if (objectId == 112) return 14;
-    if (objectId == 113) return 20;
-    if (objectId == 116) return 12;
-    if (objectId == 117) return 24;
-    return 0;
+    return downwell::enemyCreateProfile(objectId).reward;
 }
 
 bool amigaBuildInitialAreaOneTerrain(

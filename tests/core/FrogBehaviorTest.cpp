@@ -6,6 +6,7 @@
 #include "core/FrogMotion.h"
 #include "core/FrogPresentation.h"
 #include "core/EnemyStepPresentation.h"
+#include "core/EnemyCreateProfile.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -15,6 +16,22 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    {
+        struct Instance { int health = -1, reward = -1; float imageSpeed = -1; int untouched = 37; };
+        for (int object : {111, 112, 113, 116, 117, 119}) {
+            const auto profile = downwell::enemyCreateProfile(object);
+            Instance instance;
+            downwell::applyEnemyCreateStats(instance, object);
+            require(instance.health == profile.health && instance.reward == profile.reward &&
+                    std::lround(instance.imageSpeed * 20) == profile.animationRate && instance.untouched == 37,
+                    "SDL creation adapter preserves shared health/reward/rate without resetting other state");
+        }
+        for (int object : {-1, 0, 110, 114, 115, 118, 120}) {
+            const auto profile = downwell::enemyCreateProfile(object);
+            require(profile.health == 0 && profile.reward == 0 && profile.animationRate == 0,
+                    "unsupported objects are not misclassified as supported enemies");
+        }
+    }
     {
         struct Case {
             downwell::EnemyStepPose pose;

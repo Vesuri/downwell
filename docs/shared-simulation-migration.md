@@ -9,12 +9,40 @@ Current status: main-room player movement, gun/jump state, animation state and
 knockback now use `PlayerMotion` in both runtimes. Currency motion/lifetime/
 animation and default main-room camera rules are also shared, along with frog
 and bat motion slices, crawler falling/latching/wall-following, wall-snail
-attachment/movement/reversal, final enemy pose/frame selection, and the usual
-bullet's vertical segment arbitration and fractional-camera expiry.
+attachment/movement/reversal, enemy creation stats and final pose/frame
+selection, and the usual bullet's vertical segment arbitration and
+fractional-camera expiry.
 World storage/adapters, broader enemy behavior, complete bullet state/events,
 reward orchestration, special camera modes and menus still need consolidation. Native
 world classes contain domain logic that does not belong under `src/platform`.
 Rendering/storage optimizations do not justify separate gameplay rules.
+
+## Shared enemy creation profiles
+
+`EnemyCreateProfile.h` is the single definition of health, reward and initial
+animation rate for the six supported area-one enemy types. SDL Create handlers,
+the procedural builder's deferred births and the native runtime all use it;
+the terrain backend's existing enemy classification wrappers only forward to
+the shared profile. Rates remain integer twentieths on the target, with an
+explicit float adapter for the transitional SDL instance store.
+
+`tools/verify-enemy-create.py`, included in `make test`, checks every profile
+against the original Create-event VM assignments to `ehp`, `money`, `imgSp`
+and `image_speed`. It pins the input hash and export tool version, verifies
+all six object IDs, and uses decimal arithmetic for the recovered rates.
+The profile adapter tests also check that unrelated instance state survives
+and unsupported IDs remain excluded from native enemy classification.
+This removes duplicated constants, not the remaining separate world ownership
+or storage adapters. Random draws, alarm setup and movement initialization are
+unchanged.
+
+The source check and address/undefined-behavior sanitizer tests pass. A bounded
+45-second native replay keeps all four checkpoint digests unchanged, including
+weapon digest `0db388a5b1c2a40a` / coverage `3fff`. The normal executable is
+restored and both 68000 audits pass (`/tmp/downwell-enemy-create-native.log`).
+The full host suite, including all eight combat/upgrade tapes and both extended
+reentries, and the SDL rebuild pass (`/tmp/downwell-enemy-create-suite.log`,
+`/tmp/downwell-enemy-create-sdl.log`).
 
 ## Shared end-of-Step enemy presentation
 
