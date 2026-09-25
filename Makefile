@@ -117,7 +117,7 @@ verify-gameplay-death-state: generate-room-pack generate-object-pack generate-bu
 # compiler's single .d file only describes the final input, so explicitly
 # invalidate them on shared header changes rather than trusting stale tools.
 HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h)
-$(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test: $(HOST_CHECK_HEADERS)
+$(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test build/gameplay-player-step-test: $(HOST_CHECK_HEADERS)
 
 test: build/gem-homing-test
 test: build/main-camera-test
@@ -451,6 +451,10 @@ $(PLAYER_CONTROLS_TEST_TARGET): tests/core/PlayerControlsTest.cpp src/core/Playe
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/PlayerControlsTest.cpp
 
+build/gameplay-player-step-test: tests/core/GameplayPlayerStepTest.cpp src/core/GameplayPlayerStep.h src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/GameplayPlayerStepTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp
+
 $(PLAYER_COLLISION_TEST_TARGET): $(PLAYER_COLLISION_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(PLAYER_COLLISION_TEST_SOURCES)
@@ -499,7 +503,7 @@ $(AREA_ONE_TRACE_TARGET): $(AREA_ONE_TRACE_SOURCES)
 trace-area-one: generate-room-pack generate-object-pack generate-builder-pattern-pack $(AREA_ONE_TRACE_TARGET)
 	./$(AREA_ONE_TRACE_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
-test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack generate-amiga-game generate-amiga-hud $(TEST_TARGETS) $(PLAYER_CONTROLS_TEST_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/bat-motion-test build/enemy-contact-test build/frog-behavior-test
+test: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack generate-amiga-game generate-amiga-hud $(TEST_TARGETS) $(PLAYER_CONTROLS_TEST_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/bat-motion-test build/enemy-contact-test build/frog-behavior-test build/gameplay-player-step-test
 	./build/frog-behavior-test
 	python3 tools/verify-enemy-contact.py
 	python3 tools/verify-enemy-create.py
@@ -538,6 +542,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./$(RANDOM_TEST_TARGET)
 	./$(PLAYER_COLLISION_TEST_TARGET)
 	./$(PLAYER_CONTROLS_TEST_TARGET)
+	./build/gameplay-player-step-test
 	./$(GAME_RENDER_TEST_TARGET)
 	./$(HUD_NUMBER_TEST_TARGET)
 	./$(AMIGA_PLAYER_TEST_TARGET)

@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "GameplayPlayerStep.h"
 #include "MainRoomLifetime.h"
 #include "MainRoomActivation.h"
 #include "BuilderPatternPack.h"
@@ -1039,40 +1040,9 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.left = inputLeft_;
     input.right = inputRight_;
     input.fire = inputFire_;
-    mainDeath_.beginStep(input.fire);
-    run_.combo.beginStep();
-    mainPlayerMotion_.configureComboCompletion([](void* context) {
-        auto& runtime = *static_cast<StartupRuntime*>(context);
-        runtime.run_.combo.finish(runtime.mainPlayerMotion_, runtime.currencyAccount_, runtime.mainPlayerHealth_,
-                                  runtime.run_.upgrades.levels[20] != 0);
-    }, this);
-    mainPlayerMotion_.configureMovementBoundary([](void* context) {
-        auto& runtime = *static_cast<StartupRuntime*>(context);
-        runtime.run_.gems.observeDeathMovement(runtime.mainDeath_.movementDead(), runtime.currencyAccount_.gameGem);
-    }, this);
-    mainPlayerMotion_.step(input, controlsLocked_ || run_.shops.noControl || run_.exitControlsLocked,
-        mainDeath_.movementDead(), run_.shops.interactable, run_.goalStopped, run_.gemHigh);
-    const int shopPlayerX = mainPlayerOriginX_ + roundGameMakerQ8(mainPlayerMotion_.offsetXFixed());
-    const int shopPlayerY = mainPlayerOriginY_ + roundGameMakerQ8(mainPlayerMotion_.offsetYFixed());
-    run_.shops.observePlayer(shopPlayerX, shopPlayerY, mainPlayerMotion_.grounded(),
-        mainPlayerMotion_.speedXFixed());
-    int shopFacing = mainPlayerMotion_.facing();
-    const auto shopRandom = [this](unsigned lo, unsigned hi) { return lo + random_.irandomSmall(hi - lo); };
-    run_.shops.keeperAlarms(shopRandom);
-    run_.shops.step(input, shopPlayerX, shopPlayerY, false, mainDeath_.active,
-        shopFacing, currencyAccount_, [this] { return 1u + random_.irandomSmall(2); },
-        [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
-    mainPlayerMotion_.face(shopFacing);
-    run_.shops.advanceKeepers(shopPlayerX, false, run_.stage.area, shopRandom);
-    run_.shops.advancePresentation();
-    mainPlayerMotion_.configureComboCompletion(nullptr, nullptr);
-    mainPlayerMotion_.configureMovementBoundary(nullptr, nullptr);
-    // Goal-field overlap and boss completion remain separate source guards.
-    run_.clock.advance(true, mainDeath_.active, run_.goalStopped);
-    run_.advanceLevelExitAlarms(mainCameraRenderViewX(), mainCameraRenderViewY());
-    mainDeath_.publishHealth(mainPlayerHealth_);
-    mainDeath_.advanceAlarms(mainPlayerMotion_.grounded());
-    run_.results.open(mainDeath_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);
+    stepGameplayPlayer(mainPlayerMotion_, mainDeath_, run_, currencyAccount_,
+        mainPlayerHealth_, random_, input, mainPlayerOriginX_, mainPlayerOriginY_,
+        mainCameraRenderViewX(), mainCameraRenderViewY(), controlsLocked_);
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);

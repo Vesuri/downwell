@@ -18,6 +18,39 @@ The fixed-point world now lives in core, but SDL's live `StartupRuntime` still
 owns a separate world loop. Extracting the class does not complete that switch.
 Rendering/storage optimizations do not justify separate gameplay rules.
 
+## Shared live player phase
+
+Both `StartupRuntime::updateMainPlayer` (the live SDL path) and
+`GameplayWorld::step` now call `stepGameplayPlayer`. This owns the implemented
+player-phase ordering: death/combo Begin Step, movement callbacks, movement,
+shop observation/keeper alarms/interactions/presentation, clock and exit
+alarms, health publication, death alarms and results opening. The duplicate
+orchestration has been removed from both callers. Terrain/head-break adapters,
+activation, shot emission and presentation publication remain with each owner.
+The shared routine preserves native profiling phase boundaries and detaches
+its stack-local callback context before returning.
+
+Focused tests pin delayed death publication and first-death-movement gem
+recording, same-update alarm advancement, combo healing before death is
+published, completion-effect reset, callback detachment, copied state, control
+locks and absence of spurious RNG draws. Existing world fixture digests remain
+unchanged. This is live shared simulation code, not a shadow execution mode;
+the overall SDL instance-store/world-loop replacement remains incomplete.
+
+Source check: `gml_Object_objPlayer_n_Step_1.asm` calls `scrPlMovement` before
+the `global.gameTime` update (block 18) and health/death publication (block
+81). `gml_GlobalScript_scrPlMovement.asm` contains grounded `comboDone`
+(block 123) and first-death `saveStats` before setting Alarm 0. The test pins
+those implemented ordering boundaries, not full VM event fidelity.
+
+Address/undefined-behavior sanitizers pass the focused phase test. The bounded
+45-second A500 gameplay-cache run passes 600 updates, 101 fresh-composition
+comparisons, seven shop/streak overlay comparisons and three consumable
+controller updates. The 256-byte stack guard is intact, and the ordinary
+executable is restored with clean 68000 audits. Evidence:
+`/tmp/downwell-player-phase-native.log`,
+`/tmp/downwell-player-phase-restore.log`.
+
 ## First-room generator state handoff
 
 `StartupRuntime::mainBuilderState()` exposes the actual shared generator at

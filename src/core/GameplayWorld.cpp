@@ -1,4 +1,5 @@
 #include "GameplayWorld.h"
+#include "GameplayPlayerStep.h"
 #include "core/MainRoomLifetime.h"
 #include "core/MainRoomActivation.h"
 #include "Profile.h"
@@ -492,8 +493,6 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.consumables.beginStep(player_, health_, run_.combo.healthReserve);
     downwell::Input input = downwell::unpackReplayInput(packedInput);
     run_.results.beginStep(input);
-    death_.beginStep(input.fire);
-    run_.combo.beginStep();
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
     downwell::advanceMainRoomActivation(activationY_,
@@ -529,40 +528,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
         return false;
     }, &headBreak);
-    player_.configureComboCompletion([](void* context) {
-        auto& runtime = *static_cast<GameplayWorld*>(context);
-        runtime.run_.combo.finish(runtime.player_, runtime.currencyAccount_, runtime.health_,
-                                  runtime.run_.upgrades.levels[20] != 0);
-    }, this);
-    player_.configureMovementBoundary([](void* context) {
-        auto& runtime = *static_cast<GameplayWorld*>(context);
-        runtime.run_.gems.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
-    }, this);
-    DW_PROFILE_PHASE(profilePlayerMotion);
-    PlayerMotionDelta motion = player_.step(input, run_.shops.noControl || run_.exitControlsLocked,
-        death_.movementDead(), run_.shops.interactable, run_.goalStopped, run_.gemHigh);
-    DW_PROFILE_PHASE(profilePlayerShops);
-    const int shopPlayerX = 240 + downwell::roundGameMakerQ8(player_.offsetXFixed());
-    const int shopPlayerY = 176 + downwell::roundGameMakerQ8(player_.offsetYFixed());
-    run_.shops.observePlayer(shopPlayerX, shopPlayerY, player_.grounded(), player_.speedXFixed());
-    int shopFacing = player_.facing();
-    const auto shopRandom = [this](unsigned lo, unsigned hi) { return lo + enemyRandom_.irandomSmall(hi - lo); };
-    run_.shops.keeperAlarms(shopRandom);
-    run_.shops.step(input, shopPlayerX, shopPlayerY, false, death_.active,
-        shopFacing, currencyAccount_, [this] { return 1u + enemyRandom_.irandomSmall(2); },
-        [this](unsigned id) { grantConsumable(id); }, [](auto&, auto) {});
-    player_.face(shopFacing);
-    run_.shops.advanceKeepers(shopPlayerX, false, run_.stage.area, shopRandom);
-    run_.shops.advancePresentation();
-    DW_PROFILE_PHASE(profilePlayer);
-    player_.configureComboCompletion(nullptr, nullptr);
-    player_.configureMovementBoundary(nullptr, nullptr);
-    // Goal-field overlap and boss completion remain separate source guards.
-    run_.clock.advance(true, death_.active, run_.goalStopped);
-    run_.advanceLevelExitAlarms(cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142);
-    death_.publishHealth(health_);
-    death_.advanceAlarms(player_.grounded());
-    run_.results.open(death_.menuReady, run_.gems.lifetime, currencyAccount_.gameGem);
+    PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
+        currencyAccount_, health_, enemyRandom_, input, 240, 176,
+        cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142);
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if (headBreak.index >= 0) {
         const Breakable& box = breakables_[headBreak.index];
