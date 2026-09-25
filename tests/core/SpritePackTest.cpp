@@ -38,7 +38,10 @@ void testGeneratedPack(const char* path) {
                 pack.pageItemCount() == 3161 && pack.texturePageCount() == 2,
             "generated sprite pack has audited totals");
     downwell::PackedSprite sprite;
-    for (int id : {153, 163, 164, 166, 168, 170, 177, 186, 187, 188, 278})
+    // Include the Step-selected hit/hang/wake poses, not only each enemy's
+    // default art. Both runtimes wrap animation with this shared table.
+    for (int id : {153, 154, 157, 162, 163, 164, 166, 168, 170, 173,
+                   177, 178, 186, 187, 188, 278})
         require(pack.sprite(id, sprite) &&
                     sprite.frameCount == downwell::enemySpriteFrameCount(id),
                 "shared enemy animation lengths match serialized source resources");

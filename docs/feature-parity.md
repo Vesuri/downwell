@@ -26,6 +26,17 @@ runtime state, not complete original enemy scheduling or all scene coverage.
 The bounded tick-180 A500/SDL Laser Sight capture remains identical at
 0/99,968 differing pixels after this correction; that tape does not exercise
 all sixteen poses. Log: `/tmp/downwell-enemy-pose-frame.log`.
+The separate scrolled/awake-enemy capture at tick 383 also matches at
+0/99,968 pixels (`/tmp/downwell-enemy-active-frame.log`). `SpritePackTest`
+now checks all sixteen selected enemy sprite frame counts against the
+serialized source assets, including 154/157/162/173/178 rather than only the
+default poses. `make verify-sprite-pack` passes.
+The 45-second-bounded `verify-amiga-scenes` run reached scrolling gameplay
+and enemy activation with no garden copper-patch or splash-publication
+failures. It checked logo/credits/controls for 180/180/240 frames and both
+60-frame fade intervals. This is a publication/transition regression, not a
+pixel oracle for every startup frame. Log:
+`/tmp/downwell-enemy-scene-regression.log`.
 
 ### Laser Sight machine-gun firing and ray presentation
 
