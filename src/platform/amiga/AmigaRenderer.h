@@ -88,6 +88,15 @@ int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,
                                      unsigned destinationHeight);
 unsigned amigaRendererHardwareSpritePartCount(
     const UBYTE* pack, const UBYTE* packEnd, UWORD sprite, UWORD frame);
+/* Short-lived descriptor: its bank must remain unchanged through drawing. */
+typedef struct AmigaResolvedSpritePart {
+    const UBYTE* pack;
+    const UBYTE* end;
+    const UBYTE* record;
+    unsigned partCount;
+} AmigaResolvedSpritePart;
+int amigaRendererResolveSpritePart(AmigaResolvedSpritePart*, const UBYTE*, const UBYTE*, UWORD, UWORD, unsigned, int);
+int amigaRendererDrawResolvedSpritePart(const AmigaResolvedSpritePart*, int, int, UWORD*, unsigned);
 ULONG amigaRendererChipPackBytes(const UBYTE* pack, const UBYTE* packEnd);
 int amigaRendererBuildHardwareSpritePart(
     const UBYTE* pack, const UBYTE* packEnd,

@@ -858,7 +858,8 @@ ULONG amigaRendererChipPackBytes(const UBYTE* pack, const UBYTE* packEnd) {
     return first ? readLong(first + 16) : (ULONG)(packEnd - pack);
 }
 
-int amigaRendererBuildHardwareSpritePart(
+static int buildHardwareSpritePart(
+    const UBYTE* prepared,
     const UBYTE* pack, const UBYTE* packEnd,
     UWORD sprite, UWORD frame, unsigned part,
     int anchorX, int anchorY, int flipX,
@@ -889,8 +890,6 @@ int amigaRendererBuildHardwareSpritePart(
     int visibleHeight;
     int y;
     int x;
-    const UBYTE* prepared = findAsset(pack, packEnd, 63000 + sprite,
-                                     frame * 8 + (flipX ? 4 : 0) + part);
     if (prepared) {
         height = readWord(prepared + 10);
         if (height > (int)destinationHeight) return 0;
@@ -1049,6 +1048,30 @@ int amigaRendererBuildHardwareSpritePart(
     destination[2 + visibleHeight * 2] = 0;
     destination[3 + visibleHeight * 2] = 0;
     return 1;
+}
+
+int amigaRendererResolveSpritePart(AmigaResolvedSpritePart* output,
+    const UBYTE* pack, const UBYTE* end, UWORD sprite, UWORD frame, unsigned part, int flip) {
+    output->record = findAsset(pack, end, 63000 + sprite, frame*8 + (flip ? 4 : 0) + part);
+    output->pack = pack;
+    output->end = end;
+    output->partCount = output->record ? readWord(output->record+14) >> 8 : 0;
+    return output->record != 0 && output->partCount != 0;
+}
+
+int amigaRendererDrawResolvedSpritePart(const AmigaResolvedSpritePart* prepared,
+    int x, int y, UWORD* destination, unsigned height) {
+    if (!prepared->record || !prepared->partCount) return 0;
+    return buildHardwareSpritePart(prepared->record, prepared->pack, prepared->end,
+        0, 0, 0, x, y, 0, destination, height);
+}
+
+int amigaRendererBuildHardwareSpritePart(const UBYTE* pack, const UBYTE* end,
+    UWORD sprite, UWORD frame, unsigned part, int x, int y, int flip,
+    UWORD* destination, unsigned height) {
+    const UBYTE* prepared = findAsset(pack, end, 63000 + sprite, frame*8 + (flip ? 4 : 0) + part);
+    return buildHardwareSpritePart(prepared, pack, end, sprite, frame, part,
+        x, y, flip, destination, height);
 }
 
 int amigaRendererBuildHardwareSprite(const UBYTE* pack, const UBYTE* packEnd,

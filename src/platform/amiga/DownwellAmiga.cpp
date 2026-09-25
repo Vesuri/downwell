@@ -2954,14 +2954,15 @@ int main(void) {
             // back-to-front into PF1, below every allocated hardware sprite.
             while (bobCount > 0) {
                 const GameplayBob& actor = actors[bobCount - 1];
-                const unsigned parts = amigaRendererHardwareSpritePartCount(
-                    amiga_game_pack, amiga_game_pack_end, actor.sprite, actor.frame);
-                if (parts == 0) {
+                AmigaResolvedSpritePart prepared;
+                if (!amigaRendererResolveSpritePart(&prepared, amiga_game_pack,
+                        amiga_game_pack_end, actor.sprite, actor.frame, 0, actor.flip)) {
                     gDownwellActorFailureSprite = actor.sprite;
                     gDownwellActorFailureFrame = actor.frame;
                     frameReady = false;
                     break;
                 }
+                const unsigned parts = prepared.partCount;
                 const int first = channels.take(parts);
                 if (first < 0) break;
                 for (unsigned part = 0; part < parts; ++part) {
@@ -2969,9 +2970,10 @@ int main(void) {
                     const unsigned channel = first + part;
                     Sprite& sprite = channel == 0 ? playerSprites[back]
                         : actorSpriteAt(regularSprites, enemySprites[back], channel - 1);
-                    if (!amigaRendererBuildHardwareSpritePart(
-                            amiga_game_pack, amiga_game_pack_end, actor.sprite, actor.frame, part,
-                            actor.x, actor.y, actor.flip, sprite.data(), enemySpriteHeight))
+                    if ((part && !amigaRendererResolveSpritePart(&prepared, amiga_game_pack,
+                            amiga_game_pack_end, actor.sprite, actor.frame, part, actor.flip)) ||
+                        !amigaRendererDrawResolvedSpritePart(&prepared,
+                            actor.x, actor.y, sprite.data(), enemySpriteHeight))
                         frameReady = false;
                 }
                 --bobCount;

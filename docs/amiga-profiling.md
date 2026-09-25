@@ -4,6 +4,32 @@
 
 ### Actor presentation breakdown
 
+#### Resolve the selected hardware part once
+
+Channel selection now obtains a short-lived `AmigaResolvedSpritePart`, using
+its part count to allocate channels and passing its directory record directly
+to the drawing path. Part zero no longer performs a second lookup after
+allocation; additional parts resolve individually. The descriptor is local
+to that actor's allocation/draw sequence, so no new persistent cache or bank
+invalidation policy is needed. The existing lookup API and resolved API share
+the same drawing implementation; source-pixel conversion remains host-only.
+
+All 22,834 offline sprite/edge comparisons also exercise the descriptor path
+and verify its channel requirements, including flips. Missing offline data
+fails without touching the destination. Renderer sanitizer tests, native
+firing capture (0/99,968 differing pixels), forced-BOB oracle and native audits
+pass. The ordinary non-skip executable is restored.
+
+FPSCOUNT measured **813 PAL fields / 600 updates = 36.90 FPS**, maximum gap
+five, within the existing 812–813 baseline. Instrumented actor phases 42/43/44
+total 744.701 / 545.650 / 481.216 ms (previously 674.022 / 508.925 / 600.478).
+The update phase is smaller but collection/selection increased; the combined
+cost is effectively unchanged. This is a verified removal of a repeated
+lookup, **not a demonstrated frame-rate gain**. Header-only/copy counters
+remain exactly 523 / 454, with 15,486 payload words. Logs use
+`/tmp/downwell-resolved-` (`test`, `sanitized`, `fps`, `frame`, `profile`,
+`bobs`, `restored`); all emulator runs have a 45-second bound.
+
 #### Rejected immutable-directory cache shortcuts
 
 An explicit immutable-bank lifetime API allowed linked gameplay artwork to

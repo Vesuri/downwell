@@ -197,6 +197,12 @@ int main(int argc, char** argv) {
             "fully clipped hardware sprite produces a hidden record");
 
     require(argc == 3, "Amiga game and HUD pack paths are supplied");
+    AmigaResolvedSpritePart missing{};
+    UWORD untouched[4] = {1, 2, 3, 4};
+    require(!amigaRendererResolveSpritePart(&missing, pack, pack+sizeof pack, 7, 0, 0, 0) &&
+        !amigaRendererDrawResolvedSpritePart(&missing, 100, 10, untouched, 0) &&
+        untouched[0] == 1 && untouched[1] == 2 && untouched[2] == 3 && untouched[3] == 4,
+        "resolved API rejects missing offline artwork without modifying destination");
     int bx, by, bw, bh;
     require(amigaRendererAssetBounds(pack, pack + sizeof pack, 7, 0, 20, 10, 0, &bx, &by, &bw, &bh),
         "asset lookup primes same-address bank cache");
@@ -318,6 +324,17 @@ int main(int argc, char** argv) {
                     gamePack.data(), gamePack.data() + gamePack.size(),
                     id - 63000, variant / 8, variant % 4,
                     x, y, (variant % 8) / 4, actual, 32);
+                AmigaResolvedSpritePart resolved;
+                UWORD resolvedPixels[68] = {};
+                require(amigaRendererResolveSpritePart(&resolved, gamePack.data(),
+                    gamePack.data()+gamePack.size(), id-63000, variant/8,
+                    variant%4, (variant%8)/4), "offline part resolves for direct drawing");
+                require(resolved.partCount == amigaRendererHardwareSpritePartCount(
+                    gamePack.data(), gamePack.data()+gamePack.size(), id-63000, variant/8),
+                    "resolved orientation preserves hardware channel requirements");
+                require(amigaRendererDrawResolvedSpritePart(&resolved, x, y, resolvedPixels, 32) == a &&
+                    !std::memcmp(actual, resolvedPixels, sizeof actual),
+                    "resolved hardware part matches lookup path at every tested edge");
                 const int b = amigaRendererBuildHardwareSpritePart(
                     oraclePack.data(), oraclePack.data() + oraclePack.size(),
                     id - 63000, variant / 8, variant % 4,
