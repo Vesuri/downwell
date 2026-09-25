@@ -34,8 +34,10 @@ stream, even when the final list of visible particles looks identical.
 - Smoke count calls `irandom_range(-vary,vary)`. For each child, the VM draws
   the **Y choice before the X choice**, then immediately calls object 225's
   Create. That Create samples speed, animation multiplier and direction before
-  the next child's coordinates are chosen. It stores xx/yy and starts at
-  animation index 1. Coordinate choices use `choose`, not `irandom`.
+  the next child's coordinates are chosen. It stores xx/yy and leaves the
+  constructor's animation index 0 unchanged. Coordinate choices use `choose`,
+  not `irandom`. The previous index-1 description incorrectly conflated smoke
+  with flash-ball Create, which explicitly writes 1.
 - Flash-ball count also uses `irandom_range`. Its per-child Y range draw
   precedes X. Object 224's Create then adds independent integer jitter to X
   and Y and sets image speed to 0.3. Those extra draws must not be omitted.
@@ -102,11 +104,22 @@ FP helpers in this component.
 Direction and the point_distance/epsilon predicate are explicit callbacks.
 The test supplies host sin/cos/hypot: it verifies event sequencing and motion,
 **not** original-runner transcendental identity. Native geometry, world collision
-dispatch, animation lifetime and drawFx remain open; this is not a live smoke
-owner. Source export pins:
+dispatch and drawFx remain open; this is not a live smoke owner. Source export pins:
 Create SHA-256 `725336f892c1c024ccb1285545b93f683be5cca16815f0b626c82eaa496a221b`,
 Step SHA-256 `4398d86951dc87ba221561327498a924f5b97e14ba65f13b30c71377206e8263`.
 Those hashes identify the reviewed UTMT assembly, not a Windows execution test.
+
+`SmokeEffect` now composes motion with the verified sprite-84 nine-key unit
+sequence. The runner constructor initializes image_index at offset 0x94 to
+zero at 0x46190e; object 225 has no parent and its Create does not change that
+field. Animation advances before Step: its first update uses Create's sampled
+rate, subsequent updates use first Step's replacement. Other 7 requests
+retirement on the first wrap. Across 1,024 seeds, 38,059 animation updates match
+a scalar float model, with lifetimes 18..89 updates; re-creation clears the old
+retirement flag. Normal/sanitizer tests and 68000 compilation pass without FP
+helpers. Exported metadata now includes sprite 84's full sequence and the
+verifier checks all nine keys. The lifetime test supplies stationary geometry
+callbacks intentionally; it does not prove native direction or Draw fidelity.
 
 The flash pool now resides in shared `RunSession` ownership. Both runtime adapters
 advance it in their pre-Step animation work; room/run retirement clears it

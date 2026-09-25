@@ -35,9 +35,15 @@ pass without FP helpers. First Step's additional animation-rate draw is kept
 separate from Create. `SmokeMotion` now covers Step integration/rounding/decay,
 the first-Step sample, wall and alarm state changes across 81,920 scalar-matched
 Steps. Sanitizers/68000 compilation pass. Native direction/distance callbacks,
-world collision dispatch, lifetime, drawing and live ownership are still open;
+world collision dispatch, drawing and live ownership are still open;
 the host geometry callbacks are not original-runner transcendental evidence.
 See `skeleton-effect-ownership.md` for exact scope and source hashes.
+Smoke animation/lifetime now composes with motion in `SmokeEffect`: verified
+sprite-84 unit keys, frame-zero constructor state, first-update Create rate,
+then first-Step rate and Animation End retirement. The 1,024-seed regression
+checks 38,059 updates and lifespans 18..89; sanitizer/68000 checks pass. The older
+audit's smoke frame-one claim was corrected against Create and the runner
+constructor; only flash-ball Create explicitly writes frame one.
 
 Flash-ball requests now have fixed shared ownership, real Create-time jitter
 and animation/retirement state through `FlashBallEffects`. Its 1,024 seeded

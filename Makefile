@@ -133,6 +133,15 @@ build/bone-store-test: tests/core/BoneProjectileStoreTest.cpp src/core/BoneProje
 test: verify-flash-effects
 test: verify-smoke-birth
 test: verify-smoke-motion
+test: verify-smoke-effect
+.PHONY: verify-smoke-effect
+verify-smoke-effect: build/smoke-effect-test
+	./build/smoke-effect-test
+
+build/smoke-effect-test: tests/core/SmokeEffectTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeEffectTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-smoke-motion
 verify-smoke-motion: build/smoke-motion-test
 	./build/smoke-motion-test
