@@ -56,6 +56,11 @@ void verifyDamageEndpoints() {
             rows.state[i] = damage.previous.state[i];
             if (trial % 3 == 0 || i == trial % 184)
                 rows.state[i] = next() % 5;
+            if (trial % 7 == 0) rows.state[i] = damage.previous.state[i];
+            if (trial % 11 == 0) {
+                damage.previous.state[i] = 3 + (i & 1);
+                rows.state[i] = 4 - (i & 1);
+            }
         }
         int top = 256, bottom = 0;
         // Previous implementation, deliberately scanning every row.

@@ -1,5 +1,36 @@
 # Gameplay performance checkpoint after scene extraction
 
+## HUD remeasurement and rejected grouped damage scan
+
+At `1199a31`, a fresh coarse profile still attributes about 4.10 ms/update
+to ammo phases (including measurement overhead): base 0.769, rows 0.823,
+dividers 0.646, rim/label 0.515, damage 0.770, fill geometry 0.029 and
+word publication 0.551. Only 138 damage updates occur in the 600-frame tape;
+this is not evidence of an unconditional full HUD redraw every frame.
+The largest instrumented frame remains generation-dominated: 51.864 ms
+generation, 23.253 ms registration and 23.676 ms indexing. Log:
+`/tmp/downwell-hud-current-probes.log`.
+
+A four-byte damage scan normalized states 3/4 to their identical visible
+frame, skipping equal groups while retaining scalar endpoint handling.
+It passed 12,000 scalar damage comparisons, full HUD reconstruction tests,
+22,834 asset comparisons and ASan/UBSan. Damage time fell from 462.128 to
+412.156 ms over the instrumented tape, but shipping throughput worsened
+from 825 fields to 827; an equality-first refinement took 826. All retain
+the four-field worst gap. The grouped implementation was removed: no
+shipping optimization is claimed. The extra unchanged/invisible-state test
+cases remain. Logs: `/tmp/downwell-hud-blockscan-host.log`,
+`/tmp/downwell-hud-blockscan-sanitized.log`,
+`/tmp/downwell-hud-blockscan-probes.log`,
+`/tmp/downwell-hud-blockscan-fps.log` and
+`/tmp/downwell-hud-blockscan-fast-fps.log`.
+
+The next HUD target should be reducing composition passes across a damaged
+strip, not another micro-optimization of the endpoint scan. Background/fill,
+animated row runs, dividers and final word publication currently make
+separate passes even though their final pixels occupy the same narrow column.
+Any fused path must preserve ordered masking and the full scalar pixel oracle.
+
 ## Decode only the matching builder pattern
 
 `BuilderPatternPack::findPattern` now scans the two serialized identifiers
