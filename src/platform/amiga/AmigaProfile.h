@@ -49,4 +49,15 @@ public:
 #define DW_PROFILE_PHASE(phase) ((void)0)
 #endif
 
+enum DownwellProfileCounter {
+    counterSolidIndexed, counterSolidFallback, counterLandingIndexed,
+    counterLandingFallback, counterBreakableFallback, profileCounterCount
+};
+#ifdef DOWNWELL_PROBES
+extern "C" volatile unsigned long gDownwellProfileCounters[profileCounterCount];
+#define DW_PROFILE_COUNT(counter) (++gDownwellProfileCounters[counter])
+#else
+#define DW_PROFILE_COUNT(counter) ((void)0)
+#endif
+
 #endif

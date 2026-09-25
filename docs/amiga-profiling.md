@@ -130,6 +130,21 @@ The full host suite and bounded native replay pass with unchanged digests.
 The native gameplay shot capture has 0/99,968 differing pixels against SDL.
 Both 68000 audits pass; the ordinary non-skip executable is restored.
 
+### Collision route counters
+
+Probe-only counters distinguish indexed solid/landing lookups from slow
+serialized-terrain fallbacks, and count breakable full scans. They reset with
+the excluded first gameplay setup frame and are printed by `profile.gdb`.
+They compile out of normal and FPSCOUNT builds.
+
+The 600-update tape reports **10,725 indexed solid queries, 600 indexed
+landing queries, zero solid/landing fallbacks, and zero breakable fallbacks**.
+Thus the measured collision phase is not evidence that the spatial index is
+being lost. Frequent timing brackets also add overhead; do not equate this
+instrumented phase directly with shipping cost. Evidence:
+`/tmp/downwell-collision-routes-profile.log`. This diagnostic change makes
+no new FPS claim and does not alter collision behavior.
+
 ## Historical gameplay result: 600 frames without a missed PAL field
 
 The 2026-09-23 optimized `SKIP_TO_GAME=1` run completed **600 frames in

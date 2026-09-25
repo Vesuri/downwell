@@ -372,6 +372,7 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
     const int worldX = 240 + offsetX;
     int landing = downwell::gameplayNoLanding;
     if (context.index) {
+        DW_PROFILE_COUNT(counterLandingIndexed);
         int row = (minimumOffsetY + 192 + 15) / 16;
         if (row < 0) row = 0;
         const int firstColumn = (worldX - 4 + 8 - AmigaTerrainIndex::minX) >> 4;
@@ -395,6 +396,7 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
         }
         return landing;
     }
+    DW_PROFILE_COUNT(counterLandingFallback);
     for (unsigned fragmentIndex = 0;
          fragmentIndex < context.fragmentCount; ++fragmentIndex) {
         const AmigaTerrainFragment& fragment =
@@ -444,9 +446,12 @@ bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY) {
         *static_cast<const AmigaTerrainCollisionContext*>(opaque);
     const int worldX = 240 + offsetX;
     const int worldY = 176 + offsetY;
-    if (context.index)
+    if (context.index) {
+        DW_PROFILE_COUNT(counterSolidIndexed);
         return indexActive(context, indexCell(*context.index, worldX, worldY),
                            solidCell, worldX, worldY);
+    }
+    DW_PROFILE_COUNT(counterSolidFallback);
     if (context.rooms != 0 && context.room != 0) {
         for (unsigned index = 0; index < context.room->instanceCount; ++index) {
             downwell::PackedRoomInstance instance;

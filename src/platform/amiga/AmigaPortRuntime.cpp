@@ -329,6 +329,7 @@ bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
         return index >= 0 && breakables_[index].x == x && breakables_[index].y == y &&
                breakables_[index].active;
     }
+    DW_PROFILE_COUNT(counterBreakableFallback);
     unsigned index;
     for (index = 0; index < breakableCount_; ++index)
         if (breakables_[index].x == x && breakables_[index].y == y)

@@ -35,6 +35,9 @@ volatile ULONG gDownwellProfileMax[4][profilePhaseCount];
 volatile ULONG gDownwellProfileFrameMax[4];
 volatile ULONG gDownwellProfileFrozen;
 volatile ULONG gDownwellProfileClockClamps;
+#ifdef DOWNWELL_PROBES
+volatile unsigned long gDownwellProfileCounters[profileCounterCount];
+#endif
 __attribute__((noinline, used)) void downwellProfileReady()
 {
     __asm__ volatile("" ::: "memory");
@@ -126,6 +129,10 @@ void downwellProfileEnd()
             gDownwellProfileMax[3][phase] = 0;
         }
         gDownwellProfileFrameMax[3] = 0;
+#ifdef DOWNWELL_PROBES
+        for (unsigned counter = 0; counter < profileCounterCount; ++counter)
+            gDownwellProfileCounters[counter] = 0;
+#endif
         return;
     }
     const ULONG fields = gDownwellProfileVbi - startField;
