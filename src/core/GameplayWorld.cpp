@@ -50,6 +50,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
     run_.shops.reset();
+    run_.flashEffects.clear();
     run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);
     emitter_.reset(run_.upgrades.levels[12] != 0);
@@ -475,6 +476,8 @@ void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm)
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
+    // Only valid unit-sequence state is admitted through the effect owner.
+    run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
     for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active)

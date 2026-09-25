@@ -17,9 +17,12 @@ int main() {
     UBYTE pack[8]{};
     AmigaGameplayDrawList list;
     unsigned observed=0;
+    [[maybe_unused]] unsigned flashDraws=0;
     for(unsigned tick=0;tick<600;++tick) {
         world.step((tick%13==0 ? 4 : 0) | (tick%80<40 ? 1 : 2));
         const int vx=160+world.cameraOffsetX(), vy=34+world.cameraOffsetY();
+        if(tick%61==0) assert(world.emitFlashBurst(downwell::MotionBinary64::fromInteger(vx+40),
+                                                  downwell::MotionBinary64::fromInteger(vy+60)));
         const auto checkpoint=world.checkpoint();
         assert(list.collect(world,pack,pack+8,vx,vy));
         assert(world.checkpoint()==checkpoint);
@@ -29,6 +32,9 @@ int main() {
                 expected.push_back({UWORD(sprite),UWORD(frame),x,y,flip});
         };
 #ifndef DOWNWELL_REPLAY_VERIFY
+        world.flashEffects().visitNewest([&](const downwell::FlashBallEffect& effect){
+            emit(96,effect.drawFrame(),110+effect.pixelX()-vx,effect.pixelY()-vy);++flashDraws;
+        });
         for(unsigned i=0;i<world.enemyCount();++i) {
             const auto& e=world.enemyAt(i);
             if(e.active && e.awake) emit(e.spriteId,e.drawFrame(),190+e.x-world.cameraOffsetX(),
@@ -67,6 +73,9 @@ int main() {
         }
         observed+=list.count;
     }
+#ifndef DOWNWELL_REPLAY_VERIFY
+    assert(flashDraws>100);
+#endif
     GameplayWorld initial(0);
     boundsOK=false;
     assert(!list.collect(initial,pack,pack+8,160,34) && list.failedSprite!=0);

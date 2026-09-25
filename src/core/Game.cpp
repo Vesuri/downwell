@@ -293,6 +293,10 @@ void Game::renderMain(Renderer& renderer) const {
             if (x >= 0 && x < 160 && y >= 0 && y < 284)
                 renderer.fillRect(x, y, 1, 1, pen == 1 ? Color{255,255,255,255} : Color{255,0,0,255});
         });
+        startup_.flashEffects().visitNewest([&](const FlashBallEffect& effect) {
+            renderer.drawSprite(96,effect.drawFrame(),effect.pixelX()-static_cast<int>(viewX),
+                                effect.pixelY()-static_cast<int>(viewY));
+        });
       }
       for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
         const InstanceRecord& instance = startup_.instanceAt(index);

@@ -21,6 +21,8 @@ struct FlashBallEffect {
         auto jitterY=next.y.promoted();
         if(!jitterY.add(MotionBinary64::fromInteger(int(random.irandomSmall(4))-2)) ||
            !next.y.assign(jitterY)) return false;
+        std::int32_t published;
+        if(!next.x.promoted().roundPixel(published) || !next.y.promoted().roundPixel(published)) return false;
         *this=next;return true;
     }
     bool advanceImage() {
@@ -34,6 +36,8 @@ struct FlashBallEffect {
         const unsigned exponent=(imageIndex.bits>>23)&255u;
         return exponent<127?0:((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
     }
+    int pixelX() const {std::int32_t pixel=0;x.promoted().roundPixel(pixel);return pixel;}
+    int pixelY() const {std::int32_t pixel=0;y.promoted().roundPixel(pixel);return pixel;}
 };
 
 // Owned fixed storage; no target heap allocation or per-frame asset conversion.
@@ -47,20 +51,32 @@ public:
     struct Phase {std::uint32_t newest;};
     static constexpr unsigned capacity=Capacity;
     const Slot& slot(unsigned index) const {return slots_[index];}
+    void clear() {for(auto& slot:slots_)slot.handle=0;count_=0;nextHandle_=1;}
+    template<class Draw> void visitNewest(Draw draw) const {
+        for(unsigned i=0;i<count_;++i)draw(slots_[order_[i]].effect);
+    }
     Phase beginAnimation() const {return {nextHandle_?nextHandle_-1u:0xffffffffu};}
     template<class Random> std::uint32_t create(MotionBinary64 x,MotionBinary64 y,Random& random) {
         if(!nextHandle_)return 0;
-        for(auto& slot:slots_)if(!slot.handle) {
+        for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle) {
+            auto& slot=slots_[index];
             if(!slot.effect.create(x,y,random))return 0;
+            for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
+            order_[0]=index;++count_;
             slot.handle=nextHandle_++;return slot.handle;
         }
         return 0;
     }
     bool advanceAnimation(Phase phase) {
-        for(auto& slot:slots_)if(slot.handle && slot.handle<=phase.newest) {
+        for(unsigned i=0;i<count_;++i) {
+            auto& slot=slots_[order_[i]];
+            if(slot.handle>phase.newest) continue;
             if(!slot.effect.advanceImage())return false;
             if(slot.effect.destroyRequested)slot.handle=0;
         }
+        unsigned kept=0;
+        for(unsigned i=0;i<count_;++i)if(slots_[order_[i]].handle)order_[kept++]=order_[i];
+        count_=kept;
         return true;
     }
     template<class Random> bool skeletonBurst(MotionBinary64 x,MotionBinary64 y,Random& random) {
@@ -70,6 +86,8 @@ public:
     }
 private:
     Slot slots_[Capacity];
+    unsigned order_[Capacity]{};
+    unsigned count_=0;
     std::uint32_t nextHandle_=1;
 };
 }

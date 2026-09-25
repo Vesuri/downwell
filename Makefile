@@ -418,6 +418,18 @@ build/sdl-screenshot-test: tests/platform/SDLScreenshotTest.cpp src/platform/sdl
 	@mkdir -p build
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
+build/sdl-flash-raster-test: tests/platform/SDLFlashRasterTest.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp
+	@mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+.PHONY: verify-sdl-flash-raster
+verify-sdl-flash-raster: build/sdl-flash-raster-test generate-sprite-pack
+	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/sdl-flash-raster-test
+
+.PHONY: verify-flash-render-paths
+verify-flash-render-paths: build/game-render-test test-amiga-gameplay-draw-list verify-sdl-flash-raster
+	DOWNWELL_FLASH_RENDER_ONLY=1 ./build/game-render-test
+
 build/skip-intro-test: tests/core/SkipIntroTest.cpp $(filter-out tests/core/GameRenderTest.cpp,$(GAME_RENDER_TEST_SOURCES)) src/platform/amiga/AmigaSceneRuntime.cpp
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -o $@ $^

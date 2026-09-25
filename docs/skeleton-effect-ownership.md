@@ -77,7 +77,17 @@ match scalar positions/RNG/animation, retire after seven animation updates and
 reuse slots without reusing handles. Normal/sanitizer and 68000 compile checks
 pass. Exported sprite-96 sequence metadata is now explicitly verified.
 
-This pool is not yet called by the live world or either renderer. Offline-art
+The pool now resides in shared `RunSession` ownership. Both runtime adapters
+advance it in their pre-Step animation work; room/run retirement clears it
+without a whole-pool stack temporary. Both render paths consume current frames
+and camera-relative anchors, with newest-first order within the effect family.
+Only active entries are visited. Bursts are still fixture-triggered rather than
+connected to natural death, because the earlier smoke/blood/corpse/debris calls
+must preserve RNG order too. The existing renderer's class-grouped painter
+order and nearest-even integer effect anchors are retained; full cross-family
+creation-order and Windows fractional-raster fidelity remain unproven.
+
+Offline-art
 preparation uncovered noncanonical colors: every opaque pixel in sprite-96
 frames 0/2 is RGB 254 and in frame 1 is RGB 7 (436 opaque pixels per frame).
 The exact four-pen exporter initially rejected those colors. Follow-up export
@@ -104,8 +114,13 @@ The independent artwork test evaluates the source shader classes and checks
 semi-transparent inputs. Pack reproducibility and existing garden/exit-mask
 checks pass. The game pack grows from 320,958 to 323,118 bytes (+2,160), SHA-256
 `d029f6b121ad7761f496887dba2491d0ac821f26055f4e4af63523c853355de9`.
-No runtime asset conversion is added. Live effect collection/drawing remains
-unconnected, so this is asset readiness rather than visible gameplay completion.
+No Amiga runtime asset conversion is added. SDL loads three isolated canonical
+textures once instead of altering shared atlas pixels. A real SDL framebuffer
+test compares all pixels against independent source color classification over
+red, proving that the dark frame occludes rather than becoming transparent.
+Production renderer-command tests cover camera movement and retirement on both
+adapters. This is fixture-based integration, not naturally triggered effects or
+a rendered native-emulator comparison; full death presentation remains open.
 
 Smoke child state, flash rendering, corpse physics and debris relocation still
 need their own adapters; this audit does not establish those adapters.

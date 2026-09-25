@@ -32,14 +32,38 @@ and animation/retirement state through `FlashBallEffects`. Its 1,024 seeded
 burst tests compare 6,178 births to scalar arithmetic, including coordinate
 narrowing, creation-phase exclusion, seven-update Animation End and slot reuse.
 Normal/sanitizer and 68000 compilation checks pass. Sprite 96's three unit
-sequence keys are now exported/verified. The live world/renderers remain
-unconnected. The source RGB 254/7 palette issue is resolved for offline art:
+sequence keys are now exported/verified. The pool now belongs to `RunSession`:
+both gameplay adapters advance it before Step, room/run retirement clears it,
+and both renderer projections consume it. Public burst emission uses absolute
+room coordinates and the owning world's RNG. Empty pools do no per-slot work;
+draw order among effects is newest-first even after slot reuse. Natural death
+callbacks remain unconnected pending the other synchronous effects.
+The source RGB 254/7 palette issue is resolved for offline art:
 the pinned embedded default shader maps those colors to light/dark, now
 converted to our existing white/opaque-black pens for sprite 96 only. All 90
 skeleton/bone/flash planar/DMA facings and pack reproducibility checks pass.
 The pack is 323,118 bytes (+2,160); the ordinary Amiga build passes both 68000
 audits. This preserves color classes, not exact Windows shader output RGB.
 See `skeleton-effect-ownership.md` for the precise remaining boundary.
+
+`make verify-flash-render-paths` passes fixture bursts through the production
+host renderer and Amiga draw-list collector. The actual headless SDL framebuffer
+also matches all three source-classified frames over a red background, including
+opaque-dark occlusion. SDL prepares isolated mapped textures once at load time;
+it does not change shared source atlases or convert pixels per draw. Room
+retirement, shared gameplay and sanitized owner tests pass. The bounded native
+CPU replay retains all existing digests and restores ordinary startup with both
+68000 audits clean (`/tmp/downwell-flash-world-native.log`). This native tape
+does not create flashes; rendered Amiga effect capture remains open.
+
+**Existing full renderer-test coverage failure:** `GameRenderTest`'s natural
+input tape no longer reaches damage-blink/recovery coverage. An isolated
+unchanged-HEAD source snapshot fails the same assertion
+(`/tmp/downwell-flash-baseline.log`), so this predates effect integration.
+A firing-phase-six experiment also failed (4,769 main-room updates, health 4,
+no damage phases) and was reverted. The original full-suite assertions/input
+remain intact; focused flash verification is explicitly separate, not a full
+renderer-suite pass. Diagnose this route before claiming restored full coverage.
 
 Smoke/flash burst emission now has a shared implementation preserving count,
 Y-before-X sampling and synchronous child Create interleaving. The skeleton's

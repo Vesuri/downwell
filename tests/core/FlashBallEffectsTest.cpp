@@ -54,5 +54,19 @@ int main(){
     check(full.create(number(0),number(0),random)==1);
     const auto draws=random.drawCount();
     check(!full.create(number(0),number(0),random) && draws==random.drawCount());
+    unsigned visited=0;
+    full.visitNewest([&](const downwell::FlashBallEffect&){++visited;});check(visited==1);
+    full.clear();visited=0;
+    full.visitNewest([&](const downwell::FlashBallEffect&){++visited;});check(visited==0);
+    downwell::FlashBallEffects<3> ordered;
+    check(ordered.create(number(10),number(0),random));
+    const auto older=ordered.beginAnimation();
+    for(unsigned i=0;i<6;++i)check(ordered.advanceAnimation(older));
+    check(ordered.create(number(100),number(0),random));
+    check(ordered.advanceAnimation(older)); // Retire older slot only.
+    check(ordered.create(number(200),number(0),random)); // Reuses lower slot.
+    std::vector<int> order;
+    ordered.visitNewest([&](const downwell::FlashBallEffect& effect){order.push_back(effect.pixelX());});
+    check(order.size()==2 && order[0]>=198 && order[1]<=102);
     std::printf("Flash effects: %u owned births across 1024 seeds, seven-update retirement and slot reuse passed\n",births);
 }

@@ -20,12 +20,17 @@ int main() {
     run.levelResultRequested = true;
     run.levelExitPresent = run.goalStopped = run.exitControlsLocked = true;
     run.exitDither.create(160, 1000);
+    require(run.flashEffects.create(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),random)!=0,
+            "old room owns a flash effect");
     const auto draws = random.drawCount();
     require(!run.enterLevelClear(9, heart, health, player, random) && run.levelResultRequested &&
         random.drawCount() == draws, "invalid entry leaves request and RNG intact");
     require(run.enterLevelClear(0, heart, health, player, random) && run.levelClearActive &&
         !run.levelExitPresent && !run.exitDither.active && !run.levelResultRequested,
         "accepted room boundary retires exit state");
+    unsigned flashCount=0;
+    run.flashEffects.visitNewest([&](const FlashBallEffect&){++flashCount;});
+    require(flashCount==0,"room retirement clears flash effects without resetting the whole run");
     require(!run.enterLevelClear(0, heart, health, player, random) && random.drawCount() == draws + 1,
         "duplicate room entry cannot consume another Create random word");
     unsigned tick = 0, advances = 0, dithers = 0;

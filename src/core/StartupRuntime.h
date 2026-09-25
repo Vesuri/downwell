@@ -192,6 +192,10 @@ public:
         }, [this] { return random_.chooseIndexSmall(3); }, mainPlayerHealth_);
     }
     const ShopWorld& shops() const { return run_.shops; }
+    const FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
+    bool emitFlashBurst(MotionBinary64 x,MotionBinary64 y) {
+        return run_.flashEffects.skeletonBurst(x,y,random_);
+    }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
     bool cameraSideLocked() const { return mainCameraMotion_.sideLocked; }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(mainCameraMotion_); }

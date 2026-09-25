@@ -28,6 +28,10 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         return true;
     };
 #ifndef DOWNWELL_REPLAY_VERIFY
+    port.flashEffects().visitNewest([&](const downwell::FlashBallEffect& effect) {
+        if(!append(96,effect.drawFrame(),downwellPlayfieldX+effect.pixelX()-worldViewX,
+                   effect.pixelY()-worldViewY,0)) ready=false;
+    });
     for (unsigned index = 0; index < port.enemyCount(); ++index) {
         const auto& enemy = port.enemyAt(index);
         if (!enemy.active || !enemy.awake) continue;

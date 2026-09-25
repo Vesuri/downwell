@@ -58,6 +58,7 @@ PlatformSDL::PlatformSDL() {
 }
 
 PlatformSDL::~PlatformSDL() {
+    for(auto* texture:flashFrames_) if(texture) SDL_DestroyTexture(texture);
     if (framebuffer_) SDL_DestroyTexture(framebuffer_);
     for (SDL_Texture* texture : texturePages_) {
         if (texture)
@@ -82,6 +83,38 @@ bool PlatformSDL::loadSpriteAssets(const SpritePack& pack,
             return false;
         }
         SDL_SetTextureBlendMode(texturePages_[page], SDL_BLENDMODE_BLEND);
+    }
+    // Sprite 96 uses near-white/near-black source values classified by the
+    // original default shader. Prepare isolated textures once, without changing
+    // shared atlas pixels or adding per-frame palette conversion.
+    PackedSprite flash;
+    if(pack.sprite(96,flash)) {
+        if(flash.frameCount!=flashFrames_.size()) return false;
+        for(unsigned frame=0;frame<flashFrames_.size();++frame) {
+            PackedTexturePageItem item;
+            if(!pack.spriteFrame(flash,frame,item)) return false;
+            const auto path=directory+"/"+std::to_string(item.texturePageId)+".png";
+            SDL_Surface* page=IMG_Load(path.c_str());
+            if(!page) return false;
+            SDL_Surface* crop=SDL_CreateRGBSurfaceWithFormat(0,item.sourceWidth,item.sourceHeight,32,SDL_PIXELFORMAT_RGBA32);
+            if(!crop){SDL_FreeSurface(page);return false;}
+            SDL_SetSurfaceBlendMode(page,SDL_BLENDMODE_NONE);
+            SDL_Rect source{item.sourceX,item.sourceY,item.sourceWidth,item.sourceHeight};
+            const int copied=SDL_BlitSurface(page,&source,crop,nullptr);
+            SDL_FreeSurface(page);
+            bool valid=copied==0;
+            for(int y=0;valid && y<crop->h;++y) for(int x=0;valid && x<crop->w;++x) {
+                auto* pixel=static_cast<Uint8*>(crop->pixels)+y*crop->pitch+x*4;
+                if(!pixel[3]) continue;
+                valid=pixel[3]==255 && pixel[0]==pixel[1] && pixel[1]==pixel[2] &&
+                      (pixel[0]==254 || pixel[0]==7);
+                if(valid) pixel[0]=pixel[1]=pixel[2]=pixel[0]==254?255:0;
+            }
+            if(valid) flashFrames_[frame]=SDL_CreateTextureFromSurface(renderer_,crop);
+            SDL_FreeSurface(crop);
+            if(!valid || !flashFrames_[frame]) return false;
+            SDL_SetTextureBlendMode(flashFrames_[frame],SDL_BLENDMODE_BLEND);
+        }
     }
     spritePack_ = &pack;
     return true;
@@ -190,8 +223,11 @@ void PlatformSDL::drawSpriteTransformed(std::int32_t spriteId,
     SDL_Texture* texture = texturePages_[static_cast<std::size_t>(item.texturePageId)];
     if (texture == nullptr || scaleX == 0.0F || scaleY == 0.0F)
         return;
-    const SDL_Rect source{item.sourceX, item.sourceY,
+    SDL_Rect source{item.sourceX, item.sourceY,
                           item.sourceWidth, item.sourceHeight};
+    if(spriteId==96 && flashFrames_[frame%3]) {
+        texture=flashFrames_[frame%3];source.x=source.y=0;
+    }
     const float left = static_cast<float>(item.targetX - sprite.originX);
     const float top = static_cast<float>(item.targetY - sprite.originY);
     const float right = left + static_cast<float>(item.targetWidth);

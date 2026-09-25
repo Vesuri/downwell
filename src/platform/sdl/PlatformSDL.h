@@ -46,6 +46,7 @@ private:
     const SpritePack* spritePack_ = nullptr;
     const FontPack* fontPack_ = nullptr;
     std::array<SDL_Texture*, 8> texturePages_{};
+    std::array<SDL_Texture*, 3> flashFrames_{};
     std::uint64_t nextTick_ = 0;
     bool screenshotRequested_ = false;
 };

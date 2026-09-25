@@ -44,7 +44,8 @@ public:
             ++deathFlashCount;
     }
     void drawSpriteTiled(std::int32_t, std::uint32_t, int, int) override {}
-    void drawSprite(std::int32_t id, std::uint32_t, int x, int y) override {
+    void drawSprite(std::int32_t id, std::uint32_t frame, int x, int y) override {
+        if(id==96) flashDraws.push_back({id,frame,float(x),float(y),1,1,0});
         if (id == 133 || id == 134) ++gemDraws;
         require(id != 458 && id != 459, "projectiles must use their firing angle, not unrotated artwork");
         if (id == 489 && x == 110 && y == 57) ++shopPanels;
@@ -57,6 +58,7 @@ public:
     struct Transform { int sprite; unsigned frame; float x, y, sx, sy, angle; };
     bool recordTransforms = false;
     std::vector<Transform> transforms;
+    std::vector<Transform> flashDraws;
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t frame, float x, float y,
                                float sx, float sy, float angle) override {
         if (recordTransforms) transforms.push_back({sprite, frame, x, y, sx, sy, angle});
@@ -370,6 +372,33 @@ int main() {
     const downwell::BuilderPatternPack builders(builderBytes.data(), builderBytes.size());
     require(rooms.valid() && objects.valid() && builders.valid(), "damage-render test loads real room/object/builder data");
     {
+        downwell::Game flashGame(&rooms,&objects,&builders);
+        auto& runtime=const_cast<downwell::StartupRuntime&>(flashGame.startup());
+        runtime.skipToGameForTesting();
+        require(runtime.emitFlashBurst(downwell::MotionBinary64::fromInteger(int(runtime.mainCameraViewX())+40),
+                                      downwell::MotionBinary64::fromInteger(int(runtime.mainCameraViewY())+60)),
+                "decoded world owns the flash burst");
+        for(unsigned frame=0;frame<=7;++frame){
+            RecordingRenderer capture;
+            flashGame.render(capture);
+            unsigned count=0;
+            runtime.flashEffects().visitNewest([&](const downwell::FlashBallEffect& effect){
+                require(count<capture.flashDraws.size(),"flash effect reaches host renderer");
+                const auto& draw=capture.flashDraws[count++];
+                require(draw.frame==effect.drawFrame() &&
+                    draw.x==110+effect.pixelX()-int(runtime.mainCameraViewX()) &&
+                    draw.y==effect.pixelY()-int(runtime.mainCameraViewY()),"flash projection follows camera");
+            });
+            require(count==capture.flashDraws.size() && (frame<7?count>=4:count==0),
+                    "host world animation retires flash effects on seventh update");
+            runtime.step(false);
+        }
+        if(std::getenv("DOWNWELL_FLASH_RENDER_ONLY")) {
+            std::puts("Production host flash ownership, camera projection and retirement passed");
+            return 0;
+        }
+    }
+    {
         downwell::Game enemyGame(&rooms, &objects, &builders);
         auto& runtime = const_cast<downwell::StartupRuntime&>(enemyGame.startup());
         runtime.skipToGameForTesting();
@@ -470,6 +499,9 @@ int main() {
         else if (immunity % 2) ++hidden;
         else ++flashingVisible;
     }
+    if(!(hidden>0 && flashingVisible>0 && recovered))
+        std::fprintf(stderr,"Damage tape: main=%u hidden=%u visible=%u health=%d recovered=%d\n",
+            mainTicks,hidden,flashingVisible,damagedGame.startup().mainPlayerHealth(),int(recovered));
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
     require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");

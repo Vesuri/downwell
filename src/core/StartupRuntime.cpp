@@ -297,6 +297,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool fire,
                                   bool anyInput) {
     if (run_.levelClearActive) return; // Result owner uses stepLevelClear.
+    if(roomId_==mainRoomId)
+        run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
@@ -1753,6 +1755,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
         run_.stage.area != 1 || run_.stage.level >= 3 || !roomPack_ || !objectPack_) return false;
     if (!run_.advanceAfterLevelClear()) return false;
     run_.shops.reset();
+    run_.flashEffects.clear();
     run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};

@@ -264,6 +264,11 @@ public:
     unsigned gemSlotEnd() const { return gemSlotEnd_; }
     const BulletState& bulletAt(unsigned index) const;
     const EnemyState& enemyAt(unsigned index) const;
+    const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
+    // Effect positions use original absolute room coordinates, not player offsets.
+    bool emitFlashBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y) {
+        return run_.flashEffects.skeletonBurst(x,y,enemyRandom_);
+    }
     unsigned enemyCount() const { return enemyCount_; }
     unsigned enemiesDefeated() const { return enemiesDefeated_; }
     unsigned gemCount() const;

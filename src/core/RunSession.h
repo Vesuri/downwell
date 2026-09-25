@@ -18,6 +18,7 @@
 #include "CurrencyStep.h"
 #include "MachineGunProfile.h"
 #include "LevelClearController.h"
+#include "FlashBallEffects.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -42,6 +43,8 @@ struct RunSession {
     Consumables consumables;
     UpgradeInventory upgrades;
     ShopWorld shops;
+    // Room-owned effects are reset on run/room retirement, not on a repaint.
+    FlashBallEffects<32> flashEffects;
     SideCameraLockers sideCameraLockers;
     bool gemHigh = false;
     void selectWeaponLevel(const CurrencyAccount& currency) {
@@ -92,6 +95,7 @@ struct RunSession {
         if (!levelResultRequested || levelClearActive) return false;
         if (!levelClear.create(style, heartGoal, health, upgrades, player, random)) return false;
         levelClearActive = true;
+        flashEffects.clear();
         // Room creation is followed by Draw before the next Step/Alarm phase.
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);
@@ -180,6 +184,7 @@ struct RunSession {
         consumables = {};
         upgrades = {};
         shops.reset();
+        flashEffects.clear();
         sideCameraLockers.clear();
         gemHigh = false;
         levelExit = {};
