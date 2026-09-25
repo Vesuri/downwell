@@ -713,6 +713,14 @@ test-amiga-selection-layer: generate-amiga-clear build/amiga-selection-layer-tes
 	./build/amiga-selection-layer-test generated/amiga-clear.dwap
 test: test-amiga-selection-layer
 
+.PHONY: test-amiga-style-scene
+build/amiga-style-scene-test: tests/platform/amiga/AmigaStyleSceneTest.cpp src/platform/amiga/AmigaStyleScene.cpp src/platform/amiga/AmigaSceneRuntime.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-amiga-style-scene: build/amiga-style-scene-test
+	./build/amiga-style-scene-test
+test: test-amiga-style-scene
+
 build/amiga-clear-overlay-test: tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ tests/platform/amiga/AmigaClearOverlayTest.cpp src/platform/amiga/AmigaRenderer.c

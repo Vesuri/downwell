@@ -71,8 +71,15 @@ Style selection has not yet migrated to the shared retained layer.
   They need distinct scene controllers, sharing prepared-screen machinery.
 - Garden has menu renderer/cache/scroll translation units, but lifecycle and
   presentation orchestration remain in the main loop.
-- Style selection has `AmigaStyleRenderer.cpp` and its Copper class. Upgrade
-  selection must share retained layer/scrolling infrastructure with it.
+- Style selection now has `AmigaStyleScene.h/.cpp`, owning both alternating
+  frame states, preparation/re-entry reset and Copper build-versus-patch
+  state. It delegates drawing to `AmigaStyleRenderer.cpp`. The application
+  still retires DMA and publishes the completed list, and shared startup
+  rules remain in `AmigaSceneRuntime`. This extraction introduces no new
+  Chip allocation or change to drawing/selection trajectories. The renderer's
+  prepared-art cache remains single-scene scratch; this is not a concurrent
+  multi-instance renderer. Upgrade selection must still share retained
+  layer/scrolling infrastructure with style selection.
 - Both selection screens should retain world-space text and icon layers and
   use bitplane pointers for common reveal/camera translation. Source-specific
   item trajectories, easing, bobbing and shadow animation must remain intact.
@@ -83,6 +90,25 @@ Style selection has not yet migrated to the shared retained layer.
 
 Hardware pointer scrolling is now wired for both completion layers. Full
 scene-class separation and sharing this backend with style selection remain.
+
+### Style scene ownership checks
+
+The extracted scene passes host lifecycle tests for two independently retained
+slots, first-build versus later Copper patching, re-entry at reused addresses,
+insufficient storage, failed preparation/rendering and failed Copper build
+retry. These use rendering doubles to test ownership, not to claim hardware
+pixel correctness. ASan/UBSan also pass.
+
+The real A500 skip-intro test covers reveal, locked-style navigation and
+confirmation, with 105 frames matching the unchanged full-redraw oracle.
+The emulator is bounded to 120 seconds and normal startup is restored.
+Evidence: `/tmp/downwell-style-scene-native-gdb.log` and
+`/tmp/downwell-style-scene-sanitized.log`.
+The separate 180-second-bounded results-restart test passes all three
+destinations, 640 retained overlay Copper checks, style/menu/gameplay renderer
+failure checks, the stack guard and 200 final gameplay updates. This verifies
+real memory reuse, beyond the lifecycle doubles. Normal startup is restored.
+Evidence: `/tmp/downwell-style-reentry-native-gdb.log`.
 
 ## Verification of the first extraction
 

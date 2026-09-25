@@ -29,7 +29,7 @@
 #include "AmigaClearSceneAssets.h"
 #include "AmigaUpgradeScene.h"
 #include "AmigaSplashCache.h"
-#include "AmigaStyleRenderer.h"
+#include "AmigaStyleScene.h"
 #include "AmigaShopMenu.h"
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
@@ -1636,9 +1636,10 @@ int main(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 
+    AmigaStyleScene styleScene(memory.sceneCache(), sceneCacheBytes,
+        memory.copper(), memory.copper() + downwellCopperWords, downwellCopperWords);
 #if defined(DOWNWELL_SKIP_INTRO) && !defined(DOWNWELL_SKIP_TO_GAME)
-    if (!amigaBuildStyleBorder(activeGamePack, activeGamePackEnd,
-                              memory.sceneCache() + amigaStyleFrameBytes * 2)) {
+    if (!styleScene.prepare(activeGamePack, activeGamePackEnd)) {
         platform.restore();
         FreeMem(startupCopperWords, 4 * sizeof(UWORD));
         memory.release();
@@ -1672,11 +1673,6 @@ int main(void) {
         DownwellSplashCopperList(dynamicCopperWords[1],
                                  downwellCopperWords)
     };
-    DownwellStyleCopperList styleLists[2] = {
-        DownwellStyleCopperList(dynamicCopperWords[0], downwellCopperWords),
-        DownwellStyleCopperList(dynamicCopperWords[1], downwellCopperWords)
-    };
-    bool styleListBuilt[2] = {false, false};
     DownwellSelectionCopperList selectionLists[2] = {
         DownwellSelectionCopperList(dynamicCopperWords[0], downwellCopperWords),
         DownwellSelectionCopperList(dynamicCopperWords[1], downwellCopperWords)
@@ -1686,7 +1682,6 @@ int main(void) {
                   "Selection canvases must fit the retired scene cache");
     static_assert(downwellLayerBytes >= AmigaSelectionLayer::bytes,
                   "Selection borders must fit the smaller retired HUD buffer");
-    AmigaStyleFrameState styleFrameState[2];
     DownwellSplashCopperList splashBlankList(
         memory.copper() + downwellCopperWords * 2, downwellCopperWords);
     DownwellSplashCopperList splashLogoList(
@@ -2011,11 +2006,7 @@ int main(void) {
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
                     // These framebuffers and copper slots may contain gameplay,
                     // even when the new selection matches the last visit exactly.
-                    styleFrameState[0] = {};
-                    styleFrameState[1] = {};
-                    styleListBuilt[0] = styleListBuilt[1] = false;
-                    if (!amigaBuildStyleBorder(activeGamePack, activeGamePackEnd,
-                            memory.sceneCache() + amigaStyleFrameBytes * 2))
+                    if (!styleScene.prepare(activeGamePack, activeGamePackEnd))
                         break;
                 }
                 if (presentedScene == AmigaScene::splash) {
@@ -2086,10 +2077,7 @@ int main(void) {
                 }
                 else if (presentedScene == AmigaScene::menu) {
                     if (presentationChanged &&
-                        !amigaBuildStyleBorder(
-                            activeGamePack, activeGamePackEnd,
-                            memory.sceneCache() +
-                                amigaStyleFrameBytes * 2))
+                        !styleScene.prepare(activeGamePack, activeGamePackEnd))
                         break;
                 }
                 else if (presentedScene != AmigaScene::styleSelect &&
@@ -2349,16 +2337,11 @@ int main(void) {
                     continue;
                 }
                 if (presentedScene == AmigaScene::styleSelect) {
-                    if (!amigaRenderStyleFrame(
-                            activeGamePack, activeGamePackEnd,
-                            memory.sceneCache() +
-                                amigaStyleFrameBytes * 2,
-                            scenes,
-                            memory.sceneCache() +
-                                back * amigaStyleFrameBytes, styleFrameState[back]))
+                    AmigaStyleScene::Frame style;
+                    if (!styleScene.render(back, scenes, style))
                         break;
-                    const UBYTE* styleFrame = memory.sceneCache() + back * amigaStyleFrameBytes;
 #ifdef DOWNWELL_SCENE_VERIFY
+                    const UBYTE* styleFrame = style.content;
                     AmigaStyleFrameState referenceState;
                     if (!amigaRenderStyleFrame(activeGamePack, activeGamePackEnd,
                             memory.sceneCache() + amigaStyleFrameBytes * 2,
@@ -2380,21 +2363,15 @@ int main(void) {
                     }
 #endif
                     DW_PROFILE_PHASE(profileCopper);
-                    const UBYTE* styleMask = scenes.styleDitherY() < 684 || scenes.styleSelected()
-                        ? amigaStyleMask(memory.sceneCache(), scenes) : 0;
-                    const UBYTE* styleBorder = memory.sceneCache() + amigaStyleFrameBytes * 2 - scenes.styleTileY() * amigaStyleBytesPerRow;
-                    if (!(styleListBuilt[back]
-                            ? styleLists[back].update(styleFrame, styleMask, styleBorder)
-                            : styleLists[back].build(styleFrame, styleMask, nullSprite, palette, styleBorder)))
+                    if (!styleScene.updateCopper(back, style, nullSprite, palette))
                         break;
-                    styleListBuilt[back] = true;
                     DW_PROFILE_PHASE(profilePublish);
-                    platform.publish(styleLists[back]);
+                    platform.publish(styleScene.copper(back));
                     front = back;
                     DW_PROFILE_PHASE(profileOther);
 #ifdef DOWNWELL_SCENE_VERIFY
-                    gDownwellStyleMask = styleMask;
-                    gDownwellStyleCopper = styleLists[back].data();
+                    gDownwellStyleMask = style.mask;
+                    gDownwellStyleCopper = styleScene.copper(back).data();
                     if (scenes.styleDitherY() == 528 && !scenes.styleSelected()) {
                         gDownwellStyleFrame = styleComposite;
                         downwellStyleRevealFrameReady();
