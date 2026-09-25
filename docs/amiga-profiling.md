@@ -5,8 +5,30 @@
 The historical 50 FPS result below predates subsequent fidelity work and is
 not the current performance claim. The retained ammo HUD fixes visible clears
 and reduces its measured work substantially, but the current 600-update
-firing tape runs at 36.63 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
+firing tape runs at 36.95 FPS. See [the HUD checkpoint](amiga-ammo-hud-performance.md)
 for exact scope, phase timings, remaining budget work and pixel verification.
+
+### Exact WELL512 shift on 68000
+
+The target compiler emitted a variable-count 28-bit left shift for each
+WELL512 draw. The native implementation now rotates right four bits and
+masks with `0xf0000000`; this preserves exactly the low nibble shifted into
+the high nibble. The host retains the portable shift expression as its
+oracle. Disassembly confirms `ror.l #4` and `andi.l`, both 68000 instructions.
+Draw order, state layout and draw counts are unchanged.
+
+The bounded 600-update FPSCOUNT tape takes **812 PAL fields / 36.95 FPS**,
+versus 819 fields / 36.63 FPS beforehand; maximum gap remains five fields.
+The instrumented worst frame is still 258, at 149.453 ms versus 150.267 ms.
+Its builder/registration/index phases take 77.054 / 22.539 / 25.624 ms.
+This is a small measured improvement, not a solution to the generation stall
+or the 20 ms frame budget.
+
+Portable RNG and incremental generation tests, bounded cross-target replay,
+and both native instruction/helper audits pass. Logs:
+`/tmp/downwell-rng-shift-{test,profile,fps,replay}.log`. Replay verification
+restored the ordinary non-skip executable. Runs used `SKIP_TO_GAME=1` where
+applicable and a 45-second emulator limit.
 
 ### Separate runtime costs (2026-09-25)
 
