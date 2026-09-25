@@ -116,10 +116,18 @@ all: $(TARGET)
 .PHONY: verify-catacomb-symbols
 .PHONY: verify-skeleton-throw
 .PHONY: verify-skeleton-timing
+.PHONY: verify-runner-image-value
+verify-runner-image-value: build/runner-image-value-test
+	./build/runner-image-value-test
+
+build/runner-image-value-test: tests/core/RunnerImageValueTest.cpp src/core/RunnerImageValue.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/RunnerImageValueTest.cpp
+
 verify-skeleton-timing: build/skeleton-timing-test
 	./build/skeleton-timing-test
 
-build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/AlarmBank.h
+build/skeleton-timing-test: tests/core/SkeletonTimingTest.cpp src/core/SkeletonTiming.h src/core/MotionBinary64.h src/core/AlarmBank.h src/core/RunnerImageValue.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -Isrc -o $@ tests/core/SkeletonTimingTest.cpp
 

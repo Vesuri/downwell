@@ -3,6 +3,7 @@
 
 #include "MotionBinary64.h"
 #include "AlarmBank.h"
+#include "RunnerImageValue.h"
 
 namespace downwell {
 // enmSkeleton's four Alarm events and the timing writes in Step_0.
@@ -38,7 +39,11 @@ struct SkeletonTiming {
     }
 
     void beginStep(bool stopped) {
-        if (!stopped) imageSpeed = rate;
+        if (!stopped) {
+            RunnerImageValue stored;
+            // This state admits only recovered rates 0, 0.2 and 0.3.
+            if (stored.assign(rate)) imageSpeed = stored.promoted();
+        }
         else {
             imageSpeed = {};
             if (alarms[0] > 0) ++alarms[0];

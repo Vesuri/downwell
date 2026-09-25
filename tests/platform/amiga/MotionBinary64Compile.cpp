@@ -1,5 +1,6 @@
 #include "core/MotionBinary64.h"
 #include "core/BoneProjectile.h"
+#include "core/RunnerImageValue.h"
 // Code-generation fixture only, not linked into the playable executable.
 // Variable operands force the compiler to retain the complete arithmetic path.
 extern "C" bool motionBinary64Compile(downwell::MotionBinary64* position,
@@ -27,4 +28,11 @@ extern "C" unsigned boneProjectileCompile(downwell::BoneProjectile* bone,
 extern "C" bool randomBinary64Compile(unsigned word, downwell::MotionBinary64 scale,
     downwell::MotionBinary64* result) {
     return downwell::randomBinary64(word,scale,*result);
+}
+extern "C" bool runnerImageValueCompile(downwell::MotionBinary64 input,
+    downwell::MotionBinary64* output) {
+    downwell::RunnerImageValue stored;
+    if (!stored.assign(input)) return false;
+    *output = stored.promoted();
+    return true;
 }

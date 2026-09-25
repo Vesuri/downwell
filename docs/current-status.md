@@ -237,6 +237,13 @@ and the ordinary build was restored after both attempts.
   same phase. The new per-slot API and restart tests preserve this distinction
   from snapshot dispatch (see `runner-alarms.md`). Global owner integration
   and animation advancement remain incomplete, so live admission stays off.
+  Original-runner image-field inspection additionally proves that builtin
+  `image_index`/`image_speed` setters narrow VM doubles to binary32. The
+  skeleton timing component now preserves that boundary rather than treating
+  its speed as the unchanged custom `imgSp` double. Integer-only conversion
+  passes 100,000 host cases and sanitizers, and a 68000 compile has no helper
+  references. Advancement/wrapping and live actor animation fidelity remain
+  unfinished; see `runner-image-fields.md`.
 
 ## Working evidence
 
