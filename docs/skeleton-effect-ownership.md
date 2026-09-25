@@ -89,14 +89,26 @@ undefined symbol is GameMakerRandom::nextU32, with no FP helpers.
 
 Crucially, fxSmoke Step recomputes the animation rate with a **fourth** random
 draw, after calculating xsp/ysp on its first invocation. The birth state does
-not mark allSet or consume that draw early. Velocity initialization, 0.9 decay,
-the 16-pixel no-collision gate, collision dispatch, animation lifetime and drawFx
-remain to be connected; this is not yet a live smoke owner. Source export pins:
+not mark allSet or consume that draw early. `SmokeMotion` now sequences that
+initialization, integrates xx/yy, rounds and publishes builtin coordinates,
+then decays velocity by 0.9. Its wall event multiplies smokesp by 0.2 only when
+nocol is false; it does not rewrite initialized velocity or animation speed.
+Alarm 0 clears nocol and the water event is empty. There is no time-stop guard.
+An 81,920-Step/1,024-seed scalar regression covers first-Step draw timing,
+position/velocity bits, 512 distance escapes and 512 early-alarm cases, wall
+events and complete RNG state. Sanitizers and 68000 compilation pass with no
+FP helpers in this component.
+
+Direction and the point_distance/epsilon predicate are explicit callbacks.
+The test supplies host sin/cos/hypot: it verifies event sequencing and motion,
+**not** original-runner transcendental identity. Native geometry, world collision
+dispatch, animation lifetime and drawFx remain open; this is not a live smoke
+owner. Source export pins:
 Create SHA-256 `725336f892c1c024ccb1285545b93f683be5cca16815f0b626c82eaa496a221b`,
 Step SHA-256 `4398d86951dc87ba221561327498a924f5b97e14ba65f13b30c71377206e8263`.
 Those hashes identify the reviewed UTMT assembly, not a Windows execution test.
 
-The pool now resides in shared `RunSession` ownership. Both runtime adapters
+The flash pool now resides in shared `RunSession` ownership. Both runtime adapters
 advance it in their pre-Step animation work; room/run retirement clears it
 without a whole-pool stack temporary. Both render paths consume current frames
 and camera-relative anchors, with newest-first order within the effect family.
