@@ -389,6 +389,12 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
             }
             require(native.objectId == enemy.objectId,
                     "paired actor identity matches throughout live comparison");
+            if (native.active != enemy.active || native.health != enemy.health)
+                std::cerr << "Actor " << enemy.objectId << " active=" << native.active << ',' << enemy.active
+                    << " sprite=" << native.spriteId << ',' << enemy.spriteId
+                    << " xy=" << native.x+240 << ',' << native.y+176 << '/' << enemy.x << ',' << enemy.y
+                    << " scale=" << native.facing << ',' << native.imageScaleY() << '/'
+                    << enemy.scaleX << ',' << enemy.scaleY << '\n';
             require(native.active == enemy.active && native.health == enemy.health,
                     "paired enemies agree on activation and remaining health");
             require(native.alarm0 == enemy.alarms.get(0) && native.alarm1 == enemy.alarms.get(1),

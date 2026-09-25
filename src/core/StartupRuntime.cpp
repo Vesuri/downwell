@@ -994,9 +994,17 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         mainCameraMotion_.viewBottomQ12() / 16, instances_.size(),
         [this](unsigned index) {
             const auto& enemy = instances_.at(index);
-            // Round upward so fractional centres just below the frontier do
-            // not become eligible through fixed-point truncation.
-            return ActivationInstance{enemy.objectId, static_cast<long>(std::ceil(enemy.y * 256.0)),
+            if (enemy.active || !enemy.activationPending)
+                return ActivationInstance{enemy.objectId, {}, enemy.active, enemy.activationPending};
+            int sprite = enemy.spriteId;
+            if (sprite < 0 && objectPack_) {
+                PackedObject object;
+                if (objectPack_->findObject(enemy.objectId, object)) sprite = object.spriteId;
+            }
+            const auto bounds = contactWorldBounds({static_cast<long>(std::round(enemy.x * 256.0)),
+                static_cast<long>(std::round(enemy.y * 256.0)), enemy.scaleX < 0 ? -1 : 1,
+                enemy.scaleY < 0 ? -1 : 1, enemyContactMask(enemy.objectId, sprite)});
+            return ActivationInstance{enemy.objectId, bounds,
                                       enemy.active, enemy.activationPending};
         },
         [this](unsigned index) {

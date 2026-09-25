@@ -94,6 +94,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   four native locks and three releases pass with unchanged staged-swap
   coverage. See `side-camera-lockers.md` for source evidence and remaining
   achievement, multiple-overlap and original-runner caveats.
+  Enemy activation now uses resource-backed bounding-box overlap with the
+  source activation rectangle instead of centre Y alone. Natural native and
+  extended host combat gates pass; historical-runner boundary/transform
+  details remain unverified. See `activation-fidelity.md`.
 - Audio, complete persistence/unlocks/settings, later areas, remaining weapons/
   styles/enemies, bosses and ending flow are not complete. Distinguish features
   absent from both ports from actual Amiga-versus-implemented-SDL gaps.

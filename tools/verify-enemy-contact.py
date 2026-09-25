@@ -25,4 +25,7 @@ for object_id, mask in ((35, 31), (113, 166), (117, 177), (119, 278)):
 assert manifest["resources"]["objects"][112]["spriteId"] == 186
 assert manifest["resources"]["objects"][248]["spriteId"] == 133
 assert manifest["resources"]["objects"][248]["textureMaskId"] == -1
+assert manifest["resources"]["objects"][116]["spriteId"] == 153
+assert manifest["resources"]["rooms"][11]["name"] == "rmMain"
+assert manifest["resources"]["rooms"][11]["width"] == 480
 print("13 enemy/player/currency contact rectangles match pinned source metadata")

@@ -896,8 +896,20 @@ int main() {
             "upward crawler chooses its host-generated ninety-degree frame");
 
     AmigaPortRuntime bat(300);
+    {
+        AmigaPortRuntime bounds(300);
+        require(bounds.configureEnemy(0, 111, 163, 40, 3, 128, 0, 5, 6,
+                    0, 0, -1, -1, 0, 0, false) &&
+                bounds.configureEnemy(1, 111, 163, 300, 3, 128, 0, 5, 6,
+                    0, 0, -1, -1, 0, 0, false), "dormant bounds fixtures configure");
+        for (unsigned tick = 0; tick < 10; ++tick) bounds.step(0);
+        require(!bounds.enemyAt(0).active, "mask remains below frontier 160");
+        bounds.step(0);
+        require(bounds.enemyAt(0).active && !bounds.enemyAt(1).active,
+            "frontier 176 intersects mask at 175 while excluding a box outside room width");
+    }
     bat.configureSolidResolver(noSolid, 0);
-    require(bat.configureEnemy(0, 116, 175, 40, 0,
+    require(bat.configureEnemy(0, 116, 153, 40, 0,
                                0, 0, 15, 12,
                                0, 0, -1, -1, 180, 320, false),
             "generated bat retains direction and deferred activation");
@@ -942,7 +954,7 @@ int main() {
 
     AmigaPortRuntime distantBat(300);
     distantBat.configureSolidResolver(noSolid, 0);
-    require(distantBat.configureEnemy(0, 116, 175, 40, 500,
+    require(distantBat.configureEnemy(0, 116, 153, 40, 500,
                                       0, 0, 15, 12,
                                       0, 0, -1, -1, 180, 320, false),
             "distant bat configuration succeeds");

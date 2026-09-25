@@ -500,7 +500,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         318L * 256L + viewCameraYQ8(), enemyCount_,
         [this](unsigned i) {
             const auto& enemy = enemies_[i];
-            return downwell::ActivationInstance{enemy.objectId, (enemy.y + 176L) * 256,
+            if (enemy.active || !enemy.activationPending)
+                return downwell::ActivationInstance{enemy.objectId, {}, enemy.active, enemy.activationPending};
+            const auto bounds = downwell::contactWorldBounds({(enemy.x + 240L) * 256, (enemy.y + 176L) * 256,
+                enemy.objectId == 117 ? enemy.motionState : enemy.facing,
+                enemy.imageScaleY(), downwell::enemyContactMask(enemy.objectId, enemy.spriteId)});
+            return downwell::ActivationInstance{enemy.objectId, bounds,
                                                enemy.active, enemy.activationPending};
         },
         [this](unsigned i) {
