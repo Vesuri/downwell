@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_MOTION_BINARY64_VERIFICATION_H
 #define DOWNWELL_CORE_MOTION_BINARY64_VERIFICATION_H
 #include "MotionBinary64.h"
+#include "BoneMotion.h"
 namespace downwell {
 struct MotionBinary64Verification {
     std::uint32_t digest = 0x811c9dc5u, updates = 0, failures = 0;
@@ -36,6 +37,28 @@ inline MotionBinary64Verification benchmarkMotionBinary64() {
     }
     result.mix(position.high); result.mix(position.low);
     result.mix(speed.high); result.mix(speed.low); result.mix(static_cast<std::uint32_t>(pixel));
+    return result;
+}
+inline MotionBinary64Verification verifyBoneMotion(bool benchmark = false) {
+    MotionBinary64Verification result;
+    BoneMotion bone;
+    for (int vx = -12; vx <= 12; vx += 2) {
+        if (benchmark && vx != 10) continue;
+        if (!bone.launch(240,704,vx,-31)) continue; // only actual throw speeds
+        for (unsigned i = 0; i < 1000; ++i) {
+            if (!bone.step(!benchmark && i%11 < 3)) ++result.failures;
+            ++result.updates;
+            if (!benchmark) {
+                result.mix(bone.xx.high); result.mix(bone.xx.low);
+                result.mix(bone.yy.high); result.mix(bone.yy.low);
+                result.mix(bone.ysp.high); result.mix(bone.ysp.low);
+                result.mix(static_cast<std::uint32_t>(bone.x)); result.mix(static_cast<std::uint32_t>(bone.y));
+            }
+        }
+    }
+    result.mix(bone.xx.high); result.mix(bone.xx.low);
+    result.mix(bone.yy.high); result.mix(bone.yy.low);
+    result.mix(static_cast<std::uint32_t>(bone.x)); result.mix(static_cast<std::uint32_t>(bone.y));
     return result;
 }
 }

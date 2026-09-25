@@ -247,3 +247,34 @@ Evidence: `/tmp/downwell-motion-native-replay.log` and
 was stopped afterward and the ordinary executable was restored. Both native
 instruction/helper audits pass. Arithmetic is still verification-only, not
 yet installed in live projectile state.
+
+### Complete launched-bone motion component
+
+`BoneMotion` now owns both binary64 positions, both velocities and rounded
+pixel coordinates using integer-only arithmetic. `launch` accepts the source
+skeleton's supported velocity choices as integer tenths, resolves their exact
+binary64 constants, and consumes no RNG. The full child Create must still run
+before this override. Each Step preserves VM order (gravity, X, Y, pixel
+rounding); stopped Steps do nothing. Unsupported initialization or arithmetic
+fails without partially updating the motion state.
+
+The host test compares 201,600 two-axis updates across all seven horizontal
+choices, three vertical choices, 32 starting positions and interleaved time
+stops with `BoneProjectileReference`, checking all position/velocity bits and
+rounded pixels. ASan/UBSan pass. The 7,000-update native replay checksum
+`2992916f` matches a separately stepped host double oracle, as does benchmark
+checksum `c2a61ce4`. Existing replay digests and the task-stack guard still pass.
+
+The isolated full-motion benchmark takes 45 PAL fields per 1,000 updates:
+approximately **0.90 ms/bone update**, less than 0.02 ms/update endpoint
+quantization uncertainty. It includes three additions, two pixel roundings,
+failure checks and state publication; it excludes animation, collisions,
+effects, rendering and actor traversal. This cost must be budgeted before
+enabling many simultaneous bones; it is not a 50-FPS result.
+
+Evidence: `/tmp/downwell-bone-motion-native.log` and
+`/tmp/downwell-bone-motion-native-gdb.log`. The bounded emulator completed,
+stopped and restored ordinary startup with clean 68000 audits. The motion
+component is ready for ownership integration, but no skeleton or projectile
+has been enabled in the playable game. Health/collision event handling,
+animation and presentation remain outstanding.

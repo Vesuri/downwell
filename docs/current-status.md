@@ -166,6 +166,10 @@ two ports proves original-game completion. The active parity goal is unfinished.
   Native numeric replay now matches 24,000 updates; an isolated two-add/
   pixel-round batch costs about 0.46 ms/update on the emulated 68000. It is
   still not deployed: complete projectile integration and live cost remain.
+  `BoneMotion` now matches 201,600 host two-axis updates and a 7,000-update native
+  replay. Its isolated complete-motion cost is about 0.90 ms/bone update;
+  lifecycle, animation, collision and rendering costs are not included. No
+  new live actor is enabled yet.
 
 ## Working evidence
 

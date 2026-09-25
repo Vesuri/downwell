@@ -40,5 +40,8 @@ int main() {
     const auto bench = downwell::benchmarkMotionBinary64();
     if (motion.failures || bench.failures) return 6;
     std::printf("MOTION %u %08x %u %08x %u\n", motion.updates, motion.digest, motion.failures, bench.digest, bench.failures);
+    const auto bones = downwell::verifyBoneMotion(), boneBench = downwell::verifyBoneMotion(true);
+    if (bones.failures || boneBench.failures) return 7;
+    std::printf("BONE %u %08x %u %08x %u\n", bones.updates, bones.digest, bones.failures, boneBench.digest, boneBench.failures);
     return 0;
 }
