@@ -745,6 +745,14 @@ test-amiga-gameplay-rows: build/amiga-gameplay-rows-test
 	./build/amiga-gameplay-rows-test
 test: test-amiga-gameplay-rows
 
+.PHONY: test-amiga-gameplay-scene
+build/amiga-gameplay-scene-test: tests/platform/amiga/AmigaGameplaySceneTest.cpp src/platform/amiga/AmigaGameplayScene.cpp $(HOST_CHECK_HEADERS)
+	@mkdir -p build
+	$(CXX) -Isrc -Itests/platform/amiga/compat $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+test-amiga-gameplay-scene: build/amiga-gameplay-scene-test
+	./build/amiga-gameplay-scene-test
+test: test-amiga-gameplay-scene
+
 .PHONY: test-amiga-style-retained
 build/amiga-style-retained-test: tests/platform/amiga/AmigaStyleRetainedTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaSelectionLayer.cpp src/platform/amiga/AmigaSceneRuntime.cpp src/platform/amiga/AmigaRenderer.c $(HOST_CHECK_HEADERS)
 	@mkdir -p build

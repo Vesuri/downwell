@@ -131,10 +131,41 @@ the original border stride and palette rules.
   dirty-row debts, initialized margins, conservative pending ranges and
   backing-copy synchronization. Terrain staging, BOB restoration, laser/goal
   field repair and verification query this owner instead of global arrays.
-  This is a gameplay-scene component, not a completed gameplay scene owner.
+  `AmigaGameplayScene.h/.cpp` owns both Copper programs and their readiness.
+  Terrain/actor presentation still remains in the application; these are
+  incremental boundaries, not a completed gameplay scene extraction.
 
 Hardware pointer scrolling is wired for both completion layers and the style
 reveal. Full seven-scene class separation remains unfinished.
+
+### Gameplay Copper lifecycle
+
+`AmigaGameplayScene` now decides whether each retired slot requires a full
+build or only ring-pointer patches. Startup lists reference the backing
+bitmap, so both slots are explicitly invalidated before normal display-ring
+frames (and before other scenes reuse them). Re-entry and completion retain
+their existing invalidation boundaries. Failed build, update or exit-mask
+patch leaves that slot invalid; callers do not publish a failed frame.
+The application still owns DMA retirement and final platform publication.
+No new Chip storage, game rules, Copper instructions or scrolling arithmetic
+are introduced by this extraction.
+
+The host lifecycle test covers initial backing lists, 600 alternating frames,
+exit-mask introduction/removal, one-slot and two-slot reuse, invalid slot
+indices and recovery after build/patch/mask failures. ASan/UBSan pass:
+`/tmp/downwell-gameplay-scene-host.log` and
+`/tmp/downwell-gameplay-scene-sanitized.log`.
+The bounded native re-entry test passes all three results destinations,
+640 overlay Copper checks and 200 subsequent gameplay updates with no scene
+mismatches and an intact stack guard
+(`/tmp/downwell-gameplay-scene-native-gdb.log`). The separate exit-wipe test
+passes 48 presented frames, validating both cover DMA pointers and mask-bank
+bytes (`/tmp/downwell-gameplay-scene-exit-gdb.log`).
+The full startup gate also passes all three splash hashes, original splash
+durations, garden Copper checks and 138 style comparisons before gameplay,
+with the stack guard intact (`/tmp/downwell-gameplay-scene-startup-gdb.log`).
+Normal startup is restored and both 68000 audits pass. These native gates
+are bounded at 180 seconds (startup/re-entry) and 120 seconds (exit wipe).
 
 ### Gameplay ring synchronization boundary
 

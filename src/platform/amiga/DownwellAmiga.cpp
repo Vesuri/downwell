@@ -15,6 +15,7 @@
 #include "AmigaMenuCache.h"
 #include "AmigaGardenScene.h"
 #include "AmigaGameplayRows.h"
+#include "AmigaGameplayScene.h"
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
 #include "AmigaPortRuntime.h"
@@ -1621,12 +1622,7 @@ int main(void) {
     UWORD* const dynamicCopperWords[2] = {
         memory.copper(), memory.copper() + downwellCopperWords
     };
-    DownwellGameplayCopperList gameplayCopperLists[2] = {
-        DownwellGameplayCopperList(dynamicCopperWords[0],
-                                   downwellCopperWords),
-        DownwellGameplayCopperList(dynamicCopperWords[1],
-                                   downwellCopperWords)
-    };
+    AmigaGameplayScene gameplayScene(dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
     DownwellSelectionCopperList selectionLists[2] = {
         DownwellSelectionCopperList(dynamicCopperWords[0], downwellCopperWords),
         DownwellSelectionCopperList(dynamicCopperWords[1], downwellCopperWords)
@@ -1657,7 +1653,6 @@ int main(void) {
         Bitmap(memory.sceneCache() + downwellGameRingBytes, downwellVisibleWidth,
                downwellGameRingHeight, 2, false, false, downwellDmaWidth)
     };
-    bool gameListReady[2] = {false, false};
     Bitmap hudBitmap(memory.hud(), downwellVisibleWidth,
                      downwellDisplayHeight, 2, false, false,
                      downwellDmaWidth);
@@ -1745,7 +1740,7 @@ int main(void) {
     enemySprites[1].hide();
     if (
 #ifdef DOWNWELL_REPLAY_VERIFY
-        !gameplayCopperLists[dynamicCopper0].build(
+        !gameplayScene.build(dynamicCopper0,
             gameBitmap, hudBitmap, playerSprites[0], bulletSprites,
             gameplayRegularSpriteCount, enemySprites[0], palette,
             port.ringOrigin())
@@ -1765,7 +1760,7 @@ int main(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
 #ifdef DOWNWELL_REPLAY_VERIFY
-    platform.publish(gameplayCopperLists[dynamicCopper0]);
+    platform.publish(gameplayScene.copper(dynamicCopper0));
 #else
     platform.publish(splashBlankList);
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -1774,7 +1769,7 @@ int main(void) {
 #endif
     platform.waitVblank();
     FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-    if (!gameplayCopperLists[dynamicCopper1].build(
+    if (!gameplayScene.build(dynamicCopper1,
         gameBitmap, hudBitmap,
 #ifdef DOWNWELL_REPLAY_VERIFY
         playerSprites[1],
@@ -1790,6 +1785,9 @@ int main(void) {
         downwellStartupFailed();
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
+    // Startup lists use the private backing; normal frames must bind display
+    // rings, and intervening intro scenes share these Copper slots.
+    gameplayScene.invalidate();
 #ifdef DOWNWELL_REPLAY_VERIFY
     buildReferencePicture(
         &renderer, rooms, mainRoom, builders,
@@ -1951,7 +1949,7 @@ int main(void) {
                     if (presentedScene == AmigaScene::menu &&
                         !gardenScene.prepare(menuDrawList, activeGamePack, activeGamePackEnd))
                         break;
-                    gameListReady[0] = gameListReady[1] = false;
+                    gameplayScene.invalidate();
                 }
                 if (presentationChanged && presentedScene == AmigaScene::styleSelect) {
                     // These framebuffers and copper slots may contain gameplay,
@@ -2053,7 +2051,7 @@ int main(void) {
                         stagedBuffer = memory.menuForeground();
                         for (unsigned buffer = 0; buffer < 2; ++buffer) {
                             gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
-                            gameListReady[buffer] = false;
+                            gameplayScene.invalidate(buffer);
                         }
                         gameplayRows.reset();
                         worldViewX = mainViewX + port.cameraOffsetX();
@@ -2292,7 +2290,7 @@ int main(void) {
                 }
                 if (presentationChanged) {
                     syncGameRows(gameDisplay[back], gameBitmap, back);
-                    if (!gameplayCopperLists[back].build(
+                    if (!gameplayScene.build(back,
                             gameDisplay[back], hudBitmap,
                             presentedScene == AmigaScene::gameplay
                                 ? playerSprites[back] : nullSprite,
@@ -2302,8 +2300,7 @@ int main(void) {
                             enemySprites[back], palette,
                             port.ringOrigin()))
                         break;
-                    gameListReady[back] = true;
-                    platform.publish(gameplayCopperLists[back]);
+                    platform.publish(gameplayScene.copper(back));
                     front = back;
                 }
                 /*
@@ -2358,7 +2355,7 @@ int main(void) {
 #endif
                     for (unsigned buffer = 0; buffer < 2; ++buffer) {
                         gameDisplay[buffer].data = memory.sceneCache() + buffer * downwellGameRingBytes;
-                        gameListReady[buffer] = false;
+                        gameplayScene.invalidate(buffer);
                         selectionListReady[buffer] = false;
                     }
                 } else if (!port.nextLevelRequested()) {
@@ -3000,13 +2997,12 @@ int main(void) {
                 drawGameplayBobs(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount,
                     rayVisible ? &rayLine : nullptr);
             if (frameReady &&
-                !(gameListReady[back] ? gameplayCopperLists[back].update(gameDisplay[back], port.ringOrigin()) :
-                  gameplayCopperLists[back].build(
+                !gameplayScene.update(back,
                     gameDisplay[back], hudBitmap, playerSprites[back],
                     bulletSprites + back *
                         gameplayRegularSpriteCount,
                     gameplayRegularSpriteCount,
-                    enemySprites[back], palette, port.ringOrigin())))
+                    enemySprites[back], palette, port.ringOrigin()))
                 frameReady = false;
             if (!frameReady) {
                 downwellGameplayRenderFailure();
@@ -3018,15 +3014,14 @@ int main(void) {
                 exitMask = overlayAssetStorage + AmigaExitMask::offset(
                     port.exitDither().y - (mainInitialViewY + port.cameraOffsetY()));
             }
-            if (!gameplayCopperLists[back].updateExitMask(exitMask)) { exitCode = 20; break; }
-            gameListReady[back] = true;
+            if (!gameplayScene.mask(back, exitMask)) { exitCode = 20; break; }
             /* AmigaPlatform makes the published list live at next VBlank. */
             DW_PROFILE_PHASE(profilePublish);
-            platform.publish(gameplayCopperLists[back]);
+            platform.publish(gameplayScene.copper(back));
 #ifdef DOWNWELL_EXIT_WIPE_VERIFY
             if (exitMask) {
                 ++gDownwellExitWipeFrames;
-                const auto& list = gameplayCopperLists[back];
+                const auto& list = gameplayScene.copper(back);
                 const UWORD* words = list.data();
                 if (words[list.moveOffset(0x100) + 1] != 0x6401) ++gDownwellExitWipeFailures;
                 for (unsigned reg = 0xf0; reg <= 0xf4; reg += 4) {
