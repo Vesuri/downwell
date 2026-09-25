@@ -135,6 +135,21 @@ connecting native direction. Plain host double sin/cos is only a motion-test
 fixture, not evidence of matching that wrapper. These are read-only executable
 inspection and arithmetic tests, not an executed Windows smoke capture.
 
+`SmokeDirection` now transcribes the surrounding lengthdir arithmetic for
+smoke's nonnegative speed <=4 and angle <=359. Integer significand division by
+180 preserves nearest-even binary32 angle conversion; product narrowing and
+Y negation follow the wrapper. The reviewed modf fast path (0x759d50..0x759de9)
+stores the truncated integer and returns the signed fractional part. The wrapper
+snaps only when abs(float(fraction)) < float(1e-4), retaining signed zero;
+values just below an integer are not rounded upward. 100,028 scalar cases and
+snap-boundary cases pass, including sanitizers and 68000 compilation. Only
+integer division/modulo helpers and explicit callbacks/RNG are external.
+The double trig callback is deliberately still unresolved: tests use host
+sin/cos on the wrapper's promoted float radians, not evidence of matching the
+original 0x74b5f0/0x74b7b0 routines. Those routines have SSE polynomial paths
+and FP-environment-dependent fallbacks that must be accounted for before
+claiming native direction parity or admitting live smoke.
+
 `SmokeEffect` now composes motion with the verified sprite-84 nine-key unit
 sequence. The runner constructor initializes image_index at offset 0x94 to
 zero at 0x46190e; object 225 has no parent and its Create does not change that

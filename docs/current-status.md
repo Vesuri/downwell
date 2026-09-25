@@ -40,7 +40,11 @@ the host geometry callbacks are not original-runner transcendental evidence.
 The distance callback now uses the source float-rounded arithmetic and an exact
 fixed-threshold comparison without sqrt: 102,560 coordinate cases and 512
 boundary floats pass, together with the integrated motion and sanitizer tests.
-Original direction wrappers have been located/pinned but not yet implemented.
+Original direction wrappers are now transcribed for smoke's bounded inputs:
+float argument/angle/product rounding, integer-only divide by 180 and modf-style
+near-integer snapping pass 100,028 scalar cases and sanitizer/68000 checks.
+The original double trig routines remain unresolved callbacks, so this is not
+yet native direction parity or live smoke admission.
 See `skeleton-effect-ownership.md` for exact scope and source hashes.
 Smoke animation/lifetime now composes with motion in `SmokeEffect`: verified
 sprite-84 unit keys, frame-zero constructor state, first-update Create rate,

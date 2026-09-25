@@ -135,6 +135,15 @@ test: verify-smoke-birth
 test: verify-smoke-motion
 test: verify-smoke-effect
 test: verify-smoke-distance
+test: verify-smoke-direction
+.PHONY: verify-smoke-direction
+verify-smoke-direction: build/smoke-direction-test
+	./build/smoke-direction-test
+
+build/smoke-direction-test: tests/core/SmokeDirectionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeDirectionTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-smoke-distance
 verify-smoke-distance: build/smoke-distance-test
 	./build/smoke-distance-test
