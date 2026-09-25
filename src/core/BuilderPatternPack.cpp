@@ -108,11 +108,18 @@ bool BuilderPatternPack::pattern(std::uint32_t id,
 bool BuilderPatternPack::findPattern(BuilderPatternFamily family,
                                      std::uint16_t sourceIndex,
                                      PackedBuilderPattern& out) const {
-    for (std::uint32_t id = 0; id < patternCount_; ++id) {
-        if (pattern(id, out) && out.family == family &&
-            out.sourceIndex == sourceIndex)
-            return true;
+    if (!valid()) return false;
+    // Lookup only needs the two identifiers. Avoid decoding all row/cell
+    // ranges for every preceding record on the 68000. The constructor has
+    // already validated the immutable record table.
+    const auto* record = bytes_ + patternsOffset_;
+    for (std::uint32_t id = 0; id < patternCount_; ++id, record += patternRecordSize) {
+        if (u16(record) == static_cast<std::uint16_t>(family) &&
+            u16(record + 2) == sourceIndex)
+            return pattern(id, out);
     }
+    // Preserve the previous enumeration API's output on a failed lookup.
+    if (patternCount_) pattern(patternCount_ - 1, out);
     return false;
 }
 

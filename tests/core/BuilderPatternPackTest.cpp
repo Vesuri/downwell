@@ -22,6 +22,32 @@ int main(int argc, char** argv) {
                 pack.cellCount() == 8435,
             "recovered area-one pattern counts are pinned");
 
+    auto checkLookup = [](const downwell::BuilderPatternPack& source) {
+        for (unsigned family = 0; family <= 6; ++family) {
+            for (unsigned index = 0; index <= 63; ++index) {
+                downwell::PackedBuilderPattern expected{}, actual{};
+                bool found = false;
+                for (unsigned id = 0; id < source.patternCount(); ++id) {
+                    if (source.pattern(id, expected) &&
+                        static_cast<unsigned>(expected.family) == family &&
+                        expected.sourceIndex == index) {
+                        found = true;
+                        break;
+                    }
+                }
+                require(source.findPattern(static_cast<downwell::BuilderPatternFamily>(family),
+                    index, actual) == found, "lookup agrees with full record enumeration");
+                require(actual.family == expected.family && actual.sourceIndex == expected.sourceIndex &&
+                    actual.width == expected.width && actual.rowCount == expected.rowCount &&
+                    actual.firstRow == expected.firstRow && actual.firstCell == expected.firstCell &&
+                    actual.cellCount == expected.cellCount,
+                    "lookup preserves every output field on success and failure");
+            }
+        }
+    };
+    checkLookup(pack);
+    checkLookup(downwell::BuilderPatternPack(nullptr, 0));
+
     downwell::PackedBuilderPattern pattern;
     require(pack.findPattern(downwell::BuilderPatternFamily::areaOneStart, 0,
                              pattern) &&
@@ -116,6 +142,7 @@ int main(int argc, char** argv) {
     downwell::BuilderPatternPack badRange(damaged.data(), damaged.size());
     require(badRange.error() == downwell::BuilderPatternPackError::badPattern,
             "cell ranges are validated before access");
+    checkLookup(badRange);
     damaged = bytes;
     damaged.push_back(0);
     downwell::BuilderPatternPack trailing(damaged.data(), damaged.size());

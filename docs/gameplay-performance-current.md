@@ -1,5 +1,35 @@
 # Gameplay performance checkpoint after scene extraction
 
+## Decode only the matching builder pattern
+
+`BuilderPatternPack::findPattern` now scans the two serialized identifiers
+without decoding every preceding record's dimensions and row/cell ranges.
+Only the matching record is decoded. Failed lookups preserve the previous
+output behavior; invalid packs return before any record access. There is no
+new allocation, cache, asset format or RNG/Create scheduling change.
+
+At `4c624c0`, the matched baseline takes 827 PAL fields for 600 updates
+(36.28 FPS); the candidate takes 825 (36.36 FPS). Both have a four-field
+maximum. This small difference does not resolve the 20 ms target or establish
+a meaningful reduction in the worst generation stall. Logs:
+`/tmp/downwell-pattern-lookup-baseline.log` and
+`/tmp/downwell-pattern-lookup-candidate.log`.
+
+Tests compare every output field with the old full-enumeration lookup across
+all recovered patterns, missing keys, null and damaged packs. ASan/UBSan pass;
+64 generated levels retain ordered emission/RNG digest `ffcdfc23dc638be7`.
+Both host natural-exit routes, upgrade/re-entry and the generated-shop route
+also pass. Logs: `/tmp/downwell-pattern-lookup-host.log`,
+`/tmp/downwell-pattern-lookup-sanitized.log` and
+`/tmp/downwell-pattern-lookup-natural.log`.
+
+The bounded native route also passes: exit at update 1,477, 211 upgrade
+frames, 135 exit-field frames, 49 shop-HUD comparisons and 43 return updates,
+with zero failures and an intact stack guard. The normal Amiga build is
+restored and both 68000 audits pass; SDL is rebuilt. Evidence:
+`/tmp/downwell-pattern-lookup-native.log` and
+`/tmp/downwell-pattern-lookup-native-gdb.log`.
+
 ## Skip invisible ammo-row transitions
 
 `AmmoGaugeRows` still advances every original internal state and retains its
