@@ -5,6 +5,7 @@
 #include "core/FrogHitState.h"
 #include "core/FrogMotion.h"
 #include "core/FrogPresentation.h"
+#include "core/EnemyStepPresentation.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -14,6 +15,53 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    {
+        struct Case {
+            downwell::EnemyStepPose pose;
+            bool flying, batStunned;
+            int hang, sprite, forcedFrame;
+        };
+        const Case cases[] = {
+            {{111, 0, true, false, false, false}, true, false, 0, 163, -1},
+            {{111, 0, false, false, false, false}, true, false, 0, 164, -1},
+            {{112, -1, true, false, false, false}, true, false, 0, 186, -1},
+            {{112, 1, true, false, false, false}, true, false, 0, 188, -1},
+            {{112, 1, false, false, false, false}, true, false, 0, 187, -1},
+            {{113, 0, true, false, false, false}, true, false, 0, 166, -1},
+            {{113, 1, true, false, false, false}, true, false, 0, 170, -1},
+            {{113, 0, false, true, false, false}, true, false, 0, 168, 0},
+            {{113, 0, false, false, false, false}, true, false, 0, 168, 1},
+            {{113, 1, true, false, true, false}, true, false, 0, 173, -1},
+            {{113, 0, false, true, true, false}, true, false, 0, 173, -1},
+            {{116, 0, false, false, false, false}, true, false, 0, 153, -1},
+            {{116, 0, false, false, false, false}, true, true, 0, 154, -1},
+            {{116, 0, false, false, false, false}, false, true, -9, 162, -1},
+            {{116, 0, false, false, false, false}, false, true, -10, 157, -1},
+            {{117, 0, false, false, false, false}, true, false, 0, 177, -1},
+            {{117, 0, false, false, false, true}, true, false, 0, 178, -1},
+            {{119, 0, false, false, false, false}, true, false, 0, 278, -1}
+        };
+        for (const auto& test : cases) for (unsigned initial : {0u, 255u, 256u, 1023u, 4097u}) {
+            downwell::FrogPresentation frog;
+            frog.desiredRate = 3;
+            downwell::BatActivity bat;
+            bat.flying = test.flying; bat.hang = test.hang;
+            downwell::BatHitState hit;
+            hit.stunned = test.batStunned;
+            unsigned phase = initial;
+            unsigned char remainder = 4;
+            const int sprite = downwell::finishEnemyPresentation(test.pose, frog, bat, hit, phase, remainder);
+            require(sprite == test.sprite, "shared end-of-Step selection keeps specialized enemy poses");
+            require(phase == (test.forcedFrame >= 0 ? static_cast<unsigned>(test.forcedFrame)*256u
+                : initial % (downwell::enemySpriteFrameCount(sprite)*256u)),
+                "selected sprite owns frame wrapping; airborne frogs force the source frame");
+            require(remainder == (test.forcedFrame >= 0 ? 0 : 4),
+                "only forced frames discard the fractional animation remainder");
+            const unsigned rate = test.pose.object != 113 || test.pose.frogStunned ? 3
+                : !test.pose.grounded ? 0 : test.pose.auxiliary ? 3 : 4;
+            require(frog.desiredRate == rate, "only frog presentation changes next Step's frog rate");
+        }
+    }
     {
         downwell::FrogPresentation presentation;
         unsigned appliedRate = presentation.beginStepRate();

@@ -4,6 +4,7 @@
 #include "BuilderPatternPack.h"
 #include "EventScheduler.h"
 #include "EnemyPresentation.h"
+#include "EnemyStepPresentation.h"
 #include "EnemyContact.h"
 #include "EnemyContactResponse.h"
 #include "PlayerLifeRules.h"
@@ -864,21 +865,11 @@ void StartupRuntime::updateMainEnemies() {
             enemy.x = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.x) / 1280);
             enemy.y = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.y) / 1280);
         }
-        enemy.spriteId = enemyPresentationSprite(enemy.objectId, enemy.grounded,
-                                                  enemy.auxiliaryState);
-        if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
-        if (enemy.objectId == 116) enemy.spriteId = batPresentation(enemy.batActivity, enemy.batHit);
-        if (enemy.objectId == 113) {
-            const auto visual = enemy.frogPresentation.finishStep(
-                enemy.frogHit.remaining != 0, enemy.grounded,
-                enemy.auxiliaryState != 0, enemy.velocityY < 0.0F);
-            enemy.spriteId = visual.sprite;
-            if (visual.forcedFrame >= 0) {
-                enemy.enemyImagePhase = static_cast<unsigned>(visual.forcedFrame) * 256u;
-                enemy.enemyImageRemainder = 0;
-            }
-        }
-        enemy.enemyImagePhase %= enemySpriteFrameCount(enemy.spriteId) * 256u;
+        enemy.spriteId = finishEnemyPresentation(
+            {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.velocityY < 0.0F,
+             enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
+            enemy.frogPresentation, enemy.batActivity, enemy.batHit,
+            enemy.enemyImagePhase, enemy.enemyImageRemainder);
         enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
     }
 }

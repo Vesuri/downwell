@@ -9,12 +9,35 @@ Current status: main-room player movement, gun/jump state, animation state and
 knockback now use `PlayerMotion` in both runtimes. Currency motion/lifetime/
 animation and default main-room camera rules are also shared, along with frog
 and bat motion slices, crawler falling/latching/wall-following, wall-snail
-attachment/movement/reversal, and the usual bullet's vertical segment arbitration
-and fractional-camera expiry.
+attachment/movement/reversal, final enemy pose/frame selection, and the usual
+bullet's vertical segment arbitration and fractional-camera expiry.
 World storage/adapters, broader enemy behavior, complete bullet state/events,
 reward orchestration, special camera modes and menus still need consolidation. Native
 world classes contain domain logic that does not belong under `src/platform`.
 Rendering/storage optimizations do not justify separate gameplay rules.
+
+## Shared end-of-Step enemy presentation
+
+`EnemyStepPresentation.h` now owns the final pose selection and Q8 frame
+normalization for both runtime adapters. Their duplicated branches have been
+removed. This includes snail stun, bat flying/hanging/hit poses and the frog's
+hit/preparation/flight precedence, forced flight frame and next-Step rate.
+It does not relocate world storage or claim the remaining world orchestration
+is shared. Renderers continue to consume the selected sprite, not reselect it.
+
+The recovered `enmFrog` and `enmBat` Step 0 assembly retains the pose IDs and
+branch precedence used here. Focused tests cover 18 state combinations at five
+phase boundaries, including the bat hang threshold, negative turtle walking,
+stun overriding frog flight, and preservation of fractional animation state
+except on forced frames. Address/undefined-behavior sanitizers pass.
+The paired combat tape passes, and the bounded cross-CPU replay keeps all four
+digests unchanged, including weapon digest `0db388a5b1c2a40a` / coverage `3fff`.
+The ordinary Amiga build is restored with clean 68000 audits. Logs:
+`/tmp/downwell-shared-pose-combat.log`,
+`/tmp/downwell-shared-pose-native.log`.
+The full host suite (including all eight combat/upgrade tapes) and the SDL
+rebuild also pass: `/tmp/downwell-shared-pose-suite.log` and
+`/tmp/downwell-shared-pose-sdl.log`.
 
 ## First migration slice
 

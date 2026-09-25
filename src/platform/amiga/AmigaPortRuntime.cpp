@@ -6,6 +6,7 @@
 #include "core/PortCheckpoint.h"
 #include "core/GameMakerRounding.h"
 #include "core/EnemyPresentation.h"
+#include "core/EnemyStepPresentation.h"
 #include "core/EnemyContact.h"
 #include "core/EnemyContactResponse.h"
 #include "core/CurrencyReward.h"
@@ -842,25 +843,11 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         }
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
-        enemy.spriteId = downwell::enemyPresentationSprite(enemy.objectId,
-                                            enemy.grounded, enemy.auxiliaryState);
-        if (enemy.objectId == 117 && enemy.snailHit.stunned) enemy.spriteId = 178;
-        if (enemy.objectId == 116)
-            enemy.spriteId = downwell::batPresentation(enemy.batActivity, enemy.batHit);
-        if (enemy.objectId == 113) {
-            const auto visual = enemy.frogPresentation.finishStep(
-                enemy.frogHit.remaining != 0, enemy.grounded,
-                enemy.auxiliaryState != 0, enemy.speedY < 0);
-            enemy.spriteId = visual.sprite;
-            if (visual.forcedFrame >= 0) {
-                enemy.imagePhase = static_cast<unsigned>(visual.forcedFrame) * 256u;
-                enemy.imageRemainder = 0;
-            }
-        }
-        const unsigned frameCount = downwell::enemySpriteFrameCount(enemy.spriteId);
-        const unsigned cycle = frameCount * 256u;
-        while (enemy.imagePhase >= cycle)
-            enemy.imagePhase -= cycle;
+        enemy.spriteId = downwell::finishEnemyPresentation(
+            {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.speedY < 0,
+             enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
+            enemy.frogPresentation, enemy.batActivity, enemy.batHit,
+            enemy.imagePhase, enemy.imageRemainder);
         enemy.imageFrame = enemy.imagePhase >> 8;
     }
 
