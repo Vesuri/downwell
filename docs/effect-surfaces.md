@@ -70,6 +70,21 @@ This conclusion is limited to this opaque/binary path, not all particle alpha,
 shader, filtering or surface-recreation cases. It is static binary/API evidence,
 not a captured execution of Windows rendering.
 
+## Binary coverage staging
+
+`BinaryEffectSurface` accumulates offline MSB-first smoke masks with wordwise OR,
+then subtracts shade coverage with AND NOT. All additions precede subtraction;
+interleaving them would allow a later smoke stamp to undo an earlier shade cut.
+The default viewport is 160 by 284. This scratch lives in ordinary RAM, not in
+a displayed bitplane or the AmigaDOS stack. It holds one coverage plane and
+per-row dirty word bounds (at most 6,820 bytes), not two full color surfaces.
+
+Clear visits only the previous touched word spans. Shade stamps do not expand
+those spans; the consumer receives only nonzero result words with viewport
+coordinates. Consumers still own retained-background restoration, final painter
+order and publishing pixels to the target buffer. This helper does not allocate
+Chip RAM, rebuild DMA sprites, scroll a framebuffer or consume game RNG.
+
 Reviewed assembly SHA-256 values:
 
 - `gml_GlobalScript_drawFx.asm`: `6e3dceea4db4e2baaf76c5d4103bd4ed930042ae769d209369d98246162b5d92`

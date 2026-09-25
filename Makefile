@@ -139,6 +139,15 @@ test: verify-smoke-direction
 test: verify-smoke-trig
 test: verify-smoke-owner
 test: verify-effect-placement
+test: verify-binary-effects
+.PHONY: verify-binary-effects
+verify-binary-effects: build/binary-effects-test generate-amiga-game
+	./build/binary-effects-test generated/amiga-game.dwap
+
+build/binary-effects-test: tests/core/BinaryEffectSurfaceTest.cpp src/core/BinaryEffectSurface.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
+
 .PHONY: verify-effect-placement
 verify-effect-placement: build/effect-placement-test
 	./build/effect-placement-test
