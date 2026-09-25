@@ -13,9 +13,42 @@ attachment/movement/reversal, enemy creation stats and final pose/frame
 selection, and the usual bullet's vertical segment arbitration and
 fractional-camera expiry.
 World storage/adapters, broader enemy behavior, complete bullet state/events,
-reward orchestration, special camera modes and menus still need consolidation. Native
-world classes contain domain logic that does not belong under `src/platform`.
+reward orchestration, special camera modes and menus still need consolidation.
+The fixed-point world now lives in core, but SDL's live `StartupRuntime` still
+owns a separate world loop. Extracting the class does not complete that switch.
 Rendering/storage optimizations do not justify separate gameplay rules.
+
+## Portable fixed-point world extraction
+
+`GameplayWorld.{h,cpp}` now owns the formerly backend-local world simulation.
+`AmigaPortRuntime.h` is a compatibility alias, not a second implementation.
+The native build and portable replay driver compile the core source directly;
+the driver no longer imports any platform header. `Profile.h` and its
+C-compatible counters define a hardware-free instrumentation interface. Timing,
+vblank handling and measurement storage remain in `AmigaProfile.cpp`.
+
+`verify-core-world.py` checks compiler-produced transitive dependencies for
+both the world and the portable replay driver, in ordinary and freestanding
+probe configurations. Dependencies must stay in core (apart from the driver
+source itself). It is included in `make test`.
+
+This extraction preserves storage, callbacks, update order and compatibility
+ring-origin bookkeeping. It intentionally does not claim that the SDL live
+world has switched to the extracted class. That migration must preserve its
+room/instance interface and remove its replaced simulation branches, with the
+existing exact adapter/reentry tests retained during the transition.
+
+The moved implementation matches its predecessor byte-for-byte after the
+intended type/include renames. The bounded 45-second cross-CPU replay passes
+with unchanged digests (`/tmp/downwell-core-world-native.log`). A separate
+45-second-bounded `SKIP_TO_GAME=1 PROFILE_LASER=1` probe run completes 600
+gameplay updates and reports simulation/renderer phases and counters through
+the extracted interface (`/tmp/downwell-core-world-probes.log`). Both runs
+restore the ordinary executable with clean 68000 audits. This verifies the
+instrumentation move, not achievement of the 20 ms frame budget.
+The full host suite passes all eight combat/upgrade variants, both extended
+reentries and 22,834 offline sprite comparisons. SDL rebuilds successfully
+(`/tmp/downwell-core-world-suite.log`, `/tmp/downwell-core-world-sdl.log`).
 
 ## Shared projectile lifecycle
 

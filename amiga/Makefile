@@ -165,8 +165,8 @@ obj/AmigaPlayer.o: $(REPO)/src/core/PlayerMotion.cpp $(REPO)/src/core/PlayerMoti
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
-obj/AmigaPortRuntime.o: $(AMIGA_SRC)/AmigaPortRuntime.cpp \
-		$(AMIGA_SRC)/AmigaPortRuntime.h $(AMIGA_SRC)/AmigaPlayer.h
+obj/AmigaPortRuntime.o: $(REPO)/src/core/GameplayWorld.cpp \
+		$(REPO)/src/core/GameplayWorld.h $(REPO)/src/core/PlayerMotion.h
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 

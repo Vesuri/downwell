@@ -6,7 +6,8 @@
 #include "core/GameMakerRandom.h"
 #include "core/RoomPack.h"
 
-class AmigaPortRuntime;
+class GameplayWorld;
+using AmigaPortRuntime = GameplayWorld;
 namespace downwell { struct ProjectileSegment; }
 
 enum {

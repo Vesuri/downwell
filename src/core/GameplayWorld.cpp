@@ -1,7 +1,7 @@
-#include "AmigaPortRuntime.h"
+#include "GameplayWorld.h"
 #include "core/MainRoomLifetime.h"
 #include "core/MainRoomActivation.h"
-#include "AmigaProfile.h"
+#include "Profile.h"
 
 #include "core/PortCheckpoint.h"
 #include "core/GameMakerRounding.h"
@@ -30,19 +30,19 @@ inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return addres
 #include <new>
 #endif
 
-downwell::ResultsDestination AmigaPortRuntime::restartFromResults(
+downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
     const auto records = run_.records();
-    this->~AmigaPortRuntime();
-    new (this) AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true);
+    this->~GameplayWorld();
+    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true);
     run_.restart(action, records);
     enemyRandom_.setSeed(seed);
     return destination;
 }
 
-bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
+bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
     if (!run_.advanceAfterLevelClear()) return false;
@@ -74,7 +74,7 @@ bool AmigaPortRuntime::prepareNextAreaOneLevel(const downwell::Input& input, uns
     return true;
 }
 
-AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
+GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    bool startsGrounded,
                                    int landingOffset,
                                    bool followCamera)
@@ -153,7 +153,7 @@ AmigaPortRuntime::AmigaPortRuntime(unsigned initialRingOrigin,
     }
 }
 
-void AmigaPortRuntime::spawnReward(const EnemyState& enemy, bool attracted)
+void GameplayWorld::spawnReward(const EnemyState& enemy, bool attracted)
 {
     unsigned next = downwell::compactCurrencySlots(gems_, gemSlotEnd_);
     downwell::spawnCurrencyReward(enemy.reward, enemy.x, enemy.y, attracted,
@@ -175,7 +175,7 @@ void AmigaPortRuntime::spawnReward(const EnemyState& enemy, bool attracted)
     gemSlotEnd_ = next;
 }
 
-unsigned AmigaPortRuntime::gemCount() const
+unsigned GameplayWorld::gemCount() const
 {
     unsigned count = 0;
     for (unsigned index = 0; index < gemSlotEnd_; ++index)
@@ -184,13 +184,13 @@ unsigned AmigaPortRuntime::gemCount() const
     return count;
 }
 
-const AmigaPortRuntime::GemState&
-AmigaPortRuntime::gemAt(unsigned index) const
+const GameplayWorld::GemState&
+GameplayWorld::gemAt(unsigned index) const
 {
     return gems_[index < gemCapacity ? index : 0];
 }
 
-bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
+bool GameplayWorld::configureEnemy(unsigned index, int objectId,
                                       int spriteId, int x, int y,
                                       int speedX, int speedY,
                                       int health, int reward,
@@ -247,13 +247,13 @@ bool AmigaPortRuntime::configureEnemy(unsigned index, int objectId,
     return true;
 }
 
-const AmigaPortRuntime::EnemyState&
-AmigaPortRuntime::enemyAt(unsigned index) const
+const GameplayWorld::EnemyState&
+GameplayWorld::enemyAt(unsigned index) const
 {
     return enemies_[index < enemyCount_ ? index : 0];
 }
 
-unsigned AmigaPortRuntime::bulletCount() const
+unsigned GameplayWorld::bulletCount() const
 {
     unsigned count = 0;
     unsigned index;
@@ -263,13 +263,13 @@ unsigned AmigaPortRuntime::bulletCount() const
     return count;
 }
 
-const AmigaPortRuntime::BulletState&
-AmigaPortRuntime::bulletAt(unsigned index) const
+const GameplayWorld::BulletState&
+GameplayWorld::bulletAt(unsigned index) const
 {
     return bullets_[index < bulletCapacity ? index : 0];
 }
 
-int AmigaPortRuntime::bulletX() const
+int GameplayWorld::bulletX() const
 {
     unsigned index;
     for (index = 0; index < bulletSlotEnd_; ++index)
@@ -278,7 +278,7 @@ int AmigaPortRuntime::bulletX() const
     return 0;
 }
 
-int AmigaPortRuntime::bulletY() const
+int GameplayWorld::bulletY() const
 {
     unsigned index;
     for (index = 0; index < bulletSlotEnd_; ++index)
@@ -287,7 +287,7 @@ int AmigaPortRuntime::bulletY() const
     return 0;
 }
 
-downwell::LaserSightRay AmigaPortRuntime::traceLaserSight(
+downwell::LaserSightRay GameplayWorld::traceLaserSight(
     downwell::LaserSightRay::Coordinate x, downwell::LaserSightRay::Coordinate y,
     downwell::LaserSightRay::Coordinate bottom, std::uint32_t speedTurns,
     std::uint32_t aimTurns) const {
@@ -330,7 +330,7 @@ downwell::LaserSightRay AmigaPortRuntime::traceLaserSight(
         }, aimTurns);
 }
 
-void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
+void GameplayWorld::configureBreakables(const int* x, const int* y,
                                             unsigned count)
 {
     if (x == 0 || y == 0)
@@ -344,7 +344,7 @@ void AmigaPortRuntime::configureBreakables(const int* x, const int* y,
     appendBreakables(x, y, count);
 }
 
-bool AmigaPortRuntime::appendBreakables(const int* x, const int* y, unsigned count)
+bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count)
 {
     if (count > breakableCapacity - breakableCount_ || (count && (!x || !y)))
         return false;
@@ -365,7 +365,7 @@ bool AmigaPortRuntime::appendBreakables(const int* x, const int* y, unsigned cou
     return true;
 }
 
-bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
+bool GameplayWorld::breakableActiveAt(int x, int y) const
 {
     if (breakableIndexReady_) {
         const int index = indexedBreakable(x, y);
@@ -380,14 +380,14 @@ bool AmigaPortRuntime::breakableActiveAt(int x, int y) const
     return false;
 }
 
-int AmigaPortRuntime::indexedBreakable(int x, int y) const {
+int GameplayWorld::indexedBreakable(int x, int y) const {
     x += 512 + 8;
     y += 8;
     if (x < 0 || x >= 1024 || y < 0 || y >= 8192) return -1;
     return (int)breakableIndex_[(y >> 4) * 64 + (x >> 4)] - 1;
 }
 
-void AmigaPortRuntime::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect)
+void GameplayWorld::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect)
 {
     if (effect.preparation >= 0) enemy.auxiliaryState = effect.preparation;
     if (effect.setJumpSpeed) enemy.motionState = effect.jumpSpeed;
@@ -404,7 +404,7 @@ void AmigaPortRuntime::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAla
     // Audio output is not yet implemented by this backend.
 }
 
-void AmigaPortRuntime::advanceEnemyAlarms()
+void GameplayWorld::advanceEnemyAlarms()
 {
     DW_PROFILE_PHASE(profileEnemyAlarms);
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
@@ -441,7 +441,7 @@ void AmigaPortRuntime::advanceEnemyAlarms()
     }
 }
 
-void AmigaPortRuntime::updateCrawler(EnemyState& enemy, bool alarm)
+void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm)
 {
     const long cx = cameraPixelX_ * 4096L;
     const long cy = viewCameraYQ8() * 16;
@@ -462,7 +462,7 @@ void AmigaPortRuntime::updateCrawler(EnemyState& enemy, bool alarm)
     enemy.grounded = enemy.crawler.latched;
 }
 
-AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
+GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
     DW_PROFILE_PHASE(profilePlayer);
@@ -511,7 +511,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
     const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int muzzleY = (int)downwell::roundGameMakerQ8(player_.offsetYFixed()) + 4;
     struct HeadBreakContext {
-        AmigaPortRuntime* runtime;
+        GameplayWorld* runtime;
         int index;
     } headBreak = {this, -1};
     player_.configureBreakBoxResolver([](void* opaque, long x, long y) {
@@ -530,16 +530,16 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
         return false;
     }, &headBreak);
     player_.configureComboCompletion([](void* context) {
-        auto& runtime = *static_cast<AmigaPortRuntime*>(context);
+        auto& runtime = *static_cast<GameplayWorld*>(context);
         runtime.run_.combo.finish(runtime.player_, runtime.currencyAccount_, runtime.health_,
                                   runtime.run_.upgrades.levels[20] != 0);
     }, this);
     player_.configureMovementBoundary([](void* context) {
-        auto& runtime = *static_cast<AmigaPortRuntime*>(context);
+        auto& runtime = *static_cast<GameplayWorld*>(context);
         runtime.run_.gems.observeDeathMovement(runtime.death_.movementDead(), runtime.currencyAccount_.gameGem);
     }, this);
     DW_PROFILE_PHASE(profilePlayerMotion);
-    AmigaPlayerMotion motion = player_.step(input, run_.shops.noControl || run_.exitControlsLocked,
+    PlayerMotionDelta motion = player_.step(input, run_.shops.noControl || run_.exitControlsLocked,
         death_.movementDead(), run_.shops.interactable, run_.goalStopped, run_.gemHigh);
     DW_PROFILE_PHASE(profilePlayerShops);
     const int shopPlayerX = 240 + downwell::roundGameMakerQ8(player_.offsetXFixed());
@@ -918,7 +918,7 @@ AmigaPortFrame AmigaPortRuntime::step(std::uint8_t packedInput)
 #endif
 
     run_.shops.endStep(34 + downwell::floorQ8Coordinate(viewCameraYQ8()));
-    AmigaPortFrame frame = {};
+    GameplayFrame frame = {};
     run_.results.presentationStep();
     frame.playerMotion = motion;
     DW_PROFILE_PHASE(profileHudState);

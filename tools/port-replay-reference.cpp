@@ -3,7 +3,7 @@
 #include "core/GemVerification.h"
 #include "core/PlayerDeathVerification.h"
 #include "core/MachineGunVerification.h"
-#include "platform/amiga/AmigaPortRuntime.h"
+#include "core/GameplayWorld.h"
 
 #include <cinttypes>
 #include <cstdio>
@@ -14,7 +14,7 @@ int main() {
     if (!replay.valid())
         return 1;
 
-    AmigaPortRuntime runtime(300);
+    GameplayWorld runtime(300);
     for (std::uint32_t frame = 0; frame < replay.frameCount(); ++frame) {
         downwell::Input input;
         if (!replay.frame(frame, input))
