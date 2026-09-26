@@ -127,6 +127,21 @@ have scale 2, so their blood interactions cannot be justified by the unit-scale
 fast path alone. Generalized integer rectangle/field tests prove their supplied
 geometry only, not the rotated sampling of this latter path.
 
+The scaled near-zero-angle path (`0x4b926a..0x4b93f6`) is distinct from the
+rotated path even at angle zero. It computes each axis as
+`((worldPixel - adjustedPosition) * reciprocalScale) + origin`, then truncates
+with `cvttss2si` **before** testing canvas limits. Thus a sample in `(-1,0)`
+becomes pixel zero and may hit. The rotated path tests the fractional coordinate
+against zero first. `RunnerMaskTransform::prepareAxisAligned` preserves this
+distinction; explicit negative-edge fixtures reject substituting the rotated
+path with sine zero/cosine one.
+
+At dispatch, all four scales are compared inclusively against binary32 versions
+of `1 +/- epsilon`; both promoted angles must lie within double `+/- epsilon`.
+The executable initializes epsilon at `0x8a6c28` to `1e-5`. This is an initial
+data value, not proof of the value at every runtime call. The unit fast path's
+position rounding and pair-wide dispatch are separate from the scaled sampler.
+
 ## Rotated sampling
 
 `0x4b93f6..0x4b947a` computes sine/cosine of each **negated** angle with

@@ -44,6 +44,7 @@ int main(int argc,char** argv){
     assert(!Pack(duplicate.data(),duplicate.size()).valid());
     auto trailing=bytes;trailing.push_back(0);assert(!Pack(trailing.data(),trailing.size()).valid());
     unsigned transformed=0;
+    unsigned axisTransformed=0;
     Pack::Mask circle;assert(pack.mask(597,0,circle));
     for(unsigned i=0;i<4096;++i){
         const float scales[]={-2.3f,-1.f,-0.125f,0.3f,1.f,2.f};
@@ -64,10 +65,29 @@ int main(int argc,char** argv){
                 circle.contains(int(expectedX),int(expectedY));
             assert(hit==expected);++transformed;
         }
+        assert(transform.prepareAxisAligned(packed(x),packed(y),packed(sx),packed(sy),24,24));
+        for(int wx:{-19,-1,0,23})for(int wy:{-25,-1,0,21}){
+            float expectedX=float(wx)-ax,expectedY=float(wy)-ay;
+            expectedX=expectedX*rx;expectedY=expectedY*ry;
+            expectedX=expectedX+24.f;expectedY=expectedY+24.f;
+            Real actualX,actualY;assert(transform.sample(wx,wy,actualX,actualY));
+            assert(unpacked(actualX)==expectedX&&unpacked(actualY)==expectedY);
+            bool hit=true;assert(transform.contains(circle,wx,wy,hit));
+            assert(hit==circle.contains(int(expectedX),int(expectedY)));++axisTransformed;
+        }
         assert(!transform.prepare({}, {},{},packed(1),packed(1),{},0,0));
         Real untouched{0x3f800000},other=untouched;
         assert(!transform.sample(0,0,untouched,other)&&untouched.bits==0x3f800000&&other.bits==0x3f800000);
     }
+    // Same algebra with zero rotation is NOT equivalent at the negative edge.
+    const std::uint8_t filled[]={0x80};Pack::Mask onePixel{filled,1,1,1};
+    downwell::RunnerMaskTransform edge;
+    assert(edge.prepareAxisAligned(packed(1),{},packed(2),packed(2),0,0));
+    bool hit=false;assert(edge.contains(onePixel,0,0,hit)&&hit); // -0.5 -> 0
+    assert(edge.contains(onePixel,-1,0,hit)&&!hit); // -1 stays outside
+    assert(edge.prepare(packed(1),{},packed(2),packed(2),packed(1),{},0,0));
+    assert(edge.contains(onePixel,0,0,hit)&&!hit); // Rotated path rejects -0.5
     std::printf("Precise mask pack: %u pixel/boundary checks, all truncations and malformed metadata passed\n",checked);
     std::printf("Rotated mask transform: %u fractional/mirrored samples passed\n",transformed);
+    std::printf("Scaled near-zero mask transform: %u fractional/mirrored samples passed\n",axisTransformed);
 }

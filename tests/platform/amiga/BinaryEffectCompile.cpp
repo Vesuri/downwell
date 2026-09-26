@@ -19,6 +19,10 @@ bool compileMaskTransform(downwell::RunnerMaskTransform& transform,downwell::Run
     downwell::RunnerImageValue c,downwell::RunnerImageValue s,const downwell::SpriteMaskPack::Mask& mask,bool& hit){
     return transform.prepare({}, {},scale,scale,c,s,24,24)&&transform.contains(mask,1,2,hit);
 }
+bool compileAxisMaskTransform(downwell::RunnerMaskTransform& transform,downwell::RunnerImageValue scale,
+    const downwell::SpriteMaskPack::Mask& mask,bool& hit){
+    return transform.prepareAxisAligned({}, {},scale,scale,24,24)&&transform.contains(mask,1,2,hit);
+}
 bool compilePreciseMask(const std::uint8_t* bytes,std::size_t size,unsigned sprite,int x,int y){
     downwell::SpriteMaskPack pack(bytes,size);downwell::SpriteMaskPack::Mask mask;
     return pack.mask(sprite,0,mask)&&mask.contains(x,y);

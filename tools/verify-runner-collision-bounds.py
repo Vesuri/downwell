@@ -25,6 +25,8 @@ for start, end, digest in (
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x7fe38c,10) == b"bbox_left\0"
 assert region(0x80c958,14) == b"place_meeting\0"
+assert region(0x8a6c28,8) == bytes.fromhex("f168e388b5f8e43e") # initial collision epsilon, binary64 1e-5
+assert region(0x7f8298,8) == bytes.fromhex("000000000000f03f") # binary64 1
 data = (audit["root"] / "data/data.win").read_bytes()
 assert sha256(data).hexdigest() == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert data[:4] == b"FORM" and struct.unpack_from("<I", data, 4)[0] == len(data)-8
