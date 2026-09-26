@@ -16,6 +16,33 @@ static PlayerDamageNumber snapshot(const PlayerDamageNumbers<8>& owner){
     assert(owner.visitNewest([&](auto,const auto& e){result=e;++count;return true;}));assert(count==1);return result;
 }
 int main(){
+    {
+        RunSession session;
+        assert(session.contactDamageNumber(128,-128,0,0,240,176));
+        auto effect=snapshot(session.damageNumbers);
+        assert(effect.x.bits==0x43708000u && effect.y.bits==0x432b8000u); // 240.5, 171.5
+        assert(equal(effect.direction,n(45)) && equal(effect.amount,n(1)));
+    }
+    {
+        GameplayWorld encounter(0,true,0,false);
+        assert(encounter.configureEnemy(0,116,153,1,0,0,0,15,0));
+        encounter.step(0);
+        assert(encounter.health()==3 && encounter.effectsSucceeded());
+        auto effect=snapshot(encounter.damageNumbers());
+        assert(effect.alarm0==60 && equal(effect.xSpeed,n(999)));
+        assert(effect.x.bits==0x43700000u && effect.y.bits==0x432c0000u); // 240,172
+        encounter.step(0);
+        assert(encounter.health()==3 && encounter.damageNumbers().size()==1);
+        assert(encounter.damageNumbers().atNewest(0)->alarm0==59);
+    }
+    {
+        GameplayWorld encounter(0,true,0,false);
+        for(unsigned i=0;i<8;++i)assert(encounter.emitDamageNumber(n(240),n(176),n(1),{}));
+        assert(encounter.configureEnemy(0,116,153,1,0,0,0,15,0));
+        encounter.step(0);
+        assert(encounter.health()==3 && !encounter.effectsSucceeded());
+        assert(encounter.damageNumbers().size()==8);
+    }
     GameplayWorld target(0,true,0,false);bool born=false;
     target.configureGenerationStep([](void* context,GameplayWorld& world,GameMakerRandom&,int){
         auto& born=*static_cast<bool*>(context);
@@ -31,6 +58,28 @@ int main(){
     assert(roomPack.valid()&&objectPack.valid()&&builderPack.valid());
     StartupRuntime host(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
     host.skipToGameForTesting();assert(host.inMainRoom()&&host.roomLoadSucceeded());
+    {
+        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
+        encounter.skipToGameForTesting();
+        bool hit=false;
+        for(unsigned tick=0;tick<6000&&!hit;++tick){
+            Input input{};
+            input.right=(tick/90)%2==0;input.left=!input.right;input.fire=tick%10<5;
+            if(encounter.mainPlayerY()<1264){
+                input.left=encounter.mainPlayerX()>242;input.right=encounter.mainPlayerX()<238;
+            }
+            const int health=encounter.mainPlayerHealth();
+            encounter.step(input,false);
+            assert(encounter.effectsSucceeded());
+            if(encounter.mainPlayerHealth()<health){
+                auto effect=snapshot(encounter.damageNumbers());
+                assert(equal(effect.amount,n(health-encounter.mainPlayerHealth())));
+                assert(effect.alarm0==60 && equal(effect.xSpeed,n(999)));
+                hit=true;
+            }
+        }
+        assert(hit);
+    }
     const auto draws=host.randomDrawCount();
     assert(host.emitDamageNumber(n(240),n(1250),n(1),n(45))&&host.randomDrawCount()==draws);
     auto source=snapshot(host.damageNumbers());assert(source.x.bits==birth.x.bits&&source.y.bits==birth.y.bits);
@@ -66,5 +115,5 @@ int main(){
     assert(target.emitDamageNumber({}, {},n(1),{})&&target.emitCorpseExpiry({},{}));
     assert(target.damageNumbers().atNewest(0)->drawBirth>oldNumber&&target.corpseExpiryEffects().atNewest(0)->drawBirth>oldExpiry);
     assert(target.damageNumbers().visitNewest([&](auto key,const auto&){assert(key>oldKey);return true;}));
-    std::puts("Damage-number worlds: generation births excluded from current Step, 60 matching host/native-world ticks, retirement, no birth RNG and reset passed");
+    std::puts("Damage-number worlds: natural SDL damage, native-world contact births/immunity/capacity, phase eligibility, 60 matching ticks and reset passed");
 }

@@ -49,8 +49,10 @@ behavior, both backend integrations and relevant original-game verification.
 
 ### C. Connect damage effects and actors
 
-- Connect the shared player-damage scripts to natural contacts, including
-  damage-number creation, audio/controller side effects and immunity ordering.
+- Complete the shared player-damage scripts in natural contacts, including
+  source storage, audio/controller side effects, hit effects and immunity ordering.
+  Verify live damage-number placement/direction against original captures and
+  measure the native contact-math cost, not just port-to-port state agreement.
   Extend integer-only damage text formatting if live source paths require VM
   real formatting; verify fractional text placement against the original.
 - Implement remaining blood, corpse, debris and blast dependencies. Preserve

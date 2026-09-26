@@ -940,6 +940,10 @@ void StartupRuntime::updateMainEnemyInteractions() {
         [this](EnemyContact) {
             syncMainPlayerState();
             ++soundPlayRequests_;
+        },
+        [this](int x,int y) {
+            return run_.contactDamageNumber(mainPlayerMotion_.frameStartXFixed(),
+                mainPlayerMotion_.frameStartYFixed(),x,y,mainPlayerOriginX_,mainPlayerOriginY_);
         });
 }
 

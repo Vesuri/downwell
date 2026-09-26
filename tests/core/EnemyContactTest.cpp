@@ -109,8 +109,14 @@ int main() {
         bool candle = false;
         ContactActor contactActor{128, 0, 1, 1, 153};
         const auto apply = [&] {
+            const int beforeHealth = health;
             return applyEnemyContact(116, contactActor, 7, 9, active, enemyHealth,
-                motion, health, immunity, defeated, [&] { ++rewards; }, candle);
+                motion, health, immunity, defeated, [&] { ++rewards; }, candle,
+                [&](int x,int y) {
+                    require(x==7 && y==9 && immunity==0 && health==beforeHealth-1,
+                        "damage-number callback follows health subtraction and precedes immunity");
+                    return true;
+                });
         };
         require(apply() == EnemyContact::damage && health == 3 && immunity == 90 &&
                     motion.knocks == 1 && motion.knockX == 7 && motion.knockY == 9 &&
@@ -146,6 +152,13 @@ int main() {
         --immunity;
         require(apply() == EnemyContact::damage && health == 2 && immunity == 90,
                 "first expired contact damages and samples current ownership again");
+        immunity=0;
+        const int oldKnocks=motion.knocks;
+        require(applyEnemyContact(116,contactActor,7,9,active,enemyHealth,motion,
+            health,immunity,defeated,[&]{++rewards;},false,[](int,int){return false;})==EnemyContact::none,
+            "failed damage birth is not published as a successful contact");
+        require(health==1 && immunity==0 && motion.knocks==oldKnocks,
+            "failure preserves prior subtraction and does not perform later immunity or knockback");
     }
     {
         struct Player {
@@ -180,7 +193,7 @@ int main() {
                 [&](EnemyContact contact) {
                     require(contact != EnemyContact::none, "only applied contacts publish effects");
                     ++published;
-                });
+                }, [](int,int) { return true; });
         };
         step();
         require(health == 3 && immunity == 90 && motion.knocks == 1 &&

@@ -45,6 +45,22 @@ struct DamageNumberVerification {
         }
         result.check(run.effectsSucceeded);
     }
+    // Exercise the live-contact coordinate and point-direction adapter too,
+    // including negative/fractional Q8 coordinates and non-cardinal angles.
+    for(int sample=0;sample<8;++sample){
+        run.reset();
+        result.check(run.contactDamageNumber(sample*173-600,777-sample*239,
+            sample-4,3-sample,240,176));
+        const auto* effect=run.damageNumbers.atNewest(0);
+        result.check(effect!=nullptr);
+        if(effect){
+            result.word(effect->x.bits);result.word(effect->y.bits);
+            result.real(effect->direction);result.real(effect->amount);
+            result.check(effect->alarm0==60);
+            result.check(run.stepDamageNumbers(run.damageNumbers.beginPhase()));
+            result.real(effect->xSpeed);result.real(effect->ySpeed);
+        }
+    }
     run.~RunSession();return result;
 }
 }

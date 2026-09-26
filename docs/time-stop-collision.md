@@ -144,8 +144,24 @@ zero and negative values, and rejects unsupported values without rounding them.
 General VM real-to-string formatting and fractional raster placement still need
 original-runner verification. Focused tests inject effects: they verify SDL
 commands, native Draw ordering and scalar planar pixel equivalence across all
-word shifts and ring wrap, not natural player-damage dispatch. The natural
-damage-event adapters remain unfinished.
+word shifts and ring wrap, not complete player-damage dispatch.
+
+The shared area-one contact response creates a one-point damage number after
+subtracting health and before assigning immunity or applying knockback. Both
+world adapters pass pre-movement Q8 player globals and published caller x/y,
+translated to absolute room coordinates before the runner's binary32 argument
+narrowing. Direction uses `RunnerPointDirection` with the portable finite atan
+candidate; its original-runner evidence limitations remain those documented in
+[point-direction arithmetic](runner-point-direction.md). Birth consumes no RNG,
+immune contacts do not duplicate it, and capacity/math failure latches the world
+and stops the contact pass without rolling back health. The world test covers a
+natural SDL encounter and native-world collision fixtures; the cross-CPU replay
+also compares fractional contact coordinates, direction and subsequent motion.
+
+This is not yet the complete `scrPDamage`/`scrTypicalDamage` integration. Damage
+source storage, controller slowdown, audio, hit effects, Timeout and replacement
+of the approximate contact knockback/dispatch remain unfinished. Original-game
+encounter captures and native contact frame-cost measurements are still required.
 
 Damage numbers and corpse-expiry sprites share compatibility depth −1000.
 `RunSession` assigns both a common monotonic Draw-birth key and merges their

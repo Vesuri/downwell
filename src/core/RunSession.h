@@ -30,6 +30,8 @@
 #include "TypicalPlayerDamage.h"
 #include "PlayerDamage.h"
 #include "PlayerDamageNumbers.h"
+#include "RunnerPointDirection.h"
+#include "PortableAtan.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -101,6 +103,28 @@ struct RunSession {
         DamageNumberHooks hooks;
         if(effectsSucceeded)effectsSucceeded=damageNumbers.advanceAlarm(phase,index,hooks);
         return effectsSucceeded;
+    }
+    // Live Q8 player globals and caller coordinates share the world's origin.
+    // Convert without rounding subpixels or doing coordinate sums in int32.
+    bool contactDamageNumber(std::int32_t playerX, std::int32_t playerY,
+        int callerX, int callerY, int originX, int originY) {
+        if (!effectsSucceeded) return false;
+        auto coordinate = [](std::int32_t q8, int origin) {
+            auto result = MotionBinary64::fromInteger(q8);
+            if (!result.zero()) result.high -= 8u << 20; // Exact division by 256.
+            result.add(MotionBinary64::fromInteger(origin));
+            return result;
+        };
+        const auto px = coordinate(playerX, originX), py = coordinate(playerY, originY);
+        auto cx = MotionBinary64::fromInteger(callerX), cy = MotionBinary64::fromInteger(callerY);
+        MotionBinary64 direction;
+        if (!cx.add(MotionBinary64::fromInteger(originX)) ||
+            !cy.add(MotionBinary64::fromInteger(originY)) ||
+            !RunnerPointDirection::evaluate(cx,cy,px,py,direction,portableAtan)) {
+            effectsSucceeded = false;
+            return false;
+        }
+        return createDamageNumber(px,py,MotionBinary64::fromInteger(1),direction) != 0;
     }
     template<class LengthdirX> bool stepDamageNumbers(PlayerDamageNumbers<8>::Phase phase,LengthdirX lengthdirX){
         DamageNumberHooks hooks;

@@ -885,7 +885,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         for(unsigned i=0;i<count;++i)if(!emit())return false;
         return true;
     });
-    downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
+    if (!downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
         enemiesDefeated_, run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> EnemyState& { return enemies_[i]; },
         [](const EnemyState& enemy) {
@@ -896,7 +896,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)}, enemy.x, enemy.y};
         },
         [this](EnemyState& enemy) { spawnReward(enemy, true); },
-        [](downwell::EnemyContact) {});
+        [](downwell::EnemyContact) {},
+        [this](int x,int y) {
+            return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
+                x,y,240,176);
+        })) return {};
 
     DW_PROFILE_PHASE(profileGems);
     for (unsigned gemIndex = 0; gemIndex < gemSlotEnd_; ++gemIndex) {
