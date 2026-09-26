@@ -14,10 +14,14 @@ using Commands = std::vector<DeferredCreateInstance>;
 
 // Hash fields, not structure padding; pin ordered Create output plus RNG state.
 std::uint64_t emissionDigest = 14695981039346656037ULL;
-void mix(std::uint32_t value) {
+std::uint64_t legacyDigest = 14695981039346656037ULL;
+void mix(std::uint32_t value,bool newFieldPayload=false) {
+    auto legacy=newFieldPayload?0u:value;
     for (unsigned byte = 0; byte < 4; ++byte) {
         emissionDigest = (emissionDigest ^ (value & 255u)) * 1099511628211ULL;
+        legacyDigest = (legacyDigest ^ (legacy & 255u)) * 1099511628211ULL;
         value >>= 8;
+        legacy >>= 8;
     }
 }
 void capture(const Commands& commands, const GameMakerRandom& random) {
@@ -25,7 +29,8 @@ void capture(const Commands& commands, const GameMakerRandom& random) {
     for (const auto& c : commands) {
         for (std::int32_t value : {c.objectId, c.x, c.y, c.integerScaleX,
              c.integerImageIndex, c.integerVelocityX, c.integerVelocityY,
-             c.integerDirection, c.integerMoveSpeed, c.motionState, c.auxiliaryState}) mix(value);
+             c.integerDirection, c.integerMoveSpeed, c.motionState}) mix(value);
+        mix(c.auxiliaryState,c.objectId==82);
         for (float value : {c.scaleX, c.scaleY, c.imageSpeed, c.imageIndex,
              c.velocityX, c.velocityY, c.direction, c.moveSpeed}) {
             std::uint32_t bits;
@@ -168,6 +173,26 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "builder pack validates");
+    unsigned fieldCount=0;
+    for(unsigned seed=1;seed<=32;++seed){
+        AreaOneBuilder builder;GameMakerRandom actual(seed),shadow(seed);
+        builder.reset(240,704,actual,{2,4,true,false});
+        struct Probe {GameMakerRandom& actual;GameMakerRandom& shadow;unsigned& fields;} probe{actual,shadow,fieldCount};
+        AreaOneBuilderStep result;
+        for(unsigned tick=0;tick<100 && !builder.endReached();++tick)
+            require(builder.stepVisible(pack,actual,100000,[](void* opaque,const DeferredCreateInstance& command){
+                auto& p=*static_cast<Probe*>(opaque);
+                if(command.objectId!=82)return true;
+                require(p.actual.drawCount()>p.shadow.drawCount(),"field Create has a new RNG draw");
+                while(p.shadow.drawCount()+1<p.actual.drawCount())p.shadow.nextU32();
+                require(command.timeFieldRadiusWord()==p.shadow.nextU32(),"field command preserves exactly its source Create word");
+                require(sameRandom(p.actual,p.shadow),"field capture preserves complete source random stream");
+                ++p.fields;return true;
+            },&probe,result),"field capture builder traversal");
+        require(builder.endReached(),"field capture traverses whole level");
+    }
+    require(fieldCount>0,"natural builder patterns exercise ordinary time fields");
+    std::cout << "retained time-field Create words " << fieldCount << '\n';
     for (unsigned seed = 1; seed <= 32; ++seed) {
         AreaOneBuilder configured;
         GameMakerRandom configuredRandom(seed);
@@ -210,7 +235,9 @@ int main(int argc, char** argv) {
     // Re-recorded after VM-audited level-dependent enemy spawning; the previous
     // 1fd36f0408435e8b kept level-one odds and omitted crawler cells. This is a regression
     // fingerprint, not an independent Windows-runner capture.
-    require(emissionDigest == 0x970b28efcbf63992ULL,
+    require(legacyDigest == 0x970b28efcbf63992ULL,
+        "retaining field radius changes no other Create fields or RNG state");
+    require(emissionDigest == 0xddd99e417bca728fULL,
         "64 seeded levels preserve ordered Create fields and complete RNG state");
     GameMakerRandom random(2);
     AreaOneBuilder builder;

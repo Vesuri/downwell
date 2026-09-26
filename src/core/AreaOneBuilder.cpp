@@ -159,7 +159,7 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     }
     break;
     case 82:
-        random.nextU32();
+        command.setTimeFieldRadiusWord(random.nextU32());
         break;
     case 293: {
         command.imageSpeed = 0.0F;

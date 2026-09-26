@@ -1,4 +1,5 @@
 #include "core/OrdinaryTimeField.h"
+#include "core/DeferredInstanceQueue.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -14,6 +15,15 @@ int main(){
         assert(value(n)==24+double(reference.nextU32())/2147483648.0);
     }
     assert(rng.drawCount()==65536);
+    for(std::uint32_t word:{0u,1u,0x7fffffffu,0x80000000u,0xffffffffu}){
+        DeferredCreateInstance command(82,240,512);
+        command.setTimeFieldRadiusWord(word);
+        assert(command.timeFieldRadiusWord()==word);
+        OrdinaryTimeField adopted;
+        adopted.adoptCreate(command.x,command.y,command.timeFieldRadiusWord());
+        assert(value(adopted.radius)==24+double(word)/2147483648.0);
+        assert(rng.drawCount()==65536);
+    }
     OrdinaryTimeField field;field.create(240,512,rng);
     const auto radius=field.radius;
     const auto draws=rng.drawCount();

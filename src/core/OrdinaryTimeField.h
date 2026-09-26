@@ -11,10 +11,14 @@ namespace downwell {
 struct OrdinaryTimeField {
     int x=0,y=0;
     HudReal radius;
-    static HudReal nextRadius(GameMakerRandom& random){
+    static HudReal radiusFromWord(std::uint32_t word){
         // 24 + random(2), exact binary64: exponent 4 and a 2^-48 mantissa unit.
-        return {(std::uint64_t{3}<<51)|(static_cast<std::uint64_t>(random.nextU32())<<17),4};
+        return {(std::uint64_t{3}<<51)|(static_cast<std::uint64_t>(word)<<17),4};
     }
+    static HudReal nextRadius(GameMakerRandom& random){return radiusFromWord(random.nextU32());}
+    // Builder already executed Create synchronously. Adoption must not draw
+    // again; the next cell's Create continues on the same random stream.
+    void adoptCreate(int px,int py,std::uint32_t word){x=px;y=py;radius=radiusFromWord(word);}
     void create(int px,int py,GameMakerRandom& random){x=px;y=py;radius=nextRadius(random);}
     void advanceDraw(bool stopped,GameMakerRandom& random){if(!stopped)radius=nextRadius(random);}
     static bool meetsRelativeBounds(ContactBounds bounds){

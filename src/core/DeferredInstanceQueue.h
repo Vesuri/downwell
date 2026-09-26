@@ -44,6 +44,14 @@ struct DeferredCreateInstance {
     std::int32_t integerMoveSpeed = 0;
     std::int32_t motionState = 0;
     std::int32_t auxiliaryState = 0;
+    // Object 82 owns no motion auxiliary state. Retain its exact Create RNG
+    // word in that existing payload slot, avoiding a larger command for every
+    // terrain cell. Explicit arithmetic keeps all uint32 values portable.
+    void setTimeFieldRadiusWord(std::uint32_t word) {
+        auxiliaryState=word<=0x7fffffffu?static_cast<std::int32_t>(word):
+            -1-static_cast<std::int32_t>(0xffffffffu-word);
+    }
+    std::uint32_t timeFieldRadiusWord() const {return static_cast<std::uint32_t>(auxiliaryState);}
     bool motionInitialized = false;
     bool grounded = false;
     bool active = true;
