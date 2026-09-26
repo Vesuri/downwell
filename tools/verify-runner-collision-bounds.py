@@ -16,6 +16,7 @@ for start, end, digest in (
     (0x47b9f0, 0x47ba11, "585fd396a2619d2ca5f71c137b87e5fce0d15e2a7ea52ccb6b51b26061b4c866"),
     (0x464d30, 0x4650ab, "5715cddc60c08661840dce8488493b71ff4820d976cb48d282d3702a494cbdf8"),
     (0x4b8eb0, 0x4b9227, "0d24f4ba2a1d20fac0d39aa798b10d393e070d2f45289e84bedbfb709b4258f2"),
+    (0x4b93f6, 0x4b96a6, "09f250dd406633f83c22398a96544a9cc1f391b185bc300f761c97b7631f8ff1"),
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x7fe38c,10) == b"bbox_left\0"

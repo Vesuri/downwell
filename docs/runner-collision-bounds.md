@@ -72,3 +72,31 @@ angles branch to `0x4b9227`, with rotated sampling at `0x4b93f6`. Goal fields
 have scale 2, so their blood interactions cannot be justified by the unit-scale
 fast path alone. Generalized integer rectangle/field tests prove their supplied
 geometry only, not the rotated sampling of this latter path.
+
+## Rotated sampling
+
+`0x4b93f6..0x4b947a` computes sine/cosine of each **negated** angle with
+the same float pi/division and float-result narrowing as bounds. Reciprocal
+scales come from binary32 `1/scale`. Negative scales shift that sprite's
+position by minus one before evaluating coordinates.
+
+For each inclusive candidate world pixel, with `dx/dy` relative to that
+adjusted position, the unit uses this order (round every operation to binary32):
+
+```
+sampleX = ((dy*S) + (dx*C)) * reciprocalScaleX + originX
+sampleY = ((dy*C) - (dx*S)) * reciprocalScaleY + originY
+```
+
+Both coordinates must be nonnegative and strictly smaller than sprite width
+and height, even before the optional precise-mask byte test. For that test,
+`cvttss2si` truncates sample coordinates toward zero. Success requires both
+sprites to pass. X is the outer scan loop and Y the inner loop. The sprite
+flag at offset `0x8b` controls whether the mask byte is consulted; a false flag
+does not bypass the canvas-bound checks. Mapping that runtime flag to each
+loaded sprite and checking active FP modes remain necessary for live use.
+
+`BloodCollisionBounds` specializes the earlier bbox arithmetic for sprite 84,
+unit scales and nearest-even conversion, returning half-open integer edges.
+Its scalar test isolates arithmetic from trig: it does not independently
+prove Windows trig identity, FP mode, or the sampling routine described here.

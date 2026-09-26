@@ -226,6 +226,15 @@ build/smoke-distance-test: tests/core/SmokeDistanceTest.cpp $(wildcard src/core/
 
 .PHONY: verify-smoke-effect
 test: verify-blood-effect
+test: verify-blood-bounds
+.PHONY: verify-blood-bounds
+verify-blood-bounds: build/blood-bounds-test
+	./build/blood-bounds-test
+
+build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodCollisionBoundsTest.cpp
+
 test: verify-time-stop-bound
 test: verify-goal-field-bounds
 .PHONY: verify-goal-field-bounds

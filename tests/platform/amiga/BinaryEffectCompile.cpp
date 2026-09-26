@@ -1,6 +1,10 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/BloodEffect.h"
 #include "core/BloodEffects.h"
+#include "core/BloodCollisionBounds.h"
+bool compileBloodBounds(const downwell::BloodEffect& effect,downwell::ContactBounds& bounds){
+    return downwell::BloodCollisionBounds::calculate(effect,bounds);
+}
 #include "core/TimeStopBound.h"
 #include "core/GoalTimeField.h"
 bool compileGoalFieldBounds(downwell::ContactBounds bounds){
