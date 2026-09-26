@@ -40,6 +40,9 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto nextEnemyIdentity=nextEnemyLifetimeId_;
     const auto nextGemIdentity=nextGemLifetimeId_;
     const auto fieldBirths=run_.timeFields.birthSequence();
+    const auto numberBirths=run_.damageNumbers.birthSequence();
+    const auto expiryBirths=run_.corpseExpiryEffects.birthSequence();
+    const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true);
     nextBulletLifetimeId_=nextBulletIdentity;
@@ -47,6 +50,9 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     nextGemLifetimeId_=nextGemIdentity;
     run_.restart(action, records);
     if(!run_.timeFields.restoreEmptyBirthSequence(fieldBirths))run_.effectsSucceeded=false;
+    if(!run_.damageNumbers.restoreEmptyBirthSequence(numberBirths)||
+       !run_.corpseExpiryEffects.restoreEmptyBirthSequence(expiryBirths))run_.effectsSucceeded=false;
+    run_.nextForegroundBirth=foregroundBirth;
     enemyRandom_.setSeed(seed);
     return destination;
 }
@@ -62,6 +68,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     run_.smokeEffects.clear();
     run_.bloodEffects.clear();
     run_.clearCorpseExpiry();
+    run_.clearDamageNumbers();
     run_.timeFields.clear();
     run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);

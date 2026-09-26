@@ -132,6 +132,16 @@ schedulers, including a native generation-time birth. The cross-CPU replay's
 it does not exercise natural damage dispatch. Both text backends and natural
 damage-event adapters remain to be connected before visible damage numbers work.
 
+Damage numbers and corpse-expiry sprites share compatibility depth −1000.
+`RunSession` assigns both a common monotonic Draw-birth key and merges their
+newest-first owner lists in linear time, without temporary pointer arrays or
+family-priority overrides. It rejects unregistered/duplicate keys instead of
+inventing an order. Room/run cleanup never rewinds keys; exhaustion fails before
+creating another effect. These keys describe only painter insertion order, not
+original instance IDs or collision traversal. Other equal-depth families must
+join this same ordering when integrated. The projection is read-only and returns
+adapter failure to the caller; backend rendering must consume the merged stream.
+
 `OrdinaryTimeFields` exposes port-owned lifetime keys separately from array
 indices. As object 82 has no individual retirement, one room's births form a
 contiguous key interval; lookup needs two counters rather than a key per field.

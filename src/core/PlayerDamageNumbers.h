@@ -8,9 +8,20 @@ template<unsigned Capacity> class PlayerDamageNumbers {
     static_assert(Capacity>0,"nonempty damage-number capacity required");
 public:
     using Handle=std::uint32_t;
+    struct BirthSequence{Handle next=1;};
+    BirthSequence birthSequence()const{return {next_};}
+    bool restoreEmptyBirthSequence(BirthSequence sequence){
+        if(count_||!good_||(!next_&&sequence.next)||(sequence.next&&sequence.next<next_))return false;
+        next_=sequence.next;return true;
+    }
     struct Phase{Handle newest;};
     bool valid()const{return good_;}
     unsigned size()const{return count_;}
+    const PlayerDamageNumber* atNewest(unsigned index)const{
+        if(!good_||index>=count_)return nullptr;
+        const auto& effect=slots_[order_[index]].effect;
+        return effect.valid&&!effect.destroyRequested?&effect:nullptr;
+    }
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
     PlayerDamageNumber* get(Handle h){
         if(good_&&h)for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];

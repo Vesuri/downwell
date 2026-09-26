@@ -1816,6 +1816,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     run_.smokeEffects.clear();
     run_.bloodEffects.clear();
     run_.clearCorpseExpiry();
+    run_.clearDamageNumbers();
     run_.timeFields.clear();
     run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;

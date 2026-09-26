@@ -35,9 +35,18 @@ int main(){
     assert(host.emitDamageNumber(n(240),n(1250),n(1),n(45))&&host.randomDrawCount()==draws);
     auto source=snapshot(host.damageNumbers());assert(source.x.bits==birth.x.bits&&source.y.bits==birth.y.bits);
     for(unsigned tick=0;tick<60;++tick){
+        if(tick==10){assert(host.emitCorpseExpiry({},{}));assert(target.emitCorpseExpiry({},{}));}
         host.step(false);target.step(0);
         assert(host.effectsSucceeded()&&target.effectsSucceeded());
         assert(host.damageNumbers().size()==target.damageNumbers().size());
+        std::vector<unsigned> hostOrder,targetOrder;
+        assert(host.visitForegroundEffects([&](const auto&){hostOrder.push_back(1);return true;},
+            [&](const auto&){hostOrder.push_back(2);return true;}));
+        assert(target.visitForegroundEffects([&](const auto&){targetOrder.push_back(1);return true;},
+            [&](const auto&){targetOrder.push_back(2);return true;}));
+        assert(hostOrder==targetOrder);
+        assert(hostOrder==(tick==59?std::vector<unsigned>{}:tick>=10&&tick<49?
+            std::vector<unsigned>{1,2}:std::vector<unsigned>{2}));
         if(tick==59){assert(host.damageNumbers().size()==0);break;}
         auto a=snapshot(host.damageNumbers()),b=snapshot(target.damageNumbers());
         assert(a.alarm0==59-int(tick)&&a.alarm0==b.alarm0);
@@ -47,5 +56,15 @@ int main(){
     for(unsigned i=0;i<8;++i)assert(host.emitDamageNumber(n(240),n(1250),n(1),{}));
     assert(!host.emitDamageNumber({}, {},n(1),{})&&!host.effectsSucceeded());
     host.reset(PlatformProfile::desktop);assert(host.effectsSucceeded()&&host.damageNumbers().size()==0);
+    assert(target.emitDamageNumber({}, {},n(1),{})&&target.emitCorpseExpiry({},{}));
+    const auto oldNumber=target.damageNumbers().atNewest(0)->drawBirth;
+    const auto oldExpiry=target.corpseExpiryEffects().atNewest(0)->drawBirth;
+    unsigned oldKey=0;
+    assert(target.damageNumbers().visitNewest([&](auto key,const auto&){oldKey=key;return true;}));
+    target.restartFromResults(DeathMenuSequence::Action::Retry,84,0);
+    assert(target.effectsSucceeded()&&target.damageNumbers().size()==0&&target.corpseExpiryEffects().size()==0);
+    assert(target.emitDamageNumber({}, {},n(1),{})&&target.emitCorpseExpiry({},{}));
+    assert(target.damageNumbers().atNewest(0)->drawBirth>oldNumber&&target.corpseExpiryEffects().atNewest(0)->drawBirth>oldExpiry);
+    assert(target.damageNumbers().visitNewest([&](auto key,const auto&){assert(key>oldKey);return true;}));
     std::puts("Damage-number worlds: generation births excluded from current Step, 60 matching host/native-world ticks, retirement, no birth RNG and reset passed");
 }

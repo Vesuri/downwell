@@ -287,6 +287,9 @@ public:
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const downwell::CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
     const downwell::PlayerDamageNumbers<8>& damageNumbers()const{return run_.damageNumbers;}
+    template<class Expiry,class Number> bool visitForegroundEffects(Expiry expiry,Number number)const{
+        return run_.visitForegroundEffects(expiry,number);
+    }
     bool emitDamageNumber(downwell::MotionBinary64 x,downwell::MotionBinary64 y,
         downwell::MotionBinary64 amount,downwell::MotionBinary64 direction){
         return run_.createDamageNumber(x,y,amount,direction)!=0;

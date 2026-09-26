@@ -195,6 +195,9 @@ public:
     const FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
     const PlayerDamageNumbers<8>& damageNumbers()const{return run_.damageNumbers;}
+    template<class Expiry,class Number> bool visitForegroundEffects(Expiry expiry,Number number)const{
+        return run_.visitForegroundEffects(expiry,number);
+    }
     bool emitDamageNumber(MotionBinary64 x,MotionBinary64 y,MotionBinary64 amount,MotionBinary64 direction){
         return run_.createDamageNumber(x,y,amount,direction)!=0;
     }

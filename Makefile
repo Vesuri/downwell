@@ -539,6 +539,16 @@ test: verify-typical-player-damage
 test: verify-player-damage
 test: verify-player-damage-number
 test: verify-player-damage-numbers
+test: verify-foreground-effect-order
+.PHONY: verify-foreground-effect-order
+verify-foreground-effect-order: build/foreground-effect-order-test
+	python3 tools/verify-effect-depths.py
+	python3 tools/verify-runner-field-draw.py
+	./build/foreground-effect-order-test
+build/foreground-effect-order-test: tests/core/ForegroundEffectOrderTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/downwell-goal-mask.h generated/downwell-time-field-mask.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/ForegroundEffectOrderTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-player-damage-numbers
 verify-player-damage-numbers: build/player-damage-numbers-test
 	./build/player-damage-numbers-test

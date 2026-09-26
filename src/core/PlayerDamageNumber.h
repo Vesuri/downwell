@@ -7,6 +7,7 @@ namespace downwell {
 // Object 221, no parent/sprite/mask. Step has no time-stop guard. Built-in
 // positions narrow on EVERY write; user velocities remain VM binary64 values.
 struct PlayerDamageNumber {
+    std::uint32_t drawBirth=0; // Shared depth -1000 insertion order, assigned by world owner.
     RunnerImageValue x{},y{};
     MotionBinary64 amount{},direction{},xSpeed=MotionBinary64::fromInteger(999),
         ySpeed=MotionBinary64::fromInteger(3);

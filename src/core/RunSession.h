@@ -60,6 +60,26 @@ struct RunSession {
     BloodEffects<32> bloodEffects;
     CorpseExpiryEffects<32> corpseExpiryEffects;
     PlayerDamageNumbers<8> damageNumbers;
+    // Compatibility insertion places a new -1000 instance before existing
+    // equals, even across object families. Keys survive room/run reset.
+    std::uint32_t nextForegroundBirth=1;
+    template<class Expiry,class Number> bool visitForegroundEffects(Expiry expiry,Number number)const{
+        if(!effectsSucceeded||!corpseExpiryEffects.valid()||!damageNumbers.valid())return false;
+        unsigned e=0,n=0;
+        while(e<corpseExpiryEffects.size()||n<damageNumbers.size()){
+            const auto* left=corpseExpiryEffects.atNewest(e);
+            const auto* right=damageNumbers.atNewest(n);
+            if((e<corpseExpiryEffects.size()&&(!left||!left->drawBirth))||
+               (n<damageNumbers.size()&&(!right||!right->drawBirth)))return false;
+            if(left&&right&&left->drawBirth==right->drawBirth)return false;
+            if(left&&(!right||left->drawBirth>right->drawBirth)){
+                if(!expiry(*left))return false;++e;
+            }else{
+                if(!number(*right))return false;++n;
+            }
+        }
+        return true;
+    }
     // Object 221 has no mask/sprite or collision events. These hooks remain
     // explicit so registry membership can be added without changing ownership.
     struct DamageNumberHooks {
@@ -70,9 +90,12 @@ struct RunSession {
     std::uint32_t createDamageNumber(MotionBinary64 x,MotionBinary64 y,
         MotionBinary64 amount,MotionBinary64 direction){
         if(!effectsSucceeded)return 0;
+        if(!nextForegroundBirth){effectsSucceeded=false;return 0;}
         DamageNumberHooks hooks;
         const auto child=damageNumbers.createFromPlayer(x,y,amount,direction,hooks);
-        effectsSucceeded=child!=0;return child;
+        effectsSucceeded=child!=0;
+        if(child)damageNumbers.get(child)->drawBirth=nextForegroundBirth++;
+        return child;
     }
     bool advanceDamageNumberAlarm(PlayerDamageNumbers<8>::Phase phase,unsigned index){
         DamageNumberHooks hooks;
@@ -102,9 +125,12 @@ struct RunSession {
     };
     std::uint32_t createCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
         if(!effectsSucceeded)return 0;
+        if(!nextForegroundBirth){effectsSucceeded=false;return 0;}
         ExpiryHooks hooks;
         const auto child=corpseExpiryEffects.create(x,y,hooks);
-        effectsSucceeded=child!=0;return child;
+        effectsSucceeded=child!=0;
+        if(child)corpseExpiryEffects.get(child)->drawBirth=nextForegroundBirth++;
+        return child;
     }
     bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
         return createCorpseExpiry(x,y)!=0;

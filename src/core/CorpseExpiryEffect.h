@@ -6,6 +6,7 @@ namespace downwell {
 // Object 242 (fxJobutsu), parent 219 (parentNoloopFx). No Step event,
 // TimeStopBound, movement or Create RNG. Ordinary sprite drawing, not drawFx.
 struct CorpseExpiryEffect {
+    std::uint32_t drawBirth=0; // Shared depth -1000 insertion order, assigned by world owner.
     RunnerImageValue x{},y{},timeline{},imageIndex{},imageSpeed{0x3e99999au};
     int spriteId=102;
     unsigned frames=12;
