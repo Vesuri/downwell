@@ -10,6 +10,7 @@
 #include "SpriteCollisionPack.h"
 #include "RunnerMaskPair.h"
 #include "RunnerSpriteChange.h"
+#include "ObjectPack.h"
 namespace downwell {
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,
@@ -34,6 +35,36 @@ public:
         std::int32_t spriteId=-1,maskId=-1;
         Real scaleX{0x3f800000},scaleY{0x3f800000},angle{},imageIndex{};
     };
+    struct Properties {
+        Sprite sprite;
+        Real depth{},timeline{},cachedFrame{0xbf800000u};
+    };
+    // Known ordinary-object binding: source membership -> mask/depth defaults
+    // -> flags/sprite setter. Dynamic creation may override depth afterward.
+    // Graph must include recovered property bits (bindInstanceFlags), not only
+    // spatial flags. Missing object definitions are unsupported, not object 0.
+    template<class Graph>
+    bool bindObjectFromPacks(InstanceHandle h,int object,bool registered,Properties& properties,
+                            const ObjectPack& objects,const SpriteCollisionPack& sprites,
+                            const Graph& graph,bool allPrepared){
+        if(!valid()||!live(h))return false;
+        PackedObject definition;
+        if(!objects.valid()||!sprites.valid()||!graph.valid()||object<0||
+           !objects.findObject(object,definition)||!graph.flags(unsigned(object)))return checked(false);
+        const auto objectFlags=*graph.flags(unsigned(object));
+        const unsigned expected=(definition.solid()?1u:0u)|(definition.visible()?2u:0u)|
+            (definition.persistent()?4u:0u)|(definition.managed()?0x80u:0u);
+        if((objectFlags&0x87u)!=expected)return checked(false);
+        Real depth;
+        if(!depth.assign(MotionBinary64::fromInteger(definition.depth)))return checked(false);
+        if(!rebindObjectMembership(h,object,registered))return checked(false);
+        properties.sprite.maskId=definition.textureMaskId;
+        properties.depth=depth;
+        return applyBindingProperties(h,objectFlags,allPrepared,[&](InstanceHandle live){
+            return changeSpriteFromPack(live,properties.sprite,properties.timeline,properties.cachedFrame,
+                                        definition.spriteId,sprites,objectFlags);
+        });
+    }
     bool valid()const{return good_ && index_.valid();}
     // Clear retires memberships but preserves generation high-water marks.
     // Replacing the external handle domain requires replacing this owner too.

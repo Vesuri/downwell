@@ -28,6 +28,12 @@ bool compileMaskPair(const downwell::RunnerMaskPair::Shape& a,
 #include "core/RunnerSpatialInstances.h"
 #include "core/RunnerObjectFamilies.h"
 #include "core/RoomLoader.h"
+bool compileResourceObjectBinding(downwell::RunnerSpatialInstances<4,8>& owner,
+    downwell::InstanceHandle h,int object,downwell::RunnerSpatialInstances<4,8>::Properties& properties,
+    const downwell::ObjectPack& objects,const downwell::SpriteCollisionPack& sprites,
+    const downwell::RunnerObjectFamilies<386>& graph){
+    return owner.bindObjectFromPacks(h,object,true,properties,objects,sprites,graph,false);
+}
 bool compileRoomSpatialLifecycle(downwell::InstanceStore<4>& store,
     downwell::RunnerSpatialInstances<4,8>& owner,const downwell::RoomInstanceDefinition* rooms,unsigned count){
     struct Lifecycle {

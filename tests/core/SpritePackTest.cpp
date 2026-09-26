@@ -3,6 +3,7 @@
 #include "core/RunnerSpriteBounds.h"
 #include "core/SpriteCollisionPack.h"
 #include "core/RunnerSpatialInstances.h"
+#include "core/RunnerObjectFamilies.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -32,7 +33,7 @@ void testBasicValidation() {
             "bad sprite-pack magic is rejected");
 }
 
-void testGeneratedPack(const char* path,const char* maskPath) {
+void testGeneratedPack(const char* path,const char* maskPath,const char* objectPath) {
     std::ifstream input(path, std::ios::binary);
     const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(input)),
                                           std::istreambuf_iterator<char>());
@@ -45,6 +46,43 @@ void testGeneratedPack(const char* path,const char* maskPath) {
     const downwell::SpriteCollisionPack compact(compactBytes.data(),compactBytes.size());
     require(compact.valid()&&compact.spriteCount()==pack.spriteCount(),"compact collision table validates");
     require(compactBytes.size()==26700,"collision-only table excludes atlas payload and frame mappings");
+    {
+        std::ifstream objectInput(objectPath,std::ios::binary);
+        const std::vector<std::uint8_t> objectBytes((std::istreambuf_iterator<char>(objectInput)),{});
+        const downwell::ObjectPack objects(objectBytes.data(),objectBytes.size());
+        downwell::RunnerObjectFamilies<386> families;
+        require(families.bindInstanceFlags(objects),"load complete object binding flags");
+        using Owner=downwell::RunnerSpatialInstances<2,8>;
+        for(unsigned id=0;id<objects.objectCount();++id)for(bool registered:{false,true}){
+            Owner owner;Owner::Properties properties;
+            properties.sprite.spriteId=-999;properties.sprite.maskId=597;
+            properties.sprite.imageIndex={0x41000000u};properties.timeline={0x41000000u};
+            require(owner.attach({0,1},0,{}),"attach object-binding lifetime");
+            require(owner.bindObjectFromPacks({0,1},int(id),registered,properties,objects,compact,families,false),
+                    "bind complete original object through both resource packs");
+            downwell::PackedObject original;require(objects.object(id,original),"read independent object record");
+            require(properties.sprite.spriteId==original.spriteId&&properties.sprite.maskId==original.textureMaskId,
+                    "binding restores object artwork and explicit mask defaults");
+            Owner::Real depth;require(depth.assign(downwell::MotionBinary64::fromInteger(original.depth)),"convert original depth");
+            require(properties.depth.bits==depth.bits,"binding uses serialized depth, not compatibility creation override");
+            downwell::PackedSprite artwork;
+            const unsigned frames=original.spriteId>=0&&pack.sprite(unsigned(original.spriteId),artwork)?artwork.frameCount:0;
+            const bool reset=8>=frames;
+            require(properties.sprite.imageIndex.bits==(reset?0u:0x41000000u)&&
+                    properties.timeline.bits==(reset&&frames?0u:0x41000000u),"binding composes original sprite resets");
+            const unsigned flags=8u|(original.solid()?0x20u:0u)|(original.visible()?0x10u:0u)|
+                (original.persistent()?0x40u:0u)|(original.managed()?0x200000u:0u);
+            require(owner.resolve({0,1})->flags==flags,"binding installs source instance flags without changing lifetime");
+            const bool queued=original.solid()||(*families.flags(id)&0x28u);
+            require(owner.pendingSpatial()==unsigned(queued)&&
+                    owner.pendingCollision()==unsigned(queued&&(*families.flags(id)&8u)),"binding queues only eligible families");
+        }
+        Owner incomplete;Owner::Properties unchanged;
+        require(incomplete.attach({0,1},0,{}),"attach incomplete-graph fixture");
+        downwell::RunnerObjectFamilies<386> spatialOnly;require(spatialOnly.bindSpatialFlags(objects),"load deliberately incomplete flags");
+        require(!incomplete.bindObjectFromPacks({0,1},0,true,unchanged,objects,compact,spatialOnly,false)&&
+                !incomplete.valid()&&unchanged.sprite.spriteId==-1,"reject missing property flags before mutation");
+    }
     {
         using Owner=downwell::RunnerSpatialInstances<2,8>;
         unsigned empty=0;
@@ -281,8 +319,8 @@ void testGeneratedPack(const char* path,const char* maskPath) {
 
 int main(int argc, char** argv) {
     testBasicValidation();
-    require(argc==3,"sprite and collision-mask pack paths required");
-    testGeneratedPack(argv[1],argv[2]);
+    require(argc==4,"sprite, collision-mask and object pack paths required");
+    testGeneratedPack(argv[1],argv[2],argv[3]);
     std::cout << "sprite pack tests passed\n";
     return 0;
 }

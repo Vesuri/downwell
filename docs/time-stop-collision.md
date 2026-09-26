@@ -240,6 +240,18 @@ global preparation modes and both empty/existing queues. Mask/depth defaults,
 the sprite setter itself, complete runtime object flags and live installation
 remain the caller's responsibilities; this is not yet full object-change parity.
 
+`bindObjectFromPacks` now composes the known-object ordinary path using DWOB v3,
+DWSC and `bindInstanceFlags`: validate resources/property flags, rebind membership,
+copy mask and serialized depth, then apply source flags and the resource-backed
+sprite setter. Compatibility dynamic creation overrides depth separately after
+this binding; room placement likewise supplies its own layer depth. The borrowed
+`Properties` state keeps sprite fields, sequence position, cached frame and
+binary32 depth together without platform dependencies. All 386 original objects
+are exercised with registration enabled and disabled; incomplete property flags
+fail before mutation. Unknown object definitions are explicitly unsupported.
+Live ownership, mutation routing and post-binding birth publication are still
+required before replacing production collision queries.
+
 `RunnerSpatialInstances::removeSpatialMembership` exposes the live-instance
 `0x501f70` operation separately from retirement. It removes indexed bounds with
 root retry, clears only the indexed flag and unlinks both dirty queues, retaining
