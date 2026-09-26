@@ -1,5 +1,25 @@
 # Windows collision-bound contract
 
+## Transform and mask mutation
+
+VM setters `0x432290`, `0x4322e0` and `0x432090` narrow their numeric arguments
+to binary32 before calling scale-X `0x46b6d0`, scale-Y `0x46b780` and angle
+`0x46b560`. Each compares the old/new field first: equal values, including the
+two signed zeros, return without a write or queue operation. A changed field is
+stored without angle normalization, updates flag `0x4000` from unit scales,
+zero angle, alpha one and blend `0xffffff`, sets bounds-dirty bit `8`, then calls
+`0x501e50`. `RunnerSpatialInstances::changeTransform` implements this admitted
+normal/zero domain with explicit alpha/tint inputs and rejects unsupported FP
+values rather than guessing their behavior.
+
+Mask setter `0x46bfd0` likewise does nothing for the same integer ID; otherwise
+it stores the ID, sets bit `8` and queues eligible work. `changeMask` implements
+that integer boundary, including storing missing IDs. Its VM wrapper `0x432500`
+first narrows to binary32, promotes again, then uses x87 `fistp`; that numeric
+conversion still needs the caller's verified rounding policy. Neither method
+performs an immediate bounds refresh. The stored lifecycle adapter exposes both
+with lifetime/object checks; production setter-site routing remains open.
+
 Evidence is the pinned Windows executable, checked read-only by
 `python3 tools/verify-runner-collision-bounds.py`. The verifier pins reviewed
 machine code, not runtime results. Work priorities remain in [open-work.md](open-work.md).

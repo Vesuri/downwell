@@ -8,6 +8,14 @@ import struct
 audit = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = audit["region"]
 for start, end, digest in (
+    (0x46b6d0, 0x46b77b, "ee39fa80da82b85e2029cceea5db1ffca25eb98623dd94a3ded0cc59d05982b0"),
+    (0x46b780, 0x46b82b, "c4098381039749a2ad6df02434b63cf1094f76920d1fa341985b324505acac5f"),
+    (0x46b560, 0x46b60b, "e919bf50d647072302792054770b871dc3c4711580a82703a6674c1a392e365c"),
+    (0x46bfd0, 0x46bff0, "e1e842959aef96fcfb8b7a46fc715a7d76d8a254643a743ea6e629785f95bbc7"),
+    (0x432290, 0x4322d2, "cd6dc4f90b68cdd2e743d23c3e5c867b042970db0bd40f38a776affe933787bc"),
+    (0x4322e0, 0x432322, "cde58a54e3b2b54e2a8bc11d2c5c3e38f92ae2b12402ea9af7da07b9c18c61e0"),
+    (0x432090, 0x4320d2, "bad459dcbc87475b6113e3560c60c08a13d40b11206a327d335ecf6c9229fef7"),
+    (0x432500, 0x43254f, "1bce9a84061875cd4897d1fc8cc8ed2d0ad1858483e4c5830487b5b39998a398"),
     (0x42d500, 0x42d58d, "01d352d29507697e25bcc4c1321372c36791afcc0bb8f99b6276e7caf04f15f7"),
     (0x52b1f0, 0x52b27f, "32dad8432b67077aa41fdcf5a2a9fe7aba74fdeaeb856f435ecbadcacb80755d"),
     (0x466010, 0x4666fe, "44030a7ef3c09e6484c14483fb429217d33f1e087d6b97a8c7327e1b0b91f22f"),
@@ -27,6 +35,8 @@ assert region(0x7fe38c,10) == b"bbox_left\0"
 assert region(0x80c958,14) == b"place_meeting\0"
 assert region(0x8a6c28,8) == bytes.fromhex("f168e388b5f8e43e") # initial collision epsilon, binary64 1e-5
 assert region(0x7f8298,8) == bytes.fromhex("000000000000f03f") # binary64 1
+assert region(0x795ab8,4) == bytes.fromhex("0000803f") # transform setter binary32 1
+assert region(0x7fcc88,4) == bytes.fromhex("00000000") # transform setter angle zero
 data = (audit["root"] / "data/data.win").read_bytes()
 assert sha256(data).hexdigest() == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert data[:4] == b"FORM" and struct.unpack_from("<I", data, 4)[0] == len(data)-8

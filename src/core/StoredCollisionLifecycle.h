@@ -47,6 +47,15 @@ struct StoredCollisionLifecycle {
         const auto* flags=matchingFlags(h,record);
         return flags&&owner.move(h,x,y,*flags);
     }
+    bool mask(InstanceHandle h,const InstanceRecord& record,int maskId){
+        const auto* flags=matchingFlags(h,record);
+        return flags&&owner.changeMask(h,properties[h.slot].sprite,maskId,*flags);
+    }
+    bool transform(InstanceHandle h,const InstanceRecord& record,typename Owner::TransformField field,
+                   RunnerImageValue value,RunnerImageValue alpha,std::uint32_t blend){
+        const auto* flags=matchingFlags(h,record);
+        return flags&&owner.changeTransform(h,properties[h.slot].sprite,field,value,alpha,blend,*flags);
+    }
     bool retire(InstanceHandle h,const InstanceRecord&){return owner.retire(h);}
     bool membership(InstanceHandle h,const InstanceRecord&,bool registered){
         return owner.registerObject(h,registered);

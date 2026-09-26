@@ -39,6 +39,40 @@ public:
         Sprite sprite;
         Real depth{},timeline{},cachedFrame{0xbf800000u};
     };
+    enum class TransformField {scaleX,scaleY,angle};
+    // Already-narrowed fields from 0x46b6d0/0x46b780/0x46b560. Appearance
+    // inputs are explicit because source fast-draw flag 0x4000 also depends on
+    // alpha and blend. No angle wrapping. Equal signed zeros are a no-op.
+    bool changeTransform(InstanceHandle h,Sprite& sprite,TransformField field,Real value,
+                         Real alpha,std::uint32_t blend,std::uint32_t objectFlags){
+        if(!valid()||!live(h))return false;
+        Real* target=nullptr;
+        switch(field){
+            case TransformField::scaleX:target=&sprite.scaleX;break;
+            case TransformField::scaleY:target=&sprite.scaleY;break;
+            case TransformField::angle:target=&sprite.angle;break;
+            default:return checked(false);
+        }
+        if(!Math::valid(*target)||!Math::valid(value))return checked(false);
+        if(Math::equal(*target,value))return true;
+        if(!Math::valid(sprite.scaleX)||!Math::valid(sprite.scaleY)||
+           !Math::valid(sprite.angle)||!Math::valid(alpha))return checked(false);
+        *target=value;
+        auto& flags=entries_[h.slot].state.flags;
+        const Real one{0x3f800000u};
+        const bool ordinary=Math::equal(sprite.scaleX,one)&&Math::equal(sprite.scaleY,one)&&
+            Math::equal(sprite.angle,Real{})&&Math::equal(alpha,one)&&blend==0xffffffu;
+        flags=(flags&~0x4000u)|(ordinary?0x4000u:0u)|8u;
+        markSpatialChange(h.slot,objectFlags);return true;
+    }
+    // Integer setter 0x46bfd0. VM-number narrowing/rounding is a separate entry
+    // point; an invalid resource ID remains stored and means a missing mask.
+    bool changeMask(InstanceHandle h,Sprite& sprite,int mask,std::uint32_t objectFlags){
+        if(!valid()||!live(h))return false;
+        if(sprite.maskId==mask)return true;
+        sprite.maskId=mask;entries_[h.slot].state.flags|=8u;
+        markSpatialChange(h.slot,objectFlags);return true;
+    }
     // Known ordinary-object binding: source membership -> mask/depth defaults
     // -> flags/sprite setter. Dynamic creation may override depth afterward.
     // Graph must include recovered property bits (bindInstanceFlags), not only

@@ -24,6 +24,34 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    for(auto field:{Owner::TransformField::scaleX,Owner::TransformField::scaleY,Owner::TransformField::angle})
+    for(auto bits:{0u,0x80000000u,0x3f800000u,0x40000000u,0xbf800000u})
+    for(auto alpha:{0x3f800000u,0x3f000000u})for(auto blend:{0xffffffu,0xff0000u}){
+        Owner transforms;Owner::State clean;clean.flags=0;
+        assert(transforms.attach({0,1},1,clean));Owner::Sprite sprite;
+        auto& target=field==Owner::TransformField::scaleX?sprite.scaleX:
+            field==Owner::TransformField::scaleY?sprite.scaleY:sprite.angle;
+        target={0x40000000u};
+        assert(transforms.changeTransform({0,1},sprite,field,{bits},{alpha},blend,0x38));
+        assert(target.bits==bits);
+        const bool changed=bits!=0x40000000u;
+        const bool fast=sprite.scaleX.bits==0x3f800000u&&sprite.scaleY.bits==0x3f800000u&&
+            !(sprite.angle.bits&0x7fffffffu)&&alpha==0x3f800000u&&blend==0xffffffu;
+        assert(transforms.resolve({0,1})->flags==(changed?(8u|(fast?0x4000u:0u)):0u));
+        assert(transforms.pendingSpatial()==unsigned(changed)&&transforms.pendingCollision()==unsigned(changed));
+    }
+    {
+        Owner transforms;Owner::State clean;clean.flags=0x4000u;
+        assert(transforms.attach({0,1},1,clean));Owner::Sprite sprite;
+        assert(transforms.changeTransform({0,1},sprite,Owner::TransformField::angle,{0x80000000u},{0x3f800000u},0xffffff,0x38));
+        assert(sprite.angle.bits==0&&!transforms.pendingSpatial()&&transforms.resolve({0,1})->flags==0x4000u);
+        assert(transforms.changeMask({0,1},sprite,-1,0x38)&&!transforms.pendingSpatial());
+        assert(transforms.changeMask({0,1},sprite,999999,0x38)&&sprite.maskId==999999);
+        assert(transforms.pendingSpatial()==1&&transforms.pendingCollision()==1);
+        const auto old=sprite.scaleX.bits;
+        assert(!transforms.changeTransform({0,1},sprite,Owner::TransformField::scaleX,{0x7f800000u},{0x3f800000u},0xffffff,0x38));
+        assert(!transforms.valid()&&sprite.scaleX.bits==old);
+    }
     {
         Owner sprites;InstanceHandle h{0,1};Owner::State clean;clean.flags=0;
         assert(sprites.attach(h,1,clean));
