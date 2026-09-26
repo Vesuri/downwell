@@ -618,9 +618,9 @@ int main() {
                 "held confirmation cannot repeat restart or select a style");
     }
     downwell::Game naturalDeath(&rooms, &objects, &builders);
-    unsigned combatTicks = 0;
-    bool entranceLanded = false;
-    unsigned approachTicks = 0;
+    // The room-entry update precedes the first gameplay input, matching the
+    // mainTicks convention in the damage route above.
+    unsigned combatTicks = 1;
     bool retried = false;
     unsigned observedFlashFrames = 0;
     for (unsigned frame = 0; frame < 14000 && !retried; ++frame) {
@@ -645,16 +645,19 @@ int main() {
                 }
                 if (menu.goalPassed && menu.goalNotice >= 3) input.fire = (frame % 2) == 0;
             } else {
-                entranceLanded = entranceLanded || runtime.mainPlayerGrounded();
-                if (entranceLanded && approachTicks < 600) {
-                    input.right = true;
-                    ++approachTicks;
-                } else if (entranceLanded) {
-                    input.left = (combatTicks / 90) % 2 == 0;
-                    input.right = !input.left;
-                    input.fire = (combatTicks + 5) % 10 < 5;
+                input.left = (combatTicks / 90) % 2 == 0;
+                input.right = !input.left;
+                input.fire = combatTicks % 10 < 5;
+                if (runtime.mainPlayerY() < 1264) {
+                    // Break the entrance bowl through ordinary shots instead
+                    // of spending a fixed interval pushing into its side wall.
+                    input.left = runtime.mainPlayerX() > 242;
+                    input.right = runtime.mainPlayerX() < 238;
+                }
+                {
                     // Seek a nearby live enemy instead of repeatedly killing
                     // every reachable threat with the blind firing sweep.
+                    // This also applies to enemies near the entrance bowl.
                     const downwell::InstanceRecord* threat = nullptr;
                     float nearest = 64;
                     for (std::size_t i=0;i<runtime.activeInstanceCount();++i) {
@@ -662,7 +665,7 @@ int main() {
                         const int id=enemy.objectId;
                         if (!enemy.active || enemy.health<=0 ||
                             !(id==111 || id==112 || id==113 || id==116 || id==117 || id==119)) continue;
-                        if (std::abs(enemy.y-runtime.mainPlayerY())>8) continue;
+                        if (std::abs(enemy.y-runtime.mainPlayerY())>64) continue;
                         const float distance=std::abs(enemy.x-runtime.mainPlayerX())+
                             std::abs(enemy.y-runtime.mainPlayerY());
                         if (distance<nearest) {nearest=distance;threat=&enemy;}
@@ -702,8 +705,22 @@ int main() {
         naturalDeath.startup().deathResults().menu.sequenceOver,
         naturalDeath.startup().deathResults().menu.goalPassed,
         naturalDeath.startup().deathResults().menu.goalNotice);
+    if (!retried) {
+        const auto& runtime=naturalDeath.startup();
+        std::fprintf(stderr,"death route x=%.1f grounded=%d defeated=%u\n",runtime.mainPlayerX(),
+            int(runtime.mainPlayerGrounded()),runtime.mainEnemiesDefeated());
+        for(std::size_t i=0;i<runtime.activeInstanceCount();++i){
+            const auto& enemy=runtime.instanceAt(i);
+            const int id=enemy.objectId;
+            if(enemy.active && enemy.health>0 &&
+               (id==111 || id==112 || id==113 || id==116 || id==117 || id==119))
+                std::fprintf(stderr," threat=%d xy=%d,%d health=%d\n",id,enemy.x,enemy.y,enemy.health);
+        }
+    }
     require(retried, "bounded natural-death tape reaches and executes Retry");
     require(observedFlashFrames == 2, "natural death renders both white flash frames before Retry");
+    std::printf("Natural death route: %u combat updates, %u flash frames, Retry passed\n",
+        combatTicks-1, observedFlashFrames);
     downwell::Game shopGame(&rooms, &objects, &builders);
     auto& shopRuntime = const_cast<downwell::StartupRuntime&>(shopGame.startup());
     shopRuntime.skipToGameForTesting();

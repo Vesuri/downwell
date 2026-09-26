@@ -82,9 +82,6 @@ Reference: [area-two recovery](area-two-recovery.md).
   not take damage, and the phase-six death route ends without kills or combo.
   Retain their real-damage, reward and death/results assertions; use explicit
   deterministic encounter inputs rather than forcing health or enemy state.
-- Repair the host game-render natural-death/Retry tape after the field RNG
-  correction. It currently finishes alive rather than executing Retry; retain
-  actual death, results and restart assertions instead of accepting that outcome.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,
