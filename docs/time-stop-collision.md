@@ -236,9 +236,19 @@ global all-prepared byte `0xb57c98` bypass that preparation, not the query itsel
 
 Otherwise `0x4798f0` runs before visiting the ancestor-inclusive list. That helper
 sets object flag `0x20` unless `0x28` is already set and recursively visits the
-object's linked table at `+0x08`. Mapping that table to the portable object graph
-is an integration prerequisite; simply setting a flag on the queried object is
-not the full helper.
+object's child table at `+0x08`. The loader at `0x47b740..0x47b78a` resolves the
+parent ID stored at `+0x5c`, stores its pointer at `+0x04`, and inserts the child
+pointer keyed by its resource ID into that parent's `+0x08` table. This is the
+direct-child graph, not an event list or the ancestor-inclusive instance list.
+
+`RunnerObjectFamilies` builds equivalent parent/child links from a validated
+object pack. Its stack-free traversal sets `0x20` and stops at any `0x28` node,
+including that node's descendants. Sibling ordering affects no external operation
+here, so resource order is sufficient for this flag-only traversal; it must not
+be reused as an assertion about source event or collision traversal. Copies own
+their links, and clear/capacity failures invalidate access. Runtime flags must be
+provided separately, not copied from the serialized DWOB property bits. The
+original collision-pair flag construction and live registry binding remain open.
 
 Preparation follows registration-list order, skipping instance flags `0x108003`
 (including already-indexed `0x8000`). Dirty bit `8` causes a bounds refresh with

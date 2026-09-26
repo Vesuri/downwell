@@ -1,4 +1,8 @@
 #include "core/ObjectPack.h"
+#include "core/RunnerObjectFamilies.h"
+#include "core/RunnerObjectMembership.h"
+#include "core/RunnerSpatialObjectPreparation.h"
+#include "core/RunnerSpatialIndex.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -90,6 +94,43 @@ void testDecodeAndInheritance() {
             "object properties and flags are decoded");
 
     downwell::PackedObjectEvent event;
+    downwell::RunnerObjectFamilies<2> families;
+    require(families.bind(pack,[](const auto&){return 0x10u;}),"bind immutable object topology");
+    require(families.isA(1,0) && families.isA(1,1) && !families.isA(0,1) && !families.isA(-1,0),
+            "family traversal follows parent links and validates selectors");
+    require(families.markSpatialFamily(0) && *families.flags(0)==0x30 && *families.flags(1)==0x30,
+            "preparing parent marks descendants");
+    require(families.bind(pack,[](const auto& o){return o.objectId==0?8u:0x10u;}),"bind subtree barrier");
+    require(families.markSpatialFamily(0) && *families.flags(0)==8 && *families.flags(1)==0x10,
+            "collision-pair root prevents descendant preparation");
+    require(families.markSpatialFamily(1) && *families.flags(1)==0x30,
+            "explicit child query can prepare below an ancestor barrier");
+    auto copied=families;families.clear();
+    require(!families.markSpatialFamily(0) && !families.flags(0) && copied.isA(1,0),
+            "copied topology owns links independently and clear invalidates access");
+    downwell::RunnerObjectFamilies<1> small;
+    require(!small.bind(pack,[](const auto&){return 0u;}),"family capacity failure is explicit");
+    require(families.bind(pack,[](const auto&){return 0x10u;}),"bind query-chain topology");
+    downwell::RunnerObjectMembership<2> membership;
+    require(membership.bind(0,1,101) && membership.bind(1,0,100),"register child before parent instance");
+    auto isA=[&](int childId,int parentId){return families.isA(childId,parentId);};
+    using Prepare=downwell::RunnerSpatialObjectPreparation;
+    downwell::RunnerSpatialIndex<4> spatial;
+    std::uint32_t instanceFlags[2]={0,0};
+    Prepare::Box bounds[2]={};
+    for(auto& box:bounds){box.right.bits=box.bottom.bits=0x3f800000u;}
+    const auto path=Prepare::prepare(membership.count(0,isA),spatial.height(),*families.flags(0),false,
+        [&]{return families.markSpatialFamily(0);},
+        [&](auto emit){membership.visit(0,isA,[&](unsigned slot,std::uint32_t key){
+            return emit(key,instanceFlags[slot],bounds[slot]);});},
+        [](auto,auto&,auto&){return true;},
+        [&](auto box,auto key){return spatial.insert(box,key);});
+    require(path==Prepare::Path::spatial && *families.flags(1)==0x30,
+            "query-chain preparation marks the object family");
+    std::vector<unsigned> keys;
+    require(spatial.query(bounds[0],[&](unsigned key){keys.push_back(key);return true;}),"query populated index");
+    require(keys==std::vector<unsigned>({101,100}),
+            "family filtering preserves cross-object registration order into spatial publication");
     require(pack.findEvent(1, 3, 0, event) && event.codeId == 200 &&
                 event.ownerObjectId == 1,
             "direct child event resolves first");
@@ -153,6 +194,26 @@ void testGeneratedPack(const char* path) {
             "recovered player Create event resolves to its VM code ID");
     require(pack.findEvent(35, 14, 0, event) && event.codeId == 864,
             "recovered player PreCreate event resolves to its VM code ID");
+    // Independent parent-walk model: preexisting 0x28 nodes block the whole
+    // descendant subtree; sibling traversal order does not enter the model.
+    for(unsigned root=0;root<pack.objectCount();++root){
+        downwell::RunnerObjectFamilies<386> families;
+        auto initial=[](const auto& o){return 0x10u | (o.objectId%7==0?8u:0u) | (o.objectId%11==0?0x20u:0u);};
+        require(families.bind(pack,initial) && families.markSpatialFamily(root),"mark recovered object family");
+        for(unsigned id=0;id<pack.objectCount();++id){
+            downwell::PackedObject object;pack.object(id,object);
+            auto expected=initial(object);
+            bool blocked=false,reached=false;
+            for(int at=int(id);at>=0;){
+                downwell::PackedObject ancestor;pack.findObject(at,ancestor);
+                blocked|=(initial(ancestor)&0x28u)!=0;
+                if(unsigned(at)==root){reached=true;break;}
+                at=ancestor.parentId;
+            }
+            if(reached && !blocked)expected|=0x20u;
+            require(*families.flags(id)==expected,"recovered family marking matches independent ancestry model");
+        }
+    }
 }
 
 } // namespace
