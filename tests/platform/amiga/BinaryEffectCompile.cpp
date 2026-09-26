@@ -2,6 +2,10 @@
 #include "core/BloodEffect.h"
 #include "core/BloodEffects.h"
 #include "core/BloodCollisionBounds.h"
+#include "core/BloodMaskSample.h"
+bool compileBloodSample(const downwell::BloodEffect& effect,int x,int y,bool& hit){
+    downwell::BloodMaskSample sample;return sample.prepare(effect)&&sample.contains(x,y,hit);
+}
 bool compileBloodBounds(const downwell::BloodEffect& effect,downwell::ContactBounds& bounds){
     return downwell::BloodCollisionBounds::calculate(effect,bounds);
 }

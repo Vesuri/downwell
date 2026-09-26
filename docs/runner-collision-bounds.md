@@ -93,8 +93,25 @@ and height, even before the optional precise-mask byte test. For that test,
 `cvttss2si` truncates sample coordinates toward zero. Success requires both
 sprites to pass. X is the outer scan loop and Y the inner loop. The sprite
 flag at offset `0x8b` controls whether the mask byte is consulted; a false flag
-does not bypass the canvas-bound checks. Mapping that runtime flag to each
-loaded sprite and checking active FP modes remain necessary for live use.
+does not bypass the canvas-bound checks.
+
+The loader at `0x4b7b45` maps serialized mode 1 to flag `0x89` (precise) and
+mode 2 to `0x8a` (rotated-rectangle handling). Flag `0x8b` is different: it
+indicates expanded mask bytes. `0x4b7e3f..0x4b7e61` retains serialized mask
+count/data; `0x4bbbb0` lazily expands those bits and sets `0x8b` whenever stored
+masks exist, regardless of the precise-mode flag. The collision routine calls
+this expansion for both sprites. Sprite 84 has one stored mask, so its pixels
+are tested when paired with precise sprite 616. The stored mask is exactly
+columns 10..13, rows 11..13 inside its 24×24 canvas, not the whole canvas.
+
+`tools/export-blood-mask.csx` exports the source mask with UTMT 0.9.2.0 using
+`DOWNWELL_BLOOD_MASK_OUTPUT` and `DOWNWELL_DATA_WIN_SHA256`, following the goal
+mask exporter convention. Keep output at `extracted/utmt-0.9.2.0/blood-mask.json`
+and any CLI round-trip file under `generated/`, never `data/`.
+`python3 tools/verify-blood-mask.py` checks the input identity and every mask bit.
+`BloodMaskSample` specializes the unit-scale inverse transform and this rectangle;
+its prepared trig is independent of queried pixels. Active FP mode and signed
+trig equivalence still need original-runtime verification.
 
 `BloodCollisionBounds` specializes the earlier bbox arithmetic for sprite 84,
 unit scales and nearest-even conversion, returning half-open integer edges.

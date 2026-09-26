@@ -1,4 +1,5 @@
 #include "core/BloodCollisionBounds.h"
+#include "core/BloodMaskSample.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -19,6 +20,14 @@ int main(){
         for(float x:{-256.5f,0.0f,159.75f,240.0f,320.25f})for(float y:{-4.5f,176.0f,4032.25f}){
             BloodEffect effect;std::memcpy(&effect.x.bits,&x,4);std::memcpy(&effect.y.bits,&y,4);effect.imageAngle=a;
             ContactBounds actual;assert(BloodCollisionBounds::calculate(effect,actual));
+            BloodMaskSample sample;assert(sample.prepare(effect));
+            for(int py=int(y)-4;py<=int(y)+4;++py)for(int px=int(x)-4;px<=int(x)+4;++px){
+                const float dx=float(px)-x,dy=float(py)-y;
+                const float sx=(dy*(-S)+dx*C)+12;
+                const float sy=(dy*C-dx*(-S))+12;
+                bool hit=false;assert(sample.contains(px,py,hit));
+                assert(hit==(sx>=10 && sx<14 && sy>=11 && sy<14));
+            }
             const float cl=C*-2,cr=C*2,st=S*-1,sb=S*2,ct=C*-1,cb=C*2,sl=S*-2,sr=S*2;
             const float left=(x+std::min(cl,cr))+std::min(st,sb);
             const float right=(x+std::max(cl,cr))+std::max(st,sb);
