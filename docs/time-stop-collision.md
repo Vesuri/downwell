@@ -82,6 +82,20 @@ adapter contracts. This does not make the simplified live enemy contact pass
 source-equivalent or establish natural Timeout behavior; those integrations
 remain in the shared work queue.
 
+`PlayerDamage` models the nested `scrPDamage` call separately: it records the
+source name and selects caller `hitInvi` (Candle 240, otherwise 90) before
+testing death and immunity. A permitted hit subtracts health, computes direction
+again, creates the damage-number effect, plays sound 5 and ducks music, then sets
+`pHit`. Each controller receives room speed 40, `slown=23`, then Alarm 0=40 in
+that order. Regardless of whether health loss was permitted, the script finally
+sets `playerDamaged` and assigns object-35 Alarm 1 from the caller's `hitInvi`.
+The property assignment is a separate adapter operation, not a substitute
+player `with` traversal. Nested calls may mutate globals; they do not cause the
+outer damage branch to retest its entry guards or choose Candle immunity again.
+`RunSession::damagePlayer` propagates failure without retry or rollback. Its
+tests verify this event contract; the live number-effect, audio, controller and
+player-property adapters are still required before replacing contact handling.
+
 `OrdinaryTimeFields` exposes port-owned lifetime keys separately from array
 indices. As object 82 has no individual retirement, one room's births form a
 contiguous key interval; lookup needs two counters rather than a key per field.

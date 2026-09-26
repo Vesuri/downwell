@@ -28,6 +28,7 @@
 #include "TimeStopGoalContact.h"
 #include "OrdinaryTimeFields.h"
 #include "TypicalPlayerDamage.h"
+#include "PlayerDamage.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -107,6 +108,10 @@ struct RunSession {
     }
     bool createTimeField(int x,int y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=timeFields.create(x,y,random);
+        return effectsSucceeded;
+    }
+    template<class Events> bool damagePlayer(PlayerDamage& caller,MotionBinary64 amount,Events& events){
+        if(effectsSucceeded)effectsSucceeded=caller.execute(amount,events);
         return effectsSucceeded;
     }
     // Adapter for players whose published coordinates are integer pixels.

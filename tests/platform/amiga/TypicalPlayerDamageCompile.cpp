@@ -10,6 +10,16 @@ struct DamageEvents {
     bool lengthdirX(MotionBinary64,MotionBinary64,MotionBinary64&);
     bool forcedJump(MotionBinary64,MotionBinary64);
     bool playerDead(),playerHealthPositive(),timeoutOwned(),timeStopped();
+    bool setDamageSourceName(),candleOwned(),subtractHealth(MotionBinary64);
+    bool damageNumber(MotionBinary64,MotionBinary64),sound(int,int,int,int),duckMusic(int,MotionBinary64);
+    void setHit(),setRoomSpeed(int),setPlayerDamaged();
+    bool setPlayerAlarm(int,int);
+    struct Controller {void setSlow(int);bool setAlarm(int,int);};
+    Controller* nextController();
+    template<class Visit> bool forEachController(Visit visit){
+        while(auto* controller=nextController())if(!visit(*controller))return false;
+        return true;
+    }
     bool shake(int,int);
     bool hitEffect(MotionBinary64,MotionBinary64,int,MotionBinary64,int,int);
     struct Player {int publishedY(),publishedX();};
@@ -20,6 +30,10 @@ struct DamageEvents {
     }
     void clearNoDamage(),clearAreaNoDamage();
 };
+bool compilePlayerDamage(downwell::RunSession& run,downwell::PlayerDamage& caller,
+                        DamageEvents& events){
+    return run.damagePlayer(caller,MotionBinary64::fromInteger(1),events);
+}
 bool compileTypicalPlayerDamage(downwell::RunSession& run,downwell::TypicalPlayerDamage& caller,
     downwell::GameMakerRandom& random,DamageEvents& events){
     return run.typicalPlayerDamage(caller,MotionBinary64::fromInteger(1),

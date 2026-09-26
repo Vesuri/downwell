@@ -528,6 +528,16 @@ test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-moti
 test: verify-portable-atan
 test: verify-time-stop-effects
 test: verify-typical-player-damage
+test: verify-player-damage
+.PHONY: verify-player-damage
+verify-player-damage: build/player-damage-test
+	python3 tools/verify-typical-player-damage.py
+	./build/player-damage-test
+
+build/player-damage-test: tests/core/PlayerDamageTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/downwell-goal-mask.h generated/downwell-time-field-mask.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerDamageTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-typical-player-damage
 verify-typical-player-damage: build/typical-player-damage-test
 	python3 tools/verify-typical-player-damage.py
