@@ -300,16 +300,33 @@ int main(int argc, char** argv) {
     for (const auto& command : directCommands)
         emittedTorch = emittedTorch || command.objectId == 296;
     require(emittedTorch, "standalone builder tape retains I/J torch emission coverage");
-    unsigned plainWalls = 0, plainPlatforms = 0;
+    unsigned plainWalls = 0, plainPlatforms = 0, crates = 0;
     for (const auto& command : directCommands) {
+        if (command.objectId == 92) {
+            DeferredCreateInstance expected(92, command.x, command.y);
+            require(command.integerImageIndex == 16 || command.integerImageIndex == 17 ||
+                        command.integerImageIndex == 22,
+                    "crate frame remains one of its source Create choices");
+            expected.imageSpeed = 0.0F;
+            expected.integerImageIndex = command.integerImageIndex;
+#ifdef DOWNWELL_FREESTANDING
+            expected.imageIndex = command.integerImageIndex == 22 ? 22.0F : 0.0F;
+#else
+            expected.imageIndex = static_cast<float>(command.integerImageIndex);
+#endif
+            require(sameCommand(command, expected),
+                    "crate commands retain fresh non-presentation fields and alarms");
+            ++crates;
+            continue;
+        }
         if (command.objectId != 60 && command.objectId != 93) continue;
         const DeferredCreateInstance expected(command.objectId, command.x, command.y);
         require(sameCommand(command, expected),
             "reused plain terrain commands retain fresh defaults including all alarms");
         if (command.objectId == 60) ++plainWalls; else ++plainPlatforms;
     }
-    require(plainWalls > 100 && plainPlatforms > 0,
-        "default-command reuse covers walls and platforms interleaved with actors");
+    require(plainWalls > 100 && plainPlatforms > 0 && crates > 0,
+        "default-field checks cover walls, platforms and crates interleaved with actors");
     for (std::size_t i = 0; i < directCommands.size(); ++i)
         require(sameCommand(directCommands[i], incrementalCommands[i]),
                 "ordered emissions preserve every Create-event field including alarms");
