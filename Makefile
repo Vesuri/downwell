@@ -147,6 +147,15 @@ test: verify-corpse-animation
 test: verify-corpse-effects
 test: verify-corpse-replay
 test: verify-corpse-expiry
+test: verify-corpse-expiry-owner
+
+.PHONY: verify-corpse-expiry-owner
+verify-corpse-expiry-owner: build/corpse-expiry-owner-test
+	./build/corpse-expiry-owner-test
+
+build/corpse-expiry-owner-test: tests/core/CorpseExpiryEffectsTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
 .PHONY: verify-corpse-expiry
 verify-corpse-expiry: build/corpse-expiry-test

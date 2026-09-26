@@ -104,6 +104,18 @@ empty sprites and failed publication are explicit failures. Live ownership,
 ordinary mixed-depth drawing and additional corpse families still need wiring.
 `verify-corpse-expiry` pins the VM events, inheritance and sprite metadata.
 
+`CorpseExpiryEffects` provides bounded independent child ownership and monotonic
+owner-local handles. Birth publishes constructor fields before Create assigns
+the 0.3 rate; sprite mutation publishes only on a changed ID. Capture its
+animation cutoff at global phase entry, before any family dispatch. Animation
+End retires external membership exactly once; a failed publication/retirement
+or exhausted capacity is terminal until explicit cleanup. Cleanup can resume
+after a partial failure without repeating successful removals. These hooks
+must not mutate the same owner and must be recreated after world copies.
+The connected alarm/owner test covers survival after corpse retirement, stale
+phases across slot reuse and failure cleanup. This owner is not yet installed
+in the live world registry or renderer.
+
 `CorpseLifecycle` implements alarms 0–3 and the Knife and Fork player-contact
 event. Alarm 0 completes object-242 Create before assigning its sprite and
 requesting corpse retirement. Alarm 3 activates the corpse; only an active
