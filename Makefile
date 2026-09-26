@@ -981,7 +981,7 @@ $(PLAYER_CONTROLS_TEST_TARGET): tests/core/PlayerControlsTest.cpp src/core/Playe
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/PlayerControlsTest.cpp
 
-build/gameplay-player-step-test: tests/core/GameplayPlayerStepTest.cpp src/core/GameplayPlayerStep.h src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp generated/downwell-goal-mask.mask
+build/gameplay-player-step-test: tests/core/GameplayPlayerStepTest.cpp $(wildcard src/core/*.h) src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp generated/downwell-goal-mask.mask
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/GameplayPlayerStepTest.cpp src/core/PlayerMotion.cpp src/core/GameMakerRandom.cpp
 

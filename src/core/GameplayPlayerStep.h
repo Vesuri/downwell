@@ -62,9 +62,11 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     player.configureMovementBoundary(nullptr, nullptr);
     // Begin Step checks the old published x/y before x=round(xx), y=round(yy).
     // Do not substitute the newly moved shop coordinates or Draw's radius.
-    const bool inGoalField = run.levelExitPresent && run.goalField.meetsPlayer(
-        originX + roundGameMakerQ8(player.frameStartXFixed()),
-        originY + roundGameMakerQ8(player.frameStartYFixed()));
+    bool inGoalField=false;
+    if(!run.playerGoalContact(
+        MotionBinary64::fromInteger(originX + roundGameMakerQ8(player.frameStartXFixed())),
+        MotionBinary64::fromInteger(originY + roundGameMakerQ8(player.frameStartYFixed())),
+        player.facing(),inGoalField))return motion;
     // Boss completion is outside the implemented area-one scope.
     run.clock.advance(true, death.active, run.goalStopped, false, inGoalField);
     run.advanceLevelExitAlarms(viewX, viewY);

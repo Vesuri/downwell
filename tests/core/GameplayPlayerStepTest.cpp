@@ -30,6 +30,8 @@ int main() {
     require(mask.size() == 2048, "original precise mask is available for independent pixel queries");
     downwell::GoalTimeField field;
     field.x = 240; field.y = 4000;
+    downwell::RunSession contacts;
+    contacts.levelExitPresent=true;contacts.goalField=field;
     for (int dy = -144; dy <= 144; ++dy) for (int dx = -144; dx <= 144; ++dx) {
         bool expected = false;
         for (int py = dy - 4; py < dy + 8 && !expected; ++py)
@@ -40,7 +42,35 @@ int main() {
             }
         require(field.meetsPlayer(240 + dx, 4000 + dy) == expected,
                 "compact overlap exactly matches original mask pixels at every boundary position");
+        for(int facing:{-1,1}){
+            bool actual=!expected;
+            require(contacts.playerGoalContact(downwell::MotionBinary64::fromInteger(240+dx),
+                downwell::MotionBinary64::fromInteger(4000+dy),facing,actual) && actual==expected,
+                "live field adapter preserves integral clock contacts in both directions");
+        }
     }
+    unsigned differentPositions=0;
+    for(int dy=-136;dy<=136;dy+=2)for(int dx=-136;dx<=136;dx+=2){
+        auto x=downwell::MotionBinary64::fromInteger(240+dx);
+        auto y=downwell::MotionBinary64::fromInteger(4000+dy);
+        require(x.add({0x3fd00000u,0}) && y.add({0x3fe80000u,0}),"fractional fixture setup");
+        downwell::RunnerImageValue px,py,sx,sy;
+        require(px.assign(x) && py.assign(y) && sx.assign(downwell::MotionBinary64::fromInteger(-1)) &&
+            sy.assign(downwell::MotionBinary64::fromInteger(1)),"query transform setup");
+        bool expected=false,actual=false;
+        require(downwell::TimeStopGoalContact::query(downwell::TimeStopGoalContact::Mask::Player,
+            px,py,sx,sy,field,expected) && contacts.playerGoalContact(x,y,-1,actual) && expected==actual,
+            "fractional adapter uses precise mirrored query rather than rounded publication");
+        differentPositions+=actual!=field.meetsPlayer(240+dx,4000+dy);
+    }
+    require(differentPositions!=0,"old publication and private motion can disagree at a field boundary");
+    bool unchanged=true;
+    contacts.goalField.x=2147483647;
+    require(!contacts.playerGoalContact({}, {},1,unchanged) && !contacts.effectsSucceeded && unchanged,
+        "unsupported field coordinates latch failure without publishing a false overlap");
+    contacts.reset();
+    require(contacts.playerGoalContact({}, {},1,unchanged) && !unchanged && contacts.effectsSucceeded,
+        "run reset clears query failure and retires the field");
     Fixture entering;
     entering.player = PlayerMotion(false, 1000);
     entering.run.levelExitPresent = true;

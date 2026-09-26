@@ -23,6 +23,7 @@
 #include "BloodEffects.h"
 #include "TimeStopBound.h"
 #include "BloodGoalContact.h"
+#include "TimeStopGoalContact.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -129,6 +130,35 @@ struct RunSession {
     LevelExit levelExit;
     GoalTimeField goalField;
     bool levelExitPresent = false;
+    // Shared field adapter. Callers choose the source event's position: clock
+    // checks use old published x/y; transitions use private xx/yy. Never merge
+    // those queries or infer their answer from goalStopped.
+    bool playerGoalContact(MotionBinary64 x,MotionBinary64 y,int facing,bool& hit) {
+        if(!effectsSucceeded)return false;
+        if(!levelExitPresent){hit=false;return true;}
+        RunnerImageValue px,py,sx,sy;
+        effectsSucceeded=px.assign(x) && py.assign(y) &&
+            sx.assign(MotionBinary64::fromInteger(facing<0?-1:1)) &&
+            sy.assign(MotionBinary64::fromInteger(1));
+        if(!effectsSucceeded)return false;
+        // Published integral positions with unit scales have exactly the
+        // rectangle used by the compact goal query (also when mirrored).
+        // Keep clock checks cheap on 68000; fractional transitions use the
+        // original transformed sampling path below.
+        std::int32_t ix,iy;
+        RunnerImageValue rx,ry;
+        if(px.promoted().roundPixel(ix) && py.promoted().roundPixel(iy) &&
+           rx.assign(MotionBinary64::fromInteger(ix)) && ry.assign(MotionBinary64::fromInteger(iy)) &&
+           rx.bits==px.bits && ry.bits==py.bits &&
+           ix>=-1048576 && ix<=1048576 && iy>=-1048576 && iy<=1048576 &&
+           goalField.x>=-1048576 && goalField.x<=1048576 &&
+           goalField.y>=-1048576 && goalField.y<=1048576){
+            hit=goalField.meetsPlayer(ix,iy);return true;
+        }
+        effectsSucceeded=TimeStopGoalContact::query(TimeStopGoalContact::Mask::Player,
+            px,py,sx,sy,goalField,hit);
+        return effectsSucceeded;
+    }
     bool goalStopped = false, exitControlsLocked = false;
     bool exitDitherRequested = false, levelResultRequested = false;
     ExitDither exitDither;
