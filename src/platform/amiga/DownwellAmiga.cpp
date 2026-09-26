@@ -1706,6 +1706,15 @@ int main(void) {
                 liveInput.right = ((port.tick() / 120) & 1) == 0;
                 liveInput.left = !liveInput.right;
                 liveInput.fire = (port.tick() % 16) == 0 || (port.tick() % 16) == 3;
+#ifdef DOWNWELL_PROFILE_CONTACT
+                liveInput.right = (port.tick()/90)%2==0;
+                liveInput.left = !liveInput.right;
+                liveInput.fire = port.tick()%10<5;
+                if(port.player().offsetY()+176<1264){
+                    liveInput.left=port.player().offsetX()>2;
+                    liveInput.right=port.player().offsetX()<-2;
+                }
+#endif
 #endif
             }
 #ifdef DOWNWELL_PROFILE_NAVIGATE

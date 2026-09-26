@@ -39,6 +39,7 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
     for (unsigned i = 0; i < count; ++i) {
         const GameplayBob& bob = bobs[i];
         if(bob.sprite==gameplayDamageTextMarker){
+            DW_PROFILE_SCOPE(profileDamageNumberDraw);
             AmigaHardware::blitterDrain();
             AmigaRenderer textRenderer=renderer;textRenderer.blitterEnabled=0;
             downwell::DamageNumberText label;label.formatInteger(bob.flip);

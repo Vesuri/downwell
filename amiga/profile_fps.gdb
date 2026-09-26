@@ -9,6 +9,11 @@ if gDownwellProfileFrozen != 1 || gDownwellProfileFrames[$s] != gDownwellProfile
     quit 1
 end
 printf "PROFILE scene=%lu: frames=%lu PAL_fields=%lu FPS=%.2f max_gap=%lu fields\n", $s, gDownwellProfileFrames[$s], gDownwellProfileFields[$s], 50.0*gDownwellProfileFrames[$s]/gDownwellProfileFields[$s], gDownwellProfileMaxGap[$s]
+printf "Damage number births: %lu\n", gDownwellProfileDamageBirths
+if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
+    printf "Damage profiling tape did not reach a damaging contact\n"
+    quit 1
+end
 set $i = 0
 printf "Staged camera transfers=%ld last_shortfall=%ld rows\n", gDownwellProfileStagedHits, gDownwellProfileStageShortfall
 while $i < gDownwellProfileMissCount && $i < 32

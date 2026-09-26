@@ -33,6 +33,7 @@
 #include "RunnerPointDirection.h"
 #include "PortableAtan.h"
 #include "ForcedPlayerJump.h"
+#include "Profile.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -92,12 +93,13 @@ struct RunSession {
     };
     std::uint32_t createDamageNumber(MotionBinary64 x,MotionBinary64 y,
         MotionBinary64 amount,MotionBinary64 direction){
+        DW_PROFILE_SCOPE(profileDamageNumberCreate);
         if(!effectsSucceeded)return 0;
         if(!nextForegroundBirth){effectsSucceeded=false;return 0;}
         DamageNumberHooks hooks;
         const auto child=damageNumbers.createFromPlayer(x,y,amount,direction,hooks);
         effectsSucceeded=child!=0;
-        if(child)damageNumbers.get(child)->drawBirth=nextForegroundBirth++;
+        if(child){damageNumbers.get(child)->drawBirth=nextForegroundBirth++;DW_PROFILE_DAMAGE_BIRTH();}
         return child;
     }
     bool advanceDamageNumberAlarm(PlayerDamageNumbers<8>::Phase phase,unsigned index){
@@ -119,9 +121,14 @@ struct RunSession {
         const auto px = coordinate(playerX, originX), py = coordinate(playerY, originY);
         auto cx = MotionBinary64::fromInteger(callerX), cy = MotionBinary64::fromInteger(callerY);
         MotionBinary64 direction;
-        if (!cx.add(MotionBinary64::fromInteger(originX)) ||
-            !cy.add(MotionBinary64::fromInteger(originY)) ||
-            !RunnerPointDirection::evaluate(cx,cy,px,py,direction,portableAtan)) {
+        bool directed;
+        {
+            DW_PROFILE_SCOPE(profileContactDirection);
+            directed=cx.add(MotionBinary64::fromInteger(originX)) &&
+                cy.add(MotionBinary64::fromInteger(originY)) &&
+                RunnerPointDirection::evaluate(cx,cy,px,py,direction,portableAtan);
+        }
+        if (!directed) {
             effectsSucceeded = false;
             return false;
         }
@@ -133,6 +140,7 @@ struct RunSession {
         return effectsSucceeded;
     }
     bool stepDamageNumbers(PlayerDamageNumbers<8>::Phase phase){
+        DW_PROFILE_SCOPE(profileDamageNumberStep);
         return stepDamageNumbers(phase,[](MotionBinary64 speed,MotionBinary64 direction,MotionBinary64& x){
             RunnerImageValue length,angle,radian;
             MotionBinary64 cosine,sine;

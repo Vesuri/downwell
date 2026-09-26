@@ -28,6 +28,8 @@ enum DownwellProfilePhase {
     profileBuilderCommand, profileBuilderInitialize, profileGeneratedCell,
     profileGeneratedLanding, profileGeneratedTiles, profileGeneratedBreakable,
     profileGeneratedEnemy, profileGeneratedShop,
+    profileContactDirection, profileDamageNumberCreate, profileDamageNumberStep,
+    profileDamageNumberDraw,
     profilePhaseCount
 };
 
@@ -41,6 +43,8 @@ extern "C" volatile long gDownwellProfileCameraChange;
 extern "C" volatile long gDownwellProfileStagedHits;
 extern "C" volatile long gDownwellProfileStageShortfall;
 extern "C" volatile unsigned long gDownwellProfileSection;
+extern "C" volatile unsigned long gDownwellProfileDamageBirths;
+#define DW_PROFILE_DAMAGE_BIRTH() (++gDownwellProfileDamageBirths)
 class DownwellProfileFrame {
 public:
     explicit DownwellProfileFrame(unsigned scene) { downwellProfileBegin(scene); }
@@ -64,6 +68,7 @@ public:
 #else
 #define DW_PROFILE_SCOPE(phase) ((void)0)
 #define DW_PROFILE_FRAME(scene) ((void)0)
+#define DW_PROFILE_DAMAGE_BIRTH() ((void)0)
 #define DW_PROFILE_PHASE(phase) ((void)0)
 #endif
 

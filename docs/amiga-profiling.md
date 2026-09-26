@@ -18,6 +18,22 @@ instead of the gameplay shortcut. Use `PROFILE_LASER=1` when investigating
 the upgraded Laser Sight fixture. Keep identical inputs, seeds, build options
 and emulator configuration for before/after comparisons.
 
+Use `SKIP_TO_GAME=1 PROFILE_CONTACT=1` with either mode for the 1,800-update
+natural-contact tape. It centers on the entrance bowl, fires to descend, then
+sweeps left/right. It does not inject enemies, change health or call the damage
+script directly. Both reporting scripts reject this tape if no damage number
+was born. The ordinary 600-update tape is retained for existing comparisons;
+zero damage births there is not a measurement of damage handling. Contact mode
+requires autorun and cannot be combined with the level-completion shortcut.
+
+Damage phases are 75 (contact direction math), 76 (number construction),
+77 (number Step, including empty-owner calls) and 78 (native text drawing,
+including the initial blitter drain). The birth counter records successful
+allocations only and is available in both modes. Nested scopes restore their
+enclosing phase, so their costs are exclusive in the phase totals. Maximum Step
+cost can include first-update trigonometry; do not interpret it as the cost of
+every surviving number's update. Compile-time-disabled hooks change no state.
+
 The wrapper builds the selected instrumentation, runs the bounded debugger
 fixture and restores the ordinary startup build on exit, including failure.
 Results are copied to `amiga/.run/profile-fps.log` or `profile-probes.log`;

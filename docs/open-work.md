@@ -168,6 +168,9 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   navigation; preserve original heading, icon and carousel animation.
 - Measure new actor/effect costs in dense scenes. Keep a portable reference
   when introducing selected 68000 assembly optimizations.
+- Reduce live contact direction, first-update damage-number trigonometry and
+  damage-text drawing costs; retain original numeric rounding and painter order.
+  Use the contact profiling tape to distinguish these from general combat work.
 - Profile controller composition and overlap-aware sprite assignment on dense
   gem/smoke scenes; verify the resulting mixed DMA/planar frame against original
   captures while preserving controller priority.

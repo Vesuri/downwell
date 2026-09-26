@@ -28,6 +28,7 @@ FPSCOUNT ?= 0
 PROFILE_AUTORUN ?= 0
 PROFILE_NAVIGATE ?= 0
 PROFILE_LASER ?= 0
+PROFILE_CONTACT ?= 0
 # Keep the measured default; allow controlled compiler comparisons.
 AMIGA_OPTIMIZATION ?= -O3
 ifneq ($(words $(AMIGA_OPTIMIZATION)),1)
@@ -41,6 +42,13 @@ $(error Use PROBES or FPSCOUNT separately)
 endif
 ifeq ($(PROFILE_AUTORUN)$(PROBES)$(FPSCOUNT),100)
 $(error PROFILE_AUTORUN requires PROBES=1 or FPSCOUNT=1)
+endif
+ifeq ($(PROFILE_CONTACT),1)
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(PROFILE_AUTORUN)$(SKIP_TO_GAME)$(SKIP_LEVEL),110)
+$(error PROFILE_CONTACT requires PROFILE_AUTORUN=1 SKIP_TO_GAME=1 SKIP_LEVEL=0)
+endif
+endif
 endif
 
 CFLAGS := -g $(AMIGA_OPTIMIZATION) -flto -m68000 -msoft-float -nostdlib -MP -MMD \
@@ -99,6 +107,9 @@ CFLAGS += -DDOWNWELL_FPSCOUNT
 endif
 ifeq ($(PROFILE_AUTORUN),1)
 CFLAGS += -DDOWNWELL_PROFILE_AUTORUN
+endif
+ifeq ($(PROFILE_CONTACT),1)
+CFLAGS += -DDOWNWELL_PROFILE_CONTACT
 endif
 ifeq ($(PROFILE_NAVIGATE),1)
 CFLAGS += -DDOWNWELL_PROFILE_NAVIGATE

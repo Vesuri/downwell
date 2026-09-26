@@ -538,6 +538,16 @@ test: verify-time-stop-effects
 test: verify-typical-player-damage
 test: verify-player-damage
 test: verify-forced-player-jump
+test: verify-damage-profile
+.PHONY: verify-damage-profile
+verify-damage-profile: generated/smoke-trig.inc generated/downwell-goal-mask.h generated/downwell-time-field-mask.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o build/damage-profile-test tests/core/DamageProfileTest.cpp
+	./build/damage-profile-test
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -DDOWNWELL_PROBES -o build/damage-profile-probes-test tests/core/DamageProfileTest.cpp
+	./build/damage-profile-probes-test
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -DDOWNWELL_FPSCOUNT -o build/damage-profile-fps-test tests/core/DamageProfileTest.cpp
+	./build/damage-profile-fps-test
 .PHONY: verify-forced-player-jump
 verify-forced-player-jump: build/forced-player-jump-test
 	./build/forced-player-jump-test

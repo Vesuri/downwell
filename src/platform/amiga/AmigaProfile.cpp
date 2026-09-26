@@ -9,10 +9,14 @@ extern "C" {
 #ifdef DOWNWELL_SKIP_TO_GAME
 volatile ULONG gDownwellProfileTargetScene = 3;
 volatile ULONG gDownwellProfileTargetFrames =
+#ifdef DOWNWELL_PROFILE_CONTACT
+    1800;
+#else
 #ifdef DOWNWELL_SKIP_LEVEL
     480;
 #else
     600;
+#endif
 #endif
 #elif defined(DOWNWELL_SKIP_INTRO)
 volatile ULONG gDownwellProfileTargetScene = 2;
@@ -22,6 +26,13 @@ volatile ULONG gDownwellProfileTargetScene = 1;
 volatile ULONG gDownwellProfileTargetFrames = 180;
 #endif
 volatile ULONG gDownwellProfileVbi;
+volatile ULONG gDownwellProfileDamageBirths;
+volatile ULONG gDownwellProfileRequireDamage =
+#ifdef DOWNWELL_PROFILE_CONTACT
+    1;
+#else
+    0;
+#endif
 volatile ULONG gDownwellProfileEpoch;
 volatile ULONG gDownwellProfileFrames[4];
 volatile ULONG gDownwellProfileFields[4];
@@ -53,6 +64,8 @@ volatile AmigaTerrainProfileSpan gDownwellProfileWorstSpans[4][16];
 #endif
 __attribute__((noinline, used)) void downwellProfileReady()
 {
+    // Keep this debugger gate reachable through LTO/section collection.
+    (void)gDownwellProfileRequireDamage;
     __asm__ volatile("" ::: "memory");
 }
 }
