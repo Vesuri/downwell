@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -337,7 +338,9 @@ int main() {
     downwell::drawDeathResultsBackdrop(backdrop, 4, 160, 0);
     require(backdrop.tiles == 1056 && backdrop.titles == 5 && backdrop.panel,
             "source tiled shade, two gradients, inclusive panel and four-way title outline");
-    downwell::Game game;
+    // These large independent fixtures must not share one O0 stack frame.
+    auto gameStorage = std::make_unique<downwell::Game>();
+    auto& game = *gameStorage;
     RecordingRenderer renderer;
     game.render(renderer);
 
@@ -386,7 +389,8 @@ int main() {
         const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
         downwell::EffectMaskAssets assets;
         require(assets.bind(bytes.data(),bytes.size()),"live effect test binds offline art");
-        downwell::Game effectGame(&rooms,&objects,&builders,&assets);
+        auto effectStorage = std::make_unique<downwell::Game>(&rooms,&objects,&builders,&assets);
+        auto& effectGame = *effectStorage;
         auto& runtime=const_cast<downwell::StartupRuntime&>(effectGame.startup());
         runtime.skipToGameForTesting();
         const auto x=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+80);
@@ -410,7 +414,8 @@ int main() {
         }
     }
     {
-        downwell::Game flashGame(&rooms,&objects,&builders);
+        auto flashStorage = std::make_unique<downwell::Game>(&rooms,&objects,&builders);
+        auto& flashGame = *flashStorage;
         auto& runtime=const_cast<downwell::StartupRuntime&>(flashGame.startup());
         runtime.skipToGameForTesting();
         require(runtime.emitFlashBurst(downwell::MotionBinary64::fromInteger(int(runtime.mainCameraViewX())+40),
@@ -451,7 +456,8 @@ int main() {
         }
     }
     {
-        downwell::Game enemyGame(&rooms, &objects, &builders);
+        auto enemyStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
+        auto& enemyGame = *enemyStorage;
         auto& runtime = const_cast<downwell::StartupRuntime&>(enemyGame.startup());
         runtime.skipToGameForTesting();
         downwell::InstanceRecord* fixture = nullptr;
@@ -487,7 +493,8 @@ int main() {
         }
         require(runtime.randomDrawCount() == rngBefore, "enemy rendering leaves RNG untouched");
     }
-    downwell::Game damagedGame(&rooms, &objects, &builders);
+    auto damagedStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
+    auto& damagedGame = *damagedStorage;
     unsigned mainTicks = 0, hidden = 0, flashingVisible = 0;
     bool damaged = false, recovered = false, gemFlashChecked = false;
     for (unsigned tick = 0; tick < 6000 && !recovered; ++tick) {
@@ -617,7 +624,8 @@ int main() {
         require(runtime.randomSeed() == 42 && !runtime.playMenuSelected(),
                 "held confirmation cannot repeat restart or select a style");
     }
-    downwell::Game naturalDeath(&rooms, &objects, &builders);
+    auto deathStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
+    auto& naturalDeath = *deathStorage;
     // The room-entry update precedes the first gameplay input, matching the
     // mainTicks convention in the damage route above.
     unsigned combatTicks = 1;
@@ -721,7 +729,8 @@ int main() {
     require(observedFlashFrames == 2, "natural death renders both white flash frames before Retry");
     std::printf("Natural death route: %u combat updates, %u flash frames, Retry passed\n",
         combatTicks-1, observedFlashFrames);
-    downwell::Game shopGame(&rooms, &objects, &builders);
+    auto shopStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
+    auto& shopGame = *shopStorage;
     auto& shopRuntime = const_cast<downwell::StartupRuntime&>(shopGame.startup());
     shopRuntime.skipToGameForTesting();
     downwell::PackedObject exitObject;
@@ -765,7 +774,8 @@ int main() {
     require(closingLevel.exitDitherDraws == 2 && closingLevel.exitDitherX == 190 &&
         closingLevel.exitDitherY == -92 && exitDither.y == ditherWorldY && exitDither.alarm0 == 15,
         "Game projects recovered exit sprite and repeated rendering does not advance motion or alarms");
-    downwell::Game clearGame(&rooms, &objects, &builders);
+    auto clearStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
+    auto& clearGame = *clearStorage;
     auto& clearRuntime = const_cast<downwell::StartupRuntime&>(clearGame.startup());
     clearRuntime.skipToGameForTesting();
     clearRuntime.registerLevelExit(int(clearRuntime.mainPlayerY()));
