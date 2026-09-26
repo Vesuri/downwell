@@ -11,6 +11,36 @@
 using namespace downwell;
 static double value(HudReal n){return std::ldexp(double(n.mantissa),n.exponent-52);}
 int main(){
+    {
+        OrdinaryTimeFields<2> fields;
+        std::uint32_t previous=0;
+        for(unsigned room=0;room<1024;++room){
+            assert(fields.adoptCreate(240,512,room));
+            auto key=fields.identityAt(0);
+            assert(key>previous && fields.find(key)==fields.at(0));
+            assert(!fields.find(previous) && !fields.find(0) && !fields.identityAt(2));
+            assert(fields.adoptCreate(240,600,room+1));
+            assert(fields.identityAt(1)==key+1 && !fields.adoptCreate(0,0,0));
+            assert(!fields.restoreEmptyBirthSequence({1}));
+            auto copy=fields;
+            assert(copy.find(key)==copy.at(0) && copy.find(key)!=fields.find(key));
+            previous=fields.identityAt(1);
+            const auto sequence=fields.birthSequence();
+            fields.clear();
+            assert(!fields.find(key) && !fields.find(previous));
+            assert(!fields.restoreEmptyBirthSequence({1}));
+            // Same cursor must work for room retirement and fresh-owner Retry.
+            if(room&1){fields=OrdinaryTimeFields<2>{};assert(fields.restoreEmptyBirthSequence(sequence));}
+        }
+        fields.clear();
+        assert(fields.restoreEmptyBirthSequence({0xffffffffu}));
+        assert(fields.adoptCreate(240,512,0) && fields.identityAt(0)==0xffffffffu);
+        assert(fields.find(0xffffffffu)==fields.at(0) && !fields.adoptCreate(0,0,0));
+        auto exhausted=fields.birthSequence();fields.clear();
+        assert(!fields.restoreEmptyBirthSequence({1}));
+        assert(!fields.find(0xffffffffu) && !fields.adoptCreate(0,0,0));
+        assert(fields.restoreEmptyBirthSequence(exhausted) && !fields.adoptCreate(0,0,0));
+    }
     for(unsigned seed=0;seed<64;++seed)for(unsigned boundary=0;boundary<=5;++boundary){
         OrdinaryTimeFields<5> fields;GoalTimeField goal;
         GameMakerRandom actual(seed),expected(seed);

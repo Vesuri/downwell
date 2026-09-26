@@ -43,6 +43,16 @@ Builder object-82 initialization already consumes the Create random word:
 world registration must retain that result, not call Create again and consume
 a second draw. Remaining ownership, lookup and rendering work is in the queue.
 
+`OrdinaryTimeFields` exposes port-owned lifetime keys separately from array
+indices. As object 82 has no individual retirement, one room's births form a
+contiguous key interval; lookup needs two counters rather than a key per field.
+Room teardown invalidates the interval without rewinding births. `GameplayWorld`
+preserves the next key across its placement-new Retry reconstruction. Exhaustion
+rejects further births instead of wrapping to an old key, and adoption consumes
+no additional RNG. Keys are local to an owner, not original numeric instance IDs
+or evidence of source query ordering. Candidate selection still requires the
+original object/spatial traversal, eligibility and precise-mask rules below.
+
 ## Dynamic field Draw ordering
 
 `TimeFieldOutlines` takes a read-only snapshot of ordinary and goal fields in

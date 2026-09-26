@@ -39,12 +39,14 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto nextBulletIdentity=nextBulletLifetimeId_;
     const auto nextEnemyIdentity=nextEnemyLifetimeId_;
     const auto nextGemIdentity=nextGemLifetimeId_;
+    const auto fieldBirths=run_.timeFields.birthSequence();
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true);
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
     run_.restart(action, records);
+    if(!run_.timeFields.restoreEmptyBirthSequence(fieldBirths))run_.effectsSucceeded=false;
     enemyRandom_.setSeed(seed);
     return destination;
 }

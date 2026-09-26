@@ -996,8 +996,17 @@ int main() {
 
     {
         AmigaPortRuntime identities(300);
-        std::uint32_t previousEnemy = 0, previousGem = 0;
+        std::uint32_t previousEnemy = 0, previousGem = 0, previousField = 0;
+        downwell::ObjectPack unusedObjects(nullptr,0);
         for (unsigned cycle = 0; cycle < 32; ++cycle) {
+            downwell::DeferredCreateInstance field(82,240,1400);
+            field.setTimeFieldRadiusWord(cycle);
+            require(identities.createGeneratedInstance(field,unusedObjects,[](const auto&){return true;}),
+                "synchronous builder field adopts its preconsumed Create word");
+            const auto fieldKey=identities.timeFields().identityAt(0);
+            require(fieldKey>previousField && identities.timeFields().find(fieldKey) &&
+                !identities.timeFields().find(previousField),"field key cannot alias across Retry");
+            previousField=fieldKey;
             require(identities.configureEnemy(0, 111, 163, 0, 5, 0, 0, 5, 6),
                 "configure identity lifecycle encounter");
             const auto enemyKey = identities.enemyAt(0).lifetimeId;
@@ -1022,6 +1031,8 @@ int main() {
             for (auto key : keys) require(!identities.findGem(key), "collection retires gem key");
             previousEnemy = enemyKey;
             identities.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 42, 300);
+            require(identities.effectsSucceeded() && !identities.timeFields().find(fieldKey),
+                "Retry retires the field without losing its birth sequence");
         }
     }
 

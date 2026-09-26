@@ -44,6 +44,12 @@ bool compileOrdinaryTimeField(downwell::OrdinaryTimeField& field,downwell::GameM
     return field.meetsRelativeBounds(bounds);
 }
 #include "core/OrdinaryTimeFields.h"
+const downwell::OrdinaryTimeField* compileFieldLifetime(downwell::OrdinaryTimeFields<64>& fields,
+    std::uint32_t identity,downwell::OrdinaryTimeFields<64>::BirthSequence sequence){
+    if(!fields.restoreEmptyBirthSequence(sequence))return nullptr;
+    if(!fields.adoptCreate(240,512,1))return nullptr;
+    return fields.find(identity);
+}
 bool compileOrdinaryTimeFieldOrder(downwell::OrdinaryTimeFields<64>& fields,downwell::GoalTimeField& goal,downwell::GameMakerRandom& random,unsigned boundary){
     return fields.advanceDraw(false,random,true,boundary,[&]{goal.advanceDraw(false,random);});
 }
