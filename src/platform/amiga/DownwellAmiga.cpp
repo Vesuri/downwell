@@ -19,6 +19,8 @@
 #include "AmigaGameplayGeneration.h"
 #include "AmigaGameplayActors.h"
 #include "AmigaGameplayDrawList.h"
+#include "AmigaGameplayEffects.h"
+#include "core/CurrencySmokeComposition.h"
 #include "AmigaTerrainRaster.h"
 #include "AmigaTerrainPainter.h"
 #include "AmigaMenuScroll.h"
@@ -1321,6 +1323,15 @@ int main(void) {
         memory.assets()[byte] = amiga_game_pack[byte];
     activeGamePack = memory.assets();
     activeGamePackEnd = activeGamePack + gamePackBytes;
+    static downwell::EffectMaskAssets effectAssets;
+    alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
+    auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
+    if (!effectAssets.bind(activeGamePack,gamePackBytes)) {
+        platform.restore();
+        FreeMem(startupCopperWords,4*sizeof(UWORD));
+        memory.release();
+        return 20;
+    }
     AmigaGardenScene gardenScene(memory.menuForeground(), memory.menuBackground(),
         memory.menuEntry(), memory.copper(), memory.copper() + downwellCopperWords,
         downwellCopperWords);
@@ -2622,11 +2633,37 @@ int main(void) {
                         fieldChanged = true;
                 });
             DW_PROFILE_PHASE(profileActorCollect);
+            bool compositeCurrency = !port.dead();
+#ifdef DOWNWELL_REPLAY_VERIFY
+            compositeCurrency = false;
+#endif
+            if (compositeCurrency) {
+                using Real = downwell::MotionBinary64;
+                const downwell::EffectSurfacePlacement::View view{Real::fromInteger(worldViewX),Real::fromInteger(worldViewY),
+                    Real::fromInteger(160),Real::fromInteger(284)};
+                downwell::CurrencySmokeComposition::Settings settings;
+                settings.noControl = port.shops().noControl;
+                if (!controllerEffects.prepare([&](auto emit) {
+                    for(unsigned i=port.gemSlotEnd();i;--i) {
+                        const auto& gem=port.gemAt(i-1);
+                        if(gem.active && gem.motion.lifetime.visible())
+                            emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(240+gem.x),Real::fromInteger(176+gem.y));
+                    }
+                },port.smokeEffects(),effectAssets,view,settings,[&](auto emit) {
+                    for(unsigned i=0;i<port.enemyCount();++i) {
+                        const auto& enemy=port.enemyAt(i);
+                        if(enemy.active && enemy.awake)
+                            emit(Real::fromInteger(240+enemy.x),Real::fromInteger(176+enemy.y));
+                    }
+                },[](Real n,std::int32_t& out){return n.roundPixel(out);})) {
+                    exitCode=20;break;
+                }
+            }
             static AmigaGameplayDrawList actorList{};
             static_assert(gameplayPlayerStartY == AmigaGameplayDrawList::playerStartY &&
                           gameplayPlayerGroundY == AmigaGameplayDrawList::replayGroundY,
                           "Actor and gameplay camera anchors must agree");
-            if (!actorList.collect(port, activeGamePack, activeGamePackEnd, worldViewX, worldViewY)) {
+            if (!actorList.collect(port, activeGamePack, activeGamePackEnd, worldViewX, worldViewY, compositeCurrency)) {
                 gDownwellActorFailureSprite = actorList.failedSprite;
                 gDownwellActorFailureFrame = actorList.failedFrame;
                 frameReady = false;
@@ -2645,7 +2682,10 @@ int main(void) {
 #ifdef DOWNWELL_BOB_VERIFY
                 0
 #else
-                8
+                // Controller effects draw in front of world actors. Until a
+                // sprite-overlap assignment can prove that order, use BOBs
+                // on frames with nonempty controller coverage only.
+                compositeCurrency && controllerEffects.visible() ? 0 : 8
 #endif
             );
             const unsigned bobCount = assignment.bobCount;
@@ -2710,6 +2750,9 @@ int main(void) {
                 AmigaGameplayActors::draw(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount,
                     activeGamePack, activeGamePackEnd, gameplayRows, gameplayRays[back],
                     rayVisible ? &rayLine : nullptr);
+            if (compositeCurrency)
+                AmigaGameplayEffects::draw(renderer,gameDisplay[back],back,port.ringOrigin(),
+                    controllerEffects.surface(),gameplayRows);
             if (frameReady &&
                 !gameplayScene.update(back,
                     gameDisplay[back], hudBitmap, playerSprites[back],

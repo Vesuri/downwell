@@ -21,11 +21,10 @@ throughout integration, not only after content is complete.
 
 - Verify original runtime FP-mode assumptions and measure the complete smoke
   geometry/effect cost on the native target.
-- Finish smoke world collision dispatch and connect its compositor to both
-  live renderers, preserving the original effect-surface composition and
-  restoring previous effect damage from retained terrain on Amiga.
-  Migrate currency's `drawFx` path alongside smoke: retain gem colors and apply
-  shade to their combined surface, not to a smoke-only overlay above direct gems.
+- Finish smoke world collision dispatch and verify live joint currency/smoke
+  composition against original-game captures, including shade holes and retained
+  damage restoration. Complete death/low-spec direct effect drawing at the
+  original world-depth boundaries; do not flatten those paths into an overlay.
 - Implement remaining blood, corpse, debris and blast effect dependencies.
   Preserve synchronous child Create, RNG consumption and source mutation order
   before rewards and retirement.
@@ -108,6 +107,8 @@ ports does not count as parity with the original.
   retaining static layers and pointer-driven movement.
 - Measure new actor/effect costs in dense scenes. Keep a portable reference
   when introducing selected 68000 assembly optimizations.
+- Replace the all-planar actor fallback on nonempty controller-effect frames
+  with verified overlap-aware sprite assignment, preserving controller priority.
 - Repeat low-overhead timing tapes and correctness gates after changes, with
   separate horizontal-shop and dense-encounter cases. Distinguish instrumentation
   overhead from ordinary gameplay cost.

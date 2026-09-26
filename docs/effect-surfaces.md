@@ -1,8 +1,8 @@
 # Effect surface composition contract
 
 Authority: VM assembly in the pinned Windows extraction, not the current SDL
-sprite list. `EffectSurfacePlacement` implements routing and coordinates only;
-it is not yet connected to either live renderer.
+sprite list. `EffectSurfacePlacement` implements routing and coordinates;
+the live controller composition uses it on both backends.
 
 ## Routing and coordinates
 
@@ -199,7 +199,8 @@ The native operation clips a 16-bit span, splits unaligned output over at most
 two destination words, maps Y through the current circular-buffer origin, and
 updates only changed plane words. It does not call the blitter. Owners must
 restore the previous effect damage from retained terrain before publishing the
-new frame; these publishing primitives do not yet schedule live effects.
+new frame. Natural smoke creation and collision dispatch remain separate from
+rendering the smoke owner.
 
 `AmigaGameplayEffects::draw` binds a copy of the renderer to the retired display
 ring and publishes white coverage at the shaft offset. It drains outstanding
@@ -207,9 +208,11 @@ blits once before the first CPU write, then records contiguous touched-row runs
 in `AmigaGameplayRows` for that buffer only. An empty surface neither drains nor
 adds damage. Before that buffer is reused, its normal terrain sync restores the
 previous physical rows, independent of the new camera origin or effect lifetime.
-The backing and HUD remain untouched. The caller must place this operation at
-the source controller's painter-order boundary; it is not yet called by the
-live scene. `make test-amiga-gameplay-effects` exercises publication followed by
+The backing and HUD remain untouched. The live scene places this operation after
+ordinary actors and flash balls. Frames with nonempty controller coverage use
+planar actors so hardware sprites cannot incorrectly cover the effects. This is
+a conservative ordering fallback, not a demonstrated 20 ms solution; refine it
+with verified overlap-aware assignment. `make test-amiga-gameplay-effects` exercises publication followed by
 restoration across alternating rings, clipping, wrapping and effect retirement.
 
 Reviewed assembly SHA-256 values:

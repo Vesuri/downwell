@@ -4,8 +4,11 @@
 #include "core/GameMakerRounding.h"
 
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
-    const UBYTE* packEnd, int worldViewX, int worldViewY) {
+    const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
     count = 0; failedSprite = failedFrame = 0;
+#ifdef DOWNWELL_REPLAY_VERIFY
+    (void)compositeCurrency;
+#endif
     bool ready = true;
     auto append = [&](UWORD sprite, UWORD frame, int x, int y, int flip) {
         // Offline gameplay actors have <=64-pixel canvases and origins inside
@@ -81,7 +84,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             ready = false;
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
-    for (unsigned index = 0; index < port.gemSlotEnd(); ++index) {
+    for (unsigned index = 0; !compositeCurrency && index < port.gemSlotEnd(); ++index) {
         const auto& gem = port.gemAt(index);
         if (gem.active && gem.motion.lifetime.visible() && !append(
                 (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),

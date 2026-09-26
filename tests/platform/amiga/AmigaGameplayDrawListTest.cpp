@@ -74,6 +74,15 @@ int main() {
             assert(a.sprite==b.sprite && a.frame==b.frame && a.x==b.x && a.y==b.y && a.flip==b.flip);
         }
         observed+=list.count;
+        assert(list.collect(world,pack,pack+8,vx,vy,true));
+        unsigned cursor=0;
+        for(const auto& b:expected) {
+            if(b.sprite==133 || b.sprite==134)continue;
+            assert(cursor<list.count);
+            const auto& a=list.actors[cursor++];
+            assert(a.sprite==b.sprite && a.frame==b.frame && a.x==b.x && a.y==b.y && a.flip==b.flip);
+        }
+        assert(cursor==list.count && world.checkpoint()==checkpoint);
     }
 #ifndef DOWNWELL_REPLAY_VERIFY
     assert(flashDraws>100);

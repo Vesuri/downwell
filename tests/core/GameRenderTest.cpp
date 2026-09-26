@@ -110,6 +110,12 @@ public:
     int clearCount = 0;
     unsigned deathFlashCount = 0;
     unsigned gemDraws = 0;
+    unsigned effectWords = 0;
+    void drawCoverageWord(int x,int y,std::uint16_t bits,downwell::Color) override {
+        require(x>=110 && x<270 && y>=0 && y<284 && bits,"controller effect words stay in the shaft");
+        spriteOrder.push_back(-1000);
+        ++effectWords;
+    }
     unsigned shopPanels = 0, shopNameCenters = 0;
     unsigned clearTitleDraws = 0, clearChoiceDraws = 0;
     unsigned triggerDraws = 0;
@@ -375,6 +381,34 @@ int main() {
     const downwell::ObjectPack objects(objectBytes.data(), objectBytes.size());
     const downwell::BuilderPatternPack builders(builderBytes.data(), builderBytes.size());
     require(rooms.valid() && objects.valid() && builders.valid(), "damage-render test loads real room/object/builder data");
+    {
+        std::ifstream file("generated/amiga-game.dwap",std::ios::binary);
+        const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
+        downwell::EffectMaskAssets assets;
+        require(assets.bind(bytes.data(),bytes.size()),"live effect test binds offline art");
+        downwell::Game effectGame(&rooms,&objects,&builders,&assets);
+        auto& runtime=const_cast<downwell::StartupRuntime&>(effectGame.startup());
+        runtime.skipToGameForTesting();
+        const auto x=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+80);
+        const auto y=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewY()+60);
+        require(runtime.emitSmokeBurst(x,y) && runtime.emitFlashBurst(x,y),"live world emits overlapping effect owners");
+        const auto draws=runtime.randomDrawCount();
+        RecordingRenderer first,second;
+        effectGame.render(first);effectGame.render(second);
+        require(effectGame.renderingSucceeded() && first.effectWords && first.effectWords==second.effectWords &&
+            first.spriteOrder==second.spriteOrder && runtime.randomDrawCount()==draws,
+            "repeated live controller composition is deterministic and does not consume RNG");
+        bool flash=false,coverage=false;
+        for(int id:first.spriteOrder){
+            if(id==96){require(!coverage,"flash precedes controller publication");flash=true;}
+            if(id==-1000){require(flash,"controller coverage follows flash");coverage=true;}
+        }
+        require(coverage,"live effect coverage reaches renderer");
+        if(std::getenv("DOWNWELL_EFFECT_RENDER_ONLY")) {
+            std::puts("Live host controller composition, painter boundary and repaint determinism passed");
+            return 0;
+        }
+    }
     {
         downwell::Game flashGame(&rooms,&objects,&builders);
         auto& runtime=const_cast<downwell::StartupRuntime&>(flashGame.startup());

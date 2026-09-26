@@ -15,6 +15,6 @@ public:
     // Read-only projection of shared simulation into original painter order.
     // No simulation stepping, asset conversion or framebuffer writes.
     bool collect(const GameplayWorld& world, const UBYTE* pack,
-        const UBYTE* packEnd, int worldViewX, int worldViewY);
+        const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency = false);
 };
 #endif

@@ -4,6 +4,7 @@
 #include "Input.h"
 #include "Renderer.h"
 #include "StartupRuntime.h"
+#include "CurrencySmokeComposition.h"
 #include <cstdint>
 
 namespace downwell {
@@ -17,12 +18,14 @@ public:
 
     explicit Game(const RoomPack* roomPack = nullptr,
                   const ObjectPack* objectPack = nullptr,
-                  const BuilderPatternPack* builderPatternPack = nullptr);
+                  const BuilderPatternPack* builderPatternPack = nullptr,
+                  const EffectMaskAssets* effectAssets = nullptr);
 
     // Platform entropy for ResetPlayer/randomize; fixed default for replays.
     void update(const Input& input, std::uint32_t restartSeed = 2);
     void render(Renderer& renderer) const;
     bool finished() const { return finished_; }
+    bool renderingSucceeded() const { return renderingSucceeded_; }
     std::uint64_t tick() const { return tick_; }
     const StartupRuntime& startup() const { return startup_; }
 
@@ -36,6 +39,9 @@ private:
     std::uint64_t tick_ = 0;
     StartupRuntime startup_;
     const ObjectPack* objectPack_ = nullptr;
+    const EffectMaskAssets* effectAssets_ = nullptr;
+    mutable CurrencySmokeComposition effects_;
+    mutable bool renderingSucceeded_ = true;
     bool fire_ = false;
     bool left_ = false, right_ = false, heartGoal_ = false;
     bool finished_ = false;

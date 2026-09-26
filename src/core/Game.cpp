@@ -43,6 +43,9 @@ public:
     void fillRect(int x, int y, int width, int height, Color color) override {
         renderer_.fillRect(x + x_, y, width, height, color);
     }
+    void drawCoverageWord(int x,int y,std::uint16_t bits,Color color) override {
+        renderer_.drawCoverageWord(x+x_,y,bits,color);
+    }
     void drawSpriteTiled(std::int32_t id, std::uint32_t frame,
                          int x, int y) override {
         renderer_.drawSpriteTiled(id, frame, x + x_, y);
@@ -67,10 +70,10 @@ private:
 } // namespace
 
 Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
-           const BuilderPatternPack* builderPatternPack)
+           const BuilderPatternPack* builderPatternPack, const EffectMaskAssets* effectAssets)
     : startup_(PlatformProfile::desktop, roomPack, objectPack,
                StartupRuntime::defaultRandomSeed, builderPatternPack),
-      objectPack_(objectPack) {
+      objectPack_(objectPack), effectAssets_(effectAssets) {
 #ifdef DOWNWELL_SKIP_TO_GAME
     startup_.skipToGameForTesting();
 #ifdef DOWNWELL_SKIP_LEVEL
@@ -252,6 +255,28 @@ void Game::renderMain(Renderer& renderer) const {
 
     const float viewX = static_cast<float>(startup_.mainCameraRenderViewX());
     const float viewY = static_cast<float>(startup_.mainCameraRenderViewY());
+    const bool composite = effectAssets_ && !startup_.mainDeathSequence().active;
+    if (composite) {
+        using Real = MotionBinary64;
+        const EffectSurfacePlacement::View view{Real::fromInteger(int(viewX)),Real::fromInteger(int(viewY)),
+            Real::fromInteger(160),Real::fromInteger(284)};
+        CurrencySmokeComposition::Settings settings;
+        settings.noControl = startup_.shops().noControl;
+        renderingSucceeded_ = effects_.prepare([&](auto emit) {
+            for (std::size_t i = startup_.mainCurrencyCount(); i; --i) {
+                const auto& gem = startup_.mainCurrencyAt(i-1);
+                if (gem.motion.lifetime.visible())
+                    emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(int(gem.x)),Real::fromInteger(int(gem.y)));
+            }
+        }, startup_.smokeEffects(), *effectAssets_, view, settings, [&](auto emit) {
+            for (std::size_t i=0;i<startup_.activeInstanceCount();++i) {
+                const auto& instance=startup_.instanceAt(i);
+                if (instance.active && enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0)
+                    emit(Real::fromInteger(instance.x),Real::fromInteger(instance.y));
+            }
+        }, [](Real n,std::int32_t& out){return n.roundPixel(out);});
+        if (!renderingSucceeded_) return;
+    }
     const auto hasWallAt = [this](std::int32_t x, std::int32_t y) {
         for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
             const InstanceRecord& candidate = startup_.instanceAt(index);
@@ -350,7 +375,7 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
                             static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
     }
-    for (std::size_t index = 0; index < startup_.mainCurrencyCount(); ++index) {
+    for (std::size_t index = 0; !composite && index < startup_.mainCurrencyCount(); ++index) {
         const StartupRuntime::MainCurrencyState& gem =
             startup_.mainCurrencyAt(index);
         if (!gem.motion.lifetime.visible()) continue;
@@ -365,6 +390,12 @@ void Game::renderMain(Renderer& renderer) const {
     startup_.flashEffects().visitNewest([&](const FlashBallEffect& effect) {
         renderer.drawSprite(96,effect.drawFrame(),effect.pixelX()-static_cast<int>(viewX),
                             effect.pixelY()-static_cast<int>(viewY));
+    });
+    if (composite) effects_.surface().visit([&](unsigned x,unsigned y,std::uint16_t a,std::uint16_t lo,std::uint16_t hi) {
+        const std::uint16_t masks[4]={std::uint16_t(a&~lo&~hi),std::uint16_t(a&lo&~hi),
+            std::uint16_t(a&~lo&hi),std::uint16_t(a&lo&hi)};
+        const Color colors[4]={{0,0,0,255},{255,255,255,255},{255,0,0,255},{0,0,0,255}};
+        for(unsigned pen=0;pen<4;++pen)if(masks[pen])renderer.drawCoverageWord(x,y,masks[pen],colors[pen]);
     });
     if (startup_.mainDeathSequence().flashVisible())
         renderer.fillRect(0, 0, 160, logicalHeight, {255, 255, 255, 255});

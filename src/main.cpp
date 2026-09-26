@@ -59,12 +59,17 @@ int main() {
     if (!builderPatternPack.valid())
         std::fprintf(stderr, "warning: recovered builder patterns unavailable\n");
 
+    std::ifstream effectFile("generated/amiga-game.dwap", std::ios::binary);
+    const std::vector<std::uint8_t> effectBytes{std::istreambuf_iterator<char>(effectFile),{}};
+    downwell::EffectMaskAssets effectAssets;
+    if (!effectAssets.bind(effectBytes.data(),effectBytes.size())) return 20;
     downwell::Game game(roomPack.valid() ? &roomPack : nullptr,
                         objectPack.valid() ? &objectPack : nullptr,
-                        builderPatternPack.valid() ? &builderPatternPack : nullptr);
+                        builderPatternPack.valid() ? &builderPatternPack : nullptr, &effectAssets);
     while (!game.finished()) {
         game.update(platform.pollInput(), static_cast<std::uint32_t>(SDL_GetPerformanceCounter()));
         game.render(platform);
+        if (!game.renderingSucceeded()) return 20;
         platform.present();
         platform.waitForNextTick();
     }
