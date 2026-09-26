@@ -204,6 +204,14 @@ silently approximated. Callers must resolve resource/frame metadata correctly.
 Tests combine this setter with object-property updates and queue publication;
 production resource ownership and live collision installation remain unfinished.
 
+`changeSpriteFromPack` resolves frame counts from the complete borrowed DWSC
+table. The same-ID fast path does not consult metadata; a missing ID uses zero
+frames, while an invalid pack fails and latches the owner before field mutation.
+Artwork changes do not overwrite an explicit collision mask. Tests cover every
+one of the 741 resources with six signed/fractional index cases, comparing reset
+decisions against the independent DWSP frame counts, plus missing-ID and corrupt-
+pack cases. DWSC residency and the complete production adapter remain open.
+
 Skeleton VM events write only image index zero. The new component reconciles
 that write at the next animation phase using the recovered difference
 threshold. If a shorter sprite has left the old sequence position outside

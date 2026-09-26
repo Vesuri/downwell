@@ -4,6 +4,7 @@
 #include "core/SpriteCollisionPack.h"
 #include "core/RunnerSpatialInstances.h"
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -44,6 +45,41 @@ void testGeneratedPack(const char* path,const char* maskPath) {
     const downwell::SpriteCollisionPack compact(compactBytes.data(),compactBytes.size());
     require(compact.valid()&&compact.spriteCount()==pack.spriteCount(),"compact collision table validates");
     require(compactBytes.size()==26700,"collision-only table excludes atlas payload and frame mappings");
+    {
+        using Owner=downwell::RunnerSpatialInstances<2,8>;
+        unsigned empty=0;
+        for(unsigned id=0;id<pack.spriteCount();++id){
+            downwell::PackedSprite original;require(pack.sprite(id,original),"read original frame count");
+            for(int eighth:{-9,-1,0,7,int(original.frameCount*8),int(original.frameCount*8+1)}){
+                Owner owner;Owner::State clean;clean.flags=0;
+                require(owner.attach({0,1},1,clean),"attach sprite resource test");
+                Owner::Sprite sprite;sprite.spriteId=-999;sprite.maskId=597;
+                const float index=float(eighth)/8.0f;
+                std::memcpy(&sprite.imageIndex.bits,&index,4);
+                const auto before=sprite.imageIndex;
+                Owner::Real timeline{0x40000000u},cached{0x3f800000u};
+                require(owner.changeSpriteFromPack({0,1},sprite,timeline,cached,int(id),compact,0x38),"resource-backed sprite change succeeds");
+                const bool reset=eighth/8>=int(original.frameCount);
+                require(sprite.spriteId==int(id)&&sprite.maskId==597&&sprite.imageIndex.bits==(reset?0u:before.bits),
+                    "resource count drives reset without replacing explicit collision mask");
+                require(timeline.bits==(reset&&original.frameCount?0u:0x40000000u)&&cached.bits==0xbf800000u,
+                    "empty resources preserve sequence position while invalidating cached frame");
+                require(owner.pendingSpatial()==1&&owner.pendingCollision()==1,"resource change queues both eligible updates");
+            }
+            empty+=original.frameCount==0;
+        }
+        require(empty==3,"all three original empty sprites covered");
+        Owner owner;require(owner.attach({0,1},1,{}),"attach missing-resource fixture");
+        Owner::Sprite sprite;sprite.spriteId=208;Owner::Real timeline{0x40000000u},cached{};
+        const downwell::SpriteCollisionPack invalid(nullptr,0);
+        require(owner.changeSpriteFromPack({0,1},sprite,timeline,cached,208,invalid,0x38)&&owner.valid(),
+            "same-ID setter does not consult unavailable metadata");
+        require(owner.changeSpriteFromPack({0,1},sprite,timeline,cached,999999,compact,0x38)&&timeline.bits==0x40000000u,
+            "absent sprite ID is a zero-frame resource, not a pack error");
+        const auto before=sprite.spriteId;
+        require(!owner.changeSpriteFromPack({0,1},sprite,timeline,cached,208,invalid,0x38)&&!owner.valid()&&sprite.spriteId==before,
+            "unavailable pack fails before sprite mutation");
+    }
     std::ifstream maskInput(maskPath,std::ios::binary);
     const std::vector<std::uint8_t> maskBytes((std::istreambuf_iterator<char>(maskInput)),{});
     const downwell::SpriteMaskPack masks(maskBytes.data(),maskBytes.size());

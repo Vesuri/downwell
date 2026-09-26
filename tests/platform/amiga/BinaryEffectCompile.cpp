@@ -63,6 +63,12 @@ bool compileOwnedSpriteChange(downwell::RunnerSpatialInstances<64,64>& owner,
     downwell::RunnerImageValue& timeline,downwell::RunnerImageValue& cached,int next,unsigned frames){
     return owner.changeSprite(handle,sprite,timeline,cached,next,frames,0x38);
 }
+bool compileResourceSpriteChange(downwell::RunnerSpatialInstances<64,64>& owner,
+    downwell::InstanceHandle handle,downwell::RunnerSpatialInstances<64,64>::Sprite& sprite,
+    downwell::RunnerImageValue& timeline,downwell::RunnerImageValue& cached,int next,
+    const downwell::SpriteCollisionPack& pack){
+    return owner.changeSpriteFromPack(handle,sprite,timeline,cached,next,pack,0x38);
+}
 bool compileStoreSpatialRetirement(downwell::InstanceStore<4>& store,
     downwell::RunnerSpatialInstances<4,8>& owner){
     return store.enterRoom(2,[&](auto handle,const auto&){return owner.retire(handle);})&&

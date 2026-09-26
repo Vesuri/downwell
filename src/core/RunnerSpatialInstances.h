@@ -152,6 +152,17 @@ public:
         markSpatialChange(h.slot,objectFlags);
         return true;
     }
+    // Resource-backed entry point for this pinned build's verified ordinary
+    // unit tracks. Missing IDs differ from an unavailable/corrupt resource pack.
+    bool changeSpriteFromPack(InstanceHandle h,Sprite& sprite,Real& timeline,Real& cachedFrame,
+                             int next,const SpriteCollisionPack& pack,std::uint32_t objectFlags){
+        if(!valid()||!live(h))return false;
+        if(sprite.spriteId==next)return true; // Source no-op performs no lookup.
+        if(!pack.valid())return checked(false);
+        PackedSpriteCollision resource;
+        const unsigned frames=next>=0&&pack.sprite(unsigned(next),resource)?resource.frameCount:0;
+        return changeSprite(h,sprite,timeline,cachedFrame,next,frames,objectFlags);
+    }
     bool refresh(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
         const Box* bounds,bool precise,bool publish){
         if(!valid()||!live(h))return false;
