@@ -41,6 +41,28 @@ int main(){
     }
     assert(roundCalls==8192*4);
     assert(reassociatedDifferences>0); // Fixtures reject independent far-edge calculation.
+    unsigned rotatedComparisons=0;
+    for(unsigned i=0;i<4096;++i)for(bool compat:{false,true}){
+        const float angle=float(i)*0.013f,C=float(std::cos(double(angle))),S=float(std::sin(double(angle)));
+        float left=10,right=13,top=11,bottom=13;
+        if(i&1)std::swap(left,right);
+        if(i&2)std::swap(top,bottom);
+        const float sx=float(int(i%17)-8)*0.3f,sy=float(int(i%23)-11)*0.17f;
+        const float x=float(int(i)-2048)*0.31f,y=float(int(i)-1000)*0.73f;
+        Bounds::Box result;
+        assert(Bounds::rotated({packed(left),packed(top),packed(right),packed(bottom)},12,12,
+            packed(x),packed(y),packed(sx),packed(sy),packed(C),packed(S),compat,round,result));
+        const float l=(std::min(left,right)-12.f)*sx,r=((std::max(left,right)-12.f)+1.f)*sx;
+        const float t=(std::min(top,bottom)-12.f)*sy,b=((std::max(top,bottom)-12.f)+1.f)*sy;
+        const float cl=C*l,cr=C*r,st=S*t,sb=S*b,ct=C*t,cb=C*b,sl=S*l,sr=S*r;
+        float expected[]={(x+std::min(cl,cr))+std::min(st,sb),(y+std::min(ct,cb))-std::max(sl,sr),
+                          (x+std::max(cl,cr))+std::max(st,sb),(y+std::max(ct,cb))-std::min(sl,sr)};
+        if(compat)for(unsigned edge=0;edge<4;++edge)
+            expected[edge]=float(int(std::nearbyint(expected[edge]))-(edge>=2?1:0));
+        const Real actual[]={result.left,result.top,result.right,result.bottom};
+        for(unsigned edge=0;edge<4;++edge)assert(unpacked(actual[edge])==expected[edge]);
+        ++rotatedComparisons;
+    }
     Bounds::Box collapsed;
     assert(Bounds::unrotated({},0,0,packed(0.5f),packed(-0.5f),{}, {},true,round,collapsed));
     assert(unpacked(collapsed.left)==0&&unpacked(collapsed.top)==0);
@@ -49,7 +71,10 @@ int main(){
     auto fail=[](Real,std::int32_t&){return false;};
     assert(!Bounds::unrotated({},0,0,{}, {},packed(1),packed(1),true,fail,result));
     assert(std::memcmp(&result,&unchanged,sizeof(result))==0);
+    assert(!Bounds::rotated({},0,0,{}, {},packed(1),packed(1),packed(1),{},true,fail,result));
+    assert(std::memcmp(&result,&unchanged,sizeof(result))==0);
     assert(!Bounds::unrotated({},0,0,Real{0x7fc00000}, {},packed(1),packed(1),false,round,result));
     assert(std::memcmp(&result,&unchanged,sizeof(result))==0);
     std::printf("Unrotated sprite bounds: %u comparisons passed; %u distinguish reassociation\n",comparisons,reassociatedDifferences);
+    std::printf("Rotated sprite bounds: %u mirrored/fractional/reversed-margin comparisons passed\n",rotatedComparisons);
 }

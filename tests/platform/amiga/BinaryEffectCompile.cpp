@@ -16,6 +16,12 @@ bool compileRunnerSpriteBounds(downwell::RunnerSpriteBounds::Box margins,
     return downwell::RunnerSpriteBounds::unrotated(margins,12,12,{}, {},scale,scale,true,
         [](downwell::RunnerImageValue value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},result);
 }
+bool compileRunnerRotatedSpriteBounds(downwell::RunnerSpriteBounds::Box margins,
+    downwell::RunnerImageValue scale,downwell::RunnerImageValue c,downwell::RunnerImageValue s,
+    downwell::RunnerSpriteBounds::Box& result){
+    return downwell::RunnerSpriteBounds::rotated(margins,12,12,{}, {},scale,scale,c,s,true,
+        [](downwell::RunnerImageValue value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},result);
+}
 #include "core/RunnerSpatialPosition.h"
 bool compileRunnerSpatialPosition(downwell::RunnerImageValue& x,downwell::RunnerImageValue& y,std::uint32_t& flags,
     downwell::RunnerSpatialDirtyQueue<256>& spatial,downwell::RunnerSpatialDirtyQueue<256>& collision){

@@ -86,6 +86,15 @@ bottom = (y + max(C*T, C*B)) - min(S*L, S*R)
 Every multiply/add/subtract is binary32. Reassociation, double-only corner
 rotation or translating already-rounded integer bounds is not equivalent.
 
+The ordinary rotated branch sorts each pair of serialized margins before
+subtracting the origin, adding one to its upper edge and applying scale.
+Unlike the unrotated branch, compatibility conversion decrements the rounded
+upper **integer** before converting it back to binary32. `RunnerSpriteBounds`
+keeps these branches separate and accepts already-narrowed cosine/sine values.
+The blood-contact adapter shares the geometry and retains half-open integer
+output. General geometry tests cover mirrored scales and reversed margins;
+the separate blood tests include its angle conversion and precise sampling.
+
 ## Compatibility branch and limits of this evidence
 
 Byte `0x9360b0` changes the edge convention. If set, the bbox routine uses x87
