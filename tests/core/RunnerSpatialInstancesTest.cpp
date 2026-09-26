@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdio>
 #include <vector>
+#include <cstring>
 using namespace downwell;
 struct Graph {
     std::uint32_t values[4]={0x10,0x10,0x10,0x10};
@@ -24,6 +25,55 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    // VM coordinates retain fractions and narrow only once, in absolute room
+    // space. Compare the boundary with a scalar double -> float conversion,
+    // including both sides of binary32 ties and negative coordinates.
+    for(bool listPath:{false,true})for(double x:{240.25,-240.25,0.0,-0.0,
+            240.0+0x1p-17,240.0+0x1p-17-0x1p-40,240.0+0x1p-17+0x1p-40,
+            240.0+0x3p-17,16777217.0}){
+        Owner queries;Graph graph;
+        const InstanceHandle self{0,1},candidate{1,1};
+        assert(queries.attach(self,3,{})&&queries.attach(candidate,1,{}));
+        auto refresh=[&](InstanceHandle h,bool publish){
+            const auto* s=queries.resolve(h);assert(s);
+            Owner::Box box{s->x,s->y,s->x,s->y};
+            return queries.refresh(h,*graph.flags(unsigned(queries.objectId(h))),false,&box,false,publish);
+        };
+        if(listPath){
+            graph.values[3]=0x30;
+            for(unsigned i=2;i<42;++i){
+                assert(queries.attach({i,1},3,{}));assert(refresh({i,1},true));
+            }
+        }
+        float fx=static_cast<float>(x),fy=-176.25f;
+        std::uint32_t bx,by;std::memcpy(&bx,&fx,4);std::memcpy(&by,&fy,4);
+        assert(queries.move(candidate,{bx},{by},*graph.flags(1)));
+        auto vm=[](double d){std::uint64_t bits;std::memcpy(&bits,&d,8);
+            return MotionBinary64{std::uint32_t(bits>>32),std::uint32_t(bits)};};
+        unsigned calls=0;Owner::Result result;
+        assert(queries.placeVm(self,1,vm(x),vm(-176.25),false,graph,refresh,
+            [&](InstanceHandle q,InstanceHandle c,bool publish,bool& hit){
+                ++calls;assert(q.slot==self.slot&&c.slot==candidate.slot);
+                assert(publish==listPath);
+                assert(queries.resolve(q)->x.bits==bx&&queries.resolve(q)->y.bits==by);
+                hit=true;return true;
+            },result));
+        assert(calls==1&&result.found&&result.handle.slot==candidate.slot);
+        assert(!queries.resolve(self)->x.bits&&!queries.resolve(self)->y.bits);
+    }
+    for(bool badY:{false,true})for(MotionBinary64 invalid:{MotionBinary64{0x7ff00000u,0},
+            MotionBinary64{0x7ff80000u,1},MotionBinary64{0x47f00000u,0},MotionBinary64{0,1}}){
+        Owner queries;Graph graph;const InstanceHandle self{0,1};
+        assert(queries.attach(self,3,{}));
+        Owner::Result result{true,{7,8}};unsigned calls=0;
+        assert(!queries.placeVm(self,1,badY?MotionBinary64{}:invalid,badY?invalid:MotionBinary64{},
+            false,graph,[&](InstanceHandle,bool){++calls;return true;},
+            [&](InstanceHandle,InstanceHandle,bool,bool&){++calls;return true;},result));
+        assert(!queries.valid()&&!calls&&!queries.pendingSpatial()&&!queries.pendingCollision());
+        assert(result.found&&result.handle.slot==7&&result.handle.generation==8);
+        assert(!queries.resolve(self)->x.bits&&!queries.resolve(self)->y.bits);
+        assert(graph.values[1]==0x10);
+    }
     for(auto field:{Owner::TransformField::scaleX,Owner::TransformField::scaleY,Owner::TransformField::angle})
     for(auto bits:{0u,0x80000000u,0x3f800000u,0x40000000u,0xbf800000u})
     for(auto alpha:{0x3f800000u,0x3f000000u})for(auto blend:{0xffffffu,0xff0000u}){

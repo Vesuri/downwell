@@ -337,6 +337,18 @@ public:
         return checked(spatial_.flush([&](unsigned slot){return entries_[slot].state.flags;},
             [&](unsigned slot){return refreshBounds(handle(slot),true);}));
     }
+    // VM instance_place wrapper 0x529e50 narrows absolute room coordinates
+    // to binary32 before 0x4fe560. Do not round to pixels or narrow a relative
+    // offset before adding the room origin. Unsupported values are terminal,
+    // before preparation can mutate family membership or the spatial index.
+    template<class Graph,class Refresh,class Precise>
+    bool placeVm(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        bool allPrepared,Graph& graph,Refresh refreshBounds,Precise precise,Result& result){
+        if(!valid())return false;
+        Real nx,ny;
+        if(!checked(nx.assign(x)&&ny.assign(y)))return false;
+        return place(self,object,nx,ny,allPrepared,graph,refreshBounds,precise,result);
+    }
     // Graph supplies validated flags/isA/markSpatialFamily. refreshBounds(h,
     // publish) resolves assets and calls refresh above (or handles/rejects a
     // special resource). precise(a,b,publish,hit) owns the exact pair test and
