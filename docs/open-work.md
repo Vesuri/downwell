@@ -10,12 +10,20 @@ serialized resources and original-runner evidence are the authority; port-to-por
 agreement alone is insufficient. Target Amiga 500/68000. Let gameplay run slower
 on PAL; do not add 60 Hz catch-up.
 
-## Next integration milestone: live skeleton encounters
+## Working order
 
-Finish section 1 before broadening into catacombs. Supporting helpers alone do
-not close this milestone: natural encounters must execute the recovered rules
-and render correctly on both targets. Performance work in section 5 applies
-throughout integration, not only after content is complete.
+The immediate milestone is live skeleton encounters (section 1). Work through
+its dependencies in this order:
+
+1. Resolve original field-identity selection and remaining collision semantics.
+2. Connect player time-stop transitions, shards and pacing to both schedulers.
+3. Connect damage effects, then skeletons and their owned bones.
+4. Verify natural encounters against the original, on both ports.
+
+Then broaden into catacombs (section 2) and remaining content (section 4).
+Fidelity, performance, architecture, memory and regression work in the other
+sections apply throughout. Supporting helpers alone do not close a milestone;
+natural encounters must execute the recovered rules and render correctly.
 
 ## 1. Finish live skeleton and bone integration
 
@@ -37,15 +45,16 @@ throughout integration, not only after content is complete.
   and parent-time-field queries to both world schedulers before activating blood
   dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
   nor shop control-lock is a substitute for this state.
-- Add Timeout-damage creation of ordinary object-82 time fields. Integrate
-  precise sprite-597 masks and field lookup ordering for
-  all ordinary fields alongside exit fields. Complete Draw scheduling across
-  other object families and live time-stop/activation state;
-  querying only the exit field does not cover `parentTimeField`.
+- Add Timeout-damage creation of ordinary object-82 time fields. Connect the
+  shared parent-field contact adapter to live transitions. Resolve original
+  `instance_place` identity selection, including object-list insertion and
+  spatial-index traversal; a boolean hit or Draw order cannot select the field
+  that determines shard direction. Complete Draw scheduling across other
+  object families and live time-stop/activation state.
 - Integrate the shared time-shard lifecycle, animation, burst and time-change
-  owners with both live schedulers. Finish fractional player/shard time-field
-  queries, including mirrored masks and original-runner rounding. Connect
-  transition pacing and audio rather than adding alternative platform rules.
+  owners with both live schedulers. Wire fractional/mirrored player and shard
+  contacts into those events and verify original-runtime rounding assumptions.
+  Connect transition pacing and audio rather than adding alternative platform rules.
   Preserve the source distinction between paused gravity/animation and moving
   shards, and the separate alarm cooldown rules. Create-only helpers do not
   establish live integration.
@@ -59,6 +68,7 @@ throughout integration, not only after content is complete.
 
 References: [skeleton effects](skeleton-effect-ownership.md),
 [effect surfaces](effect-surfaces.md),
+[time-field contacts and identity](time-stop-collision.md),
 [phase eligibility](runner-step-eligibility.md), [alarms](runner-alarms.md),
 [animation fields](runner-image-fields.md).
 
