@@ -664,6 +664,14 @@ failure latches the owner unusable until clear; stale external handles fail
 without retiring a replacement. These contracts do not substitute for source
 activation scheduling or asset/mask fidelity.
 
+The live stored-instance scheduler uses `runStepChecked` to observe terminal
+owner failures before dispatch and after phase, event, alarm-eligibility and
+membership-publication callbacks. A failed callback must not permit another
+instance's handler, alarm decrement or reconciliation pass. Already completed
+mutations are retained, not rolled back. Both live world entry points reject
+further updates after effect failure; registry publication still needs its
+resource-backed adapter at the integration points described above.
+
 `compactInstanceSlots` and `InstanceStore` record-array offsets are not stable
 queue keys. The compacted gameplay-family arrays still need registry binding;
 the position adapter is not yet installed on live stores. Handle metadata costs

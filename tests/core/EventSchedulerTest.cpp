@@ -301,6 +301,51 @@ void testExternalMembershipPublication() {
     require(phases==1&&calls==2,"failure stops later publication and later phases");
 }
 
+void testCheckedDispatch() {
+    using namespace downwell;
+    for(auto phase:{StepEventPhase::beginStep,StepEventPhase::alarm,StepEventPhase::step,StepEventPhase::endStep})
+        for(bool boundary:{false,true}) {
+            InstanceStore<2> instances;
+            instances.create(1,10,7,false);instances.create(2,10,7,false);
+            for(unsigned i=0;i<2;++i)instances.at(i).alarms.set(0,1);
+            bool healthy=true;unsigned later=0,failedCalls=0;
+            const bool result=EventScheduler<2>::runStepChecked(instances,
+                [](const auto&){return AlarmBank::allEvents;},
+                [&](auto& record,StepEvent event){
+                    if(!healthy)++later;
+                    if(!boundary&&event.phase==phase&&record.instanceId==1){healthy=false;++failedCalls;}
+                },[&](StepEventPhase current){
+                    if(!healthy)++later;
+                    if(boundary&&current==phase){healthy=false;++failedCalls;}
+                },[&](auto,const auto&,bool){if(!healthy)++later;return true;},[&]{return healthy;});
+            require(!result&&failedCalls==1&&later==0,"failed callback stops current and later phases");
+            if(phase==StepEventPhase::alarm)
+                require(instances.at(1).alarms.get(0)==1,"failure leaves later instance alarm untouched");
+            unsigned calls=0;
+            require(!EventScheduler<2>::runStepChecked(instances,
+                [&](const auto&){++calls;return AlarmBank::allEvents;},
+                [&](auto&,auto){++calls;},[&](auto){++calls;},
+                [&](auto,const auto&,bool){++calls;return true;},[&]{return healthy;})&&calls==0,
+                "already-failed owner cannot dispatch another tick");
+        }
+    InstanceStore<1> instances;instances.create(1,10,7,false);instances.at(0).alarms.set(0,1);
+    bool healthy=true;
+    require(!EventScheduler<1>::runStepChecked(instances,
+        [&](const auto&){healthy=false;return AlarmBank::allEvents;},
+        [](auto&,auto){},[](auto){},[](auto,const auto&,bool){return true;},[&]{return healthy;}),
+        "alarm eligibility failure propagates");
+    require(instances.at(0).alarms.get(0)==1,"failed alarm eligibility does not decrement counter");
+    InstanceStore<2> publishing;
+    publishing.create(1,10,7,false);publishing.create(2,10,7,false);
+    unsigned publications=0;healthy=true;
+    require(!EventScheduler<2>::runStepChecked(publishing,
+        [](const auto&){return AlarmBank::allEvents;},
+        [](auto& record,StepEvent event){if(event.phase==StepEventPhase::beginStep)record.active=false;},
+        [](auto){},[&](auto,const auto&,bool){++publications;healthy=false;return true;},[&]{return healthy;}),
+        "latched publication failure stops reconciliation even when callback returns true");
+    require(publications==1,"no second publication after latched failure");
+}
+
 } // namespace
 
 int main() {
@@ -313,6 +358,7 @@ int main() {
     testDeferredMembershipPhaseBoundary();
     testRoomMembershipCycles();
     testExternalMembershipPublication();
+    testCheckedDispatch();
     std::cout << "event scheduler tests passed\n";
     return 0;
 }

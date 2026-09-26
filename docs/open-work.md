@@ -205,6 +205,9 @@ Reference: [scene architecture](scene-architecture.md).
   stock-machine fit.
 - Exercise allocation/capacity failures and scene teardown/re-entry. Preserve
   meaningful nonzero exit codes for startup failures.
+- Propagate terminal failures through the remaining direct actor, reward and
+  collision loops: stop later work in the same frame without rolling back
+  completed effects. Checked event dispatch alone does not cover these loops.
 - Maintain reproducible offline assets and 68000 instruction/helper checks
   across supported build configurations.
 

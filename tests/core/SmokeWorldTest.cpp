@@ -20,6 +20,8 @@ template<class World> static void flashFailure(World& world){
     assert(!world.emitFlashBurst({},{}));
     assert(!world.emitSmokeBurst({},{}));
     equalRandom(random,world.randomState());
+    world.step(0);
+    equalRandom(random,world.randomState());
     assert(world.flashEffects().birthSequence().next==births);
 }
 int main(){

@@ -514,11 +514,12 @@ void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm)
 
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
-    if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
+    if (run_.levelClearActive || !run_.effectsSucceeded) return {}; // Result owner uses stepLevelClear.
     // Only valid unit-sequence state is admitted through the effect owner.
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
+    if(!run_.effectsSucceeded)return {};
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
     for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active)

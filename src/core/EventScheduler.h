@@ -49,18 +49,31 @@ public:
     static bool runStep(InstanceStore<Capacity>& instances,
                          AlarmEvents alarmEvents, Handler handler,
                          BeforePhase beforePhase, Publish publish) {
+        return runStepChecked(instances,alarmEvents,handler,beforePhase,publish,[]{return true;});
+    }
+    // Healthy observes the owner's latched state, including callback failures.
+    // Never mutate another alarm or reconcile a partly failed phase. Completed
+    // handler side effects remain committed; recovery belongs to the owner.
+    template<class AlarmEvents,class Handler,class BeforePhase,class Publish,class Healthy>
+    static bool runStepChecked(InstanceStore<Capacity>& instances,
+        AlarmEvents alarmEvents,Handler handler,BeforePhase beforePhase,
+        Publish publish,Healthy healthy) {
+        if(!healthy())return false;
+        const auto checkedPublish=[&](InstanceHandle h,const InstanceRecord& record,bool member){
+            return healthy()&&publish(h,record,member)&&healthy();
+        };
         beforePhase(StepEventPhase::beginStep);
-        dispatchPhase(instances, StepEventPhase::beginStep, handler);
-        if(!instances.reconcileObjectMembership(publish))return false;
+        if(!healthy() || !dispatchPhase(instances, StepEventPhase::beginStep, handler,healthy))return false;
+        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
         beforePhase(StepEventPhase::alarm);
-        dispatchAlarms(instances, alarmEvents, handler);
-        if(!instances.reconcileObjectMembership(publish))return false;
+        if(!healthy() || !dispatchAlarms(instances, alarmEvents, handler,healthy))return false;
+        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
         beforePhase(StepEventPhase::step);
-        dispatchPhase(instances, StepEventPhase::step, handler);
-        if(!instances.reconcileObjectMembership(publish))return false;
+        if(!healthy() || !dispatchPhase(instances, StepEventPhase::step, handler,healthy))return false;
+        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
         beforePhase(StepEventPhase::endStep);
-        dispatchPhase(instances, StepEventPhase::endStep, handler);
-        return instances.reconcileObjectMembership(publish);
+        if(!healthy() || !dispatchPhase(instances, StepEventPhase::endStep, handler,healthy))return false;
+        return instances.reconcileObjectMembership(checkedPublish)&&healthy();
     }
 
 private:
@@ -75,23 +88,26 @@ private:
         return count;
     }
 
-    template <typename Handler>
-    static void dispatchPhase(InstanceStore<Capacity>& instances,
+    template <typename Handler,typename Healthy>
+    static bool dispatchPhase(InstanceStore<Capacity>& instances,
                               StepEventPhase phase,
-                              Handler& handler) {
+                              Handler& handler,Healthy& healthy) {
         std::array<InstanceHandle, Capacity> handles{};
         const std::size_t count = captureActive(instances, handles);
         for (std::size_t index = 0; index < count; ++index) {
             InstanceRecord* instance = instances.resolve(handles[index]);
-            if (instance != nullptr && instance->active)
+            if (instance != nullptr && instance->active) {
                 handler(*instance, StepEvent{phase, 0});
+                if(!healthy())return false;
+            }
         }
+        return true;
     }
 
-    template <typename AlarmEvents, typename Handler>
-    static void dispatchAlarms(InstanceStore<Capacity>& instances,
+    template <typename AlarmEvents, typename Handler,typename Healthy>
+    static bool dispatchAlarms(InstanceStore<Capacity>& instances,
                                AlarmEvents& alarmEvents,
-                               Handler& handler) {
+                               Handler& handler,Healthy& healthy) {
         std::array<InstanceHandle, Capacity> handles{};
         const std::size_t count = captureActive(instances, handles);
         // Original runner 0x509d97: alarm index is the outer loop and each
@@ -102,12 +118,15 @@ private:
                 if (instance == nullptr || !instance->active)
                     continue;
                 const bool hasEvent = (alarmEvents(*instance) & (1u << alarm)) != 0;
+                if(!healthy())return false;
                 if (!instance->alarms.advanceOne(alarm, hasEvent)) continue;
                 handler(*instance,
                         StepEvent{StepEventPhase::alarm,
                                   static_cast<std::uint8_t>(alarm)});
+                if(!healthy())return false;
             }
         }
+        return true;
     }
 };
 

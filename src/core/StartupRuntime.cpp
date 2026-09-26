@@ -296,11 +296,12 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool right,
                                   bool fire,
                                   bool anyInput) {
-    if (run_.levelClearActive) return; // Result owner uses stepLevelClear.
+    if (run_.levelClearActive || !run_.effectsSucceeded) return; // Result owner uses stepLevelClear.
     if(roomId_==mainRoomId)
         run_.advanceFlashAnimation();
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
     if(roomId_==mainRoomId)run_.advanceCorpseExpiryAnimation();
+    if(!run_.effectsSucceeded)return;
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
@@ -388,7 +389,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         }
     };
     auto smokeStepPhase=run_.smokeEffects.beginPhase();
-    EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler,
+    if(!EventScheduler<instanceCapacity>::runStepChecked(instances_, alarmEvents, handler,
         [&](StepEventPhase phase){
             if(roomId_==mainRoomId && phase==StepEventPhase::alarm)
                 run_.advanceDamageNumberAlarm(run_.damageNumbers.beginPhase(),0);
@@ -397,7 +398,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
             if(roomId_==mainRoomId && phase==StepEventPhase::step)
                 run_.stepDamageNumbers(run_.damageNumbers.beginPhase());
             if(phase==StepEventPhase::step)smokeStepPhase=run_.smokeEffects.beginPhase();
-        });
+        },[](InstanceHandle,const InstanceRecord&,bool){return true;},
+        [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;}))return;
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
     if (roomId_ == mainRoomId) {
