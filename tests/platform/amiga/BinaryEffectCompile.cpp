@@ -1,6 +1,10 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/RunnerSpatialSplit.h"
 #include "core/RunnerSpatialNode.h"
+#include "core/RunnerSpatialIndex.h"
+bool compileRunnerSpatialIndex(downwell::RunnerSpatialIndex<256>& index,downwell::RunnerSpatialSplit::Box box,unsigned id,unsigned& found){
+    return index.insert(box,id)&&index.query(box,[&](unsigned hit){found=hit;return false;});
+}
 bool compileRunnerSpatialNode(downwell::RunnerSpatialNode& node,downwell::RunnerSpatialNode& sibling,const downwell::RunnerSpatialNode::Entry& entry,unsigned index){
     return node.erase(index)&&node.append(entry)&&node.split(entry,sibling);
 }

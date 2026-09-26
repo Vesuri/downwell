@@ -59,7 +59,23 @@ struct RunnerSpatialSplit {
         // order in which this routine assigned their groups.
         output=next;return true;
     }
-private:
+    // 0x4fff98: least enlargement, then least area, then earliest slot.
+    static bool chooseChild(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
+        if(!count || count>6 || !valid(incoming))return false;
+        unsigned best=0;Real bestGrowth{},bestArea{};
+        for(unsigned i=0;i<count;++i){
+            Real oldArea,growth;
+            if(!valid(boxes[i]) || !area(boxes[i],oldArea) ||
+               !area(unite(boxes[i],incoming),growth) || !sub(growth,oldArea,growth))return false;
+            if(!i || less(growth,bestGrowth) || (equal(growth,bestGrowth)&&less(oldArea,bestArea))){
+                best=i;bestGrowth=growth;bestArea=oldArea;
+            }
+        }
+        chosen=best;return true;
+    }
+    // Closed bounds: touching edges survive broad-phase pruning.
+    static bool overlaps(Box a,Box b){return !less(a.right,b.left)&&!less(b.right,a.left)&&
+        !less(a.bottom,b.top)&&!less(b.bottom,a.top);}
     static bool valid(Real x){const unsigned e=(x.bits>>23)&255;return e!=255 && (e || !(x.bits&0x7fffffff));}
     static bool valid(Box b){return valid(b.left)&&valid(b.top)&&valid(b.right)&&valid(b.bottom)&&!less(b.right,b.left)&&!less(b.bottom,b.top);}
     static bool equal(Real a,Real b){return a.bits==b.bits || (!(a.bits&0x7fffffff)&&!(b.bits&0x7fffffff));}

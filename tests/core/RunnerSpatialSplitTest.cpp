@@ -1,11 +1,13 @@
 #include "core/RunnerSpatialSplit.h"
 #include "core/RunnerSpatialNode.h"
+#include "core/RunnerSpatialIndex.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 using Split=downwell::RunnerSpatialSplit;
 using Box=std::array<float,4>;
 static Box merge(Box a,Box b){return {std::min(a[0],b[0]),std::min(a[1],b[1]),std::max(a[2],b[2]),std::max(a[3],b[3])};}
@@ -40,6 +42,50 @@ static std::array<unsigned,7> reference(const Box (&b)[7]){
     return groups;
 }
 static Split::Real real(float f){Split::Real r;std::memcpy(&r.bits,&f,4);return r;}
+static Split::Box packed(Box b){return {real(b[0]),real(b[1]),real(b[2]),real(b[3])};}
+struct ReferenceTree {
+    struct Entry {Box box;unsigned link;};
+    struct Node {int level;std::vector<Entry> entries;};
+    std::vector<Node> nodes={{0,{}}};unsigned root=0;
+    Box bounds(unsigned n)const{
+        Box out=nodes[n].entries[0].box;
+        for(const auto& e:nodes[n].entries)out=merge(out,e.box);
+        return out;
+    }
+    int add(unsigned n,Entry e){
+        if(nodes[n].level){
+            unsigned best=0;float growth=INFINITY,oldArea=INFINITY;
+            for(unsigned i=0;i<nodes[n].entries.size();++i){
+                Box b=nodes[n].entries[i].box;float size=area(b),delta=area(merge(b,e.box))-size;
+                if(delta<growth || (delta==growth && size<oldArea)){best=i;growth=delta;oldArea=size;}
+            }
+            unsigned child=nodes[n].entries[best].link;int split=add(child,e);
+            nodes[n].entries[best].box=bounds(child);
+            if(split<0)return -1;
+            e={bounds(unsigned(split)),unsigned(split)};
+        }
+        nodes[n].entries.push_back(e);
+        if(nodes[n].entries.size()<7)return -1;
+        Box boxes[7];for(unsigned i=0;i<7;++i)boxes[i]=nodes[n].entries[i].box;
+        auto groups=reference(boxes);auto entries=nodes[n].entries;
+        unsigned sibling=unsigned(nodes.size());nodes.push_back({nodes[n].level,{}});
+        nodes[n].entries.clear();
+        for(unsigned i=0;i<7;++i)nodes[groups[i]?sibling:n].entries.push_back(entries[i]);
+        return int(sibling);
+    }
+    void insert(Box b,unsigned id){
+        int sibling=add(root,{b,id});if(sibling<0)return;
+        Node parent{nodes[root].level+1,{{bounds(root),root},{bounds(unsigned(sibling)),unsigned(sibling)}}};
+        root=unsigned(nodes.size());nodes.push_back(parent);
+    }
+    void visit(unsigned n,Box query,std::vector<unsigned>& hits)const{
+        for(const auto& e:nodes[n].entries){
+            const auto b=e.box;
+            if(query[0]>b[2] || query[2]<b[0] || query[1]>b[3] || query[3]<b[1])continue;
+            if(nodes[n].level)visit(e.link,query,hits);else hits.push_back(e.link);
+        }
+    }
+};
 static void check(const Box (&boxes)[7]){
     Split::Box input[7];
     for(unsigned i=0;i<7;++i)input[i]={real(boxes[i][0]),real(boxes[i][1]),real(boxes[i][2]),real(boxes[i][3])};
@@ -99,6 +145,52 @@ int main(){
         }
         check(boxes);
     }
+    for(unsigned trial=0;trial<32;++trial){
+        downwell::RunnerSpatialIndex<256> tree;ReferenceTree scalar;
+        for(unsigned id=0;id<200;++id){
+            float x=(int(random()%4096)-2048)/8.0f,y=(int(random()%4096)-2048)/8.0f;
+            Box b={x,y,x+float(random()%512)/8,y+float(random()%512)/8};
+            assert(tree.insert(packed(b),id));scalar.insert(b,id);
+            assert(tree.height()==scalar.nodes[scalar.root].level);
+            std::vector<unsigned> actual,expected;
+            assert(tree.query(packed(b),[&](unsigned hit){actual.push_back(hit);return true;}));
+            scalar.visit(scalar.root,b,expected);assert(actual==expected);
+            unsigned first=999,calls=0;
+            assert(tree.query(packed(b),[&](unsigned hit){first=hit;++calls;return false;}));
+            assert(calls==1 && first==expected.front());
+        }
+        // Complete traversal checks order even for entries outside local queries.
+        Box all={-10000,-10000,10000,10000};std::vector<unsigned> actual,expected;
+        assert(tree.query(packed(all),[&](unsigned hit){actual.push_back(hit);return true;}));
+        scalar.visit(scalar.root,all,expected);assert(actual==expected && actual.size()==200);
+        tree.clear();assert(tree.valid() && tree.height()==0 && tree.nodeCount()==1);
+        assert(tree.query(packed(all),[](unsigned){assert(false);return true;}));
+    }
+    downwell::RunnerSpatialIndex<3> equalTree;
+    for(unsigned i=0;i<7;++i)assert(equalTree.insert({},i));
+    unsigned ordered[7]={0,2,3,4,5,1,6},position=0;
+    assert(equalTree.query({},[&](unsigned id){assert(id==ordered[position++]);return true;}));
+    assert(position==7);
+    assert(equalTree.query(packed({1,1,2,2}),[](unsigned){assert(false);return true;}));
+    Split::Box invalid{};invalid.left.bits=0x7fc00000u;
+    assert(!equalTree.query(invalid,[](unsigned){assert(false);return true;}));
+    assert(equalTree.valid()); // Invalid read does not poison a valid tree.
+    assert(!equalTree.insert(invalid,100) && !equalTree.valid());
+    downwell::RunnerSpatialIndex<3> edges;
+    assert(edges.insert(packed({0,0,1,1}),10));
+    unsigned touches=0;
+    assert(edges.query(packed({1,1,2,2}),[&](unsigned id){assert(id==10);++touches;return true;}));
+    assert(touches==1); // Inclusive broad-phase corner contact.
+    downwell::RunnerSpatialIndex<1> small;
+    for(unsigned i=0;i<6;++i)assert(small.insert({},i));
+    assert(!small.insert({},6) && !small.valid());
+    assert(!small.query({},[](unsigned){assert(false);return true;}));
+    assert(!small.insert({},7));small.clear();assert(small.insert({},8));
+    // Capacity for the split sibling but not its new root also fails closed.
+    downwell::RunnerSpatialIndex<2> rootFailure;
+    for(unsigned i=0;i<6;++i)assert(rootFailure.insert({},i));
+    assert(!rootFailure.insert({},6) && !rootFailure.valid());
+    assert(!rootFailure.query({},[](unsigned){assert(false);return true;}));
     for(auto bad:{0x7f800000u,0x7fc00000u,1u,0xff800000u}){
         identical[3].left.bits=bad;Split::Result before=result;
         assert(!Split::partition(identical,result));
@@ -111,5 +203,5 @@ int main(){
     assert(!Split::partition(identical,result)); // Area overflow is not infinity.
     for(unsigned i=0;i<7;++i)assert(result.group[i]==tied[i]);
     assert(result.count[0]==5 && result.count[1]==2);
-    std::puts("Spatial nodes: swap-last removal/reinsert, stable split distribution; 8192 binary32 partitions, tie/minimum-fill and atomic failure checks passed");
+    std::puts("Spatial index: 6400 ordered scalar-reference queries/first hits, multilevel insertion, capacity failure; 8192 partitions and node removal checks passed");
 }

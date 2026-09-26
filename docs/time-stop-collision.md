@@ -246,6 +246,22 @@ Its component tests cover every removal slot, reappend, internal/leaf distinctio
 split ordering and failure preservation. It does not yet own condensation,
 index traversal or the dirty queue.
 
+`RunnerSpatialIndex` owns fixed-capacity nodes for insertion and broad-phase
+queries. It descends by least binary32 area enlargement (then least area, then
+earliest slot), propagates splits, and creates roots with the old child before
+the new sibling. Queries use closed bounding boxes and depth-first ascending
+entry order; a callback can stop the entire traversal at the first precise hit.
+An invalid insertion, unsupported arithmetic or exhausted node capacity latches
+failure and prevents queries until reset. Invalid query bounds alone do not
+change a valid index. The owner still lacks removal/condensation and live
+dirty-instance scheduling; it is not an `instance_place` replacement yet.
+
+The scalar reference test compares ordered query results and first-hit stops
+through multi-level insertions, not just unordered hit sets. It also covers
+empty queries, touching bounds, split/root capacity exhaustion and reset. This
+does not establish original-game encounter ordering until the same instances
+and mutation sequence populate the index.
+
 `tools/verify-runner-field-lookup.py` pins these reviewed bytes. It does not
 prove spatial-tree construction/update order or the
 selector outcome during a particular original-game encounter. Those must be
