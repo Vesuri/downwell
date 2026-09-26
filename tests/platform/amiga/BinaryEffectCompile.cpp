@@ -21,6 +21,10 @@ bool compileTimeStopGoalContact(downwell::RunnerImageValue x,downwell::RunnerIma
     return downwell::TimeStopGoalContact::query(downwell::TimeStopGoalContact::Mask::Player,x,x,scale,scale,field,hit);
 }
 #include "core/RunSession.h"
+bool compileParentTimeFieldContact(downwell::RunSession& state,downwell::MotionBinary64 x,
+                                  downwell::RunnerImageValue scale,bool& hit){
+    return state.parentTimeFieldContact(downwell::TimeStopGoalContact::Mask::Player,x,x,scale,scale,hit);
+}
 #include "core/PlayerTimeStop.h"
 #include "core/TimeChangeEffect.h"
 #include "core/TimeShardBirth.h"

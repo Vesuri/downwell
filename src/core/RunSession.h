@@ -137,6 +137,32 @@ struct RunSession {
     GoalTimeField goalField;
     unsigned goalFieldBirthBoundary = 0;
     bool levelExitPresent = false;
+    // Boolean parentTimeField contact, distinct from instance_place identity.
+    // Ordering cannot change the union of these supported, active masks. Do
+    // not use the first tested field as the shard burst's selected instance.
+    // Callers supply the source event's coordinates and current mask/scales.
+    bool parentTimeFieldContact(TimeStopGoalContact::Mask mask,
+        MotionBinary64 x, MotionBinary64 y, RunnerImageValue xs,
+        RunnerImageValue ys, bool& hit) {
+        if (!effectsSucceeded) return false;
+        if (!levelExitPresent && !timeFields.size()) { hit = false; return true; }
+        RunnerImageValue px, py;
+        effectsSucceeded = px.assign(x) && py.assign(y);
+        if (!effectsSucceeded) return false;
+        bool found = false;
+        for (unsigned i = 0; i < timeFields.size(); ++i) {
+            effectsSucceeded = TimeStopGoalContact::query(mask, px, py, xs, ys,
+                *timeFields.at(i), found);
+            if (!effectsSucceeded) return false;
+            if (found) { hit = true; return true; }
+        }
+        if (levelExitPresent) {
+            effectsSucceeded = TimeStopGoalContact::query(mask, px, py, xs, ys, goalField, found);
+            if (!effectsSucceeded) return false;
+        }
+        hit = found;
+        return true;
+    }
     // Shared field adapter. Callers choose the source event's position: clock
     // checks use old published x/y; transitions use private xx/yy. Never merge
     // those queries or infer their answer from goalStopped.

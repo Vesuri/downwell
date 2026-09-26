@@ -152,6 +152,13 @@ do not substitute Draw order, storage order or nearest-centre selection.
 
 ### Published and private player positions
 
+`RunSession::parentTimeFieldContact` supplies the boolean union of the supported
+ordinary and goal masks for player/shard queries. It narrows caller coordinates
+once, does not consume RNG, and latches unsupported numeric failures without
+publishing a partial result. This boolean query does not select an instance or
+replace the independently ordered identity lookup above. The goal-only clock
+query remains separate; an ordinary field must not implicitly stop the run clock.
+
 In `objPlayer_n` Begin Step, `scrPlMovement` precedes clock accounting. The
 source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.
 Camera/interactable queries follow, then the time-stop transition query uses

@@ -7,6 +7,48 @@ static void require(bool ok, const char* why) {
 int main() {
     using namespace downwell;
     {
+        RunSession fields;
+        RunnerImageValue unit,mirror;
+        require(unit.assign(MotionBinary64::fromInteger(1)) && mirror.assign(MotionBinary64::fromInteger(-1)),"contact scales");
+        bool hit=true;
+        require(fields.parentTimeFieldContact(TimeStopGoalContact::Mask::Player,{}, {},unit,unit,hit) && !hit,
+            "empty parent family does not invent a field");
+        for(unsigned i=0;i<64;++i)
+            require(fields.adoptTimeField(240,int(i)*40, i*67108863u),"ordinary field contact fixture");
+        require(fields.parentTimeFieldContact(TimeStopGoalContact::Mask::Player,
+            MotionBinary64::fromInteger(240),{},unit,unit,hit) && hit,"ordinary field triggers parent contact without exit");
+        require(fields.playerGoalContact(MotionBinary64::fromInteger(240),{},1,hit) && !hit,
+            "ordinary field does not change the goal-only run-clock query");
+        GameMakerRandom random(42);
+        struct Camera {void setLevelExit(int){}} camera;
+        fields.createLevelExit(480,3000,random,camera);
+        const auto draws=random.drawCount();
+        for(auto mask:{TimeStopGoalContact::Mask::Player,TimeStopGoalContact::Mask::Shard})
+        for(unsigned i=0;i<256;++i){
+            auto x=MotionBinary64::fromInteger(208+int(i%65));
+            auto y=MotionBinary64::fromInteger(int(i*13));
+            require(x.add({0x3fd80000u,0}) && y.add({0x3fe40000u,0}),"fractional family query"); // +3/8, +5/8
+            RunnerImageValue px,py;
+            require(px.assign(x) && py.assign(y),"query narrowing");
+            bool expected=false,part=false;
+            for(unsigned j=0;j<fields.timeFields.size();++j){
+                require(TimeStopGoalContact::query(mask,px,py,mirror,unit,*fields.timeFields.at(j),part),"ordinary reference query");
+                expected|=part;
+            }
+            require(TimeStopGoalContact::query(mask,px,py,mirror,unit,fields.goalField,part),"goal reference query");
+            expected|=part;
+            require(fields.parentTimeFieldContact(mask,x,y,mirror,unit,hit) && hit==expected,
+                "parent family includes all ordinary fields and goal child at fractional coordinates");
+        }
+        require(random.drawCount()==draws,"parent contact does not consume RNG");
+        hit=true;
+        require(!fields.parentTimeFieldContact(TimeStopGoalContact::Mask::Player,{}, {},{},unit,hit) &&
+            hit && !fields.effectsSucceeded,"unsupported contact preserves output and latches failure");
+        fields.reset(RunRecords{});
+        require(fields.parentTimeFieldContact(TimeStopGoalContact::Mask::Player,{}, {},unit,unit,hit) && !hit,
+            "room/run reset removes every field contact and failure latch");
+    }
+    {
         RunSession fields;GameMakerRandom actual(42),expected(42);
         struct Camera {void setLevelExit(int){}} camera;
         require(fields.adoptTimeField(240,800,1) && fields.adoptTimeField(240,900,2),"fields before exit birth");
