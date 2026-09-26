@@ -11,6 +11,11 @@ not execution of the original game or proof about other runner versions.
   getter wrapper `0x42c560` and setter wrapper `0x431260`.
 - The underlying getter `0x469060` and setter `0x46bf80` access twelve signed
   32-bit values at instance offset `0xf4 + index*4`.
+- The setter wrapper converts VM doubles with `cvttsd2si` at `0x431299`
+  before forwarding an integer-valued number to its final integer conversion.
+  Finite in-range fractions are truncated toward zero, not nearest-even.
+  Thus a positive `random_range(90,160)` lifetime is `90+floor(random(70))`;
+  its RNG draw must remain after the preceding image-index sample.
 - The phase initializes EBX (alarm index) to zero at `0x509da8`. Within its
   per-index traversal it visits instance lists and filters instance flags and
   creation timestamps before touching an alarm (`0x509dc0`–`0x509e12`).

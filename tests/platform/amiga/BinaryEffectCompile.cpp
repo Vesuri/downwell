@@ -7,6 +7,10 @@
 #include "core/RunSession.h"
 #include "core/PlayerTimeStop.h"
 #include "core/TimeChangeEffect.h"
+#include "core/TimeShardBirth.h"
+bool compileTimeShard(downwell::TimeShardBirth& shard,downwell::GameMakerRandom& random){
+    return shard.create({}, {},false,random);
+}
 bool compileTimeChange(downwell::TimeChangeEffect& effect,int& speed){
     if(!effect.create(speed,[](unsigned){return true;}))return false;
     effect.advanceAlarms(speed);return !effect.destroyRequested;
