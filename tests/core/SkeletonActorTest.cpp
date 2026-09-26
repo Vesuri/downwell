@@ -15,20 +15,23 @@ struct Events {
     downwell::SkeletonActor& actor;
     unsigned order=0;
     downwell::MotionBinary64 expectedImpact=number(9);
+    unsigned failAt=0;
     void hurtSound(int n) { check(n==133); }
     bool throwBone(int) { return true; }
     void enemyDeath() { check(++order==1); }
-    void blood(int a,int b) { check(++order==2 && a==10 && b==3); }
-    void smoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b) {
+    bool blood(int a,int b) { check(++order==2 && a==10 && b==3); return order!=failAt; }
+    bool smoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b) {
         check(++order==3 && x.high==actor.xx.high && y.high==actor.yy.high && a==5 && b==1);
+        return order!=failAt;
     }
-    void flash(downwell::MotionBinary64,downwell::MotionBinary64,int a,int b,int c) {
+    bool flash(downwell::MotionBinary64,downwell::MotionBinary64,int a,int b,int c) {
         check(++order==4 && a==6 && b==2 && c==10);
+        return order!=failAt;
     }
-    void currency(int n) { check(++order==5 && n==10); }
+    bool currency(int n) { check(++order==5 && n==10); return order!=failAt; }
     void deathSound(int n) { check(++order==6 && n==132); }
-    void deadBody(int sprite,downwell::MotionBinary64 impact,int debris) { check(++order==7 && sprite==206 && impact.high==expectedImpact.high && impact.low==expectedImpact.low && debris==102); }
-    void debris(int x,int y) { ++order; check((order==8 || order==9) && x==actor.x && y==actor.y-5); }
+    bool deadBody(int sprite,downwell::MotionBinary64 impact,int debris) { check(++order==7 && sprite==206 && impact.high==expectedImpact.high && impact.low==expectedImpact.low && debris==102); return order!=failAt; }
+    bool debris(int x,int y) { ++order; check((order==8 || order==9) && x==actor.x && y==actor.y-5); return order!=failAt; }
     void destroy() { check(++order==10 && actor.destroyRequested && actor.takenImpact.high==expectedImpact.high && actor.takenImpact.low==expectedImpact.low); }
 };
 struct Contact {
@@ -73,10 +76,11 @@ struct StompEvents {
     unsigned choice,smokes=0;
     std::vector<int> calls;
     PlayerMotion player{true,1000};
+    unsigned failAt=0;
     bool playerDead(){return dead;}
     int playStyle(){return style;}
     bool explodingKnees(){return knees;}
-    void blood(int n,int speed){check(n==3 && speed==0 && actor.health==60);calls.push_back(1);}
+    bool blood(int n,int speed){check(n==3 && speed==0 && actor.health==60);calls.push_back(1);return failAt!=1;}
     void forcedJump(int x,int y){
         check(x==0 && y==(style==2?15:25));
         player.stompBounce(style);calls.push_back(2);
@@ -92,15 +96,32 @@ struct StompEvents {
     void explosionSound(int id){check(id==91+int(choice));calls.push_back(8);}
     downwell::MotionBinary64 playerX(){return number(10.25+smokes);}
     downwell::MotionBinary64 playerY(){return number(20.5+smokes);}
-    void emitSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int direction,int speed){
+    bool emitSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int direction,int speed){
         const int directions[]={0,180,15,165};
         auto expectedX=number(10.25+smokes),expectedY=number(24.5+smokes);
         check(x.high==expectedX.high && x.low==expectedX.low && y.high==expectedY.high && y.low==expectedY.low);
         check(direction==directions[smokes] && speed==(smokes<2?4:3));
         calls.push_back(9+smokes++);
+        return calls.back()!=int(failAt);
     }
 };
 int main() {
+    for(unsigned failure:{2u,3u,4u,5u,7u,8u,9u}){
+        downwell::SkeletonActor actor;check(actor.create(96,192));
+        actor.health=0;actor.takenImpact=number(9);
+        Events events{actor};events.failAt=failure;
+        check(!actor.step(true,false,false,0,events));
+        check(events.order==failure&&!actor.destroyRequested&&!actor.alive);
+        check(actor.takenImpact.high==number(9).high); // No event tail or retry.
+    }
+    for(unsigned failure:{1u,9u,10u,11u,12u}){
+        downwell::SkeletonActor actor;check(actor.create(96,192));
+        StompEvents events{actor,false,true,true,0,0,0,{}};events.failAt=failure;
+        check(!actor.stompPlayer(events));
+        check(events.calls.size()==failure&&events.calls.back()==int(failure));
+        check(actor.health==(failure==1?60:-40)&&!actor.destroyRequested);
+        check(events.smokes==(failure==1?0:failure-8));
+    }
     for(bool dead:{false,true}) for(bool knees:{false,true}) for(bool capacity:{false,true})
     for(int style:{0,1,2,3,4}) for(unsigned choice:{0u,1u,2u}) {
         downwell::SkeletonActor actor;check(actor.create(96,192));
@@ -233,5 +254,5 @@ int main() {
     check(ordinary.stomps==1 && ordinary.damageCalls==0);
     Contact mutated; mutated.mutate=true; s.collidePlayer(mutated);
     check(mutated.stomps==1 && mutated.damageCalls==1);
-    std::puts("Skeleton actor: movement, death order, 120 stomps, 10086 masks and 150 precise contacts passed");
+    std::puts("Skeleton actor: 12 effect failure boundaries, movement, death order, 120 stomps, 10086 masks and 150 precise contacts passed");
 }

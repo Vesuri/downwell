@@ -51,7 +51,7 @@ struct SkeletonActor : SkeletonDecisions {
     // No death/reward or storage retirement is performed by this event.
     template<class Events> bool stompPlayer(Events& events) {
         if(events.playerDead()) return true;
-        events.blood(3,0);
+        if(!events.blood(3,0)) return false;
         events.forcedJump(0,events.playStyle()==2?15:25); // vertical tenths
         events.shake(2,10);
         health-=100;
@@ -67,7 +67,7 @@ struct SkeletonActor : SkeletonDecisions {
                 const int directions[]={0,180,15,165};
                 auto py=events.playerY();
                 if(!py.add(MotionBinary64::fromInteger(4))) return false;
-                events.emitSmoke(events.playerX(),py,directions[i],i<2?4:3);
+                if(!events.emitSmoke(events.playerX(),py,directions[i],i<2?4:3)) return false;
             }
         }
         return true;
@@ -152,15 +152,15 @@ struct SkeletonActor : SkeletonDecisions {
         }
         if (health<=0) alive=false;
         if (!alive) {
+            // Creation callbacks complete synchronously and report failure.
+            // Earlier side effects cannot be rolled back; false is terminal
+            // for the owning simulation, not permission to retry this event.
             events.enemyDeath();
-            events.blood(10,3);
-            events.smoke(xx,yy,5,1);
-            events.flash(xx,yy,6,2,10);
-            events.currency(money);
+            if(!events.blood(10,3) || !events.smoke(xx,yy,5,1) ||
+               !events.flash(xx,yy,6,2,10) || !events.currency(money)) return false;
             events.deathSound(132);
-            events.deadBody(206,takenImpact,102);
-            events.debris(x,y-5);
-            events.debris(x,y-5);
+            if(!events.deadBody(206,takenImpact,102) ||
+               !events.debris(x,y-5) || !events.debris(x,y-5)) return false;
             destroyRequested=true;
             events.destroy();
         }

@@ -93,13 +93,13 @@ struct SkeletonDecisionEvents {
     void hurtSound(int sound) { trace = (trace << 8) ^ unsigned(sound); }
     bool throwBone(int facing) { trace = (trace << 2) ^ unsigned(facing); return true; }
     void enemyDeath() { ++trace; }
-    void blood(int a,int b) { trace+=a+b; }
-    void smoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b) { trace^=x.low+y.low+a+b; }
-    void flash(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b,int c) { trace^=x.high+y.high+a+b+c; }
-    void currency(int a) { trace+=a; }
+    bool blood(int a,int b) { trace+=a+b; return true; }
+    bool smoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b) { trace^=x.low+y.low+a+b; return true; }
+    bool flash(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b,int c) { trace^=x.high+y.high+a+b+c; return true; }
+    bool currency(int a) { trace+=a; return true; }
     void deathSound(int a) { trace+=a; }
-    void deadBody(int a,downwell::MotionBinary64 b,int c) { trace+=a+b.high+b.low+c; }
-    void debris(int a,int b) { trace+=a+b; }
+    bool deadBody(int a,downwell::MotionBinary64 b,int c) { trace+=a+b.high+b.low+c; return true; }
+    bool debris(int a,int b) { trace+=a+b; return true; }
     void destroy() { ++trace; }
     void destroyBullet() { ++trace; }
     downwell::MotionBinary64 impactAngle(int x,int y) { trace+=x+y; return {}; }
@@ -120,7 +120,7 @@ struct SkeletonDecisionEvents {
     void explosionSound(int sound){trace+=sound;}
     downwell::MotionBinary64 playerX(){return {};}
     downwell::MotionBinary64 playerY(){return {};}
-    void emitSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int angle,int speed){trace+=x.low+y.low+angle+speed;}
+    bool emitSmoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int angle,int speed){trace+=x.low+y.low+angle+speed;return true;}
 };
 }
 extern "C" unsigned skeletonDecisionsCompile(downwell::SkeletonDecisions* state,

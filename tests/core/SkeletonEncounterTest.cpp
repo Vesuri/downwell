@@ -88,13 +88,13 @@ struct Effects {
     }
     void hurtSound(int id) {check(id==133);}
     void enemyDeath(){check(false);}
-    void blood(int,int){check(false);}
-    void smoke(downwell::MotionBinary64,downwell::MotionBinary64,int,int){check(false);}
-    void flash(downwell::MotionBinary64,downwell::MotionBinary64,int,int,int){check(false);}
-    void currency(int){check(false);}
+    bool blood(int,int){check(false);return false;}
+    bool smoke(downwell::MotionBinary64,downwell::MotionBinary64,int,int){check(false);return false;}
+    bool flash(downwell::MotionBinary64,downwell::MotionBinary64,int,int,int){check(false);return false;}
+    bool currency(int){check(false);return false;}
     void deathSound(int){check(false);}
-    void deadBody(int,downwell::MotionBinary64,int){check(false);}
-    void debris(int,int){check(false);}
+    bool deadBody(int,downwell::MotionBinary64,int){check(false);return false;}
+    bool debris(int,int){check(false);return false;}
     void destroy(){check(false);}
 };
 struct BoneEffects {

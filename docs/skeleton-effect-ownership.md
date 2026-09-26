@@ -13,6 +13,14 @@ must complete each effect's Create synchronously before running the next call.
 Batching all effect creation after currency generation changes the shared RNG
 stream, even when the final list of visible particles looks identical.
 
+Effect-producing callbacks return success. `SkeletonActor` stops the event on
+failed blood, smoke, flash, currency, corpse or debris creation; stomp blood and
+each Exploding Knees smoke emission have the same contract. Already completed
+child Creates and RNG draws are retained. A false result is terminal for the
+owning simulation: do not retry the event, award later rewards, or retire the
+actor as though the sequence completed. `verify-skeleton-actor` injects failures
+at each of these boundaries as well as checking the successful source order.
+
 | Source call | Owned objects / side effects required |
 | --- | --- |
 | `scrEnemyDeath` | Combo/kill counters, gunshot stop, achievement state, moment delay and level-begin cue |
