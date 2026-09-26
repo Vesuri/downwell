@@ -2,11 +2,70 @@
 #include "core/RunnerSpatialBoundsUpdate.h"
 #include "core/RunnerSpatialIndex.h"
 #include "core/RunnerSpatialPosition.h"
+#include "core/RunnerSpatialObjectPreparation.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <vector>
 int main(){
+    {
+        using Prepare=downwell::RunnerSpatialObjectPreparation;
+        using Path=Prepare::Path;
+        auto number=[](int n){downwell::RunnerImageValue v;assert(v.assign(downwell::MotionBinary64::fromInteger(n)));return v;};
+        const Prepare::Box reversed{number(4),number(6),number(0),number(0)};
+        for(unsigned population=0;population<8;++population)
+        for(unsigned height=0;height<8;++height)
+        for(unsigned object=0;object<64;++object)
+        for(unsigned all=0;all<2;++all){
+            unsigned marked=0,visited=0;
+            const auto path=Prepare::prepare(population,height,object,all,
+                [&]{++marked;return true;},[&](auto){++visited;},
+                [](auto,auto&,auto&){assert(false);return false;},
+                [](auto,auto){assert(false);return false;});
+            assert(path==(!population?Path::none:population<height?Path::list:Path::spatial));
+            const bool needs=population && population>=height && !(object&0x28) && !all;
+            assert(marked==needs && visited==needs);
+        }
+        const std::uint32_t excluded[]={1,2,0x8000,0x100000};
+        for(auto flags:excluded){
+            auto box=reversed;
+            assert(Prepare::prepare(1,0,0,false,[]{return true;},[&](auto emit){emit(1,flags,box);},
+                [](auto,auto&,auto&){assert(false);return false;},
+                [](auto,auto){assert(false);return false;})==Path::spatial);
+        }
+        downwell::RunnerSpatialIndex<8> index;
+        std::uint32_t flags[3]={8,0,2};
+        Prepare::Box boxes[3]={reversed,reversed,reversed};
+        std::vector<unsigned> calls;
+        auto prepare=[&](bool fail){return Prepare::prepare(3,index.height(),0,false,
+            [&]{calls.push_back(100);return true;},
+            [&](auto emit){for(unsigned i=0;i<3;++i)if(!emit(i,flags[i],boxes[i]))break;},
+            [&](unsigned i,auto& f,auto&){calls.push_back(10+i);f&=~8u;return true;},
+            [&](auto box,unsigned i){calls.push_back(i);return !fail && index.insert(box,i);});};
+        assert(prepare(false)==Path::spatial);
+        assert((calls==std::vector<unsigned>{100,10,0,1}));
+        assert(flags[0]==0x8000 && flags[1]==0x8000 && flags[2]==2);
+        std::vector<unsigned> hits;
+        assert(index.query({number(0),number(0),number(4),number(6)},[&](unsigned i){hits.push_back(i);return true;}));
+        assert((hits==std::vector<unsigned>{0,1}));
+        calls.clear();assert(prepare(false)==Path::spatial);
+        assert((calls==std::vector<unsigned>{100})); // Already indexed: no duplicate insert.
+        flags[0]=8;calls.clear();assert(prepare(true)==Path::failed);
+        assert(!(flags[0]&0x8000) && (calls==std::vector<unsigned>{100,10,0}));
+        assert(Prepare::prepare(1,0,0,false,[]{return false;},
+            [](auto){assert(false);},[](auto,auto&,auto&){return true;},
+            [](auto,auto){return true;})==Path::failed);
+        auto cached=reversed;std::uint32_t dirty=8;
+        assert(Prepare::prepare(1,0,0,false,[]{return true;},
+            [&](auto emit){emit(0,dirty,cached);},[](auto,auto&,auto&){return false;},
+            [](auto,auto){assert(false);return true;})==Path::failed);
+        assert(dirty==8);
+        cached.left.bits=0x7f800000u;dirty=0;
+        assert(Prepare::prepare(1,0,0,false,[]{return true;},
+            [&](auto emit){emit(0,dirty,cached);},[](auto,auto&,auto&){assert(false);return true;},
+            [](auto,auto){assert(false);return true;})==Path::failed);
+        assert(dirty==0);
+    }
     using Queue=downwell::RunnerSpatialDirtyQueue<16>;
     Queue queue;std::vector<unsigned> expected;
     auto check=[&](){
@@ -96,5 +155,5 @@ int main(){
     assert(x.bits==before.bits&&positionFlags==beforeFlags&&spatial.first()==1);
     assert(!Position::assign(1,x,y,positionFlags,Real{0x7f800000},one,false,true,0x1a,spatial,collision));
     assert(x.bits==before.bits&&positionFlags==beforeFlags);
-    std::puts("Spatial mutation: no-op/special position, dual memberships, bounds publication; 65536 queue comparisons and 32768 eligibility combinations passed");
+    std::puts("Spatial mutation: 8192 preparation gates, ordered initial publication and failure handling; 65536 queue comparisons and 32768 eligibility combinations passed");
 }

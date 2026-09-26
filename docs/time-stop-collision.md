@@ -226,6 +226,35 @@ change traversal order; the append rule alone does not establish oldest-first
 lookup once the tree branches. The removal contract is below; the set/order
 of instances populating the shared index still needs auditing.
 
+### On-demand object-query preparation
+
+`0x500f85..0x5010d4` distinguishes three cases after object resolution:
+zero ancestor-inclusive population means no candidate; population strictly less
+than root height selects list traversal; equality selects spatial traversal.
+Only the spatial case can prepare new index members. Object flags `0x28` or the
+global all-prepared byte `0xb57c98` bypass that preparation, not the query itself.
+
+Otherwise `0x4798f0` runs before visiting the ancestor-inclusive list. That helper
+sets object flag `0x20` unless `0x28` is already set and recursively visits the
+object's linked table at `+0x08`. Mapping that table to the portable object graph
+is an integration prerequisite; simply setting a flag on the queried object is
+not the full helper.
+
+Preparation follows registration-list order, skipping instance flags `0x108003`
+(including already-indexed `0x8000`). Dirty bit `8` causes a bounds refresh with
+update argument zero. It normalizes cached bounds into a local box, inserts it,
+then sets `0x8000`. This differs from both hit eligibility and ordinary dirty
+publication. The object-selector branch has no separate sprite-resource lookup
+before insertion; the `all` branch does, so those paths must not be merged.
+
+`RunnerSpatialObjectPreparation` encodes this object-selector operation using
+explicit family-marking, ordered-member, bounds-refresh and insertion callbacks.
+It does not populate the live world or establish the object's initial runtime
+flags. Failure makes partially prepared state unusable for subsequent queries
+until the owner recovers it. Tests cover branch boundaries, preparation gates,
+ordered insertion, normalization and already-indexed suppression, not a complete
+original-runner execution trace.
+
 ### Spatial split contract
 
 `0x5010e0` copies six old entries and appends the incoming seventh entry to a

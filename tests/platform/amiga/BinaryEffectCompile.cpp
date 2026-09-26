@@ -177,6 +177,15 @@ bool compileCurrencySmokeComposition(downwell::CurrencySmokeComposition& composi
         [](downwell::MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);});
 }
 #include "core/RunnerObjectMembership.h"
+#include "core/RunnerSpatialObjectPreparation.h"
+downwell::RunnerSpatialObjectPreparation::Path compileObjectPreparation(
+    downwell::RunnerSpatialIndex<64>& index,std::uint32_t& flags,
+    downwell::RunnerSpatialSplit::Box& box){
+    return downwell::RunnerSpatialObjectPreparation::prepare(1,index.height(),0,false,
+        []{return true;},[&](auto emit){emit(1,flags,box);},
+        [](auto,auto&,auto&){return true;},
+        [&](auto bounds,auto id){return index.insert(bounds,id);});
+}
 #include "core/RunnerRoomMembership.h"
 unsigned compileRoomMembership(downwell::RunnerRoomMembership<64>& rooms,
     unsigned slot,downwell::RunnerImageValue depth,std::uint64_t dormant) {
