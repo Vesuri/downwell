@@ -22,3 +22,11 @@ for name,digest in {
     "parentShootableThing": "f5c0c5d89f5db5d6ecc01a01c961592fb0a0e413eda14df7c402ed936f487a40",
 }.items():
     assert sha256((export / f"Assembly/gml_Object_{name}_Create_0.asm").read_bytes()).hexdigest() == digest
+for event,digest in {
+    "Alarm_0": "c66e3d24e7a8fd8cbcaf0e06dc3457cae0aea183604afe5d578cd7b6f0ab535a",
+    "Alarm_1": "1d019f4c251b3e928cd9e7e1e43ef6fdee1c1ac2b44926914947097b10d7763b",
+    "Alarm_2": "aabeb387894e077ae2089bfcf7a6f485401b32a0599400fb78fdffe079108e9f",
+    "Alarm_3": "7ef1cbd642cf4091103bb6b5276b8992d8dacf3c2dcc5d51a50b1f136de46402",
+    "Collision_objPlayer_n": "a50d56a52a49e2e7b35c5980a268db839e321359a5a8e75b5e275e7f7f0b5ddc",
+}.items():
+    assert sha256((export / f"Assembly/gml_Object_objDeadBody_{event}.asm").read_bytes()).hexdigest() == digest

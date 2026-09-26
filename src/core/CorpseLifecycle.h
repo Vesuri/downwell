@@ -1,0 +1,48 @@
+#ifndef DOWNWELL_CORE_CORPSE_LIFECYCLE_H
+#define DOWNWELL_CORE_CORPSE_LIFECYCLE_H
+#include "CorpseBirth.h"
+namespace downwell {
+// Event bodies only: global scheduler owns alarm-index ordering, collision
+// admission and lifetime removal. All child Creates complete synchronously.
+struct CorpseLifecycle : CorpseBirth {
+    bool destroyRequested=false,valid=true;
+    std::uint32_t myExplosion=0;
+    template<class Random,class Queries>
+    bool create(MotionBinary64 px,MotionBinary64 py,bool rip,Random& random,Queries& queries){
+        destroyRequested=false;myExplosion=0;
+        valid=CorpseBirth::create(px,py,rip,random,queries);return valid;
+    }
+    template<class Events> bool advanceAlarm(unsigned index,Events& events){
+        if(!valid)return false;
+        if(destroyRequested||index>3||!alarms.advanceOne(index))return true;
+        switch(index){
+            case 0: {
+                std::uint32_t child=0;
+                if(!events.create(242,x.promoted(),y.promoted(),child)||!child){valid=false;return false;}
+                myExplosion=child;
+                // Re-read explosionFx after Create; publish via sprite setter.
+                if(!events.sprite(myExplosion,explosionFx)){valid=false;return false;}
+                destroyRequested=true;events.destroy();break;
+            }
+            case 1: disappearing=true;break;
+            case 2: hit=false;break;
+            case 3: active=true;break;
+        }
+        return true;
+    }
+    template<class Events> bool collidePlayer(bool knifeFork,bool playerDead,Events& events){
+        if(!valid)return false;
+        if(destroyRequested||!knifeFork||playerDead||!active)return true;
+        if(!events.incrementBodiesEaten()){valid=false;return false;}
+        events.eatSound(83,80,0,1); // soundPlayOL, group "UI".
+        for(unsigned i=0;i<5;++i){
+            // VM evaluates Y before X and re-reads globals per child.
+            const auto py=events.playerY();const auto px=events.playerX();
+            std::uint32_t child=0;
+            if(!events.create(223,px,py,child)||!child){valid=false;return false;}
+        }
+        destroyRequested=true;events.destroy();return true;
+    }
+};
+}
+#endif

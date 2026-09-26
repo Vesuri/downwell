@@ -139,6 +139,16 @@ test: verify-debris-effects
 test: verify-debris-draw
 test: verify-dead-body-creation
 test: verify-corpse-birth
+test: verify-corpse-lifecycle
+
+.PHONY: verify-corpse-lifecycle
+verify-corpse-lifecycle: build/corpse-lifecycle-test
+	python3 tools/verify-dead-body-creation.py
+	./build/corpse-lifecycle-test
+
+build/corpse-lifecycle-test: tests/core/CorpseLifecycleTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CorpseLifecycleTest.cpp
 
 .PHONY: verify-corpse-birth
 verify-corpse-birth: build/corpse-birth-test

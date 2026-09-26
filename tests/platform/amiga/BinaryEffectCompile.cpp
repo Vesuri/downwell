@@ -438,6 +438,7 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/DebrisEffects.h"
 #include "core/DeadBodyCreation.h"
 #include "core/CorpseBirth.h"
+#include "core/CorpseLifecycle.h"
 namespace {
 struct CorpseBirthQueries {
     bool wall(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=true;return true;}
@@ -452,6 +453,11 @@ bool compileCorpseBirth(downwell::CorpseBirth& birth,downwell::GameMakerRandom& 
 namespace {
 struct CorpseCompileEvents {
     unsigned trace=0;
+    bool incrementBodiesEaten(){++trace;return true;}
+    void eatSound(int a,int b,int c,int d){trace+=a+b+c+d;}
+    downwell::MotionBinary64 playerY(){return downwell::MotionBinary64::fromInteger(trace);}
+    downwell::MotionBinary64 playerX(){return downwell::MotionBinary64::fromInteger(trace);}
+    void destroy(){++trace;}
     bool create(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& id){trace+=object+x.low+y.low;id=42;return true;}
     bool sprite(unsigned id,int value){trace+=id+value;return true;}
     bool verticalSpeed(unsigned id,downwell::MotionBinary64 value){trace+=id+value.low;return true;}
@@ -463,6 +469,10 @@ struct CorpseCompileEvents {
 unsigned compileDeadBodyCreation(downwell::DeadBodySource& source,downwell::MotionBinary64 impact){
     CorpseCompileEvents events;
     return downwell::createDeadBody(source,206,impact,102,events)?events.trace:0xffffffffu;
+}
+bool compileCorpseLifecycle(downwell::CorpseLifecycle& corpse,unsigned alarm){
+    CorpseCompileEvents events;
+    return corpse.advanceAlarm(alarm,events)&&corpse.collidePlayer(true,false,events);
 }
 #include "core/DebrisDraw.h"
 bool compileDebrisDraw(const downwell::DebrisAnimation& effect,

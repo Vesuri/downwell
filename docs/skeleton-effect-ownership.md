@@ -91,6 +91,19 @@ events/runner, full RNG state, query coordinates, publication order and failures
 Step, collisions, animation, lifetime ownership and live admission remain
 separate work; this test does not establish the world's collision decisions.
 
+`CorpseLifecycle` implements alarms 0–3 and the Knife and Fork player-contact
+event. Alarm 0 completes object-242 Create before assigning its sprite and
+requesting corpse retirement. Alarm 3 activates the corpse; only an active
+corpse, enabled upgrade and living player admit consumption. Consumption
+increments the shared bodies-eaten counter, plays sound 83 (80,0,1, UI), then
+creates five object-223 effects with freshly read player globals (Y before X)
+for each birth, before requesting retirement. These are not object-220 moving
+blood effects. Callback failure invalidates the component and prevents retries
+from duplicating already-completed effects. The scheduler still owns global
+alarm-index order, precise contact admission and actual lifetime removal.
+`verify-corpse-lifecycle` covers successful ordering, gates and failure paths;
+it does not establish live upgrade support.
+
 `DebrisBirth` implements that object-370 Create with four ordered RNG draws,
 custom binary64 motion/rate fields and narrowed builtin animation fields.
 `make verify-debris-birth` pins the input/export/resource/assembly identities
