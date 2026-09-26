@@ -225,6 +225,15 @@ build/smoke-distance-test: tests/core/SmokeDistanceTest.cpp $(wildcard src/core/
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeDistanceTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-smoke-effect
+test: verify-blood-effect
+.PHONY: verify-blood-effect
+verify-blood-effect: build/blood-effect-test
+	./build/blood-effect-test
+
+build/blood-effect-test: tests/core/BloodEffectTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodEffectTest.cpp src/core/GameMakerRandom.cpp
+
 verify-smoke-effect: build/smoke-effect-test
 	./build/smoke-effect-test
 

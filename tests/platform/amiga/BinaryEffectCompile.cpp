@@ -1,4 +1,9 @@
 #include "core/BinaryEffectSurface.h"
+#include "core/BloodEffect.h"
+bool compileBloodEffect(downwell::BloodEffect& effect,downwell::MotionBinary64 x,
+    downwell::MotionBinary64 y,downwell::MotionBinary64 angle,bool timeAllowed) {
+    return effect.create(x,y,angle) && effect.advanceImage() && effect.step(timeAllowed);
+}
 #include "core/PaletteEffectSurface.h"
 bool compilePaletteEffect(downwell::PaletteEffectSurface<>& surface,
     const downwell::PaletteEffectSurface<>::Asset& asset,int x,int y) {
