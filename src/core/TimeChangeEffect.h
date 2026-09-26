@@ -17,8 +17,12 @@ struct TimeChangeEffect {
     // Called in the global alarm phase, in source alarm-index order. A new
     // Begin-Step birth may participate in this phase; a Step birth may not.
     void advanceAlarms(int& roomSpeed){
+        advanceAlarm(0,roomSpeed);advanceAlarm(1,roomSpeed);
+    }
+    void advanceAlarm(unsigned index,int& roomSpeed){
         if(destroyRequested)return;
-        if(AlarmBank::advanceValue(alarm0))flash=false;
+        if(index==0){if(AlarmBank::advanceValue(alarm0))flash=false;return;}
+        if(index!=1)return;
         if(!AlarmBank::advanceValue(alarm1))return;
         if(roomSpeed<60){
             roomSpeed+=5;

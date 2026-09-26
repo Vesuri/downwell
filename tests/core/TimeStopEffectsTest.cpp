@@ -19,7 +19,7 @@ int main(){
         auto emit=[&](Effect effect){
             events.push_back(effect);
             if(effect==Effect::shake){assert(state.shards.size()==3 && rng.drawCount()==24);}
-            if(effect==Effect::change){assert(state.shards.size()==3 || state.shards.size()==9);}
+            if(effect==Effect::change){assert(state.shards.size()==3 || state.shards.size()==9);assert(state.roomSpeed==30 && state.changes.size()>0);}
             if(effect==Effect::enterSound){assert(state.shards.size()==6 && rng.drawCount()==48);}
             if(effect==Effect::exitSound){assert(state.shards.size()==12 && rng.drawCount()==96);}
             return true;
@@ -35,6 +35,10 @@ int main(){
         assert(state.beginStep(true,false,pose,false,rng,field,lookup,audio,emit));
         assert(!state.player.stopped && state.player.bgmOn && lookups==6);
         assert((events==std::vector<Effect>{Effect::change,Effect::resumeMusic,Effect::stopWind,Effect::exitSound,Effect::duckMusic}));
+        assert(state.changes.size()==2);
+        for(unsigned tick=0;tick<8;++tick){const auto phase=state.changes.beginPhase();
+            state.changes.advanceAlarm(phase,0,state.roomSpeed);state.changes.advanceAlarm(phase,1,state.roomSpeed);}
+        assert(state.changes.size()==0 && state.roomSpeed==60);
         const auto stale=state.shards.beginPhase();state.reset();assert(state.shards.size()==0 && !state.player.stopped);
         assert(state.shards.create({}, {},false,rng)>stale.newest);
     }

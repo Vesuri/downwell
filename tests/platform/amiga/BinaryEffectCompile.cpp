@@ -17,6 +17,9 @@
 #include "core/PortableAtan.h"
 #include "core/TimeStopEffects.h"
 bool compileTimeStopEffects(downwell::TimeStopEffects<24>& state,downwell::GameMakerRandom& random,bool hit){
+    const auto phase=state.changes.beginPhase();
+    state.changes.advanceAlarm(phase,0,state.roomSpeed);
+    state.changes.advanceAlarm(phase,1,state.roomSpeed);
     return state.beginStep(true,false,{},false,random,[&](bool& result){result=hit;return true;},
         [](auto,auto,auto& id,auto& x,auto& y){id=1;x={};y={};return true;},
         [](auto){return false;},[](auto){return true;});

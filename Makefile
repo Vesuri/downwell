@@ -247,6 +247,15 @@ build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/
 test: verify-time-stop-bound
 test: verify-player-time-stop
 test: verify-time-change
+test: verify-time-change-effects
+.PHONY: verify-time-change-effects
+verify-time-change-effects: build/time-change-effects-test
+	./build/time-change-effects-test
+
+build/time-change-effects-test: tests/core/TimeChangeEffectsTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/TimeChangeEffectsTest.cpp
+
 test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-motion verify-time-shard-animation verify-time-shard-effects verify-time-shard-burst verify-point-direction
 .PHONY: verify-point-direction
 test: verify-portable-atan
