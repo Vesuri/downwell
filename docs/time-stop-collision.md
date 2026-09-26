@@ -156,8 +156,11 @@ Ancestor-list registration is independent of the depth-sorted Draw list:
 
 Consequently the list branch chooses the oldest registered eligible intersecting
 instance. Birth order is equivalent only while membership remains unchanged;
-rebinding can move an existing instance to the tail. Deactivation/reactivation
-membership behavior needs separate evidence. This result does not determine
+rebinding can move an existing instance to the tail. The
+[activation reconciliation contract](activation-fidelity.md#deferred-membership-reconciliation)
+distinguishes immediate flags from delayed membership changes: completed
+deactivation/reactivation cycles append again, but requests canceled before
+reconciliation need not reorder membership. This result does not determine
 spatial-index ordering or justify using Draw order for identity queries.
 
 The spatial path calls `0x5007f0`, then recursively traverses `0x5006f0` in

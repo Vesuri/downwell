@@ -62,9 +62,37 @@ marking, which removes and prepends an existing entry.
 
 The region predicate activates only when `(flags & 0x100003) == 2` and the
 inside/outside request matches its region result. These immediate routines
-do not themselves call ancestor-list unlink/rebind. Their deferred membership
-processing must be traced before inferring reactivation order for
-`instance_place`; flag changes alone do not prove immediate tail insertion.
+do not themselves call ancestor-list unlink/rebind.
+
+## Deferred membership reconciliation
+
+At `0x510900`, a nonempty pending list triggers room reconciliation `0x48d630`;
+afterward the pending count is cleared. The reconciler does not iterate the
+request array. Its two passes use the room lists and capture the next link
+before moving the current instance:
+
+1. Traverse inactive head `room+0x8c` via instance `+0x14c`. If flag `2` is
+   clear, unlink the instance, decrement inactive count `+0x94`, and insert
+   into active head/tail `+0x80/+0x84`, incrementing count `+0x88`. The insertion
+   searches backward from the active tail, comparing the incoming binary32
+   key `+0x178` with stored keys `+0x17c`; equality inserts after that entry.
+   It copies the key, clears `0x80000`, appends object/ancestor membership via
+   `0x478380`, then calls room integration hook `0x4266e0`.
+2. Traverse the resulting active list. Instances with flag `2` set are
+   unlinked and appended to the inactive tail `+0x90`. The reconciler removes
+   object/ancestor membership via `0x479880`, sets `0x80000`, and calls the same
+   room integration hook. Surviving list order is preserved.
+
+Thus completed deactivate/reconcile/reactivate/reconcile cycles append an
+instance to its object's registration list anew. A deactivate/reactivate pair
+before reconciliation need not move membership at all. Multiple promotions
+append in inactive-list traversal order, not request order. Spatial-index
+effects of the room integration hook require separate tracing.
+
+The frame loop calls Begin Step dispatcher `0x50b7e0(1)` at `0x50dc81`, then
+calls the reconciliation wrapper at `0x50dc89`, after the dispatcher returns.
+Do not flush object memberships after each individual Begin Step handler.
+This establishes that boundary, not every frame/room-transition call site.
 
 ## Evidence and checks
 

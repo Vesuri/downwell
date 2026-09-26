@@ -15,6 +15,10 @@ for start, end, digest in (
     (0x4627d0, 0x46281c, "0ca6095a8151103bf924542f817fd86226f3edbce56733c6faf45d694bc4975e"),
     (0x4633e0, 0x463445, "e8f7c44bc1af35f9f644d3adf261f62d9714daaccc3cd8f64eba9cfdf30f0411"),
     # Constructor -> object binding -> ancestor-inclusive tail insertion.
+    # Deferred reconciliation: room-list order, not pending-request order.
+    (0x48d630, 0x48d873, "aaef6d7b86d7d4c55befd9ec54f2a33d49f7bba4a41e6df923a5d9ede738c676"),
+    (0x510900, 0x510925, "34b773c6ef3f329c07215974a76fe21f9da1595426ba3ccddb92c015e972ffa4"),
+    (0x50dc7f, 0x50dc8e, "f184fab978a5ed06fc93573d2ab00e1d0afe30b2d97f5a91c7f2e6bcf29d3562"),
     (0x46171f, 0x4618ee, "c6449f2c7c86b62c2053956c6c6aaf60d5bc8caf5f545f8c09102fb0e07d733d"),
     (0x46b830, 0x46b8b2, "f69e99dd410a652360766445ca48c817b571a44dc5089db9ada54cd10022b2ea"),
     (0x478380, 0x47841d, "ef7694656f4ae8ac1934fb8d1dfac089f085d12408bd86352ef5ad609758e4a9"),
