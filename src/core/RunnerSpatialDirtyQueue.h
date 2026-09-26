@@ -4,7 +4,7 @@
 namespace downwell {
 // 0x501e50: remove existing membership, then prepend. Slot indices are owned
 // by the instance registry, not resource IDs. Retire membership before reuse.
-// No simulation or callback scheduling is implied by this container.
+// Refresh callbacks bind this container to the instance registry.
 template<unsigned Capacity> class RunnerSpatialDirtyQueue {
     static_assert(Capacity>0,"Dirty queue needs instance slots");
     struct Link {unsigned next=Capacity,previous=Capacity;bool queued=false;};
@@ -34,11 +34,26 @@ public:
     static bool shouldQueue(bool hasObject,std::uint32_t objectFlags,std::uint32_t instanceFlags){
         return hasObject && ((objectFlags&0x28u) || (instanceFlags&0x20u));
     }
-    // Audited sprite-bound path of 0x502ca0 only. Recalculation/fallback mask
-    // handling and source object-flag construction remain scheduler work.
-    static bool shouldUpdateSpriteIndex(std::uint32_t objectFlags,std::uint32_t instanceFlags,bool allPrepared){
-        return !(instanceFlags&0x100003u) && (objectFlags&0x10u) &&
-            (allPrepared || (objectFlags&0x28u) || (instanceFlags&0x20u));
+    static bool shouldRefreshQueued(std::uint32_t instanceFlags){
+        return !(instanceFlags&0x100003u);
+    }
+    // 0x502ca0: inspect flags, refresh, read successor, then unlink. In the
+    // ordinary sprite path refresh MUST calculate bounds with update=1, even
+    // when bit 8 is clear or publication is ineligible. Special resources need
+    // their own refresh/publication path; reject unsupported ones.
+    // Callbacks may reorder other queued slots, but must not retire/reuse the
+    // current slot. New heads are not revisited automatically. On failure the
+    // current membership remains; prior updates are not rolled back. The owner
+    // must latch failure rather than retry a partially mutated simulation.
+    template<class Flags,class Refresh> bool flush(Flags flags,Refresh refresh){
+        unsigned slot=head_;
+        while(slot!=End){
+            if(shouldRefreshQueued(flags(slot)) && !refresh(slot))return false;
+            if(!contains(slot))return false;
+            const unsigned successor=next(slot);
+            remove(slot);slot=successor;
+        }
+        return true;
     }
     // Direct bounds publication (0x5020a0) has no outer dirty-pass skip:
     // membership bit 0x8000 bypasses the 0x100003 exclusion.

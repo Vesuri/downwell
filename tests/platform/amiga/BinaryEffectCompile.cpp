@@ -78,6 +78,14 @@ bool compileRunnerSpatialBoundsUpdate(downwell::RunnerSpatialIndex<256>& index,d
 bool compileRunnerSpatialDirtyQueue(downwell::RunnerSpatialDirtyQueue<256>& queue,unsigned slot){
     return queue.mark(slot)&&queue.remove(slot);
 }
+bool compileRunnerSpatialFlush(downwell::RunnerSpatialDirtyQueue<256>& queue,
+    downwell::RunnerSpatialIndex<256>& index,std::uint32_t* flags,
+    downwell::RunnerSpatialSplit::Box* boxes){
+    return queue.flush([&](unsigned i){return flags[i];},[&](unsigned i){
+        return downwell::RunnerSpatialBoundsUpdate::finishRefresh(index,i,0x30,
+            flags[i],false,boxes[i],&boxes[i],{}, {},false,true);
+    });
+}
 bool compileRunnerSpatialIndex(downwell::RunnerSpatialIndex<256>& index,downwell::RunnerSpatialSplit::Box box,unsigned id,unsigned& found){
     return index.insert(box,id)&&index.query(box,[&](unsigned hit){found=hit;return false;});
 }

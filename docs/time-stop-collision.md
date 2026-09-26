@@ -377,9 +377,13 @@ failed removal using the entire root's bounds, rather than only the supplied
 old bounds.
 
 Dirty processing `0x502ca0` walks the intrusive list rooted at `0x8a6100`.
-For the audited eligible sprite-bound path it saves old bounds, recalculates
-current bounds, removes an already indexed instance with retry enabled, and
-inserts its new bounds at level zero. It then unlinks the dirty-list entry.
+It skips entries with instance flags `0x100003`. When `0x46bff0` returns null,
+it calls `0x466010(update=1)` unconditionally: neither bounds-dirty bit `0x08`
+nor publication eligibility gates this recalculation. The bounds routine owns
+missing-resource handling and publication. The non-null resource path saves old
+bounds, calls `0x59ea10` (falling back to `0x466010` on failure), then separately
+publishes eligible bounds. These paths must not be conflated.
+After refresh it reads the next dirty node, then unlinks the current entry.
 Thus movement is not simply an in-place bounding-box update. Object-flag
 construction and all mutation callers still require integration evidence before
 reproducing a whole encounter's tree history.
@@ -428,13 +432,15 @@ deduplicating without reordering or using FIFO would change update order.
 It then calls `0x501ef0`, which separately maintains the `0x8a60f4` list for
 object flag `0x08`. These are two distinct intrusive memberships.
 
-On the audited sprite-bound update path, `0x502ca0` skips instance flags
-`0x100003`. Index update additionally requires object flag `0x10` and at least
-one of global `0xb57c98`, object flags `0x28`, or instance flag `0x20`.
-The generic sprite/mask fallback must not be inferred from this path alone.
-`RunnerSpatialDirtyQueue` supplies the slot-based move-to-front membership
-and these two eligibility predicates. Retire membership before reusing a slot;
-the scheduler still owns mutation hooks, bounds refresh and the separate list.
+`RunnerSpatialDirtyQueue::flush` preserves that outer skip and callback/unlink
+order, including refreshing clean queued instances. Its callback must dispatch
+the appropriate resource path or fail for unsupported resources. Publication
+eligibility is not a refresh predicate. A callback may reorder other entries;
+nodes prepended ahead of the current entry remain pending for a later flush.
+The current slot must stay alive and queued throughout its refresh. A failure
+leaves that entry queued without rolling back earlier publications, so callers
+must latch failure. Retire membership before reusing a slot; the scheduler still
+owns mutation hooks, resource dispatch and the separate collision list.
 
 Direct bounds publication has a different gate. The tail of `0x466010` clears
 instance bounds-dirty flag `0x08`, then calls `0x5020a0` only when its update

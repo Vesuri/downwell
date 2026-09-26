@@ -67,6 +67,57 @@ int main(){
         assert(dirty==0);
     }
     using Queue=downwell::RunnerSpatialDirtyQueue<16>;
+    {
+        Queue pending;
+        std::uint32_t flags[6]={0,8,1,2,0x100000,0x8000};
+        for(unsigned i=6;i-->0;)assert(pending.mark(i));
+        std::vector<unsigned> refreshed;
+        assert(pending.flush([&](unsigned i){return flags[i];},[&](unsigned i){
+            assert(pending.contains(i));refreshed.push_back(i);return true;
+        }));
+        assert((refreshed==std::vector<unsigned>{0,1,5}) && pending.size()==0);
+        // Read next after refresh, not before. Moving 1 ahead of the current
+        // entry leaves it for the next flush; the original successor becomes 2.
+        assert(pending.mark(2)&&pending.mark(1)&&pending.mark(0));
+        refreshed.clear();
+        assert(pending.flush([](unsigned){return 0u;},[&](unsigned i){
+            refreshed.push_back(i);if(i==0)assert(pending.mark(1));return true;
+        }));
+        assert((refreshed==std::vector<unsigned>{0,2}));
+        assert(pending.size()==1 && pending.first()==1);
+        assert(pending.mark(0));refreshed.clear();
+        assert(!pending.flush([](unsigned){return 0u;},[&](unsigned i){
+            refreshed.push_back(i);return i!=1;
+        }));
+        assert((refreshed==std::vector<unsigned>{0,1}));
+        assert(pending.size()==1 && pending.first()==1);
+        pending.clear();
+        assert(pending.flush([](unsigned){assert(false);return 0u;},
+            [](unsigned){assert(false);return false;}));
+        // Clean entries still refresh and republish unchanged bounds. Removing
+        // and appending changes first-hit order even though geometry is equal.
+        downwell::RunnerSpatialIndex<8> tree;
+        using Update=downwell::RunnerSpatialBoundsUpdate;
+        Update::Box boxes[3]={};std::uint32_t indexed[3]={};
+        for(unsigned i=0;i<3;++i)
+            assert(Update::publish(tree,i,0x30,indexed[i],false,{},{}));
+        assert(pending.mark(0));
+        assert(pending.flush([&](unsigned i){return indexed[i];},[&](unsigned i){
+            return Update::finishRefresh(tree,i,0x30,indexed[i],false,boxes[i],
+                &boxes[i],{}, {},false,true);
+        }));
+        std::vector<unsigned> hits;
+        assert(tree.query({},[&](unsigned i){hits.push_back(i);return true;}));
+        assert((hits==std::vector<unsigned>{2,1,0}));
+        // No publication eligibility: refresh still clears the dirty bit and
+        // resolves missing-resource bounds instead of silently skipping it.
+        indexed[1]=8;assert(pending.mark(1));
+        assert(pending.flush([&](unsigned i){return indexed[i];},[&](unsigned i){
+            return Update::finishRefresh(tree,i,0,indexed[i],false,boxes[i],
+                nullptr,{0x3f800000},{},false,true);
+        }));
+        assert(indexed[1]==0 && boxes[1].left.bits==0x3f800000);
+    }
     Queue queue;std::vector<unsigned> expected;
     auto check=[&](){
         assert(queue.size()==expected.size());unsigned slot=queue.first();
@@ -97,9 +148,8 @@ int main(){
         assert(Queue::shouldQueue(true,object,instance)==queueExpected);
         for(bool all:{false,true})for(unsigned extra:{0u,0x100000u,0x8000u,0x80000u}){
             unsigned flags=instance|extra;
-            bool update=!(flags&1)&&!(flags&2)&&!(flags&0x100000)&&bool(object&16)&&
-                (all||bool(object&8)||bool(object&32)||bool(flags&32));
-            assert(Queue::shouldUpdateSpriteIndex(object,flags,all)==update);
+            bool refresh=!(flags&1)&&!(flags&2)&&!(flags&0x100000);
+            assert(Queue::shouldRefreshQueued(flags)==refresh);
             bool publish=(bool(flags&0x8000)||(!(flags&1)&&!(flags&2)&&!(flags&0x100000)))&&bool(object&16)&&
                 (all||bool(object&8)||bool(object&32)||bool(flags&32));
             assert(Queue::shouldPublishBounds(object,flags,all)==publish);
@@ -111,7 +161,7 @@ int main(){
     for(unsigned id=0;id<3;++id)assert(Update::publish(index,id,0x30,flags[id],false,{},{}));
     for(auto flag:flags)assert(flag==0x8000);
     flags[0]|=0x100003;
-    assert(!Queue::shouldUpdateSpriteIndex(0x30,flags[0],false));
+    assert(!Queue::shouldRefreshQueued(flags[0]));
     assert(Update::publish(index,0,0x30,flags[0],false,{},{}));
     unsigned order[]={2,1,0},cursor=0;
     assert(index.query({},[&](unsigned id){assert(id==order[cursor++]);return true;}));assert(cursor==3);
