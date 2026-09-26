@@ -37,6 +37,11 @@ throughout integration, not only after content is complete.
   and parent-time-field queries to both world schedulers before activating blood
   dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
   nor shop control-lock is a substitute for this state.
+- Finish time-shard alarms, contact, motion, animation and burst ownership;
+  integrate time-change pacing and transition audio with the live schedulers.
+  Preserve the source distinction between paused gravity/animation and moving
+  shards, and the separate alarm cooldown rules. Create-only helpers do not
+  complete these lifecycles.
 - Register skeletons and owned bones in shared gameplay. Connect animation,
   alarms, Step, collision and End Step, player/bullet damage, rewards, capacity
   failure, out-of-view retirement and both renderers.
