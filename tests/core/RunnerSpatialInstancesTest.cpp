@@ -24,6 +24,24 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    {
+        Owner sprites;InstanceHandle h{0,1};Owner::State clean;clean.flags=0;
+        assert(sprites.attach(h,1,clean));
+        Owner::Sprite sprite;sprite.spriteId=208;sprite.imageIndex={0x40800000u};
+        Owner::Real timeline{0x40800000u},cached{0x40000000u};
+        assert(sprites.changeSprite(h,sprite,timeline,cached,208,6,0x38));
+        assert(!sprites.pendingSpatial()&&!sprites.pendingCollision()&&sprites.resolve(h)->flags==0);
+        assert(cached.bits==0x40000000u&&timeline.bits==0x40800000u);
+        assert(sprites.applyBindingProperties(h,0x96,false,[&](InstanceHandle live){
+            return sprites.changeSprite(live,sprite,timeline,cached,205,1,0x96);
+        }));
+        assert(sprite.spriteId==205&&!sprite.imageIndex.bits&&!timeline.bits&&cached.bits==0xbf800000u);
+        assert(!sprites.pendingSpatial()&&(sprites.resolve(h)->flags&8u));
+        sprite.imageIndex={0xbe800000u};timeline={0x40000000u};
+        assert(sprites.changeSprite(h,sprite,timeline,cached,-1,0,0x38));
+        assert(!sprite.imageIndex.bits&&timeline.bits==0x40000000u);
+        assert(sprites.pendingSpatial()==1&&sprites.pendingCollision()==1);
+    }
     // Source object-property ordering, independently enumerated over all low
     // flag bits and both global preparation modes. Sprite callback inspects the
     // intermediate state; final dirty/managed flags must not be applied early.

@@ -9,6 +9,7 @@
 #include "RunnerSpriteBounds.h"
 #include "SpriteCollisionPack.h"
 #include "RunnerMaskPair.h"
+#include "RunnerSpriteChange.h"
 namespace downwell {
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,
@@ -133,6 +134,23 @@ public:
         auto& s=entries_[h.slot].state;
         return checked(RunnerSpatialPosition::assign(h.slot,s.x,s.y,s.flags,x,y,
             s.special,true,objectFlags,spatial_,collision_));
+    }
+    // Caller resolves the verified ordinary/unit-track frame count (zero for
+    // missing/empty resources). Cached frame is runner offset 0x180; timeline
+    // is 0x88, distinct from image_index. Special sprite ownership is unsupported.
+    bool changeSprite(InstanceHandle h,Sprite& sprite,Real& timeline,Real& cachedFrame,
+                      int next,unsigned frames,std::uint32_t objectFlags){
+        if(!valid()||!live(h))return false;
+        if(sprite.spriteId==next)return true;
+        if(entries_[h.slot].state.special)return checked(false);
+        RunnerSpriteChange::Result change;
+        if(!checked(RunnerSpriteChange::plan(sprite.spriteId,next,sprite.imageIndex,frames,change)))return false;
+        sprite.spriteId=next;cachedFrame={0xbf800000u};
+        if(change.resetIndex)sprite.imageIndex={};
+        if(change.resetTimeline)timeline={};
+        entries_[h.slot].state.flags|=8u;
+        markSpatialChange(h.slot,objectFlags);
+        return true;
     }
     bool refresh(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
         const Box* bounds,bool precise,bool publish){

@@ -558,7 +558,7 @@ build/skeleton-decisions-test: tests/core/SkeletonDecisionsTest.cpp src/core/Ske
 verify-skeleton-animation: build/skeleton-animation-test
 	./build/skeleton-animation-test
 
-build/skeleton-animation-test: tests/core/SkeletonAnimationTest.cpp src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/UnitSequenceFrames.h src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h src/core/AlarmBank.h
+build/skeleton-animation-test: tests/core/SkeletonAnimationTest.cpp src/core/RunnerSpriteChange.h src/core/SkeletonAnimation.h src/core/SkeletonTiming.h src/core/UnitSequenceFrames.h src/core/SequenceTimeline.h src/core/RunnerImageValue.h src/core/MotionBinary64.h src/core/AlarmBank.h
 	@mkdir -p build
 	$(CXX) $(CXXFLAGS) -ffp-contract=off -Isrc -o $@ tests/core/SkeletonAnimationTest.cpp
 

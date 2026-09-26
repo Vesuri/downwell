@@ -190,6 +190,20 @@ unit frame track, resets sequence position to zero. Otherwise it preserves
 the index. The normal-sprite branch of helper `0x46bff0` does not allocate
 the special skeletal-sprite state.
 
+`RunnerSpriteChange` shares the ordinary/unit-track reset decision with
+`SkeletonAnimation` and `RunnerSpatialInstances::changeSprite`. The collision
+owner installs the new ID, invalidates cached frame `0x180` to -1, applies index/
+timeline resets, and marks bounds plus eligible dirty queues. Same-ID assignments
+perform none of these operations. Missing/empty resources use frame count zero:
+indices in `(-1,0)` truncate to zero and reset, but their sequence position is
+retained because no positive-length track exists. A failed decision leaves the
+sprite fields unchanged and invalidates the collision owner. The admitted domain
+is normal/zero binary32 indices convertible to signed 32-bit integers and counts
+through 65,535; unsupported FP conversions and special sprite state are not
+silently approximated. Callers must resolve resource/frame metadata correctly.
+Tests combine this setter with object-property updates and queue publication;
+production resource ownership and live collision installation remain unfinished.
+
 Skeleton VM events write only image index zero. The new component reconciles
 that write at the next animation phase using the recovered difference
 threshold. If a shorter sprite has left the old sequence position outside

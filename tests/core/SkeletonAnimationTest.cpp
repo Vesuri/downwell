@@ -9,6 +9,30 @@ static bool same(downwell::MotionBinary64 v, double expected) {
     return v.high == std::uint32_t(raw>>32) && v.low == std::uint32_t(raw);
 }
 int main() {
+    unsigned changes=0;
+    for(unsigned frames:{0u,1u,6u,8u,65535u})for(int eighth=-1024;eighth<=2048;++eighth){
+        const float value=float(eighth)/8;
+        downwell::RunnerImageValue index;std::memcpy(&index.bits,&value,4);
+        for(bool sameId:{false,true}){
+            downwell::RunnerSpriteChange::Result result{true,true,true};
+            check(downwell::RunnerSpriteChange::plan(1,sameId?1:2,index,frames,result));
+            const bool reset=!sameId&&int(value)>=int(frames);
+            check(result.changed==!sameId&&result.resetIndex==reset&&result.resetTimeline==(reset&&frames!=0));
+            ++changes;
+        }
+    }
+    for(auto bits:{0x80000000u,0xcf000000u,0x4effffffu}){
+        float value;std::memcpy(&value,&bits,4);
+        downwell::RunnerSpriteChange::Result result;
+        check(downwell::RunnerSpriteChange::plan(1,2,{bits},0,result));
+        check(result.resetIndex==(int(value)>=0)&&!result.resetTimeline);
+    }
+    for(auto bits:{1u,0x7f800000u,0x7fc00000u,0x4f000000u,0xcf000001u}){
+        downwell::RunnerSpriteChange::Result result{false,true,true};
+        check(!downwell::RunnerSpriteChange::plan(1,2,{bits},6,result));
+        check(!result.changed&&result.resetIndex&&result.resetTimeline);
+        check(downwell::RunnerSpriteChange::plan(1,1,{bits},6,result)&&!result.changed);
+    }
     unsigned updates = 0;
     for (unsigned seed = 0; seed < 64; ++seed) {
         downwell::SkeletonAnimation actual;
@@ -52,4 +76,5 @@ int main() {
     check(!rejected.advanceImage(crossed) && crossed && rejected.timeline.bits == 0);
     check(!rejected.setSprite(460) && rejected.sprite == 208);
     std::printf("Skeleton animation: %u reset/sprite/time-stop updates match scalar sequence model\n",updates);
+    std::printf("Shared sprite changes: %u signed-index, empty-track and same-ID comparisons passed\n",changes);
 }

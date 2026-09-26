@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_SKELETON_ANIMATION_H
 #include "SkeletonTiming.h"
 #include "UnitSequenceFrames.h"
+#include "RunnerSpriteChange.h"
 namespace downwell {
 // Animation ownership for the recovered skeleton's idle/throw/hit sprites.
 // Skeleton events only write image_index=0; arbitrary nonzero GML writes are
@@ -16,13 +17,11 @@ struct SkeletonAnimation : SkeletonTiming {
         const unsigned count = frames(next);
         if (!count) return false;
         if (next == sprite) return true;
-        RunnerImageValue index, bound;
-        if (!index.assign(imageIndex) || !bound.assign(MotionBinary64::fromInteger(count))) return false;
-        // For a nonnegative frame and integer count, truncated-index >= count
-        // is equivalent to this float comparison. Negative frames are retained.
-        if (!(index.bits & 0x80000000u) && index.bits >= bound.bits) {
-            imageIndex = {}; timeline = {};
-        }
+        RunnerImageValue index;
+        RunnerSpriteChange::Result change;
+        if (!index.assign(imageIndex) || !RunnerSpriteChange::plan(sprite,next,index,count,change)) return false;
+        if(change.resetIndex)imageIndex={};
+        if(change.resetTimeline)timeline={};
         sprite = next;
         return true;
     }
