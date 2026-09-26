@@ -142,6 +142,17 @@ test: verify-corpse-birth
 test: verify-corpse-lifecycle
 test: verify-corpse-motion
 test: verify-out-of-view-lifetime
+test: verify-corpse-creation-integration
+
+.PHONY: verify-corpse-creation-integration
+verify-corpse-creation-integration: build/corpse-creation-integration-test
+	python3 tools/verify-dead-body-creation.py
+	python3 tools/verify-debris-create.py
+	./build/corpse-creation-integration-test
+
+build/corpse-creation-integration-test: tests/core/CorpseCreationIntegrationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/CorpseCreationIntegrationTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-out-of-view-lifetime
 verify-out-of-view-lifetime: build/out-of-view-lifetime-test

@@ -127,6 +127,14 @@ collision events for parentPBullet and subparentEnemy are empty and pinned as
 such. Do not add hit reactions to those event bodies. The opposing object's
 collision event can still mutate the corpse through the shared instance system.
 
+`verify-corpse-creation-integration` connects the wrapper, actual corpse Create
+and the two following debris Creates on one RNG stream. Across 3,840 chains it
+checks full RNG state after relocation and each debris birth, retained corpse
+animation speed, post-Create overrides, caller speed mutation, and debris at the
+unchanged caller position. Failed terrain admission must prevent all wrapper
+setters. Its terrain and sprite-setter adapters are controlled test doubles;
+this does not replace live spatial membership or render/animation verification.
+
 `DebrisBirth` implements that object-370 Create with four ordered RNG draws,
 custom binary64 motion/rate fields and narrowed builtin animation fields.
 `make verify-debris-birth` pins the input/export/resource/assembly identities
