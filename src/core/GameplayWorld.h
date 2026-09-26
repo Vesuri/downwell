@@ -97,6 +97,8 @@ public:
         downwell::MachineGunTrajectory trajectory;
     };
     struct EnemyState {
+        // Family-local lifetime key; never a recovered Windows instance ID.
+        std::uint32_t lifetimeId = 0;
         int objectId;
         int spriteId;
         int x;
@@ -146,6 +148,7 @@ public:
         }
     };
     struct GemState {
+        std::uint32_t lifetimeId = 0;
         downwell::GemMotion motion;
         int x;
         int y;
@@ -275,6 +278,12 @@ public:
         return nullptr;
     }
     const EnemyState& enemyAt(unsigned index) const;
+    const EnemyState* findEnemy(std::uint32_t lifetimeId) const {
+        if(lifetimeId)for(unsigned i=0;i<enemyCount_;++i)
+            if((enemies_[i].active || enemies_[i].activationPending) &&
+               enemies_[i].lifetimeId==lifetimeId)return &enemies_[i];
+        return nullptr;
+    }
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const downwell::SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
@@ -289,6 +298,11 @@ public:
     unsigned enemiesDefeated() const { return enemiesDefeated_; }
     unsigned gemCount() const;
     const GemState& gemAt(unsigned index) const;
+    const GemState* findGem(std::uint32_t lifetimeId) const {
+        if(lifetimeId)for(unsigned i=0;i<gemSlotEnd_;++i)
+            if(gems_[i].active && gems_[i].lifetimeId==lifetimeId)return &gems_[i];
+        return nullptr;
+    }
     unsigned currency() const { return currencyAccount_.currency; }
     unsigned gameGemTotal() const { return currencyAccount_.gameGem; }
     unsigned gemStreak() const { return currencyAccount_.streak; }
@@ -413,6 +427,7 @@ private:
     int activationY_;
     BulletState bullets_[bulletCapacity];
     std::uint32_t nextBulletLifetimeId_ = 1;
+    std::uint32_t nextEnemyLifetimeId_ = 1, nextGemLifetimeId_ = 1;
     unsigned bulletSlotEnd_ = 0, gemSlotEnd_ = 0;
     EnemyState enemies_[enemyCapacity];
     GemState gems_[gemCapacity];

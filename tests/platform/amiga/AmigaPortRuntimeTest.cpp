@@ -979,6 +979,44 @@ int main() {
     require(!distantBat.enemyAt(0).active &&
                 distantBat.enemyAt(0).activationPending,
             "off-screen bat remains dormant until the camera reaches it");
+    const auto dormantIdentity = distantBat.enemyAt(0).lifetimeId;
+    require(dormantIdentity && distantBat.findEnemy(dormantIdentity) == &distantBat.enemyAt(0) &&
+                !distantBat.findEnemy(0), "pending activation retains a resolvable lifetime");
+    require(distantBat.configureEnemy(0, 116, 153, 40, 500, 0, 0, 15, 12) &&
+                distantBat.enemyAt(0).lifetimeId > dormantIdentity &&
+                !distantBat.findEnemy(dormantIdentity),
+            "explicit enemy replacement retires the old key even at the same slot");
+
+    {
+        AmigaPortRuntime identities(300);
+        std::uint32_t previousEnemy = 0, previousGem = 0;
+        for (unsigned cycle = 0; cycle < 32; ++cycle) {
+            require(identities.configureEnemy(0, 111, 163, 0, 5, 0, 0, 5, 6),
+                "configure identity lifecycle encounter");
+            const auto enemyKey = identities.enemyAt(0).lifetimeId;
+            require(enemyKey > previousEnemy && identities.findEnemy(enemyKey) &&
+                !identities.findEnemy(previousEnemy), "enemy keys cannot alias across Retry");
+            identities.step(0);
+            require(!identities.findEnemy(enemyKey) && identities.gemCount() == 3,
+                "natural stomp retires enemy identity and creates reward identities");
+            std::uint32_t keys[3];
+            for (unsigned i = 0; i < 3; ++i) {
+                keys[i] = identities.gemAt(i).lifetimeId;
+                require(keys[i] > previousGem &&
+                    identities.findGem(keys[i]) == &identities.gemAt(i),
+                    "reward identities are distinct and resolvable");
+                previousGem = keys[i];
+            }
+            require(!identities.findGem(0), "zero is not a gem lifetime");
+            for (unsigned frame = 0; frame < 120 && identities.gemCount(); ++frame)
+                identities.step(0);
+            require(identities.currency() == 6 && !identities.gemCount(),
+                "identity encounter collects all physical gems");
+            for (auto key : keys) require(!identities.findGem(key), "collection retires gem key");
+            previousEnemy = enemyKey;
+            identities.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 42, 300);
+        }
+    }
 
     AmigaPortRuntime stomp(300);
     require(stomp.configureEnemy(0, 111, 163, 0, 5,

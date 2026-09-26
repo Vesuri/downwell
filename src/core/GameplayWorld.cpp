@@ -37,9 +37,13 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (destination == downwell::ResultsDestination::none) return destination;
     const auto records = run_.records();
     const auto nextBulletIdentity=nextBulletLifetimeId_;
+    const auto nextEnemyIdentity=nextEnemyLifetimeId_;
+    const auto nextGemIdentity=nextGemLifetimeId_;
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true);
     nextBulletLifetimeId_=nextBulletIdentity;
+    nextEnemyLifetimeId_=nextEnemyIdentity;
+    nextGemLifetimeId_=nextGemIdentity;
     run_.restart(action, records);
     enemyRandom_.setSeed(seed);
     return destination;
@@ -164,9 +168,21 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
 void GameplayWorld::spawnReward(const EnemyState& enemy, bool attracted)
 {
     unsigned next = downwell::compactCurrencySlots(gems_, gemSlotEnd_);
+    unsigned available = gemCapacity - next;
+    // Exhausted keys cannot alias a retired lifetime. Bound births before
+    // Create consumes RNG, just as for exhausted storage capacity.
+    const std::uint32_t identities = nextGemLifetimeId_ ?
+        0xffffffffu - nextGemLifetimeId_ + 1u : 0u;
+    if (identities < available) {
+        available = identities;
+        const unsigned births = enemy.reward > 0 ?
+            unsigned(enemy.reward / 10 + (enemy.reward % 10 + 1) / 2) : 0;
+        if (births > available) run_.effectsSucceeded = false;
+    }
     downwell::spawnCurrencyReward(enemy.reward, enemy.x, enemy.y, attracted,
-        gemCapacity - next, enemyRandom_, [this, &enemy, attracted, &next](const downwell::CurrencyBirth& birth) {
+        available, enemyRandom_, [this, &enemy, attracted, &next](const downwell::CurrencyBirth& birth) {
         GemState& gem = gems_[next++];
+        gem.lifetimeId = nextGemLifetimeId_++;
         gem.large = birth.large;
         gem.amount = birth.amount;
         gem.age = 0;
@@ -209,7 +225,12 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
 {
     if (index >= enemyCapacity)
         return false;
+    if (!nextEnemyLifetimeId_) {
+        run_.effectsSucceeded = false;
+        return false;
+    }
     EnemyState& enemy = enemies_[index];
+    enemy.lifetimeId = nextEnemyLifetimeId_++;
     enemy.objectId = objectId;
     enemy.spriteId = spriteId;
     enemy.x = x;
