@@ -7,6 +7,28 @@ static void require(bool ok, const char* why) {
 int main() {
     using namespace downwell;
     {
+        RunSession fields;GameMakerRandom actual(42),expected(42);
+        struct Camera {void setLevelExit(int){}} camera;
+        require(fields.adoptTimeField(240,800,1) && fields.adoptTimeField(240,900,2),"fields before exit birth");
+        fields.createLevelExit(480,2000,actual,camera);
+        expected.nextU32(); // Goal Create.
+        require(fields.goalFieldBirthBoundary==2,"goal records its exact creation boundary");
+        require(fields.adoptTimeField(240,1000,3),"field after exit birth");
+        fields.gameplayPresentationStep(actual);
+        require(fields.timeFields.at(2)->radius.equal(OrdinaryTimeField::nextRadius(expected)),"new field draws first");
+        require(fields.goalField.radius.equal(GoalTimeField::nextRadius(expected)),"exit draws at birth boundary");
+        require(fields.timeFields.at(1)->radius.equal(OrdinaryTimeField::nextRadius(expected)) &&
+            fields.timeFields.at(0)->radius.equal(OrdinaryTimeField::nextRadius(expected)),"older fields draw newest first");
+        require(actual.drawCount()==expected.drawCount() && actual.stateIndex()==expected.stateIndex(),"live field Draw cursor");
+        for(unsigned i=0;i<16;++i)require(actual.stateWord(i)==expected.stateWord(i),"live field full RNG state");
+        const auto count=actual.drawCount();
+        fields.gameplayPresentationStep(actual,true);
+        require(actual.drawCount()==count,"explicit pTimeStop freezes all field Draw sampling");
+        fields.goalStopped=true;
+        fields.gameplayPresentationStep(actual,false);
+        require(actual.drawCount()==count+4,"goal stop is not a substitute for pTimeStop");
+    }
+    {
         RunSession fields;
         for(unsigned i=0;i<64;++i)require(fields.adoptTimeField(240,int(i),i),"field capacity fixture");
         require(!fields.adoptTimeField(240,65,65) && !fields.effectsSucceeded && fields.timeFields.size()==64,

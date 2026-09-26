@@ -135,6 +135,7 @@ struct RunSession {
     }
     LevelExit levelExit;
     GoalTimeField goalField;
+    unsigned goalFieldBirthBoundary = 0;
     bool levelExitPresent = false;
     // Shared field adapter. Callers choose the source event's position: clock
     // checks use old published x/y; transitions use private xx/yy. Never merge
@@ -175,7 +176,10 @@ struct RunSession {
     // One logical Draw phase per gameplay update, not per renderer repaint.
     // The source consumes field RNG even outside its camera drawing bounds.
     void gameplayPresentationStep(GameMakerRandom& random, bool timeStopped = false) {
-        if (levelExitPresent) goalField.advanceDraw(timeStopped, random);
+        if (effectsSucceeded)
+            effectsSucceeded = timeFields.advanceDraw(timeStopped, random,
+                levelExitPresent, goalFieldBirthBoundary,
+                [&] { goalField.advanceDraw(timeStopped, random); });
         results.presentationStep();
     }
 
@@ -256,7 +260,10 @@ struct RunSession {
         exitDither = {};
         levelExit.create(roomWidth, y, [&](LevelExit::Effect effect, int x, int childY) {
             if (effect == LevelExit::Effect::roomEndSetter) camera.setLevelExit(childY);
-            else if (effect == LevelExit::Effect::goalTimeField) goalField.create(x, childY, random);
+            else if (effect == LevelExit::Effect::goalTimeField) {
+                goalFieldBirthBoundary = timeFields.size();
+                goalField.create(x, childY, random);
+            }
         });
         levelExitPresent = true;
     }
@@ -287,6 +294,7 @@ struct RunSession {
         gemHigh = false;
         levelExit = {};
         goalField = {};
+        goalFieldBirthBoundary = 0;
         levelExitPresent = false;
         goalStopped = exitControlsLocked = false;
         exitDitherRequested = levelResultRequested = false;

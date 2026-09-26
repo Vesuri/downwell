@@ -38,8 +38,9 @@ throughout integration, not only after content is complete.
   dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
   nor shop control-lock is a substitute for this state.
 - Add Timeout-damage creation of ordinary object-82 time fields. Integrate
-  precise sprite-597 masks, Draw RNG, field lookup ordering and rendering for
-  all ordinary fields alongside exit fields;
+  precise sprite-597 masks, field lookup ordering and rendering for
+  all ordinary fields alongside exit fields. Complete Draw scheduling across
+  other object families and live time-stop/activation state;
   querying only the exit field does not cover `parentTimeField`.
 - Integrate the shared time-shard lifecycle, animation, burst and time-change
   owners with both live schedulers. Finish fractional player/shard time-field
@@ -182,6 +183,10 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
+- Re-establish the deterministic seed-4 second-level shop approach after
+  ordinary-field Draw RNG integration. Preserve natural counter interaction,
+  purchase/insufficient-funds checks, return-camera assertions and bounded
+  native raster verification; update timing checkpoints only from verified runs.
 - Cover naturally funded purchases, all shop/side-room layouts and camera
   transitions, dense combat, uncommon upgrade combinations and repeated runs.
 - Compare new behavior through deterministic host/native replays, including
