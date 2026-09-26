@@ -158,6 +158,23 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     if (builderPatternPath != nullptr)
         require(patterns != nullptr, "generated builder-pattern pack is valid");
 
+    if (objects != nullptr) {
+        auto cached = std::make_unique<downwell::StartupRuntime>(
+            downwell::PlatformProfile::nonDesktop, &pack, objects,
+            downwell::StartupRuntime::defaultRandomSeed, patterns);
+        std::array<std::uint64_t,180> checkpoints{};
+        for (unsigned i=0;i<checkpoints.size();++i) {
+            cached->step(i%32==0);
+            checkpoints[i]=cached->stateDigest();
+        }
+        cached->reset(downwell::PlatformProfile::nonDesktop);
+        for (unsigned i=0;i<checkpoints.size();++i) {
+            cached->step(i%32==0);
+            require(cached->stateDigest()==checkpoints[i],
+                    "alarm binding cache reset preserves complete deterministic startup state");
+        }
+    }
+
     downwell::StartupRuntime runtime(
         downwell::PlatformProfile::nonDesktop, &pack, objects,
         downwell::StartupRuntime::defaultRandomSeed, patterns);

@@ -93,6 +93,10 @@ make test
 make run
 ```
 
+The host build uses `-O2` with debug symbols and floating-point contraction
+disabled (no fast-math). For instruction-by-instruction debugging, use
+`make HOST_OPT=-O0`. Changing this option automatically rebuilds the SDL objects.
+
 The native player/scroll slice also has a real host-versus-emulated-A500 replay
 gate. With the Amiga toolchain and FS-UAE installed, run
 `make verify-cross-replay`; both targets must produce the pinned 64-frame

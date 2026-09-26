@@ -20,7 +20,8 @@ endif
 ifeq ($(SKIP_LEVEL),1)
 CPPFLAGS += -DDOWNWELL_SKIP_LEVEL
 endif
-CXXFLAGS := -std=c++17 -g -O0 -Wall -Wextra -Wpedantic -MMD -MP
+HOST_OPT ?= -O2
+CXXFLAGS := -std=c++17 -g $(HOST_OPT) -ffp-contract=off -Wall -Wextra -Wpedantic -MMD -MP
 LDFLAGS  := $(SDL_LDFLAGS)
 
 SOURCES := \
@@ -1247,7 +1248,7 @@ test-ammo-dividers: build/ammo-dividers-test
 
 build/startup-options: FORCE_STARTUP_OPTIONS
 	@mkdir -p build
-	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' > $@.tmp
+	@printf '%s\n' '$(SKIP_INTRO)' '$(SKIP_TO_GAME)' '$(SKIP_LEVEL)' '$(CXXFLAGS)' > $@.tmp
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): build/startup-options

@@ -369,6 +369,10 @@ private:
     InstanceStore<instanceCapacity> instances_;
     const RoomPack* roomPack_ = nullptr;
     const ObjectPack* objectPack_ = nullptr;
+    // Object event bindings are immutable. Cache inherited alarm masks, not
+    // per-instance alarm values; IDs outside this cache use normal lookup.
+    std::array<std::int16_t,512> alarmEventMasks_{};
+    static_assert(AlarmBank::count < 16, "Alarm cache reserves negative values for misses");
     const BuilderPatternPack* builderPatternPack_ = nullptr;
     std::uint32_t randomSeed_ = defaultRandomSeed;
     GameMakerRandom random_;

@@ -84,6 +84,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
                                  ? roomPack_->nextRuntimeInstanceId()
                                  : 105186;
     deferredCommandsSucceeded_ = true;
+    alarmEventMasks_.fill(-1);
     inputLeft_ = false;
     inputRight_ = false;
     inputLeftPressed_ = false;
@@ -355,6 +356,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
             return instance.objectId == 36
                        ? static_cast<AlarmBank::FiredMask>(1U << 0)
                        : static_cast<AlarmBank::FiredMask>(0);
+        const bool cached = instance.objectId >= 0 &&
+            static_cast<std::size_t>(instance.objectId) < alarmEventMasks_.size();
+        if (cached && alarmEventMasks_[instance.objectId] >= 0)
+            return static_cast<AlarmBank::FiredMask>(alarmEventMasks_[instance.objectId]);
         AlarmBank::FiredMask mask = 0;
         PackedObjectEvent event;
         for (std::int32_t alarm = 0;
@@ -363,6 +368,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
             if (objectPack_->findEvent(instance.objectId, 2, alarm, event))
                 mask |= static_cast<AlarmBank::FiredMask>(1U << alarm);
         }
+        if (cached) alarmEventMasks_[instance.objectId] = static_cast<std::int16_t>(mask);
         return mask;
     };
     const auto handler = [this, advancePressed](InstanceRecord& instance,
