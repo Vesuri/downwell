@@ -183,6 +183,8 @@ bool compileObjectFamilies(downwell::RunnerObjectFamilies<386>& families,
     return families.bind(objects,[&](const auto&){return initialFlags;}) &&
         families.markSpatialFamily(root);
 }
+bool compileInitialSpatialFlags(downwell::RunnerObjectFamilies<386>& families,
+    const downwell::ObjectPack& objects){return families.bindSpatialFlags(objects);}
 #include "core/RunnerSpatialObjectPreparation.h"
 downwell::RunnerSpatialObjectPreparation::Path compileObjectPreparation(
     downwell::RunnerSpatialIndex<64>& index,std::uint32_t& flags,

@@ -248,7 +248,22 @@ here, so resource order is sufficient for this flag-only traversal; it must not
 be reused as an assertion about source event or collision traversal. Copies own
 their links, and clear/capacity failures invalidate access. Runtime flags must be
 provided separately, not copied from the serialized DWOB property bits. The
-original collision-pair flag construction and live registry binding remain open.
+live registry binding remains separate from topology construction.
+
+Initial spatial flags come from `RunnerObjectFamilies::bindSpatialFlags`:
+the reset routine `0x478550` starts with `0x12`, whose spatial-relevant part is
+`0x10`. Event inheritance (`0x478830`), collision-target expansion (`0x478b60`
+and `0x4782a0`) and endpoint marking (`0x47a116`/`0x47a2bf`) establish bit `8`
+on collision owners and targets, including their descendants. An override may
+change the handler but does not remove the collision entry's participation.
+The owning object is marked even if a target lookup fails.
+
+For this participation flag alone, the result is the union of the descendant
+sets of both endpoints of each serialized collision event. The portable loader
+computes that union without materializing all inherited event pairs. It supplies
+only bits `0x10`, `8` and later `0x20`; these are sufficient for the audited
+spatial gates but are not the full runtime property/event-cache word. This does
+not determine collision dispatch order or initial spatial insertion order.
 
 Preparation follows registration-list order, skipping instance flags `0x108003`
 (including already-indexed `0x8000`). Dirty bit `8` causes a bounds refresh with

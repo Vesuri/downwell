@@ -12,6 +12,27 @@ public:
     void clear(){count_=0;good_=false;}
     bool valid()const{return good_;}
     unsigned size()const{return count_;}
+    // Spatial-relevant subset of runner +0x50: constructor enables 0x10;
+    // expanded collision-event endpoints get 0x08. Serialized visibility,
+    // solidity, managed-object and event-cache bits are not represented here.
+    bool bindSpatialFlags(const ObjectPack& pack){
+        if(!bind(pack,[](const PackedObject&){return 0x10u;}))return false;
+        for(unsigned owner=0;owner<count_;++owner){
+            PackedObject object;
+            if(!pack.object(owner,object)){clear();return false;}
+            for(unsigned i=0;i<object.bindingCount;++i){
+                PackedObjectEvent event;
+                if(!pack.binding(object.firstBinding+i,event)){clear();return false;}
+                if(event.eventType!=4)continue;
+                // Inheriting owners retain a collision entry; target expansion
+                // retains entries for descendants even when code is overridden.
+                markFamily(owner,8u,8u);
+                if(event.eventSubtype>=0 && unsigned(event.eventSubtype)<count_)
+                    markFamily(unsigned(event.eventSubtype),8u,8u);
+            }
+        }
+        return true;
+    }
     template<class Flags> bool bind(const ObjectPack& pack,Flags flags){
         clear();
         if(!pack.valid() || pack.objectCount()>Capacity)return false;
@@ -44,22 +65,25 @@ public:
     }
     bool markSpatialFamily(unsigned object){
         if(!good_ || object>=count_)return false;
+        markFamily(object,0x20u,0x28u);return true;
+    }
+private:
+    void markFamily(unsigned object,std::uint32_t flag,std::uint32_t barrier){
         unsigned current=object;
         for(;;){
             auto& e=entries_[current];
-            if(!(e.flags&0x28u)){
-                e.flags|=0x20u;
+            if(!(e.flags&barrier)){
+                e.flags|=flag;
                 if(e.child!=End){current=e.child;continue;}
             }
             // A prepared/collision-pair node is a subtree barrier, not just
             // an instruction to skip writing that node's flags.
             while(current!=object && entries_[current].next==End)
                 current=entries_[current].parent;
-            if(current==object)return true;
+            if(current==object)return;
             current=entries_[current].next;
         }
     }
-private:
     Entry entries_[Capacity?Capacity:1]{};
     unsigned count_=0;bool good_=false;
 };

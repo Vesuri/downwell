@@ -85,6 +85,21 @@ void testDecodeAndInheritance() {
     const std::vector<std::uint8_t> bytes = makePack();
     const downwell::ObjectPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "valid object pack is accepted");
+    downwell::RunnerObjectFamilies<2> spatialFlags;
+    require(spatialFlags.bindSpatialFlags(pack) && *spatialFlags.flags(0)==0x10 && *spatialFlags.flags(1)==0x10,
+            "objects with sprites but no collision events are not collision-pair prepared");
+    auto collisionBytes=makePack();
+    const auto eventOffset=downwell::ObjectPack::headerSize+2*downwell::ObjectPack::objectRecordSize;
+    collisionBytes[eventOffset]=4; // Root's event targets root: child inherits both sides.
+    downwell::ObjectPack rootCollision(collisionBytes.data(),collisionBytes.size());
+    require(spatialFlags.bindSpatialFlags(rootCollision) && *spatialFlags.flags(0)==0x18 && *spatialFlags.flags(1)==0x18,
+            "collision events mark inheriting owners and descendant targets");
+    collisionBytes[eventOffset]=0;
+    collisionBytes[eventOffset+downwell::ObjectPack::bindingRecordSize]=4;
+    for(unsigned i=0;i<4;++i)collisionBytes[eventOffset+downwell::ObjectPack::bindingRecordSize+4+i]=0xff;
+    downwell::ObjectPack missingTarget(collisionBytes.data(),collisionBytes.size());
+    require(spatialFlags.bindSpatialFlags(missingTarget) && *spatialFlags.flags(0)==0x10 && *spatialFlags.flags(1)==0x18,
+            "missing target still marks collision owner, never its ancestors");
     require(pack.objectCount() == 2 && pack.bindingCount() == 2,
             "object pack counts are decoded");
 
@@ -178,6 +193,29 @@ void testGeneratedPack(const char* path) {
     require(pack.valid(), "generated object pack passes native validation");
     require(pack.objectCount() == 386 && pack.bindingCount() == 2075,
             "generated object pack has audited totals");
+    downwell::RunnerObjectFamilies<386> collisionFamilies;
+    require(collisionFamilies.bindSpatialFlags(pack),"derive initial spatial flags from recovered collisions");
+    unsigned participants=0;
+    for(unsigned id=0;id<pack.objectCount();++id){
+        bool participates=false;
+        for(unsigned owner=0;owner<pack.objectCount();++owner){
+            downwell::PackedObject object;pack.object(owner,object);
+            for(unsigned j=0;j<object.bindingCount;++j){
+                downwell::PackedObjectEvent event;pack.binding(object.firstBinding+j,event);
+                if(event.eventType!=4)continue;
+                // Independent ancestor walks, not the implementation's subtree
+                // links/marking or its already-marked subtree optimization.
+                for(int ancestor=int(id);ancestor>=0;){
+                    if(ancestor==int(owner) || ancestor==event.eventSubtype)participates=true;
+                    downwell::PackedObject parent;pack.findObject(ancestor,parent);ancestor=parent.parentId;
+                }
+            }
+        }
+        require(*collisionFamilies.flags(id)==(participates?0x18u:0x10u),
+                "initial collision flags match expanded event endpoint ancestry");
+        participants+=participates;
+    }
+    require(participants>0 && participants<pack.objectCount(),"collision flags do not indiscriminately index every object");
 
     downwell::PackedObject player;
     require(pack.findObject(35, player) && player.spriteId == 31 &&
