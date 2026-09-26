@@ -743,6 +743,15 @@ build/player-wall-response-binary64-test: tests/core/PlayerWallResponseBinary64T
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerWallResponseBinary64Test.cpp
 
+.PHONY: verify-player-gravity-binary64
+test: verify-player-gravity-binary64
+verify-player-gravity-binary64: build/player-gravity-binary64-test
+	./build/player-gravity-binary64-test
+
+build/player-gravity-binary64-test: tests/core/PlayerGravityBinary64Test.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerGravityBinary64Test.cpp
+
 test: verify-goal-field-bounds
 .PHONY: verify-goal-field-bounds
 verify-goal-field-bounds: build/goal-field-bounds-test
