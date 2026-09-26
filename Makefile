@@ -137,6 +137,16 @@ test: verify-debris-motion
 test: verify-debris-animation
 test: verify-debris-effects
 test: verify-debris-draw
+test: verify-dead-body-creation
+
+.PHONY: verify-dead-body-creation
+verify-dead-body-creation: build/dead-body-creation-test
+	python3 tools/verify-dead-body-creation.py
+	./build/dead-body-creation-test
+
+build/dead-body-creation-test: tests/core/DeadBodyCreationTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/DeadBodyCreationTest.cpp
 
 .PHONY: verify-debris-draw
 verify-debris-draw: build/debris-draw-test

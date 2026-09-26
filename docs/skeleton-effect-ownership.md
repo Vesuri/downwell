@@ -66,6 +66,17 @@ at each of these boundaries as well as checking the successful source order.
   image_index=random(7). Area selects the sprite. Both instance-count branches
   assign alarms 0/1/2 to 30/15/7, so the count does not change the result.
 
+`createDeadBody` implements the `scrDeadBody` wrapper, not object 263's Create
+or physics. Its adapter must complete inherited Create, random samples and
+terrain relocation before reporting the new lifetime. Sprite, vertical speed,
+facing and explosion setters then run in source order. The source's `xsp`
+fallback and final corpse horizontal speed calculation follow those writes.
+`DeadBodySource` holds caller fields that must be published back to the dying
+instance; it is not a copy of corpse state. Setters use normal live mutation
+hooks, including sprite assignment's animation/collision consequences.
+`verify-dead-body-creation` pins the VM script and checks scalar branch
+boundaries, synchronous caller mutations and terminal callback failures.
+
 `DebrisBirth` implements that object-370 Create with four ordered RNG draws,
 custom binary64 motion/rate fields and narrowed builtin animation fields.
 `make verify-debris-birth` pins the input/export/resource/assembly identities

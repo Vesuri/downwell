@@ -436,6 +436,22 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/DebrisMotion.h"
 #include "core/DebrisAnimation.h"
 #include "core/DebrisEffects.h"
+#include "core/DeadBodyCreation.h"
+namespace {
+struct CorpseCompileEvents {
+    unsigned trace=0;
+    bool create(int object,downwell::MotionBinary64 x,downwell::MotionBinary64 y,std::uint32_t& id){trace+=object+x.low+y.low;id=42;return true;}
+    bool sprite(unsigned id,int value){trace+=id+value;return true;}
+    bool verticalSpeed(unsigned id,downwell::MotionBinary64 value){trace+=id+value.low;return true;}
+    bool facing(unsigned id,downwell::MotionBinary64 value){trace+=id+value.high;return true;}
+    bool explosion(unsigned id,int value){trace+=id+value;return true;}
+    bool horizontalSpeed(unsigned id,downwell::MotionBinary64 value){trace+=id+value.low;return true;}
+};
+}
+unsigned compileDeadBodyCreation(downwell::DeadBodySource& source,downwell::MotionBinary64 impact){
+    CorpseCompileEvents events;
+    return downwell::createDeadBody(source,206,impact,102,events)?events.trace:0xffffffffu;
+}
 #include "core/DebrisDraw.h"
 bool compileDebrisDraw(const downwell::DebrisAnimation& effect,
                        const downwell::EffectSurfacePlacement::View& view,
