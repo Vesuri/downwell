@@ -65,6 +65,13 @@ SDL compaction preserves the failed shot and untouched tail along with prior
 successful retirements. Both worlds stop before later actors after failure.
 These capacity-fault contracts do not establish original collision/death timing.
 
+Projectile birth must also report exhausted storage instead of silently dropping
+the shot. Both adapters latch session failure before any later projectile Step;
+the native adapter stops before alarms/generation on full storage or exhausted
+lifetime IDs. Already consumed ammo and emitter changes are retained, and the
+full pool is not overwritten. Controlled world tests park existing projectiles
+and refill ammo to reach capacity; they are fault tests, not natural encounters.
+
 | Source call | Owned objects / side effects required |
 | --- | --- |
 | `scrEnemyDeath` | Combo/kill counters, gunshot stop, achievement state, moment delay and level-begin cue |

@@ -17,6 +17,30 @@ static PlayerDamageNumber snapshot(const PlayerDamageNumbers<8>& owner){
 }
 int main(){
     {
+        // Capacity fault fixture: retain emitted shots outside all collision
+        // geometry and refill ammo. This is not a natural combat replay.
+        GameplayWorld encounter(0,true,0,false);
+        unsigned generationCalls=0;
+        encounter.configureGenerationStep([](void* context,GameplayWorld&,GameMakerRandom&,int){
+            ++*static_cast<unsigned*>(context);return true;
+        },&generationCalls);
+        unsigned beforeFailure=0;
+        for(unsigned tick=0;tick<1000&&encounter.effectsSucceeded();++tick){
+            const_cast<PlayerMotion&>(encounter.player()).increaseAmmoCapacity(1);
+            for(unsigned i=0;i<encounter.bulletSlotEnd();++i){
+                auto& bullet=const_cast<GameplayWorld::BulletState&>(encounter.bulletAt(i));
+                if(bullet.active){bullet.x=1000;bullet.y=0;bullet.trajectory.reset(1000,0,false);}
+            }
+            beforeFailure=generationCalls;
+            encounter.step(tick%10<5?4:0);
+        }
+        assert(!encounter.effectsSucceeded()&&encounter.bulletCount()==GameplayWorld::bulletCapacity);
+        assert(generationCalls==beforeFailure); // No later builder/actor work.
+        assert(encounter.bulletAt(0).y==0);
+        const auto stoppedTick=encounter.tick();encounter.step(4);
+        assert(encounter.tick()==stoppedTick&&generationCalls==beforeFailure);
+    }
+    {
         RunSession session;
         assert(session.contactDamageNumber(128,-128,0,0,240,176));
         auto effect=snapshot(session.damageNumbers);
@@ -81,6 +105,25 @@ int main(){
     RoomPack roomPack(rooms.data(),rooms.size());ObjectPack objectPack(objects.data(),objects.size());
     BuilderPatternPack builderPack(patterns.data(),patterns.size());
     assert(roomPack.valid()&&objectPack.valid()&&builderPack.valid());
+    {
+        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
+        encounter.skipToGameForTesting();Input fire{};
+        int parkedY=0;
+        for(unsigned tick=0;tick<1000&&encounter.effectsSucceeded();++tick){
+            assert(encounter.grantConsumable(101));
+            parkedY=encounter.mainCameraRenderViewY()+50;
+            for(unsigned i=0;i<encounter.mainBulletCount();++i){
+                auto& bullet=const_cast<StartupRuntime::MainBulletState&>(encounter.mainBulletAt(i));
+                bullet.x=1000;bullet.y=parkedY;
+                bullet.trajectory.reset(1000,int(bullet.y),false);
+            }
+            fire.fire=tick%10<5;encounter.step(fire,false);
+        }
+        assert(!encounter.effectsSucceeded()&&encounter.mainBulletCount()==StartupRuntime::mainBulletCapacity);
+        assert(encounter.mainBulletAt(0).y==parkedY); // No later projectile Step.
+        const auto stoppedTick=encounter.tick();encounter.step(fire,false);
+        assert(encounter.tick()==stoppedTick);
+    }
     {
         StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
         encounter.skipToGameForTesting();Input fire{};fire.fire=true;

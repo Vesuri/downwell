@@ -635,15 +635,18 @@ InstanceRecord* StartupRuntime::mainBulletEnemyCollision(const ProjectileSegment
 }
 
 void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
+    if (!run_.effectsSucceeded) return;
     const int muzzleOffset = mainEmitter_.nextOffset();
-    if (mainBulletCount_ < mainBulletCapacity) {
-        mainBullets_[mainBulletCount_++] = {
-            static_cast<float>(instance.x + muzzleOffset),
-            static_cast<float>(instance.y + 4), run_.gemHigh, {}, {}
-        };
-        mainBullets_[mainBulletCount_ - 1].trajectory.reset(instance.x + muzzleOffset, instance.y + 4,
-                                                          run_.upgrades.levels[12] != 0);
+    if (mainBulletCount_ >= mainBulletCapacity) {
+        run_.effectsSucceeded = false;
+        return;
     }
+    mainBullets_[mainBulletCount_++] = {
+        static_cast<float>(instance.x + muzzleOffset),
+        static_cast<float>(instance.y + 4), run_.gemHigh, {}, {}
+    };
+    mainBullets_[mainBulletCount_ - 1].trajectory.reset(instance.x + muzzleOffset, instance.y + 4,
+                                                      run_.upgrades.levels[12] != 0);
     ++soundPlayRequests_;
 }
 
@@ -1139,6 +1142,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     syncMainPlayerState();
     if (mainJumps_ != priorJumps) ++soundPlayRequests_;
     if (mainShotsFired_ != priorShots) emitMainBullet(instance);
+    if (!run_.effectsSucceeded) return;
     if (!wasGrounded && mainPlayerGrounded_) {
         ++mainLandings_;
         if (priorAmmo < mainAmmo_) ++soundPlayRequests_;
