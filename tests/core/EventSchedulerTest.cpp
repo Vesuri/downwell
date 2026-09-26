@@ -267,6 +267,40 @@ void testDeferredMembershipPhaseBoundary() {
     require(store.registeredObjectCount(10,exact)==2,"retired diagnostic record loses membership");
 }
 
+void testExternalMembershipPublication() {
+    using namespace downwell;
+    InstanceStore<3> store;
+    store.create(1,10,7,false,20);store.create(2,10,7,false,0);store.create(3,10,7,false,10);
+    std::vector<unsigned> publications;
+    auto publish=[&](InstanceHandle h,const InstanceRecord& record,bool registered){
+        require(store.resolve(h)==&record,"publication receives live handle and record");
+        publications.push_back(record.instanceId+(registered?100:0));return true;
+    };
+    for(unsigned i=0;i<3;++i){store.at(i).active=false;store.at(i).activationPending=true;}
+    require(store.reconcileObjectMembership(publish),"external deactivation succeeds");
+    require(publications==std::vector<unsigned>({2,3,1}),"external deactivation follows room depth order");
+    publications.clear();
+    for(unsigned id:{1u,3u,2u})store.find(id)->active=true;
+    unsigned phases=0;
+    require(EventScheduler<3>::runStep(store,
+        [](const InstanceRecord&){return AlarmBank::FiredMask(0);},
+        [](InstanceRecord&,StepEvent){},
+        [&](StepEventPhase phase){
+            if(phase!=StepEventPhase::beginStep)
+                require(publications==std::vector<unsigned>({102,103,101}),"external promotion precedes next phase");
+            ++phases;
+        },publish),"external promotion tick succeeds");
+    require(phases==4&&publications.size()==3,"unchanged memberships are not republished every phase");
+    unsigned calls=0;phases=0;
+    require(!EventScheduler<3>::runStep(store,
+        [](const InstanceRecord&){return AlarmBank::FiredMask(0);},
+        [](InstanceRecord& record,StepEvent){record.active=false;},
+        [&](StepEventPhase){++phases;},
+        [&](InstanceHandle,const InstanceRecord&,bool){return ++calls<2;}),
+        "external failure propagates from scheduler");
+    require(phases==1&&calls==2,"failure stops later publication and later phases");
+}
+
 } // namespace
 
 int main() {
@@ -278,6 +312,7 @@ int main() {
     testReusedIdCannotInheritPhaseEligibility();
     testDeferredMembershipPhaseBoundary();
     testRoomMembershipCycles();
+    testExternalMembershipPublication();
     std::cout << "event scheduler tests passed\n";
     return 0;
 }

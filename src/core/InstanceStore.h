@@ -146,17 +146,26 @@ public:
         return objectMembership_.count(object,isA);
     }
     void reconcileObjectMembership() {
-        roomMembership_.reconcile(
+        reconcileObjectMembership([](InstanceHandle,const InstanceRecord&,bool){return true;});
+    }
+    // Publish external object lists in the same order as the room reconciler,
+    // not record order. Callbacks must not mutate this store. Failure is terminal
+    // for the current step; previously published memberships are not rolled back.
+    template<class Publish> bool reconcileObjectMembership(Publish publish) {
+        if(!roomMembership_.reconcileChecked(
             [&](unsigned slot){return !records_[slots_[slot].record].active;},
             [&](unsigned slot,bool registered){
-                publishObjectMembership({slot,slots_[slot].generation},registered);
-            });
+                const InstanceHandle h{slot,slots_[slot].generation};
+                return publishObjectMembership(h,registered) &&
+                    publish(h,static_cast<const InstanceRecord&>(*resolve(h)),registered);
+            }))return false;
         // Retired records remain available to host diagnostics until room
         // cleanup, but must not retain room/object memberships.
         for(std::size_t i=0;i<size_;++i)if(!records_[i].active && !records_[i].activationPending){
             objectMembership_.unbind(recordSlots_[i]);
             roomMembership_.remove(recordSlots_[i]);
         }
+        return true;
     }
     // Graph and visitor must not mutate this store. Active/precise-hit filtering
     // belongs to the visitor; inactive flags can precede membership retirement.

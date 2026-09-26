@@ -101,6 +101,17 @@ calls the reconciliation wrapper at `0x50dc89`, after the dispatcher returns.
 Do not flush object memberships after each individual Begin Step handler.
 This establishes that boundary, not every frame/room-transition call site.
 
+`InstanceStore::reconcileObjectMembership` can publish these transitions to an
+external owner using a live handle, record and registration state. Its checked
+room traversal retains the two-pass ordering and does not republish unchanged
+memberships. The five-argument `EventScheduler::runStep` forwards that callback
+at its existing phase boundaries and returns false on publication failure,
+before entering the next phase. Failure is terminal for the tick: prior list
+moves are not rolled back. This hook does not itself implement immediate
+activation flags, dirty marking, object rebinding or spatial-tree publication;
+the live collision adapter must provide those separately. The default scheduler
+still uses no external owner.
+
 ## Evidence and checks
 
 `tools/verify-runner-field-lookup.py` pins the reviewed wrapper, predicate,

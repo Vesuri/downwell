@@ -23,18 +23,30 @@ public:
     void clear(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(head_[list]);}
     // Callbacks can publish external membership, but must not mutate this owner.
     template<class Inactive,class Publish> void reconcile(Inactive inactive,Publish publish){
+        reconcileChecked(inactive,[&](unsigned slot,bool registered){
+            publish(slot,registered);return true;
+        });
+    }
+    // Failure is terminal for this reconciliation: prior moves/publications
+    // are not rolled back. Do not invoke later callbacks after a failed owner.
+    template<class Inactive,class Publish> bool reconcileChecked(Inactive inactive,Publish publish){
         for(unsigned slot=head_[1];slot!=End;){
             const unsigned next=entries_[slot].next;
-            if(!inactive(slot)){remove(slot);insertActive(slot);publish(slot,true);}
+            if(!inactive(slot)){
+                remove(slot);insertActive(slot);
+                if(!publish(slot,true))return false;
+            }
             slot=next;
         }
         for(unsigned slot=head_[0];slot!=End;){
             const unsigned next=entries_[slot].next;
             if(inactive(slot)){
-                remove(slot);appendInactive(slot);publish(slot,false);
+                remove(slot);appendInactive(slot);
+                if(!publish(slot,false))return false;
             }
             slot=next;
         }
+        return true;
     }
 private:
     void insertActive(unsigned slot){

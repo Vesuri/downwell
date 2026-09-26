@@ -328,6 +328,17 @@ downwell::RunnerSpatialObjectPreparation::Path compileObjectPreparation(
         [&](auto bounds,auto id){return index.insert(bounds,id);});
 }
 #include "core/RunnerRoomMembership.h"
+#include "core/EventScheduler.h"
+bool compileSpatialMembershipStep(downwell::InstanceStore<4>& store,
+    downwell::RunnerSpatialInstances<4,8>& owner) {
+    return downwell::EventScheduler<4>::runStep(store,
+        [](const downwell::InstanceRecord&){return downwell::AlarmBank::FiredMask(0);},
+        [](downwell::InstanceRecord&,downwell::StepEvent){},
+        [](downwell::StepEventPhase){},
+        [&](downwell::InstanceHandle h,const downwell::InstanceRecord&,bool registered){
+            return owner.registerObject(h,registered);
+        });
+}
 unsigned compileRoomMembership(downwell::RunnerRoomMembership<64>& rooms,
     unsigned slot,downwell::RunnerImageValue depth,std::uint64_t dormant) {
     if(!rooms.bind(slot,depth))return 0;

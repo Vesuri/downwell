@@ -40,18 +40,27 @@ public:
     template <typename AlarmEvents, typename Handler, typename BeforePhase>
     static void runStep(InstanceStore<Capacity>& instances,
                         AlarmEvents alarmEvents, Handler handler, BeforePhase beforePhase) {
+        runStep(instances,alarmEvents,handler,beforePhase,
+            [](InstanceHandle,const InstanceRecord&,bool){return true;});
+    }
+    // External collision membership follows source room reconciliation. A
+    // failed publication must stop the tick before any later phase executes.
+    template <typename AlarmEvents, typename Handler, typename BeforePhase, typename Publish>
+    static bool runStep(InstanceStore<Capacity>& instances,
+                         AlarmEvents alarmEvents, Handler handler,
+                         BeforePhase beforePhase, Publish publish) {
         beforePhase(StepEventPhase::beginStep);
         dispatchPhase(instances, StepEventPhase::beginStep, handler);
-        instances.reconcileObjectMembership();
+        if(!instances.reconcileObjectMembership(publish))return false;
         beforePhase(StepEventPhase::alarm);
         dispatchAlarms(instances, alarmEvents, handler);
-        instances.reconcileObjectMembership();
+        if(!instances.reconcileObjectMembership(publish))return false;
         beforePhase(StepEventPhase::step);
         dispatchPhase(instances, StepEventPhase::step, handler);
-        instances.reconcileObjectMembership();
+        if(!instances.reconcileObjectMembership(publish))return false;
         beforePhase(StepEventPhase::endStep);
         dispatchPhase(instances, StepEventPhase::endStep, handler);
-        instances.reconcileObjectMembership();
+        return instances.reconcileObjectMembership(publish);
     }
 
 private:
