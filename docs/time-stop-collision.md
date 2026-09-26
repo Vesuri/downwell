@@ -179,8 +179,37 @@ That root receives the old root first and the split sibling second. Thus the
 selector's comparison against root `+0x04` is against tree height, not entry
 count or a fixed population threshold. Splitting and subsequent updates can
 change traversal order; the append rule alone does not establish oldest-first
-lookup once the tree branches. Split assignment, removal/reinsertion and the
-set/order of instances populating the shared index still need auditing.
+lookup once the tree branches. Removal/reinsertion and the set/order of
+instances populating the shared index still need auditing.
+
+### Spatial split contract
+
+`0x5010e0` copies six old entries and appends the incoming seventh entry to a
+temporary array. It passes minimum occupancy two to `0x4fc680`, which calls
+seed selection `0x500490`. For normal finite ordered bounds:
+
+1. Evaluate each pair in ascending `(i,j)` order using union area minus the
+   first area minus the second area, rounding each operation to binary32.
+   Greatest waste wins; complete ties retain the earliest pair. The first
+   seed belongs to group zero, the second to group one.
+2. For each unassigned entry, calculate each group's area enlargement and
+   subtract group-zero enlargement from group-one enlargement. Negative
+   difference prefers group one; zero prefers group zero.
+3. Select the largest absolute difference. Equal differences prefer the
+   candidate whose preferred group has fewer entries; otherwise retain the
+   earlier candidate. Assign it and update that group's bounds and area.
+4. When either group reaches five entries, assign all remaining entries to
+   the other group, preserving minimum occupancy two.
+5. Rebuild the original node (group zero) and new sibling (group one) by
+   scanning the original seven-entry array in order. Do not append seeds
+   first or retain assignment order: neither is the resulting traversal order.
+
+`RunnerSpatialSplit` implements this partition with integer-only binary32
+rounding through the portable numeric helpers. It rejects inverted bounds,
+subnormal/nonfinite inputs and unsupported arithmetic without changing output.
+`make verify-runner-spatial-split` compares it with a scalar binary32 reference
+and pins the audited executable regions. This is a component check, not
+execution of the Windows routine or proof of live field-selection fidelity.
 
 `tools/verify-runner-field-lookup.py` pins these reviewed bytes. It does not
 prove spatial-tree construction/update order or the

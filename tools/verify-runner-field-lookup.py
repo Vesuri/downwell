@@ -15,6 +15,10 @@ for start, end, digest in (
     # Spatial insertion/root growth and recursive child selection.
     (0x4ffd40, 0x4ffe6f, "08761b0415c1031c8e3851173fbe379b018c68758869b32c1154cf3a8b60b56b"),
     (0x4fff80, 0x50018f, "4a66ec6c3c45b6a5f35abf6c841913b3f8e6109e890b8efd3e4477cbf47450b9"),
+    # Six-plus-one split, minimum-fill assignment and quadratic seed choice.
+    (0x5010e0, 0x50146a, "a6243773257524fb7c886e6955077d7fe43f35afb6174eda79915711420b9f78"),
+    (0x4fc680, 0x4fc9ce, "19dbcb5e5d0e7b8daaa0bbb5f9e5cf3eeabc67b8c2a784c07c80e093c554b1d1"),
+    (0x500490, 0x5006d0, "c197a09c52e4e2f81d3e724a120a5ba721b508a189dfae5312e6ba99d74331f3"),
     (0x52cd08, 0x52cd1b, "44e72dafd1f48a74fb4709652b9dcce60d86ed1502e3f142f57ff91afb8a4e08"),
     (0x529e50, 0x529ebb, "0a53a026073fef6cdb42aaac33df23820cc84026c94c69601d9a219afddfa30c"),
     (0x4fe560, 0x4fe8b1, "92aba2c026ca90179868445275b9736946e775ef155ac85e9b3757dc1ff5599a"),
@@ -25,4 +29,6 @@ for start, end, digest in (
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x80cd7c,15) == b"instance_place\0"
+assert region(0x7fe7e0,4) == bytes.fromhex("000080bf") # preference sentinel -1
+assert region(0x795ab8,4) == bytes.fromhex("0000803f") # seed sentinel adjustment +1
 print("Pinned Windows ancestor-list registration/removal, instance_place dispatch and first-hit traversal")

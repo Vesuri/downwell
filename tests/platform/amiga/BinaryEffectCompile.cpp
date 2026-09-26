@@ -1,4 +1,8 @@
 #include "core/BinaryEffectSurface.h"
+#include "core/RunnerSpatialSplit.h"
+bool compileRunnerSpatialSplit(const downwell::RunnerSpatialSplit::Box (&boxes)[7],downwell::RunnerSpatialSplit::Result& result){
+    return downwell::RunnerSpatialSplit::partition(boxes,result);
+}
 #include "core/BloodEffect.h"
 #include "core/BloodEffects.h"
 #include "core/BloodCollisionBounds.h"
