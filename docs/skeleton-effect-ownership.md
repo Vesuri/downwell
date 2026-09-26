@@ -104,6 +104,17 @@ alarm-index order, precise contact admission and actual lifetime removal.
 `verify-corpse-lifecycle` covers successful ordering, gates and failure paths;
 it does not establish live upgrade support.
 
+`CorpseAnimation` admits the initial sprite 172 and skeleton override 206,
+both verified one-key unit-rate sequences. It uses the shared runner sprite
+reset decision, publishes changed sprites and leaves same-ID assignments
+untouched. Signed Create animation rates continue during time-stop: ordinary
+corpse Step never sets image speed to zero. No Animation End handler exists.
+Other corpse sprite families and nonzero external image-index writes are not
+silently approximated. `verify-corpse-animation` checks 20,480 scalar float
+updates plus setter/failure cases; the connected creation test uses this actual
+setter with a publication test double. Corpse depth 1000 equals smoke depth,
+so live Draw must preserve same-depth instance ordering across both families.
+
 `CorpseMotion` implements ordinary Step: custom-real gravity and damping,
 parent-56 motion probes, bounce/settling and the bounded 1–16 floor search.
 Area 3 divides displacement by four without changing stored velocities. It

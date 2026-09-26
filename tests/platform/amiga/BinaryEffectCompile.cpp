@@ -440,6 +440,10 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseBirth.h"
 #include "core/CorpseLifecycle.h"
 #include "core/CorpseMotion.h"
+#include "core/CorpseAnimation.h"
+bool compileCorpseAnimation(downwell::CorpseAnimation& corpse,int sprite){
+    return corpse.setSprite(sprite,[](const auto&){return true;})&&corpse.advanceImage();
+}
 namespace {
 struct CorpseMotionEvents {
     bool meeting(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=true;return true;}

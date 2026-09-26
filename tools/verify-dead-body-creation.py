@@ -14,6 +14,8 @@ assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
 obj = manifest["resources"]["objects"][263]
 assert (obj["id"], obj["name"], obj["parentId"]) == (263, "objDeadBody", 90)
+assert obj["spriteId"] == 172 and obj["textureMaskId"] == 599
+assert not any(e["eventType"] == 7 and e["eventSubtype"] == 7 for e in obj["events"])
 assembly = (export / "Assembly/gml_GlobalScript_scrDeadBody.asm").read_bytes()
 assert sha256(assembly).hexdigest() == "2245353309bd2ac8cb2006f0e162803fb1df0079b8ab2f42dcd20ac469425e08"
 print("Pinned scrDeadBody: synchronous object-263 Create, ordered overrides and caller xsp mutation")

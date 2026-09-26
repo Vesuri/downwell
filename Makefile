@@ -143,6 +143,16 @@ test: verify-corpse-lifecycle
 test: verify-corpse-motion
 test: verify-out-of-view-lifetime
 test: verify-corpse-creation-integration
+test: verify-corpse-animation
+
+.PHONY: verify-corpse-animation
+verify-corpse-animation: build/corpse-animation-test
+	python3 tools/verify-animation-metadata.py
+	./build/corpse-animation-test
+
+build/corpse-animation-test: tests/core/CorpseAnimationTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/CorpseAnimationTest.cpp
 
 .PHONY: verify-corpse-creation-integration
 verify-corpse-creation-integration: build/corpse-creation-integration-test

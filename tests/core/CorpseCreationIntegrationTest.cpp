@@ -1,5 +1,5 @@
 #include "core/DeadBodyCreation.h"
-#include "core/CorpseMotion.h"
+#include "core/CorpseAnimation.h"
 #include "core/DebrisEffects.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
@@ -11,11 +11,9 @@ static void equal(MotionBinary64 a,double d){auto b=real(d);assert(a.high==b.hig
 struct Adapter {
     GameMakerRandom& random;
     explicit Adapter(GameMakerRandom& rng):random(rng){}
-    CorpseMotion corpse;
+    CorpseAnimation corpse;
     unsigned walls=0,publications=0,setters=0,misses=0;
     bool blocked=false,failTile=false,created=false;
-    int spriteId=172;
-    RunnerImageValue facingValue{};
     bool wall(MotionBinary64,MotionBinary64,bool& hit){
         ++walls;hit=blocked&&(walls==1||walls<=misses+1);return true;
     }
@@ -26,9 +24,9 @@ struct Adapter {
         if(!corpse.create(x,y,true,random,*this))return false;
         created=true;handle=7;return true;
     }
-    bool sprite(unsigned handle,int id){assert(handle==7&&created&&++setters==1);spriteId=id;return true;}
+    bool sprite(unsigned handle,int id){assert(handle==7&&created&&++setters==1);return corpse.setSprite(id,[](const auto&){return true;});}
     bool verticalSpeed(unsigned handle,MotionBinary64 speed){assert(handle==7&&++setters==2);corpse.ysp=speed;return true;}
-    bool facing(unsigned handle,MotionBinary64 scale){assert(handle==7&&++setters==3);return facingValue.assign(scale);}
+    bool facing(unsigned handle,MotionBinary64 scale){assert(handle==7&&++setters==3);return corpse.imageXscale.assign(scale);}
     bool explosion(unsigned handle,int id){assert(handle==7&&++setters==4);corpse.explosionFx=id;return true;}
     bool horizontalSpeed(unsigned handle,MotionBinary64 speed){assert(handle==7&&++setters==5);corpse.xsp=speed;return true;}
 };
@@ -58,7 +56,9 @@ int main(){
         equal(source.xsp,-1.5);equal(source.x,96);equal(source.y,192);
         const double capped=impact>4?4:impact;
         equal(adapter.corpse.ysp,capped);equal(adapter.corpse.xsp,capped?-1.5*capped:-.5);
-        assert(adapter.spriteId==206&&source.myDeadBody==7&&adapter.setters==5);
+        assert(adapter.corpse.spriteId==206&&source.myDeadBody==7&&adapter.setters==5);
+        assert(adapter.corpse.imageIndex.bits==0&&adapter.corpse.timeline.bits==0);
+        equal(adapter.corpse.imageXscale.promoted(),-1);
         assert(adapter.corpse.health==1&&adapter.corpse.hitEffect==1);
         // Skeleton then creates two debris at its own position, not the relocated corpse.
         DebrisEffects<2> debris;

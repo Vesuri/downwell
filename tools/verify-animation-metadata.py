@@ -21,6 +21,7 @@ for index, name, frames in (
     (91,"sprPoisonPotPieces",6),
     (96,"sprFlashBall",3),
     (115,"sprDebrisRock",4), (116,"sprDebrisWood",4),
+    (172,"sprFrogDead",1),
     (205,"sprEnmSkeletonHit",1), (206,"sprSkeletonDead",1),
     (207,"sprEnmSkeletonThrow",8), (208,"sprEnmSkeletonIdle",6),
     (460,"sprSkeletonBone",4),
