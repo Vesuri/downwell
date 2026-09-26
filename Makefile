@@ -133,6 +133,17 @@ build/bone-store-test: tests/core/BoneProjectileStoreTest.cpp src/core/BoneProje
 test: verify-flash-effects
 test: verify-smoke-birth
 test: verify-debris-birth
+test: verify-debris-motion
+
+.PHONY: verify-debris-motion
+verify-debris-motion: build/debris-motion-test
+	python3 tools/verify-debris-create.py
+	python3 tools/verify-runner-integer-range.py
+	./build/debris-motion-test
+
+build/debris-motion-test: tests/core/DebrisMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/DebrisMotionTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-debris-birth
 verify-debris-birth: build/debris-birth-test

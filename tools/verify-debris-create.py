@@ -18,4 +18,11 @@ event = next(e for e in obj["events"] if e["eventType"] == 0 and e["eventSubtype
 assert event["actions"] == [{"codeId": 2722, "codeName": "gml_Object_breakablesDebris_Create_0"}]
 assembly = (export / "Assembly/gml_Object_breakablesDebris_Create_0.asm").read_bytes()
 assert sha256(assembly).hexdigest() == "7eeeed80e7b0eeb7c293fd5dbf872ab9644985906dbe9addc7bbefaba1a91417"
+for name, digest in {
+    "Step_0": "f10781ed5f8231e1ead276eba2b2de864c2f4f70e5f3498e7ec0550e28603052",
+    "Alarm_0": "d7288b2999ecc62b3f8db25a0313f8144cf903161c68062d4cb8181c8fbcd7dd",
+    "Alarm_1": "3b7a34c872f9265143d15f3052836d739c30e20f3668d9446ebe86ab8e13a1dc",
+    "Alarm_2": "790f7e88f5b3bca443bafdaca3a2f2fcc946cd55e05cc25a17875a5828e99738",
+}.items():
+    assert sha256((export / f"Assembly/gml_Object_breakablesDebris_{name}.asm").read_bytes()).hexdigest() == digest
 print("Pinned object-370 Create: no parent or relocation, four RNG draws and area artwork")

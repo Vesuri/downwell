@@ -65,6 +65,31 @@ and compares 7,168 area/seed cases to scalar arithmetic and the complete RNG
 state. Position/lifetime ownership, Step, alarms, collisions and drawing are
 not implemented by this birth component; it is not live death integration.
 
+`DebrisMotion` supplies object 370's ordinary Step and alarms 0–2. Unlike
+`fxTimeShard`, a failed `TimeStopBound` decision skips the entire motion and
+flash-update body. `alarmStop(2)` restores only positive remaining alarm values
+after the alarm phase; it cannot reverse an already-fired alarm. Alarm 0 requests
+destruction, alarm 1 enables disappearance and alarm 2 clears `noTouch`.
+
+The allowed Step restores `image_speed` from custom `imgSp`, adds 0.1 gravity
+when ysp is strictly below -1 (otherwise 0.08), probes horizontal then vertical
+motion against object 56 and applies the source damping/animation choice. Its
+fractional `irandom_range(-0.5,-0.8)` truncates to zero but consumes two words;
+see [integer-range conversion](runner-integer-range.md). No 0.9 drag is applied.
+Position writes narrow directly to builtin binary32 x/y before the embedded
+test. Escape probes prefer right over left, then up over down using the updated
+X. Remaining overlap requests destruction without skipping the final flash
+assignment. Zero horizontal speed remains zero rather than acquiring a minimum
+direction; nonzero magnitudes below 0.05 are clamped to signed 0.05.
+
+`make verify-debris-motion` compares query coordinates/order, arithmetic and
+complete RNG state across 8,192 branch tapes, plus alarm/freeze/failure cases.
+The owner must provide source-equivalent time-stop and precise collision
+decisions, publish coordinate mutations to collision ownership, schedule
+animation separately and retire requested lifetimes at the proper boundary.
+Player collision, Draw, pool ownership and live death integration are outside
+this Step component's verification scope.
+
 `SkeletonEffectBursts.h` now implements the skeleton's smoke/flash count and
 birth-coordinate arithmetic, calling the child creator synchronously per birth.
 The scope is exactly the skeleton's (5,1) smoke and (6,2,10) flash parameters;
