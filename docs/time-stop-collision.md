@@ -280,6 +280,31 @@ until the owner recovers it. Tests cover branch boundaries, preparation gates,
 ordered insertion, normalization and already-indexed suppression, not a complete
 original-runner execution trace.
 
+### Dynamic birth publication
+
+Dynamic allocation `0x4878f0` finishes object/room registration before calling
+`0x501dc0`. That routine ensures the shared index exists, calls bounds refresh
+`0x466010` with update argument **one**, then enters the separate collision queue
+through `0x501ef0`. The outer wrapper `0x4fdcf0` dispatches PreCreate and Create
+only after allocation returns. Eligible initial bounds therefore enter the index
+before user Create code; deferred end-of-phase insertion is not equivalent.
+Bounds publication still uses the sprite/mask and preparation gates described
+below. A later dirty pass can remove/reinsert that birth, changing tree order.
+
+Immediately before direct publication, `0x4879ca..0x4879f3` checks the new
+object's `0x28` flags. If absent, it walks parents and, on a prepared ancestor,
+sets `0x20` on the new object's record only. `RunnerObjectFamilies::prepareBirth`
+models this transition. Unlike query-time family marking, it changes neither
+descendants nor siblings; it also leaves an already-prepared object unchanged.
+
+Object binding `0x46b8b2..0x46b968` supplies the explicit mask, default depth,
+sprite and property flags. Solidity sets instance `0x20` and bounds-dirty `8`;
+non-solid binding clears `0x20` and may remove old spatial membership when no
+preparation flag applies. The final binding step marks bounds dirty and invokes
+the spatial dirty-queue helper. These property and birth-publication operations
+still require live registry integration; family-flag tests alone do not establish
+correct instance insertion histories.
+
 ### Spatial split contract
 
 `0x5010e0` copies six old entries and appends the incoming seventh entry to a

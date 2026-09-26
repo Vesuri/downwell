@@ -120,6 +120,10 @@ void testDecodeAndInheritance() {
             "collision-pair root prevents descendant preparation");
     require(families.markSpatialFamily(1) && *families.flags(1)==0x30,
             "explicit child query can prepare below an ancestor barrier");
+    require(families.bind(pack,[](const auto& o){return o.objectId==0?8u:0x10u;}) &&
+                families.prepareBirth(1) && *families.flags(0)==8 && *families.flags(1)==0x30,
+            "birth inherits prepared ancestor flag without modifying the ancestor");
+    require(!families.prepareBirth(2),"invalid birth object cannot mutate flags");
     auto copied=families;families.clear();
     require(!families.markSpatialFamily(0) && !families.flags(0) && copied.isA(1,0),
             "copied topology owns links independently and clear invalidates access");
@@ -250,6 +254,22 @@ void testGeneratedPack(const char* path) {
             }
             if(reached && !blocked)expected|=0x20u;
             require(*families.flags(id)==expected,"recovered family marking matches independent ancestry model");
+        }
+        // A birth changes only the named object even when its parent or a
+        // more distant ancestor was prepared. Reinitialize between births.
+        require(families.bind(pack,initial),"reset flags for recovered birth transition");
+        downwell::PackedObject born;pack.object(root,born);
+        auto birthExpected=initial(born);
+        for(int parent=born.parentId;parent>=0;){
+            downwell::PackedObject ancestor;pack.findObject(parent,ancestor);
+            if(!(birthExpected&0x28u) && (initial(ancestor)&0x28u))birthExpected|=0x20u;
+            parent=ancestor.parentId;
+        }
+        require(families.prepareBirth(root),"prepare recovered birth");
+        for(unsigned id=0;id<pack.objectCount();++id){
+            downwell::PackedObject other;pack.object(id,other);
+            require(*families.flags(id)==(id==root?birthExpected:initial(other)),
+                    "birth preparation changes neither siblings nor descendants");
         }
     }
 }

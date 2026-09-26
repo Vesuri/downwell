@@ -181,7 +181,7 @@ bool compileCurrencySmokeComposition(downwell::CurrencySmokeComposition& composi
 bool compileObjectFamilies(downwell::RunnerObjectFamilies<386>& families,
     const downwell::ObjectPack& objects,unsigned root,std::uint32_t initialFlags){
     return families.bind(objects,[&](const auto&){return initialFlags;}) &&
-        families.markSpatialFamily(root);
+        families.markSpatialFamily(root) && families.prepareBirth(root);
 }
 bool compileInitialSpatialFlags(downwell::RunnerObjectFamilies<386>& families,
     const downwell::ObjectPack& objects){return families.bindSpatialFlags(objects);}

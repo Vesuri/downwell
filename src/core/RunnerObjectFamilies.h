@@ -67,6 +67,16 @@ public:
         if(!good_ || object>=count_)return false;
         markFamily(object,0x20u,0x28u);return true;
     }
+    // 0x4879ca..0x4879f3: birth inherits preparation from an ancestor only
+    // onto its own object. Unlike a query, this does not mark a whole subtree.
+    bool prepareBirth(unsigned object){
+        if(!good_ || object>=count_)return false;
+        if(entries_[object].flags&0x28u)return true;
+        for(unsigned parent=entries_[object].parent;parent!=End;parent=entries_[parent].parent){
+            if(entries_[parent].flags&0x28u){entries_[object].flags|=0x20u;break;}
+        }
+        return true;
+    }
 private:
     void markFamily(unsigned object,std::uint32_t flag,std::uint32_t barrier){
         unsigned current=object;
