@@ -148,7 +148,7 @@ build/smoke-world-test: tests/core/SmokeWorldTest.cpp $(filter-out tests/core/St
 test: verify-effect-placement
 test: verify-binary-effects
 .PHONY: verify-binary-effects
-build/palette-effects-test: tests/core/PaletteEffectSurfaceTest.cpp src/core/PaletteEffectSurface.h
+build/palette-effects-test: tests/core/PaletteEffectSurfaceTest.cpp src/core/PaletteEffectSurface.h src/core/EffectMaskAssets.h src/core/BinaryEffectSurface.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 .PHONY: verify-palette-effects

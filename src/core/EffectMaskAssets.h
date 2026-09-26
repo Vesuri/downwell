@@ -5,7 +5,7 @@
 #include <cstdint>
 
 namespace downwell {
-// Borrowed immutable views of the existing offline DWAP masks. No allocation,
+// Borrowed immutable views of existing offline DWAP color planes and masks. No allocation,
 // texture decoding, pixel conversion or target-specific types. The pack must
 // remain alive and unchanged until these descriptors are discarded.
 class EffectMaskAssets {
@@ -13,10 +13,15 @@ public:
     struct Asset {
         BinaryEffectSurface<>::Mask mask{};
         int originX=0,originY=0;
+        const std::uint8_t* low=nullptr;
+        const std::uint8_t* high=nullptr;
     };
     bool ready()const{return ready_;}
     const Asset* smoke(unsigned frame)const{return ready_ && frame<9 ? &smoke_[frame] : nullptr;}
     const Asset* shade()const{return ready_ ? &shade_ : nullptr;}
+    const Asset* currency(bool large,unsigned frame)const{
+        return ready_ && frame<4 ? &currency_[large?1:0][frame] : nullptr;
+    }
     bool bind(const std::uint8_t* pack,std::size_t size){
         // Failed rebind must not leave a formerly valid, now stale view live.
         ready_=false;
@@ -46,20 +51,23 @@ public:
                 if(offset<payload || offset%2 || offset>size || bytes>size-offset ||
                    plane>bytes/3 || plane*3!=bytes)return false;
                 out={{pack+offset+2*plane,unsigned(plane),width,height,dma/8},
-                     signedWord(record+4),signedWord(record+6)};
+                     signedWord(record+4),signedWord(record+6),pack+offset,pack+offset+plane};
                 return true;
             }
             return false;
         };
         for(unsigned frame=0;frame<9;++frame)if(!resolve(84,frame,smoke_[frame]))return false;
         if(!resolve(117,0,shade_))return false;
+        for(unsigned large=0;large<2;++large)
+            for(unsigned frame=0;frame<4;++frame)
+                if(!resolve(133+large,frame,currency_[large][frame]))return false;
         ready_=true;return true;
     }
 private:
     static unsigned u16(const std::uint8_t* p){return (unsigned(p[0])<<8)|p[1];}
     static std::uint32_t u32(const std::uint8_t* p){return (std::uint32_t(u16(p))<<16)|u16(p+2);}
     static int signedWord(const std::uint8_t* p){const unsigned n=u16(p);return n<32768?int(n):int(n)-65536;}
-    Asset smoke_[9]{},shade_{};
+    Asset smoke_[9]{},shade_{},currency_[2][4]{};
     bool ready_=false;
 };
 }

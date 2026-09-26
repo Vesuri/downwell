@@ -136,8 +136,11 @@ Chip RAM. `verify-palette-effects` exercises original gem/smoke/shade art and
 all pens, including opaque-black overlap. The live scene still needs joint
 currency/smoke binding, source visibility and painter-boundary integration.
 
-`EffectMaskAssets` borrows the nine sprite-84 frame masks and sprite-117 shade
-mask directly from the immutable offline DWAP pack. It validates the version,
+`EffectMaskAssets` borrows all nine sprite-84 smoke frames, sprite-117 shade,
+and all four frames of each currency sprite (133/134) directly from the immutable
+offline DWAP pack. Each descriptor exposes both color planes and its coverage
+mask; these must stay together so opaque black is not treated as transparent.
+Binding requires all eighteen records. It validates the version,
 source-hash prefix, sorted directory, payload boundaries, planar dimensions and
 three-plane record flags before exposing descriptors. Signed cropped origins
 are retained, including the last smoke frame; consumers subtract those origins

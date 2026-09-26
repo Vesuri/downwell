@@ -1,4 +1,5 @@
 #include "core/PaletteEffectSurface.h"
+#include "core/EffectMaskAssets.h"
 #include <array>
 #include <vector>
 #include <fstream>
@@ -14,12 +15,19 @@ struct Asset {Surface::Asset image;int ox,oy;};
 int main(int argc,char**argv){
     assert(argc==2);std::ifstream file(argv[1],std::ios::binary);
     const std::vector<unsigned char> pack{std::istreambuf_iterator<char>(file),{}};
+    downwell::EffectMaskAssets shared;
+    assert(shared.bind(pack.data(),pack.size()));
     auto find=[&](unsigned id,unsigned frame){
         for(unsigned i=0;i<dword(pack.data()+8);++i){
             const auto* r=pack.data()+word(pack.data()+6)+i*24;
             if(word(r)!=id || word(r+2)!=frame)continue;
             const unsigned stride=word(r+12)/8,plane=stride*word(r+10),offset=dword(r+16);
             assert(word(r+14)==3 && dword(r+20)==3*plane && offset+3*plane<=pack.size());
+            const auto* cached=id==84?shared.smoke(frame):id==117?shared.shade():shared.currency(id==134,frame);
+            assert(cached && cached->low==pack.data()+offset && cached->high==pack.data()+offset+plane &&
+                   cached->mask.data==pack.data()+offset+2*plane && cached->mask.bytes==plane &&
+                   cached->mask.width==word(r+8) && cached->mask.height==word(r+10) && cached->mask.stride==stride &&
+                   cached->originX==int(short(word(r+4))) && cached->originY==int(short(word(r+6))));
             return Asset{{{pack.data()+offset+2*plane,plane,word(r+8),word(r+10),stride},
                            pack.data()+offset,pack.data()+offset+plane},
                          int(short(word(r+4))),int(short(word(r+6)))};
