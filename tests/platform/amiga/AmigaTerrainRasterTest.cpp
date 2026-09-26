@@ -43,6 +43,59 @@ int main() {
     }
     assert(raster->runEnd(3,0,284)==0&&raster->runEnd(0,5,5)==5&&raster->runEnd(0,0,8193)==0);
     std::printf("Terrain raster: %u mixed-span partitions repaint only dirty rows\n",partitions);
+    unsigned stagedCases = 0;
+    raster->ready = true;
+    for (unsigned column=0; column<3; ++column)
+    for (unsigned origin : {0u, 309u}) for (unsigned mask=0; mask<32; ++mask) {
+        std::vector<UBYTE> stage(downwellGameRingBytes, 0xa5), expected(stage);
+        unsigned painted=0, expectedPainted=0, done=0;
+        AmigaGameplayRows debts;
+        debts.damage(0,0,320);
+        for (unsigned y=0; y<48; ++y) {
+            const bool dirty = (mask >> (y%5)) & 1;
+            raster->dirty(column,8000+y)=dirty;
+            expectedPainted += dirty;
+            for (unsigned p=0;p<2;++p) for (unsigned w=0;w<11;++w) {
+                const UWORD old = UWORD(23*y+57*p+w+column);
+                raster->row(column,8000+y)[p*11+w]=old;
+                const UWORD fresh = dirty ? old^0x55aa : old;
+                std::memcpy(expected.data()+p*320*48+((origin+y)%320)*48+12+2*w,&fresh,2);
+            }
+        }
+        while (done<48) {
+            AmigaRenderer renderer{};
+            renderer.game=renderer.target=stage.data();
+            renderer.gameOrigin=(origin+done)%320;
+            unsigned batchPainted=0;
+            const int prepared=raster->prepareStage(&renderer,column,8000+done,48-done,debts,
+                [&](unsigned top,unsigned height) {
+                    batchPainted+=height;
+                    for (unsigned y=top;y<top+height;++y) {
+                        assert(raster->dirty(column,8000+done+y));
+                        for (unsigned p=0;p<2;++p) {
+                            const unsigned at=p*320*48+((origin+done+y)%320)*48+12;
+                            std::memcpy(stage.data()+at,expected.data()+at,22);
+                        }
+                    }
+                    return true;
+                });
+            assert(prepared>0 && unsigned(prepared)<=48-done && batchPainted<=16);
+            for (int y=0;y<prepared;++y) assert(!raster->dirty(column,8000+done+y));
+            painted+=batchPainted; done+=prepared;
+        }
+        assert(stage==expected && painted==expectedPainted);
+        for(unsigned y=0;y<320;++y) assert(debts.dirty(y,0)&&debts.dirty(y,1));
+        ++stagedCases;
+    }
+    AmigaRenderer failedStage{};
+    AmigaGameplayRows untouchedDebts;
+    raster->dirty(0,100)=true;
+    assert(raster->prepareStage(&failedStage,0,100,1,untouchedDebts,
+        [](unsigned,unsigned){return false;})==-1);
+    assert(raster->dirty(0,100));
+    assert(raster->prepareStage(&failedStage,3,100,1,untouchedDebts,
+        [](unsigned,unsigned){assert(false);return true;})==-1);
+    std::printf("Terrain staging: %u mixed/cold wrapped spans, <=16 repainted rows, untouched display debts\n",stagedCases);
     downwell::ShopWorld shops{};
     shops.instances[0].allocated=true;
     for(int y : {-50, 0, 120, 8190, 8250}) {

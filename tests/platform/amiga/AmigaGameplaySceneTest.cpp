@@ -105,6 +105,17 @@ int main() {
     scene.resetStage();
     assert(scene.stageFirst()==0 && scene.stageEnd()==0);
     assert(!scene.stageCovers(x,y,284));
+    // Cold append work may stop after a prefix, but prepends must adjoin the
+    // old interval. Exercise both a bounded suffix and rejection of a gap.
+    auto cold = scene.stageSpan(160,100,284,16);
+    scene.staged({cold.first,16},320);
+    cold = scene.stageSpan(160,52,284,16);
+    assert(cold.first==84 && cold.count==16);
+    scene.staged(cold,320);
+    assert(scene.stageCovers(160,84,32));
+    scene.staged({52,16},320);
+    assert(!scene.stageCovers(160,52,64));
+    scene.resetStage();
     std::printf("Staging: 20000 updates, %u covered views, %u failed copies, %u upward strips\n",
                 covered,failed,upward);
     // Independent pixel-row identity/revision oracle for the active backing.

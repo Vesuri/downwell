@@ -360,6 +360,7 @@ volatile const UBYTE* gDownwellCreditsFrame;
 volatile const UWORD* gDownwellCreditsCopper;
 #ifdef DOWNWELL_SCENE_VERIFY
 volatile LONG gDownwellTerrainFirstMismatch[8];
+volatile ULONG gDownwellColdStageRows;
 volatile ULONG gDownwellSplashCheckedFrames[7];
 volatile ULONG gDownwellSplashPublicationFailures;
 volatile const UWORD* gDownwellMenuSpriteOracle;
@@ -2334,6 +2335,14 @@ int main(void) {
             // Bind through the world: step() rebinds the player's callbacks.
             port.configureLandingResolver([](void*, int, int) { return 0; }, nullptr);
             port.configureSolidResolver([](void*, int, int) { return false; }, nullptr);
+            if (!port.tick()) {
+                // Exercise cold staging, not just transfers from a fully
+                // prepared raster. Production invalidation follows generation.
+                for (unsigned y=0; y<terrainRasterRows; ++y) {
+                    terrainRaster.dirty(0,y)=true;
+                    terrainRaster.dirty(2,y)=true;
+                }
+            }
             if (!port.tick() && (!port.registerSideCameraLocker(385, 256) ||
                                  !port.registerSideCameraLocker(95, 288))) return 20;
             const bool wasSideLocked = port.cameraSideLocked();
@@ -2653,22 +2662,34 @@ int main(void) {
                 const int targetY = wanted != 10000 ? port.previewCameraViewY(wanted) : -1;
                 if (targetY >= 0 && targetY + downwellGameRingHeight <= terrainRasterRows) {
                     const int targetX = mainViewX + wanted;
-                    const auto span = gameplayScene.stageSpan(targetX, targetY, downwellDisplayHeight);
+                    const auto span = gameplayScene.stageSpan(targetX, targetY, downwellDisplayHeight,
+                        AmigaTerrainRaster::stagePaintRows);
                     const int first = span.first, count = span.count;
                     if (count > 0) {
-                        bool clean = true;
                         const unsigned column = (targetX - mainViewX + 160) / 160;
-                        for (int row = first; row < first + count; ++row)
-                            if (terrainRaster.dirty(column, row)) clean = false;
-                        if (clean) {
-                            AmigaRenderer stage = renderer;
-                            stage.game = stagedBuffer;
-                            int origin = port.ringOrigin() + first - worldViewY;
-                            while (origin < 0) origin += downwellGameRingHeight;
-                            stage.gameOrigin = origin % downwellGameRingHeight;
-                            transferTerrainRows(&stage, targetX, first, 0, count, false);
-                            gameplayScene.staged(span, downwellGameRingHeight);
-                        } else gameplayScene.invalidateStage();
+                        AmigaRenderer stage = renderer;
+                        stage.game = stage.target = stagedBuffer;
+                        int origin = port.ringOrigin() + first - worldViewY;
+                        while (origin < 0) origin += downwellGameRingHeight;
+                        stage.gameOrigin = origin % downwellGameRingHeight;
+                        const int prepared = terrainRaster.prepareStage(&stage, column, first, count,
+                            gameplayRows, [&](unsigned top, unsigned height) {
+#ifdef DOWNWELL_SCENE_VERIFY
+                                gDownwellColdStageRows += height;
+#endif
+                                downwellProfileTerrainSpan(targetX, first + top, height,
+                                    downwellPlayfieldX, downwellPlayfieldWidth, 1, 4);
+                                amigaRendererClearGameRows(&stage, top, height, 0);
+                                AmigaTerrainPainter::paint(&stage, rooms, mainRoom, terrainCollision.index,
+                                    terrainTiles, generatedDecorations, liveBuilder.decorationCount(), &port,
+                                    activeGamePack, activeGamePackEnd, targetX, first,
+                                    downwellPlayfieldX, top, downwellPlayfieldWidth, height);
+                                AmigaHardware::blitterDrain();
+                                return true;
+                            });
+                        if (prepared >= 0)
+                            gameplayScene.staged({first, prepared}, downwellGameRingHeight);
+                        else gameplayScene.invalidateStage();
                     }
                 }
             }

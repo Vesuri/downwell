@@ -22,10 +22,13 @@ public:
     int backingFirst() const { return cachedFirst_; }
     int backingEnd() const { return cachedEnd_; }
     // Staging belongs to the scene, independently of the Copper slot lifetime.
-    // A span is committed only after its clean source rows have been copied.
+    // A span is committed only after its rows have been copied or freshly
+    // composed. A preparation budget may complete only a prefix of a request.
     void invalidateStage() { stagedX_ = -10000; }
     void resetStage() { invalidateStage(); stagedFirst_ = stagedEnd_ = 0; }
-    StageSpan stageSpan(int x, int y, int visibleHeight);
+    // Prepends must fit the cold-paint budget: committing only their prefix
+    // would leave an uninitialized gap before the previous valid interval.
+    StageSpan stageSpan(int x, int y, int visibleHeight, int prependBudget = 48);
     void staged(StageSpan span, int ringHeight);
     bool stageCovers(int x, int y, int height) const {
         return stagedX_ == x && stagedFirst_ <= y && stagedEnd_ >= y + height;

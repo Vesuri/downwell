@@ -33,7 +33,7 @@ AmigaGameplayScene::StageSpan AmigaGameplayScene::exposeBacking(int viewY, int h
     return {first, count};
 }
 
-AmigaGameplayScene::StageSpan AmigaGameplayScene::stageSpan(int x, int y, int visibleHeight) {
+AmigaGameplayScene::StageSpan AmigaGameplayScene::stageSpan(int x, int y, int visibleHeight, int prependBudget) {
     if (x != stagedX_) {
         stagedX_ = x;
         stagedFirst_ = stagedEnd_ = y;
@@ -42,6 +42,7 @@ AmigaGameplayScene::StageSpan AmigaGameplayScene::stageSpan(int x, int y, int vi
     if (y < stagedFirst_) {
         count = stagedFirst_ - y;
         if (count > 48) count = 48;
+        if (count > prependBudget) count = prependBudget > 0 ? prependBudget : 0;
         first = stagedFirst_ - count;
     } else if (count > 48) count = 48;
     return {first, count > 0 ? count : 0};
@@ -49,6 +50,11 @@ AmigaGameplayScene::StageSpan AmigaGameplayScene::stageSpan(int x, int y, int vi
 
 void AmigaGameplayScene::staged(StageSpan span, int ringHeight) {
     if (span.count <= 0) return;
+    if (stagedFirst_ < stagedEnd_ &&
+        (span.first > stagedEnd_ || span.first + span.count < stagedFirst_)) {
+        invalidateStage(); // Never claim the unprepared gap between intervals.
+        return;
+    }
     if (span.first < stagedFirst_) stagedFirst_ = span.first;
     if (span.first + span.count > stagedEnd_) stagedEnd_ = span.first + span.count;
     if (stagedEnd_ - stagedFirst_ > ringHeight) {

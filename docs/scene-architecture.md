@@ -68,6 +68,16 @@ Before CPU composition follows a blitter clear, drain queued work as well as
 the active DMA. Waiting for the active blit alone does not establish that a
 queued clear has completed.
 
+Side-view staging borrows retired storage, never the active restoration backing.
+Each update copies at most 48 cached rows and composes at most 16 dirty rows;
+completed fresh runs also update the retained raster. This is read-only rendering
+of already-created world state, not deferred generation or Create dispatch.
+Staging cannot clear either visible buffer's repair debts or invoke their
+pipelined publication copies. Commit only the prepared contiguous interval.
+For upward preparation, bound the adjacent suffix to the paint budget so a
+partial operation cannot claim an untouched gap. World changes still invalidate
+staging before a camera switch can use it.
+
 Retire and publish buffers independently: damage acknowledged in one display
 must not clear the other's debt. A Copper rebuild does not itself invalidate
 retained pixels. Fixed-capacity draw-list failure must prevent publication,

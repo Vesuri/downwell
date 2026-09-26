@@ -15,6 +15,11 @@ if gDownwellCameraFrameChecks != 2 * gDownwellCameraTransitions
     printf "Both display slots were not checked after each camera transition\n"
     quit 1
 end
+if gDownwellColdStageRows == 0
+    printf "Cold side-room staging was not exercised\n"
+    quit 1
+end
+printf "Cold side-room staging: %lu freshly composed rows\n", gDownwellColdStageRows
 if gDownwellTerrainRasterFailures != 0 || gDownwellTerrainRasterChecks < 50 || gDownwellGameBufferFailures != 0 || gDownwellGameplayBobFailures != 0
     printf "Camera raster mismatch: raster=%lu checks=%lu display=%lu bobs=%lu\n", gDownwellTerrainRasterFailures, gDownwellTerrainRasterChecks, gDownwellGameBufferFailures, gDownwellGameplayBobFailures
     printf "First cache/fresh mismatch: viewX=%ld worldY=%ld height=%ld row=%ld plane=%ld word=%ld cached=%04lx fresh=%04lx\n", gDownwellTerrainFirstMismatch[0], gDownwellTerrainFirstMismatch[1], gDownwellTerrainFirstMismatch[2], gDownwellTerrainFirstMismatch[3], gDownwellTerrainFirstMismatch[4], gDownwellTerrainFirstMismatch[5], gDownwellTerrainFirstMismatch[6], gDownwellTerrainFirstMismatch[7]

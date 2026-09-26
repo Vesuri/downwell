@@ -48,7 +48,7 @@ if $sum != gDownwellProfileFrameMax[$s] || gDownwellProfileWorstFrame[$s] == 0
     quit 1
 end
 printf "Collision routes: solid_indexed=%lu solid_fallback=%lu landing_indexed=%lu landing_fallback=%lu breakable_fallback=%lu\n", gDownwellProfileCounters[0], gDownwellProfileCounters[1], gDownwellProfileCounters[2], gDownwellProfileCounters[3], gDownwellProfileCounters[4]
-printf "Worst-frame terrain spans: %lu (first 16 retained); kind 0=cache 1=dirty 2=forced 3=uncached; cause 0=exposure/camera/prefetch 1=generation 2=shop 3=broken block\n", gDownwellProfileWorstSpanCount[$s]
+printf "Worst-frame terrain spans: %lu (first 16 retained); kind 0=cache 1=dirty 2=forced 3=uncached; cause 0=exposure/camera/prefetch 1=generation 2=shop 3=broken block 4=cold side staging\n", gDownwellProfileWorstSpanCount[$s]
 set $i = 0
 while $i < gDownwellProfileWorstSpanCount[$s] && $i < 16
     set $span = &gDownwellProfileWorstSpans[$s][$i]

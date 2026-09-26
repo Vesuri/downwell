@@ -153,10 +153,10 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   Re-profile after integration changes; average FPS is not the criterion.
 - Remove unnecessary terrain recomposition and transfers. Preserve circular
   hardware scrolling, static terrain backing and incremental restoration.
-  Prepare uncached side-room rows incrementally before horizontal camera jumps;
-  staging currently accepts only clean raster rows, leaving wholly dirty views
-  to be composed at the switch. Preserve invalidation, ring ownership and both
-  display buffers' restoration debts while doing so.
+  Reduce speculative side-view preparation for views the player never enters,
+  and cache misses on late direction changes or generation invalidation. Check
+  throughput as well as worst-frame gaps. Extend natural horizontal-shop
+  coverage while preserving ring ownership and both display buffers' debts.
 - Profile generation CPU costs without changing RNG consumption or synchronous
   Create ordering. Shop and exit Create effects must precede the next pattern
   cell's random draw; spreading generation over frames is not behavior-neutral.
