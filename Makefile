@@ -262,6 +262,7 @@ test: verify-ordinary-time-field
 verify-ordinary-time-field: build/ordinary-time-field-test
 	./build/ordinary-time-field-test
 	python3 tools/verify-runner-field-draw.py
+	python3 tools/verify-runner-field-lookup.py
 
 generated/downwell-time-field-mask.h: generated/time-stop-masks.json tools/verify-time-stop-masks.py
 	python3 tools/verify-time-stop-masks.py --generate

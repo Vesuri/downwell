@@ -115,6 +115,43 @@ are not execution of the Windows collision routine.
 
 ## Player event boundary
 
+### Field identity lookup is not Draw traversal
+
+`scrTimeShard` calls `instance_place(x,y,parentTimeField)` twice on a hit and
+uses the chosen instance's centre for `point_direction`. Boolean contact alone
+does not determine that direction when multiple fields overlap.
+
+The pinned Windows registration at `0x52cd08` binds `instance_place` to
+`0x529e50`. That wrapper narrows query coordinates to binary32, calls
+`0x4fe560`, and returns the selected instance's ID at offset `0x7c`, or `-4`
+for no instance. The callee temporarily moves the querying instance and
+restores its position before returning.
+
+The selector `0x500d30` distinguishes object and instance selectors and can
+return either list or spatial traversal. For object selectors, `0x500f8e`
+compares object offset `0x4c` with spatial-root offset `0x04`; `jl 0x5010c0`
+selects the list path. This is not a fixed field-count threshold inferred from
+our storage capacity. Flag checks and index preparation also affect dispatch.
+
+The object-list path at `0x4fe7c1` follows object offset `0x44`, list next at
+offset zero and instance pointer at offset eight. It skips instance flags
+`0x100003`, calls precise contact at `0x464d30`, and returns on the first hit
+when no collection argument is supplied (the ordinary wrapper supplies zero).
+
+The spatial path calls `0x5007f0`, then recursively traverses `0x5006f0` in
+ascending node-entry order, pruning bounding boxes. Callback `0x5016a0`
+filters self, flags and object/ancestor membership before precise contact.
+At `0x501751` it stores the first matching instance and returns false, stopping
+the recursive traversal. The Draw-list links are not used by these paths.
+
+`tools/verify-runner-field-lookup.py` pins these reviewed bytes. It does not
+prove object-list insertion, spatial-tree construction/update order or the
+selector outcome during a particular original-game encounter. Those must be
+established before assigning a source-equivalent field identity to shard bursts;
+do not substitute Draw order, storage order or nearest-centre selection.
+
+### Published and private player positions
+
 In `objPlayer_n` Begin Step, `scrPlMovement` precedes clock accounting. The
 source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.
 Camera/interactable queries follow, then the time-stop transition query uses
