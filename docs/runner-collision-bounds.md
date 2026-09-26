@@ -48,10 +48,27 @@ Byte `0x9360b0` changes the edge convention. If set, the bbox routine uses x87
 If clear, internal bounds remain fractional and the public right/bottom
 getters subtract one instead. Conversion depends on the runtime FP control word.
 
-The option-loading code at `0x47bcc0..0x47bcd8` assigns this byte from bit
-`0x08000000` of the structure word at offset 8. Selecting the deployed branch
-requires tracing that structure to serialized options or observing the runner;
-the instruction hash alone does not prove the byte's runtime value. Likewise,
-the subsequent precise-mask collision routine must establish how fractional
-bounds become sampled pixel intervals. Do not wire blood collisions using an
-assumed edge convention merely because an integer field-mask helper passes.
+The `OPTN` chunk dispatch at `0x4985d2..0x4985e4` calls loader `0x47b9f0`
+with the chunk payload. It recognizes the negative marker and version 2,
+then `0x47bcc0..0x47bcd8` assigns the byte from bit `0x08000000` at payload
+offset 8. The pinned data contains marker `0x80000000`, version 2 and flags
+`0x28400214`: **compatibility mode is enabled at load**. The verifier checks
+both this serialized value and the loader/dispatch machine code. This is a
+static load-path conclusion, not a runtime FP-control-word measurement.
+
+## Precise collision dispatch
+
+Instance collision routine `0x464d30` adds one to inclusive upper bounds for
+its broad overlap tests in this mode. If either sprite is precise, it calls
+`0x4b8eb0`; the fractional-mode alternative is `0x4b96b0`. Both sprites' frame,
+position, scale, angle and computed bounds are supplied. Frame selection is
+truncated toward zero, then normalized to the sprite's frame count.
+
+At `0x4b8fb8..0x4b8ff9`, the compatibility routine intersects the bounds and
+converts the extrema with `cvttss2si`. Its loops include both endpoint pixels.
+The unit-scale, near-zero-angle fast path rounds positions with x87 `fistp`
+and indexes masks from origin plus pixel minus position. Other scales and
+angles branch to `0x4b9227`, with rotated sampling at `0x4b93f6`. Goal fields
+have scale 2, so their blood interactions cannot be justified by the unit-scale
+fast path alone. Generalized integer rectangle/field tests prove their supplied
+geometry only, not the rotated sampling of this latter path.

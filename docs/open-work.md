@@ -46,8 +46,8 @@ References: [skeleton effects](skeleton-effect-ownership.md),
 [phase eligibility](runner-step-eligibility.md), [alarms](runner-alarms.md),
 [animation fields](runner-image-fields.md).
 
-Blood time-field integration also requires the runner's active edge convention
-and precise-mask sampling rules; see [collision bounds](runner-collision-bounds.md).
+Blood time-field integration also requires the runner's rotated precise-mask
+sampling and FP rounding rules; see [collision bounds](runner-collision-bounds.md).
 
 ## 2. Make catacombs playable
 

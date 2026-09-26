@@ -3,6 +3,7 @@
 from hashlib import sha256
 from pathlib import Path
 import runpy
+import struct
 
 audit = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = audit["region"]
@@ -11,8 +12,26 @@ for start, end, digest in (
     (0x52b1f0, 0x52b27f, "32dad8432b67077aa41fdcf5a2a9fe7aba74fdeaeb856f435ecbadcacb80755d"),
     (0x466010, 0x4666fe, "44030a7ef3c09e6484c14483fb429217d33f1e087d6b97a8c7327e1b0b91f22f"),
     (0x47bcba, 0x47bce0, "da4711425d941efd63fecf899c4d91e0aa274a2b22620cf9a7ca79b8f86c9e14"),
+    (0x4985d2, 0x4985e9, "f22a7e471ee17b0bd02cdcb02f59b629ba48a21460715553aa7af698a73d4ce2"),
+    (0x47b9f0, 0x47ba11, "585fd396a2619d2ca5f71c137b87e5fce0d15e2a7ea52ccb6b51b26061b4c866"),
+    (0x464d30, 0x4650ab, "5715cddc60c08661840dce8488493b71ff4820d976cb48d282d3702a494cbdf8"),
+    (0x4b8eb0, 0x4b9227, "0d24f4ba2a1d20fac0d39aa798b10d393e070d2f45289e84bedbfb709b4258f2"),
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x7fe38c,10) == b"bbox_left\0"
 assert region(0x80c958,14) == b"place_meeting\0"
-print("Pinned Windows bbox transforms, compatibility branch and place_meeting wrapper")
+data = (audit["root"] / "data/data.win").read_bytes()
+assert sha256(data).hexdigest() == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
+assert data[:4] == b"FORM" and struct.unpack_from("<I", data, 4)[0] == len(data)-8
+offset, options = 8, []
+while offset < len(data):
+    size = struct.unpack_from("<I", data, offset+4)[0]
+    assert offset+8+size <= len(data)
+    if data[offset:offset+4] == b"OPTN":
+        options.append(data[offset+8:offset+8+size])
+    offset += 8+size
+assert offset == len(data) and len(options) == 1
+marker, version, flags = struct.unpack_from("<IIQ", options[0])
+assert marker == 0x80000000 and version == 2 and flags == 0x28400214
+assert flags & 0x08000000
+print("Pinned Windows collision bounds and OPTN compatibility mode: enabled (integer inclusive edges)")
