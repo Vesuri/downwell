@@ -1,12 +1,20 @@
 #include "core/PlayerSolidCollisionBinary64.h"
 // Reviewed UTMT 0.9.2.0 scrCheckCollisionWith assembly SHA-256:
 // 436c35e576d8e3b7d31b2db6b8346521b5d53115bc0d25a06fc798a7ca94a959
+// scrPlayerPlatformCollision assembly SHA-256:
+// ff16a679255d294bae4a597f87d9dd627033df1b2dea5c289a261ea37a4d5bc7
 // data.win: c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8
 #ifdef DOWNWELL_FREESTANDING
 extern "C" bool playerSolidCollisionBinary64Compile(downwell::MotionBinary64& x,
     downwell::MotionBinary64& y,downwell::MotionBinary64 vx,downwell::MotionBinary64 vy,
     bool(*query)(downwell::MotionBinary64,downwell::MotionBinary64,bool&),downwell::SolidCollisionResult& result){
     return downwell::PlayerSolidCollisionBinary64::resolve(x,y,vx,vy,query,result);
+}
+extern "C" bool playerPlatformCollisionBinary64Compile(downwell::MotionBinary64& x,
+    downwell::MotionBinary64& y,downwell::MotionBinary64 vx,downwell::MotionBinary64 vy,
+    bool(*platform)(downwell::MotionBinary64,downwell::MotionBinary64,bool&),
+    bool(*wall)(downwell::MotionBinary64,downwell::MotionBinary64,bool&),downwell::SolidCollisionResult& result){
+    return downwell::PlayerSolidCollisionBinary64::resolvePlatform(x,y,vx,vy,platform,wall,result);
 }
 #else
 #include <cassert>
@@ -67,6 +75,39 @@ int main(){
     assert(!PlayerSolidCollisionBinary64::resolve(invalid,y,number(1),number(1),
         [](auto,auto,bool&){assert(false);return true;},unchanged));
     assert(unchanged.x==7 && unchanged.y==8 && value(y)==1);
-    std::printf("Binary64 solid collision: %u coordinate/query-order comparisons and failure cutoffs passed\n",cases);
+    // VM platform blocks 28/31 and 35/38: platform first, wall only on miss.
+    // First three probes must remain platform-only, even with nearby walls.
+    for(unsigned wallAxis=0;wallAxis<3;++wallAxis){
+        auto x=number(0.25),y=number(0.25);SolidCollisionResult result{};
+        std::vector<unsigned> order;
+        assert(PlayerSolidCollisionBinary64::resolvePlatform(x,y,number(3),number(3),
+            [&](auto a,auto b,bool& hit){order.push_back(87);hit=value(a)>=2 && value(b)>=2;return true;},
+            [&](auto a,auto b,bool& hit){order.push_back(57);
+                hit=wallAxis==0?(value(a)==1 && value(b)==0):
+                    wallAxis==1?(value(a)==1 && value(b)==1):false;return true;},result));
+        assert(result.x==1 && result.y==1);
+        if(wallAxis==0){assert(value(x)==0 && value(y)==0);
+            assert((order==std::vector<unsigned>{87,87,87,87,57}));}
+        else if(wallAxis==1){assert(value(x)==1 && value(y)==0);
+            assert((order==std::vector<unsigned>{87,87,87,87,57,87,57}));}
+        else {assert(value(x)==2 && value(y)==1);
+            assert((order==std::vector<unsigned>{87,87,87,87,57,87,57,87,57,87}));}
+    }
+    for(unsigned fail=0;fail<10;++fail){
+        auto x=number(0.25),y=number(0.25);SolidCollisionResult result{};unsigned calls=0;
+        assert(!PlayerSolidCollisionBinary64::resolvePlatform(x,y,number(3),number(3),
+            [&](auto a,auto b,bool& hit){if(calls++==fail)return false;
+                hit=value(a)>=2 && value(b)>=2;return true;},
+            [&](auto,auto,bool& hit){if(calls++==fail)return false;hit=false;return true;},result));
+        assert(calls==fail+1 && value(x)==(fail<3?0.25:0.0) && value(y)==(fail<3?0.25:0.0));
+    }
+    for(unsigned contact=0;contact<3;++contact){
+        auto x=number(0.25),y=number(0.25);SolidCollisionResult result{};
+        assert(PlayerSolidCollisionBinary64::resolvePlatform(x,y,number(3),number(3),
+            [&](auto a,auto b,bool& hit){hit=contact==0?false:contact==1?value(a)>=2:value(b)>=2;return true;},
+            [](auto,auto,bool&){assert(false);return false;},result));
+        assert(result.x==(contact==1?1:0) && result.y==(contact==2?1:0));
+    }
+    std::printf("Binary64 collision: %u scalar traces, platform/wall ordering and failure cutoffs passed\n",cases);
 }
 #endif

@@ -34,6 +34,24 @@ struct PlayerSolidCollisionBinary64 {
     }
     template<class Query>
     static bool resolve(N& x,N& y,N vx,N vy,Query query,SolidCollisionResult& result){
+        return resolveWithDiagonalQuery(x,y,vx,vy,query,query,result);
+    }
+    // scrPlayerPlatformCollision differs only in its diagonal walk: query
+    // checkTarget first, then parentWall (57) on a miss, for each axis probe.
+    // Do not apply that union to the initial predictive or axis-only queries.
+    template<class Platform,class Wall>
+    static bool resolvePlatform(N& x,N& y,N vx,N vy,Platform platform,Wall wall,
+                                SolidCollisionResult& result){
+        return resolveWithDiagonalQuery(x,y,vx,vy,platform,
+            [&](N px,N py,bool& hit){
+                if(!platform(px,py,hit))return false;
+                return hit || wall(px,py,hit);
+            },result);
+    }
+private:
+    template<class Query,class Diagonal>
+    static bool resolveWithDiagonalQuery(N& x,N& y,N vx,N vy,Query query,Diagonal diagonal,
+                                         SolidCollisionResult& result){
         if(!x.valid()||!y.valid()||!vx.valid()||!vy.valid())return false;
         N px,py;
         if(!probe(x,vx,px)||!probe(y,vy,py))return false;
@@ -76,10 +94,10 @@ struct PlayerSolidCollisionBinary64 {
         N mx{},my{};
         for(;;){
             N qx,qy;
-            if(!offset(x,mx,dx,qx)||!offset(y,my,{},qy)||!query(qx,qy,hit))return false;
+            if(!offset(x,mx,dx,qx)||!offset(y,my,{},qy)||!diagonal(qx,qy,hit))return false;
             if(hit)break;
             if(!mx.add(dx))return false;
-            if(!offset(x,mx,{},qx)||!offset(y,my,dy,qy)||!query(qx,qy,hit))return false;
+            if(!offset(x,mx,{},qx)||!offset(y,my,dy,qy)||!diagonal(qx,qy,hit))return false;
             if(hit)break;
             if(!my.add(dy))return false;
             if(atLeast(my,vy)){mx={};my={};break;}
