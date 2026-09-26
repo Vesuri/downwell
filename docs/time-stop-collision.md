@@ -175,8 +175,23 @@ The fixed registry stores 16 bytes per slot plus its three list counters;
 queries scan the common list rather than allocating a node for every ancestor.
 The owner must provide a validated immutable parent graph and unbind retired
 slots before reuse. Active requests are not immediate unbind operations: apply
-the reconciliation contract above. This component is not yet the live world's
-membership owner or a complete `instance_place` implementation.
+the reconciliation contract above.
+
+The decoded host's `InstanceStore` owns this registry alongside its generation
+handles. Successful births bind, and erase/clear/transient room retirement
+unbind before slot reuse. Copies retain self-contained links; compaction leaves
+registration order unchanged. `bindObject` is the explicit object-change boundary,
+including same-object rebinding. `publishObjectMembership` changes registration
+without changing the lifetime or active flag, and repeated publication is a
+no-op. Direct writes to a record's `objectId` bypass this contract and must not
+be used. `visitObject` returns the matching lifetime handle and const record.
+
+The store preserves persistent memberships when compacting for room entry;
+source-specific room-transition rebinding still belongs to the room owner.
+Live deferred activation reconciliation, other gameplay-family registration and
+spatial/list branch selection are not connected yet. These counts therefore
+must not replace original-runner field selection until that integration is
+complete. Store ownership alone is not a complete `instance_place` implementation.
 
 The spatial path calls `0x5007f0`, then recursively traverses `0x5006f0` in
 ascending node-entry order, pruning bounding boxes. Callback `0x5016a0`

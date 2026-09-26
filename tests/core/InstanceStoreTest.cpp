@@ -1,6 +1,7 @@
 #include "core/InstanceStore.h"
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 
 namespace {
 
@@ -90,6 +91,44 @@ void testStableHandles() {
     require(empty.create(1,1,1,false)==downwell::CreateInstanceResult::full,"zero capacity remains supported");
 }
 
+void testOwnedObjectMembership() {
+    downwell::InstanceStore<4> store;
+    auto isA=[](int child,int ancestor){return child==11 && ancestor==10;};
+    auto ids=[&](const auto& owner){
+        std::vector<unsigned> result;
+        owner.visitObject(10,isA,[&](downwell::InstanceHandle handle,const downwell::InstanceRecord& record){
+            require(owner.resolve(handle)==&record,"membership resolves its exact live generation");
+            result.push_back(record.instanceId);return true;
+        });
+        require(result.size()==owner.registeredObjectCount(10,isA),"ancestor count matches owned memberships");
+        return result;
+    };
+    store.create(1,10,7,true);store.create(2,11,7,false);store.create(3,10,7,true);
+    auto first=store.handleAt(0),second=store.handleAt(1),third=store.handleAt(2);
+    require(ids(store)==std::vector<unsigned>({1,2,3}),"birth binds own and derived objects in creation order");
+    store.resolve(first)->active=false;
+    require(ids(store)==std::vector<unsigned>({1,2,3}),"deactivation request alone does not unlink membership");
+    store.resolve(first)->active=true;
+    require(store.publishObjectMembership(first,true) && ids(store)==std::vector<unsigned>({1,2,3}),
+        "canceled deactivation does not reappend an already registered instance");
+    require(store.publishObjectMembership(first,false) && ids(store)==std::vector<unsigned>({2,3}),
+        "reconciliation removes membership without destroying its lifetime");
+    require(store.publishObjectMembership(first,true) && ids(store)==std::vector<unsigned>({2,3,1}),
+        "completed reactivation appends at the ancestor-list tail");
+    require(store.bindObject(third,11) && ids(store)==std::vector<unsigned>({2,1,3}),
+        "object rebinding uses new metadata and moves membership to tail");
+    store.erase(2);store.create(2,11,7,false);
+    require(!store.bindObject(second,10) && !store.publishObjectMembership(second,false),
+        "stale handle cannot change reused-slot membership");
+    require(ids(store)==std::vector<unsigned>({1,3,2}),"retirement and slot reuse preserve survivor order");
+    auto copy=store;
+    require(copy.publishObjectMembership(first,false) && ids(copy)==std::vector<unsigned>({3,2}) &&
+        ids(store)==std::vector<unsigned>({1,3,2}),"copied registry owns independent links and records");
+    store.enterRoom(8);
+    require(ids(store)==std::vector<unsigned>({1,3}),"room retirement removes transient memberships after compaction");
+    store.clear();require(ids(store).empty(),"clear retires all membership");
+}
+
 } // namespace
 
 int main() {
@@ -97,6 +136,7 @@ int main() {
     testErasePreservesOrder();
     testRoomTransitionKeepsPersistentInstances();
     testStableHandles();
+    testOwnedObjectMembership();
     std::cout << "instance store tests passed\n";
     return 0;
 }

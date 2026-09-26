@@ -12,6 +12,7 @@
 #include "WalkingEnemyMotion.h"
 #include "BatHitState.h"
 #include "BatBehavior.h"
+#include "RunnerObjectMembership.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -91,6 +92,7 @@ public:
     static constexpr std::size_t capacity = Capacity;
 
     void clear() {
+        objectMembership_.clear();
         for(std::size_t i=0;i<size_;++i)slots_[recordSlots_[i]].record=Capacity;
         size_ = 0;
     }
@@ -111,6 +113,39 @@ public:
     }
     InstanceRecord* resolve(InstanceHandle handle) {
         return const_cast<InstanceRecord*>(static_cast<const InstanceStore&>(*this).resolve(handle));
+    }
+
+    // Object changes must use this boundary rather than writing objectId.
+    // Rebinding appends even when the object and lifetime are unchanged.
+    bool bindObject(InstanceHandle handle,std::int32_t objectId,bool registered=true) {
+        auto* instance=resolve(handle);
+        if(!instance || objectId<0)return false;
+        objectMembership_.unbind(handle.slot);
+        instance->objectId=objectId;
+        if(registered)objectMembership_.bind(handle.slot,objectId,handle.generation);
+        return true;
+    }
+    // Called by deferred reconciliation, NOT by an active-flag write. Repeated
+    // publication of the same membership state does not change registration order.
+    bool publishObjectMembership(InstanceHandle handle,bool registered) {
+        const auto* instance=resolve(handle);
+        if(!instance || instance->objectId<0)return false;
+        if(!registered)objectMembership_.unbind(handle.slot);
+        else if(!objectMembership_.contains(handle.slot))
+            objectMembership_.bind(handle.slot,instance->objectId,handle.generation);
+        return true;
+    }
+    template<class IsA> unsigned registeredObjectCount(int object,IsA isA) const {
+        return objectMembership_.count(object,isA);
+    }
+    // Graph and visitor must not mutate this store. Active/precise-hit filtering
+    // belongs to the visitor; inactive flags can precede membership retirement.
+    template<class IsA,class Visit> void visitObject(int object,IsA isA,Visit visit) const {
+        objectMembership_.visit(object,isA,[&](unsigned slot,std::uint32_t generation){
+            const InstanceHandle handle{slot,generation};
+            const auto* instance=resolve(handle);
+            return !instance || visit(handle,*instance);
+        });
     }
 
     const InstanceRecord* find(std::uint32_t instanceId) const {
@@ -151,6 +186,7 @@ public:
         instance.objectId = objectId;
         instance.roomId = roomId;
         instance.persistent = persistent;
+        if(objectId>=0)objectMembership_.bind(static_cast<unsigned>(slot),objectId,slots_[slot].generation);
         return CreateInstanceResult::success;
     }
 
@@ -158,6 +194,7 @@ public:
         for (std::size_t index = 0; index < size_; ++index) {
             if (records_[index].instanceId != instanceId)
                 continue;
+            objectMembership_.unbind(recordSlots_[index]);
             slots_[recordSlots_[index]].record=Capacity;
             for (std::size_t next = index + 1; next < size_; ++next){
                 records_[next - 1] = records_[next];
@@ -174,6 +211,7 @@ public:
         std::size_t destination = 0;
         for (std::size_t source = 0; source < size_; ++source) {
             if (!records_[source].persistent){
+                objectMembership_.unbind(recordSlots_[source]);
                 slots_[recordSlots_[source]].record=Capacity;
                 continue;
             }
@@ -188,6 +226,7 @@ public:
     }
 
 private:
+    RunnerObjectMembership<static_cast<unsigned>(Capacity)> objectMembership_;
     struct Slot {std::size_t record=Capacity;std::uint32_t generation=0;};
     std::array<Slot,Capacity> slots_{};
     std::array<std::uint32_t,Capacity> recordSlots_{};
