@@ -62,12 +62,41 @@ void testRoomTransitionKeepsPersistentInstances() {
             "persistent transform and layer state survive transition");
 }
 
+void testStableHandles() {
+    downwell::InstanceStore<4> instances;
+    instances.create(1,10,7,false);instances.create(2,20,7,true);instances.create(3,30,7,true);
+    const auto gone=instances.handleAt(0),second=instances.handleAt(1),third=instances.handleAt(2);
+    require(instances.resolve({})==nullptr,"default handle is invalid");
+    require(instances.resolve(instances.handleAt(99))==nullptr,"out-of-range handle is invalid");
+    require(instances.erase(1),"erase first record");
+    require(!instances.resolve(gone),"retired handle is invalidated");
+    require(instances.resolve(second)==&instances.at(0),"second handle follows compaction");
+    require(instances.resolve(third)==&instances.at(1),"third handle follows compaction");
+    for(unsigned cycle=0;cycle<1024;++cycle){
+        require(instances.create(1,10,7,false)==downwell::CreateInstanceResult::success,"reuse retired slot");
+        auto transient=instances.handleAt(2);
+        require(transient.slot==gone.slot && transient.generation!=gone.generation,"reused slot has new generation");
+        require(!instances.resolve(gone),"old handle never resolves reused ID");
+        instances.enterRoom(8);
+        require(!instances.resolve(transient),"room entry retires transient handle");
+        require(instances.resolve(second)==&instances.at(0)&&instances.resolve(third)==&instances.at(1),"persistent handles survive room compaction");
+    }
+    // Store copies carry self-contained indices, not pointers into the source.
+    auto copy=instances;copy.resolve(second)->x=123;
+    require(instances.resolve(second)->x!=123,"copy handles resolve within copied store");
+    instances.clear();require(!instances.resolve(second)&&!instances.resolve(third),"clear invalidates handles");
+    instances.create(2,20,8,true);require(!instances.resolve(second),"clear preserves generation protection");
+    downwell::InstanceStore<0> empty;
+    require(empty.create(1,1,1,false)==downwell::CreateInstanceResult::full,"zero capacity remains supported");
+}
+
 } // namespace
 
 int main() {
     testCapacityIdentityAndOrder();
     testErasePreservesOrder();
     testRoomTransitionKeepsPersistentInstances();
+    testStableHandles();
     std::cout << "instance store tests passed\n";
     return 0;
 }

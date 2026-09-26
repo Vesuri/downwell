@@ -75,19 +75,43 @@ enum class CreateInstanceResult {
     full
 };
 
+// Store-local identity, independent of compacted record offsets. Generation
+// protects deferred consumers from a retired slot being reused for a new birth.
+struct InstanceHandle {
+    std::uint32_t slot = 0xffffffffu;
+    std::uint32_t generation = 0;
+};
+
 // Stable-order, allocation-free storage suitable for both the reference build
 // and an Amiga capacity selected later from measured room/runtime requirements.
 template <std::size_t Capacity>
 class InstanceStore {
+    static_assert(Capacity<0xffffffffu,"Instance handles use 32-bit slots");
 public:
     static constexpr std::size_t capacity = Capacity;
 
-    void clear() { size_ = 0; }
+    void clear() {
+        for(std::size_t i=0;i<size_;++i)slots_[recordSlots_[i]].record=Capacity;
+        size_ = 0;
+    }
     std::size_t size() const { return size_; }
     bool empty() const { return size_ == 0; }
 
     const InstanceRecord& at(std::size_t index) const { return records_[index]; }
     InstanceRecord& at(std::size_t index) { return records_[index]; }
+
+    InstanceHandle handleAt(std::size_t index) const {
+        if(index>=size_)return {};
+        const auto slot=recordSlots_[index];return {slot,slots_[slot].generation};
+    }
+    const InstanceRecord* resolve(InstanceHandle handle) const {
+        if(handle.slot>=Capacity || !handle.generation)return nullptr;
+        const auto& slot=slots_[handle.slot];
+        return slot.record<size_ && slot.generation==handle.generation?&records_[slot.record]:nullptr;
+    }
+    InstanceRecord* resolve(InstanceHandle handle) {
+        return const_cast<InstanceRecord*>(static_cast<const InstanceStore&>(*this).resolve(handle));
+    }
 
     const InstanceRecord* find(std::uint32_t instanceId) const {
         for (std::size_t index = 0; index < size_; ++index) {
@@ -114,6 +138,13 @@ public:
         if (size_ == Capacity)
             return CreateInstanceResult::full;
 
+        std::size_t slot=0;
+        while(slot<Capacity && (slots_[slot].record!=Capacity || slots_[slot].generation==0xffffffffu))++slot;
+        // Exhausted generations never wrap into a stale live handle.
+        if(slot==Capacity)return CreateInstanceResult::full;
+        slots_[slot].record=size_;++slots_[slot].generation;
+        recordSlots_[size_]=static_cast<std::uint32_t>(slot);
+
         InstanceRecord& instance = records_[size_++];
         instance = InstanceRecord{};
         instance.instanceId = instanceId;
@@ -127,8 +158,12 @@ public:
         for (std::size_t index = 0; index < size_; ++index) {
             if (records_[index].instanceId != instanceId)
                 continue;
-            for (std::size_t next = index + 1; next < size_; ++next)
+            slots_[recordSlots_[index]].record=Capacity;
+            for (std::size_t next = index + 1; next < size_; ++next){
                 records_[next - 1] = records_[next];
+                recordSlots_[next-1]=recordSlots_[next];
+                slots_[recordSlots_[next-1]].record=next-1;
+            }
             --size_;
             return true;
         }
@@ -138,10 +173,14 @@ public:
     void enterRoom(std::int32_t roomId) {
         std::size_t destination = 0;
         for (std::size_t source = 0; source < size_; ++source) {
-            if (!records_[source].persistent)
+            if (!records_[source].persistent){
+                slots_[recordSlots_[source]].record=Capacity;
                 continue;
+            }
             if (destination != source)
                 records_[destination] = records_[source];
+            recordSlots_[destination]=recordSlots_[source];
+            slots_[recordSlots_[destination]].record=destination;
             records_[destination].roomId = roomId;
             ++destination;
         }
@@ -149,6 +188,9 @@ public:
     }
 
 private:
+    struct Slot {std::size_t record=Capacity;std::uint32_t generation=0;};
+    std::array<Slot,Capacity> slots_{};
+    std::array<std::uint32_t,Capacity> recordSlots_{};
     std::array<InstanceRecord, Capacity> records_{};
     std::size_t size_ = 0;
 };

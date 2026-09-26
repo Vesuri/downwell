@@ -253,11 +253,21 @@ the bounds-dirty bit before moving eligible memberships to the head. The second
 collision queue is updated only through the source's object-flag `0x08` path.
 Invalid numeric values or required slot bindings fail before mutation.
 
-The queue slot must be a stable registry handle. `InstanceStore::erase` and
-`compactInstanceSlots` move records; their array offsets are not stable handles
-and cannot be bound directly to this queue. Live integration must preserve
-identity across compaction or use a separate stable registry. The position
-adapter is not yet installed on those live stores.
+The queue slot must be a stable registry handle. `InstanceStore` supplies
+store-local slot/generation handles and resolves them through compaction;
+`handleAt` refers to a record in creation-order iteration, while `resolve`
+finds its current location. Erase, room retirement and clear invalidate handles;
+persistent instances keep theirs. Generation exhaustion fails creation instead
+of wrapping. Store copies carry index mappings, not pointers to the original.
+Consumers must still remove queue/index membership before slot reuse and check
+generation on deferred references. Whole-store replacement resets the identity
+domain and requires resetting associated consumers.
+
+`compactInstanceSlots` and `InstanceStore` record-array offsets are not stable
+queue keys. The compacted gameplay-family arrays still need registry binding;
+the position adapter is not yet installed on live stores. Handle metadata costs
+one slot index plus one record index and generation per capacity entry, without
+changing the serialized resource IDs or `InstanceRecord` payload.
 
 `0x501e50` requires an object and either object flags `0x28` or instance flag
 `0x20`. It unlinks existing spatial-dirty membership and prepends the instance

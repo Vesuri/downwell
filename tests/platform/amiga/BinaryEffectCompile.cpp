@@ -1,4 +1,10 @@
 #include "core/BinaryEffectSurface.h"
+#include "core/InstanceStore.h"
+bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
+    if(store.create(id,82,1,false)!=downwell::CreateInstanceResult::success)return false;
+    auto handle=store.handleAt(store.size()-1);store.enterRoom(2);
+    return store.resolve(handle)==nullptr;
+}
 #include "core/RunnerSpatialSplit.h"
 #include "core/RunnerSpatialNode.h"
 #include "core/RunnerSpatialIndex.h"
