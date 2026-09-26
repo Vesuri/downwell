@@ -25,8 +25,21 @@ int main() {
     require(run.smokeEffects.create(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),random)!=0,
             "old room owns a smoke effect");
     const auto draws = random.drawCount();
+    require(run.emitBloodBurst(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),random),
+            "old room owns blood effects");
+    const auto bloodDraws=random.drawCount()-draws;
+    require(bloodDraws==2,"blood script consumes exactly two angle draws");
+    const auto bloodPhase=run.bloodEffects.beginPhase();
+    run.advanceBloodAnimation();
+    unsigned allowedQueries=0;
+    run.stepBlood(bloodPhase,[&](auto,const auto&){++allowedQueries;return false;});
+    require(allowedQueries==2 && run.effectsSucceeded,"session dispatches per-instance time-stop query");
+    run.bloodEffects.visitNewest([&](auto,const BloodEffect& effect){
+        require(effect.imageIndex.bits==0x3f000000u && effect.imageSpeed.bits==0,
+                "earlier animation remains visible when Step freezes movement");
+    });
     require(!run.enterLevelClear(9, heart, health, player, random) && run.levelResultRequested &&
-        random.drawCount() == draws, "invalid entry leaves request and RNG intact");
+        random.drawCount() == draws+bloodDraws, "invalid entry leaves request and RNG intact");
     require(run.enterLevelClear(0, heart, health, player, random) && run.levelClearActive &&
         !run.levelExitPresent && !run.exitDither.active && !run.levelResultRequested,
         "accepted room boundary retires exit state");
@@ -34,7 +47,8 @@ int main() {
     run.flashEffects.visitNewest([&](const FlashBallEffect&){++flashCount;});
     require(flashCount==0,"room retirement clears flash effects without resetting the whole run");
     require(run.smokeEffects.size()==0,"room retirement clears smoke ownership");
-    require(!run.enterLevelClear(0, heart, health, player, random) && random.drawCount() == draws + 1,
+    require(run.bloodEffects.size()==0,"room retirement clears blood ownership");
+    require(!run.enterLevelClear(0, heart, health, player, random) && random.drawCount() == draws + bloodDraws + 1,
         "duplicate room entry cannot consume another Create random word");
     unsigned tick = 0, advances = 0, dithers = 0;
     auto emit = [&](LevelClearSelection::Effect event, unsigned) {

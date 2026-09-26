@@ -20,6 +20,7 @@
 #include "LevelClearController.h"
 #include "FlashBallEffects.h"
 #include "SmokeEffects.h"
+#include "BloodEffects.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -47,7 +48,20 @@ struct RunSession {
     // Room-owned effects are reset on run/room retirement, not on a repaint.
     FlashBallEffects<32> flashEffects;
     SmokeEffects<32> smokeEffects;
+    BloodEffects<32> bloodEffects;
     bool effectsSucceeded=true;
+    void advanceBloodAnimation(){
+        if(effectsSucceeded)effectsSucceeded=bloodEffects.advanceAnimation(bloodEffects.beginPhase());
+    }
+    // Caller supplies the source TimeStopBound query, including field-mask
+    // contacts and strict room-side exemptions. A global pause bit is not enough.
+    template<class Allowed> void stepBlood(BloodEffects<32>::Phase phase,Allowed allowed){
+        if(effectsSucceeded)effectsSucceeded=bloodEffects.step(phase,allowed);
+    }
+    bool emitBloodBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+        if(effectsSucceeded)effectsSucceeded=bloodEffects.burst(x,y,random);
+        return effectsSucceeded;
+    }
     void advanceSmokeAnimation(){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.advanceAnimation(smokeEffects.beginPhase());
     }
@@ -119,6 +133,7 @@ struct RunSession {
         levelClearActive = true;
         flashEffects.clear();
         smokeEffects.clear();
+        bloodEffects.clear();
         // Room creation is followed by Draw before the next Step/Alarm phase.
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);
@@ -209,6 +224,7 @@ struct RunSession {
         shops.reset();
         flashEffects.clear();
         smokeEffects.clear();
+        bloodEffects.clear();
         effectsSucceeded=true;
         sideCameraLockers.clear();
         gemHigh = false;

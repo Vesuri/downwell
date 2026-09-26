@@ -1795,6 +1795,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     run_.shops.reset();
     run_.flashEffects.clear();
     run_.smokeEffects.clear();
+    run_.bloodEffects.clear();
     run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};

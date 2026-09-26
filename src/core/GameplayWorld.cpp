@@ -52,6 +52,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     run_.shops.reset();
     run_.flashEffects.clear();
     run_.smokeEffects.clear();
+    run_.bloodEffects.clear();
     run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);
     emitter_.reset(run_.upgrades.levels[12] != 0);
