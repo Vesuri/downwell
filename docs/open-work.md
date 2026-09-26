@@ -47,8 +47,9 @@ natural encounters must execute the recovered rules and render correctly.
   nor shop control-lock is a substitute for this state.
 - Add Timeout-damage creation of ordinary object-82 time fields. Connect the
   shared parent-field contact adapter to live transitions. Resolve original
-  `instance_place` identity selection, including object-list insertion and
-  spatial-index traversal; a boolean hit or Draw order cannot select the field
+  `instance_place` identity selection, including spatial-index construction,
+  updates and traversal, runtime branch selection and activation/rebinding;
+  a boolean hit or Draw order cannot select the field
   that determines shard direction. Complete Draw scheduling across other
   object families and live time-stop/activation state.
 - Integrate the shared time-shard lifecycle, animation, burst and time-change

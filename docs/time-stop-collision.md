@@ -138,14 +138,52 @@ offset zero and instance pointer at offset eight. It skips instance flags
 `0x100003`, calls precise contact at `0x464d30`, and returns on the first hit
 when no collection argument is supplied (the ordinary wrapper supplies zero).
 
+Ancestor-list registration is independent of the depth-sorted Draw list:
+
+- The constructor calls object binding `0x46b830` at `0x4618e9`. Binding
+  removes previous membership through `0x479880`, resolves the object, and,
+  when its registration argument is enabled, calls `0x478380`.
+- `0x478380` appends a 12-byte node to the object's own list (head `+0x38`,
+  tail `+0x3c`, count `+0x40`). Each node stores next, previous and instance
+  pointers at offsets zero, four and eight.
+- It then appends to the ancestor-inclusive list (head `+0x44`, tail `+0x48`,
+  count `+0x4c`) for the object and every ancestor, following object `+0x04`.
+  A derived goal field therefore participates in the parent's registration
+  order rather than a separate derived-object pass.
+- `0x479880` unlinks a matching instance from these ancestor lists by repairing
+  both neighboring links and head/tail pointers. It decrements the count
+  without reordering surviving nodes.
+
+Consequently the list branch chooses the oldest registered eligible intersecting
+instance. Birth order is equivalent only while membership remains unchanged;
+rebinding can move an existing instance to the tail. Deactivation/reactivation
+membership behavior needs separate evidence. This result does not determine
+spatial-index ordering or justify using Draw order for identity queries.
+
 The spatial path calls `0x5007f0`, then recursively traverses `0x5006f0` in
 ascending node-entry order, pruning bounding boxes. Callback `0x5016a0`
 filters self, flags and object/ancestor membership before precise contact.
 At `0x501751` it stores the first matching instance and returns false, stopping
 the recursive traversal. The Draw-list links are not used by these paths.
 
+Spatial insertion starts at `0x4ffd40` and recursively descends through
+`0x4fff80`. Nodes hold at most six 24-byte entries, with entry count at offset
+zero and tree level at offset four. At the requested insertion level, a node
+with space appends the entry; a full node calls split routine `0x5010e0`.
+Descent chooses the child with least bounding-box area enlargement, breaking
+equal enlargement by smaller existing area and retaining the earlier entry
+on a complete tie. These area operations use binary32 SSE arithmetic.
+
+If insertion splits the root, `0x4ffdb9` increments its level for a new root.
+That root receives the old root first and the split sibling second. Thus the
+selector's comparison against root `+0x04` is against tree height, not entry
+count or a fixed population threshold. Splitting and subsequent updates can
+change traversal order; the append rule alone does not establish oldest-first
+lookup once the tree branches. Split assignment, removal/reinsertion and the
+set/order of instances populating the shared index still need auditing.
+
 `tools/verify-runner-field-lookup.py` pins these reviewed bytes. It does not
-prove object-list insertion, spatial-tree construction/update order or the
+prove spatial-tree construction/update order or the
 selector outcome during a particular original-game encounter. Those must be
 established before assigning a source-equivalent field identity to shard bursts;
 do not substitute Draw order, storage order or nearest-centre selection.

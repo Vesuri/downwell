@@ -7,6 +7,14 @@ import runpy
 audit = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = audit["region"]
 for start, end, digest in (
+    # Constructor -> object binding -> ancestor-inclusive tail insertion.
+    (0x46171f, 0x4618ee, "c6449f2c7c86b62c2053956c6c6aaf60d5bc8caf5f545f8c09102fb0e07d733d"),
+    (0x46b830, 0x46b8b2, "f69e99dd410a652360766445ca48c817b571a44dc5089db9ada54cd10022b2ea"),
+    (0x478380, 0x47841d, "ef7694656f4ae8ac1934fb8d1dfac089f085d12408bd86352ef5ad609758e4a9"),
+    (0x479880, 0x4798e6, "f1fcec78f8a0030802a25deb2000505047308032028eacd677b77cfd2fc680ef"),
+    # Spatial insertion/root growth and recursive child selection.
+    (0x4ffd40, 0x4ffe6f, "08761b0415c1031c8e3851173fbe379b018c68758869b32c1154cf3a8b60b56b"),
+    (0x4fff80, 0x50018f, "4a66ec6c3c45b6a5f35abf6c841913b3f8e6109e890b8efd3e4477cbf47450b9"),
     (0x52cd08, 0x52cd1b, "44e72dafd1f48a74fb4709652b9dcce60d86ed1502e3f142f57ff91afb8a4e08"),
     (0x529e50, 0x529ebb, "0a53a026073fef6cdb42aaac33df23820cc84026c94c69601d9a219afddfa30c"),
     (0x4fe560, 0x4fe8b1, "92aba2c026ca90179868445275b9736946e775ef155ac85e9b3757dc1ff5599a"),
@@ -17,4 +25,4 @@ for start, end, digest in (
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x80cd7c,15) == b"instance_place\0"
-print("Pinned Windows instance_place wrapper, list/spatial dispatch and first-hit traversal")
+print("Pinned Windows ancestor-list registration/removal, instance_place dispatch and first-hit traversal")
