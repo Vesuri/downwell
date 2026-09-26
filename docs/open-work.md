@@ -37,11 +37,13 @@ throughout integration, not only after content is complete.
   and parent-time-field queries to both world schedulers before activating blood
   dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
   nor shop control-lock is a substitute for this state.
-- Finish time-shard alarms, contact, motion, animation and burst ownership;
-  integrate time-change pacing and transition audio with the live schedulers.
+- Integrate the shared time-shard lifecycle, animation, burst and time-change
+  owners with both live schedulers. Finish fractional player/shard time-field
+  queries, including mirrored masks and original-runner rounding. Connect
+  transition pacing and audio rather than adding alternative platform rules.
   Preserve the source distinction between paused gravity/animation and moving
   shards, and the separate alarm cooldown rules. Create-only helpers do not
-  complete these lifecycles.
+  establish live integration.
 - Register skeletons and owned bones in shared gameplay. Connect animation,
   alarms, Step, collision and End Step, player/bullet damage, rewards, capacity
   failure, out-of-view retirement and both renderers.
@@ -142,8 +144,7 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   separate horizontal-shop and dense-encounter cases. Distinguish instrumentation
   overhead from ordinary gameplay cost.
 
-References: [gameplay performance](gameplay-performance-current.md),
-[level completion](level-clear-profile.md), [profiling](amiga-profiling.md).
+Reference: [profiling procedure](amiga-profiling.md).
 
 ## 6. Finish scene and backend separation
 
