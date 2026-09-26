@@ -27,7 +27,10 @@ public:
         movementBoundary_ = callback; movementBoundaryContext_ = context;
     }
     // Coordinates use fifths of Q8, matching FixedCollisionMath.
-    typedef bool (*BreakBoxResolver)(void* context, long x, long y);
+    // Return success separately from the collision result. A query failure
+    // stops the step without rolling back earlier movement/script effects.
+    typedef bool (*BreakBoxResolver)(void* context, long x, long y, bool& found);
+    bool motionSucceeded() const { return motionSucceeded_; }
     void configureBreakBoxResolver(BreakBoxResolver resolver, void* context) {
         breakBoxResolver_ = resolver;
         breakBoxContext_ = context;
@@ -107,6 +110,7 @@ public:
     void appendStateDigest(downwell::StateDigest& digest) const;
 
 private:
+    bool motionSucceeded_ = true;
     static int fixedToPixel(long value);
     static unsigned integerSquareRoot(unsigned value);
     void beginSpin();

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_PLAYER_PRECISE_VERIFICATION_H
 #include "PlayerGravityBinary64.h"
 #include "PlayerWallResponseBinary64.h"
+#include "PlayerBoxContact.h"
 namespace downwell {
 struct PlayerPreciseVerification {
     unsigned checks=0,failures=0;std::uint32_t digest=2166136261u;
@@ -52,6 +53,21 @@ struct PlayerPreciseVerification {
             result.word(state.grounded);result.word(state.hardLand);result.word(state.wallColliding);
             result.word(unsigned(state.collision.x));result.word(unsigned(state.collision.y));result.word(unsigned(facing));
         }
+    }
+    // Live ceiling-box adapter, including half ties at odd/even room origins.
+    auto rounded=[](long value){
+        long q=value/1280,r=value%1280;
+        if(r>640||(r==640&&(q%2)))++q;
+        if(r< -640||(r== -640&&(q%2)))--q;
+        return q;
+    };
+    for(int origin=240;origin<242;++origin)for(long x=-15360;x<=15360;x+=320){
+        bool hit=false;
+        result.check(PlayerBoxContact::test(x,0,origin,176,origin,176,hit));
+        const long left=rounded(x+(origin-4)*1280L);
+        const long right=rounded(x+(origin+4)*1280L)-1;
+        result.check(hit==(right>=origin-8&&left<=origin+7));
+        result.word(hit);
     }
     return result;
 }

@@ -18,15 +18,6 @@ typename Math::Number ceilingResponse(typename Math::Number x,
     return breakBox(x, y - 16 * Math::unit()) ? Math::unit() : 0;
 }
 
-// sprPlayerIdle at the instance_place query position against a 16x16 box.
-template<class N>
-bool playerMaskMeetsBox(N x, N y, N boxX, N boxY, N unit) {
-    return x + 3 * unit >= boxX - 8 * unit &&
-           x - 4 * unit <= boxX + 7 * unit &&
-           y + 7 * unit >= boxY - 8 * unit &&
-           y - 4 * unit <= boxY + 7 * unit;
-}
-
 // VM blocks 12..23, also usable while a caller still resolves X separately.
 // Do not call the full two-axis script with an artificial zero X velocity:
 // its rounded X probe can move a fractional X into an adjacent wall.

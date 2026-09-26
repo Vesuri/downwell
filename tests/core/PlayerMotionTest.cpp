@@ -152,6 +152,21 @@ int main() {
     ceilingPlayer.step(jumpAtCeiling);
     require(ceilingPlayer.offsetYFixed() > -7 * 256,
             "gravity resumes downward motion on the frame after ceiling contact");
+    PlayerMotion failedCeiling(true);
+    failedCeiling.configureSolidResolver([](void*,int,int y){return y<=-12;},nullptr,-60,60);
+    unsigned failedQueries=0;
+    failedCeiling.configureBreakBoxResolver([](void* context,long,long,bool& found){
+        ++*static_cast<unsigned*>(context);found=false;return false;
+    },&failedQueries);
+    failedCeiling.step(jumpAtCeiling);failedCeiling.step(jumpAtCeiling);
+    require(!failedCeiling.motionSucceeded()&&failedQueries==1,
+            "failed head-box query terminates player movement");
+    const long failedY=failedCeiling.offsetYFixed(),failedSpeed=failedCeiling.speedYFixed();
+    failedCeiling.step(jumpAtCeiling);
+    require(failedQueries==1&&failedCeiling.offsetYFixed()==failedY&&failedCeiling.speedYFixed()==failedSpeed,
+            "terminal player failure forbids subsequent movement");
+    failedCeiling.enterRoom(false);
+    require(failedCeiling.motionSucceeded(),"room initialization clears terminal player failure");
 
     PlayerMotion gravityPrecision(false, 10000);
     // Source scrGravity_n: exactly .2 per update, capped at 7.

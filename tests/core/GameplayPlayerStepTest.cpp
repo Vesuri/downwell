@@ -25,6 +25,18 @@ struct Fixture {
 }
 
 int main() {
+    {
+        Fixture failed;
+        failed.player.configureSolidResolver([](void*,int,int y){return y<=-12;},nullptr,-60,60);
+        failed.player.configureBreakBoxResolver([](void*,long,long,bool& found){found=false;return false;},nullptr);
+        downwell::Input jump;jump.fire=true;
+        failed.step(jump);
+        const auto ticks=failed.run.clock.ticks;
+        failed.step(jump);
+        require(!failed.run.effectsSucceeded&&!failed.player.motionSucceeded(),
+                "checked head-box failure reaches shared run owner");
+        require(failed.run.clock.ticks==ticks,"failed player step does not run later clock phase");
+    }
     std::ifstream maskFile("generated/downwell-goal-mask.mask", std::ios::binary);
     const std::vector<unsigned char> mask((std::istreambuf_iterator<char>(maskFile)), {});
     require(mask.size() == 2048, "original precise mask is available for independent pixel queries");

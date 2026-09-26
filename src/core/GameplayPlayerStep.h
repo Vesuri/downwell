@@ -39,6 +39,12 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     const auto motion = player.step(input,
         controlsLocked || run.shops.noControl || run.exitControlsLocked,
         death.movementDead(), run.shops.interactable, run.goalStopped, run.gemHigh);
+    if(!player.motionSucceeded()){
+        player.configureComboCompletion(nullptr,nullptr);
+        player.configureMovementBoundary(nullptr,nullptr);
+        run.effectsSucceeded=false;
+        return motion;
+    }
     DW_PROFILE_PHASE(profilePlayerShops);
     const int shopPlayerX = originX + roundGameMakerQ8(player.offsetXFixed());
     const int shopPlayerY = originY + roundGameMakerQ8(player.offsetYFixed());

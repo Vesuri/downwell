@@ -1,4 +1,5 @@
 #include "GameplayWorld.h"
+#include "PlayerBoxContact.h"
 #include "GameplayPlayerStep.h"
 #include "core/MainRoomLifetime.h"
 #include "core/MainRoomActivation.h"
@@ -577,25 +578,31 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         GameplayWorld* runtime;
         int index;
     } headBreak = {this, -1};
-    player_.configureBreakBoxResolver([](void* opaque, long x, long y) {
+    player_.configureBreakBoxResolver([](void* opaque, long x, long y, bool& found) {
         auto& context = *static_cast<HeadBreakContext*>(opaque);
         auto& runtime = *context.runtime;
+        downwell::PlayerBoxContact::Bounds bounds;
+        if(!downwell::PlayerBoxContact::prepare(x,y,240,176,bounds))return false;
         for (unsigned i = 0; i < runtime.breakableCount_; ++i) {
             Breakable& box = runtime.breakables_[i];
-            if (box.active && downwell::playerMaskMeetsBox(
-                    x, y, (long)box.x * 1280, (long)box.y * 1280, 1280L)) {
+            if(!box.active)continue;
+            bool hit=false;
+            if(!downwell::PlayerBoxContact::testPrepared(bounds,box.x+240,box.y+176,hit))return false;
+            if (hit) {
                 box.active = false;
                 ++runtime.blocksDestroyed_;
                 context.index = (int)i;
+                found=true;
                 return true;
             }
         }
-        return false;
+        found=false;return true;
     }, &headBreak);
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
         cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142);
     player_.configureBreakBoxResolver(nullptr, nullptr);
+    if(!run_.effectsSucceeded)return {};
     if (headBreak.index >= 0) {
         const Breakable& box = breakables_[headBreak.index];
         destroyedBlockX[destroyedBlockCount] = box.x;

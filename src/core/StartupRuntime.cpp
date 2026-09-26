@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "PlayerBoxContact.h"
 #include "GameplayPlayerStep.h"
 #include "MainRoomLifetime.h"
 #include "MainRoomActivation.h"
@@ -1121,20 +1122,24 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         return runtime.run_.shops.playerLanding(worldX, minimumY + runtime.mainPlayerOriginY_,
             nearest + runtime.mainPlayerOriginY_) - runtime.mainPlayerOriginY_;
     }, this);
-    mainPlayerMotion_.configureBreakBoxResolver([](void* context, long x, long y) {
+    mainPlayerMotion_.configureBreakBoxResolver([](void* context, long x, long y, bool& found) {
         auto& runtime = *static_cast<StartupRuntime*>(context);
+        PlayerBoxContact::Bounds bounds;
+        if(!PlayerBoxContact::prepare(x,y,runtime.mainPlayerOriginX_,runtime.mainPlayerOriginY_,bounds))return false;
         for (std::size_t i = 0; i < runtime.instances_.size(); ++i) {
             auto& box = runtime.instances_.at(i);
-            if (box.active && box.objectId == 92 && playerMaskMeetsBox(
-                    x, y, (long)(box.x - runtime.mainPlayerOriginX_) * 1280,
-                    (long)(box.y - runtime.mainPlayerOriginY_) * 1280, 1280L)) {
+            if(!box.active || box.objectId!=92)continue;
+            bool hit=false;
+            if(!PlayerBoxContact::testPrepared(bounds,box.x,box.y,hit))return false;
+            if (hit) {
                 box.active = false;
                 ++runtime.mainBlocksDestroyed_;
                 ++runtime.soundPlayRequests_;
+                found=true;
                 return true;
             }
         }
-        return false;
+        found=false;return true;
     }, this);
     Input input;
     input.left = inputLeft_;
@@ -1147,6 +1152,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);
     mainPlayerMotion_.configureBreakBoxResolver(nullptr, nullptr);
+    if(!run_.effectsSucceeded)return;
     syncMainPlayerState();
     if (mainJumps_ != priorJumps) ++soundPlayRequests_;
     if (mainShotsFired_ != priorShots) emitMainBullet(instance);

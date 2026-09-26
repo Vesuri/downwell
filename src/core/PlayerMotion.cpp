@@ -148,6 +148,7 @@ void PlayerMotion::contactKnockback(int enemyX, int enemyY)
 PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool controlsLocked, bool dead,
                                    bool interactable, bool goalStopped, bool gemHigh)
 {
+    if(!motionSucceeded_)return {};
     const auto input = downwell::playerGameplayInput(rawInput, dead ? 0 : 1);
     frameStartX_ = x_;
     frameStartY_ = y_;
@@ -308,11 +309,16 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             if (hit < 0) {
                 y_ = collisionY / 5;
                 verticalPositionRemainder_ = (int)(collisionY % 5);
+                // scrWallCol writes ysp=0 before the synchronous box query.
+                speedY_=0;gravityRemainder_=0;
                 const long response = downwell::ceilingResponse<downwell::FixedCollisionMath>(
                     collisionX, collisionY, [this](long x, long y) {
-                        return breakBoxResolver_ != nullptr &&
-                            breakBoxResolver_(breakBoxContext_, x, y);
+                        bool found=false;
+                        if(breakBoxResolver_ && !breakBoxResolver_(breakBoxContext_,x,y,found))
+                            motionSucceeded_=false;
+                        return found;
                     });
+                if(!motionSucceeded_)return {};
                 speedY_ = response / 5;
                 gravityRemainder_ = 0;
             }
@@ -437,6 +443,7 @@ void PlayerMotion::appendStateDigest(downwell::StateDigest& digest) const
     if (ammoCapacity_ != maximumAmmo) {
         digest.addU32(0x414d4d4f); digest.addI32(ammoCapacity_);
     }
+    if(!motionSucceeded_)digest.addU32(0x4641494c);
 }
 
 int PlayerMotion::spriteId(bool dead) const

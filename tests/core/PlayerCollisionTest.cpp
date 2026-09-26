@@ -1,5 +1,9 @@
 #include "core/PlayerCollision.h"
 #include "core/SolidCollision.h"
+#include "core/PlayerBoxContact.h"
+#include <cmath>
+#include <fstream>
+#include <vector>
 #include <cstdlib>
 #include <iostream>
 
@@ -22,9 +26,53 @@ int main() {
     require(downwell::ceilingResponse<Math>(0L, 0L,
                 [](long, long) { return false; }) == 0,
             "an ordinary ceiling stops ascent without the box impulse");
-    require(downwell::playerMaskMeetsBox(11L, 0L, 0L, 0L, 1L) &&
-            !downwell::playerMaskMeetsBox(12L, 0L, 0L, 0L, 1L),
-            "instance_place uses the player mask, not a single point in the box");
+    // Pin the live rectangular specialization to the original mask metadata.
+    std::ifstream file("generated/downwell-sprites.dwsc",std::ios::binary);
+    std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(file),{}};
+    downwell::SpriteCollisionPack pack(bytes.data(),bytes.size());
+    for(auto id:{31u,585u}){
+        downwell::PackedSpriteCollision resource;
+        require(pack.sprite(id,resource),"original collision metadata available");
+        const auto expected=id==31?downwell::PlayerBoxContact::player:downwell::PlayerBoxContact::box;
+        require(resource.originX==expected.originX&&resource.originY==expected.originY&&
+            resource.marginLeft==expected.marginLeft&&resource.marginTop==expected.marginTop&&
+            resource.marginRight==expected.marginRight&&resource.marginBottom==expected.marginBottom&&
+            resource.collisionMode==0&&resource.frameCount==expected.frameCount,
+            "live player and box descriptors match original rectangular masks");
+    }
+    unsigned differences=0;
+    for(int origin:{0,1,176,240,12001})for(long x=-13*unit;x<=13*unit;x+=80)
+      for(long y=-17*unit;y<=13*unit;y+=80){
+        bool hit=false;
+        require(downwell::PlayerBoxContact::test(x,y,origin,origin,origin,origin,hit),
+            "fractional box query succeeds");
+        // Scalar transcription of the compatibility bounds arithmetic: each
+        // operation is binary32, near/far rounded separately, far decremented.
+        const float px=float(double(x)/1280.+origin),py=float(double(y)/1280.+origin);
+        const int left=int(std::nearbyint(float(px-4.f)));
+        const int top=int(std::nearbyint(float(py-4.f)));
+        const int right=int(std::nearbyint(float(float(px-4.f)+8.f)))-1;
+        const int bottom=int(std::nearbyint(float(float(py-4.f)+12.f)))-1;
+        const bool expected=right>=origin-8&&left<=origin+7&&bottom>=origin-8&&top<=origin+7;
+        require(hit==expected,"live box query matches runner rounded bounds");
+        const bool legacy=x+3*unit>=-8*unit&&x-4*unit<=7*unit&&
+            y+7*unit>=-8*unit&&y-4*unit<=7*unit;
+        differences+=hit!=legacy;
+      }
+    require(differences>0,"fractional edge regression distinguishes the old unrounded check");
+    for(int origin:{8388592,8388609,-8388609,16777216,-16777216})
+      for(long x=-16*unit;x<=16*unit;x+=320){
+        bool hit=false;
+        require(downwell::PlayerBoxContact::test(x,0,origin,176,origin,176,hit),
+                "large-coordinate fallback succeeds");
+        const float px=float(double(x)/1280.+origin),bx=float(origin);
+        const float pl=float(std::nearbyint(float(px-4.f)));
+        const float pr=float(float(std::nearbyint(float(float(px-4.f)+8.f)))-1.f);
+        const float bl=float(std::nearbyint(float(bx-8.f)));
+        const float br=float(float(std::nearbyint(float(float(bx-8.f)+16.f)))-1.f);
+        require(hit==(bl<float(pr+1.f)&&pl<float(br+1.f)),
+                "fallback retains strict binary32 far-edge-plus-one comparison");
+    }
     require(Math::round(10 * unit + unit / 2) == 10 * unit &&
             Math::round(11 * unit + unit / 2) == 12 * unit &&
             Math::round(-11 * unit - unit / 2) == -12 * unit &&
