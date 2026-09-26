@@ -529,6 +529,17 @@ test: verify-portable-atan
 test: verify-time-stop-effects
 test: verify-typical-player-damage
 test: verify-player-damage
+test: verify-player-damage-number
+.PHONY: verify-player-damage-number
+verify-player-damage-number: build/player-damage-number-test
+	python3 tools/verify-typical-player-damage.py
+	python3 tools/verify-effect-depths.py
+	./build/player-damage-number-test
+
+build/player-damage-number-test: tests/core/PlayerDamageNumberTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerDamageNumberTest.cpp
+
 .PHONY: verify-player-damage
 verify-player-damage: build/player-damage-test
 	python3 tools/verify-typical-player-damage.py

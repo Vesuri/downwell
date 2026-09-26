@@ -1,4 +1,5 @@
 #include "core/RunSession.h"
+#include "core/PlayerDamageNumber.h"
 using downwell::MotionBinary64;
 // Compile-only backend contract: declarations deliberately prevent the
 // compiler from folding away any event branches or synchronous field Create.
@@ -38,4 +39,13 @@ bool compileTypicalPlayerDamage(downwell::RunSession& run,downwell::TypicalPlaye
     downwell::GameMakerRandom& random,DamageEvents& events){
     return run.typicalPlayerDamage(caller,MotionBinary64::fromInteger(1),
         MotionBinary64::fromInteger(3),MotionBinary64::fromInteger(2),random,events);
+}
+struct NumberDraw {
+    void align(int),color(int);
+    bool text(MotionBinary64,MotionBinary64,MotionBinary64);
+};
+bool compileDamageNumber(downwell::PlayerDamageNumber& effect,DamageEvents& events,NumberDraw& draw){
+    effect.advanceAlarm(0);
+    return effect.step([&](auto speed,auto angle,auto& out){return events.lengthdirX(speed,angle,out);},
+        [](bool,const auto&){return true;})&&effect.draw(draw);
 }

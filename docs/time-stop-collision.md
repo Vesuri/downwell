@@ -96,6 +96,24 @@ outer damage branch to retest its entry guards or choose Candle immunity again.
 tests verify this event contract; the live number-effect, audio, controller and
 player-property adapters are still required before replacing contact handling.
 
+Object 221's `PlayerDamageNumber` stores published binary32 x/y separately
+from binary64 velocities. Create uses `xsp=999` as a sentinel, `ysp=3` and
+Alarm 0=60. The first Step resolves `lengthdir_x(2,enemydir)`; every Step
+writes Y then X before damping both velocities by binary64 0.8. It has no
+time-stop guard, parent or sprite. Alarm 0 requests destruction. The wrapper
+subtracts four from precise `global.ply` before creation narrows the position,
+then assigns amount/direction after Create; the effect's separate creation and
+argument-assignment methods preserve that boundary for its owner.
+
+Draw is ordinary text at compatibility depth −1000, not a sprite or `drawFx`
+surface. It selects centered horizontal alignment, draws black text at the
+four cardinal one-pixel offsets, then red text at the center and restores left
+alignment. The current font and vertical alignment are retained; color remains
+red. The backend must format the source `"-" + string(dmgamt)` and preserve
+fractional coordinates. Component tests compare each float position write and
+double velocity update with a scalar reference and verify ordered text commands;
+they do not prove final font rasterization or live scheduler integration.
+
 `OrdinaryTimeFields` exposes port-owned lifetime keys separately from array
 indices. As object 82 has no individual retirement, one room's births form a
 contiguous key interval; lookup needs two counters rather than a key per field.
