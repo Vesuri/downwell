@@ -53,6 +53,8 @@ behavior, both backend integrations and relevant original-game verification.
   source storage, audio/controller side effects, hit effects and immunity ordering.
   Verify live damage-number placement/direction against original captures and
   measure the native contact-math cost, not just port-to-port state agreement.
+  Replace non-coincident fixed-point knockback normalization with the source
+  point-direction/lengthdir path and preserve its precision through player motion.
   Extend integer-only damage text formatting if live source paths require VM
   real formatting; verify fractional text placement against the original.
 - Implement remaining blood, corpse, debris and blast dependencies. Preserve

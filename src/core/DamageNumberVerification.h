@@ -61,6 +61,20 @@ struct DamageNumberVerification {
             result.real(effect->xSpeed);result.real(effect->ySpeed);
         }
     }
+    for(int sample=0;sample<6;++sample){
+        run.reset();ForcedPlayerJump jump;
+        struct Events {
+            DamageNumberVerification& result;
+            void setSpinJumping(){result.word(1);}
+            bool recharge(){result.word(2);return true;}
+            bool setGrounded(bool value){result.word(3);result.check(!value);return true;}
+            bool setHorizontal(MotionBinary64 value){result.word(4);result.real(value);return true;}
+            bool setVertical(MotionBinary64 value){result.word(5);result.real(value);return true;}
+        } events{result};
+        result.check(run.forcedPlayerJump(jump,MotionBinary64::fromInteger(sample%3-1),
+            MotionBinary64::fromInteger(sample/3),events));
+        result.real(jump.horizontal);result.real(jump.vertical);result.real(jump.defaultVertical);
+    }
     run.~RunSession();return result;
 }
 }

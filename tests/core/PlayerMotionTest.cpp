@@ -401,8 +401,8 @@ int main() {
 
     PlayerMotion overlapping;
     overlapping.contactKnockback(0, 0);
-    require(overlapping.speedXFixed() == 0 && !overlapping.grounded(),
-            "exact enemy overlap has no invented horizontal knockback");
+    require(overlapping.speedXFixed() == 768 && !overlapping.grounded(),
+            "exact overlap follows source zero direction and positive lengthdir_x knockback");
     PlayerMotion diagonal;
     diagonal.contactKnockback(6, 8);
     require(diagonal.speedXFixed() == -460,

@@ -537,6 +537,13 @@ test: verify-portable-atan
 test: verify-time-stop-effects
 test: verify-typical-player-damage
 test: verify-player-damage
+test: verify-forced-player-jump
+.PHONY: verify-forced-player-jump
+verify-forced-player-jump: build/forced-player-jump-test
+	./build/forced-player-jump-test
+build/forced-player-jump-test: tests/core/ForcedPlayerJumpTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/ForcedPlayerJumpTest.cpp src/core/GameMakerRandom.cpp
 test: verify-player-damage-number
 test: verify-damage-number-text
 .PHONY: verify-damage-number-text

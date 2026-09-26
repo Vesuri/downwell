@@ -32,6 +32,7 @@
 #include "PlayerDamageNumbers.h"
 #include "RunnerPointDirection.h"
 #include "PortableAtan.h"
+#include "ForcedPlayerJump.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -197,6 +198,11 @@ struct RunSession {
     }
     template<class Events> bool damagePlayer(PlayerDamage& caller,MotionBinary64 amount,Events& events){
         if(effectsSucceeded)effectsSucceeded=caller.execute(amount,events);
+        return effectsSucceeded;
+    }
+    template<class Events> bool forcedPlayerJump(ForcedPlayerJump& caller,
+        MotionBinary64 horizontal,MotionBinary64 vertical,Events& events){
+        if(effectsSucceeded)effectsSucceeded=caller.execute(horizontal,vertical,events);
         return effectsSucceeded;
     }
     // Adapter for players whose published coordinates are integer pixels.

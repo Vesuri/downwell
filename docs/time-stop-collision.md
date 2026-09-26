@@ -163,6 +163,24 @@ source storage, controller slowdown, audio, hit effects, Timeout and replacement
 of the approximate contact knockback/dispatch remain unfinished. Original-game
 encounter captures and native contact frame-cost measurements are still required.
 
+`ForcedPlayerJump` models the caller-owned `scrFjump` fields and VM write order:
+assign arguments/default 2.7, replace either signed zero vertical argument with
+that default, set global spin, synchronously recharge, clear player grounded,
+conditionally write nonzero horizontal speed, then write negated vertical speed.
+It re-reads caller fields after recharge instead of snapshotting them across a
+synchronous script call. `RunSession` latches callback failure without replaying
+earlier mutations. The shared player's contact path uses this ordering through
+an adapter for its existing Q8 impulse and fixed vertical argument of 2.
+
+Exactly coincident caller/player coordinates produce direction zero and hence
+positive horizontal impulse 3, rather than no impulse. Other directions still
+use the legacy fixed-point normalized vector in `PlayerMotion`; this is not the
+original `point_direction`/`lengthdir_x` pipeline and remains migration work.
+Component tests cover default height, signed zero, caller mutation during
+recharge and partial failure; the damage replay includes forced-jump writes on
+both CPUs. These do not prove original-runner contact dispatch or general motion
+precision.
+
 Damage numbers and corpse-expiry sprites share compatibility depth −1000.
 `RunSession` assigns both a common monotonic Draw-birth key and merges their
 newest-first owner lists in linear time, without temporary pointer arrays or
