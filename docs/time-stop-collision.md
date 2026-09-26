@@ -252,6 +252,20 @@ fail before mutation. Unknown object definitions are explicitly unsupported.
 Live ownership, mutation routing and post-binding birth publication are still
 required before replacing production collision queries.
 
+`StoredCollisionLifecycle` is the explicit bridge from loader birth snapshots
+to this resource-backed owner. It narrows the stored integer birth coordinates,
+binds resources, applies placed scale/angle/index and room/dynamic depth, then
+prepares the object family and publishes bounds before game callbacks. It also
+forwards retirement, activation requests and deferred membership publication.
+The adapter borrows its owner, per-slot properties, packs and graph; rebuild it
+around copied runtimes rather than retaining references to an original store.
+It does not infer subsequent direct record writes or choose between a live
+actor's integer position and separate fractional motion owner. Tests pass it
+through `RoomLoader` with original field metadata and verify publication before
+PreCreate, placed overrides, transition retirement and failure propagation.
+Production installation still requires all later mutation paths to use the same
+owner and the separate compact gameplay pools to participate in its identities.
+
 `RunnerSpatialInstances::removeSpatialMembership` exposes the live-instance
 `0x501f70` operation separately from retirement. It removes indexed bounds with
 root retry, clears only the indexed flag and unlinks both dirty queues, retaining

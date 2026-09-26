@@ -4,6 +4,8 @@
 #include "core/SpriteCollisionPack.h"
 #include "core/RunnerSpatialInstances.h"
 #include "core/RunnerObjectFamilies.h"
+#include "core/StoredCollisionLifecycle.h"
+#include "core/RoomLoader.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -82,6 +84,35 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         downwell::RunnerObjectFamilies<386> spatialOnly;require(spatialOnly.bindSpatialFlags(objects),"load deliberately incomplete flags");
         require(!incomplete.bindObjectFromPacks({0,1},0,true,unchanged,objects,compact,spatialOnly,false)&&
                 !incomplete.valid()&&unchanged.sprite.spriteId==-1,"reject missing property flags before mutation");
+        using StoredOwner=downwell::RunnerSpatialInstances<4,8>;
+        StoredOwner storedOwner;StoredOwner::Properties properties[4];
+        downwell::InstanceStore<4> records;
+        auto trig=[](auto,auto&,auto&){return false;}; // Zero angle must bypass trigonometry.
+        auto round=[](auto value,int& out){return value.promoted().roundPixel(out);};
+        downwell::StoredCollisionLifecycle<4,8,decltype(families),decltype(trig),decltype(round)>
+            lifecycle{storedOwner,properties,objects,compact,families,trig,round};
+        downwell::PackedObject field;require(objects.findObject(82,field),"read placed field defaults");
+        downwell::RoomInstanceDefinition definition{123,82,false};
+        definition.spriteId=field.spriteId;definition.maskId=field.textureMaskId;
+        definition.x=32;definition.y=64;definition.scaleX=0.5f;definition.depth=-123;
+        unsigned callbacks=0;
+        auto event=[&](downwell::InstanceRecord&,downwell::RoomInstancePhase phase){
+            if(phase!=downwell::RoomInstancePhase::preCreate)return;
+            ++callbacks;const auto h=records.handleAt(0);const auto* state=storedOwner.resolve(h);
+            require(state&&!(state->flags&8u),"resource-backed bounds published before PreCreate");
+            int depth;
+            require(properties[h.slot].sprite.scaleX.bits==0x3f000000u&&properties[h.slot].depth.promoted().roundPixel(depth)&&depth==-123,
+                    "placed scale and layer depth override object defaults before callbacks");
+        };
+        auto room=[](int){};auto deferred=[](auto&){};
+        require(downwell::RoomLoader<4>::enter(records,7,&definition,1,true,event,room,deferred,lifecycle)==downwell::LoadRoomResult::success&&callbacks==1,
+                "real-resource lifecycle composes with room loading");
+        const auto old=records.handleAt(0);
+        require(downwell::RoomLoader<4>::enter(records,8,nullptr,0,false,event,room,deferred,lifecycle)==downwell::LoadRoomResult::success&&
+                !storedOwner.resolve(old)&&records.empty(),"room transition retires the resource-backed owner");
+        definition.rotation=30.0f;
+        require(downwell::RoomLoader<4>::enter(records,9,&definition,1,false,event,room,deferred,lifecycle)==downwell::LoadRoomResult::lifecycleFailure&&
+                callbacks==1&&!storedOwner.valid(),"unsupported bounds calculation stops before PreCreate and invalidates collision owner");
     }
     {
         using Owner=downwell::RunnerSpatialInstances<2,8>;

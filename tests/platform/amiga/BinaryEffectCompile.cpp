@@ -28,6 +28,18 @@ bool compileMaskPair(const downwell::RunnerMaskPair::Shape& a,
 #include "core/RunnerSpatialInstances.h"
 #include "core/RunnerObjectFamilies.h"
 #include "core/RoomLoader.h"
+#include "core/StoredCollisionLifecycle.h"
+bool compileStoredCollisionBirth(downwell::RunnerSpatialInstances<4,8>& owner,
+    downwell::RunnerSpatialInstances<4,8>::Properties (&properties)[4],
+    const downwell::ObjectPack& objects,const downwell::SpriteCollisionPack& sprites,
+    downwell::RunnerObjectFamilies<386>& graph,downwell::InstanceHandle handle,
+    const downwell::InstanceRecord& record){
+    auto trig=[](auto,auto&,auto&){return false;};
+    auto round=[](auto value,std::int32_t& out){return value.promoted().roundPixel(out);};
+    downwell::StoredCollisionLifecycle<4,8,decltype(graph),decltype(trig),decltype(round)>
+        lifecycle{owner,properties,objects,sprites,graph,trig,round};
+    return lifecycle.birth(handle,record);
+}
 bool compileResourceObjectBinding(downwell::RunnerSpatialInstances<4,8>& owner,
     downwell::InstanceHandle h,int object,downwell::RunnerSpatialInstances<4,8>::Properties& properties,
     const downwell::ObjectPack& objects,const downwell::SpriteCollisionPack& sprites,
