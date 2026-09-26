@@ -226,6 +226,15 @@ build/smoke-distance-test: tests/core/SmokeDistanceTest.cpp $(wildcard src/core/
 
 .PHONY: verify-smoke-effect
 test: verify-blood-effect
+test: verify-time-stop-bound
+.PHONY: verify-time-stop-bound
+verify-time-stop-bound: build/time-stop-bound-test
+	./build/time-stop-bound-test
+
+build/time-stop-bound-test: tests/core/TimeStopBoundTest.cpp src/core/TimeStopBound.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/TimeStopBoundTest.cpp
+
 test: verify-blood-owner
 .PHONY: verify-blood-owner
 verify-blood-owner: build/blood-owner-test

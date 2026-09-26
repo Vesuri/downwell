@@ -1,6 +1,11 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/BloodEffect.h"
 #include "core/BloodEffects.h"
+#include "core/TimeStopBound.h"
+bool compileTimeStopBound(bool stopped,downwell::MotionBinary64 x,int width,bool inField,bool& allowed){
+    return downwell::TimeStopBound::evaluate(stopped,x,{},width,
+        [&](auto,auto,bool& hit){hit=inField;return true;},allowed);
+}
 bool compileBloodOwner(downwell::BloodEffects<32>& owner, bool allowed) {
     if(!owner.create({}, {},{}))return false;
     const auto phase=owner.beginPhase();
