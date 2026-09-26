@@ -20,6 +20,29 @@ void Bitmap::copy(const Bitmap& source,uint16_t x,uint16_t y,uint16_t sx,uint16_
 int main() {
     auto raster=std::make_unique<AmigaTerrainRaster>();
     unsigned cases=0;
+    unsigned partitions=0;
+    for(unsigned column=0;column<3;++column)for(unsigned mask=0;mask<256;++mask){
+        for(unsigned y=0;y<8192;++y)raster->dirty(column,y)=false;
+        for(unsigned y=0;y<284;++y)raster->dirty(column,7908+y)=((mask>>(y%8))&1)!=0;
+        unsigned first=7908,painted=0,copied=0;
+        while(first<8192){
+            const bool dirty=raster->dirty(column,first);
+            const auto end=raster->runEnd(column,first,8192);
+            assert(end>first&&end<=8192);
+            for(unsigned y=first;y<end;++y){
+                assert(raster->dirty(column,y)==dirty);
+                // Simulate the compositor clearing a completed dirty run.
+                raster->dirty(column,y)=false;
+                if(dirty)++painted;else ++copied;
+            }
+            first=end;
+        }
+        unsigned expected=0;
+        for(unsigned y=0;y<284;++y)expected+=(mask>>(y%8))&1;
+        assert(painted==expected&&copied==284-expected);++partitions;
+    }
+    assert(raster->runEnd(3,0,284)==0&&raster->runEnd(0,5,5)==5&&raster->runEnd(0,0,8193)==0);
+    std::printf("Terrain raster: %u mixed-span partitions repaint only dirty rows\n",partitions);
     downwell::ShopWorld shops{};
     shops.instances[0].allocated=true;
     for(int y : {-50, 0, 120, 8190, 8250}) {

@@ -61,7 +61,10 @@ extern "C" int amigaBlitterClearPlanar(UBYTE* destination,
         return 0;
     AmigaHardware::blitterClear(
         (UWORD*)destination, 384 / 16, (UWORD)(height * planes), 0);
-    AmigaHardware::blitterWait();
+    // Clear may be queued behind a terrain/display copy. Waiting only for
+    // the active DMA does not finish queued work; subsequent CPU tile writes
+    // would then be erased when the pending clear finally executes.
+    AmigaHardware::blitterDrain();
     return 1;
 }
 

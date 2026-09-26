@@ -17,6 +17,7 @@ if gDownwellCameraFrameChecks != 2 * gDownwellCameraTransitions
 end
 if gDownwellTerrainRasterFailures != 0 || gDownwellTerrainRasterChecks < 50 || gDownwellGameBufferFailures != 0 || gDownwellGameplayBobFailures != 0
     printf "Camera raster mismatch: raster=%lu checks=%lu display=%lu bobs=%lu\n", gDownwellTerrainRasterFailures, gDownwellTerrainRasterChecks, gDownwellGameBufferFailures, gDownwellGameplayBobFailures
+    printf "First cache/fresh mismatch: viewX=%ld worldY=%ld height=%ld row=%ld plane=%ld word=%ld cached=%04lx fresh=%04lx\n", gDownwellTerrainFirstMismatch[0], gDownwellTerrainFirstMismatch[1], gDownwellTerrainFirstMismatch[2], gDownwellTerrainFirstMismatch[3], gDownwellTerrainFirstMismatch[4], gDownwellTerrainFirstMismatch[5], gDownwellTerrainFirstMismatch[6], gDownwellTerrainFirstMismatch[7]
     quit 1
 end
 if gDownwellStackGuardReady != 1 || gDownwellLiveGenerationFailed != 0 || gDownwellResultsAssetFailures != 0

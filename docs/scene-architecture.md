@@ -61,6 +61,13 @@ A discontinuous camera jump prepares the destination interval, not every skipped
 row. Commit staging validity only after successful transfer; failed or replaced
 content invalidates the corresponding range.
 
+Partition mixed cache requests into contiguous clean and dirty row runs. Copy
+clean runs from the retained raster; compose and store only dirty runs. Explicit
+partial-width repairs remain separate, preserving the other pixels in each row.
+Before CPU composition follows a blitter clear, drain queued work as well as
+the active DMA. Waiting for the active blit alone does not establish that a
+queued clear has completed.
+
 Retire and publish buffers independently: damage acknowledged in one display
 must not clear the other's debt. A Copper rebuild does not itself invalidate
 retained pixels. Fixed-capacity draw-list failure must prevent publication,

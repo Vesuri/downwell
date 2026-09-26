@@ -359,6 +359,7 @@ volatile const UWORD* gDownwellControlsCopper;
 volatile const UBYTE* gDownwellCreditsFrame;
 volatile const UWORD* gDownwellCreditsCopper;
 #ifdef DOWNWELL_SCENE_VERIFY
+volatile LONG gDownwellTerrainFirstMismatch[8];
 volatile ULONG gDownwellSplashCheckedFrames[7];
 volatile ULONG gDownwellSplashPublicationFailures;
 volatile const UWORD* gDownwellMenuSpriteOracle;
@@ -854,8 +855,22 @@ static void drawMainWorldSpan(
         finalWorldY <= terrainRasterRows;
     if (terrainRaster.ready && cacheable && !refresh) {
         const int column = (viewX - mainViewX + 160) / 160;
-        for (int y = firstWorldY; y < finalWorldY; ++y)
-            if (terrainRaster.dirty(column, y)) { refresh = true; break; }
+        // A dirty strip must not force reconstruction of clean retained rows.
+        // Each recursive call is homogeneous, so splitting adds one stack
+        // level only (the verification oracle may add its existing level).
+        const unsigned firstEnd=terrainRaster.runEnd(column,firstWorldY,finalWorldY);
+        if(firstEnd<unsigned(finalWorldY)){
+            unsigned first=firstWorldY,end=firstEnd;
+            do {
+                drawMainWorldSpan(renderer,rooms,room,builders,fragments,fragmentCount,
+                    decorations,decorationCount,runtime,viewX,viewY,int(first)-viewY,int(end-first),
+                    clipX,clipWidth,false,refreshCause);
+                first=end;
+                end=terrainRaster.runEnd(column,first,finalWorldY);
+            }while(first<unsigned(finalWorldY));
+            return;
+        }
+        refresh = firstWorldY < finalWorldY && terrainRaster.dirty(column, firstWorldY);
         if (!refresh) {
             downwellProfileTerrainSpan(viewX, firstWorldY, clipHeight, clipX, clipWidth, 0, refreshCause);
             transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, false);
@@ -883,7 +898,14 @@ static void drawMainWorldSpan(
                     const UWORD* chip = (const UWORD*)(renderer->game + plane * downwellGameRingPlaneBytes +
                         physical * downwellBytesPerPlaneLine + terrainRasterX / 8);
                     for (unsigned word = 0; word < terrainRasterWords; ++word)
-                        if (expected[y][plane][word] != chip[word]) ++gDownwellTerrainRasterFailures;
+                        if (expected[y][plane][word] != chip[word]) {
+                            if (!gDownwellTerrainRasterFailures) {
+                                const LONG details[] = {viewX, firstWorldY, clipHeight, y,
+                                    LONG(plane), LONG(word), expected[y][plane][word], chip[word]};
+                                for (unsigned i=0;i<8;++i) gDownwellTerrainFirstMismatch[i]=details[i];
+                            }
+                            ++gDownwellTerrainRasterFailures;
+                        }
                 }
             ++gDownwellTerrainRasterChecks;
 #endif
