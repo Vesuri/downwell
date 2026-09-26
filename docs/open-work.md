@@ -57,10 +57,10 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Restore full-page scrolling coverage in the strict adapter gate's
-  post-landing route (currently fails at frame 1374), then complete both combat
-  tapes with exact creation and published-coordinate comparisons. Preserve
-  the coverage requirement and distinguish route changes from simulation bugs.
+- Restore surviving-frog-hit coverage in the strict combat gate: the traversal
+  reaches its scrolling/retirement requirements but leaves the first frog
+  behind before combat. Retain exact state and all encounter assertions, and
+  reverify both firing phases, upgrade variants, death and survival continuations.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,

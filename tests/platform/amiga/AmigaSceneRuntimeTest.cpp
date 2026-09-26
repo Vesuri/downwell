@@ -1314,19 +1314,40 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     bool sawAwakeEnemy = false;
     const int postLandingCameraY = gameplay.cameraOffsetY();
     bool traverseFire = false;
-    for (int tick = 0; tick < 600; ++tick) {
+    for (int tick = 0; tick < 1800; ++tick) {
         parityFrame += 1;
         downwell::Input traverse;
         traverse.right = (tick / 90) % 2 == 0;
         traverse.left = !traverse.right;
-        traverse.fire = gameplay.player().grounded();
+        // Jump, release, then fire in the air: generated breakable floors
+        // cannot be traversed by a tape that only ever presses while grounded.
+        traverse.fire = tick % 40 == 0 || tick % 40 == 3;
         gameplay.step(downwell::packReplayInput(traverse));
         reference.step(traverse, traverse.fire && !traverseFire);
         traverseFire = traverse.fire;
         compareInitialGameplay(gameplay, reference);
+        if (std::getenv("DOWNWELL_TRACE_TRAVERSAL") && tick % 60 == 0)
+            std::cerr << "TRAVERSE tick=" << tick
+                      << " player=" << gameplay.player().offsetX() << ',' << gameplay.player().offsetY()
+                      << " camera=" << gameplay.cameraOffsetY()
+                      << " start=" << postLandingCameraY
+                      << " grounded=" << gameplay.player().grounded()
+                      << " health=" << reference.mainPlayerHealth()
+                      << " ammo=" << reference.mainAmmo() << '\n';
         for (unsigned enemy = 0; enemy < gameplay.enemyCount(); ++enemy)
             sawAwakeEnemy = sawAwakeEnemy || gameplay.enemyAt(enemy).awake;
+        unsigned retiredOnRoute = 0;
+        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+            const auto& enemy = reference.instanceAt(i);
+            const bool tracked = enemy.objectId == 111 || enemy.objectId == 112 ||
+                enemy.objectId == 113 || enemy.objectId == 116 ||
+                enemy.objectId == 117 || enemy.objectId == 119;
+            if (tracked && !enemy.active && enemy.health > 0 &&
+                enemy.y < reference.mainCameraViewY() - 160)
+                ++retiredOnRoute;
+        }
         if (sawAwakeEnemy && sawExtendedEnemyAnimation && sawPairedFrogAir && sawPairedFrogGround &&
+            retiredOnRoute >= 2 &&
             gameplay.cameraOffsetY() >= postLandingCameraY + 256)
             break;
     }
@@ -1350,6 +1371,17 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(!native.active && !native.awake && !native.activationPending,
                     "SDL-retired enemies no longer remain live in Amiga");
             ++retiredCompared;
+        }
+    }
+    if (retiredCompared < 2 && std::getenv("DOWNWELL_TRACE_TRAVERSAL")) {
+        std::cerr << "RETIREMENTS count=" << retiredCompared
+                  << " viewY=" << reference.mainCameraViewY() << '\n';
+        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+            const auto& enemy = reference.instanceAt(i);
+            if (enemy.objectId >= 111 && enemy.objectId <= 119)
+                std::cerr << "ENEMY object=" << enemy.objectId << " y=" << enemy.y
+                          << " active=" << enemy.active << " health=" << enemy.health
+                          << " pending=" << enemy.activationPending << '\n';
         }
     }
     require(retiredCompared >= 2, "comparison exercises two out-of-view enemy retirements");
