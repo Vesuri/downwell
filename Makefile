@@ -249,11 +249,20 @@ test: verify-player-time-stop
 test: verify-time-change
 test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-motion verify-time-shard-animation verify-time-shard-effects verify-time-shard-burst verify-point-direction
 .PHONY: verify-point-direction
+test: verify-portable-atan
+.PHONY: verify-portable-atan
+verify-portable-atan: build/portable-atan-test
+	./build/portable-atan-test
+
+build/portable-atan-test: tests/core/PortableAtanTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PortableAtanTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: probe-runner-atan-x86-macos
 # Optional numeric evidence only; not a portable/default test or Windows run.
 probe-runner-atan-x86-macos:
 	@mkdir -p build
-	clang++ -arch x86_64 -std=c++17 -O2 -ffp-contract=off tests/core/RunnerAtanProbe.cpp -o build/runner-atan-probe
+	clang++ -arch x86_64 -std=c++17 -O2 -ffp-contract=off -Isrc tests/core/RunnerAtanProbe.cpp -o build/runner-atan-probe
 	arch -x86_64 build/runner-atan-probe
 
 verify-point-direction: build/point-direction-test

@@ -14,6 +14,10 @@
 #include "core/TimeShardEffects.h"
 #include "core/TimeShardBurst.h"
 #include "core/RunnerPointDirection.h"
+#include "core/PortableAtan.h"
+bool compilePortableAtan(downwell::MotionBinary64 x,downwell::MotionBinary64 y,downwell::MotionBinary64& out){
+    return downwell::RunnerPointDirection::evaluate({}, {},x,y,out,downwell::portableAtan);
+}
 bool compilePointDirection(downwell::MotionBinary64 x,downwell::MotionBinary64 y,downwell::MotionBinary64& out){
     return downwell::RunnerPointDirection::evaluate({}, {},x,y,out,
         [](auto dy,auto,auto& angle){angle=dy;return true;});

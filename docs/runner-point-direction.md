@@ -30,6 +30,17 @@ Zero/nonfinite classification paths require separate treatment.
 
 ## Reproducible probe and limits
 
+`PortableAtan.h` is a mathematical candidate, not x87 emulation. It reduces
+the ratio to [0,1], transforms ratios >=1/2 around pi/4, evaluates an alternating
+series with integer-only binary64 operations, and applies quadrant corrections.
+`DivideBinary64.h` performs nearest-even normal division with two 32-bit limbs.
+The candidate's binary64 result is not promised to match FPATAN bit-for-bit;
+the required observable comparison here is its narrowed binary32 result.
+The probe compares that result directly for its first 10,000 finite inputs.
+`make verify-portable-atan` additionally checks arithmetic, quadrants, signed
+zeros and broad float exponent ranges against a host reference. Neither test
+constitutes exhaustive proof or a native frame-budget measurement.
+
 `make probe-runner-atan-x86-macos` runs a finite one-million-input probe with
 the recovered x87 operation sequence and compares its narrowed result with
 host libm. It requires an x86-capable macOS execution environment (Rosetta on
