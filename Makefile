@@ -249,6 +249,13 @@ test: verify-player-time-stop
 test: verify-time-change
 test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-motion verify-time-shard-animation verify-time-shard-effects verify-time-shard-burst verify-point-direction
 .PHONY: verify-point-direction
+.PHONY: probe-runner-atan-x86-macos
+# Optional numeric evidence only; not a portable/default test or Windows run.
+probe-runner-atan-x86-macos:
+	@mkdir -p build
+	clang++ -arch x86_64 -std=c++17 -O2 -ffp-contract=off tests/core/RunnerAtanProbe.cpp -o build/runner-atan-probe
+	arch -x86_64 build/runner-atan-probe
+
 verify-point-direction: build/point-direction-test
 	python3 tools/verify-runner-point-direction.py
 	./build/point-direction-test
