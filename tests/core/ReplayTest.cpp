@@ -95,11 +95,17 @@ void testReplayProducesStableStartupState() {
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
     const std::uint64_t digest = runtime.stateDigest();
-    if (digest != 0x30a2c11706f2ba35ULL)
+    // Schema 46 adds each instance's explicit collision mask (default -1).
+    if (digest != 0xcc4d04361bb5bb72ULL)
         std::cerr << "startup state digest: 0x" << std::hex << digest
                   << std::dec << '\n';
-    require(digest == 0x30a2c11706f2ba35ULL,
-            "startup state digest remains wire-stable");
+    require(digest == 0xcc4d04361bb5bb72ULL,
+            "schema-46 startup state digest remains wire-stable");
+    auto& record=const_cast<downwell::InstanceRecord&>(runtime.instanceAt(0));
+    const auto mask=record.maskId;record.maskId=31;
+    require(runtime.stateDigest()!=digest,"digest detects mask-only changes behind identical artwork");
+    record.maskId=mask;
+    require(runtime.stateDigest()==digest,"restoring mask restores the complete replay digest");
 }
 
 void testPortCheckpointIsStable() {

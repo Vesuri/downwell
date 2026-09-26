@@ -312,6 +312,14 @@ before user Create code; deferred end-of-phase insertion is not equivalent.
 Bounds publication still uses the sprite/mask and preparation gates described
 below. A later dirty pass can remove/reinsert that birth, changing tree order.
 
+`InstanceRecord` retains sprite and explicit mask IDs separately. Deferred
+births copy both from object metadata before invoking their Create handler.
+Packed-room loading resolves both defaults during preflight when object metadata
+is supplied, then installs them before PreCreate; Create must not reset values
+changed by PreCreate. `StartupRuntime` supplies that metadata on initial entry
+and room changes. Resource identity storage does not itself register spatial
+membership or publish bounds; those hooks still belong at the birth boundary.
+
 Immediately before direct publication, `0x4879ca..0x4879f3` checks the new
 object's `0x28` flags. If absent, it walks parents and, on a prepared ancestor,
 sets `0x20` on the new object's record only. `RunnerObjectFamilies::prepareBirth`

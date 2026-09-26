@@ -113,7 +113,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
         roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
             instances_, *roomPack_, entryRoomId, true,
             instanceHandler, roomCreationHandler,
-            deferredHandler) == PackedRoomLoadResult::success;
+            deferredHandler,objectPack_) == PackedRoomLoadResult::success;
     } else {
         roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
             instances_, entryRoomId, definitions, 2, true,
@@ -1826,7 +1826,7 @@ void StartupRuntime::gotoRoom(int roomId) {
         roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
             instances_, *roomPack_, roomId, false,
             instanceHandler, roomCreationHandler,
-            deferredHandler) == PackedRoomLoadResult::success;
+            deferredHandler,objectPack_) == PackedRoomLoadResult::success;
     } else {
         roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
             instances_, roomId, nullptr, 0, false,
@@ -1857,7 +1857,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(45); // Includes each projectile's birth-time spread override.
+    digest.addU32(46); // Includes source collision-mask overrides at instance birth.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2056,6 +2056,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
             digest.addU32(instance.enemyImageRemainder);
         }
         digest.addI32(instance.spriteId);
+        digest.addI32(instance.maskId);
         digest.addI32(instance.creationCodeId);
         digest.addI32(instance.preCreateCodeId);
         digest.addU32(instance.layerId);

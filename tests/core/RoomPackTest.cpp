@@ -181,6 +181,40 @@ void testPackedRoomLoader() {
     require(instances.at(0).layerId == 13 && instances.at(0).depth == -300000,
             "layer membership resolves into instance state");
 
+    std::vector<std::uint8_t> objectBytes={'D','W','O','B'};
+    appendU16(objectBytes,downwell::ObjectPack::formatVersion);
+    appendU16(objectBytes,downwell::ObjectPack::headerSize);
+    appendU32(objectBytes,downwell::ObjectPack::manifestSchema);
+    appendU32(objectBytes,38);appendU32(objectBytes,0);
+    appendU64(objectBytes,downwell::ObjectPack::sourceHashPrefix);
+    appendU32(objectBytes,0);appendU64(objectBytes,0);
+    for(int id=0;id<38;++id){
+        appendI32(objectBytes,id);appendI32(objectBytes,12+id);appendI32(objectBytes,-1);
+        appendI32(objectBytes,90+id);appendI32(objectBytes,0);appendU32(objectBytes,0);
+        appendU32(objectBytes,0);appendU32(objectBytes,0);appendI32(objectBytes,0);
+    }
+    const downwell::ObjectPack objects(objectBytes.data(),objectBytes.size());
+    require(objects.valid(),"synthetic object defaults validate");
+    downwell::InstanceStore<3> withDefaults;
+    unsigned initialized=0;
+    auto phases=[&](downwell::InstanceRecord& instance,downwell::RoomInstancePhase phase){
+        if(phase==downwell::RoomInstancePhase::preCreate){
+            require(instance.spriteId==12+instance.objectId&&instance.maskId==90+instance.objectId,
+                "room object sprite and mask are bound before PreCreate");
+            instance.maskId=777;++initialized;
+        }else if(phase==downwell::RoomInstancePhase::create)
+            require(instance.maskId==777,"Create retains mask mutations from PreCreate");
+    };
+    auto noDeferred=[](auto&){};
+    require(downwell::PackedRoomLoader<3>::enter(withDefaults,pack,7,true,phases,noRoomCode,
+        noDeferred,&objects)==downwell::PackedRoomLoadResult::success&&initialized==2,
+        "packed loader publishes object defaults once per birth");
+    const downwell::ObjectPack invalidObjects(nullptr,0);
+    require(downwell::PackedRoomLoader<3>::enter(withDefaults,pack,7,true,phases,noRoomCode,
+        noDeferred,&invalidObjects)==downwell::PackedRoomLoadResult::invalidObject&&
+        initialized==2&&withDefaults.size()==2&&withDefaults.at(0).maskId==777,
+        "invalid object metadata is rejected before any room transition or callback");
+
     std::vector<std::uint8_t> damaged = bytes;
     // Final membership is changed from instance 100066 to 100065, making one
     // duplicate membership and leaving the second instance without a layer.

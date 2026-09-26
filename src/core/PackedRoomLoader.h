@@ -3,6 +3,7 @@
 
 #include "RoomLoader.h"
 #include "RoomPack.h"
+#include "ObjectPack.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -15,7 +16,8 @@ enum class PackedRoomLoadResult {
     roomNotFound,
     capacityExceeded,
     duplicateInstanceId,
-    invalidLayerMembership
+    invalidLayerMembership,
+    invalidObject
 };
 
 template <std::size_t Capacity>
@@ -42,9 +44,11 @@ public:
                                       bool firstGameRoom,
                                       InstanceHandler instanceHandler,
                                       RoomCreationHandler roomCreationHandler,
-                                      DeferredCommandHandler deferredCommandHandler) {
+                                      DeferredCommandHandler deferredCommandHandler,
+                                      const ObjectPack* objects = nullptr) {
         if (!pack.valid())
             return PackedRoomLoadResult::invalidPack;
+        if(objects && !objects->valid())return PackedRoomLoadResult::invalidObject;
 
         PackedRoom room;
         if (!pack.findRoom(roomId, room))
@@ -78,6 +82,12 @@ public:
                 packedLayer.layerId,
                 packedLayer.depth
             };
+            if(objects){
+                PackedObject object;
+                if(!objects->findObject(packedInstance.objectId,object))return PackedRoomLoadResult::invalidObject;
+                definitions[index].spriteId=object.spriteId;
+                definitions[index].maskId=object.textureMaskId;
+            }
         }
 
         const LoadRoomResult result = RoomLoader<Capacity>::enter(

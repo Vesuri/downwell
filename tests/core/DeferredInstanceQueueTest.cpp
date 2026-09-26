@@ -45,7 +45,7 @@ std::vector<std::uint8_t> makeObjectPack() {
     appendI32(bytes, 0);
     appendI32(bytes, 12);
     appendI32(bytes, -1);
-    appendI32(bytes, 12);
+    appendI32(bytes, 99); // Deliberately different collision mask and artwork.
     appendI32(bytes, -40);
     appendU32(bytes, 5); // visible and persistent
     appendU32(bytes, 0);
@@ -65,6 +65,7 @@ void testApplyIsOrderedAndAtomic() {
     std::uint32_t callbacks = 0;
     const auto onCreate = [&callbacks](downwell::InstanceRecord& instance) {
         require(instance.spriteId == 12,"serialized sprite exists before Create callback");
+        require(instance.maskId == 99,"serialized collision mask exists before Create callback");
         require(instance.depth == -70,"compatibility depth exists before Create callback");
         ++callbacks;
     };

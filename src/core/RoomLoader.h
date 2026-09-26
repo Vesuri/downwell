@@ -22,6 +22,8 @@ struct RoomInstanceDefinition {
     std::int32_t preCreateCodeId = -1;
     std::uint32_t layerId = 0;
     std::int32_t depth = 0;
+    std::int32_t spriteId = -1;
+    std::int32_t maskId = -1;
 };
 
 enum class RoomInstancePhase {
@@ -94,6 +96,8 @@ public:
             instance.preCreateCodeId = definition.preCreateCodeId;
             instance.layerId = definition.layerId;
             instance.depth = definition.depth;
+            instance.spriteId = definition.spriteId;
+            instance.maskId = definition.maskId;
             instanceHandler(instance, RoomInstancePhase::preCreate);
             instanceHandler(instance, RoomInstancePhase::create);
             instanceHandler(instance, RoomInstancePhase::instanceCreation);
