@@ -87,6 +87,17 @@ References: [behavior audit](original-behavior-audit.md),
 
 - Remaining areas, enemies, hazards, bosses and ending flow.
 - Remaining weapons, styles, upgrades and their interactions; hard-mode rules.
+- Complete shared projectile state and lifecycle before dependent upgrades:
+  damage, direction, speed, range, penetration, artwork, creation RNG and
+  collision order. Use it for Popping Gems, Gunpowder Blocks, Drone, Hot Casing
+  and weapon-specific Laser Sight behavior rather than backend-specific rules.
+- Complete blast/corpse lifecycles for Blast Module, Rocket Jump, Rest in Pieces
+  and Knife and Fork; gun-module hit/reshuffle behavior for Reverse Engineering;
+  companion/time-field lifecycles for Heart Balloon, Drone and Timeout; and
+  Safety Jetpack input, fuel, reset and thrust.
+- Complete upgrade pickup/grant/HUD effects and validate each upgrade through
+  a live deterministic encounter, original-game evidence and bounded native
+  execution. Inventory or offer support alone does not close an upgrade.
 - Music and sound on both platforms, including Amiga conversion, mixing,
   timing and memory residency.
 - Persistence, unlocks, achievements where applicable, settings and complete
@@ -94,6 +105,8 @@ References: [behavior audit](original-behavior-audit.md),
 
 Implement shared behavior and connect both backends. A feature absent from both
 ports does not count as parity with the original.
+
+Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 ## 5. Meet the Amiga frame budget
 

@@ -128,9 +128,7 @@ Checks:
 - Both ordinary builds pass, including Amiga 68000 instruction/helper audits
   (`/tmp/downwell-startup-choose-{amiga,sdl}.log`). No emulator was launched.
 
-Remaining audit starts with shared gems, player/impact choices and enemy alarm
-callbacks. Native gameplay shortcuts and geometry-dependent test tapes still
-require regeneration after the migration is complete.
+For the active RNG audit and checkpoint work, see [the work queue](open-work.md).
 
 ## Third migration: shared gems and immune bullet impacts
 

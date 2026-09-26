@@ -183,12 +183,10 @@ gating, bone storage and motion/collisions, alarms, hit/death effects and actor
 registration remain necessary. No new playable actor, native timing result,
 or original-runner playback comparison is claimed by these unit tests.
 
-Remaining work includes wiring catacomb symbol emission into traversal, new actor
-and hazard behavior, matching offline art and both rendering backends, and
-verified area 1-3 → 2-1 transition ownership. Do not remove the current
-later-area guard or substitute cavern logic merely because these tables are
-now available. No new Amiga performance or Windows visual-fidelity claim is
-made by this data-export gate.
+Live catacomb integration is tracked in [the work queue](open-work.md).
+Recovered tables alone do not justify removing the later-area guard or
+substituting cavern logic, and do not establish native performance or
+Windows visual fidelity.
 
 ### Bone projectile numeric/event reference
 
