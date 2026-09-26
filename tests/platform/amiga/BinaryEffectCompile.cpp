@@ -16,6 +16,14 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
 #include "core/SpriteMaskPack.h"
 #include "core/RunnerMaskTransform.h"
 #include "core/RunnerMaskDispatch.h"
+#include "core/RunnerMaskPair.h"
+bool compileMaskPair(const downwell::RunnerMaskPair::Shape& a,
+    const downwell::RunnerMaskPair::Shape& b,downwell::RunnerMaskPair::Result& result,
+    downwell::RunnerImageValue c,downwell::RunnerImageValue s){
+    return downwell::RunnerMaskPair::test(a,b,{},
+        [&](auto,auto& cosine,auto& sine){cosine=c;sine=s;return true;},
+        [](auto value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},result);
+}
 #include "core/RunnerPlaceQuery.h"
 #include "core/RunnerSpatialInstances.h"
 #include "core/RunnerObjectFamilies.h"

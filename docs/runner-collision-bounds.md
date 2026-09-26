@@ -233,3 +233,27 @@ as near zero. The stored blood rectangle's strictly positive edges make direct
 interval tests equivalent to truncating coordinates and reading its verified
 bits. These query adapters do not select instance identity or activation state;
 the scheduler/registry must supply eligible fields.
+
+## Shared stored-mask pair kernel
+
+`RunnerMaskPair` composes the three sampling branches for two resolved ordinary
+resources. The caller supplies the selected stored mask frame, cached bounds,
+source frame count, transform and origin for each partner. It must still apply
+instance eligibility, resource resolution, lazy bounds refresh and the outer
+decision to require precise testing; this kernel is not a replacement for those
+gates. Inverse trigonometry and integer position rounding remain explicit inputs.
+
+The kernel intersects float bounds, truncates the intersection endpoints to
+signed integers, and scans inclusive X outer/Y inner. It retains the first
+shared solid pixel for diagnostics, though the runner returns only a boolean.
+Both partners use the pair-wide dispatch selection, including the near-unit
+rounded-position path's 32-bit integer coordinate arithmetic. Unsupported
+numeric inputs or unavailable masks fail without replacing the result. Zero
+scale or zero frames produce a successful miss. Integer overflow in the scan
+increment is avoided without changing the admitted scan endpoints.
+
+The resource-backed test covers all 741 masks against ordinary/goal field masks
+in all three paths, using a separate host arithmetic transcription and injected
+trigonometric values. Explicit fixtures distinguish scan order and truncation
+from rounding. This is arithmetic/composition evidence, not proof of the
+original runtime FP mode, complete instance collision dispatch, or live wiring.

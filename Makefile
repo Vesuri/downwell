@@ -318,9 +318,14 @@ verify-precise-masks: verify-collision-masks
 generate-collision-masks: generated/collision-sprite-masks.json
 	python3 tools/generate-collision-masks.py
 
-verify-collision-masks: generate-collision-masks generate-sprite-pack build/sprite-mask-pack-test
+verify-collision-masks: generate-collision-masks generate-sprite-pack build/sprite-mask-pack-test build/runner-mask-pair-test
 	python3 tools/generate-collision-masks.py --check
 	./build/sprite-mask-pack-test generated/downwell-sprite-masks.dwsm generated/downwell-sprites.dwsc
+	./build/runner-mask-pair-test generated/downwell-sprite-masks.dwsm generated/downwell-sprites.dwsc
+
+build/runner-mask-pair-test: tests/core/RunnerMaskPairTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerMaskPairTest.cpp
 
 build/sprite-mask-pack-test: tests/core/SpriteMaskPackTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
