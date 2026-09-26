@@ -724,6 +724,15 @@ build/player-horizontal-binary64-test: tests/core/PlayerHorizontalBinary64Test.c
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerHorizontalBinary64Test.cpp
 
+.PHONY: verify-player-solid-collision-binary64
+test: verify-player-solid-collision-binary64
+verify-player-solid-collision-binary64: build/player-solid-collision-binary64-test
+	./build/player-solid-collision-binary64-test
+
+build/player-solid-collision-binary64-test: tests/core/PlayerSolidCollisionBinary64Test.cpp src/core/PlayerSolidCollisionBinary64.h src/core/SolidCollision.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerSolidCollisionBinary64Test.cpp
+
 test: verify-goal-field-bounds
 .PHONY: verify-goal-field-bounds
 verify-goal-field-bounds: build/goal-field-bounds-test
