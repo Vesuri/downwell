@@ -64,6 +64,24 @@ Builder object-82 initialization already consumes the Create random word:
 world registration must retain that result, not call Create again and consume
 a second draw. Remaining ownership, lookup and rendering work is in the queue.
 
+`TypicalPlayerDamage` preserves `scrTypicalDamage`'s caller variables and
+synchronous call order. The immunity check follows argument assignment;
+direction is calculated before `scrPDamage`, then knockback, shake and the
+surviving-health hit effect run before Timeout. Timeout is outside the death
+and health conditions. Its object-35 traversal re-reads `pTimeStop` for each
+instance and uses published instance coordinates, not player globals. New field
+creation does not itself update `pTimeStop`. The two achievement writes occur
+after that traversal. `RunSession::typicalPlayerDamage` latches adapter/creation
+failure without replaying earlier effects; its current field adapter accepts
+integer published coordinates only.
+
+The component test verifies this ordering, gates, synchronous field RNG and
+partial capacity failure against the reviewed VM script. Math, `scrPDamage`,
+`scrFjump`, hit-effect ownership and original player traversal remain explicit
+adapter contracts. This does not make the simplified live enemy contact pass
+source-equivalent or establish natural Timeout behavior; those integrations
+remain in the shared work queue.
+
 `OrdinaryTimeFields` exposes port-owned lifetime keys separately from array
 indices. As object 82 has no individual retirement, one room's births form a
 contiguous key interval; lookup needs two counters rather than a key per field.
