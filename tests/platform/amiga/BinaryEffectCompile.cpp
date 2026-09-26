@@ -6,7 +6,16 @@ bool compilePaletteEffect(downwell::PaletteEffectSurface<>& surface,
 }
 #include "core/EffectMaskAssets.h"
 #include "core/SmokeComposition.h"
+#include "core/CurrencySmokeComposition.h"
 #include "core/SmokeEffects.h"
+bool compileCurrencySmokeComposition(downwell::CurrencySmokeComposition& composition,
+    const downwell::SmokeEffects<32>& smoke,const downwell::EffectMaskAssets& assets,
+    const downwell::EffectSurfacePlacement::View& view,
+    downwell::SmokeComposition::Settings settings) {
+    return composition.prepare([&](auto emit){emit(false,0,view.x,view.y);},
+        smoke,assets,view,settings,[&](auto emit){emit(view.x,view.y);},
+        [](downwell::MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);});
+}
 bool compileSmokeComposition(downwell::SmokeComposition& composition,
     const downwell::SmokeEffects<32>& smoke,const downwell::EffectMaskAssets& assets,
     const downwell::EffectSurfacePlacement::View& view,

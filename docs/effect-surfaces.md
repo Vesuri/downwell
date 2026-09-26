@@ -50,6 +50,16 @@ overlay above directly drawn gems would incorrectly leave gem pixels visible
 inside shade holes. Live integration must migrate both producers together.
 The currency Draw assembly is pinned by `verify-effect-depths.py`.
 
+`CurrencySmokeComposition` provides the shared colored controller surface.
+Callers enumerate visible (non-dflash) currency in original Draw order using
+published coordinates, followed by the smoke owner; shade is applied only after
+both producers. Supply the backend's raster sampling policy explicitly. Its
+ordinary-RAM surface owns no DMA storage and never changes simulation or RNG.
+Death/low-spec requests return `directRequired()` with an empty surface: the
+backend must draw each producer at its own world-depth boundary, not flatten
+them into a controller overlay. A missing normal effect surface remains empty.
+Preparation failure clears partial output so it cannot publish stale pixels.
+
 Currency Step publishes rounded `xx`/`yy` into its builtin `x`/`y` before Draw;
 the private integration fractions must not be passed directly to `drawFx` or
 truncated at drawing time. Both adapters use `GemMotion::rounded` for that
