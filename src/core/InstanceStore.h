@@ -13,6 +13,7 @@
 #include "BatHitState.h"
 #include "BatBehavior.h"
 #include "RunnerObjectMembership.h"
+#include "RunnerRoomMembership.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -93,6 +94,7 @@ public:
 
     void clear() {
         objectMembership_.clear();
+        roomMembership_.clear();
         for(std::size_t i=0;i<size_;++i)slots_[recordSlots_[i]].record=Capacity;
         size_ = 0;
     }
@@ -138,6 +140,19 @@ public:
     template<class IsA> unsigned registeredObjectCount(int object,IsA isA) const {
         return objectMembership_.count(object,isA);
     }
+    void reconcileObjectMembership() {
+        roomMembership_.reconcile(
+            [&](unsigned slot){return !records_[slots_[slot].record].active;},
+            [&](unsigned slot,bool registered){
+                publishObjectMembership({slot,slots_[slot].generation},registered);
+            });
+        // Retired records remain available to host diagnostics until room
+        // cleanup, but must not retain room/object memberships.
+        for(std::size_t i=0;i<size_;++i)if(!records_[i].active && !records_[i].activationPending){
+            objectMembership_.unbind(recordSlots_[i]);
+            roomMembership_.remove(recordSlots_[i]);
+        }
+    }
     // Graph and visitor must not mutate this store. Active/precise-hit filtering
     // belongs to the visitor; inactive flags can precede membership retirement.
     template<class IsA,class Visit> void visitObject(int object,IsA isA,Visit visit) const {
@@ -167,7 +182,7 @@ public:
     CreateInstanceResult create(std::uint32_t instanceId,
                                 std::int32_t objectId,
                                 std::int32_t roomId,
-                                bool persistent) {
+                                bool persistent,std::int32_t depth=0) {
         if (find(instanceId) != nullptr)
             return CreateInstanceResult::duplicateId;
         if (size_ == Capacity)
@@ -186,7 +201,12 @@ public:
         instance.objectId = objectId;
         instance.roomId = roomId;
         instance.persistent = persistent;
+        instance.depth = depth;
         if(objectId>=0)objectMembership_.bind(static_cast<unsigned>(slot),objectId,slots_[slot].generation);
+        // Every int32 depth narrows to a finite normal/zero binary32 value;
+        // slot was checked above, so these bindings cannot fail.
+        RunnerImageValue key;key.assign(MotionBinary64::fromInteger(depth));
+        roomMembership_.bind(static_cast<unsigned>(slot),key);
         return CreateInstanceResult::success;
     }
 
@@ -195,6 +215,7 @@ public:
             if (records_[index].instanceId != instanceId)
                 continue;
             objectMembership_.unbind(recordSlots_[index]);
+            roomMembership_.remove(recordSlots_[index]);
             slots_[recordSlots_[index]].record=Capacity;
             for (std::size_t next = index + 1; next < size_; ++next){
                 records_[next - 1] = records_[next];
@@ -212,6 +233,7 @@ public:
         for (std::size_t source = 0; source < size_; ++source) {
             if (!records_[source].persistent){
                 objectMembership_.unbind(recordSlots_[source]);
+                roomMembership_.remove(recordSlots_[source]);
                 slots_[recordSlots_[source]].record=Capacity;
                 continue;
             }
@@ -227,6 +249,7 @@ public:
 
 private:
     RunnerObjectMembership<static_cast<unsigned>(Capacity)> objectMembership_;
+    RunnerRoomMembership<static_cast<unsigned>(Capacity)> roomMembership_;
     struct Slot {std::size_t record=Capacity;std::uint32_t generation=0;};
     std::array<Slot,Capacity> slots_{};
     std::array<std::uint32_t,Capacity> recordSlots_{};

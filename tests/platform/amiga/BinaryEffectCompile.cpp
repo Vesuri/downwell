@@ -171,6 +171,15 @@ bool compileCurrencySmokeComposition(downwell::CurrencySmokeComposition& composi
         [](downwell::MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);});
 }
 #include "core/RunnerObjectMembership.h"
+#include "core/RunnerRoomMembership.h"
+unsigned compileRoomMembership(downwell::RunnerRoomMembership<64>& rooms,
+    unsigned slot,downwell::RunnerImageValue depth,std::uint64_t dormant) {
+    if(!rooms.bind(slot,depth))return 0;
+    unsigned publications=0;
+    rooms.reconcile([&](unsigned member){return (dormant>>member)&1;},
+        [&](unsigned,bool){++publications;});
+    return publications;
+}
 unsigned compileObjectMembership(downwell::RunnerObjectMembership<64>& registry,
     unsigned slot,int object,std::uint32_t identity,int parent) {
     if(!registry.bind(slot,object,identity))return 0;

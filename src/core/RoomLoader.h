@@ -81,7 +81,7 @@ public:
             instances.create(definition.instanceId,
                              definition.objectId,
                              roomId,
-                             definition.persistent);
+                             definition.persistent,definition.depth);
             InstanceRecord& instance = *instances.find(definition.instanceId);
             instance.x = definition.x;
             instance.y = definition.y;

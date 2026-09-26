@@ -42,12 +42,16 @@ public:
                         AlarmEvents alarmEvents, Handler handler, BeforePhase beforePhase) {
         beforePhase(StepEventPhase::beginStep);
         dispatchPhase(instances, StepEventPhase::beginStep, handler);
+        instances.reconcileObjectMembership();
         beforePhase(StepEventPhase::alarm);
         dispatchAlarms(instances, alarmEvents, handler);
+        instances.reconcileObjectMembership();
         beforePhase(StepEventPhase::step);
         dispatchPhase(instances, StepEventPhase::step, handler);
+        instances.reconcileObjectMembership();
         beforePhase(StepEventPhase::endStep);
         dispatchPhase(instances, StepEventPhase::endStep, handler);
+        instances.reconcileObjectMembership();
     }
 
 private:

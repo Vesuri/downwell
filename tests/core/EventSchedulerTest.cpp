@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 namespace {
 
@@ -180,6 +181,92 @@ void testReusedIdCannotInheritPhaseEligibility() {
     }
 }
 
+void testRoomMembershipCycles() {
+    constexpr unsigned capacity=16;
+    downwell::RunnerRoomMembership<capacity> rooms;
+    std::vector<unsigned> active,inactive;
+    unsigned depths[capacity]{};
+    bool dormant[capacity]{};
+    std::uint32_t rng=17;
+    auto next=[&](){rng=rng*1664525u+1013904223u;return rng;};
+    auto remove=[](auto& list,unsigned slot){
+        list.erase(std::remove(list.begin(),list.end(),slot),list.end());
+    };
+    auto insert=[&](unsigned slot){
+        auto pos=active.begin();
+        while(pos!=active.end() && depths[*pos]<=depths[slot])++pos;
+        active.insert(pos,slot);
+    };
+    for(unsigned iteration=0;iteration<4096;++iteration){
+        unsigned slot=(next()>>16)%capacity,op=(next()>>16)%5;
+        if(op==0){
+            remove(active,slot);remove(inactive,slot);
+            depths[slot]=(next()>>16)%4; // Frequent equal-depth insertion ties.
+            downwell::RunnerImageValue key;
+            require(key.assign(downwell::MotionBinary64::fromInteger(depths[slot])),"depth is representable");
+            require(rooms.bind(slot,key),"bind room member");insert(slot);
+        }else if(op==1){
+            rooms.remove(slot);remove(active,slot);remove(inactive,slot);
+        }else dormant[slot]=!dormant[slot];
+        // Several pending requests between publications exercise cancellation.
+        if(iteration%7)continue;
+        std::vector<unsigned> expected,actual;
+        auto oldInactive=inactive;
+        for(auto member:oldInactive)if(!dormant[member]){
+            remove(inactive,member);insert(member);expected.push_back(member*2+1);
+        }
+        auto oldActive=active;
+        for(auto member:oldActive)if(dormant[member]){
+            remove(active,member);inactive.push_back(member);expected.push_back(member*2);
+        }
+        // Copied owners must retain links without pointers into the old owner.
+        auto copied=rooms;
+        copied.reconcile([&](unsigned member){return dormant[member];},
+            [&](unsigned member,bool registered){actual.push_back(member*2+registered);});
+        require(actual==expected,"room publication matches independent ordered lists");
+        rooms=copied;
+        if(iteration%91==0){rooms.clear();active.clear();inactive.clear();}
+        for(unsigned member=0;member<capacity;++member)
+            require(rooms.contains(member)==(std::find(active.begin(),active.end(),member)!=active.end() ||
+                std::find(inactive.begin(),inactive.end(),member)!=inactive.end()),"membership survives reuse and clear");
+    }
+}
+
+void testDeferredMembershipPhaseBoundary() {
+    using Phase=downwell::StepEventPhase;
+    downwell::InstanceStore<3> store;
+    store.create(1,10,7,false,20);store.create(2,10,7,false,0);store.create(3,10,7,false,10);
+    auto exact=[](int,int){return false;};
+    for(unsigned i=0;i<3;++i){store.at(i).active=false;store.at(i).activationPending=true;}
+    store.reconcileObjectMembership();
+    require(store.registeredObjectCount(10,exact)==0,"deactivation reconciliation unbinds all dormant members");
+    // Request order deliberately differs from both storage and inactive order.
+    for(unsigned id:{1u,3u,2u}){store.find(id)->active=true;store.find(id)->activationPending=false;}
+    unsigned beginCalls=0,publications=0;
+    downwell::EventScheduler<3>::runStep(store,
+        [](const downwell::InstanceRecord&){return downwell::AlarmBank::FiredMask(0);},
+        [&](downwell::InstanceRecord&,downwell::StepEvent event){
+            if(event.phase==Phase::beginStep){
+                ++beginCalls;
+                require(store.registeredObjectCount(10,exact)==0,
+                    "membership stays unpublished through every Begin Step handler");
+            }
+        },
+        [&](Phase phase){
+            if(phase==Phase::beginStep)return;
+            std::vector<unsigned> order;
+            store.visitObject(10,exact,[&](downwell::InstanceHandle,const downwell::InstanceRecord& record){
+                order.push_back(record.instanceId);return true;});
+            require(order==std::vector<unsigned>({2,3,1}),
+                "post-phase promotion follows inactive room-list order, not request or storage order");
+            ++publications;
+        });
+    require(beginCalls==3 && publications==3,"publication precedes every later phase snapshot");
+    store.find(3)->active=false; // Retirement, not pending activation.
+    store.reconcileObjectMembership();
+    require(store.registeredObjectCount(10,exact)==2,"retired diagnostic record loses membership");
+}
+
 } // namespace
 
 int main() {
@@ -189,6 +276,8 @@ int main() {
     testActiveStateAndMissingAlarmEvent();
     testDeletionAndCreationAcrossPhases();
     testReusedIdCannotInheritPhaseEligibility();
+    testDeferredMembershipPhaseBoundary();
+    testRoomMembershipCycles();
     std::cout << "event scheduler tests passed\n";
     return 0;
 }

@@ -28,8 +28,26 @@ must not transfer phase eligibility to the replacement. Handle resolution also
 follows surviving records through compaction without linear ID searches.
 Each phase snapshot costs eight bytes per capacity slot; this is not the
 Amiga `GameplayWorld` actor scheduler and does not establish source object-list
-traversal or deferred activation membership. Those integrations remain in the
-[work queue](open-work.md).
+event traversal.
+
+The decoded host publishes deferred object membership after each complete Begin
+Step, alarm, ordinary Step and End Step phase, before the next phase snapshot.
+The Windows frame loop calls reconciliation after those phases at `0x50dc89`,
+`0x50dceb`, `0x50dd80` and `0x50defd`. Requests during a handler must not reorder
+membership immediately. `RunnerRoomMembership` follows `0x48d630`: promote in
+inactive-room-list order, then demote in active-room-list order. Active insertion
+uses ascending binary32 depth and inserts after equal keys; demotions append to
+the inactive tail. Storage compaction and request order are not substitutes.
+The fixed-capacity room lists add 16 bytes per slot plus four list endpoints;
+the decoded host's 2,048 slots therefore add 32 KiB plus endpoint storage.
+
+The host supplies serialized depth at birth. This adapter does not yet model
+runtime depth changes, persistent-instance room re-registration, the complete
+Windows destruction queues, or the additional manual actor/collision passes
+after `EventScheduler`. Nor does it publish spatial-index updates or wire the
+Amiga world actor families into these lists. Those integrations remain in the
+[work queue](open-work.md). Component publication tests do not establish live
+`instance_place` identity equivalence.
 
 `BoneProjectileStore::beginPhase()` captures a monotonic handle cutoff before
 any actor executes that phase. `visitPhase()` excludes newer handles and

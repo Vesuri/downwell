@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include <memory>
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
@@ -378,7 +379,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         {
             // Isolate projectile/block coverage from later randomized layout.
             // Use a copy and a real room instance; original resources stay untouched.
-            auto collision = runtime;
+            // O0 reserves all local snapshots in this function's stack frame.
+            // Keep independent runtime copies on the heap, not the host stack.
+            auto collisionStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto& collision = *collisionStorage;
             std::size_t target = collision.activeInstanceCount();
             for (std::size_t i = 0; i < collision.activeInstanceCount(); ++i)
                 if (collision.instanceAt(i).objectId == 60) { target = i; break; }
@@ -553,7 +557,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         if (!foundMovingEnemy) {
             // This entrance can contain only resting/offscreen actors.
             // Exercise host movement explicitly without changing its RNG tape.
-            auto movement = runtime;
+            auto movementStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto& movement = *movementStorage;
             std::size_t actorIndex = movement.activeInstanceCount();
             for (std::size_t i = 0; i < movement.activeInstanceCount(); ++i) {
                 auto& actor = const_cast<downwell::InstanceRecord&>(movement.instanceAt(i));
@@ -586,7 +591,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainBulletCount() == 0,
                 "the corrected layout's shot destroys one block and retires its projectile");
         {
-            auto retirement = runtime;
+            auto retirementStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto& retirement = *retirementStorage;
             std::size_t boxIndex = retirement.activeInstanceCount();
             for (std::size_t i = 0; i < retirement.activeInstanceCount(); ++i) {
                 auto& object = const_cast<downwell::InstanceRecord&>(retirement.instanceAt(i));
@@ -626,7 +632,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         {
             // A controlled ceiling fixture on a copy of the live room; never
             // mutate exported resources or the original test trajectory.
-            auto headBoxRuntime = runtime;
+            auto headBoxStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto& headBoxRuntime = *headBoxStorage;
             downwell::InstanceRecord* ceilingBox = nullptr;
             for (std::size_t i = 0; i < headBoxRuntime.activeInstanceCount(); ++i) {
                 auto& candidate = const_cast<downwell::InstanceRecord&>(headBoxRuntime.instanceAt(i));
@@ -662,7 +669,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         {
             // A controlled encounter, independent of the later side-room route.
             // Natural combat and collection remain mandatory in the paired scene tapes.
-            auto combat = runtime;
+            auto combatStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto& combat = *combatStorage;
             downwell::InstanceRecord* target = nullptr;
             std::size_t targetIndex = 0;
             for (std::size_t i = 0; i < combat.activeInstanceCount(); ++i) {
@@ -689,7 +697,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             target->grounded = false;
             target->walker.initialize(target->x, target->y, 0, 0, false);
             // Reuse the same isolated bullet path for a surviving-hit fixture.
-            auto batCombat = combat;
+            auto batCombatStorage = std::make_unique<downwell::StartupRuntime>(combat);
+            auto& batCombat = *batCombatStorage;
             auto& bat = const_cast<downwell::InstanceRecord&>(batCombat.instanceAt(targetIndex));
             bat.objectId = 116;
             bat.spriteId = 153;
