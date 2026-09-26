@@ -57,10 +57,11 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Restore surviving-frog-hit coverage in the strict combat gate: the traversal
-  reaches its scrolling/retirement requirements but leaves the first frog
-  behind before combat. Retain exact state and all encounter assertions, and
-  reverify both firing phases, upgrade variants, death and survival continuations.
+- Restore next-level encounter coverage in the strict gate: the level-two
+  reentry route remains at the entrance (player 240,880) without active enemies.
+  Retain the active-enemy/firing assertions, and reverify both firing phases,
+  upgrade variants, death and survival continuations after correcting the route
+  or any underlying source-behavior discrepancy.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,

@@ -336,7 +336,15 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
         if (!matching)
             std::cerr << "FROG MOTION tick=" << amiga.tick() << " actor=" << ordinal - 1
                       << " Q8 native=" << native.preciseX << ',' << nativeY << ',' << native.speedX << ',' << nativeVY
-                      << " SDL=" << referenceX << ',' << referenceY << ',' << referenceVX << ',' << referenceVY << '\n';
+                      << " SDL=" << referenceX << ',' << referenceY << ',' << referenceVX << ',' << referenceVY
+                      << " horizontal=" << native.frogHorizontal.position << ',' << enemy.frogHorizontal.position
+                      << '/' << native.frogHorizontal.velocity << ',' << enemy.frogHorizontal.velocity
+                      << " vertical=" << native.preciseY*5+native.gravityPositionRemainder << ',' << enemy.frogVertical.position
+                      << '/' << native.speedY*5+native.gravityRemainder << ',' << enemy.frogVertical.velocity
+                      << " ground=" << native.grounded << ',' << enemy.frogVertical.grounded
+                      << " hit=" << native.frogHit.pending << ',' << enemy.frogHit.pending
+                      << '/' << native.frogHit.ready << ',' << enemy.frogHit.ready
+                      << '/' << native.frogHit.remaining << ',' << enemy.frogHit.remaining << '\n';
         require(matching, "frog adapters must agree at Q8 precision, not within a one-pixel allowance");
         if (enemy.frogHit.remaining != 0) {
             sawPairedFrogHit = true;
@@ -1314,6 +1322,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     bool sawAwakeEnemy = false;
     const int postLandingCameraY = gameplay.cameraOffsetY();
     bool traverseFire = false;
+    bool routeFrogHit = false;
     for (int tick = 0; tick < 1800; ++tick) {
         parityFrame += 1;
         downwell::Input traverse;
@@ -1322,10 +1331,34 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         // Jump, release, then fire in the air: generated breakable floors
         // cannot be traversed by a tape that only ever presses while grounded.
         traverse.fire = tick % 40 == 0 || tick % 40 == 3;
+        // Keep this encounter tape in the shaft; side-room navigation has
+        // separate coverage and a periodic sweep can become trapped there.
+        if (reference.mainPlayerX() < 192) {
+            traverse.left = false; traverse.right = true;
+        } else if (reference.mainPlayerX() > 288) {
+            traverse.left = true; traverse.right = false;
+        }
+        if (!routeFrogHit) {
+            for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                const auto& enemy = reference.instanceAt(i);
+                if (enemy.objectId != 113 || !enemy.active || enemy.health <= 0 ||
+                    enemy.y < reference.mainPlayerY() + 20 ||
+                    enemy.y > reference.mainPlayerY() + 260) continue;
+                traverse.left = reference.mainPlayerX() > enemy.x + 2;
+                traverse.right = reference.mainPlayerX() < enemy.x - 2;
+                traverse.fire = tick % 10 < 5;
+                break;
+            }
+        }
         gameplay.step(downwell::packReplayInput(traverse));
         reference.step(traverse, traverse.fire && !traverseFire);
         traverseFire = traverse.fire;
         compareInitialGameplay(gameplay, reference);
+        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+            const auto& enemy = reference.instanceAt(i);
+            if (enemy.objectId == 113 && enemy.active && enemy.health > 0 &&
+                enemy.frogHit.remaining != 0) routeFrogHit = true;
+        }
         if (std::getenv("DOWNWELL_TRACE_TRAVERSAL") && tick % 60 == 0)
             std::cerr << "TRAVERSE tick=" << tick
                       << " player=" << gameplay.player().offsetX() << ',' << gameplay.player().offsetY()
@@ -1355,6 +1388,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "post-landing tape scrolls at least one circular-buffer page");
     require(sawAwakeEnemy,
             "post-landing tape reaches generated native enemy simulation");
+    require(routeFrogHit,
+            "each traversal reaches a real surviving frog hit before retirement");
     unsigned retiredCompared = 0, enemyOrdinal = 0;
     for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
         const auto& enemy = reference.instanceAt(i);
@@ -1439,7 +1474,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         bool reported = false;
         unsigned pairedDeadFrames = 0;
         const unsigned combatTicks = std::getenv("DOWNWELL_COMBAT_TICKS")
-            ? static_cast<unsigned>(std::atoi(std::getenv("DOWNWELL_COMBAT_TICKS"))) : 600;
+            ? static_cast<unsigned>(std::atoi(std::getenv("DOWNWELL_COMBAT_TICKS"))) : 1800;
         require(combatTicks >= 600 && combatTicks <= 6000,
                 "combat continuation is bounded to 600..6000 updates");
         for (unsigned tick = 0; tick < combatTicks; ++tick) {
@@ -1459,8 +1494,22 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             downwell::Input input;
             input.left = (tick / 90) % 2 == 0;
             input.right = !input.left;
-            // Offset the firing cycle to retain a surviving-frog hit after
-            // replacing oversized provisional boxes with recovered masks.
+            if (reference.mainPlayerX() < 192) {
+                input.left = false; input.right = true;
+            } else if (reference.mainPlayerX() > 288) {
+                input.left = true; input.right = false;
+            }
+            int targetY = static_cast<int>(reference.mainPlayerY()) + 261;
+            for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                const auto& enemy = reference.instanceAt(i);
+                if (!amigaEnemyHealth(enemy.objectId) || !enemy.active || enemy.health <= 0 ||
+                    enemy.x < 176 || enemy.x > 304 ||
+                    enemy.y < reference.mainPlayerY() + 20 || enemy.y >= targetY) continue;
+                targetY = enemy.y;
+                input.left = reference.mainPlayerX() > enemy.x + 2;
+                input.right = reference.mainPlayerX() < enemy.x - 2;
+            }
+            // Exercise alternate press phases of the same firing cycle.
             const int firePhase = std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")
                 ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
             input.fire = (tick + firePhase) % 10 < 5;
@@ -1812,6 +1861,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                   << " kills=" << gameplay.enemiesDefeated() << ',' << reference.mainEnemiesDefeated()
                   << " currency=" << gameplay.currency() << ',' << reference.mainCurrencyTotal()
                   << " bestCombo=" << gameplay.runCombo().state.best << ',' << reference.runCombo().state.best << '\n';
+        if (std::getenv("DOWNWELL_TRACE_TRAVERSAL"))
+            std::cerr << "COMBAT LOCATION player=" << reference.mainPlayerX() << ','
+                      << reference.mainPlayerY() << " camera=" << reference.mainCameraViewY()
+                      << " noControl=" << reference.shops().noControl
+                      << " grounded=" << reference.mainPlayerGrounded()
+                      << " frogHit=" << routeFrogHit << '\n';
         require(gameplay.runCombo().state.best > 0, "combat tape completes a nonzero combo");
         require(sawPairedCurrencyAnimation, "combat tape actually covers live currency animation");
         require(gameplay.enemiesDefeated() > 0 && reference.mainEnemiesDefeated() > 0 &&
