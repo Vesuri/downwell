@@ -247,6 +247,17 @@ build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/
 test: verify-time-stop-bound
 test: verify-player-time-stop
 test: verify-time-change
+test: verify-time-stop-masks
+.PHONY: verify-time-stop-masks
+verify-time-stop-masks: generated/time-stop-masks.json
+	python3 tools/verify-time-stop-masks.py
+
+generated/time-stop-masks.json: tools/export-time-stop-masks.csx data/data.win
+	@mkdir -p generated
+	@test "$$(shasum -a 256 data/data.win | awk '{print $$1}')" = c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8
+	DOWNWELL_DATA_WIN_SHA256=c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8 DOWNWELL_TIME_STOP_MASK_OUTPUT=generated/time-stop-masks.json "$$(tools/bootstrap-utmt.sh)" load data/data.win -s tools/export-time-stop-masks.csx
+	@test "$$(shasum -a 256 data/data.win | awk '{print $$1}')" = c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8
+
 test: verify-time-change-effects
 .PHONY: verify-time-change-effects
 verify-time-change-effects: build/time-change-effects-test
