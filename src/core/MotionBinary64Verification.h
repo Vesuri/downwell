@@ -11,6 +11,26 @@ struct MotionBinary64Verification {
 };
 inline MotionBinary64Verification verifyMotionBinary64() {
     MotionBinary64Verification result;
+    // Boundary probes keep the trajectory digest comparable while checking
+    // the bounded normalization on the real target, not only a host compiler.
+    for(unsigned bit=0;bit<52;++bit){
+        MotionBinary64 value{0x3ff00000u,0};
+        if(bit<32)value.low=1u<<bit;else value.high|=1u<<(bit-32);
+        const auto expected=(1023u+bit-52u)<<20;
+        if(!value.add({0xbff00000u,0})||value.high!=expected||value.low)++result.failures;
+    }
+    for(unsigned bit=0;bit<32;++bit){
+        const auto input=static_cast<std::int32_t>(1u<<bit);
+        const auto actual=MotionBinary64::fromInteger(input);
+        const auto expected=((1023u+bit)<<20)|(bit==31?0x80000000u:0);
+        if(actual.high!=expected||actual.low)++result.failures;
+    }
+    for(unsigned shift=0;shift<=65;++shift){
+        MotionBinary64::Words reference{0x12345678u,0x9abcdef0u};
+        const auto actual=reference.left(shift);
+        for(unsigned i=0;i<shift;++i)reference.leftOne();
+        if(actual.high!=reference.high||actual.low!=reference.low)++result.failures;
+    }
     const int starts[] = {0,32,128,704,990,2048,4096,8192};
     const MotionBinary64 speeds[] = {{0xc0080000u,0}, {0xc008ccccu,0xcccccccdu}, {0xc0099999u,0x9999999au}};
     for (int start : starts) for (auto speed : speeds) {

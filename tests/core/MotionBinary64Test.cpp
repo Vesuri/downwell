@@ -18,6 +18,32 @@ static void check(bool ok) { if (!ok) std::abort(); }
 int main() {
     unsigned state = 1234;
     auto next = [&] { state = state * 1664525u + 1013904223u; return state; };
+    for(unsigned i=0;i<10000;++i){
+        const MotionBinary64::Words words{next(),next()};
+        const std::uint64_t wide=(std::uint64_t(words.high)<<32)|words.low;
+        for(unsigned shift=0;shift<=65;++shift){
+            const auto actual=words.left(shift);
+            const auto expected=shift<64?wide<<shift:0;
+            check(actual.high==std::uint32_t(expected>>32)&&actual.low==std::uint32_t(expected));
+        }
+    }
+    check(MotionBinary64::Words::leadingZeros32(0)==32);
+    for(unsigned bit=0;bit<32;++bit){
+        check(MotionBinary64::Words::leadingZeros32(1u<<bit)==31-bit);
+        for(int delta:{-1,0,1}){
+            const auto input=std::int32_t((1u<<bit)+unsigned(delta));
+            const auto actual=MotionBinary64::fromInteger(input),expected=bits(double(input));
+            check(actual.high==expected.high&&actual.low==expected.low);
+        }
+    }
+    // Near-equal subtraction must preserve every cancellation depth, including
+    // results whose surviving leading bit starts in the low word.
+    for(unsigned bit=0;bit<52;++bit){
+        const std::uint64_t raw=(std::uint64_t(0x3ff00000u)<<32)|(std::uint64_t(1)<<bit);
+        MotionBinary64 a{std::uint32_t(raw>>32),std::uint32_t(raw)};
+        const auto expected=bits(value(a)-1.0);
+        check(a.add(bits(-1.0))&&a.high==expected.high&&a.low==expected.low);
+    }
     for (unsigned i = 0; i < 10000; ++i) {
         const auto integer = static_cast<std::int32_t>(next());
         const auto actual = MotionBinary64::fromInteger(integer), expected = bits(double(integer));

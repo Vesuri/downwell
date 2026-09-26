@@ -12,6 +12,22 @@ struct MotionBinary64 {
     struct Words {
         std::uint32_t high, low;
         bool nonzero() const { return high || low; }
+        static unsigned leadingZeros32(std::uint32_t value) {
+            if (!value) return 32;
+            unsigned count=0;
+            if (!(value&0xffff0000u)) {value<<=16;count+=16;}
+            if (!(value&0xff000000u)) {value<<=8;count+=8;}
+            if (!(value&0xf0000000u)) {value<<=4;count+=4;}
+            if (!(value&0xc0000000u)) {value<<=2;count+=2;}
+            if (!(value&0x80000000u)) ++count;
+            return count;
+        }
+        Words left(unsigned count) const {
+            if (!count) return *this;
+            if (count>=64) return {0,0};
+            if (count>=32) return {low<<(count-32),0};
+            return {(high<<count)|(low>>(32-count)),low<<count};
+        }
         Words rightJam(unsigned count) const {
             if (!count) return *this;
             if (count >= 64) return {0, unsigned(nonzero())};
@@ -40,8 +56,9 @@ struct MotionBinary64 {
     static MotionBinary64 fromInteger(std::int32_t value) {
         if (!value) return {};
         Words m{0, value < 0 ? 0u - static_cast<std::uint32_t>(value) : static_cast<std::uint32_t>(value)};
-        int exponent = 1023 + 52;
-        while (!(m.high & 0x100000u)) { m.leftOne(); --exponent; }
+        const unsigned top=31-Words::leadingZeros32(m.low);
+        const int exponent=1023+int(top);
+        m=m.left(52-top);
         return {(value < 0 ? 0x80000000u : 0u) | (unsigned(exponent) << 20) | (m.high & 0xfffff), m.low};
     }
     bool add(MotionBinary64 other) {
@@ -65,7 +82,11 @@ struct MotionBinary64 {
         if ((a.high ^ b.high) & 0x80000000u) {
             ma.subtract(mb);
             if (!ma.nonzero()) { high = low = 0; return true; }
-            while (!(ma.high & 0x800000u)) { ma.leftOne(); --exponent; }
+            // At most 55 leading positions after cancellation. Skip them in
+            // bounded 32-bit operations instead of a per-bit 68000 loop.
+            const unsigned shift=ma.high?Words::leadingZeros32(ma.high)-8:
+                24+Words::leadingZeros32(ma.low);
+            ma=ma.left(shift);exponent-=int(shift);
         } else {
             ma.add(mb);
             if (ma.high & 0x1000000u) { ma = ma.rightJam(1); ++exponent; }

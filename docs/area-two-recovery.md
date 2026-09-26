@@ -251,6 +251,15 @@ signs and rounding carries. It rejects subnormal operands/results, NaN,
 infinity and overflow rather than silently approximating them. No multiply,
 divide, host double or 64-bit integer operation appears in the implementation.
 
+Integer conversion and post-subtraction normalization use a bounded binary
+search for the leading bit, followed by a two-word left shift. Counts of zero,
+32 and 64 have separate branches; no C++ shift uses a count equal to or greater
+than its operand width. Cancellation normalization moves the existing guarded
+significand without discarding any bits, so the subsequent sticky/ties-to-even
+rounding is unchanged. The target boundary probes cover all 52 fractional-bit
+positions in near-equal subtraction and each input-bit position in integer conversion;
+host tests additionally compare 660,000 two-word shifts against a 64-bit oracle.
+
 `make verify-motion-binary64` checks 200,000 mixed-sign/magnitude additions
 against host double bits, plus 24,000 bone-trajectory updates (velocity bits,
 position bits and rounded pixels), signed zeros, cancellation, halfway cases,
