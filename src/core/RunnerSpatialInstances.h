@@ -192,7 +192,9 @@ public:
     // 0x501f70: remove old bounds (retry at root), clear indexed flag, then
     // unlink both dirty memberships. Missing resources may have changed the
     // cached bounds without moving the old index entry, so retry is essential.
-    bool retire(InstanceHandle h){
+    // Object rebinding also calls this on a LIVE instance: object membership,
+    // generation and all flags other than indexed must survive.
+    bool removeSpatialMembership(InstanceHandle h){
         if(!valid()||!live(h))return false;
         auto& e=entries_[h.slot];
         if(e.state.flags&0x8000u){
@@ -202,8 +204,13 @@ public:
             if(!checked(index_.remove(box,h.slot,true,removed)))return false;
             e.state.flags&=~0x8000u;
         }
-        spatial_.remove(h.slot);collision_.remove(h.slot);membership_.unbind(h.slot);
-        e.object=-1;return true;
+        spatial_.remove(h.slot);collision_.remove(h.slot);
+        return true;
+    }
+    bool retire(InstanceHandle h){
+        if(!removeSpatialMembership(h))return false;
+        membership_.unbind(h.slot);
+        entries_[h.slot].object=-1;return true;
     }
     unsigned pendingSpatial()const{return spatial_.size();}
     unsigned pendingCollision()const{return collision_.size();}

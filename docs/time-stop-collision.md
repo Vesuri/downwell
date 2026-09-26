@@ -229,6 +229,14 @@ global preparation is disabled, it calls `0x501f70` to remove spatial/dirty
 membership without destroying the instance. Those property effects must be
 connected separately before treating this as a complete live object change.
 
+`RunnerSpatialInstances::removeSpatialMembership` exposes the live-instance
+`0x501f70` operation separately from retirement. It removes indexed bounds with
+root retry, clears only the indexed flag and unlinks both dirty queues, retaining
+the object registration, cached state and lifetime. `retire` then additionally
+unbinds object membership and ends that lifetime. Tests force mismatched cached
+bounds, verify that list queries can still find the unindexed instance, and
+republish it through an eligible bounds refresh without allocating a new handle.
+
 The store preserves persistent memberships when compacting for room entry;
 source-specific room-transition rebinding still belongs to the room owner.
 Decoded-host deferred activation publishes at event-phase boundaries; other

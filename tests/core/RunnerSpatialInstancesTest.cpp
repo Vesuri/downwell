@@ -175,6 +175,27 @@ int main(){
     preciseOrder.clear();modes.clear();refreshOrder.clear();
     assert(owner.place(self,1,{}, {},false,graph,refresh,precise,result));
     assert(result.found&&result.handle.slot==a.slot&&modes.size()==1&&modes[0]);
+    // Object binding can unlink spatial state without retiring object lists.
+    // Mismatch cached bounds deliberately, exercising removal's root retry.
+    assert(owner.refresh(a,0x30,false,&owner.resolve(a)->bounds,false,true));
+    assert(owner.move(a,{0x42c80000},{},0x38));
+    assert(owner.refresh(a,0x38,false,nullptr,false,true));
+    const auto preserved=*owner.resolve(a);
+    assert(preserved.flags&0x8000u);
+    assert(owner.removeSpatialMembership(a));
+    assert(owner.resolve(a)&&owner.resolve(a)->flags==(preserved.flags&~0x8000u));
+    assert(owner.resolve(a)->x.bits==preserved.x.bits&&owner.resolve(a)->bounds.left.bits==preserved.bounds.left.bits);
+    assert(!owner.pendingSpatial()&&!owner.pendingCollision());
+    assert(owner.removeSpatialMembership(a)); // Idempotent, not lifetime retirement.
+    assert(owner.move(a,{}, {},0x38));
+    modes.clear();
+    assert(owner.place(self,1,{}, {},false,graph,refresh,precise,result));
+    assert(result.found&&result.handle.slot==a.slot&&result.handle.generation==a.generation&&modes[0]);
+    assert(!(owner.resolve(a)->flags&0x8000u)); // List hit need not prepare the object.
+    const auto republished=owner.resolve(a)->bounds;
+    assert(owner.refresh(a,0x30,false,&republished,false,true));
+    assert(owner.resolve(a)->flags&0x8000u); // Eligible refresh republishes same lifetime.
+    assert(!owner.removeSpatialMembership({a.slot,a.generation+1})&&owner.valid());
     assert(owner.registerObject(a,false));
     preciseOrder.clear();
     assert(owner.place(self,1,{}, {},false,graph,refresh,precise,result));

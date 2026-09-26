@@ -52,6 +52,8 @@ bool compileSpatialInstances(downwell::RunnerSpatialInstances<64,64>& owner,
 }
 bool compileSpatialRetirement(downwell::RunnerSpatialInstances<64,64>& owner,
     downwell::InstanceHandle handle){return owner.retire(handle);}
+bool compileLiveSpatialRemoval(downwell::RunnerSpatialInstances<64,64>& owner,
+    downwell::InstanceHandle handle){return owner.removeSpatialMembership(handle);}
 bool compileStoreSpatialRetirement(downwell::InstanceStore<4>& store,
     downwell::RunnerSpatialInstances<4,8>& owner){
     return store.enterRoom(2,[&](auto handle,const auto&){return owner.retire(handle);})&&
