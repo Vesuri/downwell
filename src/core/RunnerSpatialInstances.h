@@ -71,6 +71,29 @@ public:
         if(registered)membership_.bind(h.slot,object,h.generation);
         return true;
     }
+    // Collision/flag portion of 0x46b8b2..0x46b968, after membership rebinding
+    // and mask/depth defaults. objectFlags is the RUNNER word, not DWOB flags.
+    // The sprite setter runs between visible/persistent and managed/dirty writes;
+    // it owns resource/index changes and any additional source queue effects.
+    // Failure is terminal: preceding removals/flag writes cannot be rolled back.
+    template<class SetSprite>
+    bool applyBindingProperties(InstanceHandle h,std::uint32_t objectFlags,
+                                bool allPrepared,SetSprite setSprite){
+        if(!valid()||!live(h))return false;
+        auto& flags=entries_[h.slot].state.flags;
+        if(objectFlags&1u){
+            flags|=0x28u;
+            markSpatialChange(h.slot,objectFlags);
+        }else{
+            flags&=~0x20u;
+            if(!allPrepared && !(objectFlags&0x28u) && !removeSpatialMembership(h))return false;
+        }
+        flags=(flags&~0x50u)|((objectFlags&2u)?0x10u:0u)|((objectFlags&4u)?0x40u:0u);
+        if(!checked(setSprite(h)))return false;
+        flags=(flags&~0x200000u)|((objectFlags&0x80u)?0x200000u:0u)|8u;
+        markSpatialChange(h.slot,objectFlags);
+        return true;
+    }
     // Collision side of 0x4627d0/0x467640. Room pending requests and traversal
     // cache invalidation belong to the scheduler. Do NOT rebind object lists
     // here, or synthesize bounds-dirty bit 8: reactivation queues a refresh even
@@ -268,6 +291,12 @@ private:
     RunnerSpatialIndex<Nodes> index_;
     bool good_=true;
     bool checked(bool ok){if(!ok)good_=false;return ok;}
+    void markSpatialChange(unsigned slot,std::uint32_t objectFlags){
+        if(Queue::shouldQueue(true,objectFlags,entries_[slot].state.flags)){
+            spatial_.mark(slot);
+            if(objectFlags&8u)collision_.mark(slot);
+        }
+    }
     bool live(InstanceHandle h)const{return h.slot<Capacity && h.generation &&
         entries_[h.slot].object>=0 && entries_[h.slot].generation==h.generation;}
     InstanceHandle handle(unsigned slot)const{return {slot,entries_[slot].generation};}

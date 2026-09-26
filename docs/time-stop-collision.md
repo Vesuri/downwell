@@ -229,6 +229,17 @@ global preparation is disabled, it calls `0x501f70` to remove spatial/dirty
 membership without destroying the instance. Those property effects must be
 connected separately before treating this as a complete live object change.
 
+`applyBindingProperties` supplies the collision-side flag and queue ordering
+around an explicit sprite-setter callback. It consumes the runner flag word,
+not serialized DWOB flags. Solidity sets `0x28` and marks queues; clearing
+solidity clears `0x20` and conditionally removes spatial membership. Visibility
+and persistence are written before the sprite callback, managed-object and
+bounds-dirty flags afterward. Callback failure latches owner failure before
+the final writes. Tests enumerate 256 low object-flag combinations with both
+global preparation modes and both empty/existing queues. Mask/depth defaults,
+the sprite setter itself, complete runtime object flags and live installation
+remain the caller's responsibilities; this is not yet full object-change parity.
+
 `RunnerSpatialInstances::removeSpatialMembership` exposes the live-instance
 `0x501f70` operation separately from retirement. It removes indexed bounds with
 root retry, clears only the indexed flag and unlinks both dirty queues, retaining

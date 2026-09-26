@@ -24,6 +24,53 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    // Source object-property ordering, independently enumerated over all low
+    // flag bits and both global preparation modes. Sprite callback inspects the
+    // intermediate state; final dirty/managed flags must not be applied early.
+    for(unsigned objectFlags=0;objectFlags<256;++objectFlags)for(bool allPrepared:{false,true}){
+        RunnerSpatialInstances<2,8> bound;
+        const InstanceHandle h{0,1};
+        RunnerSpatialInstances<2,8>::State state;state.flags=0x200070u;
+        assert(bound.attach(h,1,state));
+        const RunnerSpatialInstances<2,8>::Box zero{};
+        assert(bound.refresh(h,0x38,false,&zero,false,true));
+        assert(bound.move(h,{0x3f800000},{},0x38));
+        const unsigned before=bound.resolve(h)->flags;
+        const bool remove=!(objectFlags&1u)&&!allPrepared&&!(objectFlags&0x28u);
+        unsigned intermediate=before;
+        if(objectFlags&1u)intermediate|=0x28u;else intermediate&=~0x20u;
+        if(remove)intermediate&=~0x8000u;
+        intermediate=(intermediate&~0x50u)|((objectFlags&2u)?0x10u:0u)|((objectFlags&4u)?0x40u:0u);
+        unsigned calls=0;
+        assert(bound.applyBindingProperties(h,objectFlags,allPrepared,[&](InstanceHandle live){
+            ++calls;assert(live.slot==h.slot&&live.generation==h.generation);
+            assert(bound.resolve(h)->flags==intermediate);
+            assert(bound.pendingSpatial()==(remove?0u:1u));
+            return true;
+        }));
+        const unsigned expected=(intermediate&~0x200000u)|((objectFlags&0x80u)?0x200000u:0u)|8u;
+        assert(calls==1&&bound.resolve(h)->flags==expected);
+        assert(bound.pendingSpatial()==(remove?0u:1u));
+        assert(bound.pendingCollision()==(remove?0u:1u));
+        assert(bound.resolve(h)&&bound.valid());
+        RunnerSpatialInstances<2,8> fresh;
+        RunnerSpatialInstances<2,8>::State clean;clean.flags=0;
+        assert(fresh.attach(h,1,clean));
+        assert(fresh.applyBindingProperties(h,objectFlags,allPrepared,[&](InstanceHandle){
+            assert(fresh.pendingSpatial()==((objectFlags&1u)?1u:0u));
+            assert(fresh.pendingCollision()==((objectFlags&1u)&&(objectFlags&8u)?1u:0u));
+            return true;
+        }));
+        const bool queue=(objectFlags&0x28u)||(objectFlags&1u);
+        assert(fresh.pendingSpatial()==(queue?1u:0u));
+        assert(fresh.pendingCollision()==(queue&&(objectFlags&8u)?1u:0u));
+    }
+    {
+        RunnerSpatialInstances<2,8> failed;
+        assert(failed.attach({0,1},1,{}));
+        assert(!failed.applyBindingProperties({0,1},0x86,false,[](InstanceHandle){return false;}));
+        assert(!failed.valid()&&!(failed.resolve({0,1})->flags&0x200000u));
+    }
     {
         InstanceStore<64> records;Owner space;
         records.create(1,1,7,false);
