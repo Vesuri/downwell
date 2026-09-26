@@ -15,6 +15,12 @@
 #include "core/TimeShardBurst.h"
 #include "core/RunnerPointDirection.h"
 #include "core/PortableAtan.h"
+#include "core/TimeStopEffects.h"
+bool compileTimeStopEffects(downwell::TimeStopEffects<24>& state,downwell::GameMakerRandom& random,bool hit){
+    return state.beginStep(true,false,{},false,random,[&](bool& result){result=hit;return true;},
+        [](auto,auto,auto& id,auto& x,auto& y){id=1;x={};y={};return true;},
+        [](auto){return false;},[](auto){return true;});
+}
 bool compilePortableAtan(downwell::MotionBinary64 x,downwell::MotionBinary64 y,downwell::MotionBinary64& out){
     return downwell::RunnerPointDirection::evaluate({}, {},x,y,out,downwell::portableAtan);
 }

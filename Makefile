@@ -250,6 +250,15 @@ test: verify-time-change
 test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-motion verify-time-shard-animation verify-time-shard-effects verify-time-shard-burst verify-point-direction
 .PHONY: verify-point-direction
 test: verify-portable-atan
+test: verify-time-stop-effects
+.PHONY: verify-time-stop-effects
+verify-time-stop-effects: build/time-stop-effects-test
+	./build/time-stop-effects-test
+
+build/time-stop-effects-test: tests/core/TimeStopEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeStopEffectsTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-portable-atan
 verify-portable-atan: build/portable-atan-test
 	./build/portable-atan-test
