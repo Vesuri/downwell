@@ -132,6 +132,16 @@ build/bone-store-test: tests/core/BoneProjectileStoreTest.cpp src/core/BoneProje
 .PHONY: verify-skeleton-actor
 test: verify-flash-effects
 test: verify-smoke-birth
+test: verify-debris-birth
+
+.PHONY: verify-debris-birth
+verify-debris-birth: build/debris-birth-test
+	python3 tools/verify-debris-create.py
+	./build/debris-birth-test
+
+build/debris-birth-test: tests/core/DebrisBirthTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DebrisBirthTest.cpp src/core/GameMakerRandom.cpp
 test: verify-smoke-motion
 test: verify-smoke-effect
 test: verify-smoke-distance

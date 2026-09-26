@@ -22,7 +22,7 @@ stream, even when the final list of visible particles looks identical.
 | `scrCurrencySpawn(money)` | Existing currency owner, after all preceding effect Creates |
 | Death sound 132 | Source position in call sequence; playback need not own RNG |
 | `scrDeadBody(206,takenImpact,102)` | Object 263 Create, then sprite/velocity/facing overrides; also modifies the dying skeleton's xsp |
-| Two debris Creates | Object 370 twice at published `(x,y-5)`; full Create includes terrain-dependent relocation |
+| Two debris Creates | Object 370 twice at published `(x,y-5)`; four RNG draws per Create, no terrain relocation |
 | Destruction | Request retirement; finish the current event's impact reset and hit presentation first |
 
 ## Creation contracts that cannot be replaced by an arbitrary RNG skip
@@ -47,12 +47,23 @@ stream, even when the final list of visible particles looks identical.
   four, sets the new corpse's sprite/facing/explosion effect, and replaces the
   **source skeleton's** xsp with facing times 1.5 when its magnitude is below
   0.5. Zero impact still gives the corpse a horizontal speed of magnitude 0.5.
-- Debris Create first queries walls/tiles. A blocked birth snaps to the grid
-  and runs a bounded random relocation search before sampling velocity,
-  animation speed and initial frame. Consequently RNG consumption depends on
-  actual terrain, not just the number of debris requests. Area selects the
-  debris sprite. Its two instance-count branches currently assign identical
-  alarms; that does not remove the terrain-dependent work earlier in Create.
+  **Corpse** Create also queries walls/tiles. A blocked birth snaps to the grid
+  and runs a bounded random relocation search, then republishes xx/yy. The
+  velocity and animation-speed samples precede that relocation loop, so
+  terrain-dependent draws follow them.
+  This work belongs to object 263, not debris object 370.
+- Debris has no parent and its Create does not query terrain. It samples
+  xsp=random_range(-2,2), ysp=random_range(-0.5,1), chooses imgSp from
+  (-0.5,-0.3,0,0.3,0.5), copies it to builtin image_speed, then samples
+  image_index=random(7). Area selects the sprite. Both instance-count branches
+  assign alarms 0/1/2 to 30/15/7, so the count does not change the result.
+
+`DebrisBirth` implements that object-370 Create with four ordered RNG draws,
+custom binary64 motion/rate fields and narrowed builtin animation fields.
+`make verify-debris-birth` pins the input/export/resource/assembly identities
+and compares 7,168 area/seed cases to scalar arithmetic and the complete RNG
+state. Position/lifetime ownership, Step, alarms, collisions and drawing are
+not implemented by this birth component; it is not live death integration.
 
 `SkeletonEffectBursts.h` now implements the skeleton's smoke/flash count and
 birth-coordinate arithmetic, calling the child creator synchronously per birth.
@@ -257,8 +268,8 @@ Production renderer-command tests cover camera movement and retirement on both
 adapters. This is fixture-based integration, not naturally triggered effects or
 a rendered native-emulator comparison; full death presentation remains open.
 
-Smoke child state, flash rendering, corpse physics and debris relocation still
-need their own adapters; this audit does not establish those adapters.
+The birth contract does not establish corpse relocation/physics or debris
+motion/collision adapters, nor their composition with the other death effects.
 No request may silently succeed when required child storage is exhausted.
 
 ## Integration boundary

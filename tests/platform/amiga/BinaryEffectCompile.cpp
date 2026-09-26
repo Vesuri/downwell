@@ -431,3 +431,7 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
     surface.clear();
     return surface.add(effect,x,y) && surface.subtract(shade,x-32,y-16);
 }
+#include "core/DebrisBirth.h"
+bool compileDebrisBirth(downwell::DebrisBirth& birth,int area,downwell::GameMakerRandom& random){
+    return birth.create(area,random);
+}
