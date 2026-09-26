@@ -411,6 +411,35 @@ Consumers must still remove queue/index membership before slot reuse and check
 generation on deferred references. Whole-store replacement resets the identity
 domain and requires resetting associated consumers.
 
+`RunnerSpatialInstances` is the shared ownership boundary for these handles.
+It joins object registration, cached binary32 positions/bounds, spatial traversal
+and both dirty queues. Object-selector queries use `RunnerPlaceQuery` and return
+a generation-checked handle, not a compacted index or a resource ID. Resource
+resolution, precise pair tests and the validated object graph remain supplied
+by the caller. It is not yet installed in the live gameplay schedulers: every
+relevant birth, mutation, activation/rebinding and retirement must be connected
+before its first-hit results can replace existing contact paths.
+Its `publishBirth` boundary performs ancestor preparation and immediate bounds
+publication before adding collision-queue membership. The scheduler must invoke
+it before PreCreate/Create, not defer it to a later dirty flush. It does not
+invent a spatial-queue insertion when earlier property setters did not make one.
+
+The retirement boundary follows `0x501f70..0x502098`: for indexed instances,
+normalize cached bounds, remove with root retry and clear `0x8000`; then unlink
+both pending memberships. Only after that may the external store reuse the
+slot. Missing-resource refresh can leave an old index entry elsewhere, which
+is why cached-bounds-only removal is insufficient. Owner tests exercise this
+case with actual `InstanceStore` compaction and slot-generation reuse. Clearing
+the spatial owner preserves generation high-water marks; replacing the entire
+external identity domain requires replacing its spatial owner too.
+
+Immediate exclusion flags and deferred object registration are distinct APIs.
+An unregister operation alone does not retire a lifetime or its spatial state.
+Callbacks cannot create, retire or rebind instances during a query. Mutation
+failure latches the owner unusable until clear; stale external handles fail
+without retiring a replacement. These contracts do not substitute for source
+activation scheduling or asset/mask fidelity.
+
 `compactInstanceSlots` and `InstanceStore` record-array offsets are not stable
 queue keys. The compacted gameplay-family arrays still need registry binding;
 the position adapter is not yet installed on live stores. Handle metadata costs

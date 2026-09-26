@@ -45,6 +45,8 @@ for start, end, digest in (
     (0x501e50, 0x501eeb, "01e304875dd3765c862d7a678598cb8c735cc55ac29cda95ca6ee0207f70e0ee"),
     (0x501ef0, 0x501f6f, "e1929af99fd7ef2ae676ad677567236da7a1acbf410a363640afb1ffabd545c6"),
     # Bounds-refresh publication gate and direct index publication.
+    # Explicit retirement: root-retry removal, indexed flag, both dirty lists.
+    (0x501f70, 0x502098, "90432a2851366b11348bd01edc0cfdbba309d9175126691a1d9b115f97048c38"),
     (0x466045, 0x4660b9, "531eb148f104406280a20a2993122756bc804f3372be8a8fd4a9d3715d817d06"),
     (0x46669c, 0x4666fe, "217756a0efd85d15bd7b89020e34bc2625cef26c621972f7ded7d570a2dfd771"),
     (0x4666b6, 0x4666fe, "786128d7493dc128f14a60d7746e8a1696ae91901cff4fd38e21feb1d21e001d"),

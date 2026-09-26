@@ -14,6 +14,7 @@
 #include "BatBehavior.h"
 #include "RunnerObjectMembership.h"
 #include "RunnerRoomMembership.h"
+#include "InstanceHandle.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -75,13 +76,6 @@ enum class CreateInstanceResult {
     success,
     duplicateId,
     full
-};
-
-// Store-local identity, independent of compacted record offsets. Generation
-// protects deferred consumers from a retired slot being reused for a new birth.
-struct InstanceHandle {
-    std::uint32_t slot = 0xffffffffu;
-    std::uint32_t generation = 0;
 };
 
 // Stable-order, allocation-free storage suitable for both the reference build

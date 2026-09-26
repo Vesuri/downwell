@@ -17,6 +17,28 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
 #include "core/RunnerMaskTransform.h"
 #include "core/RunnerMaskDispatch.h"
 #include "core/RunnerPlaceQuery.h"
+#include "core/RunnerSpatialInstances.h"
+#include "core/RunnerObjectFamilies.h"
+bool compileSpatialInstances(downwell::RunnerSpatialInstances<64,64>& owner,
+    downwell::RunnerObjectFamilies<386>& graph,downwell::InstanceHandle self,
+    downwell::RunnerSpatialInstances<64,64>::Result& result){
+    return owner.place(self,0,{}, {},false,graph,
+        [&](downwell::InstanceHandle h,bool publish){
+            const auto* state=owner.resolve(h);if(!state)return false;
+            const auto bounds=state->bounds;
+            return owner.refresh(h,0x30,false,&bounds,false,publish);
+        },[](auto,auto,bool,bool& hit){hit=true;return true;},result);
+}
+bool compileSpatialRetirement(downwell::RunnerSpatialInstances<64,64>& owner,
+    downwell::InstanceHandle handle){return owner.retire(handle);}
+bool compileSpatialBirth(downwell::RunnerSpatialInstances<64,64>& owner,
+    downwell::RunnerObjectFamilies<386>& graph,downwell::InstanceHandle handle){
+    return owner.publishBirth(handle,graph,[&](auto h,bool publish){
+        const auto* s=owner.resolve(h);if(!s)return false;
+        const auto box=s->bounds;
+        return owner.refresh(h,0x30,false,&box,false,publish);
+    });
+}
 bool compilePlaceQuery(downwell::RunnerImageValue& x,downwell::RunnerImageValue& y,
     std::uint32_t& flags,downwell::RunnerPlaceQuery::Box& box,downwell::RunnerPlaceQuery::Result& result){
     using Query=downwell::RunnerPlaceQuery;
