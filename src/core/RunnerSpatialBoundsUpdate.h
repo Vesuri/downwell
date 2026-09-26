@@ -9,6 +9,25 @@ namespace downwell {
 struct RunnerSpatialBoundsUpdate {
     using Math=RunnerSpatialSplit;
     using Box=Math::Box;
+    // Finalize 0x466010 after resource lookup/bounds calculation. A null
+    // resourceBounds means lookup failed, NOT an empty collision rectangle.
+    // Missing resources suppress publication even for already indexed instances.
+    // The caller supplies source-calculated bounds; this does not calculate masks.
+    template<class Index> static bool finishRefresh(Index& index,std::uint32_t id,
+        std::uint32_t objectFlags,std::uint32_t& instanceFlags,bool allPrepared,
+        Box& cached,const Box* resourceBounds,RunnerImageValue x,RunnerImageValue y,
+        bool precise,bool update){
+        if(!resourceBounds){
+            if(!Math::valid(x)||!Math::valid(y))return false;
+            cached={x,y,x,y};
+            instanceFlags&=~0x208u; // Clear precise and bounds-dirty, keep membership.
+            return true;
+        }
+        const Box old=cached,newBox=*resourceBounds;
+        cached=newBox;
+        instanceFlags=(instanceFlags&~0x208u)|(precise?0x200u:0u);
+        return !update || publish(index,id,objectFlags,instanceFlags,allPrepared,old,newBox);
+    }
     template<class Index> static bool publish(Index& index,std::uint32_t id,
         std::uint32_t objectFlags,std::uint32_t& instanceFlags,bool allPrepared,Box oldBox,Box newBox){
         if(!RunnerSpatialDirtyQueue<1>::shouldPublishBounds(objectFlags,instanceFlags,allPrepared))return true;

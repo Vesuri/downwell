@@ -132,6 +132,37 @@ int main(){
     assert(Update::publish(index,100,0x30,skipped,false,invalid,invalid)&&skipped==1);
     assert(!Update::publish(index,99,0x30,absent,false,{},invalid)&&absent==0x8000);
     Queue spatial,collision;
+    // Missing-resource refresh updates the cache, but leaves even an old index
+    // entry untouched. Restoring a resource must use the removal retry path.
+    downwell::RunnerSpatialIndex<8> refreshed;
+    Update::Box cached{},calculated{Real{0x40000000},Real{0x40000000},Real{0x40000000},Real{0x40000000}};
+    std::uint32_t refreshFlags=0x208;
+    assert(Update::finishRefresh(refreshed,7,0x30,refreshFlags,false,cached,nullptr,
+        Real{0x3f800000},Real{},true,true));
+    assert(refreshFlags==0 && cached.left.bits==0x3f800000 && cached.right.bits==0x3f800000);
+    unsigned refreshHits=0;
+    assert(refreshed.query(cached,[&](unsigned){++refreshHits;return true;}));assert(refreshHits==0);
+    assert(Update::finishRefresh(refreshed,7,0x30,refreshFlags,false,cached,&calculated,
+        Real{},Real{},true,true));
+    assert(refreshFlags==0x8200);
+    refreshFlags|=8;
+    assert(Update::finishRefresh(refreshed,7,0x30,refreshFlags,false,cached,nullptr,
+        Real{},Real{},false,true));
+    assert(refreshFlags==0x8000 && cached.left.bits==0);
+    assert(refreshed.query(calculated,[&](unsigned id){assert(id==7);++refreshHits;return true;}));
+    assert(refreshHits==1); // The entry remains at the previous resource bounds.
+    Update::Box origin{};
+    assert(Update::finishRefresh(refreshed,7,0x30,refreshFlags,false,cached,&origin,
+        Real{},Real{},false,true));
+    refreshHits=0;
+    assert(refreshed.query(calculated,[&](unsigned){++refreshHits;return true;}));assert(refreshHits==0);
+    assert(refreshed.query(origin,[&](unsigned id){assert(id==7);++refreshHits;return true;}));assert(refreshHits==1);
+    refreshFlags|=8;
+    assert(Update::finishRefresh(refreshed,7,0x30,refreshFlags,false,cached,&calculated,
+        Real{},Real{},true,false));
+    assert(refreshFlags==0x8200 && cached.left.bits==calculated.left.bits);
+    refreshHits=0;
+    assert(refreshed.query(origin,[&](unsigned){++refreshHits;return true;}));assert(refreshHits==1);
     Real x{},y{},one{0x3f800000};std::uint32_t positionFlags=0;
     using Position=downwell::RunnerSpatialPosition;
     assert(Position::assign(1,x,y,positionFlags,one,one,false,true,0x1a,spatial,collision));

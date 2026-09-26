@@ -15,6 +15,26 @@ machine code, not runtime results. Work priorities remain in [open-work.md](open
 - `place_meeting` wrapper `0x52b1f0` converts supplied coordinates to binary32
   and calls `0x4fee30`; this is distinct from reading bbox getter values.
 
+## Cache refresh and spatial publication
+
+At `0x466045` the routine saves the old cached bounds before resolving the
+mask/sprite. Failed lookup (`0x466077..0x4660b9`) copies position into both
+endpoints, clears instance bit `0x200`, and forces the update argument to zero.
+The common tail clears bounds-dirty bit `8`. It does **not** remove an existing
+spatial entry or clear membership bit `0x8000` on this path.
+
+For a resolved resource, `0x46669c` copies its precise-mask byte into instance
+bit `0x200`. After clearing dirty bit `8`, a nonzero update argument invokes
+`0x5020a0` with the saved old bounds. Recalculation with update zero changes the
+cache/flags but leaves the index untouched. A later publication can therefore
+require the index removal helper's full-root retry when the cached old bounds
+no longer enclose its stored entry.
+
+`RunnerSpatialBoundsUpdate::finishRefresh` models this finalization, not sprite
+lookup or mask geometry. The reviewed ranges are pinned by
+`tools/verify-runner-field-lookup.py`; component tests cover missing-resource
+birth, retained old entries, restoration and update-disabled refresh.
+
 ## Rotated ordinary-sprite branch
 
 `0x4663da..0x4664ab` subtracts sprite origins from inclusive margins, adds one
