@@ -1,5 +1,26 @@
 # Time-stop collision inputs
 
+## Query mutation contract
+
+The object-selector `instance_place` wrapper (`0x4fe560..0x4fe8b1`) is not a
+read-only first-hit scan. It prepares the selector before choosing traversal.
+For a spatial traversal it then flushes the dirty queue and refreshes dirty
+query bounds with publication enabled. Only then does it save position/bounds,
+move to the requested position and refresh bounds without publication. The
+spatial candidate callback also invokes precise collision with publication
+disabled. Restoration calls the normal position setter, then copies the saved
+cached bounds back; it does not restore the old dirty flags or queue position.
+
+The list path instead moves directly, invokes precise collision with publication
+enabled, and restores position through the setter without restoring cached
+bounds. `RunnerPlaceQuery` models these sequences and stops on the first hit.
+Its caller must provide eligible, lifetime-resolved candidates in source order;
+it is not yet the live registry, nor the all/instance selector or collect-all
+variant. Port-side callback failures attempt position restoration and require
+the owner to latch failure rather than use partially changed index state.
+
+## Player and shard inputs
+
 The source player object 35 uses sprite 31 as its explicit collision mask,
 independent of the visible animation sprite. Shard object 238 uses sprite 91
 and has no explicit replacement mask. Both sprites have origin (12,12), a

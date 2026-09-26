@@ -16,6 +16,16 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
 #include "core/SpriteMaskPack.h"
 #include "core/RunnerMaskTransform.h"
 #include "core/RunnerMaskDispatch.h"
+#include "core/RunnerPlaceQuery.h"
+bool compilePlaceQuery(downwell::RunnerImageValue& x,downwell::RunnerImageValue& y,
+    std::uint32_t& flags,downwell::RunnerPlaceQuery::Box& box,downwell::RunnerPlaceQuery::Result& result){
+    using Query=downwell::RunnerPlaceQuery;
+    return Query::run(x,y,flags,box,{}, {},
+        []{return Query::Path::spatial;},[]{return true;},[&](bool){flags&=~8u;return true;},
+        [&](auto nx,auto ny){x=nx;y=ny;flags|=8u;return true;},
+        [](auto visit){visit(7);return true;},[](auto,auto visit){visit(8);return true;},
+        [](unsigned,bool,bool& hit){hit=true;return true;},result);
+}
 downwell::RunnerMaskDispatch::Path compileMaskDispatch(downwell::RunnerMaskDispatch::Shape a,
     downwell::RunnerMaskDispatch::Shape b,downwell::MotionBinary64 epsilon){
     downwell::RunnerMaskDispatch dispatch;
