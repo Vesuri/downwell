@@ -935,15 +935,23 @@ void StartupRuntime::updateMainEnemyInteractions() {
 }
 
 void StartupRuntime::updateMainLifecycle() {
+    // scrOutofview destroys, rather than deactivates, the instance. Erasure
+    // compacts records but preserves survivor handles/order. Translate the
+    // original traversal index after each removal so adjacent deaths are not
+    // skipped. No game callbacks run during this currently supported sweep.
+    unsigned removed = 0;
     retireMainRoomObjects(static_cast<unsigned>(instances_.size()), roomId_, 1,
         mainCameraMotion_.viewTopQ12(),
-        [this](unsigned i) {
-            const auto& instance = instances_.at(i);
+        [this, &removed](unsigned i) {
+            const auto& instance = instances_.at(i - removed);
             return LifetimeInstance{instance.objectId, instance.y, instance.active};
         },
-        [this](unsigned i) {
-            instances_.at(i).active = false;
-            ++mainInstancesRetired_;
+        [this, &removed](unsigned i) {
+            const auto id = instances_.at(i - removed).instanceId;
+            if (instances_.erase(id)) {
+                ++removed;
+                ++mainInstancesRetired_;
+            }
         });
 }
 
@@ -1857,7 +1865,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(46); // Includes source collision-mask overrides at instance birth.
+    digest.addU32(47); // Offscreen destruction removes stored identities, not just activation.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);

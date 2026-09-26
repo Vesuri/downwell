@@ -918,16 +918,18 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
     const long viewTop = 34L * 4096 + viewCameraYQ8() * 16;
+    unsigned retiredEnemies = 0;
     downwell::retireMainRoomObjects(enemyCount_, 11, 1, viewTop,
-        [this](unsigned i) {
-            const auto& enemy = enemies_[i];
+        [this, &retiredEnemies](unsigned i) {
+            const auto& enemy = enemies_[i - retiredEnemies];
             return downwell::LifetimeInstance{enemy.objectId, enemy.y + 176, enemy.active};
         },
-        [this](unsigned i) {
-            auto& enemy = enemies_[i];
-            enemy.active = false;
-            enemy.awake = false;
-            enemy.activationPending = false;
+        [this, &retiredEnemies](unsigned i) {
+            const unsigned index = i - retiredEnemies;
+            for (unsigned next = index + 1; next < enemyCount_; ++next)
+                enemies_[next - 1] = enemies_[next];
+            --enemyCount_;
+            ++retiredEnemies;
         });
     downwell::retireMainRoomObjects(breakableCount_, 11, 1, viewTop,
         [this](unsigned i) {

@@ -134,6 +134,19 @@ still uses no external owner.
 
 ## Evidence and checks
 
+Offscreen retirement is not deactivation: `scrOutofview` compares the instance
+Y against view Y minus 160 / plus 3000, checks room 11, then calls
+`instance_destroy`. `StartupRuntime::updateMainLifecycle` erases the supported
+records and invalidates their handles rather than leaving them searchable and
+occupying capacity. Its compacting traversal retains survivor order and visits
+adjacent retired records. `GameplayWorld` likewise removes offscreen enemy
+entries while retaining surviving lifetime keys and order; dormant future
+enemies remain present because they do not receive End Step. Static terrain
+storage is separate from this actor pool. The pinned resource manifest contains no Destroy or
+Clean Up events; this sweep therefore has no such game callbacks to dispatch.
+This does not establish generic destruction timing or wire external collision
+retirement; those remain separate scheduler-integration requirements.
+
 `tools/verify-runner-field-lookup.py` pins the reviewed wrapper, predicate,
 activation/deactivation and unique-enqueue bytes against the immutable Windows
 executable. `tests/core/MainRoomActivationTest.cpp` covers the shared supported

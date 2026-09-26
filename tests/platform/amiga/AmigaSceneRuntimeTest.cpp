@@ -379,7 +379,7 @@ void compareInitialGameplay(const AmigaPortRuntime& amiga,
     for (unsigned i = 0; i < reference.activeInstanceCount(); ++i)
         if (amigaEnemyHealth(reference.instanceAt(i).objectId)) ++referenceEnemyCount;
     require(referenceEnemyCount == amiga.enemyCount(),
-            "all enemy births occur on matching Step frames throughout this tape");
+            "enemy populations match after births and offscreen destruction throughout this tape");
     if (std::getenv("DOWNWELL_TRACE_BIRTHS")) {
         static unsigned nativeSeen = 0, referenceSeen = 0;
         const unsigned count = referenceEnemyCount;
@@ -1402,6 +1402,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     const int postLandingCameraY = gameplay.cameraOffsetY();
     bool traverseFire = false;
     bool routeFrogHit = false;
+    unsigned retiredCompared = 0;
     for (int tick = 0; tick < 1800; ++tick) {
         parityFrame += 1;
         downwell::Input traverse;
@@ -1429,10 +1430,28 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 break;
             }
         }
+        struct PairedLifetime { std::uint32_t storedId, nativeKey; };
+        std::vector<PairedLifetime> beforeStep;
+        unsigned beforeOrdinal = 0;
+        for (unsigned i=0;i<reference.activeInstanceCount();++i) {
+            const auto& enemy=reference.instanceAt(i);
+            if (!amigaEnemyHealth(enemy.objectId)) continue;
+            require(beforeOrdinal<gameplay.enemyCount(), "pre-Step lifetime pairing is complete");
+            const auto& native=gameplay.enemyAt(beforeOrdinal++);
+            require(native.objectId==enemy.objectId, "pre-Step lifetime pairing preserves creation order");
+            if (enemy.active && enemy.health>0)
+                beforeStep.push_back({enemy.instanceId,native.lifetimeId});
+        }
         gameplay.step(downwell::packReplayInput(traverse));
         reference.step(traverse, traverse.fire && !traverseFire);
         traverseFire = traverse.fire;
         compareInitialGameplay(gameplay, reference);
+        for (const auto& previous:beforeStep) {
+            if (reference.hasInstance(previous.storedId)) continue;
+            require(!gameplay.findEnemy(previous.nativeKey),
+                    "offscreen destruction invalidates both previously paired lifetimes on the same frame");
+            ++retiredCompared;
+        }
         for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
             const auto& enemy = reference.instanceAt(i);
             if (enemy.objectId == 113 && enemy.active && enemy.health > 0 &&
@@ -1448,18 +1467,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                       << " ammo=" << reference.mainAmmo() << '\n';
         for (unsigned enemy = 0; enemy < gameplay.enemyCount(); ++enemy)
             sawAwakeEnemy = sawAwakeEnemy || gameplay.enemyAt(enemy).awake;
-        unsigned retiredOnRoute = 0;
-        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
-            const auto& enemy = reference.instanceAt(i);
-            const bool tracked = enemy.objectId == 111 || enemy.objectId == 112 ||
-                enemy.objectId == 113 || enemy.objectId == 116 ||
-                enemy.objectId == 117 || enemy.objectId == 119;
-            if (tracked && !enemy.active && enemy.health > 0 &&
-                enemy.y < reference.mainCameraViewY() - 160)
-                ++retiredOnRoute;
-        }
         if (sawAwakeEnemy && sawExtendedEnemyAnimation && sawPairedFrogAir && sawPairedFrogGround &&
-            retiredOnRoute >= 2 &&
+            retiredCompared >= 2 &&
             gameplay.cameraOffsetY() >= postLandingCameraY + 256)
             break;
     }
@@ -1469,7 +1478,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             "post-landing tape reaches generated native enemy simulation");
     require(routeFrogHit,
             "each traversal reaches a real surviving frog hit before retirement");
-    unsigned retiredCompared = 0, enemyOrdinal = 0;
+    unsigned enemyOrdinal = 0;
     for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
         const auto& enemy = reference.instanceAt(i);
         if (enemy.objectId != 111 && enemy.objectId != 112 && enemy.objectId != 113 &&
@@ -1477,15 +1486,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         require(enemyOrdinal < gameplay.enemyCount() &&
                 gameplay.enemyAt(enemyOrdinal).objectId == enemy.objectId,
                 "generated enemy prefix preserves creation order across targets");
-        const auto& native = gameplay.enemyAt(enemyOrdinal++);
-        if (!enemy.active && enemy.health > 0 &&
-            enemy.y < reference.mainCameraViewY() - 160) {
-            require(!enemy.activationPending,
-                    "retired SDL enemies are not eligible for later region activation");
-            require(!native.active && !native.awake && !native.activationPending,
-                    "SDL-retired enemies no longer remain live in Amiga");
-            ++retiredCompared;
-        }
+        ++enemyOrdinal;
     }
     if (retiredCompared < 2 && std::getenv("DOWNWELL_TRACE_TRAVERSAL")) {
         std::cerr << "RETIREMENTS count=" << retiredCompared

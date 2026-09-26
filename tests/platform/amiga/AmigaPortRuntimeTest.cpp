@@ -207,15 +207,21 @@ int main() {
     require(lifecycle.configureEnemy(3, 111, 163, 0, 4000, 0, 0, 5, 6,
                 0, 0, -1, -1, 0, 320, false),
             "configure genuinely inactive future enemy");
+    std::uint32_t lifecycleKeys[4];
+    for (unsigned i=0;i<4;++i) lifecycleKeys[i]=lifecycle.enemyAt(i).lifetimeId;
     lifecycle.step(0);
-    require(!lifecycle.enemyAt(0).active && !lifecycle.enemyAt(0).activationPending,
+    require(!lifecycle.findEnemy(lifecycleKeys[0]),
             "enemy above viewTop minus 160 is retired, not queued for reactivation");
-    require(lifecycle.enemyAt(1).active,
+    require(lifecycle.findEnemy(lifecycleKeys[1]) && lifecycle.findEnemy(lifecycleKeys[1])->active,
             "cleanup comparison is strictly less than the boundary");
-    require(!lifecycle.enemyAt(2).active && !lifecycle.enemyAt(2).activationPending,
+    require(!lifecycle.findEnemy(lifecycleKeys[2]),
             "render awakening does not exempt active instances from source End Step");
-    require(!lifecycle.enemyAt(3).active && lifecycle.enemyAt(3).activationPending,
+    require(lifecycle.findEnemy(lifecycleKeys[3]) && !lifecycle.findEnemy(lifecycleKeys[3])->active &&
+                lifecycle.findEnemy(lifecycleKeys[3])->activationPending,
             "inactive future instances receive no End Step and remain pending");
+    require(lifecycle.enemyCount()==2 && lifecycle.enemyAt(0).lifetimeId==lifecycleKeys[1] &&
+                lifecycle.enemyAt(1).lifetimeId==lifecycleKeys[3],
+            "offscreen destruction frees capacity while preserving survivor keys and order");
     {
         downwell::LifetimeInstance instances[] = {
             {116, -160, true}, {116, 3000, true}, {116, -161, true},
@@ -240,7 +246,7 @@ int main() {
         require(retired(10, 1, 0) == 0, "scrOutofview does not destroy outside rmMain");
     }
     lifecycle.step(0);
-    require(!lifecycle.enemyAt(0).active && !lifecycle.enemyAt(0).awake,
+    require(!lifecycle.findEnemy(lifecycleKeys[0]) && !lifecycle.findEnemy(lifecycleKeys[2]),
             "retired enemy stays retired on subsequent ticks");
     for (unsigned limit = 0; limit <= 8; ++limit) {
         for (unsigned pattern = 0; pattern < 256; ++pattern) {

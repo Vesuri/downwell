@@ -124,6 +124,13 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     const downwell::ObjectPack* objects = objectPack.valid() ? &objectPack : nullptr;
     if (objectPath != nullptr)
         require(objects != nullptr, "generated object pack is valid");
+    if (objects) {
+        for (int id : {60,92,93,111,112,113,116,117,119,289}) {
+            downwell::PackedObjectEvent event;
+            require(!objects->findEvent(id,1,0,event) && !objects->findEvent(id,12,0,event),
+                    "supported offscreen destruction has no inherited Destroy or Clean Up callback");
+        }
+    }
 
     std::vector<std::uint8_t> builderPatternBytes;
     if (builderPatternPath != nullptr) {
@@ -594,18 +601,24 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             auto retirementStorage = std::make_unique<downwell::StartupRuntime>(runtime);
             auto& retirement = *retirementStorage;
             std::size_t boxIndex = retirement.activeInstanceCount();
+            std::vector<std::uint32_t> retiredIds;
             for (std::size_t i = 0; i < retirement.activeInstanceCount(); ++i) {
                 auto& object = const_cast<downwell::InstanceRecord&>(retirement.instanceAt(i));
                 if (object.objectId != 92) continue;
                 object.active = true;
                 object.y = -512;
                 boxIndex = i;
-                break;
+                retiredIds.push_back(object.instanceId);
             }
             require(boxIndex < retirement.activeInstanceCount(), "retirement fixture has a box");
+            require(retiredIds.size() > 1, "retirement fixture exercises multiple compacting removals");
+            const auto controller = *retirement.instance(downwell::StartupRuntime::controllerInstanceId);
             retirement.step(releasedMain, false);
-            require(!retirement.instanceAt(boxIndex).active && retirement.mainInstancesRetired() > 0,
-                    "breakable boxes retain the source offscreen retirement rule");
+            for (auto id : retiredIds)
+                require(!retirement.hasInstance(id), "offscreen destruction removes identity rather than deactivating it");
+            require(retirement.mainInstancesRetired() >= retiredIds.size() &&
+                    retirement.instance(controller.instanceId)->objectId == controller.objectId,
+                    "compacting retirement preserves surviving identities");
         }
         bool retainedOldStone = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
