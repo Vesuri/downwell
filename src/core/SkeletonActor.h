@@ -150,7 +150,9 @@ struct SkeletonActor : SkeletonDecisions {
             // Creation callbacks complete synchronously and report failure.
             // Earlier side effects cannot be rolled back; false is terminal
             // for the owning simulation, not permission to retry this event.
-            events.enemyDeath();
+            // scrEnemyDeath includes levelBeginCue, which can synchronously
+            // create object 372. Failure there must stop before blood/rewards.
+            if(!events.enemyDeath()) return false;
             if(!events.blood(10,3) || !events.smoke(xx,yy,5,1) ||
                !events.flash(xx,yy,6,2,10) || !events.currency(money)) return false;
             events.deathSound(132);

@@ -18,7 +18,7 @@ struct Events {
     unsigned failAt=0;
     void hurtSound(int n) { check(n==133); }
     bool throwBone(int) { return true; }
-    void enemyDeath() { check(++order==1); }
+    bool enemyDeath() { check(++order==1); return order!=failAt; }
     bool blood(int a,int b) { check(++order==2 && a==10 && b==3); return order!=failAt; }
     bool smoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b) {
         check(++order==3 && x.high==actor.xx.high && y.high==actor.yy.high && a==5 && b==1);
@@ -106,11 +106,11 @@ struct StompEvents {
     }
 };
 int main() {
-    for(unsigned failure:{2u,3u,4u,5u,7u,8u,9u}){
+    for(bool stopped:{false,true}) for(unsigned failure:{1u,2u,3u,4u,5u,7u,8u,9u}){
         downwell::SkeletonActor actor;check(actor.create(96,192));
         actor.health=0;actor.takenImpact=number(9);
         Events events{actor};events.failAt=failure;
-        check(!actor.step(true,false,false,0,events));
+        check(!actor.step(stopped,false,false,0,events));
         check(events.order==failure&&!actor.destroyRequested&&!actor.alive);
         check(actor.takenImpact.high==number(9).high); // No event tail or retry.
     }
@@ -254,5 +254,5 @@ int main() {
     check(ordinary.stomps==1 && ordinary.damageCalls==0);
     Contact mutated; mutated.mutate=true; s.collidePlayer(mutated);
     check(mutated.stomps==1 && mutated.damageCalls==1);
-    std::puts("Skeleton actor: 12 effect failure boundaries, movement, death order, 120 stomps, 10086 masks and 150 precise contacts passed");
+    std::puts("Skeleton actor: 8 death failure boundaries with/without time-stop, 5 stomp failure boundaries, movement, death order, 120 stomps, 10086 masks and 150 precise contacts passed");
 }

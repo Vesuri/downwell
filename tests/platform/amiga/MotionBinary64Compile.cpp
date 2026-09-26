@@ -92,7 +92,7 @@ struct SkeletonDecisionEvents {
     unsigned trace = 0;
     void hurtSound(int sound) { trace = (trace << 8) ^ unsigned(sound); }
     bool throwBone(int facing) { trace = (trace << 2) ^ unsigned(facing); return true; }
-    void enemyDeath() { ++trace; }
+    bool enemyDeath() { ++trace; return true; }
     bool blood(int a,int b) { trace+=a+b; return true; }
     bool smoke(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b) { trace^=x.low+y.low+a+b; return true; }
     bool flash(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int a,int b,int c) { trace^=x.high+y.high+a+b+c; return true; }

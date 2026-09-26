@@ -14,12 +14,22 @@ Batching all effect creation after currency generation changes the shared RNG
 stream, even when the final list of visible particles looks identical.
 
 Effect-producing callbacks return success. `SkeletonActor` stops the event on
-failed blood, smoke, flash, currency, corpse or debris creation; stomp blood and
-each Exploding Knees smoke emission have the same contract. Already completed
+failed enemy-death setup, blood, smoke, flash, currency, corpse or debris
+creation; stomp blood and each Exploding Knees smoke emission have the same
+contract. Already completed
 child Creates and RNG draws are retained. A false result is terminal for the
 owning simulation: do not retry the event, award later rewards, or retire the
 actor as though the sequence completed. `verify-skeleton-actor` injects failures
 at each of these boundaries as well as checking the successful source order.
+
+The `enemyDeath` callback is checked too: `scrEnemyDeath` VM block 1 updates
+combo, calls `gunshotStop`, updates kill/achievement state, calls `momentDelay`,
+then calls `levelBeginCue`. That last script's blocks 1–6 create object 372
+when `!firstLand && !pTimeStop && area != 5`. Its Create completes before
+`firstLand` changes and before the audio work. Failure must retain prior
+bookkeeping but stop before blood, currency, retirement and the event tail.
+The actor test covers this boundary with and without time-stop; it does not
+claim that the live worlds yet implement the script or level-title creation.
 
 Both runtime adapters route flash bursts and pre-Step flash animation through
 `RunSession`'s shared `effectsSucceeded` latch. Failed bursts retain earlier

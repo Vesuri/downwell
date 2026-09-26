@@ -87,7 +87,7 @@ struct Effects {
         born=creation.child;++throws;return true;
     }
     void hurtSound(int id) {check(id==133);}
-    void enemyDeath(){check(false);}
+    bool enemyDeath(){check(false);return false;}
     bool blood(int,int){check(false);return false;}
     bool smoke(downwell::MotionBinary64,downwell::MotionBinary64,int,int){check(false);return false;}
     bool flash(downwell::MotionBinary64,downwell::MotionBinary64,int,int,int){check(false);return false;}
