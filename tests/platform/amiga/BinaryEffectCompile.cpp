@@ -2,6 +2,10 @@
 #include "core/RunnerSpatialSplit.h"
 #include "core/RunnerSpatialNode.h"
 #include "core/RunnerSpatialIndex.h"
+#include "core/RunnerSpatialDirtyQueue.h"
+bool compileRunnerSpatialDirtyQueue(downwell::RunnerSpatialDirtyQueue<256>& queue,unsigned slot){
+    return queue.mark(slot)&&queue.remove(slot);
+}
 bool compileRunnerSpatialIndex(downwell::RunnerSpatialIndex<256>& index,downwell::RunnerSpatialSplit::Box box,unsigned id,unsigned& found){
     return index.insert(box,id)&&index.query(box,[&](unsigned hit){found=hit;return false;});
 }

@@ -236,9 +236,30 @@ Dirty processing `0x502ca0` walks the intrusive list rooted at `0x8a6100`.
 For the audited eligible sprite-bound path it saves old bounds, recalculates
 current bounds, removes an already indexed instance with retry enabled, and
 inserts its new bounds at level zero. It then unlinks the dirty-list entry.
-Thus movement is not simply an in-place bounding-box update. Dirty-list
-enqueuing, eligibility flags and all mutation callers still require integration
-evidence before reproducing a whole encounter's tree history.
+Thus movement is not simply an in-place bounding-box update. Object-flag
+construction and all mutation callers still require integration evidence before
+reproducing a whole encounter's tree history.
+
+The position setter `0x46bc60` checks the two binary32 coordinates when its
+`0x46bff0` lookup returns null. An unchanged position then does nothing;
+otherwise it writes the coordinates, sets instance flag `0x08` and calls
+`0x501e50`. Do not mark dirty merely because a setter was invoked. The non-null
+lookup path bypasses the unchanged-position comparison.
+
+`0x501e50` requires an object and either object flags `0x28` or instance flag
+`0x20`. It unlinks existing spatial-dirty membership and prepends the instance
+at `0x8a6100`. Repeated mutations therefore move an instance to the front;
+deduplicating without reordering or using FIFO would change update order.
+It then calls `0x501ef0`, which separately maintains the `0x8a60f4` list for
+object flag `0x08`. These are two distinct intrusive memberships.
+
+On the audited sprite-bound update path, `0x502ca0` skips instance flags
+`0x100003`. Index update additionally requires object flag `0x10` and at least
+one of global `0xb57c98`, object flags `0x28`, or instance flag `0x20`.
+The generic sprite/mask fallback must not be inferred from this path alone.
+`RunnerSpatialDirtyQueue` supplies the slot-based move-to-front membership
+and these two eligibility predicates. Retire membership before reusing a slot;
+the scheduler still owns mutation hooks, bounds refresh and the separate list.
 
 `RunnerSpatialNode` supplies the six-slot node, last-entry replacement and
 original-order split distribution using index links rather than native pointers.

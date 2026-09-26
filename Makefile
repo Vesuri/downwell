@@ -260,13 +260,18 @@ test: verify-time-stop-masks
 test: verify-ordinary-time-field
 test: verify-runner-spatial-split
 .PHONY: verify-runner-spatial-split
-verify-runner-spatial-split: build/runner-spatial-split-test
+verify-runner-spatial-split: build/runner-spatial-split-test build/runner-spatial-dirty-test
 	./build/runner-spatial-split-test
+	./build/runner-spatial-dirty-test
 	python3 tools/verify-runner-field-lookup.py
 
 build/runner-spatial-split-test: tests/core/RunnerSpatialSplitTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerSpatialSplitTest.cpp
+
+build/runner-spatial-dirty-test: tests/core/RunnerSpatialDirtyQueueTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/RunnerSpatialDirtyQueueTest.cpp
 
 .PHONY: verify-ordinary-time-field
 verify-ordinary-time-field: build/ordinary-time-field-test
