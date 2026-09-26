@@ -100,6 +100,11 @@ void testDecodeAndInheritance() {
 
 void testValidation() {
     std::vector<std::uint8_t> bytes = makePack();
+    bytes[4] = 1;
+    require(downwell::ObjectPack(bytes.data(), bytes.size()).error() ==
+                downwell::ObjectPackError::unsupportedVersion,
+            "legacy pack without compatibility depths is rejected");
+    bytes = makePack();
     bytes[0] = 'X';
     require(downwell::ObjectPack(bytes.data(), bytes.size()).error() ==
                 downwell::ObjectPackError::badMagic,
@@ -137,6 +142,11 @@ void testGeneratedPack(const char* path) {
     require(pack.findObject(35, player) && player.spriteId == 31 &&
                 player.parentId == 34 && player.bindingCount == 29,
             "recovered player object properties are decoded");
+    require(player.depth == 0 && player.creationDepth == -50000,
+            "player compatibility depth is distinct from serialized depth");
+    downwell::PackedObject field;
+    require(pack.findObject(82, field) && field.depth == 0 && field.creationDepth == 10000,
+            "time-field compatibility table is resolved by name, not array slot 48");
     downwell::PackedObjectEvent event;
     require(pack.findEvent(35, 0, 0, event) && event.codeId == 836 &&
                 event.ownerObjectId == 35,

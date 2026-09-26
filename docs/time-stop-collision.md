@@ -188,8 +188,9 @@ be used. `visitObject` returns the matching lifetime handle and const record.
 
 The store preserves persistent memberships when compacting for room entry;
 source-specific room-transition rebinding still belongs to the room owner.
-Live deferred activation reconciliation, other gameplay-family registration and
-spatial/list branch selection are not connected yet. These counts therefore
+Decoded-host deferred activation publishes at event-phase boundaries; other
+gameplay-family registration and spatial/list branch selection are not connected
+yet. These counts therefore
 must not replace original-runner field selection until that integration is
 complete. Store ownership alone is not a complete `instance_place` implementation.
 

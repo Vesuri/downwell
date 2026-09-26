@@ -116,7 +116,7 @@ public:
             // IDs after preflight. Never dereference a rejected birth, nor
             // replay already-dispatched callbacks after partial failure.
             const auto created = instances.create(instanceId, command.objectId, roomId,
-                                                  definition.persistent(),definition.depth);
+                                                  definition.persistent(),definition.creationDepth);
             if (created != CreateInstanceResult::success) {
                 applyFailure_ = created == CreateInstanceResult::full ?
                     ApplyInstanceCommandsResult::instanceStoreFull :
@@ -145,7 +145,6 @@ public:
             instance.active = command.active;
             instance.activationPending = !command.active;
             instance.alarms = command.alarms;
-            instance.depth = definition.depth;
             createHandler(instance);
         }
         clear();

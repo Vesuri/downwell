@@ -31,6 +31,7 @@ struct PackedObject {
     std::uint32_t flags;
     std::uint32_t firstBinding;
     std::uint32_t bindingCount;
+    std::int32_t creationDepth; // Compatibility instance_create, not OBJT depth.
 
     bool visible() const { return (flags & 1U) != 0; }
     bool solid() const { return (flags & 2U) != 0; }
@@ -47,7 +48,7 @@ struct PackedObjectEvent {
 
 class ObjectPack {
 public:
-    static constexpr std::uint16_t formatVersion = 1;
+    static constexpr std::uint16_t formatVersion = 2;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 40;

@@ -41,7 +41,8 @@ the inactive tail. Storage compaction and request order are not substitutes.
 The fixed-capacity room lists add 16 bytes per slot plus four list endpoints;
 the decoded host's 2,048 slots therefore add 32 KiB plus endpoint storage.
 
-The host supplies serialized depth at birth. This adapter does not yet model
+The host supplies room/layer depth for placed instances and VM compatibility
+depth for dynamic births. This adapter does not yet model
 runtime depth changes, persistent-instance room re-registration, the complete
 Windows destruction queues, or the additional manual actor/collision passes
 after `EventScheduler`. Nor does it publish spatial-index updates or wire the

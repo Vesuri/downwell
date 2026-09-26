@@ -50,7 +50,7 @@ std::vector<std::uint8_t> makeObjectPack() {
     appendU32(bytes, 5); // visible and persistent
     appendU32(bytes, 0);
     appendU32(bytes, 0);
-    appendU32(bytes, 0);
+    appendI32(bytes, -70); // Compatibility depth deliberately differs from OBJT.
     return bytes;
 }
 
@@ -65,6 +65,7 @@ void testApplyIsOrderedAndAtomic() {
     std::uint32_t callbacks = 0;
     const auto onCreate = [&callbacks](downwell::InstanceRecord& instance) {
         require(instance.spriteId == 12,"serialized sprite exists before Create callback");
+        require(instance.depth == -70,"compatibility depth exists before Create callback");
         ++callbacks;
     };
     require(queue.apply(instances, objects, 20, nextId, onCreate) ==
@@ -73,7 +74,7 @@ void testApplyIsOrderedAndAtomic() {
     require(instances.size() == 2 && callbacks == 2 && nextId == 105188,
             "all creates apply in queue order and advance allocator");
     require(instances.at(0).instanceId == 105186 && instances.at(0).x == 10 &&
-                instances.at(0).y == 20 && instances.at(0).depth == -40 &&
+                instances.at(0).y == 20 && instances.at(0).depth == -70 &&
                 instances.at(0).persistent,
             "object properties and requested position populate native state");
 
