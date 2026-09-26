@@ -247,7 +247,16 @@ build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/
 test: verify-time-stop-bound
 test: verify-player-time-stop
 test: verify-time-change
-test: verify-time-shard-birth verify-time-shard-lifecycle
+test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-motion
+.PHONY: verify-time-shard-motion
+verify-time-shard-motion: build/time-shard-motion-test
+	python3 tools/verify-runner-integer-range.py
+	./build/time-shard-motion-test
+
+build/time-shard-motion-test: tests/core/TimeShardMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardMotionTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-time-shard-lifecycle
 verify-time-shard-lifecycle: build/time-shard-lifecycle-test
 	./build/time-shard-lifecycle-test
