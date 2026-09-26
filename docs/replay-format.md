@@ -110,7 +110,8 @@ is compiled out of normal Amiga builds and does not affect frame time.
 
 `CorpseVerification` runs 32 seeded owned creation/motion/animation/expiration
 tapes, hashing published and precise positions, velocities, animation, alarms
-and full RNG state. Its 1,184 independent checks must report zero failures;
+and full RNG state, followed by the actual expiry child's animation lifetime.
+Its 2,464 independent checks must report zero failures;
 matching failure counts are not success. The standalone regression is
 `make verify-corpse-replay`. Verification scratch storage uses aligned static
 bytes and placement construction, not the small Amiga task stack or guarded

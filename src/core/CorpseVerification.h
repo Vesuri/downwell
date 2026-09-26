@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_CORPSE_VERIFICATION_H
 #define DOWNWELL_CORE_CORPSE_VERIFICATION_H
 #include "CorpseEffects.h"
+#include "CorpseExpiryEffect.h"
 #include "GameMakerRandom.h"
 #ifndef DOWNWELL_PLATFORM_AMIGA
 #include <new>
@@ -15,6 +16,7 @@ struct CorpseVerification {
 };
 namespace corpseVerificationDetail {
 struct Hooks {
+    CorpseExpiryEffect expiry;
     unsigned births=0,retired=0,publications=0,children=0,destroys=0;
     bool birth(unsigned,const CorpseAnimation&){++births;return true;}
     bool retire(unsigned,const CorpseAnimation&){++retired;return true;}
@@ -27,9 +29,12 @@ struct Hooks {
     bool facing(unsigned,const CorpseAnimation&){return true;}
     int area(){return 3;}
     int restInPieces(){return 0;}
-    bool create(int id,MotionBinary64,MotionBinary64,std::uint32_t& child){if(id!=242)return false;child=++children;return true;}
+    bool create(int id,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){
+        if(id!=242)return false;
+        child=++children;return expiry.create(x,y);
+    }
     bool create(int,MotionBinary64,MotionBinary64){return false;}
-    bool sprite(unsigned,int id){return id==102;}
+    bool sprite(unsigned,int id){return id==102&&expiry.setSprite(id,12,[](const auto&){return true;});}
     void destroy(){++destroys;}
 };
 }
@@ -63,6 +68,11 @@ struct Hooks {
         result.check(owner.dispatch(owner.beginPhase(),[&](auto,auto& state){return state.advanceAlarm(0,hooks);},hooks));
         result.check(!owner.get(source.myDeadBody)&&hooks.births==1&&hooks.retired==1&&hooks.children==1&&hooks.destroys==1);
         result.check(hooks.publications==20&&random.drawCount()==3);
+        for(unsigned tick=0;tick<40;++tick){
+            result.check(hooks.expiry.advanceImage()&&hooks.expiry.destroyRequested==(tick==39));
+            result.word(hooks.expiry.x.bits);result.word(hooks.expiry.y.bits);
+            result.word(hooks.expiry.imageIndex.bits);result.word(hooks.expiry.timeline.bits);
+        }
         result.word(hooks.publications);result.word(random.stateIndex());
         for(unsigned i=0;i<16;++i)result.word(random.stateWord(i));
     }

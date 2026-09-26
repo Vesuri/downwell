@@ -91,6 +91,19 @@ events/runner, full RNG state, query coordinates, publication order and failures
 Step, collisions, animation, lifetime ownership and live admission remain
 separate work; this test does not establish the world's collision decisions.
 
+`CorpseExpiryEffect` models object 242 (`fxJobutsu`): Create assigns the
+single-rounded speed 0.3, with sprite 102's twelve unit sequence keys. Its
+parent 219 (`parentNoloopFx`) destroys it at Animation End. Neither object has
+a Step or Draw override: no TimeStopBound, movement or drawFx surface route
+is applicable. Default position and sprite drawing remain scheduler/backend
+responsibilities. The connected alarm test creates the child before corpse
+retirement and advances it for its 40-update lifetime; the cross-CPU corpse
+replay hashes the child's position and animation too. `setSprite` accepts
+verified nonempty unit-track metadata and publishes changed bounds; unsupported
+empty sprites and failed publication are explicit failures. Live ownership,
+ordinary mixed-depth drawing and additional corpse families still need wiring.
+`verify-corpse-expiry` pins the VM events, inheritance and sprite metadata.
+
 `CorpseLifecycle` implements alarms 0–3 and the Knife and Fork player-contact
 event. Alarm 0 completes object-242 Create before assigning its sprite and
 requesting corpse retirement. Alarm 3 activates the corpse; only an active

@@ -20,6 +20,7 @@ for index, name, frames in (
     (84,"sprSmoke",9),
     (91,"sprPoisonPotPieces",6),
     (96,"sprFlashBall",3),
+    (102,"sprFxExplosionS",12),
     (115,"sprDebrisRock",4), (116,"sprDebrisWood",4),
     (172,"sprFrogDead",1),
     (205,"sprEnmSkeletonHit",1), (206,"sprSkeletonDead",1),

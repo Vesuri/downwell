@@ -146,6 +146,17 @@ test: verify-corpse-creation-integration
 test: verify-corpse-animation
 test: verify-corpse-effects
 test: verify-corpse-replay
+test: verify-corpse-expiry
+
+.PHONY: verify-corpse-expiry
+verify-corpse-expiry: build/corpse-expiry-test
+	python3 tools/verify-corpse-expiry.py
+	python3 tools/verify-animation-metadata.py
+	./build/corpse-expiry-test
+
+build/corpse-expiry-test: tests/core/CorpseExpiryEffectTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ $<
 
 .PHONY: verify-corpse-replay
 verify-corpse-replay: build/corpse-verification-test
