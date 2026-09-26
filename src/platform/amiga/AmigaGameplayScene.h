@@ -12,6 +12,18 @@ class AmigaGameplayScene {
     int cachedFirst_ = 0, cachedEnd_ = 0;
 public:
     struct StageSpan { int first, count; };
+    static constexpr int noStageColumn = 10000;
+    // Rendering prediction only, never a camera rule. Retain completed work
+    // while stopped/turning; the normal switch path handles a late prediction.
+    static int stageColumn(int playerX, long velocityX, int cameraX, bool dead) {
+        if (dead) return noStageColumn;
+        if (!cameraX) {
+            if (playerX < -16 && velocityX < 0) return -160;
+            if (playerX > 16 && velocityX > 0) return 160;
+        } else if ((cameraX < 0 && playerX > -144 && velocityX > 0) ||
+                   (cameraX > 0 && playerX < 144 && velocityX < 0)) return 0;
+        return noStageColumn;
+    }
     void setBackingRange(int first, int end) { cachedFirst_ = first; cachedEnd_ = end; }
     // Visible damage is repainted by the caller. Retained offscreen damage
     // must leave the valid interval before the camera can expose it.

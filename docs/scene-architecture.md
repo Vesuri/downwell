@@ -78,6 +78,13 @@ For upward preparation, bound the adjacent suffix to the paint budget so a
 partial operation cannot claim an untouched gap. World changes still invalidate
 staging before a camera switch can use it.
 
+Prefetch only a column the player's resolved horizontal velocity approaches.
+Do not infer movement from held input: wall collisions can zero velocity while
+the key remains held. A stopped, dead or retreating player leaves completed
+staging intact without preparing more rows. This is a rendering prediction,
+not an entry rule; camera transitions still use shared simulation and fall back
+to destination composition whenever the predicted interval is incomplete.
+
 Retire and publish buffers independently: damage acknowledged in one display
 must not clear the other's debt. A Copper rebuild does not itself invalidate
 retained pixels. Fixed-capacity draw-list failure must prevent publication,

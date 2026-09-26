@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaGameplayScene.h"
 #include <cassert>
+#include <initializer_list>
 #include <cstdio>
 #include <cstdint>
 // Lifecycle doubles. Native gates exercise actual Copper/ring behavior.
@@ -67,6 +68,19 @@ int main() {
     before=builds;
     assert(update(0) && update(1) && builds==before+2);
     assert(!scene.mask(2,mask));
+    // Predict only a view being approached. Zero resolved speed includes
+    // pressing against a wall, irrespective of the held input direction.
+    const int none = AmigaGameplayScene::noStageColumn;
+    for (int x=-236; x<=236; ++x) for (int camera : {-160,0,160})
+    for (long speed : {-640L,-1L,0L,1L,640L}) {
+        const int target=AmigaGameplayScene::stageColumn(x,speed,camera,false);
+        const bool approachRight=camera==0 && x>16 && speed>0;
+        const bool approachLeft=camera==0 && x<-16 && speed<0;
+        const bool returning=(camera<0 && x>-144 && speed>0) ||
+                             (camera>0 && x<144 && speed<0);
+        assert(target==(approachRight?160:approachLeft?-160:returning?0:none));
+        assert(AmigaGameplayScene::stageColumn(x,speed,camera,true)==none);
+    }
     // Model the actual retained row contents independently of interval math.
     // Include reversals, column switches, failed copies and ring wraparound.
     int storedY[320], storedX[320];

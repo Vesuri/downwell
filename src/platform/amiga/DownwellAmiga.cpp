@@ -2655,11 +2655,10 @@ int main(void) {
             if (!cameraXChanged && missingHeight == 0 && destroyedBlockCount == 0 && terrainRaster.ready) {
                 const int playerX = port.player().offsetX();
                 const int cameraX = port.cameraOffsetX();
-                const int wanted = cameraX == 0
-                    ? (playerX < -16 ? -160 : playerX > 16 ? 160 : 10000)
-                    : (cameraX < 0 ? (playerX > -144 ? 0 : 10000)
-                                   : (playerX < 144 ? 0 : 10000));
-                const int targetY = wanted != 10000 ? port.previewCameraViewY(wanted) : -1;
+                const int wanted = AmigaGameplayScene::stageColumn(playerX,
+                    port.player().speedXFixed(), cameraX, port.dead());
+                const int targetY = wanted != AmigaGameplayScene::noStageColumn
+                    ? port.previewCameraViewY(wanted) : -1;
                 if (targetY >= 0 && targetY + downwellGameRingHeight <= terrainRasterRows) {
                     const int targetX = mainViewX + wanted;
                     const auto span = gameplayScene.stageSpan(targetX, targetY, downwellDisplayHeight,
