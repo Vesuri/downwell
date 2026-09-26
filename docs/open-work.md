@@ -57,10 +57,9 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Initialize SDL frog precise motion state at Create, matching the original
-  event and the Amiga adapter. The strict paired-state gate currently fails at
-  tick 163 because SDL defers this initialization until movement; preserve the
-  exact comparison and rerun it after correcting initialization.
+- Resolve the garden-to-well sequence-state disagreement at frame 291 in the
+  strict adapter gate, then complete both combat tapes with exact creation and
+  published-coordinate comparisons. Keep all existing assertions.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,

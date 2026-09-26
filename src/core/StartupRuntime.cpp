@@ -1339,6 +1339,9 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 instance->motionInitialized = true;
                 instance->grounded = true;
             }
+            instance->walker.initialize(instance->x, instance->y,
+                static_cast<long>(std::round(instance->velocityX * 1280)),
+                static_cast<long>(std::round(instance->velocityY * 1280)), instance->grounded);
         }
         return;
     case 1198: // gml_Object_enmGroundTurtle_Create_0
@@ -1352,6 +1355,9 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 instance->motionInitialized = true;
                 instance->grounded = true;
             }
+            instance->walker.initialize(instance->x, instance->y,
+                static_cast<long>(std::round(instance->velocityX * 1280)),
+                static_cast<long>(std::round(instance->velocityY * 1280)), instance->grounded);
         }
         return;
     case 1204: // gml_Object_enmFrog_Create_0
@@ -1363,6 +1369,16 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 instance->preciseY = static_cast<float>(instance->y);
                 instance->motionInitialized = true;
             }
+            // Create assigns xx=x and yy=y before any Step can observe them.
+            // Keep the shared motion state initialized at the same boundary.
+            instance->frogHorizontal.position = static_cast<long>(std::round(
+                (instance->preciseX - mainPlayerOriginX_) * 65536.0F));
+            instance->frogHorizontal.velocity = 0;
+            instance->frogVertical.position = static_cast<long>(std::round(
+                (instance->preciseY - mainPlayerOriginY_) * 1280.0F));
+            instance->frogVertical.velocity = 0;
+            instance->frogVertical.grounded = false;
+            instance->frogMotionInitialized = true;
         }
         return;
     case 1230: // gml_Object_enmBat_Create_0
@@ -1387,6 +1403,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 instance->velocityY = 0.1F;
                 instance->motionInitialized = true;
             }
+            instance->snail.initialize(instance->x, instance->y, instance->velocityY >= 0);
         }
         return;
     case 1252: // gml_Object_enmCrawler_Create_0
@@ -1400,6 +1417,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 instance->motionState = 1;
                 instance->motionInitialized = true;
             }
+            instance->crawler.initialize(instance->x, instance->y);
         }
         return;
     case 1231: // gml_Object_enmBat_Alarm_0
