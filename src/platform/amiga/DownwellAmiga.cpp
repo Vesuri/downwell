@@ -268,6 +268,7 @@ extern "C" { volatile ULONG gDownwellStackGuardReady; }
 #include "core/MachineGunVerification.h"
 #include "core/RunnerSpatialVerification.h"
 #include "core/CorpseVerification.h"
+#include "core/DamageNumberVerification.h"
 extern "C" {
 volatile ULONG gReplayComplete;
 volatile ULONG gReplayFrames;
@@ -290,6 +291,7 @@ volatile ULONG gBoneCreateDigest, gBoneCreateCount, gBoneCreateFailures;
 volatile ULONG gBoneAnimationDigest, gBoneAnimationCount, gBoneAnimationFailures;
 volatile ULONG gSpatialChecks, gSpatialDigest, gSpatialFailures;
 volatile ULONG gCorpseChecks, gCorpseDigest, gCorpseFailures;
+volatile ULONG gDamageNumberChecks, gDamageNumberDigest, gDamageNumberFailures;
 volatile ULONG gReplayStackFailureStage;
 
 // Identify the first workload that consumes the guard without resetting it.
@@ -3132,6 +3134,9 @@ int main(void) {
             const auto corpses=downwell::verifyCorpses();
             downwellReplayCheckStack(12);
             gCorpseChecks=corpses.checks;gCorpseDigest=corpses.digest;gCorpseFailures=corpses.failures;
+            const auto numbers=downwell::verifyDamageNumbers();
+            downwellReplayCheckStack(13);
+            gDamageNumberChecks=numbers.checks;gDamageNumberDigest=numbers.digest;gDamageNumberFailures=numbers.failures;
             gReplayComplete = 1;
             downwellReplayComplete();
             for (;;) platform.waitVblank();

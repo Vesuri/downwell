@@ -609,8 +609,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     // Alarms follow Begin Step movement, before builder Step/Create events.
+    const auto damageNumberAlarmPhase=run_.damageNumbers.beginPhase();
+    // Object 221 Alarm 0 only destroys itself: no RNG or cross-family effects.
+    run_.advanceDamageNumberAlarm(damageNumberAlarmPhase,0);
     advanceEnemyAlarms();
     const auto smokeStepPhase=run_.smokeEffects.beginPhase();
+    const auto damageNumberStepPhase=run_.damageNumbers.beginPhase();
     DW_PROFILE_PHASE(profilePlayer);
     int scrollDelta = 0;
     int cameraXDelta = 0;
@@ -867,6 +871,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
+    run_.stepDamageNumbers(damageNumberStepPhase);
     run_.collideSmokeWalls([&](const downwell::ContactBounds& bounds,auto emit){
         unsigned count=0;
         if(wallContactResolver_ && !wallContactResolver_(solidResolverContext_,bounds,count))return false;

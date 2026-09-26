@@ -7,6 +7,7 @@
 #include "core/GameplayWorld.h"
 #include "core/RunnerSpatialVerification.h"
 #include "core/CorpseVerification.h"
+#include "core/DamageNumberVerification.h"
 
 #include <cinttypes>
 #include <cstdio>
@@ -57,5 +58,8 @@ int main() {
     const auto corpses=downwell::verifyCorpses();
     if(corpses.failures)return 11;
     std::printf("CORPSE %u %08x %u\n",corpses.checks,corpses.digest,corpses.failures);
+    const auto numbers=downwell::verifyDamageNumbers();
+    if(numbers.failures)return 12;
+    std::printf("DAMAGE_NUMBER %u %08x %u\n",numbers.checks,numbers.digest,numbers.failures);
     return 0;
 }

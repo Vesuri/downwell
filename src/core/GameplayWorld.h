@@ -286,6 +286,11 @@ public:
     }
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const downwell::CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
+    const downwell::PlayerDamageNumbers<8>& damageNumbers()const{return run_.damageNumbers;}
+    bool emitDamageNumber(downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+        downwell::MotionBinary64 amount,downwell::MotionBinary64 direction){
+        return run_.createDamageNumber(x,y,amount,direction)!=0;
+    }
     bool emitCorpseExpiry(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
     const downwell::SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}

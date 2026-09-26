@@ -122,7 +122,15 @@ Retirement and room cleanup invalidate handles before slot reuse; partial cleanu
 can resume after failure without repeating completed retirements. Creation or
 mutation failure disables simulation until cleanup. `RunSession` supplies the
 shared owner, failure propagation and room/run cleanup. Live scheduler call sites
-and both text backends must still be connected before damage numbers appear.
+advance its Alarm 0 after Begin Step and its motion in ordinary Step in both
+worlds. These events mutate only the number itself: no source RNG, child creation,
+collision membership or cross-family side effects. Ordinary-Step births are
+excluded until the next update; previously surviving numbers expire at Alarm 0
+before that frame's Step. The world integration test compares 60 updates of both
+schedulers, including a native generation-time birth. The cross-CPU replay's
+`DAMAGE_NUMBER` case exercises the actual session math path at eight directions;
+it does not exercise natural damage dispatch. Both text backends and natural
+damage-event adapters remain to be connected before visible damage numbers work.
 
 `OrdinaryTimeFields` exposes port-owned lifetime keys separately from array
 indices. As object 82 has no individual retirement, one room's births form a

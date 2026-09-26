@@ -84,6 +84,14 @@ struct RunSession {
         if(effectsSucceeded)effectsSucceeded=damageNumbers.step(phase,lengthdirX,hooks);
         return effectsSucceeded;
     }
+    bool stepDamageNumbers(PlayerDamageNumbers<8>::Phase phase){
+        return stepDamageNumbers(phase,[](MotionBinary64 speed,MotionBinary64 direction,MotionBinary64& x){
+            RunnerImageValue length,angle,radian;
+            MotionBinary64 cosine,sine;
+            return length.assign(speed)&&angle.assign(direction)&&SmokeDirection::radians(angle,radian)&&
+                smokeTrig(radian.promoted(),cosine,sine)&&SmokeDirection::component(length,cosine,false,x);
+        });
+    }
     void clearDamageNumbers(){DamageNumberHooks hooks;damageNumbers.clear(hooks);}
     // This effect has no source collision events or external membership in the
     // current worlds. Keep publication hooks explicit for registry integration.

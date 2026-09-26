@@ -194,6 +194,10 @@ public:
     const ShopWorld& shops() const { return run_.shops; }
     const FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
+    const PlayerDamageNumbers<8>& damageNumbers()const{return run_.damageNumbers;}
+    bool emitDamageNumber(MotionBinary64 x,MotionBinary64 y,MotionBinary64 amount,MotionBinary64 direction){
+        return run_.createDamageNumber(x,y,amount,direction)!=0;
+    }
     bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
     const SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}

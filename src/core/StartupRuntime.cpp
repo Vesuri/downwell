@@ -390,6 +390,12 @@ void StartupRuntime::stepInternal(bool advancePressed,
     auto smokeStepPhase=run_.smokeEffects.beginPhase();
     EventScheduler<instanceCapacity>::runStep(instances_, alarmEvents, handler,
         [&](StepEventPhase phase){
+            if(roomId_==mainRoomId && phase==StepEventPhase::alarm)
+                run_.advanceDamageNumberAlarm(run_.damageNumbers.beginPhase(),0);
+            // This sprite-less effect only mutates itself. Execute at the
+            // global Step boundary, before any collision/Step births.
+            if(roomId_==mainRoomId && phase==StepEventPhase::step)
+                run_.stepDamageNumbers(run_.damageNumbers.beginPhase());
             if(phase==StepEventPhase::step)smokeStepPhase=run_.smokeEffects.beginPhase();
         });
     if (deferredInstances_.size() != 0)
