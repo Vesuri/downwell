@@ -22,6 +22,14 @@ void verifyTerrainSegments() {
     context.index = &index;
     require(amigaAddTerrainObject(index, 92, 240, 176) &&
             amigaAddTerrainObject(index, 60, 256, 192), "segment test tiles register");
+    require(amigaAddTerrainObject(index,60,256,192),"duplicate wall Create is retained separately");
+    unsigned contacts=0;
+    require(amigaResolveTerrainWallContacts(&context,{247,250,183,186},contacts) && contacts==3,
+        "native query reports box and both overlapping wall instances");
+    index.wallContactsComplete=false;
+    require(!amigaResolveTerrainWallContacts(&context,{247,250,183,186},contacts),
+        "reconstructed occupancy cannot masquerade as actual collision instances");
+    index.wallContactsComplete=true;
     AmigaPortRuntime runtime(0);
     int bx = 0, by = 0;
     runtime.configureBreakables(&bx, &by, 1);
@@ -29,6 +37,8 @@ void verifyTerrainSegments() {
     for (unsigned state = 0; state < 3; ++state) {
         if (state) context.runtime = &runtime;
         if (state == 2) runtime.configureBreakables(&bx, &by, 0);
+        require(amigaResolveTerrainWallContacts(&context,{247,250,183,186},contacts) && contacts==(state==2?2u:3u),
+            "native contact query filters destroyed boxes without merging walls");
         for (int x = -40; x <= 40; ++x) for (int y = -40; y <= 40; ++y) {
             const bool corners = amigaResolveTerrainSolid(&context, x-4, y-4) ||
                 amigaResolveTerrainSolid(&context, x+3, y-4) ||

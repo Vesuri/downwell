@@ -123,13 +123,28 @@ Water's empty event must not be treated as wall contact. The metadata, target
 families and event instructions are checked by `verify-enemy-contact.py`.
 Live terrain enumerators are tracked in the single work queue.
 
-Both gameplay adapters dispatch shop-wall contacts through `RunSession` after
-smoke Step. `ShopWorld::visitWallContacts` enumerates the table, three cases and
+Both gameplay adapters dispatch terrain and shop-wall contacts through
+`RunSession` after smoke Step. `ShopWorld::visitWallContacts` enumerates the table, three cases and
 the extant invisible wall individually, including sold cases. All these child
 types descend from parentWall; the counter itself is not a substitute. One-way
 platform object 93 is not a parentWall descendant and must not be admitted by
-reusing a player-landing query. The native terrain occupancy grid merges
-instances, so it cannot yet supply the per-instance terrain contact contract.
+reusing a player-landing query.
+
+The native occupancy grid remains a union for player queries. Its companion
+`TerrainWallContacts` retains actual Create records for cavern walls, boxes and
+gem chunks (60/92/293), including duplicates, in 16-pixel row buckets. It uses
+mask 585 for walls/boxes and sprite 569 for chunks. Queries consult current
+box retirement state and emit each overlap separately. The SDL adapter queries
+its active instance records with the same mask definitions. Neither adapter
+uses the visible artwork bounds as collision geometry.
+
+The native companion costs 32 KiB for 4096 records plus 1 KiB for row heads in
+ordinary RAM; it allocates no Chip RAM or scrolling buffers. Capacity failure
+propagates through generation. Room/reset clears all heads. Indexes reconstructed
+from pattern occupancy are explicitly marked incomplete for contact queries:
+only recorded Create events establish instance multiplicity. Both paths currently
+cover unit-scale cavern terrain; additional wall families/transforms require
+their source masks and lifecycle rules, not guesses from solid cells.
 
 ### Native smoke distance gate
 

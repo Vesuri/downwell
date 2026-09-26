@@ -66,7 +66,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     for (unsigned i = 0; i < gemCapacity; ++i) gems_[i].active = false;
     generationStep_ = nullptr; generationContext_ = nullptr;
     generationSucceeded_ = true;
-    solidResolver_ = nullptr; solidResolverContext_ = nullptr;
+    solidResolver_ = nullptr; solidResolverContext_ = nullptr; wallContactResolver_ = nullptr;
     segmentResolver_ = nullptr;
     maskResolver_ = nullptr;
     landingResolver_ = nullptr; landingResolverContext_ = nullptr;
@@ -487,7 +487,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                                      enemies_[i].imageSpeed);
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
-    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_);
+    if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_,wallContactResolver_);
     if (landingResolver_) configureLandingResolver(landingResolver_, landingResolverContext_);
     // The reference dispatches the builder before the camera in rmMain's
     // ordinary Step instance order. Generation observes the previous camera,
@@ -837,7 +837,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
-    run_.collideSmokeShopWalls();
+    run_.collideSmokeWalls([&](const downwell::ContactBounds& bounds,auto emit){
+        unsigned count=0;
+        if(wallContactResolver_ && !wallContactResolver_(solidResolverContext_,bounds,count))return false;
+        for(unsigned i=0;i<count;++i)if(!emit())return false;
+        return true;
+    });
     downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
         enemiesDefeated_, run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> EnemyState& { return enemies_[i]; },

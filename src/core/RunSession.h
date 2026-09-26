@@ -55,8 +55,13 @@ struct RunSession {
         if(effectsSucceeded)effectsSucceeded=smokeEffects.step(phase,random);
     }
     void collideSmokeShopWalls(){
+        collideSmokeWalls([](const ContactBounds&,auto){return true;});
+    }
+    template<class Terrain> void collideSmokeWalls(Terrain terrain){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.collideWalls(smokeEffects.beginPhase(),
-            [&](const ContactBounds& bounds,auto emit){return shops.visitWallContacts(bounds,emit);});
+            [&](const ContactBounds& bounds,auto emit){
+                return terrain(bounds,emit) && shops.visitWallContacts(bounds,emit);
+            });
     }
     bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.skeletonBurst(x,y,random);

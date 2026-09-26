@@ -180,6 +180,13 @@ build/effect-placement-test: tests/core/EffectSurfacePlacementTest.cpp $(wildcar
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $<
 
 .PHONY: verify-smoke-owner
+build/terrain-wall-contacts-test: tests/core/TerrainWallContactsTest.cpp src/core/TerrainWallContacts.h src/core/EnemyContact.h
+	@mkdir -p build
+	$(CXX) -Isrc -std=c++17 -O2 -Wall -Wextra -o $@ $<
+.PHONY: test-terrain-wall-contacts
+test-terrain-wall-contacts: build/terrain-wall-contacts-test
+	./build/terrain-wall-contacts-test
+test: test-terrain-wall-contacts
 verify-smoke-owner: build/smoke-owner-test
 	./build/smoke-owner-test
 

@@ -10,7 +10,7 @@ assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee49275
 assert manifest["extractor"]["version"] == "0.9.2.0"
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
-assert {int(row[0]) for row in records} == {31, 84, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 208, 278, 460}
+assert {int(row[0]) for row in records} == {31, 84, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 208, 278, 460, 569, 585}
 for row in records:
     sprite = manifest["resources"]["sprites"][int(row[0])]
     assert sprite["id"] == int(row[0])
@@ -30,6 +30,10 @@ assert manifest["resources"]["objects"][269]["spriteId"] == 460
 assert manifest["resources"]["objects"][269]["textureMaskId"] == -1
 assert manifest["resources"]["objects"][225]["spriteId"] == 84
 assert manifest["resources"]["objects"][225]["textureMaskId"] == -1
+for object_id in (60,92):
+    assert manifest["resources"]["objects"][object_id]["textureMaskId"] == 585
+assert manifest["resources"]["objects"][293]["spriteId"] == 569
+assert manifest["resources"]["objects"][293]["textureMaskId"] == -1
 for object_id in (98, 278, 279):
     parent = object_id
     while parent != 57:
@@ -70,4 +74,4 @@ assert instructions == [
     "pushi.e 2", "conv.i.v", "pushi.e 3", "conv.i.v", "pushi.e 1", "conv.i.v",
     "call.i gml_Script_scrTypicalDamage(argc=3)", "popz.v",
 ]
-print("16 enemy/player/currency/bone/smoke contact rectangles and smoke wall response match pinned source")
+print("18 actor/terrain contact rectangles and smoke wall response match pinned source")

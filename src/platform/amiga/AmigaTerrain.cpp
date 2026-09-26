@@ -295,6 +295,9 @@ bool indexActive(const AmigaTerrainCollisionContext& context, unsigned cell,
 
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index) {
+    index.wallContacts.clear();
+    // Reconstructed pattern occupancy is not evidence of actual Create events.
+    index.wallContactsComplete = context.fragmentCount==0;
     for (unsigned i = 0; i < sizeof(index.cells); ++i) index.cells[i] = 0;
     if (context.rooms && context.room) {
         for (unsigned i = 0; i < context.room->instanceCount; ++i) {
@@ -303,6 +306,7 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
             if ((instance.objectId == 60 || instance.objectId == 92) &&
                 !indexAdd(index, instance.x, instance.y, solidCell |
                     (instance.objectId == 60 ? roomWallCell : 0))) return false;
+            if (!index.wallContacts.append(instance.objectId,instance.x,instance.y))return false;
         }
     }
     for (unsigned f = 0; f < context.fragmentCount; ++f) {
@@ -349,12 +353,22 @@ bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y) {
     return (indexCell(index, x, y) & roomWallCell) != 0;
 }
 
+bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned& count){
+    count=0;
+    const auto& context=*static_cast<const AmigaTerrainCollisionContext*>(opaque);
+    if(!context.index || !context.index->wallContactsComplete)return false;
+    return context.index->wallContacts.visit(query,[&](unsigned object,int x,int y){
+        return object!=92 || !context.runtime || context.runtime->breakableActiveAt(x-240,y-176);
+    },[&](){++count;return true;});
+}
+
 bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y) {
     return (indexCell(index, x, y) & (wallCell | roomWallCell)) != 0;
 }
 
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
                            bool initialRoomWall) {
+    if (!index.wallContacts.append(objectId,x,y))return false;
     const unsigned flags = objectId == 60
         ? solidCell | landingCell | wallCell | (initialRoomWall ? roomWallCell : 0)
         : objectId == 92 ? breakableCell : objectId == 93 ? landingCell : 0;

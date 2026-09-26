@@ -68,6 +68,7 @@ public:
     static constexpr unsigned gemCapacity = gameplayWorldGemCapacity;
     typedef bool (*SolidResolver)(void* context, int x, int y);
     typedef bool (*SegmentResolver)(void* context, const downwell::ProjectileSegment& path);
+    using WallContactResolver = bool (*)(void*,const downwell::ContactBounds&,unsigned&);
     // Called once after existing alarms and camera Step, before bullets and
     // enemy motion. Receives the shared RNG and ceil(world-space view bottom).
     // A false return latches generationSucceeded() until explicitly rebound.
@@ -181,10 +182,11 @@ public:
     // Reject capacity failure before changing any state.
     bool appendBreakables(const int* x, const int* y, unsigned count);
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
-                                SolidResolver mask = nullptr) {
+                                SolidResolver mask = nullptr,WallContactResolver walls = nullptr) {
         solidResolver_ = resolver;
         segmentResolver_ = segment;
         maskResolver_ = mask;
+        wallContactResolver_ = walls;
         solidResolverContext_ = context;
         player_.configureSolidResolver(resolver ? [](void* opaque, int x, int y) {
             const auto& runtime = *static_cast<GameplayWorld*>(opaque);
@@ -414,6 +416,7 @@ private:
     SolidResolver solidResolver_;
     SegmentResolver segmentResolver_ = nullptr;
     SolidResolver maskResolver_ = nullptr;
+    WallContactResolver wallContactResolver_ = nullptr;
     void* solidResolverContext_;
     PlayerMotion::LandingResolver landingResolver_ = nullptr;
     void* landingResolverContext_ = nullptr;

@@ -657,6 +657,48 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                                                 patternBytes.size());
     require(rooms.valid() && objects.valid() && patterns.valid(),
             "generated recovery packs are valid for scene parity");
+    if(std::getenv("DOWNWELL_VERIFY_SMOKE_TERRAIN")) {
+        downwell::StartupRuntime host(downwell::PlatformProfile::desktop,&rooms,&objects,2,&patterns);
+        host.skipToGameForTesting();
+        AmigaPortRuntime native(0);
+        static AmigaTerrainIndex contacts;
+        AmigaTerrainCollisionContext context{nullptr,nullptr,nullptr,nullptr,0,&native,&contacts};
+        require(amigaBuildTerrainIndex(context,contacts),"smoke fixture clears native terrain");
+        std::vector<int> boxX,boxY;
+        int x=0,y=0;bool found=false;
+        for(std::size_t i=0;i<host.activeInstanceCount();++i){
+            const auto& wall=host.instanceAt(i);
+            if(!wall.active)continue;
+            require(amigaAddTerrainObject(contacts,wall.objectId,wall.x,wall.y),"smoke fixture retains actual room instances");
+            if(wall.objectId==92){boxX.push_back(wall.x-240);boxY.push_back(wall.y-176);}
+            if(wall.objectId==60 && !found){x=wall.x;y=wall.y;found=true;}
+        }
+        require(found,"smoke fixture has a real wall");
+        native.configureBreakables(boxX.data(),boxY.data(),boxX.size());
+        native.configureSolidResolver(amigaResolveTerrainSolid,&context,amigaResolveTerrainSegment,
+            amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
+        downwell::GameMakerRandom a(91),b(91);
+        auto& hs=const_cast<downwell::SmokeEffects<32>&>(host.smokeEffects());
+        auto& ns=const_cast<downwell::SmokeEffects<32>&>(native.smokeEffects());
+        const auto hh=hs.create(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),a);
+        const auto nh=ns.create(downwell::MotionBinary64::fromInteger(x),downwell::MotionBinary64::fromInteger(y),b);
+        require(hh && nh,"both owners create collision fixtures");
+        // Isolate dispatch, not natural smoke motion (covered independently).
+        for(auto* effect:{hs.get(hh),ns.get(nh)}) {
+            effect->allSet=true;effect->noCollision=false;effect->imageSpeed={};
+        }
+        const auto initial=hs.get(hh)->speed;
+        for(unsigned tick=0;tick<4;++tick){
+            host.step(false);native.step(0);
+            require(host.effectsSucceeded() && native.effectsSucceeded(),"live contact queries succeed");
+            const auto& h=*hs.get(hh);const auto& n=*ns.get(nh);
+            require(h.speed.high==n.speed.high && h.speed.low==n.speed.low && h.x.bits==n.x.bits && h.y.bits==n.y.bits,
+                "live decoded and native terrain collision responses agree bit-for-bit");
+        }
+        require(hs.get(hh)->speed.high!=initial.high || hs.get(hh)->speed.low!=initial.low,"live terrain contact changed speed");
+        std::cout<<"Live smoke terrain contacts agree across both simulation adapters\n";
+        return;
+    }
 
     {
         downwell::StartupRuntime restarted(downwell::PlatformProfile::desktop,

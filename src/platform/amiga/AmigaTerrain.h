@@ -5,6 +5,7 @@
 #include "core/AreaOneBuilder.h"
 #include "core/GameMakerRandom.h"
 #include "core/RoomPack.h"
+#include "core/TerrainWallContacts.h"
 
 class GameplayWorld;
 using AmigaPortRuntime = GameplayWorld;
@@ -135,6 +136,8 @@ struct AmigaTerrainIndex {
     enum { columns = 128, rows = 512, minX = -512 };
     unsigned char cells[columns * rows];
     std::uint16_t nextLanding[columns * rows]; // row+1; zero means no candidate
+    downwell::TerrainWallContacts<> wallContacts;
+    bool wallContactsComplete = false;
 };
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index);
@@ -180,5 +183,6 @@ int amigaResolveTerrainLanding(void* opaque, int offsetX,
 bool amigaResolveTerrainSolid(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainPlayerMask(void* opaque, int offsetX, int offsetY);
 bool amigaResolveTerrainSegment(void* opaque, const downwell::ProjectileSegment& path);
+bool amigaResolveTerrainWallContacts(void* opaque,const downwell::ContactBounds& query,unsigned& count);
 
 #endif

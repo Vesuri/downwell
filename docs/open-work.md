@@ -21,7 +21,10 @@ throughout integration, not only after content is complete.
 
 - Verify original runtime FP-mode assumptions and measure the complete smoke
   geometry/effect cost on the native target.
-- Finish smoke world collision dispatch and verify live joint currency/smoke
+- Verify smoke world collision dispatch against original-runner encounters,
+  including multiple simultaneous contacts and wall retirement; extend contact
+  shapes with later-area wall families as those areas are integrated.
+  Verify live joint currency/smoke
   composition against original-game captures, including shade holes and retained
   damage restoration. Complete death/low-spec direct effect drawing at the
   original world-depth boundaries; do not flatten those paths into an overlay.

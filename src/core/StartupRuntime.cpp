@@ -398,7 +398,17 @@ void StartupRuntime::stepInternal(bool advancePressed,
         updateMainBullets();
         updateMainEnemies();
         run_.stepSmoke(smokeStepPhase,random_);
-        run_.collideSmokeShopWalls();
+        run_.collideSmokeWalls([&](const ContactBounds& query,auto emit){
+            for(std::size_t i=0;i<instances_.size();++i){
+                const auto& wall=instances_.at(i);
+                if(!wall.active || (wall.objectId!=60 && wall.objectId!=92 && wall.objectId!=293))continue;
+                if((wall.scaleX!=1 && wall.scaleX!=-1) || (wall.scaleY!=1 && wall.scaleY!=-1) || wall.rotation!=0)return false;
+                const auto bounds=contactWorldBounds({long(wall.x)*256,long(wall.y)*256,
+                    int(wall.scaleX),int(wall.scaleY),wall.objectId==293?569:585});
+                if(contactBoundsOverlap(query,bounds) && !emit())return false;
+            }
+            return true;
+        });
         updateMainEnemyInteractions();
         run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);

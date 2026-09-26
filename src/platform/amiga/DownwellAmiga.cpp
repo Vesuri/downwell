@@ -1309,7 +1309,7 @@ int main(void) {
         port.configureLandingResolver(amigaResolveTerrainLanding,
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
-                                    &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask);
+                                    &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
         liveBuilder.resetInitialCheckpoint(enemyRandom);
 #ifdef DOWNWELL_NATURAL_VERIFY
         AmigaNaturalRouteVerification::entry(liveBuilder, enemyRandom);
@@ -1824,7 +1824,7 @@ int main(void) {
                         port.configureGenerationStep(generateLiveTerrain, &liveGeneration);
                         port.configureLandingResolver(amigaResolveTerrainLanding, &terrainCollision);
                         port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision,
-                            amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask);
+                            amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
                         terrainRaster.ready = false;
                         terrainCopyTarget = nullptr;
                         terrainCopyBacking = nullptr;
