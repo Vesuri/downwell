@@ -1,6 +1,7 @@
 #include "core/RunnerSpatialDirtyQueue.h"
 #include "core/RunnerSpatialBoundsUpdate.h"
 #include "core/RunnerSpatialIndex.h"
+#include "core/RunnerSpatialPosition.h"
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
@@ -71,5 +72,29 @@ int main(){
     std::uint32_t skipped=1;
     assert(Update::publish(index,100,0x30,skipped,false,invalid,invalid)&&skipped==1);
     assert(!Update::publish(index,99,0x30,absent,false,{},invalid)&&absent==0x8000);
-    std::puts("Spatial dirty queue: 65536 vector comparisons, move-to-front/retire/reuse and 32768 sprite eligibility combinations passed");
+    Queue spatial,collision;
+    Real x{},y{},one{0x3f800000};std::uint32_t positionFlags=0;
+    using Position=downwell::RunnerSpatialPosition;
+    assert(Position::assign(1,x,y,positionFlags,one,one,false,true,0x1a,spatial,collision));
+    assert(x.bits==one.bits&&y.bits==one.bits&&positionFlags==8);
+    assert(spatial.first()==1&&collision.first()==1);
+    assert(spatial.mark(2)&&collision.mark(2));
+    assert(Position::assign(1,x,y,positionFlags,one,one,false,true,0x1a,spatial,collision));
+    assert(spatial.first()==2&&collision.first()==2); // Ordinary no-op preserves ordering.
+    assert(Position::assign(1,x,y,positionFlags,one,one,true,true,0x1a,spatial,collision));
+    assert(spatial.first()==1&&collision.first()==1); // Special state bypasses comparison.
+    x={};y={};positionFlags=0;spatial.clear();collision.clear();
+    assert(Position::assign(1,x,y,positionFlags,Real{0x80000000},y,false,true,0x1a,spatial,collision));
+    assert(x.bits==0&&positionFlags==0&&spatial.size()==0); // SSE +0 equals -0.
+    assert(Position::assign(1,x,y,positionFlags,one,y,false,true,0x12,spatial,collision));
+    assert(positionFlags==8&&spatial.size()==0&&collision.size()==0); // Bounds dirty without queue eligibility.
+    positionFlags|=0x20;
+    assert(Position::assign(1,x,y,positionFlags,{},y,false,true,0x12,spatial,collision));
+    assert(spatial.first()==1&&collision.size()==0); // Instance opt-in is spatial only.
+    Real before=x;auto beforeFlags=positionFlags;
+    assert(!Position::assign(Queue::End,x,y,positionFlags,one,one,false,true,0x1a,spatial,collision));
+    assert(x.bits==before.bits&&positionFlags==beforeFlags&&spatial.first()==1);
+    assert(!Position::assign(1,x,y,positionFlags,Real{0x7f800000},one,false,true,0x1a,spatial,collision));
+    assert(x.bits==before.bits&&positionFlags==beforeFlags);
+    std::puts("Spatial mutation: no-op/special position, dual memberships, bounds publication; 65536 queue comparisons and 32768 eligibility combinations passed");
 }

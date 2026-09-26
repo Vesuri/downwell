@@ -246,6 +246,19 @@ otherwise it writes the coordinates, sets instance flag `0x08` and calls
 `0x501e50`. Do not mark dirty merely because a setter was invoked. The non-null
 lookup path bypasses the unchanged-position comparison.
 
+`RunnerSpatialPosition` implements that mutation boundary for already-narrowed
+coordinates: ordinary no-op writes preserve queue order (including `+0` versus
+`-0`), special sprite state forces the update path, and actual mutations set
+the bounds-dirty bit before moving eligible memberships to the head. The second
+collision queue is updated only through the source's object-flag `0x08` path.
+Invalid numeric values or required slot bindings fail before mutation.
+
+The queue slot must be a stable registry handle. `InstanceStore::erase` and
+`compactInstanceSlots` move records; their array offsets are not stable handles
+and cannot be bound directly to this queue. Live integration must preserve
+identity across compaction or use a separate stable registry. The position
+adapter is not yet installed on those live stores.
+
 `0x501e50` requires an object and either object flags `0x28` or instance flag
 `0x20`. It unlinks existing spatial-dirty membership and prepends the instance
 at `0x8a6100`. Repeated mutations therefore move an instance to the front;

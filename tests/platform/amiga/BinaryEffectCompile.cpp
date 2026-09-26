@@ -4,6 +4,11 @@
 #include "core/RunnerSpatialIndex.h"
 #include "core/RunnerSpatialDirtyQueue.h"
 #include "core/RunnerSpatialBoundsUpdate.h"
+#include "core/RunnerSpatialPosition.h"
+bool compileRunnerSpatialPosition(downwell::RunnerImageValue& x,downwell::RunnerImageValue& y,std::uint32_t& flags,
+    downwell::RunnerSpatialDirtyQueue<256>& spatial,downwell::RunnerSpatialDirtyQueue<256>& collision){
+    return downwell::RunnerSpatialPosition::assign(1,x,y,flags,{},{},false,true,0x1a,spatial,collision);
+}
 bool compileRunnerSpatialBoundsUpdate(downwell::RunnerSpatialIndex<256>& index,downwell::RunnerSpatialSplit::Box box,std::uint32_t& flags){
     return downwell::RunnerSpatialBoundsUpdate::publish(index,123,0x30,flags,false,box,box);
 }
