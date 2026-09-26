@@ -56,6 +56,25 @@ public:
         if(!valid()||!live(h))return false;
         if(!registered)membership_.unbind(h.slot);
         else if(!membership_.contains(h.slot))membership_.bind(h.slot,entries_[h.slot].object,h.generation);
+        auto& flags=entries_[h.slot].state.flags;
+        if(registered)flags&=~0x80000u;else flags|=0x80000u;
+        return true;
+    }
+    // Collision side of 0x4627d0/0x467640. Room pending requests and traversal
+    // cache invalidation belong to the scheduler. Do NOT rebind object lists
+    // here, or synthesize bounds-dirty bit 8: reactivation queues a refresh even
+    // when that bit is clear. 0x501e50 also queues collision processing when
+    // eligible; repeated activation without an intervening deactivation is idle.
+    bool setActive(InstanceHandle h,bool active,std::uint32_t objectFlags){
+        if(!valid()||!live(h))return false;
+        auto& flags=entries_[h.slot].state.flags;
+        if(active){
+            if((flags&2u)&&Queue::shouldQueue(true,objectFlags,flags)){
+                spatial_.mark(h.slot);
+                if(objectFlags&8u)collision_.mark(h.slot);
+            }
+            flags&=~2u;
+        }else flags|=2u;
         return true;
     }
     // 0x4879ca then 0x501dc0, before PreCreate/Create: inherit ancestor

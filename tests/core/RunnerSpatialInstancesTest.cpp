@@ -23,6 +23,35 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    {
+        Owner activation;Owner::State clean;clean.flags=0;
+        InstanceHandle a{0,1},b{1,1},c{2,1};
+        assert(activation.attach(a,1,clean)&&activation.attach(b,1,clean)&&activation.attach(c,1,clean));
+        assert(activation.setActive(a,false,0x38)&&activation.setActive(b,false,0x38));
+        assert(!activation.pendingSpatial()&&!activation.pendingCollision());
+        assert(activation.setActive(a,true,0x38)&&activation.setActive(b,true,0x38));
+        assert(activation.pendingSpatial()==2&&activation.pendingCollision()==2);
+        assert(activation.resolve(a)->flags==0); // No invented dirty bit.
+        assert(activation.setActive(a,true,0x38)); // Must not move a to head.
+        std::vector<unsigned> order;
+        assert(activation.flush([&](InstanceHandle h,bool publish){
+            assert(publish);order.push_back(h.slot);return true;
+        }));
+        assert((order==std::vector<unsigned>{1,0}));
+        assert(activation.setActive(c,false,0x10)&&activation.setActive(c,true,0x10));
+        assert(!activation.pendingSpatial()); // Unprepared object is ineligible.
+        assert(activation.registerObject(c,false));
+        assert(activation.resolve(c)->flags==0x80000u);
+        assert(activation.setActive(c,false,0x30)&&activation.setActive(c,true,0x30));
+        assert(activation.resolve(c)->flags==0x80000u); // Deferred flag remains.
+        assert(activation.pendingSpatial()==1&&activation.pendingCollision()==2);
+        assert(activation.registerObject(c,true)&&activation.resolve(c)->flags==0);
+        assert(activation.setActive(c,false,0x30));
+        order.clear();
+        assert(activation.flush([&](InstanceHandle,bool){order.push_back(99);return true;}));
+        assert(order.empty()&&!activation.pendingSpatial()); // Deactivated queue entries are skipped.
+        assert(!activation.setActive({0,2},true,0x38)&&activation.valid());
+    }
     Owner owner;Graph graph;InstanceStore<64> store;
     auto attach=[&](unsigned id,int object){
         assert(store.create(id,object,0,false)==CreateInstanceResult::success);

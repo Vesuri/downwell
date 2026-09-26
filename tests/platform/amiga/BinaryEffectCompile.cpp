@@ -339,6 +339,10 @@ bool compileSpatialMembershipStep(downwell::InstanceStore<4>& store,
             return owner.registerObject(h,registered);
         });
 }
+bool compileSpatialActivation(downwell::RunnerSpatialInstances<4,8>& owner,
+    downwell::InstanceHandle handle,bool active,std::uint32_t objectFlags) {
+    return owner.setActive(handle,active,objectFlags);
+}
 unsigned compileRoomMembership(downwell::RunnerRoomMembership<64>& rooms,
     unsigned slot,downwell::RunnerImageValue depth,std::uint64_t dormant) {
     if(!rooms.bind(slot,depth))return 0;

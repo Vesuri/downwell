@@ -60,6 +60,17 @@ The enqueue routine `0x4633e0` appends only if the instance is absent; a repeate
 request does not move an existing entry. This differs from spatial dirty
 marking, which removes and prepends an existing entry.
 
+`RunnerSpatialInstances::setActive` implements the collision-side flag and
+queue effects. Reactivation calls the `0x501e50` equivalent only when bit `2`
+was set, and only prepared-object/instance eligibility permits queueing. That
+routine also calls `0x501ef0` for objects with collision flag `8`. Neither
+activation nor deactivation invents bounds-dirty bit `8`; an eligible queued
+reactivation still refreshes clean cached bounds during the dirty pass.
+`registerObject` updates deferred flag `0x80000` at reconciliation, separately
+from immediate bit `2`. Pending room requests and activation traversal-cache
+invalidation remain scheduler responsibilities. These owner methods are not
+yet wired to all live activation writes.
+
 The region predicate activates only when `(flags & 0x100003) == 2` and the
 inside/outside request matches its region result. These immediate routines
 do not themselves call ancestor-list unlink/rebind.
