@@ -88,10 +88,20 @@ public:
     static constexpr std::size_t capacity = Capacity;
 
     void clear() {
+        clear([](InstanceHandle,const InstanceRecord&){return true;});
+    }
+    // Retire external memberships while every old handle still resolves. The
+    // callback must not mutate this store. Failure leaves store records intact,
+    // but earlier external retirements are not rolled back: the caller must
+    // stop the simulation rather than retry or reuse the partially retired set.
+    template<class BeforeRetire> bool clear(BeforeRetire beforeRetire) {
+        for(std::size_t i=0;i<size_;++i)
+            if(!beforeRetire(handleAt(i),static_cast<const InstanceRecord&>(records_[i])))return false;
         objectMembership_.clear();
         roomMembership_.clear();
         for(std::size_t i=0;i<size_;++i)slots_[recordSlots_[i]].record=Capacity;
         size_ = 0;
+        return true;
     }
     std::size_t size() const { return size_; }
     bool empty() const { return size_ == 0; }
@@ -206,9 +216,13 @@ public:
     }
 
     bool erase(std::uint32_t instanceId) {
+        return erase(instanceId,[](InstanceHandle,const InstanceRecord&){return true;});
+    }
+    template<class BeforeRetire> bool erase(std::uint32_t instanceId,BeforeRetire beforeRetire) {
         for (std::size_t index = 0; index < size_; ++index) {
             if (records_[index].instanceId != instanceId)
                 continue;
+            if(!beforeRetire(handleAt(index),static_cast<const InstanceRecord&>(records_[index])))return false;
             objectMembership_.unbind(recordSlots_[index]);
             roomMembership_.remove(recordSlots_[index]);
             slots_[recordSlots_[index]].record=Capacity;
@@ -224,6 +238,13 @@ public:
     }
 
     void enterRoom(std::int32_t roomId) {
+        enterRoom(roomId,[](InstanceHandle,const InstanceRecord&){return true;});
+    }
+    template<class BeforeRetire> bool enterRoom(std::int32_t roomId,BeforeRetire beforeRetire) {
+        // Do not invalidate handles or compact records until all retirements
+        // succeed. Persistent instances keep identity and external membership.
+        for(std::size_t i=0;i<size_;++i)if(!records_[i].persistent &&
+            !beforeRetire(handleAt(i),static_cast<const InstanceRecord&>(records_[i])))return false;
         std::size_t destination = 0;
         for (std::size_t source = 0; source < size_; ++source) {
             if (!records_[source].persistent){
@@ -240,6 +261,7 @@ public:
             ++destination;
         }
         size_ = destination;
+        return true;
     }
 
 private:

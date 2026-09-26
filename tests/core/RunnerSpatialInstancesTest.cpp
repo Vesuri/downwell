@@ -69,9 +69,13 @@ int main(){
     assert(owner.move(a,{0x42c80000},{},0x38));
     assert(owner.pendingSpatial()==1&&owner.pendingCollision()==1);
     assert(owner.refresh(a,0x38,false,nullptr,false,true));
-    assert(owner.retire(a));assert(!owner.resolve(a));
+    assert(store.erase(10,[&](InstanceHandle h,const InstanceRecord& record){
+        assert(h.slot==a.slot&&h.generation==a.generation&&record.instanceId==10);
+        assert(store.resolve(h)==&record);return owner.retire(h);
+    }));
+    assert(!owner.resolve(a)&&!store.resolve(a));
     assert(!owner.pendingSpatial()&&!owner.pendingCollision());
-    assert(store.erase(10)); // Compaction must not affect b/c/self handles.
+    // Compaction must not affect b/c/self handles.
     assert(store.resolve(b)&&store.resolve(c)&&store.resolve(self));
     auto replacement=attach(14,1);
     assert(replacement.slot==a.slot&&replacement.generation!=a.generation);
@@ -80,9 +84,20 @@ int main(){
     assert(refresh(replacement,true));
     assert(owner.place(self,0,{}, {},false,graph,refresh,precise,result));
     assert(result.found&&result.handle.generation==replacement.generation&&result.handle.slot==replacement.slot);
+    // Room retirement keeps persistent handles and spatial membership intact.
+    store.resolve(self)->persistent=true;
+    assert(store.enterRoom(2,[&](InstanceHandle h,const InstanceRecord& record){
+        assert(!record.persistent&&store.resolve(h)==&record);return owner.retire(h);
+    }));
+    assert(store.size()==1&&store.resolve(self)&&owner.resolve(self));
+    assert(!owner.resolve(replacement)&&!owner.resolve(b)&&!owner.resolve(c));
+    assert(store.clear([&](InstanceHandle h,const InstanceRecord& record){
+        assert(store.resolve(h)==&record);return owner.retire(h);
+    }));
+    assert(!owner.resolve(self)&&store.empty());
     // Clear cannot make an old external handle valid again.
     owner.clear();assert(!owner.attach(replacement,1,{}));
-    store.clear();graph=Graph{};
+    graph=Graph{};
     self=attach(20,3);a=attach(21,1);
     // Grow the unrelated tree enough to select the ancestor-list branch for
     // the one-member object. Its precise callback must request publication.
@@ -110,6 +125,34 @@ int main(){
         assert(small.refresh({i,1},0x30,false,&zero,false,true)==(i<6));
     }
     assert(!small.valid());
+    {
+        InstanceStore<4> lifetimes;RunnerSpatialInstances<4,8> memberships;
+        for(unsigned i=0;i<3;++i){
+            assert(lifetimes.create(i,1,7,i==1)==CreateInstanceResult::success);
+            assert(memberships.attach(lifetimes.handleAt(i),1,{}));
+        }
+        const auto first=lifetimes.handleAt(0),persistent=lifetimes.handleAt(1),last=lifetimes.handleAt(2);
+        unsigned calls=0;
+        assert(!lifetimes.erase(99,[&](auto,const auto&){++calls;return true;})&&!calls);
+        assert(!lifetimes.erase(0,[&](auto h,const auto& record){
+            ++calls;assert(lifetimes.resolve(h)==&record);return false;
+        }));
+        assert(calls==1&&lifetimes.size()==3&&memberships.resolve(first));
+        calls=0;
+        assert(!lifetimes.enterRoom(8,[&](auto h,const auto& record){
+            ++calls;assert(record.roomId==7&&!record.persistent);
+            return h.slot==first.slot?memberships.retire(h):false;
+        }));
+        assert(calls==2&&lifetimes.size()==3&&lifetimes.resolve(first)&&lifetimes.resolve(last));
+        assert(lifetimes.resolve(persistent)->roomId==7&&memberships.resolve(persistent));
+        assert(!memberships.resolve(first)&&memberships.resolve(last));
+        // A failed batch is terminal for this simulation: do not replay the
+        // first external retirement. Explicit teardown resets both domains.
+        memberships.clear();lifetimes.clear();
+        calls=0;assert(lifetimes.clear([&](auto,const auto&){++calls;return false;})&&!calls);
+        assert(lifetimes.create(4,1,9,false)==CreateInstanceResult::success);
+        assert(!lifetimes.clear([](auto,const auto&){return false;})&&lifetimes.size()==1);
+    }
     {
         Owner births;Graph family;family.values[0]=0x30;
         assert(births.attach({0,1},1,{}));

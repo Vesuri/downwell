@@ -39,6 +39,11 @@ bool compileSpatialInstances(downwell::RunnerSpatialInstances<64,64>& owner,
 }
 bool compileSpatialRetirement(downwell::RunnerSpatialInstances<64,64>& owner,
     downwell::InstanceHandle handle){return owner.retire(handle);}
+bool compileStoreSpatialRetirement(downwell::InstanceStore<4>& store,
+    downwell::RunnerSpatialInstances<4,8>& owner){
+    return store.enterRoom(2,[&](auto handle,const auto&){return owner.retire(handle);})&&
+        store.clear([&](auto handle,const auto&){return owner.retire(handle);});
+}
 bool compileSpatialBirth(downwell::RunnerSpatialInstances<64,64>& owner,
     downwell::RunnerObjectFamilies<386>& graph,downwell::InstanceHandle handle){
     return owner.publishBirth(handle,graph,[&](auto h,bool publish){

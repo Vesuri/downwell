@@ -441,6 +441,17 @@ case with actual `InstanceStore` compaction and slot-generation reuse. Clearing
 the spatial owner preserves generation high-water marks; replacing the entire
 external identity domain requires replacing its spatial owner too.
 
+`InstanceStore` accepts explicit retirement callbacks on erase, clear and room
+entry. They run while old handles and records still resolve, before slot
+invalidation or compaction; room entry excludes persistent instances. This
+allows the spatial owner to remove its bounds and both queues before slot reuse.
+Callbacks may not mutate the store. If a batch callback fails, store records
+remain intact but earlier external retirements are not rolled back; callers must
+stop rather than retry a partially retired simulation. Existing no-callback
+overloads remain for stores without external memberships. Supplying these hooks
+at all live lifecycle call sites is still required; the overloads do not attach
+a registry implicitly or add per-instance callback pointers.
+
 Immediate exclusion flags and deferred object registration are distinct APIs.
 An unregister operation alone does not retire a lifetime or its spatial state.
 Callbacks cannot create, retire or rebind instances during a query. Mutation
