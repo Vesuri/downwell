@@ -55,6 +55,28 @@ validates format, source hash, complete length and mask modes; it does not
 allocate or convert pixels. Full and compact descriptors use the same bounds
 adapter. This projection is not yet resident in the live Amiga registry.
 
+## Original precise-mask pixels (`DWSM`)
+
+`make verify-precise-masks` exports every `Precise` sprite's masks using the
+pinned extractor, verifies `data.win` before and after reading, and builds
+`generated/downwell-sprite-masks.dwsm`. The four resources are sprites 577,
+597, 613 and 616. The complete pack is 3,328 bytes; masks are original MSB-first
+rows with stride `ceil(width/8)`, not artwork alpha or approximated circles.
+
+The little-endian 24-byte header is `char[4] magic (DWSM); u16 version (1),
+headerSize (24); byte[8] sourceHashPrefix; u32 maskCount, manifestSchema (3)`.
+Sorted 20-byte descriptors contain `u32 spriteId, maskFrame, width, height,
+absoluteByteOffset`. Payloads follow contiguously, each `stride * height` bytes.
+The sidecar records source/extractor identity, export and script hashes,
+manifest/generator hashes, individual mask hashes and output hash.
+
+`SpriteMaskPack` validates lengths, ordering, dimensions, offsets and source
+identity before exposing borrowed views. Lookup uses an exact stored mask index;
+image-frame normalization, single-mask reuse and world-to-mask coordinate
+transforms remain the caller's responsibility. Out-of-canvas pixel samples are
+false. This resource layer does not itself implement precise collision dispatch
+or establish live integration.
+
 ## Frame record — 4 bytes
 
 `u32 texturePageItemId`

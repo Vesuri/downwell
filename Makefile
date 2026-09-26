@@ -301,6 +301,25 @@ build/ordinary-time-field-test: tests/core/OrdinaryTimeFieldTest.cpp $(wildcard 
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/OrdinaryTimeFieldTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-time-stop-masks
+test: verify-precise-masks
+.PHONY: generate-precise-masks verify-precise-masks
+generate-precise-masks: generated/precise-sprite-masks.json
+	python3 tools/generate-precise-masks.py
+
+verify-precise-masks: generate-precise-masks build/sprite-mask-pack-test
+	python3 tools/generate-precise-masks.py --check
+	./build/sprite-mask-pack-test generated/downwell-sprite-masks.dwsm
+
+build/sprite-mask-pack-test: tests/core/SpriteMaskPackTest.cpp src/core/SpriteMaskPack.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/SpriteMaskPackTest.cpp
+
+generated/precise-sprite-masks.json: tools/export-precise-masks.csx data/data.win
+	@mkdir -p generated
+	@test "$$(shasum -a 256 data/data.win | awk '{print $$1}')" = c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8
+	DOWNWELL_DATA_WIN_SHA256=c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8 DOWNWELL_PRECISE_MASK_OUTPUT=generated/precise-sprite-masks.json "$$(tools/bootstrap-utmt.sh)" load data/data.win -s tools/export-precise-masks.csx
+	@test "$$(shasum -a 256 data/data.win | awk '{print $$1}')" = c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8
+
 verify-time-stop-masks: generated/time-stop-masks.json
 	python3 tools/verify-time-stop-masks.py
 

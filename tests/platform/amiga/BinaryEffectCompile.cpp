@@ -13,6 +13,11 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
 #include "core/RunnerSpriteBounds.h"
 #include "core/SpritePack.h"
 #include "core/SpriteCollisionPack.h"
+#include "core/SpriteMaskPack.h"
+bool compilePreciseMask(const std::uint8_t* bytes,std::size_t size,unsigned sprite,int x,int y){
+    downwell::SpriteMaskPack pack(bytes,size);downwell::SpriteMaskPack::Mask mask;
+    return pack.mask(sprite,0,mask)&&mask.contains(x,y);
+}
 bool compileCompactCollision(const std::uint8_t* bytes,std::size_t size,int id,
     downwell::RunnerSpriteBounds::Box& result){
     downwell::SpriteCollisionPack pack(bytes,size);downwell::PackedSpriteCollision sprite;
