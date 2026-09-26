@@ -60,6 +60,28 @@ int main(){
     assert(!assets.debris(91,0,debris)); // Older pack has no optional debris.
     assert(!assets.corpse(172,false,debris)&&!assets.corpse(206,true,debris));
     assert(!assets.corpse(65536+172,false,debris));
+    assert(!assets.corpseExpiry(0,debris));
+    std::array<std::uint8_t,746> expiryPack{};
+    for(unsigned i=0;i<20;++i)expiryPack[i]=good[i];
+    expiryPack[11]=30;
+    for(unsigned i=0;i<30;++i){
+        auto* record=expiryPack.data()+20+24*i;
+        const unsigned source=i<9?i:i<21?0:i-12;
+        for(unsigned j=0;j<24;++j)record[j]=good[20+24*source+j];
+        if(i>=9&&i<21){record[0]=0;record[1]=102;record[2]=0;record[3]=i-9;}
+        record[16]=record[17]=0;record[18]=2;record[19]=228; // payload 740
+    }
+    assert(assets.bind(expiryPack.data(),expiryPack.size()));
+    for(unsigned frame=0;frame<12;++frame){
+        assert(assets.corpseExpiry(frame,debris));
+        assert(debris.low==expiryPack.data()+740&&debris.high==expiryPack.data()+742&&
+            debris.mask.data==expiryPack.data()+744&&debris.originX==-3&&debris.originY==7);
+    }
+    assert(!assets.corpseExpiry(12,debris)&&!assets.corpseExpiry(~0u,debris));
+    expiryPack[20+9*24+14]=1; // Invalid plane flags in optional frame.
+    assert(assets.bind(expiryPack.data(),expiryPack.size()));
+    assert(!assets.corpseExpiry(0,debris)&&debris.low==expiryPack.data()+740);
+    assert(assets.corpseExpiry(1,debris));
     std::array<std::uint8_t,794> expanded{};
     for(unsigned i=0;i<20;++i)expanded[i]=good[i];
     expanded[11]=32;

@@ -46,13 +46,16 @@ except ValueError:
     pass
 else:
     raise AssertionError("general palette guard was weakened")
-for ident in (84, 91, 96, 115, 116, 117, 172, 205, 206, 207, 208, 460):
+for ident in (84, 91, 96, 102, 115, 116, 117, 172, 205, 206, 207, 208, 460):
     sprite = resources["sprites"][ident]
     if ident in (91,115,116):
         assert len(sprite["frames"]) == (6 if ident == 91 else 4)
     if ident == 84:
         assert sprite["name"] == "sprSmoke" and len(sprite["frames"]) == 9
         assert (sprite["originX"], sprite["originY"]) == (12, 12)
+    if ident == 102:
+        assert sprite["name"] == "sprFxExplosionS" and len(sprite["frames"]) == 12
+        assert (sprite["originX"], sprite["originY"]) == (16, 32)
     for frame, source_frame in enumerate(sprite["frames"]):
         canvas = pack.frame_canvas(sprite, source_frame, resources["texturePageItems"], pages)
         if ident == 117:
@@ -61,7 +64,7 @@ for ident in (84, 91, 96, 115, 116, 117, 172, 205, 206, 207, 208, 460):
         if ident == 84:
             assert (62084, frame) not in records
             assert (63084, frame*8+4) not in records
-        for flip in ((0,) if ident in (84,91,115,116,117) else (0, 1)):
+        for flip in ((0,) if ident in (84,91,102,115,116,117) else (0, 1)):
             expected = {}
             for y in range(canvas.height):
                 for x in range(canvas.width):
@@ -83,7 +86,7 @@ for ident in (84, 91, 96, 115, 116, 117, 172, 205, 206, 207, 208, 460):
                         expected[wx, y-sprite["originY"]] = pen
             assert planar_pixels(records[ident+62000*flip, frame]) == expected, (ident,frame,flip,"planar")
             checked += 1
-            if ident in (91,115,116,117,172,206):
+            if ident in (91,102,115,116,117,172,206):
                 assert (63000+ident, frame*8+flip*4) not in records
                 continue
             first = records[63000+ident, frame*8+flip*4]

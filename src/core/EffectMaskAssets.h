@@ -32,6 +32,9 @@ public:
         return ready_&&(sprite==172||sprite==206)&&
             resolve(pack_,size_,count_,sprite+(mirrored?62000:0),0,out);
     }
+    bool corpseExpiry(unsigned frame,Asset& out)const{
+        return ready_&&frame<12&&resolve(pack_,size_,count_,102,frame,out);
+    }
     bool bind(const std::uint8_t* pack,std::size_t size){
         // Failed rebind must not leave a formerly valid, now stale view live.
         ready_=false;

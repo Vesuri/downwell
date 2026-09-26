@@ -103,6 +103,13 @@ verified nonempty unit-track metadata and publishes changed bounds; unsupported
 empty sprites and failed publication are explicit failures. Live ownership,
 ordinary mixed-depth drawing and additional corpse families still need wiring.
 `verify-corpse-expiry` pins the VM events, inheritance and sprite metadata.
+The gameplay DWAP includes all twelve sprite-102 frames as immutable planar
+color/mask payloads, anchored at the original (16,32) origin. Checked
+`EffectMaskAssets::corpseExpiry` lookup rejects absent or malformed frames
+without modifying the caller's descriptor. No DMA sprite copies or runtime
+conversion are needed. The compatibility depth table places this ordinary
+sprite at -1000 (not its OBJT default 0, nor the corpse's 1000); the live painter
+must merge it with other families at that depth, not the effect surface.
 
 `CorpseExpiryEffects` provides bounded independent child ownership and monotonic
 owner-local handles. Birth publishes constructor fields before Create assigns
