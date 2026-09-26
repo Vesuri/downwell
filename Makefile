@@ -530,6 +530,15 @@ test: verify-time-stop-effects
 test: verify-typical-player-damage
 test: verify-player-damage
 test: verify-player-damage-number
+test: verify-player-damage-numbers
+.PHONY: verify-player-damage-numbers
+verify-player-damage-numbers: build/player-damage-numbers-test
+	./build/player-damage-numbers-test
+
+build/player-damage-numbers-test: tests/core/PlayerDamageNumbersTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerDamageNumbersTest.cpp
+
 .PHONY: verify-player-damage-number
 verify-player-damage-number: build/player-damage-number-test
 	python3 tools/verify-typical-player-damage.py

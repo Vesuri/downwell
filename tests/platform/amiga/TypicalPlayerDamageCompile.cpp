@@ -49,3 +49,9 @@ bool compileDamageNumber(downwell::PlayerDamageNumber& effect,DamageEvents& even
     return effect.step([&](auto speed,auto angle,auto& out){return events.lengthdirX(speed,angle,out);},
         [](bool,const auto&){return true;})&&effect.draw(draw);
 }
+bool compileDamageNumberOwner(downwell::RunSession& run,DamageEvents& events){
+    auto h=run.createDamageNumber({}, {},MotionBinary64::fromInteger(1),{});
+    auto phase=run.damageNumbers.beginPhase();
+    return h&&run.advanceDamageNumberAlarm(phase,0)&&run.stepDamageNumbers(phase,
+        [&](auto speed,auto angle,auto& out){return events.lengthdirX(speed,angle,out);});
+}

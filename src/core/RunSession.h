@@ -29,6 +29,7 @@
 #include "OrdinaryTimeFields.h"
 #include "TypicalPlayerDamage.h"
 #include "PlayerDamage.h"
+#include "PlayerDamageNumbers.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -58,6 +59,32 @@ struct RunSession {
     SmokeEffects<32> smokeEffects;
     BloodEffects<32> bloodEffects;
     CorpseExpiryEffects<32> corpseExpiryEffects;
+    PlayerDamageNumbers<8> damageNumbers;
+    // Object 221 has no mask/sprite or collision events. These hooks remain
+    // explicit so registry membership can be added without changing ownership.
+    struct DamageNumberHooks {
+        bool birth(unsigned,RunnerImageValue,RunnerImageValue){return true;}
+        bool position(unsigned,bool,const PlayerDamageNumber&){return true;}
+        bool retire(unsigned,const PlayerDamageNumber&){return true;}
+    };
+    std::uint32_t createDamageNumber(MotionBinary64 x,MotionBinary64 y,
+        MotionBinary64 amount,MotionBinary64 direction){
+        if(!effectsSucceeded)return 0;
+        DamageNumberHooks hooks;
+        const auto child=damageNumbers.createFromPlayer(x,y,amount,direction,hooks);
+        effectsSucceeded=child!=0;return child;
+    }
+    bool advanceDamageNumberAlarm(PlayerDamageNumbers<8>::Phase phase,unsigned index){
+        DamageNumberHooks hooks;
+        if(effectsSucceeded)effectsSucceeded=damageNumbers.advanceAlarm(phase,index,hooks);
+        return effectsSucceeded;
+    }
+    template<class LengthdirX> bool stepDamageNumbers(PlayerDamageNumbers<8>::Phase phase,LengthdirX lengthdirX){
+        DamageNumberHooks hooks;
+        if(effectsSucceeded)effectsSucceeded=damageNumbers.step(phase,lengthdirX,hooks);
+        return effectsSucceeded;
+    }
+    void clearDamageNumbers(){DamageNumberHooks hooks;damageNumbers.clear(hooks);}
     // This effect has no source collision events or external membership in the
     // current worlds. Keep publication hooks explicit for registry integration.
     struct ExpiryHooks {
@@ -284,6 +311,7 @@ struct RunSession {
         smokeEffects.clear();
         bloodEffects.clear();
         clearCorpseExpiry();
+        clearDamageNumbers();
         timeFields.clear();
         // Room creation is followed by Draw before the next Step/Alarm phase.
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
@@ -380,6 +408,7 @@ struct RunSession {
         smokeEffects.clear();
         bloodEffects.clear();
         clearCorpseExpiry();
+        clearDamageNumbers();
         timeFields.clear();
         effectsSucceeded=true;
         sideCameraLockers.clear();

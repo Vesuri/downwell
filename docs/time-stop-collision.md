@@ -114,6 +114,16 @@ fractional coordinates. Component tests compare each float position write and
 double velocity update with a scalar reference and verify ordered text commands;
 they do not prove final font rasterization or live scheduler integration.
 
+`PlayerDamageNumbers` owns room-local lifetimes with non-reused keys and global
+phase cutoffs. Its source wrapper computes `ply-4` before constructor narrowing,
+publishes the birth, completes Create, then assigns amount/direction. Newest-first
+Step and Alarm traversal excludes births after the caller's phase cutoff.
+Retirement and room cleanup invalidate handles before slot reuse; partial cleanup
+can resume after failure without repeating completed retirements. Creation or
+mutation failure disables simulation until cleanup. `RunSession` supplies the
+shared owner, failure propagation and room/run cleanup. Live scheduler call sites
+and both text backends must still be connected before damage numbers appear.
+
 `OrdinaryTimeFields` exposes port-owned lifetime keys separately from array
 indices. As object 82 has no individual retirement, one room's births form a
 contiguous key interval; lookup needs two counters rather than a key per field.

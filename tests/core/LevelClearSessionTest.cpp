@@ -7,6 +7,21 @@ static void require(bool ok, const char* why) {
 int main() {
     using namespace downwell;
     {
+        RunSession run;
+        auto create=[&](){return run.createDamageNumber(MotionBinary64::fromInteger(240),
+            MotionBinary64::fromInteger(500),MotionBinary64::fromInteger(1),{});};
+        const auto first=create();require(first && run.damageNumbers.size()==1,"shared damage-number birth");
+        const auto phase=run.damageNumbers.beginPhase();
+        require(run.stepDamageNumbers(phase,[](auto,auto,auto& out){out={};return true;}),"shared number Step");
+        for(unsigned tick=0;tick<60;++tick)require(run.advanceDamageNumberAlarm(phase,0),"shared number alarm");
+        require(run.damageNumbers.size()==0&&!run.damageNumbers.get(first),"shared number retirement");
+        for(unsigned i=0;i<8;++i)require(create()!=0,"shared number capacity fixture");
+        require(!create()&&!run.effectsSucceeded,"shared number capacity failure");
+        require(!run.stepDamageNumbers(run.damageNumbers.beginPhase(),[](auto,auto,auto&){return false;}),"failed session stops number Step");
+        run.reset();require(run.effectsSucceeded&&run.damageNumbers.size()==0,"reset cleans failed number owner");
+        require(create()==10,"reset preserves damage-number lifetime keys");
+    }
+    {
         RunSession fields;
         RunnerImageValue unit,mirror;
         require(unit.assign(MotionBinary64::fromInteger(1)) && mirror.assign(MotionBinary64::fromInteger(-1)),"contact scales");
@@ -117,6 +132,9 @@ int main() {
     }
     RunSession run;
     require(run.adoptTimeField(240,900,42),"old room owns an ordinary time field");
+    const auto oldNumber=run.createDamageNumber(MotionBinary64::fromInteger(240),
+        MotionBinary64::fromInteger(900),MotionBinary64::fromInteger(1),{});
+    require(oldNumber!=0,"old room owns a damage number");
     PlayerMotion player(false, 10000);
     GameMakerRandom random(17);
     CurrencyAccount currency;
@@ -169,6 +187,7 @@ int main() {
     require(run.smokeEffects.size()==0,"room retirement clears smoke ownership");
     require(run.bloodEffects.size()==0,"room retirement clears blood ownership");
     require(run.timeFields.size()==0,"room retirement clears ordinary time fields");
+    require(run.damageNumbers.size()==0&&!run.damageNumbers.get(oldNumber),"room retirement clears damage numbers");
     require(!run.enterLevelClear(0, heart, health, player, random) && random.drawCount() == draws + bloodDraws + 1,
         "duplicate room entry cannot consume another Create random word");
     unsigned tick = 0, advances = 0, dithers = 0;
