@@ -42,7 +42,7 @@ by_name = {name: depths[index] for index, name in names.items()}
 expected = {"objControlerN": -300000, "fxFlashBall": -200000,
             "objPlayer_n": -50000, "bulletStandard": 0,
             "bulletEnmBone": 0, "fxSmoke": 1000, "objCurrency": 10000,
-            "enmSkeleton": 14000}
+            "enmSkeleton": 14000, "breakablesDebris": -1000}
 assert all(by_name[name] == depth for name, depth in expected.items())
 objects = {obj["name"]: obj for obj in manifest["resources"]["objects"]}
 flash = objects["fxFlashBall"]

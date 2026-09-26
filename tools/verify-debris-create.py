@@ -25,6 +25,9 @@ for name, digest in {
     "Alarm_1": "3b7a34c872f9265143d15f3052836d739c30e20f3668d9446ebe86ab8e13a1dc",
     "Alarm_2": "790f7e88f5b3bca443bafdaca3a2f2fcc946cd55e05cc25a17875a5828e99738",
     "Collision_objPlayer_n": "e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",
+    "Draw_0": "ac27f4219f2706c07122b7b06c1549709c5be5f5697777c4560daa12f4d68854",
 }.items():
     assert sha256((export / f"Assembly/gml_Object_breakablesDebris_{name}.asm").read_bytes()).hexdigest() == digest
 print("Pinned object-370 Create: no parent or relocation, four RNG draws and area artwork")
+assert sha256((export / "Assembly/gml_GlobalScript_drawFx.asm").read_bytes()).hexdigest() == \
+    "6e3dceea4db4e2baaf76c5d4103bd4ed930042ae769d209369d98246162b5d92"

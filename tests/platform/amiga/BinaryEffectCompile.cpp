@@ -436,6 +436,12 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/DebrisMotion.h"
 #include "core/DebrisAnimation.h"
 #include "core/DebrisEffects.h"
+#include "core/DebrisDraw.h"
+bool compileDebrisDraw(const downwell::DebrisAnimation& effect,
+                       const downwell::EffectSurfacePlacement::View& view,
+                       downwell::DebrisDraw::Command& command){
+    return downwell::DebrisDraw::prepare(effect,view,false,false,true,command);
+}
 bool compileDebrisEffects(downwell::DebrisEffects<16>& owner,downwell::GameMakerRandom& random){
     const auto phase=owner.beginPhase();
     return owner.create({}, {},1,random)&&owner.advanceAnimation(phase)&&owner.advanceAlarm(phase,0)&&

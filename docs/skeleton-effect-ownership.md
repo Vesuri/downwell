@@ -129,6 +129,18 @@ yet a unified game-instance registry. Global cross-family event/Draw ordering,
 coordinate publication, scene residency and live death admission remain the
 responsibility of the integrating world scheduler.
 
+`DebrisDraw` implements the pinned Draw event's `!dflash` gate and `drawFx`
+route without rounding published coordinates or the fractional image index.
+Normal drawing uses strict origin-in-view admission and camera-relative
+surface coordinates; death/low-spec drawing uses world coordinates without
+surface admission. The compatibility depth table assigns object 370 depth
+-1000, after smoke (1000) and before the player (-50000). Invoke the adapter at
+that instance's global Draw position, not as a late foreground overlay.
+`make verify-debris-draw` tests routing, flash/retirement, boundary admission,
+fractional preservation and failure publication. It does not establish original
+GPU sampling or live cross-family ordering. All fourteen debris artwork frames
+are available offline through checked `EffectMaskAssets::debris` views.
+
 `SkeletonEffectBursts.h` now implements the skeleton's smoke/flash count and
 birth-coordinate arithmetic, calling the child creator synchronously per birth.
 The scope is exactly the skeleton's (5,1) smoke and (6,2,10) flash parameters;
