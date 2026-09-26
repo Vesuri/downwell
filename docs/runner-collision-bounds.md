@@ -142,6 +142,14 @@ The executable initializes epsilon at `0x8a6c28` to `1e-5`. This is an initial
 data value, not proof of the value at every runtime call. The unit fast path's
 position rounding and pair-wide dispatch are separate from the scaled sampler.
 
+`RunnerMaskDispatch` models this pair-wide choice, with configurable epsilon
+and the pinned initial value as its default. `TimeStopGoalContact` uses that
+default for its unrotated ordinary/goal-field specialization: near-unit partners
+round positions for sampling, while scale-2 goal fields retain scaled sampling.
+Bounds are still calculated with the actual scales before choosing sampled
+pixels. The specialization retains its existing nearest-even policy; this
+does not independently establish the original runtime FP control word.
+
 ## Rotated sampling
 
 `0x4b93f6..0x4b947a` computes sine/cosine of each **negated** angle with

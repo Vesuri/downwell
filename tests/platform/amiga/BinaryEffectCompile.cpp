@@ -15,6 +15,13 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
 #include "core/SpriteCollisionPack.h"
 #include "core/SpriteMaskPack.h"
 #include "core/RunnerMaskTransform.h"
+#include "core/RunnerMaskDispatch.h"
+downwell::RunnerMaskDispatch::Path compileMaskDispatch(downwell::RunnerMaskDispatch::Shape a,
+    downwell::RunnerMaskDispatch::Shape b,downwell::MotionBinary64 epsilon){
+    downwell::RunnerMaskDispatch dispatch;
+    if(!dispatch.configure(epsilon))return downwell::RunnerMaskDispatch::Path::unsupported;
+    return dispatch.select(a,b);
+}
 bool compileMaskTransform(downwell::RunnerMaskTransform& transform,downwell::RunnerImageValue scale,
     downwell::RunnerImageValue c,downwell::RunnerImageValue s,const downwell::SpriteMaskPack::Mask& mask,bool& hit){
     return transform.prepare({}, {},scale,scale,c,s,24,24)&&transform.contains(mask,1,2,hit);

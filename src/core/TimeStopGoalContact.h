@@ -5,6 +5,7 @@
 #include "RunnerImageValue.h"
 #include "MultiplyBinary64.h"
 #include "DivideBinary64.h"
+#include "RunnerMaskDispatch.h"
 namespace downwell {
 // Unrotated sprite 31/91 versus integral-centred goal or ordinary field.
 // Compatibility bounds use nearest-even conversion. Angled masks require a
@@ -30,8 +31,11 @@ private:
         if(fieldX < -1048576 || fieldX > 1048576 ||
            fieldY < -1048576 || fieldY > 1048576)return false;
         const int top=mask==Mask::Player?8:10, bottom=mask==Mask::Player?20:13;
+        const RunnerMaskDispatch dispatch;
+        const auto fieldScale=integer(pixelScale);
+        const bool rounded=dispatch.select({xs,ys,{}},{fieldScale,fieldScale,{}})==RunnerMaskDispatch::Path::roundedPosition;
         Axis horizontal,vertical;
-        if(!horizontal.prepare(x,xs,8,16) || !vertical.prepare(y,ys,top,bottom))return false;
+        if(!horizontal.prepare(x,xs,8,16,rounded) || !vertical.prepare(y,ys,top,bottom,rounded))return false;
         const int l=horizontal.low>fieldX-extent?horizontal.low:fieldX-extent;
         const int r=horizontal.high<fieldX+extent?horizontal.high:fieldX+extent;
         const int t=vertical.low>fieldY-extent?vertical.low:fieldY-extent;
@@ -59,20 +63,31 @@ private:
     }
     struct Axis {
         RunnerImageValue position,inverse;std::int32_t low=0,high=0;
-        bool prepare(RunnerImageValue p,RunnerImageValue scale,int first,int end){
+        std::int32_t roundedOrigin=0;bool roundedSampling=false;
+        bool roundPosition(){
+            if(!position.promoted().roundPixel(roundedOrigin))return false;
+            roundedSampling=true;return true;
+        }
+        bool prepare(RunnerImageValue p,RunnerImageValue scale,int first,int end,bool rounded){
             if(!valid(p) || !valid(scale) || !(scale.bits&0x7fffffffu))return false;
             RunnerImageValue start,width,finish;MotionBinary64 reciprocal;
             // Upper edge is lower + scaled width, not position + scaled end.
             if(!multiply(integer(first-12),scale,start) || !add(start,p,start) ||
                !multiply(integer(end-first),scale,width) || !add(width,start,finish) ||
-               !start.promoted().roundPixel(low) || !finish.promoted().roundPixel(high) ||
-               !divideBinary64(MotionBinary64::fromInteger(1),scale.promoted(),reciprocal) ||
-               !inverse.assign(reciprocal))return false;
+               !start.promoted().roundPixel(low) || !finish.promoted().roundPixel(high))return false;
             if(low>high){const int tmp=low;low=high;high=tmp;}
             position=p;
+            if(rounded)return roundPosition();
+            if(!divideBinary64(MotionBinary64::fromInteger(1),scale.promoted(),reciprocal)||!inverse.assign(reciprocal))return false;
             return !(inverse.bits&0x80000000u) || add(position,integer(-1),position);
         }
         bool contains(int pixel,int first,int end,bool& hit)const{
+            if(roundedSampling){
+                // Original integer origin - rounded position + world pixel;
+                // unsigned arithmetic preserves its 32-bit wrap without UB.
+                const auto sample=12u-std::uint32_t(roundedOrigin)+std::uint32_t(pixel);
+                hit=sample>=unsigned(first)&&sample<unsigned(end);return true;
+            }
             auto negative=position;negative.bits^=0x80000000u;
             RunnerImageValue sample;
             if(!add(integer(pixel),negative,sample) || !multiply(sample,inverse,sample) ||
