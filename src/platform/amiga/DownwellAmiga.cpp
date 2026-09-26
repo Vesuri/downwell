@@ -58,6 +58,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "AmigaTerrain.h"
 #include "framework/AmigaHardware.h"
 #include "core/GameMakerRounding.h"
+#include "core/GameplayContactProfileInput.h"
 #include "core/HudNumbers.h"
 #include "core/AmmoDividers.h"
 #include "core/AmmoFill.h"
@@ -1734,13 +1735,8 @@ int main(void) {
                 liveInput.left = !liveInput.right;
                 liveInput.fire = (port.tick() % 16) == 0 || (port.tick() % 16) == 3;
 #ifdef DOWNWELL_PROFILE_CONTACT
-                liveInput.right = (port.tick()/90)%2==0;
-                liveInput.left = !liveInput.right;
-                liveInput.fire = port.tick()%10<5;
-                if(port.player().offsetY()+176<1264){
-                    liveInput.left=port.player().offsetX()>2;
-                    liveInput.right=port.player().offsetX()<-2;
-                }
+                liveInput=downwell::gameplayContactProfileInput(port.tick(),
+                    240+port.player().offsetX(),176+port.player().offsetY());
 #endif
 #endif
             }

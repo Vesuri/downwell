@@ -9,8 +9,8 @@ commit that records them, not a rolling status document.
 From the repository root:
 
 ```sh
-SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=120 bash amiga/profile.sh fps
-SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=120 bash amiga/profile.sh probes
+SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=60 bash amiga/profile.sh fps
+SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=60 bash amiga/profile.sh probes
 ```
 
 Use `SKIP_LEVEL=1` for level completion and `SKIP_INTRO=1` for style selection
@@ -25,6 +25,22 @@ script directly. Both reporting scripts reject this tape if no damage number
 was born. The ordinary 600-update tape is retained for existing comparisons;
 zero damage births there is not a measurement of damage handling. Contact mode
 requires autorun and cannot be combined with the level-completion shortcut.
+
+The input policy and duration live in `GameplayContactProfileInput.h` and are
+shared with the host contact gate. The profiling wrapper runs this gate before
+building contact instrumentation. It can also be run separately:
+
+```sh
+make verify-contact-profile
+```
+
+This gate starts at the ordinary seed-2 gameplay checkpoint, sends identical
+inputs to both worlds, and requires a real damage-number lifetime while checking
+movement, health, effect ownership and complete RNG state. If a behavior fix
+invalidates the tape, the optional `DOWNWELL_CONTACT_PROFILE_SEARCH=1` environment
+variable reports the ten fire-phase variants; it does not bypass the normal
+gate's contact requirement. Rebaseline both timing modes after changing inputs;
+old/new FPS values from different trajectories are not optimization evidence.
 
 Damage phases are 75 (contact direction math), 76 (number construction),
 77 (number Step, including empty-owner calls) and 78 (native text drawing,

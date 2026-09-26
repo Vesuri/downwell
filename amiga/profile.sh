@@ -15,6 +15,9 @@ restore() {
   make -j4 SKIP_INTRO=0 SKIP_TO_GAME=0 SKIP_LEVEL=0 PROFILE_LASER=0 PROFILE_CONTACT=0 GENERATION_DETAIL=0 >> .run/profile-restore.log 2>&1
 }
 mkdir -p .run
+if [[ ${PROFILE_CONTACT:-0} == 1 ]]; then
+  env -u DOWNWELL_CONTACT_PROFILE_SEARCH make -C .. verify-contact-profile
+fi
 trap restore EXIT
 make clean
 make -j4 "$flags" PROFILE_AUTORUN=1

@@ -1,5 +1,6 @@
 #include "AmigaProfile.h"
 #include "AmigaTerrainProfile.h"
+#include "core/GameplayContactProfileInput.h"
 #include <exec/types.h>
 
 #if defined(DOWNWELL_PROBES) || defined(DOWNWELL_FPSCOUNT)
@@ -10,7 +11,7 @@ extern "C" {
 volatile ULONG gDownwellProfileTargetScene = 3;
 volatile ULONG gDownwellProfileTargetFrames =
 #ifdef DOWNWELL_PROFILE_CONTACT
-    1800;
+    downwell::gameplayContactProfileFrames;
 #else
 #ifdef DOWNWELL_SKIP_LEVEL
     480;

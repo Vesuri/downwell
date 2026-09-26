@@ -10,6 +10,7 @@
 #include "core/RoomPack.h"
 #include "core/StartupRuntime.h"
 #include "core/GameMakerRounding.h"
+#include "core/GameplayContactProfileInput.h"
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -2284,6 +2285,57 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
 }
 
 int main(int argc, char** argv) {
+    if(argc>=4&&std::getenv("DOWNWELL_VERIFY_CONTACT_PROFILE")){
+        const auto roomBytes=readFile(argv[1]),objectBytes=readFile(argv[2]),patternBytes=readFile(argv[3]);
+        downwell::RoomPack rooms(roomBytes.data(),roomBytes.size());
+        downwell::ObjectPack objects(objectBytes.data(),objectBytes.size());
+        downwell::BuilderPatternPack patterns(patternBytes.data(),patternBytes.size());
+        downwell::PackedRoom room;
+        require(rooms.valid()&&objects.valid()&&patterns.valid()&&rooms.findRoom(11,room),"contact profile resources");
+        const bool search=std::getenv("DOWNWELL_CONTACT_PROFILE_SEARCH")!=nullptr;
+        for(unsigned phase=search?0:downwell::gameplayContactProfilePhase;
+            phase<(search?10u:downwell::gameplayContactProfilePhase+1);++phase){
+            downwell::StartupRuntime host(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+            host.skipToGameForTesting();
+            AmigaPortRuntime game(300,false,1201-176,true);game.initializeEntryInput(false);
+            LiveSceneWorld live(patterns,objects);live.bind(game,rooms,room,false,&host);
+            unsigned firstDamage=0,damageFrames=0;
+            for(unsigned tick=0;tick<downwell::gameplayContactProfileFrames;++tick){
+                const auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
+                    176+game.player().offsetY(),phase);
+                game.step(downwell::packReplayInput(input));
+                require(game.effectsSucceeded()&&game.generationSucceeded(),"contact tape runtime remains valid");
+                if(game.damageNumbers().size()){if(!firstDamage)firstDamage=tick+1;++damageFrames;}
+                if(!search){
+                    host.step(input,false);parityFrame=tick;
+                    compareInitialGameplay(game,host);
+                    require(game.health()==host.mainPlayerHealth()&&game.damageNumbers().size()==host.damageNumbers().size(),
+                        "contact tape health and damage ownership agree");
+                    require(game.damageNumbers().birthSequence().next==host.damageNumbers().birthSequence().next,
+                        "contact tape damage lifetime sequence agrees");
+                    for(unsigned i=0;i<game.damageNumbers().size();++i){
+                        const auto& a=*game.damageNumbers().atNewest(i);
+                        const auto& b=*host.damageNumbers().atNewest(i);
+                        auto same=[](downwell::MotionBinary64 x,downwell::MotionBinary64 y){
+                            return x.high==y.high&&x.low==y.low;
+                        };
+                        require(a.x.bits==b.x.bits&&a.y.bits==b.y.bits&&a.alarm0==b.alarm0&&
+                            a.drawBirth==b.drawBirth&&same(a.amount,b.amount)&&same(a.direction,b.direction)&&
+                            same(a.xSpeed,b.xSpeed)&&same(a.ySpeed,b.ySpeed),
+                            "contact tape complete damage-number motion and painter order agree");
+                    }
+                    require(game.randomDrawCount()==host.randomDrawCount()&&
+                        game.randomState().stateIndex()==host.randomState().stateIndex(),"contact tape RNG cursor agrees");
+                    for(unsigned i=0;i<16;++i)require(game.randomState().stateWord(i)==host.randomState().stateWord(i),
+                        "contact tape full RNG agrees");
+                }
+            }
+            std::cout<<"Contact profile phase="<<phase<<" first_damage="<<firstDamage
+                <<" damage_frames="<<damageFrames<<" health="<<game.health()<<" y="<<176+game.player().offsetY()<<std::endl;
+            if(!search)require(firstDamage&&damageFrames,"profile input must reach real damage");
+        }
+        return 0;
+    }
     if(argc>=4 && std::getenv("DOWNWELL_VERIFY_GENERATED_HANDOFF")){
         const auto bytes=readFile(argv[2]);
         const downwell::ObjectPack objects(bytes.data(),bytes.size());

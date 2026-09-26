@@ -445,6 +445,10 @@ test: verify-time-stop-masks
 test: verify-ordinary-time-field
 test: verify-runner-spatial-split
 .PHONY: verify-runner-spatial-split
+.PHONY: verify-contact-profile
+verify-contact-profile: $(AMIGA_SCENE_TEST_TARGET)
+	DOWNWELL_VERIFY_CONTACT_PROFILE=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+
 verify-runner-spatial-split: build/runner-spatial-split-test build/runner-spatial-dirty-test build/runner-object-membership-test build/runner-sprite-bounds-test build/runner-place-query-test build/runner-spatial-instances-test
 	./build/runner-spatial-split-test
 	./build/runner-spatial-dirty-test
