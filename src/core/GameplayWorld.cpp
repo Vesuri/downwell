@@ -892,6 +892,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         for(unsigned i=0;i<count;++i)if(!emit())return false;
         return true;
     });
+    if(!run_.effectsSucceeded)return {};
     if (!downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
         enemiesDefeated_, run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> EnemyState& { return enemies_[i]; },
@@ -902,7 +903,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.imageScaleY(),
             downwell::enemyContactMask(enemy.objectId, enemy.spriteId)}, enemy.x, enemy.y};
         },
-        [this](EnemyState& enemy) { spawnReward(enemy, true); },
+        [this](EnemyState& enemy) { spawnReward(enemy, true); return run_.effectsSucceeded; },
         [](downwell::EnemyContact) {},
         [this](int x,int y) {
             return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),

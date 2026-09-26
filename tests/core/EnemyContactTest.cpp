@@ -111,7 +111,7 @@ int main() {
         const auto apply = [&] {
             const int beforeHealth = health;
             return applyEnemyContact(116, contactActor, 7, 9, active, enemyHealth,
-                motion, health, immunity, defeated, [&] { ++rewards; }, candle,
+                motion, health, immunity, defeated, [&] { ++rewards; return true; }, candle,
                 [&](int x,int y) {
                     require(x==7 && y==9 && immunity==0 && health==beforeHealth-1,
                         "damage-number callback follows health subtraction and precedes immunity");
@@ -155,7 +155,7 @@ int main() {
         immunity=0;
         const int oldKnocks=motion.knocks;
         require(applyEnemyContact(116,contactActor,7,9,active,enemyHealth,motion,
-            health,immunity,defeated,[&]{++rewards;},false,[](int,int){return false;})==EnemyContact::none,
+            health,immunity,defeated,[&]{++rewards;return true;},false,[](int,int){return false;})==EnemyContact::none,
             "failed damage birth is not published as a successful contact");
         require(health==1 && immunity==0 && motion.knocks==oldKnocks,
             "failure preserves prior subtraction and does not perform later immunity or knockback");
@@ -178,8 +178,9 @@ int main() {
         struct Combo { unsigned kills = 0; void enemyDefeated() { ++kills; } } combo;
         int health = 4;
         unsigned immunity = 1, defeated = 0, rewards = 0, published = 0, located = 0;
+        bool rewardWorks=true;
         auto step = [&] {
-            stepEnemyContacts(5, motion, health, immunity, defeated, combo, false,
+            return stepEnemyContacts(5, motion, health, immunity, defeated, combo, false,
                 [&](unsigned i) -> Enemy& { return enemies[i]; },
                 [&](const Enemy& e) {
                     ++located;
@@ -189,6 +190,7 @@ int main() {
                     require(e.active && e.health == 15 && combo.kills == rewards + 1 &&
                             defeated == rewards, "combo precedes reward, which precedes retirement");
                     ++rewards;
+                    return rewardWorks;
                 },
                 [&](EnemyContact contact) {
                     require(contact != EnemyContact::none, "only applied contacts publish effects");
@@ -209,6 +211,16 @@ int main() {
         require(health == 0 && published == 3 && motion.knocks == 2 &&
                 enemies[3].active && rewards == 1 && defeated == 1,
                 "fatal damage suppresses later damage and stomp in stable instance order");
+        health=4;immunity=5;rewardWorks=false;
+        enemies[1].y=enemies[2].y=3*256;
+        const auto oldLocated=located,oldPublished=published,oldDefeated=defeated;
+        const auto oldBounces=motion.bounces,oldRewards=rewards,oldCombo=combo.kills;
+        require(!step(),"failed stomp reward aborts contact traversal");
+        require(located==oldLocated+1&&published==oldPublished&&defeated==oldDefeated&&
+                motion.bounces==oldBounces&&enemies[1].active&&enemies[1].health==15,
+                "failed reward cannot retire, bounce, publish or reach a later contact");
+        require(rewards==oldRewards+1&&combo.kills==oldCombo+1,
+                "already executed reward callback and combo changes are not rolled back");
     }
     ContactActor player{0, 0, 1, 1, 31};
     ContactActor bat{0, -11 * 256, 1, 1, 153};

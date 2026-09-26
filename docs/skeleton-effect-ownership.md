@@ -31,6 +31,14 @@ The SDL `Game` latches simulation failure separately from ordinary quit and
 does not dispatch more updates afterward. The executable returns 20 before
 rendering/presenting the failed update, matching the Amiga effect-error path.
 
+The current shared cavern stomp adapter checks reward success before its
+immediate enemy retirement, defeat count and player bounce. A failed reward
+retains prior combo changes and partial gem births, but stops contact traversal
+and publication. Both worlds stop before entering that pass if an earlier
+effect failed. This does not validate the adapter's immediate-retirement
+approximation against the original later enemy death Step, nor cover the
+separate bullet-impact path.
+
 | Source call | Owned objects / side effects required |
 | --- | --- |
 | `scrEnemyDeath` | Combo/kill counters, gunshot stop, achievement state, moment delay and level-begin cue |

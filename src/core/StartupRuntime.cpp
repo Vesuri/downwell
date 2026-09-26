@@ -418,7 +418,9 @@ void StartupRuntime::stepInternal(bool advancePressed,
             }
             return true;
         });
+        if(!run_.effectsSucceeded)return;
         updateMainEnemyInteractions();
+        if(!run_.effectsSucceeded)return;
         run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
         updateMainCurrency();
@@ -923,7 +925,7 @@ void StartupRuntime::updateMainEnemies() {
 }
 
 void StartupRuntime::updateMainEnemyInteractions() {
-    stepEnemyContacts(static_cast<unsigned>(instances_.size()), mainPlayerMotion_,
+    if(!stepEnemyContacts(static_cast<unsigned>(instances_.size()), mainPlayerMotion_,
         mainPlayerHealth_, mainPlayerInvulnerability_, mainEnemiesDefeated_,
         run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> InstanceRecord& { return instances_.at(i); },
@@ -938,6 +940,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
         [this](InstanceRecord& enemy) {
             spawnMainCurrency(static_cast<float>(enemy.x), static_cast<float>(enemy.y),
                               enemy.reward, true);
+            return run_.effectsSucceeded;
         },
         [this](EnemyContact) {
             syncMainPlayerState();
@@ -946,7 +949,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
         [this](int x,int y) {
             return run_.contactDamageNumber(mainPlayerMotion_.frameStartXFixed(),
                 mainPlayerMotion_.frameStartYFixed(),x,y,mainPlayerOriginX_,mainPlayerOriginY_);
-        });
+        }))return;
 }
 
 void StartupRuntime::updateMainLifecycle() {

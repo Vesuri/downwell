@@ -19,7 +19,7 @@ EnemyContact applyEnemyContact(int object, const ContactActor& enemy,
     const auto contact = classifyEnemyContact(playerContact, enemy, object,
                                              player.frameStartYFixed());
     if (contact == EnemyContact::stomp) {
-        reward();
+        if (!reward()) return EnemyContact::none;
         enemyHealth = 0;
         active = false;
         ++defeated;
@@ -46,8 +46,8 @@ struct EnemyContactLocation {
 
 // Storage adapters retain their coordinate representation and presentation
 // hooks; eligibility, immunity expiry and ordered contact effects are shared.
-// A failed synchronous damage callback stops traversal without rolling back
-// health already subtracted. The callback must latch the world's failure state.
+// Failed reward/damage callbacks stop traversal without rolling back earlier
+// combo, child-creation or health changes. They must latch world failure.
 template<class Player, class Immunity, class Count, class Combo,
          class Get, class Locate, class Reward, class Publish, class Damage>
 bool stepEnemyContacts(unsigned count, Player& player, int& health,
@@ -61,16 +61,16 @@ bool stepEnemyContacts(unsigned count, Player& player, int& health,
             (object != 111 && object != 112 && object != 113 &&
              object != 116 && object != 117 && object != 119)) continue;
         const auto location = locate(enemy);
-        bool damageSucceeded = true;
+        bool succeeded = true;
         const auto contact = applyEnemyContact(object, location.actor,
             location.publishedX, location.publishedY, enemy.active, enemy.health,
             player, health, immunity, defeated, [&] {
                 combo.enemyDefeated();
-                reward(enemy);
+                return succeeded = reward(enemy);
             }, candle, [&](int x, int y) {
-                return damageSucceeded = damage(x, y);
+                return succeeded = damage(x, y);
             });
-        if (!damageSucceeded) return false;
+        if (!succeeded) return false;
         if (contact != EnemyContact::none) publish(contact);
     }
     return true;

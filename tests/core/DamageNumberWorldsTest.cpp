@@ -43,6 +43,19 @@ int main(){
         assert(encounter.health()==3 && !encounter.effectsSucceeded());
         assert(encounter.damageNumbers().size()==8);
     }
+    {
+        // Explicit capacity fault, not a natural enemy reward value.
+        GameplayWorld encounter(0,false,10000,false);
+        assert(encounter.configureEnemy(0,116,153,0,3,0,0,15,
+            int(GameplayWorld::gemCapacity+1)*10));
+        assert(encounter.configureEnemy(1,116,153,0,3,0,0,15,0));
+        encounter.step(0);
+        assert(!encounter.effectsSucceeded());
+        assert(encounter.gemCount()==GameplayWorld::gemCapacity);
+        assert(encounter.enemyAt(0).active&&encounter.enemyAt(0).health==15);
+        assert(encounter.enemyAt(1).active&&encounter.enemyAt(1).health==15);
+        assert(encounter.enemiesDefeated()==0&&encounter.player().speedYFixed()>=0);
+    }
     GameplayWorld target(0,true,0,false);bool born=false;
     target.configureGenerationStep([](void* context,GameplayWorld& world,GameMakerRandom&,int){
         auto& born=*static_cast<bool*>(context);
