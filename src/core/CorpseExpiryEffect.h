@@ -39,6 +39,10 @@ struct CorpseExpiryEffect {
         if(valid&&crossed)destroyRequested=true;
         return valid;
     }
+    unsigned drawFrame()const{
+        const unsigned exponent=(imageIndex.bits>>23)&255u;
+        return exponent<127?0:((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
+    }
 };
 }
 #endif

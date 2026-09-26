@@ -23,6 +23,8 @@ int main() {
         const int vx=160+world.cameraOffsetX(), vy=34+world.cameraOffsetY();
         if(tick%61==0) assert(world.emitFlashBurst(downwell::MotionBinary64::fromInteger(vx+40),
                                                   downwell::MotionBinary64::fromInteger(vy+60)));
+        if(tick%61==0)assert(world.emitCorpseExpiry(downwell::MotionBinary64::fromInteger(vx+50),
+                                                  downwell::MotionBinary64::fromInteger(vy+80)));
         const auto checkpoint=world.checkpoint();
         assert(list.collect(world,pack,pack+8,vx,vy));
         assert(world.checkpoint()==checkpoint);
@@ -52,6 +54,10 @@ int main() {
             if(b.active) emit(downwell::machineGunProfile(b.gemHigh).sprite,768+b.animation.frame(),
                 190+b.x-world.cameraOffsetX(),142+b.y-world.cameraOffsetY());
         }
+        assert(world.corpseExpiryEffects().visitNewest([&](unsigned,const downwell::CorpseExpiryEffect& effect){
+            std::int32_t x,y;assert(effect.x.promoted().roundPixel(x)&&effect.y.promoted().roundPixel(y));
+            emit(102,effect.drawFrame(),110+x-vx,y-vy);
+        }));
         if(world.playerVisible()) emit(world.player().spriteId(world.deathSequence().movementDead()),
             world.player().spriteFrame(world.deathSequence().movementDead(),world.deathSequence().animation),
             190+downwell::roundGameMakerQ8(world.player().offsetXFixed())-world.cameraOffsetX(),
@@ -75,6 +81,7 @@ int main() {
             int depth;
             if(sprite==133||sprite==134)depth=10000;
             else if(sprite==458||sprite==459)depth=0;
+            else if(sprite==102)depth=-1000;
             else if(sprite==unsigned(world.player().spriteId(world.deathSequence().movementDead())))depth=-50000;
             else if(sprite==96)depth=-200000;
             else continue;

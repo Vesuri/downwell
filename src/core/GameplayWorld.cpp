@@ -61,6 +61,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     run_.flashEffects.clear();
     run_.smokeEffects.clear();
     run_.bloodEffects.clear();
+    run_.clearCorpseExpiry();
     run_.timeFields.clear();
     run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);
@@ -507,6 +508,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Only valid unit-sequence state is admitted through the effect owner.
     run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
     run_.advanceSmokeAnimation();
+    run_.advanceCorpseExpiryAnimation();
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
     for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active)

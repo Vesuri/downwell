@@ -100,8 +100,8 @@ responsibilities. The connected alarm test creates the child before corpse
 retirement and advances it for its 40-update lifetime; the cross-CPU corpse
 replay hashes the child's position and animation too. `setSprite` accepts
 verified nonempty unit-track metadata and publishes changed bounds; unsupported
-empty sprites and failed publication are explicit failures. Live ownership,
-ordinary mixed-depth drawing and additional corpse families still need wiring.
+empty sprites and failed publication are explicit failures. Natural corpse
+death/expiry production and additional corpse families still need wiring.
 `verify-corpse-expiry` pins the VM events, inheritance and sprite metadata.
 The gameplay DWAP includes all twelve sprite-102 frames as immutable planar
 color/mask payloads, anchored at the original (16,32) origin. Checked
@@ -120,8 +120,15 @@ or exhausted capacity is terminal until explicit cleanup. Cleanup can resume
 after a partial failure without repeating successful removals. These hooks
 must not mutate the same owner and must be recreated after world copies.
 The connected alarm/owner test covers survival after corpse retirement, stale
-phases across slot reuse and failure cleanup. This owner is not yet installed
-in the live world registry or renderer.
+phases across slot reuse and failure cleanup. `RunSession` owns the effects in
+both worlds, advances their animation before Begin Step, latches capacity
+failure, and clears them on room/run retirement. Its publication hooks currently
+have no external spatial registry; integration into a global registry remains
+separate. Both renderers place sprite 102 between bullets and player at -1000.
+Host rendering retains fractional coordinates; native raster projection uses
+the existing nearest-pixel convention. Integer-position command tests cover
+both renderers; fractional GPU raster equivalence remains unverified. Explicit
+world emission in tests is not evidence of a natural skeleton death chain.
 
 `CorpseLifecycle` implements alarms 0–3 and the Knife and Fork player-contact
 event. Alarm 0 completes object-242 Create before assigning its sprite and

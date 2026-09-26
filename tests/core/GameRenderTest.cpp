@@ -451,7 +451,10 @@ int main() {
             runtime.step(false);
         }
         if(std::getenv("DOWNWELL_FLASH_RENDER_ONLY")) {
-            unsigned bulletsSeen=0,playersSeen=0;
+            require(runtime.emitCorpseExpiry(downwell::MotionBinary64::fromInteger(int(runtime.mainCameraViewX())+50),
+                                            downwell::MotionBinary64::fromInteger(int(runtime.mainCameraViewY())+80)),
+                    "world admits owned corpse expiry");
+            unsigned bulletsSeen=0,playersSeen=0,expirySeen=0;
             for(unsigned tick=0;tick<32;++tick){
                 downwell::Input fire;fire.fire=true;runtime.step(fire,false);
                 RecordingRenderer capture;flashGame.render(capture);
@@ -460,6 +463,7 @@ int main() {
                     int depth;
                     if(sprite==133||sprite==134)depth=10000;
                     else if(sprite==458||sprite==459){depth=0;++bulletsSeen;}
+                    else if(sprite==102){depth=-1000;++expirySeen;}
                     else if(sprite==runtime.mainPlayerSpriteId()){depth=-50000;++playersSeen;}
                     else if(sprite==96)depth=-200000;
                     else continue;
@@ -468,6 +472,10 @@ int main() {
                 }
             }
             require(bulletsSeen&&playersSeen,"live painter test covers fired bullets and player");
+            require(expirySeen==32,"owned expiry emits one draw per surviving frame");
+            require(runtime.corpseExpiryEffects().size()==1,"expiry survives independently through first 32 updates");
+            for(unsigned i=0;i<8;++i)runtime.step(false);
+            require(runtime.corpseExpiryEffects().size()==0,"world retires expiry on animation boundary");
             std::puts("Production host flash ownership, camera projection and retirement passed");
             return 0;
         }

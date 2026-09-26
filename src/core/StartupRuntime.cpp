@@ -300,6 +300,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if(roomId_==mainRoomId)
         run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
+    if(roomId_==mainRoomId)run_.advanceCorpseExpiryAnimation();
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
@@ -1806,6 +1807,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     run_.flashEffects.clear();
     run_.smokeEffects.clear();
     run_.bloodEffects.clear();
+    run_.clearCorpseExpiry();
     run_.timeFields.clear();
     run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;

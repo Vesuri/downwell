@@ -21,6 +21,7 @@
 #include "FlashBallEffects.h"
 #include "SmokeEffects.h"
 #include "BloodEffects.h"
+#include "CorpseExpiryEffects.h"
 #include "TimeStopBound.h"
 #include "BloodGoalContact.h"
 #include "TimeStopGoalContact.h"
@@ -53,6 +54,24 @@ struct RunSession {
     FlashBallEffects<32> flashEffects;
     SmokeEffects<32> smokeEffects;
     BloodEffects<32> bloodEffects;
+    CorpseExpiryEffects<32> corpseExpiryEffects;
+    // This effect has no source collision events or external membership in the
+    // current worlds. Keep publication hooks explicit for registry integration.
+    struct ExpiryHooks {
+        bool birth(unsigned,const CorpseExpiryEffect&){return true;}
+        bool sprite(unsigned,const CorpseExpiryEffect&){return true;}
+        bool retire(unsigned,const CorpseExpiryEffect&){return true;}
+    };
+    bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
+        ExpiryHooks hooks;
+        if(effectsSucceeded)effectsSucceeded=corpseExpiryEffects.create(x,y,hooks)!=0;
+        return effectsSucceeded;
+    }
+    void advanceCorpseExpiryAnimation(){
+        ExpiryHooks hooks;
+        if(effectsSucceeded)effectsSucceeded=corpseExpiryEffects.advanceAnimation(corpseExpiryEffects.beginPhase(),hooks);
+    }
+    void clearCorpseExpiry(){ExpiryHooks hooks;corpseExpiryEffects.clear(hooks);}
     OrdinaryTimeFields<64> timeFields;
     bool effectsSucceeded=true;
     bool adoptTimeField(int x,int y,std::uint32_t radiusWord){
@@ -219,6 +238,7 @@ struct RunSession {
         flashEffects.clear();
         smokeEffects.clear();
         bloodEffects.clear();
+        clearCorpseExpiry();
         timeFields.clear();
         // Room creation is followed by Draw before the next Step/Alarm phase.
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
@@ -314,6 +334,7 @@ struct RunSession {
         flashEffects.clear();
         smokeEffects.clear();
         bloodEffects.clear();
+        clearCorpseExpiry();
         timeFields.clear();
         effectsSucceeded=true;
         sideCameraLockers.clear();

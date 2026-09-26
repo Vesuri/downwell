@@ -1,5 +1,6 @@
 #include "core/CorpseExpiryEffects.h"
 #include "core/CorpseLifecycle.h"
+#include "core/RunSession.h"
 #include <cassert>
 #include <cstdio>
 using namespace downwell;
@@ -67,5 +68,15 @@ int main(){
     assert(owner.get(corpse.myExplosion)->timeline.bits==0);
     for(unsigned i=0;i<40;++i)assert(owner.advanceAnimation(owner.beginPhase(),hooks));
     assert(!owner.size()&&corpse.destroyRequested);
+    RunSession session;
+    assert(session.emitCorpseExpiry({},{}));
+    for(unsigned i=0;i<39;++i)session.advanceCorpseExpiryAnimation();
+    assert(session.corpseExpiryEffects.size()==1&&session.effectsSucceeded);
+    session.advanceCorpseExpiryAnimation();assert(!session.corpseExpiryEffects.size());
+    for(unsigned i=0;i<32;++i)assert(session.emitCorpseExpiry({},{}));
+    assert(!session.emitCorpseExpiry({}, {})&&!session.effectsSucceeded);
+    session.reset();assert(session.effectsSucceeded&&!session.corpseExpiryEffects.size());
+    assert(session.emitCorpseExpiry({},{}));session.clearCorpseExpiry();
+    assert(!session.corpseExpiryEffects.size());
     std::puts("Corpse expiry ownership: connected alarm, phase cutoffs, stable reuse, capacity and partial cleanup passed");
 }

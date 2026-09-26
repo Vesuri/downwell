@@ -285,6 +285,8 @@ public:
         return nullptr;
     }
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
+    const downwell::CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
+    bool emitCorpseExpiry(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
     const downwell::SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
     bool emitSmokeBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y){

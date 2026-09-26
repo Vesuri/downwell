@@ -370,6 +370,12 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
                             static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
     }
+    // fxJobutsu uses ordinary Draw at -1000, between bullets and player.
+    startup_.corpseExpiryEffects().visitNewest([&](unsigned,const CorpseExpiryEffect& effect){
+        float x,y;
+        std::memcpy(&x,&effect.x.bits,sizeof x);std::memcpy(&y,&effect.y.bits,sizeof y);
+        renderer.drawSpriteTransformed(effect.spriteId,effect.drawFrame(),x-viewX,y-viewY,1,1,0);
+    });
     if (startup_.mainPlayerVisible())
         renderer.drawSpriteTransformed(
             startup_.mainPlayerSpriteId(),

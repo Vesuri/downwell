@@ -73,6 +73,14 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 playerStartY + bullet.y - port.cameraOffsetY(), 0))
             ready = false;
     }
+    // Ordinary sprite depth -1000, not a controller effect-surface layer.
+    if(!port.corpseExpiryEffects().visitNewest([&](unsigned,const downwell::CorpseExpiryEffect& effect){
+        std::int32_t x,y;
+        if(!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)){
+            failedSprite=effect.spriteId;ready=false;return;
+        }
+        if(!append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+x-worldViewX,y-worldViewY,0))ready=false;
+    }))ready=false;
     if (port.playerVisible() && !append(
             (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
             (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),
