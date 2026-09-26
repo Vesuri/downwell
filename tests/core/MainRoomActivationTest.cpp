@@ -30,14 +30,14 @@ int main() {
                 read, activate) == 0 && frontier == 0 && reads == 0,
             "view equality does not advance or visit instances");
     require(downwell::advanceMainRoomActivation(frontier, -112L * 256 + 1, 7,
-                read, activate) == 3 && frontier == 16,
+                read, activate) == 4 && frontier == 16,
             "strict view crossing advances exactly one row and activates eligible enemies");
-    require(writes == 3 && order[0] == 0 && order[1] == 5 && order[2] == 6,
+    require(writes == 4 && order[0] == 0 && order[1] == 1 && order[2] == 5 && order[3] == 6,
             "activation preserves storage order and excludes active/retired/non-enemy records");
-    require(!records[0].pending && !records[1].active,
-            "activation clears pending; a box touching but not crossing the frontier stays dormant");
+    require(!records[0].pending && records[1].active && !records[1].pending,
+            "original runner includes a mask whose top equals the activation frontier");
     require(downwell::advanceMainRoomActivation(frontier, 300000L * 256, 7,
-                read, activate) == 1 && frontier == 32 && order[3] == 1,
+                read, activate) == 0 && frontier == 32 && writes == 4,
             "distant camera does not catch up multiple rows in one Begin Step");
     require(downwell::advanceMainRoomActivation(frontier, 300000L * 256, 7,
                 read, activate) == 0 && frontier == 48 && writes == 4,
@@ -45,13 +45,16 @@ int main() {
     ActivationInstance edges[] = {
         {111, {-8,0,0,8}, false,true}, {111,{480,488,0,8},false,true},
         {111, {0,8,-8,0}, false,true}, {111,{0,8,0,0},false,true},
-        {111, {0,8,15,23},false,true}, {111,{0,8,16,24},false,true}
+        {111, {0,8,15,23},false,true}, {111,{0,8,16,24},false,true},
+        {111, {481,489,0,8},false,true}, {111,{0,8,17,25},false,true},
+        {111, {-8,1,0,8},false,true}, {111,{0,8,-8,1},false,true}
     };
     frontier = 0;
     unsigned edgeMask = 0;
-    require(downwell::advanceMainRoomActivation(frontier, 318L*256, 6,
-        [&](unsigned i) { return edges[i]; }, [&](unsigned i) { edgeMask |= 1u << i; }) == 1 && edgeMask == 16,
-        "activation uses all rectangle edges and accepts overlap with centre below the frontier");
+    const unsigned touchingOrInside = (1u<<1) | (1u<<4) | (1u<<5) | (1u<<8) | (1u<<9);
+    require(downwell::advanceMainRoomActivation(frontier, 318L*256, 10,
+        [&](unsigned i) { return edges[i]; }, [&](unsigned i) { edgeMask |= 1u << i; }) == 5 && edgeMask == touchingOrInside,
+        "activation includes all four touching pixel edges but excludes the adjacent outside pixels");
     frontier = 299984;
     require(downwell::advanceMainRoomActivation(frontier, 300000L * 256, 0,
                 read, activate) == 0 && frontier == 300000,

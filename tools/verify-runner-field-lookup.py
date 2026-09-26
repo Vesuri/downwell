@@ -7,6 +7,13 @@ import runpy
 audit = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = audit["region"]
 for start, end, digest in (
+    # Activation region wrapper/predicate and immediate flag/dirty transitions.
+    (0x52ce57, 0x52ce6a, "3821ff37ce05c24591f9a3ed106968438c99c6893b7ba97f9bf49bdee01d0482"),
+    (0x529660, 0x5296c5, "522eef58be76c480be6f5232f11526195a3ac6a87540136768b12e59cc103f89"),
+    (0x52d040, 0x52d14d, "eda4791dc3d4f7433065e50a923ed1dfca3e1659c08c1f33a006be93530b02c3"),
+    (0x467640, 0x467678, "cba757068aff96e0b61205df89cbbb28685f611c14f5b507a3d681e9b888ef72"),
+    (0x4627d0, 0x46281c, "0ca6095a8151103bf924542f817fd86226f3edbce56733c6faf45d694bc4975e"),
+    (0x4633e0, 0x463445, "e8f7c44bc1af35f9f644d3adf261f62d9714daaccc3cd8f64eba9cfdf30f0411"),
     # Constructor -> object binding -> ancestor-inclusive tail insertion.
     (0x46171f, 0x4618ee, "c6449f2c7c86b62c2053956c6c6aaf60d5bc8caf5f545f8c09102fb0e07d733d"),
     (0x46b830, 0x46b8b2, "f69e99dd410a652360766445ca48c817b571a44dc5089db9ada54cd10022b2ea"),
@@ -41,6 +48,7 @@ for start, end, digest in (
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x80cd7c,15) == b"instance_place\0"
+assert region(0x80cee0,25) == b"instance_activate_region\0"
 assert region(0x7fe7e0,4) == bytes.fromhex("000080bf") # preference sentinel -1
 assert region(0x795ab8,4) == bytes.fromhex("0000803f") # seed sentinel adjustment +1
 print("Pinned Windows ancestor-list registration/removal, instance_place dispatch and first-hit traversal")

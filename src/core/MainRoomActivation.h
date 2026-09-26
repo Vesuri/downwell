@@ -15,6 +15,9 @@ struct ActivationInstance {
 // instance_activate_region tests bounding-box overlap, not the origin or
 // precise mask pixels. rmMain's serialized width is 480. This is the supported
 // enemy store, not a generic activation implementation for all resources.
+// Windows 0x52d040 includes equality at region right/bottom. In this build's
+// compatibility mode the runner's mask upper edges are inclusive; ContactBounds
+// stores them plus one, hence >0 on those edges but <= on left/top below.
 template<class Read, class Activate>
 unsigned advanceMainRoomActivation(int& activationY, long viewBottomQ8,
                                    unsigned count, Read read, Activate activate) {
@@ -28,8 +31,8 @@ unsigned advanceMainRoomActivation(int& activationY, long viewBottomQ8,
             instance.objectId == 117 || instance.objectId == 119;
         if (enemy && !instance.active && instance.pending &&
             instance.bounds.left < instance.bounds.right && instance.bounds.top < instance.bounds.bottom &&
-            instance.bounds.left < 480 && instance.bounds.right > 0 &&
-            instance.bounds.top < activationY && instance.bounds.bottom > 0) {
+            instance.bounds.left <= 480 && instance.bounds.right > 0 &&
+            instance.bounds.top <= activationY && instance.bounds.bottom > 0) {
             activate(i);
             ++activated;
         }

@@ -1,82 +1,76 @@
-# Activation lifecycle correction
+# Activation source contract
 
-Current checkpoint: the historical extended-combat failures recorded below
-are superseded by the passing two-cadence, 6,000-update checks in
-[the fidelity audit](original-behavior-audit.md#current-extended-combat-checkpoint).
-Exact boundary and transform behavior in the original Windows runner remains
-an open fidelity item; centre-only activation has now been removed.
+Remaining integration and verification belong in [open work](open-work.md).
+Implementation history and past test results belong in the git log.
 
-## Bounding-box region inclusion
+## Main-room frontier
 
-The shared activation helper now intersects the enemy's published mask bounds
-with `(0,0,480,activatey)`. The width is rmMain's serialized width, and the VM
-passes `(0,0,room_width,activatey,true)` to `instance_activate_region`.
-[The GameMaker documentation](https://manual.gamemaker.io/lts/en/GameMaker_Language/GML_Reference/Asset_Management/Instances/Deactivating_Instances/instance_activate_region.htm)
-describes bounding-box overlap, independent of precise mask pixels. The former
-centre-Y predicate could miss an overlapping mask and ignored room width.
+`gml_Object_objPlayer_n_Step_1.asm` tests view bottom > activatey - 112,
+adds exactly 16 once per Begin Step, then calls
+`instance_activate_region(0,0,room_width,activatey,true)` before gravity and
+movement. `scrPlayerInit` initializes activatey to zero; rmMain width is 480.
+`scrOutofview` destroys instances rather than deactivating them.
 
-Both adapters use the existing resource-verified `EnemyContact` bounds and
-unit flips. SDL resolves the serialized object sprite when the instance has
-no animation override, as its renderer does. Without that fallback, the new
-paired route check failed at update 882 because a dormant bat appeared to
-have no mask. Two older unit fixtures also used sprite 175 (jellyfish hit)
-for object 116; these now use the serialized bat sprite 153.
+`MainRoomActivation` supplies this frontier operation to both adapters.
+`activationPending` distinguishes dormant records from destroyed records;
+an inactive flag alone is not permission to reactivate an instance.
 
-Tests cover region edges, empty boxes, overlap with an origin below the
-frontier, horizontal exclusion, storage order and active/retired exclusions.
-The live runtime test activates a snake centred at world Y=179 when its top
-at 175 overlaps frontier 176. No extra frontier advances, RNG calls or changes
-to actor execution order were introduced. Bounds are only resolved for
-pending inactive records, not every active enemy every frame.
+## Windows region predicate
 
-Host unit/resource checks and both natural exit/shop routes pass:
-`/tmp/downwell-activation-bounds-unit.log` and
-`/tmp/downwell-activation-bounds-natural.log`. This implements documented box
-overlap using the existing integer-bound model. Exact touching-edge, flipped
-pixel and fractional-coordinate behavior still needs original-runner capture;
-modern documentation alone does not prove every detail of this GMS1 build.
-General within-event visibility of newly activated instances is not a generic
-VM scheduler implementation; this retains the existing player/actor phases.
+In the pinned Steam executable, wrapper `0x529660` narrows region coordinates
+to binary32 and constructs the upper edges by adding width/height. It calls
+the inactive-instance traversal with predicate `0x52d040`.
 
-The bounded native natural-route gate passes: exit at update 1,477, 211
-upgrade and 135 exit-field comparisons, 49 shop-HUD comparisons, and the
-43-update return to the shaft. Pixel failure counters remain zero and the
-task-stack guard passes. Normal startup is restored with both 68000 audits
-clean. Logs: `/tmp/downwell-activation-bounds-native.log` and
-`/tmp/downwell-activation-bounds-native-gdb.log`.
+For an instance with a valid sprite or mask, the predicate recalculates dirty
+bounds through `0x466010(instance,1)`. It marks the instance outside only when:
 
-The 6,000-update combat/death adapter regression also passes, including 3,502
-paired dead updates and both later room re-entries. Log:
-`/tmp/downwell-activation-bounds-combat.log`.
+```
+region.left > bounds.right || bounds.left > region.right ||
+region.top > bounds.bottom || bounds.top > region.bottom
+```
 
-## Historical frontier/phase correction
+These are strict comparisons: equality intersects. If neither resource is
+valid, the predicate applies the same inclusive region comparisons to the
+instance origin. The main-room enemy adapter supports known nonempty masks,
+not this general missing-resource path.
 
-Source evidence is `gml_Object_objPlayer_n_Step_1.asm`: its first block tests
-view bottom > activatey - 112, adds exactly 16 to activatey, then activates the
-region before gravity and movement. `scrPlayerInit` initializes activatey=0.
-`gml_GlobalScript_scrOutofview.asm` calls instance_destroy, not deactivation.
+This build loads compatibility-mode inclusive mask bounds; see
+[collision bounds](runner-collision-bounds.md). The portable `ContactBounds`
+uses exclusive upper edges. For supported integer axis-aligned masks, the
+source region `(0,0)..(480,activatey)` therefore becomes:
 
-Amiga now maintains this advancing frontier instead of a constant camera-distance
-activation test. SDL performs its frontier update at the start of player Begin
-Step rather than after all gameplay updates. Deferred inactive instances carry
-an explicit activationPending flag; activation clears it. Destroyed/retired
-instances cannot be reactivated merely because their active flag is false.
-The pending state is included in the SDL deterministic digest.
-Its pinned startup digest is now `5ebea3e340215cdc`; this is an explicit
-checksum-layout change, not a new Windows behavior reference.
+```
+left <= 480 && right > 0 && top <= activatey && bottom > 0
+```
 
-Tests cover ten 16-pixel frontier advances leaving a world-y 176 centre dormant,
-the eleventh activating it before enemy motion, deferred insertion preserving
-dormancy, and retired live-tape enemies no longer awaiting activation.
-These older tests proved frontier progression and scheduling, not region
-inclusion. The bounding-box work above supersedes their centre-only predicate.
+This conversion does not establish fractional/rotated mask rounding or the
+runtime FP control word. Sprite fallback and explicit-mask selection must
+remain consistent with source resource metadata.
 
-The extended combat gate still fails at the tick-600 snake hit and tick-666
-player movement. The bat at world y2368 still activates earlier in SDL; camera
-fraction/frame alignment and region boundaries remain under investigation.
-Do not claim full activation fidelity from matching the frontier algorithm.
+## Immediate activation transitions versus membership processing
 
-Validation: full host suite passes; the bounded A500 canonical replay passes
-with `bfbbd762b9b62a59`, and 68000 helper/instruction audits are clean. SDL was
-rebuilt. The short target replay is a platform regression check, not coverage
-of the disputed bat boundary in the extended host tape.
+`0x467640` requests deactivation. When instance flag `0x80000` is clear it
+enqueues the instance in the pending list at `0xb5a070`, then sets flag `2`.
+Changed flags invalidate both cached activation traversals (`0x8a65e4/5`).
+
+`0x4627d0` requests activation. When flag `0x80000` is set it enqueues the
+instance in that pending list. If flag `2` is set, it calls dirty-queue marker
+`0x501e50` before clearing `2`. Changed flags invalidate the same caches.
+The enqueue routine `0x4633e0` appends only if the instance is absent; a repeated
+request does not move an existing entry. This differs from spatial dirty
+marking, which removes and prepends an existing entry.
+
+The region predicate activates only when `(flags & 0x100003) == 2` and the
+inside/outside request matches its region result. These immediate routines
+do not themselves call ancestor-list unlink/rebind. Their deferred membership
+processing must be traced before inferring reactivation order for
+`instance_place`; flag changes alone do not prove immediate tail insertion.
+
+## Evidence and checks
+
+`tools/verify-runner-field-lookup.py` pins the reviewed wrapper, predicate,
+activation/deactivation and unique-enqueue bytes against the immutable Windows
+executable. `tests/core/MainRoomActivationTest.cpp` covers the shared supported
+mask boundary conversion, frontier cadence and active/retired exclusions.
+These are static-source and component checks, not Windows encounter captures
+or proof of complete event/membership scheduling.

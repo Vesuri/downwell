@@ -918,12 +918,19 @@ int main() {
         require(bounds.configureEnemy(0, 111, 163, 40, 3, 128, 0, 5, 6,
                     0, 0, -1, -1, 0, 0, false) &&
                 bounds.configureEnemy(1, 111, 163, 300, 3, 128, 0, 5, 6,
+                    0, 0, -1, -1, 0, 0, false) &&
+                bounds.configureEnemy(2, 111, 163, 60, 4, 128, 0, 5, 6,
+                    0, 0, -1, -1, 0, 0, false) &&
+                bounds.configureEnemy(3, 111, 163, 80, 5, 128, 0, 5, 6,
                     0, 0, -1, -1, 0, 0, false), "dormant bounds fixtures configure");
         for (unsigned tick = 0; tick < 10; ++tick) bounds.step(0);
         require(!bounds.enemyAt(0).active, "mask remains below frontier 160");
         bounds.step(0);
         require(bounds.enemyAt(0).active && !bounds.enemyAt(1).active,
             "frontier 176 intersects mask at 175 while excluding a box outside room width");
+        require(bounds.enemyAt(2).active && !bounds.enemyAt(2).activationPending &&
+                !bounds.enemyAt(3).active && bounds.enemyAt(3).activationPending,
+            "live activation includes mask top 176 but not the next pixel at 177");
     }
     bat.configureSolidResolver(noSolid, 0);
     require(bat.configureEnemy(0, 116, 153, 40, 0,
