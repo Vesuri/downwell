@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 MAGIC = b"DWSP"
-VERSION = 1
+VERSION = 2
 MANIFEST_SCHEMA = 3
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 EXPECTED_SPRITES = 741
@@ -19,7 +19,7 @@ EXPECTED_FRAMES = 3152
 EXPECTED_PAGE_ITEMS = 3161
 
 HEADER = struct.Struct("<4sHHIIIIQII")
-SPRITE = struct.Struct("<iiiiiIII")
+SPRITE = struct.Struct("<iiiiiIIIiiiiII")
 FRAME = struct.Struct("<I")
 PAGE_ITEM = struct.Struct("<Iiiiiiiiiiii")
 
@@ -56,10 +56,14 @@ def build_pack(manifest):
             flags |= SPRITE_SMOOTH
         if sprite["preload"]:
             flags |= SPRITE_PRELOAD
+        modes = {"AxisAlignedRect": 0, "Precise": 1}
+        require(sprite["separateMasks"] in modes, "unsupported collision mode")
         sprite_records.append(SPRITE.pack(
             sprite["id"], sprite["width"], sprite["height"],
             sprite["originX"], sprite["originY"], flags,
             first_frame, len(sprite["frames"]),
+            sprite["marginLeft"], sprite["marginTop"], sprite["marginRight"], sprite["marginBottom"],
+            modes[sprite["separateMasks"]], sprite["collisionMaskCount"],
         ))
 
     page_item_records = []
@@ -115,15 +119,27 @@ def main():
                         default=root / "generated/downwell-sprites.dwsp")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    payload = build_pack(json.loads(args.manifest.read_text(encoding="utf-8")))
+    manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+    payload = build_pack(manifest)
     digest = hashlib.sha256(payload).hexdigest()
+    provenance = (json.dumps({
+        "formatVersion": VERSION, "source": manifest["source"],
+        "extractor": manifest["extractor"],
+        "manifestSha256": hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
+        "generatorSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "packSha256": digest,
+    }, sort_keys=True, indent=2) + "\n").encode()
+    provenance_path = args.output.with_suffix(".manifest.json")
     if args.check:
         require(args.output.is_file(), f"missing sprite pack: {args.output}")
         require(args.output.read_bytes() == payload,
                 "sprite pack differs from deterministic generator output")
+        require(provenance_path.is_file() and provenance_path.read_bytes() == provenance,
+                "sprite provenance differs from deterministic generator output")
         print(f"sprite pack verified: {len(payload)} bytes sha256 {digest}")
         return
     atomic_write(args.output, payload)
+    atomic_write(provenance_path, provenance)
     print(f"sprite pack written: {len(payload)} bytes sha256 {digest}")
 
 

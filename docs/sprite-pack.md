@@ -19,15 +19,25 @@ the original GameMaker resources.
 u32 spriteCount, frameCount, pageItemCount; u64 sourceHashPrefix;
 u32 texturePageCount, reserved`
 
-Version 1 contains 741 sprites, 3,152 frames, 3,161 page items, and two texture
+Version 2 contains 741 sprites, 3,152 frames, 3,161 page items, and two texture
 pages for the pinned build.
 
-## Sprite record — 32 bytes
+## Sprite record — 56 bytes
 
 `i32 spriteId, width, height, originX, originY; u32 flags, firstFrame,
-frameCount`
+frameCount; i32 marginLeft, marginTop, marginRight, marginBottom;
+u32 collisionMode, collisionMaskCount`
 
 Flag bits 0–2 are transparent, smooth, and preload.
+Margins retain serialized inclusive collision bounds, independently of artwork
+dimensions and trimming. Collision mode is a DWSP enum: 0 means AxisAlignedRect,
+1 means Precise. Unknown modes are rejected. Mask count is metadata only; the
+pack does not contain mask pixels. Readers reject version 1 rather than treating
+its next record as collision metadata.
+
+The generated `.manifest.json` sidecar records the original input hash,
+extractor version/commit, extraction-manifest hash, generator hash and pack hash.
+`--check` verifies both files. Both remain ignored generated material.
 
 ## Frame record — 4 bytes
 

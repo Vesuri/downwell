@@ -64,7 +64,7 @@ SpritePack::SpritePack(const std::uint8_t* bytes, std::size_t size) : bytes_(byt
         PackedSprite value;
         sprite(id, value);
         if (value.spriteId != static_cast<std::int32_t>(id) ||
-            !range(value.firstFrame, value.frameCount, frameCount_)) {
+            !range(value.firstFrame, value.frameCount, frameCount_) || value.collisionMode>1) {
             error_ = SpritePackError::badSprite; return;
         }
     }
@@ -87,7 +87,8 @@ bool SpritePack::sprite(std::uint32_t id, PackedSprite& out) const {
     if (!valid() || id >= spriteCount_) return false;
     const std::uint8_t* p = bytes_ + spritesOffset_ + id * spriteRecordSize;
     out = {i32(p), i32(p + 4), i32(p + 8), i32(p + 12), i32(p + 16),
-           u32(p + 20), u32(p + 24), u32(p + 28)};
+           u32(p + 20), u32(p + 24), u32(p + 28),
+           i32(p + 32), i32(p + 36), i32(p + 40), i32(p + 44),u32(p + 48),u32(p + 52)};
     return true;
 }
 

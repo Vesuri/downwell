@@ -12,6 +12,8 @@ enum class SpritePackError { none, tooShort, badMagic, unsupportedVersion,
 struct PackedSprite {
     std::int32_t spriteId, width, height, originX, originY;
     std::uint32_t flags, firstFrame, frameCount;
+    std::int32_t marginLeft, marginTop, marginRight, marginBottom;
+    std::uint32_t collisionMode, collisionMaskCount; // DWSP: 0 rectangle, 1 precise.
 };
 
 struct PackedTexturePageItem {
@@ -23,11 +25,11 @@ struct PackedTexturePageItem {
 
 class SpritePack {
 public:
-    static constexpr std::uint16_t formatVersion = 1;
+    static constexpr std::uint16_t formatVersion = 2;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 40;
-    static constexpr std::size_t spriteRecordSize = 32;
+    static constexpr std::size_t spriteRecordSize = 56;
     static constexpr std::size_t frameRecordSize = 4;
     static constexpr std::size_t pageItemRecordSize = 48;
 
@@ -39,6 +41,12 @@ public:
     std::uint32_t pageItemCount() const { return pageItemCount_; }
     std::uint32_t texturePageCount() const { return texturePageCount_; }
     bool sprite(std::uint32_t id, PackedSprite& output) const;
+    // 0x46604c: only a NEGATIVE mask index falls back to the artwork sprite.
+    // An invalid nonnegative mask is a missing resource, not a fallback.
+    bool collisionSprite(std::int32_t spriteId,std::int32_t maskId,PackedSprite& output) const {
+        const auto id=maskId<0?spriteId:maskId;
+        return id>=0 && sprite(static_cast<std::uint32_t>(id),output);
+    }
     bool pageItem(std::uint32_t id, PackedTexturePageItem& output) const;
     bool spriteFrame(const PackedSprite& sprite,
                      std::uint32_t frame,

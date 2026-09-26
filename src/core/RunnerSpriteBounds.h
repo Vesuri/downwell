@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPRITE_BOUNDS_H
 #define DOWNWELL_CORE_RUNNER_SPRITE_BOUNDS_H
 #include "RunnerSpatialSplit.h"
+#include "SpritePack.h"
 namespace downwell {
 // Ordinary sprite bounds: 0x46616d..0x46669c. Not the skeletal-sprite
 // branch. Each arithmetic operation narrows to binary32. Compatibility mode
@@ -9,6 +10,19 @@ struct RunnerSpriteBounds {
     using Math=RunnerSpatialSplit;
     using Real=Math::Real;
     using Box=Math::Box;
+    template<class Round> static bool fromSprite(const PackedSprite& sprite,Real x,Real y,
+        Real scaleX,Real scaleY,bool hasRotation,Real cosine,Real sine,
+        bool compatibility,Round round,Box& result){
+        Box margins;
+        if(!margins.left.assign(MotionBinary64::fromInteger(sprite.marginLeft))||
+           !margins.top.assign(MotionBinary64::fromInteger(sprite.marginTop))||
+           !margins.right.assign(MotionBinary64::fromInteger(sprite.marginRight))||
+           !margins.bottom.assign(MotionBinary64::fromInteger(sprite.marginBottom)))return false;
+        return hasRotation?rotated(margins,sprite.originX,sprite.originY,x,y,scaleX,scaleY,
+                                   cosine,sine,compatibility,round,result):
+                           unrotated(margins,sprite.originX,sprite.originY,x,y,scaleX,scaleY,
+                                     compatibility,round,result);
+    }
     // Nonzero-angle branch. Caller supplies the source-narrowed cosine/sine;
     // angle conversion and trigonometry are separate from this geometry.
     template<class Round> static bool rotated(Box margins,int originX,int originY,
