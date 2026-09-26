@@ -3,6 +3,10 @@
 #include "core/BloodEffects.h"
 #include "core/BloodCollisionBounds.h"
 #include "core/BloodMaskSample.h"
+#include "core/BloodGoalContact.h"
+bool compileBloodGoal(const downwell::BloodEffect& effect,const downwell::GoalTimeField& field,bool& hit){
+    return downwell::BloodGoalContact::query(effect,field,hit);
+}
 bool compileBloodSample(const downwell::BloodEffect& effect,int x,int y,bool& hit){
     downwell::BloodMaskSample sample;return sample.prepare(effect)&&sample.contains(x,y,hit);
 }
