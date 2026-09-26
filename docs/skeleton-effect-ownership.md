@@ -443,6 +443,14 @@ records executable, exporter, path, table and output hashes plus decoder version
 storage. Evaluation preserves each scalar/packed lane operation and rounding
 boundary; it does not replace the source polynomial with host libm.
 
+Single-axis consumers can call `smokeCosine`, which evaluates only the recovered
+cosine path. Damage-number `lengthdir_x` uses it; two-axis smoke/shard motion
+retains `smokeTrig`. Both interfaces have the same admitted input domain and
+atomic failure behavior. The numeric test compares the single-axis result's
+binary64 bits with the pair result as well as the scalar source-program oracle,
+including signed zero and reduction-boundary neighbors. No lookup approximation,
+precomputed direction quantization or changed rounding is introduced.
+
 The supported contract includes smoke and shard radians in [-11,11] under
 nearest-even FP mode, with signed-zero results. The runner's entry guards at
 0x74b621 and 0x74b7e1 strip the sign before range testing; the polynomial itself

@@ -143,9 +143,9 @@ struct RunSession {
         DW_PROFILE_SCOPE(profileDamageNumberStep);
         return stepDamageNumbers(phase,[](MotionBinary64 speed,MotionBinary64 direction,MotionBinary64& x){
             RunnerImageValue length,angle,radian;
-            MotionBinary64 cosine,sine;
+            MotionBinary64 cosine;
             return length.assign(speed)&&angle.assign(direction)&&SmokeDirection::radians(angle,radian)&&
-                smokeTrig(radian.promoted(),cosine,sine)&&SmokeDirection::component(length,cosine,false,x);
+                smokeCosine(radian.promoted(),cosine)&&SmokeDirection::component(length,cosine,false,x);
         });
     }
     void clearDamageNumbers(){DamageNumberHooks hooks;damageNumbers.clear(hooks);}
