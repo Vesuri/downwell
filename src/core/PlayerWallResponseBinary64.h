@@ -12,6 +12,23 @@ struct PlayerWallResponseBinary64 {
     N x{},y{},vx{},vy{},hardLandSpeed{0x3ff33333u,0x33333333u};
     bool grounded=false,hardLand=false,hardLandJump=false,airStatus=false,wallColliding=false;
     SolidCollisionResult collision{};
+    // objPlayer_n Begin Step blocks 19..25, after wall responses and napping/
+    // jetpack handling. Clock accounting queries OLD published x/y before this
+    // call. Publish callbacks perform the actual builtin setters (including
+    // binary32 narrowing and collision-index side effects), X before Y.
+    // Coordinates here are absolute room coordinates, not camera offsets.
+    template<class PublishX,class PublishY>
+    bool integrateAndPublish(bool goalStopped,bool wrap,PublishX publishX,PublishY publishY){
+        if(!goalStopped && (!y.add(vy)||!x.add(vx)))return false;
+        if(wrap){
+            if(!x.valid())return false;
+            if(PlayerHorizontalBinary64::less(N::fromInteger(320),x))x=N::fromInteger(160);
+            else if(PlayerHorizontalBinary64::less(x,N::fromInteger(160)))x=N::fromInteger(320);
+        }
+        N rounded;
+        if(!PlayerSolidCollisionBinary64::rounded(x,rounded)||!publishX(rounded))return false;
+        return PlayerSolidCollisionBinary64::rounded(y,rounded) && publishY(rounded);
+    }
     // Events: meeting(target,x,y,hit), breakBox(x,y,found), timeStopped(),
     // comboDone(), recharge(), gravity(). Boolean operations report failure.
     // Synchronous script callbacks may change state; later operations reread it.
