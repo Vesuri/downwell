@@ -269,6 +269,14 @@ the position adapter is not yet installed on live stores. Handle metadata costs
 one slot index plus one record index and generation per capacity entry, without
 changing the serialized resource IDs or `InstanceRecord` payload.
 
+Ordinary bullets in `GameplayWorld` carry nonzero internal lifetime IDs, like
+the effect owners' opaque handles. `findBullet` resolves only live shots and
+follows creation-order compaction. New births cannot reuse a retired ID; the
+sequence survives level changes and Retry, and exhaustion fails explicitly.
+These keys are not reconstructed Windows instance IDs and must not be used as
+source ordering evidence. Mapping them into a shared spatial registry, including
+synchronous membership retirement, remains necessary before live queries use it.
+
 `0x501e50` requires an object and either object flags `0x28` or instance flag
 `0x20`. It unlinks existing spatial-dirty membership and prepends the instance
 at `0x8a6100`. Repeated mutations therefore move an instance to the front;

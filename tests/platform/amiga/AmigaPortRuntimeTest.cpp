@@ -376,6 +376,10 @@ int main() {
     auto birthCoordinate = [](downwell::MachineGunTrajectory::Coordinate p, int velocity, unsigned age) {
         return p.pixel + (p.fraction - static_cast<double>(velocity) * age) / 1048576.0;
     };
+    const auto oldestIdentity=burst.bulletAt(0).lifetimeId;
+    const auto survivorIdentity=burst.bulletAt(1).lifetimeId;
+    require(oldestIdentity && survivorIdentity>oldestIdentity && !burst.findBullet(0),
+            "bullet lifetimes have distinct nonzero internal identities");
     require(birthCoordinate(burst.bulletAt(0).trajectory.x, burst.bulletAt(0).trajectory.velocityX, 8) == -1 &&
             birthCoordinate(burst.bulletAt(1).trajectory.x, burst.bulletAt(1).trajectory.velocityX, 1) == 1,
             "original default gun alternates left and right boot emission offsets");
@@ -383,6 +387,8 @@ int main() {
     burst.step(4);
     require(!burst.bulletAt(0).active && burst.bulletAt(1).active,
             "retiring the oldest bullet leaves a hole before a surviving shot");
+    require(!burst.findBullet(oldestIdentity) && burst.findBullet(survivorIdentity)==&burst.bulletAt(1),
+            "retirement invalidates old identity without touching the survivor");
     burst.configureSolidResolver(nullptr, nullptr);
     for (unsigned frame = 9; frame <= 14; ++frame) burst.step(4);
     require(burst.player().shots() == 3 && burst.bulletCount() == 2 &&
@@ -392,11 +398,21 @@ int main() {
                 birthCoordinate(burst.bulletAt(1).trajectory.x, burst.bulletAt(1).trajectory.velocityX, 1) == -1 &&
                 burst.bulletAt(0).y > burst.bulletAt(1).y,
             "new shots append after older survivors rather than reusing earlier holes");
+    require(burst.findBullet(survivorIdentity)==&burst.bulletAt(0) &&
+            burst.bulletAt(1).lifetimeId>survivorIdentity && !burst.findBullet(oldestIdentity),
+            "lifetime lookup follows compaction and new births cannot alias retired shots");
     downwell::ProjectileAnimation newborn;
     newborn.advance();
     require(burst.bulletAt(1).animation.index.equal(newborn.index) &&
                 !burst.bulletAt(0).animation.index.equal(newborn.index),
             "slot reuse resets new-shot animation without resetting surviving bullets");
+    const auto lastBulletIdentity=burst.bulletAt(1).lifetimeId;
+    burst.restartFromResults(downwell::DeathMenuSequence::Action::Retry,2,300);
+    require(!burst.findBullet(survivorIdentity)&&!burst.findBullet(lastBulletIdentity),
+            "Retry retires all prior bullet lifetimes");
+    for(unsigned tick=0;tick<100 && !burst.bulletCount();++tick)burst.step(tick%2?4:0);
+    require(burst.bulletCount() && burst.bulletAt(0).lifetimeId>lastBulletIdentity,
+            "Retry preserves identity sequence while resetting game rules");
     AmigaPortRuntime movingShot(300, false, 1000);
     for (unsigned frame = 0; frame < 12; ++frame) movingShot.step(2);
     const int muzzleX = downwell::roundGameMakerQ8(movingShot.player().offsetXFixed());

@@ -87,6 +87,8 @@ public:
     void confirmFirstStage() { if (run_.stage.area == 0) run_.stage.advance(1); }
 
     struct BulletState {
+        // Internal lifetime key, not a Windows instance/resource ID or slot.
+        std::uint32_t lifetimeId = 0;
         int x;
         int y;
         bool active;
@@ -267,6 +269,11 @@ public:
     unsigned bulletSlotEnd() const { return bulletSlotEnd_; }
     unsigned gemSlotEnd() const { return gemSlotEnd_; }
     const BulletState& bulletAt(unsigned index) const;
+    const BulletState* findBullet(std::uint32_t lifetimeId) const {
+        if(lifetimeId)for(unsigned i=0;i<bulletSlotEnd_;++i)
+            if(bullets_[i].active && bullets_[i].lifetimeId==lifetimeId)return &bullets_[i];
+        return nullptr;
+    }
     const EnemyState& enemyAt(unsigned index) const;
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const downwell::SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
@@ -405,6 +412,7 @@ private:
     int cameraPixelX_;
     int activationY_;
     BulletState bullets_[bulletCapacity];
+    std::uint32_t nextBulletLifetimeId_ = 1;
     unsigned bulletSlotEnd_ = 0, gemSlotEnd_ = 0;
     EnemyState enemies_[enemyCapacity];
     GemState gems_[gemCapacity];

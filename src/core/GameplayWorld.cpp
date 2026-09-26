@@ -36,8 +36,10 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
     const auto records = run_.records();
+    const auto nextBulletIdentity=nextBulletLifetimeId_;
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true);
+    nextBulletLifetimeId_=nextBulletIdentity;
     run_.restart(action, records);
     enemyRandom_.setSeed(seed);
     return destination;
@@ -568,15 +570,19 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         const unsigned index = downwell::compactInstanceSlots(bullets_, bulletSlotEnd_);
         bulletSlotEnd_ = index;
         if (index < bulletCapacity) {
-            BulletState& bullet = bullets_[index];
-            bullet.active = true;
-            bulletSlotEnd_ = index + 1;
-            bullet.x = muzzleX + muzzleOffset;
-            bullet.y = muzzleY;
-            bullet.gemHigh = run_.gemHigh;
-            bullet.animation = {};
-            bullet.trajectory.reset(bullet.x, bullet.y, run_.upgrades.levels[12] != 0);
-            bulletChanged = true;
+            if(!nextBulletLifetimeId_)run_.effectsSucceeded=false;
+            else {
+                BulletState& bullet = bullets_[index];
+                bullet.lifetimeId=nextBulletLifetimeId_++;
+                bullet.active = true;
+                bulletSlotEnd_ = index + 1;
+                bullet.x = muzzleX + muzzleOffset;
+                bullet.y = muzzleY;
+                bullet.gemHigh = run_.gemHigh;
+                bullet.animation = {};
+                bullet.trajectory.reset(bullet.x, bullet.y, run_.upgrades.levels[12] != 0);
+                bulletChanged = true;
+            }
         }
     }
 
