@@ -34,6 +34,13 @@ public:
         if(count_==Capacity || !nextIdentity_)return false;
         fields_[count_].adoptCreate(x,y,word);++count_;++nextIdentity_;return true;
     }
+    // Runtime instance_create executes object 82 Create synchronously, unlike
+    // adoption of a builder birth whose random sample was already consumed.
+    // Reject port storage/key exhaustion before consuming the Create sample.
+    bool create(int x,int y,GameMakerRandom& random){
+        if(count_==Capacity || !nextIdentity_)return false;
+        return adoptCreate(x,y,random.nextU32());
+    }
     // Equal-depth dynamic instances are inserted before existing equals by
     // runner 0x487610. The goal's boundary is the ordinary count at its birth;
     // later ordinary births therefore precede it. No coordinate sorting.

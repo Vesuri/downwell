@@ -11,6 +11,27 @@
 using namespace downwell;
 static double value(HudReal n){return std::ldexp(double(n.mantissa),n.exponent-52);}
 int main(){
+    for(unsigned seed=0;seed<256;++seed){
+        OrdinaryTimeFields<2> fields;
+        GameMakerRandom actual(seed),expected(seed);
+        assert(fields.create(-16,512,actual));
+        assert(fields.at(0)->x==-16 && fields.at(0)->y==512);
+        assert(fields.at(0)->radius.equal(OrdinaryTimeField::radiusFromWord(expected.nextU32())));
+        const auto first=fields.identityAt(0);
+        assert(fields.adoptCreate(240,600,17)); // Adoption must not sample again.
+        assert(fields.identityAt(1)==first+1);
+        assert(!fields.create(0,0,actual) && fields.size()==2);
+        fields.clear();
+        assert(!fields.find(first));
+        assert(fields.restoreEmptyBirthSequence({0xffffffffu}));
+        assert(fields.create(240,700,actual) && fields.identityAt(0)==0xffffffffu);
+        assert(fields.at(0)->radius.equal(OrdinaryTimeField::radiusFromWord(expected.nextU32())));
+        // A free storage slot cannot revive an exhausted identity sequence.
+        assert(!fields.create(0,0,actual) && fields.size()==1);
+        fields.clear();assert(!fields.create(0,0,actual));
+        assert(actual.drawCount()==2 && actual.stateIndex()==expected.stateIndex());
+        for(unsigned i=0;i<16;++i)assert(actual.stateWord(i)==expected.stateWord(i));
+    }
     {
         OrdinaryTimeFields<2> fields;
         std::uint32_t previous=0;

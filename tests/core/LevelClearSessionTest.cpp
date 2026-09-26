@@ -55,7 +55,10 @@ int main() {
         fields.createLevelExit(480,2000,actual,camera);
         expected.nextU32(); // Goal Create.
         require(fields.goalFieldBirthBoundary==2,"goal records its exact creation boundary");
-        require(fields.adoptTimeField(240,1000,3),"field after exit birth");
+        require(fields.createTimeField(240,1000,actual),"runtime field after exit birth");
+        require(fields.timeFields.at(2)->radius.equal(OrdinaryTimeField::nextRadius(expected)),
+            "runtime field Create samples exactly once before Draw");
+        require(fields.goalFieldBirthBoundary==2,"runtime birth preserves exit Draw boundary");
         fields.gameplayPresentationStep(actual);
         require(fields.timeFields.at(2)->radius.equal(OrdinaryTimeField::nextRadius(expected)),"new field draws first");
         require(fields.goalField.radius.equal(GoalTimeField::nextRadius(expected)),"exit draws at birth boundary");
@@ -69,6 +72,25 @@ int main() {
         fields.goalStopped=true;
         fields.gameplayPresentationStep(actual,false);
         require(actual.drawCount()==count+4,"goal stop is not a substitute for pTimeStop");
+    }
+    {
+        RunSession fields;GameMakerRandom actual(123),expected(123);
+        for(unsigned i=0;i<64;++i){
+            require(fields.createTimeField(240,int(i),actual),"runtime field capacity fixture");
+            require(fields.timeFields.at(i)->radius.equal(OrdinaryTimeField::nextRadius(expected)),
+                "runtime birth retains synchronous Create radius");
+        }
+        require(!fields.createTimeField(240,65,actual) && !fields.effectsSucceeded && fields.timeFields.size()==64,
+            "runtime field exhaustion is explicit");
+        fields.timeFields.clear();
+        require(!fields.createTimeField(240,66,actual) && fields.timeFields.size()==0,
+            "free storage does not clear session failure");
+        require(actual.drawCount()==expected.drawCount() && actual.stateIndex()==expected.stateIndex(),
+            "rejected runtime births consume no random words");
+        for(unsigned i=0;i<16;++i)require(actual.stateWord(i)==expected.stateWord(i),"runtime full RNG state");
+        fields.reset();
+        require(fields.createTimeField(240,700,actual) && fields.timeFields.identityAt(0)==65,
+            "reset permits runtime births without reusing stale identities");
     }
     {
         RunSession fields;

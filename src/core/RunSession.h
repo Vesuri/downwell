@@ -104,6 +104,10 @@ struct RunSession {
         if(effectsSucceeded)effectsSucceeded=timeFields.adoptCreate(x,y,radiusWord);
         return effectsSucceeded;
     }
+    bool createTimeField(int x,int y,GameMakerRandom& random){
+        if(effectsSucceeded)effectsSucceeded=timeFields.create(x,y,random);
+        return effectsSucceeded;
+    }
     void advanceBloodAnimation(){
         if(effectsSucceeded)effectsSucceeded=bloodEffects.advanceAnimation(bloodEffects.beginPhase());
     }
