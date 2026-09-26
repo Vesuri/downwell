@@ -76,6 +76,10 @@ image-frame normalization, single-mask reuse and world-to-mask coordinate
 transforms remain the caller's responsibility. Out-of-canvas pixel samples are
 false. This resource layer does not itself implement precise collision dispatch
 or establish live integration.
+The original precise-pair path also samples stored masks of rectangle-mode
+partners when present. This four-resource pack is therefore not an exhaustive
+mask source for arbitrary pairs; verified rectangle specializations (such as
+the blood mask) remain distinct from assuming an entire sprite canvas is solid.
 
 ## Frame record — 4 bytes
 

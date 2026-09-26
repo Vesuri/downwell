@@ -310,9 +310,9 @@ verify-precise-masks: generate-precise-masks build/sprite-mask-pack-test
 	python3 tools/generate-precise-masks.py --check
 	./build/sprite-mask-pack-test generated/downwell-sprite-masks.dwsm
 
-build/sprite-mask-pack-test: tests/core/SpriteMaskPackTest.cpp src/core/SpriteMaskPack.h
+build/sprite-mask-pack-test: tests/core/SpriteMaskPackTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
-	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/SpriteMaskPackTest.cpp
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SpriteMaskPackTest.cpp
 
 generated/precise-sprite-masks.json: tools/export-precise-masks.csx data/data.win
 	@mkdir -p generated

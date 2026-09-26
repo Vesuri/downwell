@@ -149,6 +149,17 @@ sprites to pass. X is the outer scan loop and Y the inner loop. The sprite
 flag at offset `0x8b` controls whether the mask byte is consulted; a false flag
 does not bypass the canvas-bound checks.
 
+`RunnerMaskTransform` shares this rotated-branch transform with the blood
+sampler. It accepts the already-narrowed inverse sine/cosine, prepares reciprocal
+scales and negative-scale position adjustments once, and can sample a borrowed
+`SpriteMaskPack` view. Integer-only arithmetic is checked against separately
+evaluated scalar binary32 expressions for 65,536 mirrored/fractional samples.
+It rejects zero scales and unsupported nonfinite/subnormal arithmetic rather
+than silently treating failure as a miss. Unit-scale arithmetic skips identity
+multiplications/divisions; this does not select the runner's distinct near-zero
+angle fast path. That dispatch, trig identity and original FP mode are not
+established by the transform tests.
+
 The loader at `0x4b7b45` maps serialized mode 1 to flag `0x89` (precise) and
 mode 2 to `0x8a` (rotated-rectangle handling). Flag `0x8b` is different: it
 indicates expanded mask bytes. `0x4b7e3f..0x4b7e61` retains serialized mask
@@ -163,7 +174,7 @@ columns 10..13, rows 11..13 inside its 24×24 canvas, not the whole canvas.
 mask exporter convention. Keep output at `extracted/utmt-0.9.2.0/blood-mask.json`
 and any CLI round-trip file under `generated/`, never `data/`.
 `python3 tools/verify-blood-mask.py` checks the input identity and every mask bit.
-`BloodMaskSample` specializes the unit-scale inverse transform and this rectangle;
+`BloodMaskSample` uses the shared transform with unit scale and specializes this rectangle;
 its prepared trig is independent of queried pixels. Active FP mode and signed
 trig equivalence still need original-runtime verification.
 
