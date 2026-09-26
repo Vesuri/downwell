@@ -260,11 +260,17 @@ test: verify-time-stop-masks
 test: verify-ordinary-time-field
 test: verify-runner-spatial-split
 .PHONY: verify-runner-spatial-split
-verify-runner-spatial-split: build/runner-spatial-split-test build/runner-spatial-dirty-test build/runner-object-membership-test
+verify-runner-spatial-split: build/runner-spatial-split-test build/runner-spatial-dirty-test build/runner-object-membership-test build/runner-sprite-bounds-test
 	./build/runner-spatial-split-test
 	./build/runner-spatial-dirty-test
 	./build/runner-object-membership-test
+	./build/runner-sprite-bounds-test
 	python3 tools/verify-runner-field-lookup.py
+	python3 tools/verify-runner-collision-bounds.py
+
+build/runner-sprite-bounds-test: tests/core/RunnerSpriteBoundsTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/RunnerSpriteBoundsTest.cpp
 
 build/runner-spatial-split-test: tests/core/RunnerSpatialSplitTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build

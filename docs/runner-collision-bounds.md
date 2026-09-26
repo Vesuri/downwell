@@ -35,6 +35,31 @@ lookup or mask geometry. The reviewed ranges are pinned by
 `tools/verify-runner-field-lookup.py`; component tests cover missing-resource
 birth, retained old entries, restoration and update-disabled refresh.
 
+## Unrotated ordinary-sprite branch
+
+`0x46616d..0x466328` treats each axis in this order, narrowing every operation
+to binary32 (margins are inclusive):
+
+```
+width = (high - low) + 1
+near = ((low - origin) * scale) + position
+far = (scale * width) + near
+```
+
+Compatibility mode rounds both endpoints to integers and converts them back
+to binary32, then sorts them, then subtracts one from the far endpoint. In
+fractional mode it sorts without rounding or subtracting. Zero scale can
+therefore yield reversed inclusive endpoints in compatibility mode; this is
+distinct from the spatial index's later endpoint normalization. Computing the
+far edge independently from `(high + 1 - origin)` changes rounding and is not
+equivalent.
+
+`RunnerSpriteBounds::unrotated` implements this ordinary-sprite branch with
+an explicit rounding callback. Its host tests use nearest-even and compare
+16,384 cases against a separate floating-point instruction-order transcription,
+including cases that distinguish reassociation. This does not establish the
+original runtime's FP control word, nor cover rotated or skeletal resources.
+
 ## Rotated ordinary-sprite branch
 
 `0x4663da..0x4664ab` subtracts sprite origins from inclusive margins, adds one

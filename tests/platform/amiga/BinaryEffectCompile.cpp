@@ -10,6 +10,12 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
 #include "core/RunnerSpatialIndex.h"
 #include "core/RunnerSpatialDirtyQueue.h"
 #include "core/RunnerSpatialBoundsUpdate.h"
+#include "core/RunnerSpriteBounds.h"
+bool compileRunnerSpriteBounds(downwell::RunnerSpriteBounds::Box margins,
+    downwell::RunnerImageValue scale,downwell::RunnerSpriteBounds::Box& result){
+    return downwell::RunnerSpriteBounds::unrotated(margins,12,12,{}, {},scale,scale,true,
+        [](downwell::RunnerImageValue value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},result);
+}
 #include "core/RunnerSpatialPosition.h"
 bool compileRunnerSpatialPosition(downwell::RunnerImageValue& x,downwell::RunnerImageValue& y,std::uint32_t& flags,
     downwell::RunnerSpatialDirtyQueue<256>& spatial,downwell::RunnerSpatialDirtyQueue<256>& collision){
