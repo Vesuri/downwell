@@ -246,6 +246,15 @@ build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/
 
 test: verify-time-stop-bound
 test: verify-player-time-stop
+test: verify-time-change
+.PHONY: verify-time-change
+verify-time-change: build/time-change-test
+	./build/time-change-test
+
+build/time-change-test: tests/core/TimeChangeEffectTest.cpp src/core/TimeChangeEffect.h src/core/AlarmBank.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/TimeChangeEffectTest.cpp
+
 .PHONY: verify-player-time-stop
 verify-player-time-stop: build/player-time-stop-test
 	./build/player-time-stop-test

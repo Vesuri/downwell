@@ -6,6 +6,11 @@
 #include "core/BloodGoalContact.h"
 #include "core/RunSession.h"
 #include "core/PlayerTimeStop.h"
+#include "core/TimeChangeEffect.h"
+bool compileTimeChange(downwell::TimeChangeEffect& effect,int& speed){
+    if(!effect.create(speed,[](unsigned){return true;}))return false;
+    effect.advanceAlarms(speed);return !effect.destroyRequested;
+}
 bool compilePlayerTimeStop(downwell::PlayerTimeStop& state,bool main,bool side,bool field){
     return state.step(main,side,[&](bool& hit){hit=field;return true;},
         [](auto){return false;},[](auto){return true;});
