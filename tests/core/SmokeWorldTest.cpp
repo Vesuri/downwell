@@ -35,6 +35,20 @@ int main(){
     for(unsigned i=0;i<100;++i)world.step(0);
     assert(world.effectsSucceeded() && world.smokeEffects().size()==0);
 
+    // Retry reconstructs GameplayWorld in place. It must not reuse the old
+    // world's effect keys, unlike a genuinely new independent identity domain.
+    assert(world.emitSmokeBurst({}, {})&&world.emitFlashBurst({}, {}));
+    const auto smokeSequence=world.smokeEffects().birthSequence();
+    const auto flashSequence=world.flashEffects().birthSequence();
+    world.restartFromResults(DeathMenuSequence::Action::Retry,84,0);
+    assert(world.effectsSucceeded());
+    assert(world.smokeEffects().birthSequence().next==smokeSequence.next);
+    assert(world.flashEffects().birthSequence().next==flashSequence.next);
+    assert(world.emitSmokeBurst({}, {})&&world.emitFlashBurst({}, {}));
+    world.smokeEffects().visitNewest([&](auto key,const auto&){assert(key>=smokeSequence.next);});
+    for(unsigned i=0;i<32;++i)if(world.flashEffects().slot(i).handle)
+        assert(world.flashEffects().slot(i).handle>=flashSequence.next);
+
     // Scheduler cutoff must follow alarm births and precede ordinary-Step births.
     InstanceStore<1> instances;instances.create(1,1,1,false);auto* instance=instances.find(1);
     instance->alarms.set(0,1);
@@ -65,6 +79,10 @@ int main(){
     while(host.emitSmokeBurst({},{})){assert(++attempts<10);}
     assert(!host.effectsSucceeded());
     const auto draws=host.randomDrawCount();assert(!host.emitSmokeBurst({},{}));assert(draws==host.randomDrawCount());
+    const auto hostSequence=host.smokeEffects().birthSequence();
     host.reset(PlatformProfile::desktop);assert(host.effectsSucceeded()&&host.smokeEffects().size()==0);
+    assert(host.smokeEffects().birthSequence().next==hostSequence.next);
+    assert(host.emitSmokeBurst({},{}));
+    host.smokeEffects().visitNewest([&](auto key,const auto&){assert(key>=hostSequence.next);});
     std::puts("Smoke worlds: Create RNG, generation/phase exclusion, next-step motion, host lifetime, exhaustion and reset passed");
 }

@@ -47,11 +47,17 @@ struct FlashBallEffect {
 template<unsigned Capacity> class FlashBallEffects {
     static_assert(Capacity>0,"Flash effect capacity must be nonzero");
 public:
+    struct BirthSequence {std::uint32_t next=1;};
+    BirthSequence birthSequence()const{return {nextHandle_};}
+    bool restoreEmptyBirthSequence(BirthSequence sequence){
+        if(count_ || (!nextHandle_ && sequence.next) || (sequence.next && sequence.next<nextHandle_))return false;
+        nextHandle_=sequence.next;return true;
+    }
     struct Slot {std::uint32_t handle=0;FlashBallEffect effect;};
     struct Phase {std::uint32_t newest;};
     static constexpr unsigned capacity=Capacity;
     const Slot& slot(unsigned index) const {return slots_[index];}
-    void clear() {for(auto& slot:slots_)slot.handle=0;count_=0;nextHandle_=1;}
+    void clear() {for(auto& slot:slots_)slot.handle=0;count_=0;} // Never rewind lifetime keys.
     template<class Draw> void visitNewest(Draw draw) const {
         for(unsigned i=0;i<count_;++i)draw(slots_[order_[i]].effect);
     }

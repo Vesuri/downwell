@@ -42,6 +42,9 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto fieldBirths=run_.timeFields.birthSequence();
     const auto numberBirths=run_.damageNumbers.birthSequence();
     const auto expiryBirths=run_.corpseExpiryEffects.birthSequence();
+    const auto smokeBirths=run_.smokeEffects.birthSequence();
+    const auto bloodBirths=run_.bloodEffects.birthSequence();
+    const auto flashBirths=run_.flashEffects.birthSequence();
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true);
@@ -50,6 +53,9 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     nextGemLifetimeId_=nextGemIdentity;
     run_.restart(action, records);
     if(!run_.timeFields.restoreEmptyBirthSequence(fieldBirths))run_.effectsSucceeded=false;
+    if(!run_.smokeEffects.restoreEmptyBirthSequence(smokeBirths)||
+       !run_.bloodEffects.restoreEmptyBirthSequence(bloodBirths)||
+       !run_.flashEffects.restoreEmptyBirthSequence(flashBirths))run_.effectsSucceeded=false;
     if(!run_.damageNumbers.restoreEmptyBirthSequence(numberBirths)||
        !run_.corpseExpiryEffects.restoreEmptyBirthSequence(expiryBirths))run_.effectsSucceeded=false;
     run_.nextForegroundBirth=foregroundBirth;

@@ -678,6 +678,15 @@ These keys are not reconstructed Windows instance IDs and must not be used as
 source ordering evidence. Mapping them into a shared spatial registry, including
 synchronous membership retirement, remains necessary before live queries use it.
 
+Smoke, blood and flash owners preserve their birth counters when cleared.
+In-place world reconstruction for Retry transfers these counters into empty
+owners, just as it does for damage numbers and corpse-expiry effects. A restore
+cannot overwrite live records, rewind a counter or revive an exhausted counter.
+Zero denotes exhaustion, not the first key. Clear and Retry must not make an
+old phase cutoff eligible to advance new effects. These owner-local keys are
+not Windows instance IDs or cross-family traversal order; registry binding and
+retirement still have to respect the contracts above.
+
 `0x501e50` requires an object and either object flags `0x28` or instance flag
 `0x20`. It unlinks existing spatial-dirty membership and prepends the instance
 at `0x8a6100`. Repeated mutations therefore move an instance to the front;

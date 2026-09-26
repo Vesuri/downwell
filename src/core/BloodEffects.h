@@ -8,6 +8,12 @@ template<unsigned Capacity> class BloodEffects {
     static_assert(Capacity>0,"Blood effect storage must be nonempty");
 public:
     using Handle=std::uint32_t;
+    struct BirthSequence {Handle next=1;};
+    BirthSequence birthSequence()const{return {next_};}
+    bool restoreEmptyBirthSequence(BirthSequence sequence){
+        if(count_ || (!next_ && sequence.next) || (sequence.next && sequence.next<next_))return false;
+        next_=sequence.next;return true;
+    }
     struct Phase {Handle newest;};
     struct Slot {Handle handle=0;BloodEffect effect;};
     static constexpr unsigned capacity=Capacity;

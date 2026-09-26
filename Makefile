@@ -366,6 +366,14 @@ test: test-terrain-wall-contacts
 verify-smoke-owner: build/smoke-owner-test
 	./build/smoke-owner-test
 
+.PHONY: verify-effect-birth-sequences
+verify-effect-birth-sequences: build/effect-birth-sequences-test
+	./build/effect-birth-sequences-test
+test: verify-effect-birth-sequences
+build/effect-birth-sequences-test: tests/core/EffectBirthSequenceTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/EffectBirthSequenceTest.cpp src/core/GameMakerRandom.cpp
+
 build/smoke-owner-test: tests/core/SmokeEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeEffectsTest.cpp src/core/GameMakerRandom.cpp
