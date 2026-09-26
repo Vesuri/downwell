@@ -423,7 +423,8 @@ bool compileSmokeComposition(downwell::SmokeComposition& composition,
         [](downwell::MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);});
 }
 bool compileEffectAssets(downwell::EffectMaskAssets& assets,const std::uint8_t* pack,std::size_t size) {
-    return assets.bind(pack,size);
+    downwell::EffectMaskAssets::Asset debris;
+    return assets.bind(pack,size) && assets.debris(91,0,debris);
 }
 bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
     const downwell::BinaryEffectSurface<>::Mask& effect,

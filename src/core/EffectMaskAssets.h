@@ -22,6 +22,12 @@ public:
     const Asset* currency(bool large,unsigned frame)const{
         return ready_ && frame<4 ? &currency_[large?1:0][frame] : nullptr;
     }
+    // Optional offline debris frames. Old packs remain usable for smoke/gems;
+    // a missing frame fails without exposing a partial descriptor.
+    bool debris(unsigned sprite,unsigned frame,Asset& out)const{
+        const unsigned frames=sprite==91?6:sprite==115||sprite==116?4:0;
+        return ready_ && frame<frames && resolve(pack_,size_,count_,sprite,frame,out);
+    }
     bool bind(const std::uint8_t* pack,std::size_t size){
         // Failed rebind must not leave a formerly valid, now stale view live.
         ready_=false;
@@ -30,12 +36,22 @@ public:
         for(unsigned i=0;i<8;++i)if(pack[12+i]!=source[i])return false;
         const std::uint32_t count=u32(pack+8);
         if(count>(size-20)/24)return false;
-        const std::size_t payload=20+std::size_t(count)*24;
         // The producer guarantees strict sorted keys. Validate once at bind,
         // not once per effect/frame. Payloads may alias immutable whole/subblocks.
         for(std::uint32_t i=1;i<count;++i)
             if(u32(pack+20+std::size_t(i-1)*24)>=u32(pack+20+std::size_t(i)*24))return false;
-        auto resolve=[&](unsigned id,unsigned frame,Asset& out){
+        for(unsigned frame=0;frame<9;++frame)if(!resolve(pack,size,count,84,frame,smoke_[frame]))return false;
+        if(!resolve(pack,size,count,117,0,shade_))return false;
+        for(unsigned large=0;large<2;++large)
+            for(unsigned frame=0;frame<4;++frame)
+                if(!resolve(pack,size,count,133+large,frame,currency_[large][frame]))return false;
+        pack_=pack;size_=size;count_=count;
+        ready_=true;return true;
+    }
+private:
+    static bool resolve(const std::uint8_t* pack,std::size_t size,std::uint32_t count,
+                        unsigned id,unsigned frame,Asset& out){
+            const std::size_t payload=20+std::size_t(count)*24;
             const std::uint32_t key=(id<<16)|frame;
             std::uint32_t first=0,last=count;
             while(first<last){
@@ -55,19 +71,14 @@ public:
                 return true;
             }
             return false;
-        };
-        for(unsigned frame=0;frame<9;++frame)if(!resolve(84,frame,smoke_[frame]))return false;
-        if(!resolve(117,0,shade_))return false;
-        for(unsigned large=0;large<2;++large)
-            for(unsigned frame=0;frame<4;++frame)
-                if(!resolve(133+large,frame,currency_[large][frame]))return false;
-        ready_=true;return true;
     }
-private:
     static unsigned u16(const std::uint8_t* p){return (unsigned(p[0])<<8)|p[1];}
     static std::uint32_t u32(const std::uint8_t* p){return (std::uint32_t(u16(p))<<16)|u16(p+2);}
     static int signedWord(const std::uint8_t* p){const unsigned n=u16(p);return n<32768?int(n):int(n)-65536;}
     Asset smoke_[9]{},shade_{},currency_[2][4]{};
+    const std::uint8_t* pack_=nullptr;
+    std::size_t size_=0;
+    std::uint32_t count_=0;
     bool ready_=false;
 };
 }

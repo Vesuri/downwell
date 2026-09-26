@@ -17,6 +17,13 @@ int main(int argc,char**argv){
     assert(argc==2);std::ifstream file(argv[1],std::ios::binary);
     const std::vector<std::uint8_t> pack{std::istreambuf_iterator<char>(file),{}};
     EffectMaskAssets assets;assert(assets.bind(pack.data(),pack.size()));
+    for(unsigned sprite:{91u,115u,116u})for(unsigned frame=0;frame<(sprite==91?6u:4u);++frame){
+        EffectMaskAssets::Asset debris;
+        assert(assets.debris(sprite,frame,debris));
+        assert(debris.mask.width && debris.mask.height && debris.mask.bytes);
+        assert(debris.high==debris.low+debris.mask.bytes);
+        assert(debris.mask.data==debris.high+debris.mask.bytes);
+    }
     SmokeEffects<32> smoke;GameMakerRandom random(225);
     for(unsigned i=0;i<24;++i)assert(smoke.create(number(int(i%6)*29-3),number(int(i/6)*75-2),random));
     SmokeComposition composition;

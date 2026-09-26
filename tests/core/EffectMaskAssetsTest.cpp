@@ -56,5 +56,40 @@ int main(){
         dword(at+16,0xffffffffu);reject();dword(at+20,5);reject();dword(at+20,0xffffffffu);reject();
     }
     assert(bind() && pack==good);
+    Assets::Asset debris{};
+    assert(!assets.debris(91,0,debris)); // Older pack has no optional debris.
+    std::array<std::uint8_t,794> expanded{};
+    for(unsigned i=0;i<20;++i)expanded[i]=good[i];
+    expanded[11]=32;
+    unsigned row=0;
+    for(unsigned id:{84u,91u,115u,116u,117u,133u,134u}){
+        const unsigned frames=id==84?9:id==91?6:id==117?1:4;
+        for(unsigned frame=0;frame<frames;++frame){
+            auto* record=expanded.data()+20+24*row++;
+            for(unsigned i=0;i<24;++i)record[i]=good[20+i];
+            record[0]=id>>8;record[1]=id;record[2]=0;record[3]=frame;
+            record[16]=record[17]=0;record[18]=3;record[19]=20; // payload 788
+        }
+    }
+    assert(row==32);
+    expanded[788]=0x80;expanded[792]=0x80;
+    assert(assets.bind(expanded.data(),expanded.size()));
+    for(unsigned id:{91u,115u,116u}){
+        const unsigned frames=id==91?6:4;
+        for(unsigned frame=0;frame<frames;++frame){
+            assert(assets.debris(id,frame,debris));
+            assert(debris.low==expanded.data()+788 && debris.high==expanded.data()+790 &&
+                   debris.mask.data==expanded.data()+792 && debris.originX==-3 && debris.originY==7);
+        }
+        assert(!assets.debris(id,frames,debris));
+        assert(!assets.debris(id,~0u,debris));
+    }
+    assert(!assets.debris(84,0,debris) && !assets.debris(65536+91,0,debris));
+    // Optional malformed payload is rejected at lookup, without changing output.
+    expanded[20+9*24+14]=1;
+    assert(assets.bind(expanded.data(),expanded.size()));
+    assert(!assets.debris(91,0,debris) && debris.low==expanded.data()+788);
+    assert(!assets.bind(nullptr,0));
+    assert(!assets.debris(115,0,debris));
     std::printf("Effect assets: shared color/mask payloads, signed origins, 458 truncations and %u malformed records rejected\n",invalid);
 }
