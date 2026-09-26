@@ -110,6 +110,18 @@ def atomic_write(path, payload):
         raise
 
 
+def collision_pack(payload):
+    """Project validated DWSP records; no second interpretation of source fields."""
+    count = HEADER.unpack_from(payload)[4]
+    header = struct.pack("<4sHH8sII", b"DWSC", 1, 24,
+                         bytes.fromhex(SOURCE_SHA256)[:8], count, MANIFEST_SCHEMA)
+    records = []
+    for index in range(count):
+        row = SPRITE.unpack_from(payload, HEADER.size + index * SPRITE.size)
+        records.append(struct.pack("<iiiiiiIII", row[3], row[4], *row[8:14], row[7]))
+    return header + b"".join(records)
+
+
 def main():
     root = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser()
@@ -122,12 +134,15 @@ def main():
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     payload = build_pack(manifest)
     digest = hashlib.sha256(payload).hexdigest()
+    collision = collision_pack(payload)
+    collision_path = args.output.with_suffix(".dwsc")
     provenance = (json.dumps({
         "formatVersion": VERSION, "source": manifest["source"],
         "extractor": manifest["extractor"],
         "manifestSha256": hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
         "generatorSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "packSha256": digest,
+        "collisionPackSha256": hashlib.sha256(collision).hexdigest(),
     }, sort_keys=True, indent=2) + "\n").encode()
     provenance_path = args.output.with_suffix(".manifest.json")
     if args.check:
@@ -136,9 +151,12 @@ def main():
                 "sprite pack differs from deterministic generator output")
         require(provenance_path.is_file() and provenance_path.read_bytes() == provenance,
                 "sprite provenance differs from deterministic generator output")
+        require(collision_path.is_file() and collision_path.read_bytes() == collision,
+                "collision metadata differs from deterministic generator output")
         print(f"sprite pack verified: {len(payload)} bytes sha256 {digest}")
         return
     atomic_write(args.output, payload)
+    atomic_write(collision_path, collision)
     atomic_write(provenance_path, provenance)
     print(f"sprite pack written: {len(payload)} bytes sha256 {digest}")
 

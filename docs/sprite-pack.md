@@ -37,7 +37,23 @@ its next record as collision metadata.
 
 The generated `.manifest.json` sidecar records the original input hash,
 extractor version/commit, extraction-manifest hash, generator hash and pack hash.
-`--check` verifies both files. Both remain ignored generated material.
+`--check` verifies the generated packs and sidecar. All remain ignored generated material.
+
+## Collision-only projection (`DWSC`)
+
+The same generator also writes `downwell-sprites.dwsc`, projected directly from
+the validated DWSP records. It contains no artwork or atlas references and is
+26,700 bytes for this build, versus 205,872 bytes for DWSP. Its hash is included
+in the same provenance sidecar and checked by `--check`.
+
+The little-endian 24-byte header is `char[4] magic (DWSC); u16 version (1),
+headerSize (24); byte[8] sourceHashPrefix; u32 spriteCount, manifestSchema (3)`.
+Each 36-byte record contains `i32 originX, originY, marginLeft, marginTop,
+marginRight, marginBottom; u32 collisionMode, collisionMaskCount, frameCount`.
+Record index is the original sprite ID. The shared borrowed-view decoder
+validates format, source hash, complete length and mask modes; it does not
+allocate or convert pixels. Full and compact descriptors use the same bounds
+adapter. This projection is not yet resident in the live Amiga registry.
 
 ## Frame record — 4 bytes
 

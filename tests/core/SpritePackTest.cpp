@@ -1,6 +1,7 @@
 #include "core/SpritePack.h"
 #include "core/EnemyPresentation.h"
 #include "core/RunnerSpriteBounds.h"
+#include "core/SpriteCollisionPack.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -35,6 +36,38 @@ void testGeneratedPack(const char* path) {
                                           std::istreambuf_iterator<char>());
     const downwell::SpritePack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated sprite pack passes native validation");
+    std::string collisionPath(path);collisionPath.replace(collisionPath.find_last_of('.'),std::string::npos,".dwsc");
+    std::ifstream collisionInput(collisionPath,std::ios::binary);
+    const std::vector<std::uint8_t> compactBytes((std::istreambuf_iterator<char>(collisionInput)),
+                                                std::istreambuf_iterator<char>());
+    const downwell::SpriteCollisionPack compact(compactBytes.data(),compactBytes.size());
+    require(compact.valid()&&compact.spriteCount()==pack.spriteCount(),"compact collision table validates");
+    require(compactBytes.size()==26700,"collision-only table excludes atlas payload and frame mappings");
+    for(unsigned id=0;id<pack.spriteCount();++id){
+        downwell::PackedSprite full;downwell::PackedSpriteCollision small;
+        require(pack.sprite(id,full)&&compact.sprite(id,small),"both metadata views resolve every ID");
+        require(full.originX==small.originX&&full.originY==small.originY&&
+            full.marginLeft==small.marginLeft&&full.marginTop==small.marginTop&&
+            full.marginRight==small.marginRight&&full.marginBottom==small.marginBottom&&
+            full.collisionMode==small.collisionMode&&full.collisionMaskCount==small.collisionMaskCount&&
+            full.frameCount==small.frameCount,"all source collision fields agree across views");
+    }
+    require(!downwell::SpriteCollisionPack(nullptr,0).valid(),"null compact table rejected");
+    for(auto length:{std::size_t(0),std::size_t(23),compactBytes.size()-1})
+        require(!downwell::SpriteCollisionPack(compactBytes.data(),length).valid(),"truncated compact table rejected");
+    for(unsigned offset:{0u,4u,8u,16u,20u,48u}){
+        auto bad=compactBytes;bad[offset]=255;
+        require(!downwell::SpriteCollisionPack(bad.data(),bad.size()).valid(),"corrupt compact header/mode rejected");
+    }
+    downwell::PackedSpriteCollision selected;
+    require(compact.collisionSprite(84,597,selected)&&selected.collisionMode==1,"compact mask override resolves");
+    require(!compact.collisionSprite(84,9999,selected)&&selected.collisionMode==1,"compact invalid mask does not fall back");
+    require(compact.collisionSprite(84,-1,selected)&&selected.marginLeft==10,"compact negative mask falls back");
+    downwell::RunnerSpriteBounds::Box compactBounds;
+    require(downwell::RunnerSpriteBounds::fromSprite(selected,{}, {},{0x3f800000},{0x3f800000},false,{}, {},true,
+        [](downwell::RunnerImageValue v,std::int32_t& pixel){return v.promoted().roundPixel(pixel);},compactBounds)&&
+        compactBounds.left.bits==0xc0000000&&compactBounds.right.bits==0x3f800000,
+        "compact metadata feeds the same geometry adapter");
     require(pack.spriteCount() == 741 && pack.frameCount() == 3152 &&
                 pack.pageItemCount() == 3161 && pack.texturePageCount() == 2,
             "generated sprite pack has audited totals");

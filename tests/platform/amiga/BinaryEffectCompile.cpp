@@ -11,6 +11,15 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
 #include "core/RunnerSpatialDirtyQueue.h"
 #include "core/RunnerSpatialBoundsUpdate.h"
 #include "core/RunnerSpriteBounds.h"
+#include "core/SpritePack.h"
+#include "core/SpriteCollisionPack.h"
+bool compileCompactCollision(const std::uint8_t* bytes,std::size_t size,int id,
+    downwell::RunnerSpriteBounds::Box& result){
+    downwell::SpriteCollisionPack pack(bytes,size);downwell::PackedSpriteCollision sprite;
+    return pack.collisionSprite(id,-1,sprite)&&downwell::RunnerSpriteBounds::fromSprite(sprite,
+        {}, {},{0x3f800000},{0x3f800000},false,{}, {},true,
+        [](downwell::RunnerImageValue value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},result);
+}
 bool compilePackedSpriteBounds(const downwell::PackedSprite& sprite,downwell::RunnerSpriteBounds::Box& result){
     return downwell::RunnerSpriteBounds::fromSprite(sprite,{}, {},{0x3f800000},{0x3f800000},false,{}, {},true,
         [](downwell::RunnerImageValue value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},result);

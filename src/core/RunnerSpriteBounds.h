@@ -1,7 +1,6 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPRITE_BOUNDS_H
 #define DOWNWELL_CORE_RUNNER_SPRITE_BOUNDS_H
 #include "RunnerSpatialSplit.h"
-#include "SpritePack.h"
 namespace downwell {
 // Ordinary sprite bounds: 0x46616d..0x46669c. Not the skeletal-sprite
 // branch. Each arithmetic operation narrows to binary32. Compatibility mode
@@ -10,7 +9,8 @@ struct RunnerSpriteBounds {
     using Math=RunnerSpatialSplit;
     using Real=Math::Real;
     using Box=Math::Box;
-    template<class Round> static bool fromSprite(const PackedSprite& sprite,Real x,Real y,
+    // Accept full artwork metadata or the compact collision-only descriptor.
+    template<class Resource,class Round> static bool fromSprite(const Resource& sprite,Real x,Real y,
         Real scaleX,Real scaleY,bool hasRotation,Real cosine,Real sine,
         bool compatibility,Round round,Box& result){
         Box margins;
