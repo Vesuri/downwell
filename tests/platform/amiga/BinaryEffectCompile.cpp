@@ -5,6 +5,11 @@
 #include "core/BloodMaskSample.h"
 #include "core/BloodGoalContact.h"
 #include "core/RunSession.h"
+#include "core/PlayerTimeStop.h"
+bool compilePlayerTimeStop(downwell::PlayerTimeStop& state,bool main,bool side,bool field){
+    return state.step(main,side,[&](bool& hit){hit=field;return true;},
+        [](auto){return false;},[](auto){return true;});
+}
 bool compileBloodSession(downwell::RunSession& run,bool stopped){
     run.stepBloodBound(run.bloodEffects.beginPhase(),stopped,480,
         [](const auto&,bool& hit){hit=false;return true;});

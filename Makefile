@@ -245,6 +245,15 @@ build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodCollisionBoundsTest.cpp
 
 test: verify-time-stop-bound
+test: verify-player-time-stop
+.PHONY: verify-player-time-stop
+verify-player-time-stop: build/player-time-stop-test
+	./build/player-time-stop-test
+
+build/player-time-stop-test: tests/core/PlayerTimeStopTest.cpp src/core/PlayerTimeStop.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/PlayerTimeStopTest.cpp
+
 test: verify-goal-field-bounds
 .PHONY: verify-goal-field-bounds
 verify-goal-field-bounds: build/goal-field-bounds-test
