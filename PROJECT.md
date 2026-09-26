@@ -1,4 +1,4 @@
-# Downwell port plan
+# Downwell port architecture
 
 ## Goal
 
@@ -57,17 +57,8 @@ truth.
 - Keep a portable implementation beside each assembly replacement and provide
   an in-process or replay-based differential test.
 
-## Initial phases
+## Work tracking
 
-1. Inventory and immutable-input manifest — initial inspection complete.
-2. Reproducible GameMaker extraction and decompilation.
-3. Resource graph and normalized IR.
-4. Minimal GameMaker-compatible host runtime.
-5. Playable SDL reference implementation.
-6. Amiga display/input/audio bring-up on the shared C++ framework.
-7. Behavior-complete native Amiga C/C++ implementation.
-8. Asset and memory-layout conversion.
-9. Profile-driven 68000 assembly optimization.
-10. Packaging, compatibility testing, and release documentation.
-
-See [docs/open-work.md](docs/open-work.md) for the current queue.
+[Remaining work](docs/open-work.md) is the only backlog. This document defines
+the architecture, not a second project plan. Completed work and verification
+results belong in the git log.

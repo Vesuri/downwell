@@ -10,62 +10,63 @@ serialized resources and original-runner evidence are the authority; port-to-por
 agreement alone is insufficient. Target Amiga 500/68000. Let gameplay run slower
 on PAL; do not add 60 Hz catch-up.
 
-## Working order
+## Priority and scope
 
-The immediate milestone is live skeleton encounters (section 1). Work through
-its dependencies in this order:
+Next: finish live skeleton encounters, following the dependency order in
+section 1. Then make catacombs playable (section 2), followed by the remaining
+content (section 4). Apply the fidelity, performance, architecture, memory and
+verification requirements in sections 3 and 5–8 to each integration; they are
+not deferred cleanup phases.
 
-1. Resolve original field-identity selection and remaining collision semantics.
-2. Connect player time-stop transitions, shards and pacing to both schedulers.
-3. Connect damage effects, then skeletons and their owned bones.
-4. Verify natural encounters against the original, on both ports.
-
-Then broaden into catacombs (section 2) and remaining content (section 4).
-Fidelity, performance, architecture, memory and regression work in the other
-sections apply throughout. Supporting helpers alone do not close a milestone;
-natural encounters must execute the recovered rules and render correctly.
+Supporting helpers alone do not close an item. Completion requires the shared
+behavior, both backend integrations and relevant original-game verification.
 
 ## 1. Finish live skeleton and bone integration
 
-- Verify original runtime FP-mode assumptions and measure the complete smoke
-  geometry/effect cost on the native target.
-- Verify smoke world collision dispatch against original-runner encounters,
-  including multiple simultaneous contacts and wall retirement; extend contact
-  shapes with later-area wall families as those areas are integrated.
-  Verify live joint currency/smoke
-  composition against original-game captures, including shade holes and retained
-  damage restoration. Complete death/low-spec direct effect drawing at the
-  original world-depth boundaries; do not flatten those paths into an overlay.
-- Implement remaining blood, corpse, debris and blast effect dependencies.
-  Preserve synchronous child Create, RNG consumption and source mutation order
-  before rewards and retirement.
-- Connect natural death/stomp/hit events to real effect owners, including flash
-  balls; fixture-triggered rendering is not sufficient.
-- Connect the player's source Begin Step `checkStop`/`pTimeStop` transitions
-  and parent-time-field queries to both world schedulers before activating blood
-  dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
-  nor shop control-lock is a substitute for this state.
-- Add Timeout-damage creation of ordinary object-82 time fields. Connect the
-  shared parent-field contact adapter to live transitions. Resolve original
-  `instance_place` identity selection, including spatial-index construction,
-  updates and traversal, runtime branch selection and activation/rebinding;
-  a boolean hit or Draw order cannot select the field
-  that determines shard direction. Complete Draw scheduling across other
-  object families and live time-stop/activation state.
-- Integrate the shared time-shard lifecycle, animation, burst and time-change
-  owners with both live schedulers. Wire fractional/mirrored player and shard
-  contacts into those events and verify original-runtime rounding assumptions.
-  Connect transition pacing and audio rather than adding alternative platform rules.
-  Preserve the source distinction between paused gravity/animation and moving
-  shards, and the separate alarm cooldown rules. Create-only helpers do not
-  establish live integration.
-- Register skeletons and owned bones in shared gameplay. Connect animation,
-  alarms, Step, collision and End Step, player/bullet damage, rewards, capacity
-  failure, out-of-view retirement and both renderers.
+### A. Resolve collision identity and ordering
+
+- Connect source-equivalent `instance_place` selection to the live world:
+  spatial-index population, updates and traversal, runtime branch selection,
+  activation/rebinding and lifetime-safe instance lookup. A boolean hit or Draw
+  order cannot identify the field that determines shard direction.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
-- Verify natural encounters with full state/RNG comparisons, rendered Amiga
-  effect captures and dense-encounter profiles.
+- Resolve remaining precise-mask sampling and original runtime FP-mode/rounding
+  assumptions, including rotated masks required by blood time-field contacts.
+
+### B. Connect time-stop state and effects
+
+- Connect player Begin Step `checkStop`/`pTimeStop` and parent-time-field queries
+  to both world schedulers before blood dispatch. Goal-stop and shop control-lock
+  are not substitutes. Preserve transition effects, RNG and audio order.
+- Add Timeout-damage creation of ordinary object-82 time fields. Connect the
+  parent-field contact adapter and complete Draw scheduling across object
+  families, including live time-stop and activation state.
+- Integrate time-shard lifecycle, animation, burst and time-change owners with
+  both schedulers. Wire fractional/mirrored player and shard contacts, transition
+  pacing and audio. Preserve moving shards while gravity/animation are paused,
+  and the separate alarm cooldown rules.
+
+### C. Connect damage effects and actors
+
+- Implement remaining blood, corpse, debris and blast dependencies. Preserve
+  synchronous child Create, RNG consumption and mutation order before rewards
+  and retirement.
+- Connect natural death/stomp/hit events to effect owners, including flash balls.
+  Complete death/low-spec direct drawing at original world-depth boundaries,
+  rather than flattening those paths into an overlay.
+- Register skeletons and owned bones in shared gameplay: animation, alarms,
+  Step, collision, End Step, player/bullet damage, rewards, capacity failure,
+  out-of-view retirement and both renderers.
+
+### D. Verify natural encounters
+
+- Verify smoke collision dispatch, simultaneous contacts and wall retirement
+  against the original; extend contact shapes as later wall families enter play.
+- Compare joint currency/smoke composition with original captures, including
+  shade holes and retained damage restoration.
+- Compare full state/RNG through natural skeleton encounters, capture native
+  effects and profile dense scenes, including complete smoke geometry costs.
 
 References: [skeleton effects](skeleton-effect-ownership.md),
 [effect surfaces](effect-surfaces.md),
@@ -73,8 +74,7 @@ References: [skeleton effects](skeleton-effect-ownership.md),
 [phase eligibility](runner-step-eligibility.md), [alarms](runner-alarms.md),
 [animation fields](runner-image-fields.md).
 
-Blood time-field integration also requires the runner's rotated precise-mask
-sampling and FP rounding rules; see [collision bounds](runner-collision-bounds.md).
+Precise-mask reference: [collision bounds](runner-collision-bounds.md).
 
 ## 2. Make catacombs playable
 
@@ -204,6 +204,8 @@ Reference: [scene architecture](scene-architecture.md).
   selection, gameplay, death, upgrades and later-area progression.
 - Run all relevant regression gates before claiming parity. Component tests,
   CPU replays and screenshots each prove only their respective scope.
+- Prepare release packaging, compatibility tests and installation documentation
+  for the measured CPU/memory requirements, without bundling copyrighted inputs.
 
 ## Closing work
 
