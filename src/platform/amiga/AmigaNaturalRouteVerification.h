@@ -7,6 +7,8 @@
 // decoded startup by the paired host test; no terrain/exit/health is injected.
 struct AmigaNaturalRouteVerification {
     int target = 240;
+    int deepestY = 0;
+    unsigned noDescent = 0;
     unsigned menuFrame = 0, returnFrames = 0, failures = 0;
     unsigned money = 0, stock = 0, price = 0;
     bool done = false;
@@ -49,10 +51,17 @@ struct AmigaNaturalRouteVerification {
                 if (score > best) { best = score; target = candidate; }
             }
         }
+        {
+            if (tick == 0) { deepestY = y; noDescent = 0; }
+            if (y > deepestY + 8) { deepestY = y; noDescent = 0; }
+            else ++noDescent;
+            if (noDescent >= 120) target = (tick / 120) % 2 ? 180 : 300;
+        }
         if (second) for (const auto& shop : game.shops().instances)
             if (shop.present && y < shop.y + 12 && y > shop.y - 200) target = shop.x - 6;
         result.left = x > target + 2; result.right = x < target - 2;
         result.fire = tick % 40 == 0 || tick % 40 == 3;
+        if (noDescent >= 120) result.fire = tick % 12 == 0;
         return result;
     }
     void check(const AmigaPortRuntime& game) {

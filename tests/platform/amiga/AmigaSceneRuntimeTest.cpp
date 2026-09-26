@@ -2088,7 +2088,9 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                     if (score > best) { best = score; target = candidate; }
                 }
             }
-            if (sweep) {
+            // Escape local ledges using ordinary inputs, including when
+            // corrected source RNG changes later generated geometry.
+            {
                 if (y > deepestY + 8) { deepestY = y; noDescent = 0; }
                 else ++noDescent;
                 if (noDescent >= 120) target = (updates / 120) % 2 ? 180 : 300;
@@ -2096,7 +2098,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             downwell::Input input;
             input.left = x > target + 2; input.right = x < target - 2;
             input.fire = updates % 40 == 0 || updates % 40 == 3;
-            if (sweep && noDescent >= 120) input.fire = updates % 12 == 0;
+            if (noDescent >= 120) input.fire = updates % 12 == 0;
             if (seed == 4 && !sweep)
                 require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision)),
                     "native input controller reproduces host natural route");
@@ -2109,12 +2111,14 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                     game.dead() == reference.mainDeathSequence().active &&
                     game.levelResultRequested() == reference.levelResultRequested(),
                     "route sweep health, currency and exit state agree");
+            }
+            {
                 require(game.randomDrawCount() == reference.randomDrawCount() &&
                     game.randomState().stateIndex() == reference.randomState().stateIndex(),
-                    "route sweep RNG cursor agrees");
+                    "natural route RNG cursor agrees");
                 for (unsigned i = 0; i < 16; ++i)
                     require(game.randomState().stateWord(i) == reference.randomState().stateWord(i),
-                        "route sweep complete RNG state agrees");
+                        "natural route complete RNG state agrees");
             }
         }
         if (sweep) {
@@ -2126,6 +2130,12 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                 << " depth=" << deepestY << " enemies=" << game.enemyCount() << std::endl;
             continue;
         }
+        if(game.dead() || !game.levelResultRequested() || !reference.levelResultRequested())
+            std::cerr << "Natural route incomplete seed=" << seed << " updates=" << updates
+                << " position=" << 240+game.player().offsetX() << ',' << 176+game.player().offsetY()
+                << " target=" << target << " health=" << game.health()
+                << " fields=" << game.timeFields().size() << " rng=" << game.randomDrawCount()
+                << " dead=" << game.dead() << std::endl;
         require(!game.dead() && game.levelResultRequested() && reference.levelResultRequested(),
             "input-only route reaches a naturally generated exit alive on both adapters");
         require(game.enterLevelClear(0, false) && reference.enterLevelClear(0, false),
@@ -2172,6 +2182,8 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         if (seed == 4) {
             bool reached = false;
             unsigned shopUpdates = 0;
+            deepestY = 176 + game.player().offsetY();
+            noDescent = 0;
             for (; shopUpdates < 1500 && !game.dead() && !game.levelResultRequested(); ++shopUpdates) {
                 const unsigned tick = shopUpdates;
                 const int x = 240 + game.player().offsetX(), y = 176 + game.player().offsetY();
@@ -2184,17 +2196,27 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                         if (score > best) { best = score; target = candidate; }
                     }
                 }
+                if (y > deepestY + 8) { deepestY = y; noDescent = 0; }
+                else ++noDescent;
+                if (noDescent >= 120) target = (tick / 120) % 2 ? 180 : 300;
                 for (const auto& shop : game.shops().instances)
                     if (shop.present && y < shop.y + 12 && y > shop.y - 200) target = shop.x - 6;
                 downwell::Input input;
                 input.left = x > target + 2; input.right = x < target - 2;
                 input.fire = tick % 40 == 0 || tick % 40 == 3;
+                if (noDescent >= 120) input.fire = tick % 12 == 0;
                 require(downwell::packReplayInput(input) == downwell::packReplayInput(nativeRoute.input(game, live.collision, tick + 120)),
                     "native natural shop approach inputs match");
                 game.step(downwell::packReplayInput(input)); reference.step(input, false);
                 parityFrame = tick;
                 compareInitialGameplay(game, reference);
                 if (game.shops().interactable) { reached = true; ++shopUpdates; break; }
+                if (std::getenv("DOWNWELL_TRACE_SHOP_ROUTE") && tick % 200 == 0) {
+                    std::cout << "Shop approach tick=" << tick << " xy=" << x << ',' << y
+                        << " target=" << target << " health=" << game.health() << std::endl;
+                    for (const auto& shop : game.shops().instances) if (shop.present)
+                        std::cout << "  shop=" << shop.x << ',' << shop.y << std::endl;
+                }
             }
             require(reached && reference.shops().interactable, "ordinary input reaches the generated second-level shop");
             unsigned secondUpdates = 120 + shopUpdates;
@@ -2249,7 +2271,7 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                       << " camera=" << sideCamera << "->" << game.cameraOffsetX() << std::endl;
             require(sideCamera != 0 && returnUpdates < 240 && !game.dead(),
                 "natural shop return releases side camera and reaches main shaft alive");
-            require(nativeRoute.done && secondUpdates == 688 && nativeRoute.returnFrames == 43,
+            require(nativeRoute.done && secondUpdates == 1201 && nativeRoute.returnFrames == 43,
                 "native natural route completion matches host timing");
         }
     }

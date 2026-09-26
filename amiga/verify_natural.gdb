@@ -12,7 +12,7 @@ continue
 end
 break downwellNaturalReady
 continue
-if gDownwellNaturalExitTick != 1646 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 688
+if gDownwellNaturalExitTick != 1634 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 1201
     printf "Natural route timing/reentry mismatch: exit=%lu entries=%lu updates=%lu\n", gDownwellNaturalExitTick, gDownwellClearReentries, gDownwellClearGameplayUpdates
     quit 1
 end

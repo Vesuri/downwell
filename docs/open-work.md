@@ -183,10 +183,6 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
-- Re-establish the deterministic seed-4 second-level shop approach after
-  ordinary-field Draw RNG integration. Preserve natural counter interaction,
-  purchase/insufficient-funds checks, return-camera assertions and bounded
-  native raster verification; update timing checkpoints only from verified runs.
 - Cover naturally funded purchases, all shop/side-room layouts and camera
   transitions, dense combat, uncommon upgrade combinations and repeated runs.
 - Compare new behavior through deterministic host/native replays, including
