@@ -176,6 +176,11 @@ void compareMenu(const AmigaSceneRuntime& amiga,
                 static_cast<int>(title->imageIndex) &&
             amiga.menuTitleY() == title->y,
             "menu title animation follows decoded runtime");
+    if (amiga.menuEnterSequenceActive() != reference.enterSequenceActive())
+        std::cerr << "WELL ENTRY frame=" << parityFrame
+                  << " active native=" << amiga.menuEnterSequenceActive()
+                  << " host=" << reference.enterSequenceActive()
+                  << " title=" << amiga.menuTitleFrame() << ',' << title->imageIndex << '\n';
     require(amiga.menuEnterSequenceActive() == reference.enterSequenceActive(),
             "well-entry sequence follows decoded runtime");
     if (amiga.menuEnterSequenceActive())

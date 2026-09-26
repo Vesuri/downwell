@@ -248,6 +248,7 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
 {
     ++menuTicks_;
     const bool teleportWasActive = menuTeleport_;
+    const bool titleWasReady = menuTitleReady_;
     const bool controlsLocked = menuTicks_ <= 30 || menuTeleport_;
     if (menuNapping_) {
         if (!controlsLocked &&
@@ -372,12 +373,13 @@ void AmigaSceneRuntime::stepMenu(const downwell::Input& input)
     }
 
     const bool enterWasActive = menuEnterActive_;
-    if (menuTeleport_ && menuTitleReady_ && !menuEnterActive_) {
+    // Teleport Begin Step observes the previous alarm phase's titleOk.
+    // Its newly assigned Alarm 1 is decremented in this update, and fires
+    // on reaching zero, rather than waiting one extra update at zero.
+    if (teleportWasActive && titleWasReady && !menuEnterActive_) {
         if (menuSequenceDelay_ < 0)
             menuSequenceDelay_ = 30;
-        else if (menuSequenceDelay_ > 0)
-            --menuSequenceDelay_;
-        else
+        if (menuSequenceDelay_ > 0 && --menuSequenceDelay_ == 0)
             menuEnterActive_ = true;
     }
     if (enterWasActive) {

@@ -57,9 +57,10 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Resolve the garden-to-well sequence-state disagreement at frame 291 in the
-  strict adapter gate, then complete both combat tapes with exact creation and
-  published-coordinate comparisons. Keep all existing assertions.
+- Resolve forecast-terrain setup failure at frame 532 in the strict adapter
+  gate, then complete both combat tapes with exact creation and published-
+  coordinate comparisons. Audit the forecast's pinned RNG checkpoint against
+  source-backed choice semantics rather than merely accepting new totals.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,
