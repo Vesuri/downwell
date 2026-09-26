@@ -11,6 +11,14 @@
 #include "core/TimeShardLifecycle.h"
 #include "core/TimeShardMotion.h"
 #include "core/TimeShardAnimation.h"
+#include "core/TimeShardEffects.h"
+bool compileTimeShardEffects(downwell::TimeShardEffects<24>& owner,downwell::GameMakerRandom& random,bool stopped){
+    const auto phase=owner.beginPhase();
+    owner.advanceAlarm(phase,0);
+    return owner.advanceAnimation(phase) && owner.step(phase,stopped,random,
+        [&](auto,const auto&,auto,auto,bool& hit){hit=stopped;return true;},
+        [](auto,const auto&,bool& retire){retire=false;return true;});
+}
 bool compileTimeShardAnimation(downwell::TimeShardAnimation& shard){return shard.advanceImage();}
 bool compileTimeShardMotion(downwell::TimeShardMotion& shard,downwell::GameMakerRandom& random,bool stopped){
     return shard.step(stopped,random,[&](auto,auto,bool& hit){hit=stopped;return true;},
