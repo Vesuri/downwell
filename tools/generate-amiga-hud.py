@@ -257,6 +257,37 @@ def flash_palette_canvas(canvas):
     return mapped
 
 
+def planar_payload_order(streams):
+    """Deterministic offline overlap ordering; no target decompression needed."""
+    unique = sorted(set(streams), key=lambda data: (-len(data), data))
+    standalone, contained = [], []
+    for data in unique:
+        for previous in standalone:
+            at = previous.find(data)
+            while at >= 0 and at % 2:
+                at = previous.find(data, at + 1)
+            if at >= 0:
+                contained.append(data)
+                break
+        else:
+            standalone.append(data)
+    payload = bytearray()
+    ordered = []
+    while standalone:
+        best_overlap, best_index = -1, 0
+        for index, data in enumerate(standalone):
+            overlap = min(len(payload), len(data)) & ~1
+            while overlap and payload[-overlap:] != data[:overlap]:
+                overlap -= 2
+            # Stable ties favor larger streams, then lexical byte order.
+            if overlap > best_overlap:
+                best_overlap, best_index = overlap, index
+        data = standalone.pop(best_index)
+        payload.extend(data[best_overlap:])
+        ordered.append(data)
+    return {data: index for index, data in enumerate(ordered + contained)}
+
+
 def intern_planar(data, payload, blocks):
     """Share only word-aligned immutable regions, never writable DMA records."""
     if data in blocks:
@@ -853,12 +884,14 @@ def build_pack(manifest, extracted, profile, language_path=None):
     payload = bytearray()
     offsets = {}
     immutable_payloads = {}
+    planar_order = planar_payload_order(
+        item[3] for item in encoded if not item[0].get("hardware"))
     # Gameplay DMA words are copied into channel slots, not read by DMA here.
     # Keep them at the end so the target can leave this tail in Fast RAM.
     for sprite, frame_index, dma_width, planar in sorted(
             encoded, key=lambda item: (
                 2 if item[0].get("hardwareParts") else 1 if item[0].get("hardware") else 0,
-                0 if item[0].get("hardware") else -len(item[3]))):
+                0 if item[0].get("hardware") else planar_order[item[3]])):
         # Planar art/masks are immutable. Identical frames and symmetric
         # variants can share bytes without changing any resource/frame ID.
         # Garden DMA records contain writable position headers: never alias

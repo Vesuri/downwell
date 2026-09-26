@@ -189,10 +189,6 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 7. Establish memory fit and failure handling
 
-- Restore the resident game-art regression budget of 278,000 bytes without
-  weakening the gate. The current pack requires 281,074 bytes (the preceding
-  committed generator already required 280,996); separate this conservative
-  asset limit from measured whole-program allocation and peak usage.
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit.

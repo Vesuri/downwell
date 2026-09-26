@@ -10,6 +10,16 @@ spec = importlib.util.spec_from_file_location("pack", root / "tools/generate-ami
 pack = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pack)
 rng = random.Random(84)
+ordering_samples = [b"abcdef", b"efgh", b"ghij", b"cd", b"bc", b"abcdef"]
+order = pack.planar_payload_order(ordering_samples)
+assert order == pack.planar_payload_order(reversed(ordering_samples))
+assert set(order) == set(ordering_samples)
+ordered_payload, ordered_blocks = bytearray(), {}
+for data in sorted(set(ordering_samples), key=order.__getitem__):
+    offset = pack.intern_planar(data, ordered_payload, ordered_blocks)
+    assert offset % 2 == 0
+    assert ordered_payload[offset:offset+len(data)] == data
+assert len(ordered_payload) < sum(map(len, set(ordering_samples)))
 payload, blocks, records = bytearray(), {}, []
 samples = [b"\x00\x01\x02\x03\x04\x05", b"\x02\x03", b"\x04\x05\x06\x07",
            b"\x01\x02", b"\x06\x07", bytes(64)]

@@ -76,6 +76,18 @@ preserving every directory entry and resource/frame ID. This saves 35,136
 bytes. Writable garden sprite DMA records are explicitly excluded from sharing;
 inactive position headers must never alias the displayed sprite.
 
+Immutable payload placement is an offline operation. The packer removes duplicate
+streams, defers word-aligned substrings, then greedily chooses the next stream
+with the longest word-aligned overlap with the existing payload tail. Ties use
+descending stream size and lexical byte order, independent of input iteration
+order. The directory remains sorted by resource/frame ID; each complete planar
+and mask stream remains contiguous. No target decompression, extra copies or
+runtime asset conversion are introduced. Writable DMA records bypass sharing
+and retain separate storage. `tests/planar-packing-test.py` compares directory
+metadata and every payload against an unshared pack and checks writable-record
+isolation. The renderer's residency gate remains 278,000 bytes; passing it is
+not proof of whole-program or peak-transition memory fit.
+
 The eight-frame spin animation adds 6,912 resident bytes, including directory
 entries and offline mirrored art. The bounded A500 allocation check passes
 with this pack. Four offline frog damage frames and their mirrored/DMA variants
