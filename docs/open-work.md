@@ -37,6 +37,10 @@ throughout integration, not only after content is complete.
   and parent-time-field queries to both world schedulers before activating blood
   dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
   nor shop control-lock is a substitute for this state.
+- Retain ordinary object-82 time fields from builder `O` and Timeout damage,
+  without repeating their Create RNG draw. Integrate their precise sprite-597
+  mask, Draw RNG, field lookup ordering and rendering alongside exit fields;
+  querying only the exit field does not cover `parentTimeField`.
 - Integrate the shared time-shard lifecycle, animation, burst and time-change
   owners with both live schedulers. Finish fractional player/shard time-field
   queries, including mirrored masks and original-runner rounding. Connect

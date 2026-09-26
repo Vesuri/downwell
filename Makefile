@@ -257,6 +257,21 @@ test: verify-time-stop-bound
 test: verify-player-time-stop
 test: verify-time-change
 test: verify-time-stop-masks
+test: verify-ordinary-time-field
+.PHONY: verify-ordinary-time-field
+verify-ordinary-time-field: build/ordinary-time-field-test
+	./build/ordinary-time-field-test
+
+generated/downwell-time-field-mask.h: generated/time-stop-masks.json tools/verify-time-stop-masks.py
+	python3 tools/verify-time-stop-masks.py --generate
+
+generated/downwell-time-field-mask.mask: generated/downwell-time-field-mask.h
+	@test -f $@ || python3 tools/verify-time-stop-masks.py --generate
+
+build/ordinary-time-field-test: tests/core/OrdinaryTimeFieldTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/downwell-time-field-mask.h generated/downwell-time-field-mask.mask
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/OrdinaryTimeFieldTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-time-stop-masks
 verify-time-stop-masks: generated/time-stop-masks.json
 	python3 tools/verify-time-stop-masks.py

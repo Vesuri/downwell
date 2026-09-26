@@ -20,7 +20,30 @@ performs its transformed per-pixel intersection after the compatibility-mode
 bounds test. Float narrowing, inverse sampling and negative-scale alignment
 must agree with [the runner collision rules](runner-collision-bounds.md).
 
-## Player event boundary
+## Ordinary fields
+
+`parentTimeField` (object 82) itself is instantiated by builder symbol `O`
+and by `scrTypicalDamage` for the Timeout upgrade. Its sprite 597,
+`maskCircle24`, has a 48×48 precise mask and origin (24,24), at unit scale.
+It is not the scaled exit field. The stored bitmap contains 1,741 solid pixels;
+each row is contiguous, so exact row intervals may replace bitmap storage,
+but a geometric circle approximation may not replace those intervals.
+
+Create initializes radius bounds to 24 and 26 and consumes one random word
+for `24 + random(2)`. Draw resamples before checking camera visibility unless
+`global.pTimeStop` is set. It draws white outline circles at radius and
+radius−1, followed by a red outline at radius+1. Drawing never changes the
+collision mask. `OrdinaryTimeField` separates radius advancement from snapshot
+painting so repaints cannot consume RNG.
+
+The mask exporter records sprite IDs, source hash and extractor version/commit.
+`make verify-ordinary-time-field` generates ignored row tables and a manifest;
+the verifier pins all bitmap bytes and the audited Create/Draw assembly.
+Builder object-82 initialization already consumes the Create random word:
+world registration must retain that result, not call Create again and consume
+a second draw. Remaining ownership, lookup and rendering work is in the queue.
+
+## Unrotated transformed sampling
 
 The unrotated precise path at Windows runner `0x4b9227..0x4b93f6`
 narrows reciprocal scales to binary32. For each negative reciprocal it
@@ -41,6 +64,8 @@ handle rotated actors or other time-field resources. Unsupported numeric
 inputs fail explicitly. The nearest-even bounds assumption still requires
 original-runtime FP-mode verification; source pinning and host scalar tests
 are not execution of the Windows collision routine.
+
+## Player event boundary
 
 In `objPlayer_n` Begin Step, `scrPlMovement` precedes clock accounting. The
 source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.

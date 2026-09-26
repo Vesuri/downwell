@@ -4,6 +4,11 @@
 #include "core/BloodCollisionBounds.h"
 #include "core/BloodMaskSample.h"
 #include "core/BloodGoalContact.h"
+#include "core/OrdinaryTimeField.h"
+bool compileOrdinaryTimeField(downwell::OrdinaryTimeField& field,downwell::GameMakerRandom& random,downwell::ContactBounds bounds){
+    field.create(240,512,random);field.advanceDraw(false,random);
+    return field.meetsRelativeBounds(bounds);
+}
 #include "core/TimeStopGoalContact.h"
 bool compileTimeStopGoalContact(downwell::RunnerImageValue x,downwell::RunnerImageValue scale,const downwell::GoalTimeField& field,bool& hit){
     return downwell::TimeStopGoalContact::query(downwell::TimeStopGoalContact::Mask::Player,x,x,scale,scale,field,hit);
