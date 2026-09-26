@@ -43,6 +43,42 @@ int main(){
         assert(actual==expected);++cases;hits+=actual;broadRejected+=broad&&!actual;
     }
     assert(hits && broadRejected);
+    {
+        std::ifstream ordinaryFile("generated/downwell-time-field-mask.mask",std::ios::binary);
+        const std::vector<unsigned char> pixels((std::istreambuf_iterator<char>(ordinaryFile)),{});
+        assert(pixels.size()==288);
+        OrdinaryTimeField ordinary;ordinary.x=240;ordinary.y=4032;
+        unsigned count=0,ordinaryHits=0,rejected=0;
+        for(auto mask:{TimeStopGoalContact::Mask::Player,TimeStopGoalContact::Mask::Shard})
+        for(unsigned i=0;i<24000;++i){
+            const float x=ordinary.x+int(i*37%73)-36+(i%8)*.125f;
+            const float y=ordinary.y+int(i*71%73)-36+(i%7)*.125f;
+            const float xs=scales[i%7],ys=scales[i/7%7];
+            const int first=mask==TimeStopGoalContact::Mask::Player?8:10;
+            const int end=mask==TimeStopGoalContact::Mask::Player?20:13;
+            const float a=-4*xs+x,c=(first-12)*ys+y;
+            int l=int(std::nearbyint(a)),r=int(std::nearbyint(8*xs+a));
+            int t=int(std::nearbyint(c)),b=int(std::nearbyint((end-first)*ys+c));
+            if(l>r)std::swap(l,r);if(t>b)std::swap(t,b);
+            l=std::max(l,ordinary.x-24);r=std::min(r,ordinary.x+24);
+            t=std::max(t,ordinary.y-24);b=std::min(b,ordinary.y+24);
+            const float ix=1/xs,iy=1/ys,px=x-(ix<0?1:0),py=y-(iy<0?1:0);
+            bool expected=false,broad=false;
+            for(int xx=l;xx<r;++xx)for(int yy=t;yy<b;++yy){
+                const int fx=xx-ordinary.x+24,fy=yy-ordinary.y+24;
+                if(!(pixels[fy*6+fx/8]&(128>>(fx%8))))continue;
+                broad=true;
+                const int sx=int((float(xx)-px)*ix+12),sy=int((float(yy)-py)*iy+12);
+                expected|=sx>=8 && sx<16 && sy>=first && sy<end;
+            }
+            bool actual=!expected;
+            assert(TimeStopGoalContact::query(mask,real(x),real(y),real(xs),real(ys),ordinary,actual));
+            assert(actual==expected);++count;ordinaryHits+=actual;rejected+=broad&&!actual;
+        }
+        assert(ordinaryHits && rejected);
+        std::printf("Ordinary field contact: %u comparisons, %u hits, %u bbox false positives rejected\n",
+            count,ordinaryHits,rejected);
+    }
     bool hit=true;
     assert(!TimeStopGoalContact::query(TimeStopGoalContact::Mask::Player,{}, {},{},real(1),field,hit) && hit);
     assert(!TimeStopGoalContact::query(TimeStopGoalContact::Mask::Player,{0x7f800000}, {},real(1),real(1),field,hit));

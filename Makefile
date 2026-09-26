@@ -231,7 +231,7 @@ test: verify-time-stop-goal-contact
 verify-time-stop-goal-contact: build/time-stop-goal-contact-test
 	./build/time-stop-goal-contact-test
 
-build/time-stop-goal-contact-test: tests/core/TimeStopGoalContactTest.cpp $(wildcard src/core/*.h) generated/downwell-goal-mask.h generated/downwell-goal-mask.mask
+build/time-stop-goal-contact-test: tests/core/TimeStopGoalContactTest.cpp $(wildcard src/core/*.h) generated/downwell-goal-mask.h generated/downwell-goal-mask.mask generated/downwell-time-field-mask.h generated/downwell-time-field-mask.mask
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeStopGoalContactTest.cpp
 

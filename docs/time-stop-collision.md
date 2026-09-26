@@ -103,9 +103,12 @@ and subtract one from the upper inclusive edge. Computing the upper edge
 independently from the position is not the same arithmetic contract.
 
 `TimeStopGoalContact` specializes these rules for the two rectangular masks
-above and an integral-centred, scale-2 goal field. It returns half-open bounds
-internally, then tests shared solid pixels in X/Y traversal order. It does not
-handle rotated actors or other time-field resources. Unsupported numeric
+above against either an integral-centred, scale-2 goal field or a unit-scale
+ordinary field. The overload selects the actual resource mask: sprite 597 uses
+its 48-by-48 bitmap, not a resized goal mask or the randomized Draw radius.
+It returns half-open bounds internally, then tests shared solid pixels in X/Y
+traversal order. It does not handle rotated actors or transformed field instances.
+Unsupported numeric
 inputs fail explicitly. The nearest-even bounds assumption still requires
 original-runtime FP-mode verification; source pinning and host scalar tests
 are not execution of the Windows collision routine.

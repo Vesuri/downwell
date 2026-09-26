@@ -1,11 +1,12 @@
 #ifndef DOWNWELL_CORE_TIME_STOP_GOAL_CONTACT_H
 #define DOWNWELL_CORE_TIME_STOP_GOAL_CONTACT_H
 #include "GoalTimeField.h"
+#include "OrdinaryTimeField.h"
 #include "RunnerImageValue.h"
 #include "MultiplyBinary64.h"
 #include "DivideBinary64.h"
 namespace downwell {
-// Unrotated sprite 31/91 versus integral-centred, scale-2 goal field.
+// Unrotated sprite 31/91 versus integral-centred goal or ordinary field.
 // Compatibility bounds use nearest-even conversion. Angled masks require a
 // different path; callers must not silently discard an instance's rotation.
 struct TimeStopGoalContact {
@@ -13,15 +14,28 @@ struct TimeStopGoalContact {
     static bool query(Mask mask,RunnerImageValue x,RunnerImageValue y,
                       RunnerImageValue xs,RunnerImageValue ys,
                       const GoalTimeField& field,bool& hit){
-        if(field.x < -1048576 || field.x > 1048576 ||
-           field.y < -1048576 || field.y > 1048576)return false;
+        return queryMask(mask,x,y,xs,ys,field.x,field.y,128,2,goalMaskRows,hit);
+    }
+    static bool query(Mask mask,RunnerImageValue x,RunnerImageValue y,
+                      RunnerImageValue xs,RunnerImageValue ys,
+                      const OrdinaryTimeField& field,bool& hit){
+        return queryMask(mask,x,y,xs,ys,field.x,field.y,24,1,timeFieldMaskRows,hit);
+    }
+private:
+    template<class Rows>
+    static bool queryMask(Mask mask,RunnerImageValue x,RunnerImageValue y,
+                          RunnerImageValue xs,RunnerImageValue ys,
+                          int fieldX,int fieldY,int extent,int pixelScale,
+                          const Rows& rows,bool& hit){
+        if(fieldX < -1048576 || fieldX > 1048576 ||
+           fieldY < -1048576 || fieldY > 1048576)return false;
         const int top=mask==Mask::Player?8:10, bottom=mask==Mask::Player?20:13;
         Axis horizontal,vertical;
         if(!horizontal.prepare(x,xs,8,16) || !vertical.prepare(y,ys,top,bottom))return false;
-        const int l=horizontal.low>field.x-128?horizontal.low:field.x-128;
-        const int r=horizontal.high<field.x+128?horizontal.high:field.x+128;
-        const int t=vertical.low>field.y-128?vertical.low:field.y-128;
-        const int b=vertical.high<field.y+128?vertical.high:field.y+128;
+        const int l=horizontal.low>fieldX-extent?horizontal.low:fieldX-extent;
+        const int r=horizontal.high<fieldX+extent?horizontal.high:fieldX+extent;
+        const int t=vertical.low>fieldY-extent?vertical.low:fieldY-extent;
+        const int b=vertical.high<fieldY+extent?vertical.high:fieldY+extent;
         for(int px=l;px<r;++px){
             bool inside;
             if(!horizontal.contains(px,8,16,inside))return false;
@@ -29,13 +43,12 @@ struct TimeStopGoalContact {
             for(int py=t;py<b;++py){
                 if(!vertical.contains(py,top,bottom,inside))return false;
                 if(!inside)continue;
-                const int fx=(px-field.x+128)/2,fy=(py-field.y+128)/2;
-                if(fx>=goalMaskRows[fy][0] && fx<goalMaskRows[fy][1]){hit=true;return true;}
+                const int fx=(px-fieldX+extent)/pixelScale,fy=(py-fieldY+extent)/pixelScale;
+                if(fx>=rows[fy][0] && fx<rows[fy][1]){hit=true;return true;}
             }
         }
         hit=false;return true;
     }
-private:
     static RunnerImageValue integer(int n){RunnerImageValue v;v.assign(MotionBinary64::fromInteger(n));return v;}
     static bool valid(RunnerImageValue v){const auto e=(v.bits>>23)&255u;return e!=255 && (e || !(v.bits&0x7fffffffu));}
     static bool add(RunnerImageValue a,RunnerImageValue b,RunnerImageValue& out){
