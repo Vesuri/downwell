@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_SKELETON_ACTOR_H
 #include "SkeletonDecisions.h"
 #include "EnemyContact.h"
+#include "OutOfViewLifetime.h"
 namespace downwell {
 // Shared object-120 event body. Owner runs pre-Step animation and global alarm
 // phases separately, supplies synchronous effect/child calls, and defers removal
@@ -128,15 +129,9 @@ struct SkeletonActor : SkeletonDecisions {
     // rmMain and does not invoke enemy death, currency or hit effects.
     template<class Events>
     bool endStep(bool mainRoom,MotionBinary64 viewY,Events& events) {
-        if(!mainRoom) return true;
-        auto top=viewY,bottom=viewY;
-        int before,after;
-        const auto publishedY=MotionBinary64::fromInteger(y);
-        if(!top.add(MotionBinary64::fromInteger(-160)) ||
-           !bottom.add(MotionBinary64::fromInteger(3000)) ||
-           !compareRunnerReal(publishedY,top,before) ||
-           !compareRunnerReal(publishedY,bottom,after)) return false;
-        if(before<0 || after>0) { destroyRequested=true; events.destroy(); }
+        bool retire;
+        if(!outOfViewRetirement(MotionBinary64::fromInteger(y),viewY,mainRoom,retire))return false;
+        if(retire) { destroyRequested=true; events.destroy(); }
         return true;
     }
     template<class Events>

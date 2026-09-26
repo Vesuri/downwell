@@ -1,12 +1,21 @@
 #ifndef DOWNWELL_CORE_CORPSE_LIFECYCLE_H
 #define DOWNWELL_CORE_CORPSE_LIFECYCLE_H
 #include "CorpseBirth.h"
+#include "OutOfViewLifetime.h"
 namespace downwell {
 // Event bodies only: global scheduler owns alarm-index ordering, collision
 // admission and lifetime removal. All child Creates complete synchronously.
 struct CorpseLifecycle : CorpseBirth {
     bool destroyRequested=false,valid=true;
     std::uint32_t myExplosion=0;
+    template<class Events> bool endStep(bool mainRoom,MotionBinary64 viewY,Events& events){
+        if(!valid)return false;
+        if(destroyRequested)return true;
+        bool retire;
+        if(!outOfViewRetirement(y.promoted(),viewY,mainRoom,retire)){valid=false;return false;}
+        if(retire){destroyRequested=true;events.destroy();}
+        return true;
+    }
     template<class Random,class Queries>
     bool create(MotionBinary64 px,MotionBinary64 py,bool rip,Random& random,Queries& queries){
         destroyRequested=false;myExplosion=0;

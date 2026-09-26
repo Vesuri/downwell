@@ -141,6 +141,16 @@ test: verify-dead-body-creation
 test: verify-corpse-birth
 test: verify-corpse-lifecycle
 test: verify-corpse-motion
+test: verify-out-of-view-lifetime
+
+.PHONY: verify-out-of-view-lifetime
+verify-out-of-view-lifetime: build/out-of-view-lifetime-test
+	python3 tools/verify-dead-body-creation.py
+	./build/out-of-view-lifetime-test
+
+build/out-of-view-lifetime-test: tests/core/OutOfViewLifetimeTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/OutOfViewLifetimeTest.cpp
 
 .PHONY: verify-corpse-motion
 verify-corpse-motion: build/corpse-motion-test

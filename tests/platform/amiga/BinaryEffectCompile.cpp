@@ -486,7 +486,7 @@ unsigned compileDeadBodyCreation(downwell::DeadBodySource& source,downwell::Moti
 }
 bool compileCorpseLifecycle(downwell::CorpseLifecycle& corpse,unsigned alarm){
     CorpseCompileEvents events;
-    return corpse.advanceAlarm(alarm,events)&&corpse.collidePlayer(true,false,events);
+    return corpse.advanceAlarm(alarm,events)&&corpse.collidePlayer(true,false,events)&&corpse.endStep(true,{},events);
 }
 #include "core/DebrisDraw.h"
 bool compileDebrisDraw(const downwell::DebrisAnimation& effect,

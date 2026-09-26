@@ -23,6 +23,9 @@ for name,digest in {
 }.items():
     assert sha256((export / f"Assembly/gml_Object_{name}_Create_0.asm").read_bytes()).hexdigest() == digest
 for event,digest in {
+    "Step_2": "71aaac10eef02f61e15327032a995fe459f49451cd38b8434e071ec96268b315",
+    "Collision_parentPBullet": "e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",
+    "Collision_subparentEnemy": "e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",
     "Step_0": "ece87bc038a5d6ee43fb6cf5e9d238ac12f30182d4765c748602f5e2215eebd5",
     "Alarm_0": "c66e3d24e7a8fd8cbcaf0e06dc3457cae0aea183604afe5d578cd7b6f0ab535a",
     "Alarm_1": "1d019f4c251b3e928cd9e7e1e43ef6fdee1c1ac2b44926914947097b10d7763b",
@@ -31,3 +34,5 @@ for event,digest in {
     "Collision_objPlayer_n": "a50d56a52a49e2e7b35c5980a268db839e321359a5a8e75b5e275e7f7f0b5ddc",
 }.items():
     assert sha256((export / f"Assembly/gml_Object_objDeadBody_{event}.asm").read_bytes()).hexdigest() == digest
+assert sha256((export / "Assembly/gml_GlobalScript_scrOutofview.asm").read_bytes()).hexdigest() == \
+    "e06b55bcc8952fd6eb918461ffce8196a41cff92c7f7dfe97060160468a2fcff"

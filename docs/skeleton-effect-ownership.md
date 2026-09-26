@@ -115,7 +115,17 @@ still executes after successful retirement requests and during time-stop.
 Frozen Step refunds only positive alarms 0–2 and leaves alarm 3 untouched.
 `verify-corpse-motion` checks 6,272 scalar query tapes, upgrade/freeze gates and
 partial failures. The owner still supplies original collision admission,
-global scheduling, animation and End Step culling; this is not live parity.
+global scheduling, animation and End Step dispatch; this is not live parity.
+
+Corpse End Step now uses `outOfViewRetirement`, shared with the skeleton event.
+It tests published Y against view Y minus 160 / plus 3000 using source real
+comparisons, then gates retirement on rmMain. The upper/lower tests retain their
+short-circuit order. This path does not run expiration, damage, rewards or
+effect creation. The scheduler supplies activation eligibility; custom corpse
+`active` is an upgrade flag, not instance deactivation. Both explicit corpse
+collision events for parentPBullet and subparentEnemy are empty and pinned as
+such. Do not add hit reactions to those event bodies. The opposing object's
+collision event can still mutate the corpse through the shared instance system.
 
 `DebrisBirth` implements that object-370 Create with four ordered RNG draws,
 custom binary64 motion/rate fields and narrowed builtin animation fields.
