@@ -1,5 +1,11 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/BloodEffect.h"
+#include "core/BloodEffects.h"
+bool compileBloodOwner(downwell::BloodEffects<32>& owner, bool allowed) {
+    if(!owner.create({}, {},{}))return false;
+    const auto phase=owner.beginPhase();
+    return owner.advanceAnimation(phase) && owner.step(phase,[&](auto,const auto&){return allowed;});
+}
 bool compileBloodEffect(downwell::BloodEffect& effect,downwell::MotionBinary64 x,
     downwell::MotionBinary64 y,downwell::MotionBinary64 angle,bool timeAllowed) {
     return effect.create(x,y,angle) && effect.advanceImage() && effect.step(timeAllowed);
