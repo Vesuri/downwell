@@ -13,7 +13,7 @@ File.WriteAllText(Environment.GetEnvironmentVariable("DOWNWELL_ANIMATION_OUTPUT"
             special = sprite.IsSpecialType,
             spriteType = sprite.SSpriteType.ToString(),
             hasSequence = sprite.V2Sequence != null,
-            sequence = new[] {84, 96, 205, 206, 207, 208, 460}.Contains(id) ? sprite.V2Sequence : null,
+            sequence = new[] {84, 91, 96, 205, 206, 207, 208, 460}.Contains(id) ? sprite.V2Sequence : null,
             playbackSpeed = sprite.GMS2PlaybackSpeed,
             playbackSpeedType = sprite.GMS2PlaybackSpeedType.ToString()
         }).ToArray()

@@ -10,6 +10,8 @@
 #include "core/TimeShardBirth.h"
 #include "core/TimeShardLifecycle.h"
 #include "core/TimeShardMotion.h"
+#include "core/TimeShardAnimation.h"
+bool compileTimeShardAnimation(downwell::TimeShardAnimation& shard){return shard.advanceImage();}
 bool compileTimeShardMotion(downwell::TimeShardMotion& shard,downwell::GameMakerRandom& random,bool stopped){
     return shard.step(stopped,random,[&](auto,auto,bool& hit){hit=stopped;return true;},
         [](){return 1;},[](const auto&,bool& retire){retire=false;return true;});
