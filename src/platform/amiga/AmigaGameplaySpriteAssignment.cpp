@@ -14,7 +14,7 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* a
     };
     while (result.bobCount > 0) {
         const auto& actor = actors[result.bobCount - 1];
-        if (actor.sprite == gameplayRayMarker) break;
+        if (actor.sprite == gameplayRayMarker || actor.sprite == gameplayDamageTextMarker) break;
         if (controller) {
             int x,y,width,height;
             if (!amigaRendererAssetBounds(pack,packEnd,actor.sprite,actor.frame,

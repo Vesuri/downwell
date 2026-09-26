@@ -9,6 +9,8 @@ class AmigaGameplayRows;
 class AmigaLaserSight;
 // Marker in painter order; never looked up as a packed sprite.
 static constexpr UWORD gameplayRayMarker = 65535;
+// x/y are text anchor, flip stores the signed integer damage, frame is unused.
+static constexpr UWORD gameplayDamageTextMarker = 65534;
 struct GameplayBob { UWORD sprite, frame; int x, y, flip; };
 class AmigaGameplayActors {
 public:

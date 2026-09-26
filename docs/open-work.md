@@ -49,6 +49,10 @@ behavior, both backend integrations and relevant original-game verification.
 
 ### C. Connect damage effects and actors
 
+- Connect the shared player-damage scripts to natural contacts, including
+  damage-number creation, audio/controller side effects and immunity ordering.
+  Extend integer-only damage text formatting if live source paths require VM
+  real formatting; verify fractional text placement against the original.
 - Implement remaining blood, corpse, debris and blast dependencies. Preserve
   synchronous child Create, RNG consumption and mutation order before rewards
   and retirement.
@@ -185,6 +189,10 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 7. Establish memory fit and failure handling
 
+- Restore the resident game-art regression budget of 278,000 bytes without
+  weakening the gate. The current pack requires 281,074 bytes (the preceding
+  committed generator already required 280,996); separate this conservative
+  asset limit from measured whole-program allocation and peak usage.
 - Measure Chip/Fast RAM, task stack, asset residency and peak transition usage.
   Establish the A500 memory requirement; expanded-emulator runs do not prove
   stock-machine fit.

@@ -2,6 +2,7 @@
 #include "TimeFieldOutlines.h"
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
+#include "DamageNumberText.h"
 #include "AmmoDividers.h"
 #include "AmmoFill.h"
 #include "DeathResultsBackdrop.h"
@@ -371,11 +372,26 @@ void Game::renderMain(Renderer& renderer) const {
                             static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
     }
     // fxJobutsu uses ordinary Draw at -1000, between bullets and player.
-    startup_.corpseExpiryEffects().visitNewest([&](unsigned,const CorpseExpiryEffect& effect){
+    if(!startup_.visitForegroundEffects([&](const CorpseExpiryEffect& effect){
         float x,y;
         std::memcpy(&x,&effect.x.bits,sizeof x);std::memcpy(&y,&effect.y.bits,sizeof y);
         renderer.drawSpriteTransformed(effect.spriteId,effect.drawFrame(),x-viewX,y-viewY,1,1,0);
-    });
+        return true;
+    },[&](const PlayerDamageNumber& effect){
+        DamageNumberText label;if(!label.format(effect.amount))return false;
+        struct Draw {
+            Renderer& renderer;const char* label;float viewX,viewY;unsigned pen=0;
+            void align(int){} // Each renderer call carries the source center alignment explicitly.
+            void color(unsigned value){pen=value;}
+            bool text(MotionBinary64 x,MotionBinary64 y,MotionBinary64){
+                RunnerImageValue px,py;if(!px.assign(x)||!py.assign(y))return false;
+                float fx,fy;std::memcpy(&fx,&px.bits,4);std::memcpy(&fy,&py.bits,4);
+                renderer.drawText(2,label,fx-viewX,fy-viewY,Color{std::uint8_t(pen),0,0,255},TextAlign::center);
+                return true;
+            }
+        } draw{renderer,label.text,viewX,viewY};
+        return effect.draw(draw);
+    })){renderingSucceeded_=false;return;}
     if (startup_.mainPlayerVisible())
         renderer.drawSpriteTransformed(
             startup_.mainPlayerSpriteId(),

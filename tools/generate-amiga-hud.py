@@ -201,6 +201,7 @@ CREDIT_TEXT_ANCHOR_X = {
 # strings 10..99 are unnecessary now that counters compose these ten glyphs.
 TEXT_SELECTIONS["game"].update({65100 + value: str(value)
                                 for value in range(10)})
+TEXT_SELECTIONS["game"][65110] = "-"  # Moving damage text uses the same font bank.
 
 # The original 320x800 style-transition sprites are almost entirely opaque
 # black.  Only the 160x80 gradient edge that crosses the logical playfield
@@ -664,8 +665,9 @@ def build_pack(manifest, extracted, profile, language_path=None):
     if profile == "game":
         glyphs = {glyph["character"]: glyph
                   for glyph in manifest["resources"]["fonts"][2]["glyphs"]}
-        require(all(glyphs[ord(digit)]["shift"] == 8 for digit in "0123456789"),
-                "native streak compositor requires eight-pixel decimal advances")
+        require(all(glyphs[ord(digit)]["shift"] == 8 and not glyphs[ord(digit)]["kernings"]
+                    for digit in "-0123456789"),
+                "native numeric text requires eight-pixel advances without kerning")
     texts = (shop_texts(language_path) if profile == "shop" else
              clear_texts(language_path) if profile == "clear" else TEXT_SELECTIONS.get(profile, {}))
     for text_id, text in texts.items():

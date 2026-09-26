@@ -6,6 +6,7 @@
 #include "platform/amiga/GameplaySceneStorage.h"
 #include "platform/amiga/AmigaExitMask.h"
 #include "core/ShopFixtures.h"
+#include "core/DamageNumberText.h"
 #include "platform/amiga/AmigaShopMenu.h"
 
 #include <cstdlib>
@@ -453,8 +454,6 @@ int main(int argc, char** argv) {
         std::istreambuf_iterator<char>(input),
         std::istreambuf_iterator<char>()};
     require(!gamePack.empty(), "Amiga game pack can be read");
-    require(amigaRendererChipPackBytes(gamePack.data(), gamePack.data() + gamePack.size()) <= 278000,
-            "resident game art stays within the tested 512 KiB A500 budget");
     const unsigned runtimeSprites[][2] = {
         {0, 2}, {1, 8}, {3, 4}, {12, 8}, {27, 8}, {31, 4}, {37, 5},
         {127, 1}, {133, 4}, {134, 4}, {139, 2}, {153, 4}, {154, 1}, {157, 4}, {162, 4},
@@ -591,6 +590,38 @@ int main(int argc, char** argv) {
     std::vector<UBYTE> actualGame(downwellGameRingBytes), expectedGame(downwellGameRingBytes);
     std::vector<UBYTE> actualHud(downwellLayerBytes), expectedHud(downwellLayerBytes);
     AmigaRenderer actualRenderer, expectedRenderer;
+    for(unsigned origin:{0u,311u,319u})for(int shift=0;shift<16;++shift)for(int edge:{110,190,266}){
+        std::fill(actualGame.begin(),actualGame.end(),0x5a);expectedGame=actualGame;
+        amigaRendererInit(&actualRenderer,actualGame.data(),actualHud.data());
+        amigaRendererSetGameOrigin(&actualRenderer,origin);
+        amigaRendererSetClipRect(&actualRenderer,110,0,160,284);
+        downwell::DamageNumberText label;label.formatInteger(12);
+        const int anchor=edge+shift,anchorY=3;
+        label.draw(anchor,anchorY,[&](unsigned glyph,int x,int y,unsigned pen){
+            amigaRendererDrawAssetPen(&actualRenderer,gamePack.data(),gamePack.data()+gamePack.size(),glyph,0,x,y,0,pen);
+        });
+        const unsigned glyphs[]={65110,65101,65102};
+        const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+        for(unsigned pass=0;pass<5;++pass)for(unsigned g=0;g<3;++g){
+            const UBYTE* record=nullptr;
+            for(unsigned i=0;i<records;++i){const auto* r=gamePack.data()+20+i*24;if(word(r)==glyphs[g]&&word(r+2)==0){record=r;break;}}
+            require(record!=nullptr,"damage text glyph exists");
+            const int stride=word(record+12)/8,height=word(record+10),width=word(record+8);
+            const auto* data=gamePack.data()+word(record+16)*65536u+word(record+18);
+            for(int sy=0;sy<height;++sy)for(int sx=0;sx<width;++sx){
+                const unsigned bit=128u>>(sx&7),offset=sy*stride+sx/8;
+                if(!((data[offset]|data[offset+stride*height])&bit))continue;
+                const int x=anchor-12+int(g)*8+dx[pass]+sx,y=anchorY+dy[pass]+sy;
+                if(x<110||x>=270||y<0||y>=284)continue;
+                for(unsigned plane=0;plane<2;++plane){
+                    auto& byte=expectedGame[plane*downwellGameRingPlaneBytes+((origin+y)%320)*48+x/8];
+                    const unsigned mask=128u>>(x&7),pen=pass==4?2:0;
+                    byte=(byte&~mask)|((pen&(1u<<plane))?mask:0);
+                }
+            }
+        }
+        require(actualGame==expectedGame,"damage text CPU glyph writes match scalar outline, clipping and circular-buffer oracle");
+    }
     unsigned tileComparisons = 0;
     for (unsigned i = 0; i < records; ++i) {
         const auto* r = gamePack.data() + 20 + i * 24;
@@ -1005,6 +1036,11 @@ int main(int argc, char** argv) {
                 "unchanged and closing shop restores foreground HUD without erasing underlying panel");
         }
     }
+    std::cout << "Amiga renderer pixel comparisons passed\n";
+    // Run the raster checks even when asset growth violates the residency gate.
+    // Keep the budget a hard failure, not an automatically growing allowance.
+    require(amigaRendererChipPackBytes(gamePack.data(), gamePack.data() + gamePack.size()) <= 278000,
+            "resident game art stays within the tested 512 KiB A500 budget");
     std::cout << "Amiga renderer tests passed\n";
     return 0;
 }

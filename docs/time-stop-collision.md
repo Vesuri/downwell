@@ -129,8 +129,23 @@ excluded until the next update; previously surviving numbers expire at Alarm 0
 before that frame's Step. The world integration test compares 60 updates of both
 schedulers, including a native generation-time birth. The cross-CPU replay's
 `DAMAGE_NUMBER` case exercises the actual session math path at eight directions;
-it does not exercise natural damage dispatch. Both text backends and natural
-damage-event adapters remain to be connected before visible damage numbers work.
+it does not exercise natural damage dispatch.
+
+Both rendering backends consume the merged foreground stream. SDL emits the
+five original text passes using recovered font 2. Amiga uses offline numeric
+glyph masks (IDs 65100–65110), drains outstanding blits, then writes the small
+glyphs with the CPU into the retired display buffer. Only their touched rows
+are marked for restoration; the terrain backing remains unchanged. The text
+marker participates in sprite assignment so DMA actors cannot incorrectly cover
+foreground text. Glyph advances are eight pixels with no numeric kerning.
+
+The current formatter accepts exact signed 32-bit integer damage, including
+zero and negative values, and rejects unsupported values without rounding them.
+General VM real-to-string formatting and fractional raster placement still need
+original-runner verification. Focused tests inject effects: they verify SDL
+commands, native Draw ordering and scalar planar pixel equivalence across all
+word shifts and ring wrap, not natural player-damage dispatch. The natural
+damage-event adapters remain unfinished.
 
 Damage numbers and corpse-expiry sprites share compatibility depth −1000.
 `RunSession` assigns both a common monotonic Draw-birth key and merges their

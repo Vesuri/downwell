@@ -63,6 +63,8 @@ public:
     std::vector<Transform> transforms;
     std::vector<Transform> flashDraws;
     std::vector<int> spriteOrder;
+    struct DamageText {float x,y;downwell::Color color;};
+    std::vector<DamageText> damageTexts;
     void drawSpriteTransformed(std::int32_t sprite, std::uint32_t frame, float x, float y,
                                float sx, float sy, float angle) override {
         spriteOrder.push_back(sprite);
@@ -84,6 +86,10 @@ public:
     void drawText(std::int32_t, const char* text, float x, float y,
                   downwell::Color color,
                   downwell::TextAlign align) override {
+        if(std::strcmp(text,"-12")==0){
+            require(align==downwell::TextAlign::center,"damage text is centered");
+            damageTexts.push_back({x,y,color});spriteOrder.push_back(-1001);
+        }
         if (std::strstr(text, "CLEARED")) ++clearTitleDraws;
         if (std::strcmp(text, "CHOOSE 1 UPGRADE") == 0) ++clearChoiceDraws;
         if (x == 190 && y == 64 && color.r == 255 && color.g == 255 &&
@@ -476,6 +482,20 @@ int main() {
             require(runtime.corpseExpiryEffects().size()==1,"expiry survives independently through first 32 updates");
             for(unsigned i=0;i<8;++i)runtime.step(false);
             require(runtime.corpseExpiryEffects().size()==0,"world retires expiry on animation boundary");
+            const int nx=int(runtime.mainCameraViewX())+80,ny=int(runtime.mainCameraViewY())+104;
+            require(runtime.emitCorpseExpiry(downwell::MotionBinary64::fromInteger(nx),downwell::MotionBinary64::fromInteger(ny)),"older foreground fixture");
+            require(runtime.emitDamageNumber(downwell::MotionBinary64::fromInteger(nx),downwell::MotionBinary64::fromInteger(ny),downwell::MotionBinary64::fromInteger(12),{}),"damage text fixture");
+            RecordingRenderer textCapture;flashGame.render(textCapture);
+            require(flashGame.renderingSucceeded()&&textCapture.damageTexts.size()==5,"damage text reaches host renderer");
+            const int dx[]={1,-1,0,0,0},dy[]={0,0,1,-1,0};
+            for(unsigned i=0;i<5;++i){const auto& t=textCapture.damageTexts[i];
+                require(t.x==110+nx-runtime.mainCameraViewX()+dx[i]&&t.y==ny-4-runtime.mainCameraViewY()+dy[i],"damage text preserves source offsets");
+                require(t.color.r==(i==4?255:0)&&t.color.g==0&&t.color.b==0,"damage text has black outline and red center");
+            }
+            unsigned textCommands=0;
+            for(int sprite:textCapture.spriteOrder){if(sprite==-1001)++textCommands;if(sprite==102)require(textCommands==5,"new text precedes older equal-depth sprite");}
+            require(runtime.emitDamageNumber({}, {},{0x3fe00000u,0},{}),"unsupported display amount fixture");
+            RecordingRenderer unsupported;flashGame.render(unsupported);require(!flashGame.renderingSucceeded(),"unsupported formatting fails explicitly");
             std::puts("Production host flash ownership, camera projection and retirement passed");
             return 0;
         }

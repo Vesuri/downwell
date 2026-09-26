@@ -2,6 +2,7 @@
 #include "AmigaProfile.h"
 #include "core/ShopFixtures.h"
 #include "core/GameMakerRounding.h"
+#include "core/DamageNumberText.h"
 
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
@@ -74,12 +75,27 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             ready = false;
     }
     // Ordinary sprite depth -1000, not a controller effect-surface layer.
-    if(!port.corpseExpiryEffects().visitNewest([&](unsigned,const downwell::CorpseExpiryEffect& effect){
+    if(!port.visitForegroundEffects([&](const downwell::CorpseExpiryEffect& effect){
         std::int32_t x,y;
         if(!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)){
-            failedSprite=effect.spriteId;ready=false;return;
+            failedSprite=effect.spriteId;return false;
         }
-        if(!append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+x-worldViewX,y-worldViewY,0))ready=false;
+        return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
+    },[&](const downwell::PlayerDamageNumber& effect){
+        downwell::DamageNumberText label;std::int32_t x,y;
+        auto fail=[&](){failedSprite=gameplayDamageTextMarker;return false;};
+        if(!label.format(effect.amount)||
+           !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y))return fail();
+        const std::int64_t sx=std::int64_t(downwellPlayfieldX)+x-worldViewX,sy=std::int64_t(y)-worldViewY;
+        const int half=int(label.length)*4;
+        if(sx+half+1<=downwellPlayfieldX||sx-half-1>=downwellPlayfieldX+downwellPlayfieldWidth||sy+11<=0||sy-1>=downwellDisplayHeight)return true;
+        for(unsigned i=0;i<label.length;++i){
+            int left,top,width,height;
+            if(!amigaRendererAssetBounds(pack,packEnd,label.glyph(label.text[i]),0,0,0,0,&left,&top,&width,&height))return fail();
+        }
+        if(count==capacity)return fail();
+        actors[count++]={gameplayDamageTextMarker,0,int(sx),int(sy),int(label.integerValue)};
+        return true;
     }))ready=false;
     if (port.playerVisible() && !append(
             (UWORD)port.player().spriteId(port.deathSequence().movementDead()),

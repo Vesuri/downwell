@@ -44,13 +44,13 @@ int main() {
         unsigned v=pattern;
         for(unsigned i=0;i<4;++i) {
             actors[i]={UWORD(1+v%4),17,-20,300,1}; v/=4;
-            if(i==marker) actors[i].sprite=gameplayRayMarker;
+            if(i==marker) actors[i].sprite=pattern&1?gameplayRayMarker:gameplayDamageTextMarker;
         }
         UWORD expected[8]; for(auto& value:expected) value=0xffff;
         unsigned remaining=4, used=0;
         while(remaining) {
             const unsigned parts=actors[remaining-1].sprite;
-            if(parts==gameplayRayMarker || (cover&(1u<<(parts-1))) || used+parts>limit) break;
+            if(parts==gameplayRayMarker || parts==gameplayDamageTextMarker || (cover&(1u<<(parts-1))) || used+parts>limit) break;
             for(unsigned part=0;part<parts;++part) expected[used++]=parts*16+part;
             --remaining;
         }

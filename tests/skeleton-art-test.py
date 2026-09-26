@@ -33,6 +33,25 @@ def planar_pixels(row):
             for y in range(height) for x in range(width) if pixels[y*width+x]}
 
 checked = 0
+font = resources["fonts"][2]
+assert font["name"] == "font0" and font["antiAliasing"] == 0
+font_item = resources["texturePageItems"][font["texturePageItemId"]]
+for character in "-0123456789":
+    glyph = next(g for g in font["glyphs"] if g["character"] == ord(character))
+    assert glyph["shift"] == 8 and not glyph["kernings"]
+    ident = 65110 if character == "-" else 65100 + int(character)
+    row = records[(ident,0)]
+    assert row[2:6] == (4,0,8,10)
+    expected = {}
+    for y in range(glyph["sourceHeight"]):
+        for x in range(glyph["sourceWidth"]):
+            pixel = pages[font_item["texturePageId"]].getpixel((
+                font_item["sourceX"]+glyph["sourceX"]+x,
+                font_item["sourceY"]+glyph["sourceY"]+y))
+            assert pixel[3] in (0,255)
+            if pixel[3]: expected[(x+glyph["offset"]-4,y)] = 1
+    assert planar_pixels(row) == expected, character
+    checked += 1
 for pixel in ((128,128,128,255), (254,254,254,127), (255,255,255,255)):
     try:
         pack.flash_palette_canvas(pack.Image.new("RGBA", (1,1), pixel))

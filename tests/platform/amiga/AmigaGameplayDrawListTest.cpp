@@ -10,6 +10,22 @@ int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD,UWORD,int x,int y,i
     *left=x-8; *top=y-8; *width=*height=16; return boundsOK;
 }
 int main() {
+    {
+        GameplayWorld scene(0,true,0,false);UBYTE pack[8]{};AmigaGameplayDrawList list;
+        auto n=[](int v){return downwell::MotionBinary64::fromInteger(v);};
+        assert(scene.emitCorpseExpiry(n(240),n(120)));
+        assert(scene.emitDamageNumber(n(240),n(124),n(12),{}));
+        assert(list.collect(scene,pack,pack+8,160,34));
+        unsigned text=0,expiry=0;
+        for(unsigned i=0;i<list.count;++i){
+            auto a=list.actors[i];
+            if(a.sprite==gameplayDamageTextMarker){assert(!expiry&&a.x==190&&a.y==86&&a.flip==12);++text;}
+            if(a.sprite==102){assert(text==1);++expiry;}
+        }
+        assert(text==1&&expiry==1);
+        assert(scene.emitDamageNumber(n(240),n(124),{0x3fe00000u,0},{}));
+        assert(!list.collect(scene,pack,pack+8,160,34)&&list.failedSprite==gameplayDamageTextMarker);
+    }
     GameplayWorld world(300,true,0,true);
     assert(world.grantUpgrade(12));
     world.registerShop(240,210);

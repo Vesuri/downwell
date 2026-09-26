@@ -538,6 +538,13 @@ test: verify-time-stop-effects
 test: verify-typical-player-damage
 test: verify-player-damage
 test: verify-player-damage-number
+test: verify-damage-number-text
+.PHONY: verify-damage-number-text
+verify-damage-number-text: build/damage-number-text-test
+	./build/damage-number-text-test
+build/damage-number-text-test: tests/core/DamageNumberTextTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/DamageNumberTextTest.cpp
 test: verify-player-damage-numbers
 test: verify-foreground-effect-order
 .PHONY: verify-foreground-effect-order

@@ -2,6 +2,7 @@
 #include "AmigaGameplayRows.h"
 #include "AmigaLaserSight.h"
 #include "AmigaProfile.h"
+#include "core/DamageNumberText.h"
 #include "framework/Bitmap.h"
 #include "framework/AmigaHardware.h"
 #ifdef DOWNWELL_SCENE_VERIFY
@@ -37,6 +38,22 @@ void AmigaGameplayActors::draw(AmigaRenderer renderer, Bitmap& display,
 #endif
     for (unsigned i = 0; i < count; ++i) {
         const GameplayBob& bob = bobs[i];
+        if(bob.sprite==gameplayDamageTextMarker){
+            AmigaHardware::blitterDrain();
+            AmigaRenderer textRenderer=renderer;textRenderer.blitterEnabled=0;
+            downwell::DamageNumberText label;label.formatInteger(bob.flip);
+            label.draw(bob.x,bob.y,[&](unsigned glyph,int x,int y,unsigned pen){
+                amigaRendererDrawAssetPen(&textRenderer,pack,packEnd,glyph,0,x,y,0,pen);
+#ifdef DOWNWELL_SCENE_VERIFY
+                amigaRendererDrawAssetPen(&oracle,pack,packEnd,glyph,0,x,y,0,pen);
+#endif
+            });
+            int top=bob.y-1,bottom=bob.y+11;
+            if(top<0)top=0;
+            if(bottom>downwellDisplayHeight)bottom=downwellDisplayHeight;
+            if(bottom>top)rows.damage(origin,top,bottom-top,(UBYTE)(1u<<buffer));
+            continue;
+        }
         if (bob.sprite == gameplayRayMarker) {
             DW_PROFILE_SCOPE(profileLaserDraw);
             { DW_PROFILE_SCOPE(profileLaserDrawDrain); AmigaHardware::blitterDrain(); }
