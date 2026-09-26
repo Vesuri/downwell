@@ -101,6 +101,9 @@ bool compileOrdinaryTimeFieldOrder(downwell::OrdinaryTimeFields<64>& fields,down
     return fields.advanceDraw(false,random,true,boundary,[&]{goal.advanceDraw(false,random);});
 }
 #include "core/TimeStopGoalContact.h"
+bool compileBloodOrdinaryContact(const downwell::BloodEffect& blood,const downwell::OrdinaryTimeField& field,bool& hit){
+    return downwell::BloodGoalContact::query(blood,field,hit);
+}
 bool compileOrdinaryTimeStopContact(downwell::RunnerImageValue x,downwell::RunnerImageValue scale,const downwell::OrdinaryTimeField& field,bool& hit){
     return downwell::TimeStopGoalContact::query(downwell::TimeStopGoalContact::Mask::Shard,x,x,scale,scale,field,hit);
 }

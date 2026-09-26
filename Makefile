@@ -240,7 +240,7 @@ test: verify-blood-goal-contact
 verify-blood-goal-contact: build/blood-goal-contact-test
 	./build/blood-goal-contact-test
 
-build/blood-goal-contact-test: tests/core/BloodGoalContactTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/downwell-goal-mask.h generated/downwell-goal-mask.mask
+build/blood-goal-contact-test: tests/core/BloodGoalContactTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc generated/downwell-goal-mask.h generated/downwell-goal-mask.mask generated/downwell-time-field-mask.h generated/downwell-time-field-mask.mask
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/BloodGoalContactTest.cpp
 

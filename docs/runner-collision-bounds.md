@@ -205,3 +205,13 @@ trig equivalence still need original-runtime verification.
 unit scales and nearest-even conversion, returning half-open integer edges.
 Its scalar test isolates arithmetic from trig: it does not independently
 prove Windows trig identity, FP mode, or the sampling routine described here.
+
+`BloodGoalContact` covers both integral-centred goal fields (sprite 616, scale 2)
+and ordinary fields (sprite 597, scale 1). It selects the sampling branch from
+both sprites' scales/angles. `BloodMaskSample` then uses rounded integer
+positions, unrotated fractional sampling, or the rotated transform as selected.
+Bounds still use the actual blood angle, even when sampling dispatch treats it
+as near zero. The stored blood rectangle's strictly positive edges make direct
+interval tests equivalent to truncating coordinates and reading its verified
+bits. These query adapters do not select instance identity or activation state;
+the scheduler/registry must supply eligible fields.
