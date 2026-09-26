@@ -45,6 +45,19 @@ int main(int argc,char**argv){
             for(unsigned bit=0;bit<16;++bit)if(mask&(0x8000u>>bit))
                 actual[y*160+x+bit]=unsigned(bool(low&(0x8000u>>bit)))+2*unsigned(bool(high&(0x8000u>>bit)));
         });assert(actual==expected);
+        static unsigned serial=0;
+        for(unsigned n=0;n<24;++n,++serial){
+            const int left=int((serial*29)%210)-25,top=int((serial*17)%334)-25;
+            const int right=left+int(serial%35),bottom=top+int(serial%21);
+            bool hit=false;
+            for(int y=top;y<bottom;++y)for(int x=left;x<right;++x)
+                if(x>=0 && x<160 && y>=0 && y<284 && expected[y*160+x]>=0)hit=true;
+            assert(surface.intersects(left,top,right,bottom)==hit);
+        }
+        assert(!surface.intersects(INT_MIN,INT_MIN,0,0));
+        assert(!surface.intersects(160,284,INT_MAX,INT_MAX));
+        bool any=false;for(int pen:expected)any|=pen>=0;
+        assert(surface.intersects(INT_MIN,INT_MIN,INT_MAX,INT_MAX)==any);
     };
     auto stamp=[&](const Asset& a,int anchorX,int anchorY,bool shade){
         const int x=anchorX-a.ox,y=anchorY-a.oy;const auto& mask=a.image.alpha;

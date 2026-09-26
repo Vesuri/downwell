@@ -107,8 +107,9 @@ ports does not count as parity with the original.
   retaining static layers and pointer-driven movement.
 - Measure new actor/effect costs in dense scenes. Keep a portable reference
   when introducing selected 68000 assembly optimizations.
-- Replace the all-planar actor fallback on nonempty controller-effect frames
-  with verified overlap-aware sprite assignment, preserving controller priority.
+- Profile controller composition and overlap-aware sprite assignment on dense
+  gem/smoke scenes; verify the resulting mixed DMA/planar frame against original
+  captures while preserving controller priority.
 - Repeat low-overhead timing tapes and correctness gates after changes, with
   separate horizontal-shop and dense-encounter cases. Distinguish instrumentation
   overhead from ordinary gameplay cost.

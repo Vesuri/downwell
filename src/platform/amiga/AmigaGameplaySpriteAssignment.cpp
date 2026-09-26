@@ -5,7 +5,8 @@
 
 AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* actors,
     unsigned count, const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
-    Sprite* regular, Sprite& overflow, unsigned height, unsigned limit) {
+    Sprite* regular, Sprite& overflow, unsigned height, unsigned limit,
+    const downwell::PaletteEffectSurface<>* controller) {
     Assignment result{count, true, 0, 0};
     AmigaActorChannels channels(limit);
     auto slot = [&](unsigned channel) -> Sprite& {
@@ -14,6 +15,18 @@ AmigaGameplayActors::Assignment AmigaGameplayActors::assign(const GameplayBob* a
     while (result.bobCount > 0) {
         const auto& actor = actors[result.bobCount - 1];
         if (actor.sprite == gameplayRayMarker) break;
+        if (controller) {
+            int x,y,width,height;
+            if (!amigaRendererAssetBounds(pack,packEnd,actor.sprite,actor.frame,
+                    actor.x,actor.y,actor.flip,&x,&y,&width,&height)) {
+                result.ready=false;result.failedSprite=actor.sprite;result.failedFrame=actor.frame;
+                break;
+            }
+            // The canvas is conservative (transparent actor pixels included).
+            // Stop at the first overlap: backfilling behind that planar actor
+            // would reverse world painter order even outside the effect itself.
+            if (controller->intersects(x-downwellPlayfieldX,y,x-downwellPlayfieldX+width,y+height)) break;
+        }
         AmigaResolvedSpritePart prepared;
         if (!amigaRendererResolveSpritePart(&prepared, pack, packEnd,
                 actor.sprite, actor.frame, 0, actor.flip)) {

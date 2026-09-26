@@ -209,10 +209,13 @@ in `AmigaGameplayRows` for that buffer only. An empty surface neither drains nor
 adds damage. Before that buffer is reused, its normal terrain sync restores the
 previous physical rows, independent of the new camera origin or effect lifetime.
 The backing and HUD remain untouched. The live scene places this operation after
-ordinary actors and flash balls. Frames with nonempty controller coverage use
-planar actors so hardware sprites cannot incorrectly cover the effects. This is
-a conservative ordering fallback, not a demonstrated 20 ms solution; refine it
-with verified overlap-aware assignment. `make test-amiga-gameplay-effects` exercises publication followed by
+ordinary actors and flash balls. Sprite assignment tests final effect alpha
+against each candidate's canvas, stopping at the first overlap. Only that actor
+and actors behind it fall back to planar drawing; the non-overlapping frontmost
+suffix remains eligible for DMA sprites. Shade holes and cleared surfaces do
+not block assignment, while opaque black does. Canvas bounds are conservative:
+transparent sprite pixels may still cause fallback. This preserves order, not
+a demonstrated 20 ms budget. `make test-amiga-gameplay-effects` exercises publication followed by
 restoration across alternating rings, clipping, wrapping and effect retirement.
 
 Reviewed assembly SHA-256 values:

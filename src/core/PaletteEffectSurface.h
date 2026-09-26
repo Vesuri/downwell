@@ -23,6 +23,27 @@ public:
         return stamp(asset.alpha,asset.low,asset.high,x,y);
     }
     bool subtract(const Mask& mask,int x,int y){return stamp(mask,nullptr,nullptr,x,y);}
+    // Half-open viewport rectangle. Test final alpha, including shade holes
+    // and opaque black; stale color bits are never evidence of overlap.
+    bool intersects(int left,int top,int right,int bottom)const{
+        if(left<0)left=0;
+        if(top<0)top=0;
+        if(right>int(Width))right=Width;
+        if(bottom>int(Height))bottom=Height;
+        if(left>=right || top>=bottom)return false;
+        const unsigned first=unsigned(left)/16,last=unsigned(right-1)/16;
+        for(unsigned y=unsigned(top);y<unsigned(bottom);++y){
+            unsigned begin=first>first_[y]?first:first_[y];
+            unsigned end=last+1<last_[y]?last+1:last_[y];
+            for(unsigned x=begin;x<end;++x){
+                unsigned mask=0xffffu;
+                if(x==first)mask&=0xffffu>>(unsigned(left)%16);
+                if(x==last && unsigned(right)%16)mask&=0xffffu<<(16-unsigned(right)%16);
+                if(alpha_[y*words+x]&mask)return true;
+            }
+        }
+        return false;
+    }
     template<class Emit> void visit(Emit emit)const{
         for(unsigned y=0;y<Height;++y)for(unsigned x=first_[y];x<last_[y];++x){
             const unsigned at=y*words+x;const auto a=alpha_[at];

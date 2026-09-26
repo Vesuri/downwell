@@ -2682,11 +2682,9 @@ int main(void) {
 #ifdef DOWNWELL_BOB_VERIFY
                 0
 #else
-                // Controller effects draw in front of world actors. Until a
-                // sprite-overlap assignment can prove that order, use BOBs
-                // on frames with nonempty controller coverage only.
-                compositeCurrency && controllerEffects.visible() ? 0 : 8
+                8
 #endif
+                , compositeCurrency && controllerEffects.visible() ? &controllerEffects.surface() : nullptr
             );
             const unsigned bobCount = assignment.bobCount;
             if (!assignment.ready) {

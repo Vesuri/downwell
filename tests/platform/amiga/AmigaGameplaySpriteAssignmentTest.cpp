@@ -5,6 +5,11 @@
 static UBYTE records[5][4][2];
 static bool drawOK=true;
 static int failedPart=-1;
+static bool boundsOK=true;
+int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD sprite,UWORD,int,int,int,
+    int* x,int* y,int* width,int* height) {
+    *x=110+sprite*20;*y=10;*width=16;*height=1;return boundsOK;
+}
 Sprite::Sprite(UWORD* data,UWORD,bool,bool) : data_(data) {}
 Sprite::~Sprite() {}
 UWORD* Sprite::data() const { return data_; }
@@ -30,7 +35,11 @@ int main() {
     UBYTE pack[8]{};
     unsigned cases=0;
     for(unsigned pattern=0;pattern<256;++pattern) for(unsigned limit=0;limit<=8;++limit)
-    for(unsigned marker=0;marker<=4;++marker) {
+    for(unsigned marker=0;marker<=4;++marker) for(unsigned cover=0;cover<16;++cover) {
+        downwell::PaletteEffectSurface<> surface;
+        const UBYTE opaque[]={0x80,0},zero[]={0,0};
+        for(unsigned i=0;i<4;++i)if(cover&(1u<<i))
+            assert(surface.add({{opaque,2,16,1,2},zero,zero},int((i+1)*20),10));
         GameplayBob actors[4];
         unsigned v=pattern;
         for(unsigned i=0;i<4;++i) {
@@ -41,11 +50,11 @@ int main() {
         unsigned remaining=4, used=0;
         while(remaining) {
             const unsigned parts=actors[remaining-1].sprite;
-            if(parts==gameplayRayMarker || used+parts>limit) break;
+            if(parts==gameplayRayMarker || (cover&(1u<<(parts-1))) || used+parts>limit) break;
             for(unsigned part=0;part<parts;++part) expected[used++]=parts*16+part;
             --remaining;
         }
-        const auto result=AmigaGameplayActors::assign(actors,4,pack,pack+8,player,regular,overflow,32,limit);
+        const auto result=AmigaGameplayActors::assign(actors,4,pack,pack+8,player,regular,overflow,32,limit,&surface);
         assert(result.ready && result.bobCount==remaining);
         for(unsigned i=0;i<8;++i) assert(data[i][0]==expected[i]);
         ++cases;
@@ -61,8 +70,13 @@ int main() {
     result=AmigaGameplayActors::assign(&actor,1,pack,pack+8,player,regular,overflow,32);
     assert(!result.ready && result.failedSprite==4 && result.failedFrame==17);
     failedPart=-1;
+    downwell::PaletteEffectSurface<> empty;
+    boundsOK=false;
+    result=AmigaGameplayActors::assign(&actor,1,pack,pack+8,player,regular,overflow,32,8,&empty);
+    assert(!result.ready && result.bobCount==1 && result.failedSprite==4);
+    boundsOK=true;
     result=AmigaGameplayActors::assign(nullptr,0,pack,pack+8,player,regular,overflow,32);
     assert(result.ready && result.bobCount==0);
     for(const auto& slot:data) assert(slot[0]==0xffff);
-    std::printf("Gameplay sprite assignment: %u multipart/capacity/ray cases and failure diagnostics\n",cases);
+    std::printf("Gameplay sprite assignment: %u multipart/capacity/ray/effect-overlap cases and failure diagnostics\n",cases);
 }

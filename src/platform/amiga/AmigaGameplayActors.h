@@ -2,6 +2,7 @@
 #define DOWNWELL_AMIGA_GAMEPLAY_ACTORS_H
 #include "AmigaRenderer.h"
 #include "core/LaserSightLine.h"
+#include "core/PaletteEffectSurface.h"
 class Bitmap;
 class Sprite;
 class AmigaGameplayRows;
@@ -19,9 +20,12 @@ public:
     };
     // Channels are player, six regular slots, overflow. Select the frontmost
     // suffix only: a failed fit or planar ray forbids backfilling behind it.
+    // Final controller alpha overlapping an actor canvas is another planar
+    // boundary. Actors ahead of it remain eligible; holes permit DMA sprites.
     static Assignment assign(const GameplayBob* actors, unsigned count,
         const UBYTE* pack, const UBYTE* packEnd, Sprite& player,
-        Sprite* regular, Sprite& overflow, unsigned height, unsigned limit = 8);
+        Sprite* regular, Sprite& overflow, unsigned height, unsigned limit = 8,
+        const downwell::PaletteEffectSurface<>* controller = nullptr);
     // Draw only into the retired display ring, not the terrain backing.
     static void draw(AmigaRenderer renderer, Bitmap& display,
         unsigned buffer, unsigned origin, const GameplayBob* bobs, unsigned count,
