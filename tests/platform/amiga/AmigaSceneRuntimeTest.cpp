@@ -1217,15 +1217,27 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 if (tick >= 90) {
                     input.left = (tick / 150) % 2 != 0;
                     input.right = !input.left;
-                    if (!sawReentryEnemy) {
-                        // This seeded entrance closes around breakable centre
-                        // blocks. Clear that route before traversing the shaft.
-                        const int x = 240 + gameplay.player().offsetX();
-                        input.left = x > 244;
-                        input.right = x < 236;
-                    }
+                    // Entrances can contain thin platforms, not just boxes.
+                    // Walk off their edges instead of firing forever at centre.
+                    const int x = 240 + gameplay.player().offsetX();
+                    if (x < 192) { input.left = false; input.right = true; }
+                    else if (x > 288) { input.left = true; input.right = false; }
                     // Sparse taps allow descent between jumps and shots.
                     input.fire = tick % 60 == 0 || tick % 60 == 3;
+                    if (!sawReentryEnemy) {
+                        int nearest = 1000;
+                        for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                            const auto& block = reference.instanceAt(i);
+                            if (!block.active || block.objectId != 92 || block.x < 176 || block.x > 288 ||
+                                block.y < reference.mainPlayerY() + 8 ||
+                                block.y > reference.mainPlayerY() + 80) continue;
+                            const int distance = std::abs(x - block.x);
+                            if (distance >= nearest) continue;
+                            nearest = distance;
+                            input.left = x > block.x + 2;
+                            input.right = x < block.x - 2;
+                        }
+                    }
                 }
                 gameplay.step(downwell::packReplayInput(input)); reference.step(input, false);
                 parityFrame = gameplay.tick();
@@ -1248,6 +1260,16 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 << " enemies=" << gameplay.enemyCount() << " active=" << sawReentryEnemy
                 << " shots=" << gameplay.player().shots() - entryShots
                 << " player=" << 240 + gameplay.player().offsetX() << ',' << 176 + gameplay.player().offsetY() << '\n';
+            if (!sawReentryEnemy) {
+                for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                    const auto& item = reference.instanceAt(i);
+                    if (item.active && (item.objectId == 60 || item.objectId == 92 || item.objectId == 93) &&
+                        std::abs(item.x - reference.mainPlayerX()) < 80 &&
+                        std::abs(item.y - reference.mainPlayerY()) < 64)
+                        std::cerr << "REENTRY SOLID object=" << item.objectId
+                                  << " x=" << item.x << " y=" << item.y << '\n';
+                }
+            }
             require(sawReentryEnemy && gameplay.player().shots() > entryShots,
                     "each regenerated room exercises active enemies and firing, not just an idle landing");
             if (completedLevel == 1) {

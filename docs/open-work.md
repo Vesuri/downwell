@@ -57,11 +57,10 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Restore next-level encounter coverage in the strict gate: the level-two
-  reentry route remains at the entrance (player 240,880) without active enemies.
-  Retain the active-enemy/firing assertions, and reverify both firing phases,
-  upgrade variants, death and survival continuations after correcting the route
-  or any underlying source-behavior discrepancy.
+- Restore specialized damage/death encounter coverage: the Candle route does
+  not take damage, and the phase-six death route ends without kills or combo.
+  Retain their real-damage, reward and death/results assertions; use explicit
+  deterministic encounter inputs rather than forcing health or enemy state.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,
