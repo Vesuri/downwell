@@ -1,4 +1,5 @@
 #include "core/SpriteMaskPack.h"
+#include "core/SpriteCollisionPack.h"
 #include "core/RunnerMaskTransform.h"
 #include <cmath>
 #include <cstring>
@@ -12,10 +13,36 @@ using Real=downwell::RunnerImageValue;
 Real packed(float x){Real value;std::memcpy(&value.bits,&x,4);return value;}
 float unpacked(Real value){float x;std::memcpy(&x,&value.bits,4);return x;}
 int main(int argc,char** argv){
-    assert(argc==2);
+    assert(argc==3);
     std::ifstream input(argv[1],std::ios::binary);
     std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(input)),{});
-    Pack pack(bytes.data(),bytes.size());assert(pack.valid()&&pack.count()==4);
+    Pack pack(bytes.data(),bytes.size());assert(pack.valid()&&pack.count()==741);
+    std::ifstream metadataInput(argv[2],std::ios::binary);
+    std::vector<std::uint8_t> metadataBytes((std::istreambuf_iterator<char>(metadataInput)),{});
+    downwell::SpriteCollisionPack metadata(metadataBytes.data(),metadataBytes.size());
+    assert(metadata.valid()&&metadata.spriteCount()==741);
+    unsigned allPixels=0,rectangles=0,nonRectangularMasks=0;
+    for(unsigned id=0;id<741;++id){
+        Pack::Mask mask;assert(pack.mask(id,0,mask));
+        downwell::PackedSpriteCollision sprite;assert(metadata.sprite(id,sprite));
+        assert(sprite.collisionMaskCount==1);
+        bool differs=false;
+        for(int y=-1;y<=int(mask.height);++y)for(int x=-1;x<=int(mask.width);++x){
+            const bool inside=x>=0&&y>=0&&x<int(mask.width)&&y<int(mask.height);
+            const bool expected=inside&&((mask.bytes[y*mask.stride+x/8]>>(7-x%8))&1);
+            assert(mask.contains(x,y)==expected);++allPixels;
+            if(inside)differs|=expected!=(x>=sprite.marginLeft&&x<=sprite.marginRight&&
+                y>=sprite.marginTop&&y<=sprite.marginBottom);
+        }
+        if(sprite.collisionMode==0){++rectangles;nonRectangularMasks+=differs;}
+        assert(!pack.mask(id,1,mask));
+    }
+    assert(rectangles==737&&nonRectangularMasks==98);
+    // Rectangular-mode partners still have stored masks used by precise-pair
+    // tests. Neither their artwork canvas nor alpha is the collision shape.
+    Pack::Mask blood;assert(pack.mask(84,0,blood));
+    for(int y=0;y<24;++y)for(int x=0;x<24;++x)
+        assert(blood.contains(x,y)==(x>=10&&x<=13&&y>=11&&y<=13));
     const unsigned ids[]={577,597,613,616},widths[]={48,48,72,128},heights[]={40,48,72,128};
     const unsigned sourceHits[]={1044,1741,3969,12645};
     unsigned checked=0;
@@ -87,7 +114,7 @@ int main(int argc,char** argv){
     assert(edge.contains(onePixel,-1,0,hit)&&!hit); // -1 stays outside
     assert(edge.prepare(packed(1),{},packed(2),packed(2),packed(1),{},0,0));
     assert(edge.contains(onePixel,0,0,hit)&&!hit); // Rotated path rejects -0.5
-    std::printf("Precise mask pack: %u pixel/boundary checks, all truncations and malformed metadata passed\n",checked);
+    std::printf("Collision mask pack: %u all-resource and %u precise pixel/boundary checks, all truncations and malformed metadata passed\n",allPixels,checked);
     std::printf("Rotated mask transform: %u fractional/mirrored samples passed\n",transformed);
     std::printf("Scaled near-zero mask transform: %u fractional/mirrored samples passed\n",axisTransformed);
 }

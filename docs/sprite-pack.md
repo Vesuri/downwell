@@ -55,13 +55,17 @@ validates format, source hash, complete length and mask modes; it does not
 allocate or convert pixels. Full and compact descriptors use the same bounds
 adapter. This projection is not yet resident in the live Amiga registry.
 
-## Original precise-mask pixels (`DWSM`)
+## Original collision-mask pixels (`DWSM`)
 
-`make verify-precise-masks` exports every `Precise` sprite's masks using the
+`make verify-collision-masks` exports every sprite's stored collision masks using the
 pinned extractor, verifies `data.win` before and after reading, and builds
-`generated/downwell-sprite-masks.dwsm`. The four resources are sprites 577,
-597, 613 and 616. The complete pack is 3,328 bytes; masks are original MSB-first
+`generated/downwell-sprite-masks.dwsm`. All 741 sprites have one stored mask in
+this build; four resources (577, 597, 613 and 616) select precise collision mode.
+The complete pack is 511,580 bytes; masks are original MSB-first
 rows with stride `ceil(width/8)`, not artwork alpha or approximated circles.
+The older `generate-precise-masks` and `verify-precise-masks` Make targets remain
+aliases. Generated payloads stay ignored and are not automatically embedded in
+the Amiga executable; target subsets/compression and residency are separate.
 
 The little-endian 24-byte header is `char[4] magic (DWSM); u16 version (1),
 headerSize (24); byte[8] sourceHashPrefix; u32 maskCount, manifestSchema (3)`.
@@ -77,9 +81,11 @@ transforms remain the caller's responsibility. Out-of-canvas pixel samples are
 false. This resource layer does not itself implement precise collision dispatch
 or establish live integration.
 The original precise-pair path also samples stored masks of rectangle-mode
-partners when present. This four-resource pack is therefore not an exhaustive
-mask source for arbitrary pairs; verified rectangle specializations (such as
-the blood mask) remain distinct from assuming an entire sprite canvas is solid.
+partners when present. Of the 737 rectangle-mode sprites, 98 stored masks differ
+from simply filling their inclusive serialized bounding box. Retaining both
+partners' actual masks is therefore necessary; neither collision mode nor the
+bounding box alone justifies replacing a mask with a rectangle. The blood mask
+is separately verified to equal its small margin rectangle.
 
 ## Frame record — 4 bytes
 
