@@ -211,6 +211,11 @@ int main(int argc, char** argv) {
                 "retained multi-field snapshot");
             retained.draw();
             require(retained.lastWordWrites == 0, "unchanged field collection writes no pixels");
+            require(retained.prepare(actual.data(), origin, shape, true, [](unsigned) { return false; }),
+                "forced coverage rebuild retains unchanged underlay");
+            retained.draw();
+            require(retained.lastWordWrites == 0 && actual == expected,
+                "coverage rebuild suppresses every unchanged planar write");
         }
         downwell::TimeFieldOutlines absent;
         require(retained.prepare(actual.data(), 0, absent, false, [](unsigned) { return false; }), "field teardown");
