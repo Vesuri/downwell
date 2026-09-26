@@ -305,7 +305,7 @@ public:
         return run_.emitFlashBurst(x,y,enemyRandom_);
     }
     unsigned enemyCount() const { return enemyCount_; }
-    unsigned enemiesDefeated() const { return enemiesDefeated_; }
+    unsigned enemiesDefeated() const { return run_.kills; }
     unsigned gemCount() const;
     const GemState& gemAt(unsigned index) const;
     const GemState* findGem(std::uint32_t lifetimeId) const {
@@ -442,7 +442,6 @@ private:
     EnemyState enemies_[enemyCapacity];
     GemState gems_[gemCapacity];
     unsigned enemyCount_;
-    unsigned enemiesDefeated_;
     downwell::GameMakerRandom enemyRandom_;
     int health_;
     unsigned invulnerability_;

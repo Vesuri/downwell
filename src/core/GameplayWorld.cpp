@@ -83,7 +83,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     currencyAccount_.playerCreated();
     death_ = {};
     invulnerability_ = 0;
-    enemyCount_ = enemiesDefeated_ = breakableCount_ = blocksDestroyed_ = 0;
+    enemyCount_ = breakableCount_ = blocksDestroyed_ = 0;
     bulletSlotEnd_ = gemSlotEnd_ = 0;
     for (unsigned i = 0; i < bulletCapacity; ++i) bullets_[i].active = false;
     for (unsigned i = 0; i < enemyCapacity; ++i) enemies_[i].active = false;
@@ -110,7 +110,7 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       cameraPixelX_(0), activationY_(0),
-      enemyCount_(0), enemiesDefeated_(0), enemyRandom_(2),
+      enemyCount_(0), enemyRandom_(2),
       health_(4), invulnerability_(0),
       solidResolver_(0),
       solidResolverContext_(0),
@@ -694,7 +694,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                             !path.intersects(contact))
                             continue;
                         const auto impact = downwell::applyStandardBulletImpact(
-                            enemy, enemiesDefeated_, enemyRandom_,
+                            enemy, run_.kills, enemyRandom_,
                             [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); return run_.effectsSucceeded; },
                             bullet.gemHigh, bullet.trajectory.direction);
                         return impact.kind != downwell::BulletImpactKind::ignored;
@@ -896,7 +896,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     });
     if(!run_.effectsSucceeded)return {};
     if (!downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
-        enemiesDefeated_, run_.combo.state, run_.upgrades.levels[7] != 0,
+        run_.kills, run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> EnemyState& { return enemies_[i]; },
         [](const EnemyState& enemy) {
             return downwell::EnemyContactLocation{{

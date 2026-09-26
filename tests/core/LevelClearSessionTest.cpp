@@ -159,6 +159,7 @@ int main() {
     CurrencyAccount currency;
     currency.currency = 123;
     run.stage.area = 1; run.stage.level = 3;
+    run.kills = 37;
     run.upgrades.levels[0] = 1;
     run.gems.lifetime = 999;
     int health = 4;
@@ -239,6 +240,7 @@ int main() {
     require(run.advanceAfterLevelClear() && run.stage.area == 2 && run.stage.level == 1 &&
         !run.goalStopped && !run.exitControlsLocked && !run.exitDither.active,
         "consuming transition advances stage and releases gameplay locks");
+    require(run.kills == 37, "kill total survives upgrade selection and area transition");
     require(!run.advanceAfterLevelClear(), "stage advancement is one-shot");
     require(run.upgrades.levels[0] == 1 && run.upgrades.count == 1 && run.gems.lifetime == 999 &&
         currency.currency >= 123, "level transition preserves run ownership and records");
@@ -255,6 +257,7 @@ int main() {
         player.jumpShootLocked() && player.shotDelayed(),
         "room entry resets instance motion but preserves globals and refills charge");
     run.reset();
+    require(run.kills == 0, "new-run reset clears kills, not a level transition");
     require(!run.levelClearActive && !run.nextLevelRequested && run.levelClear.selection.alarm4 == 60 &&
         run.upgrades.count == 0, "new-run reset clears result lifecycle");
     std::puts("Shared exit/result/next-stage lifecycle and persistent ownership passed");

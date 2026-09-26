@@ -51,6 +51,9 @@ struct RunSession {
     RunGemStatistics gems;
     RunClock clock;
     RunCombo combo;
+    // global.killCount: scrGlobalStuff resets it for a new run, not rmMain
+    // entry. DeathMenu/EndMenu display the cumulative total across levels.
+    std::uint32_t kills = 0;
     RunStage stage;
     DeathResults results;
     AmmoHudMotion ammoHud;
@@ -475,6 +478,7 @@ struct RunSession {
         gems.record = saved.bestRunGems;
         clock = {};
         combo = {};
+        kills = 0;
         combo.state.record = saved.bestCombo;
         stage = {};
         results = {};

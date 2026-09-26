@@ -2163,11 +2163,16 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                 require(game.upgrades().levels[i] == reference.upgrades().levels[i], "natural upgrade inventory agrees");
         }
         require(game.nextLevelRequested(), "natural upgrade sequence finishes within budget");
+        const auto carriedKills = game.enemiesDefeated();
+        require(carriedKills == reference.mainEnemiesDefeated(), "natural run kill totals agree before reentry");
+        std::cout << "Natural carried kills=" << carriedKills << std::endl;
         downwell::Input held; held.fire = true;
         require(game.prepareNextAreaOneLevel(held, 319) && reference.loadNextAreaOneLevel(held),
             "natural route enters second cavern");
         require(game.runStage().level == 2 && reference.runStage().level == 2,
             "natural route advances exactly one level");
+        require(game.enemiesDefeated() == carriedKills && reference.mainEnemiesDefeated() == carriedKills,
+            "both room loaders preserve the run kill total used by results");
         live.bind(game, rooms, room, true);
         for (unsigned tick = 0; tick < 120; ++tick) {
             downwell::Input input;

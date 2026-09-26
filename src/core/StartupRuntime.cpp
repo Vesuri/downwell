@@ -185,7 +185,6 @@ void StartupRuntime::resetSceneState() {
     mainActivationY_ = 0;
     mainEnemiesActivated_ = 0;
     mainInstancesRetired_ = 0;
-    mainEnemiesDefeated_ = 0;
     mainJumps_ = 0;
     mainBulletCount_ = 0;
     mainCurrencyCount_ = 0;
@@ -674,7 +673,7 @@ void StartupRuntime::updateMainBullets() {
           [this, &bullet](const ProjectileSegment& path) {
             InstanceRecord* enemy = mainBulletEnemyCollision(path);
             if (enemy != nullptr) {
-                const auto impact = applyStandardBulletImpact(*enemy, mainEnemiesDefeated_, random_,
+                const auto impact = applyStandardBulletImpact(*enemy, run_.kills, random_,
                     [this, enemy] {
                         run_.combo.state.enemyDefeated();
                         spawnMainCurrency(static_cast<float>(enemy->x),
@@ -937,7 +936,7 @@ void StartupRuntime::updateMainEnemies() {
 
 void StartupRuntime::updateMainEnemyInteractions() {
     if(!stepEnemyContacts(static_cast<unsigned>(instances_.size()), mainPlayerMotion_,
-        mainPlayerHealth_, mainPlayerInvulnerability_, mainEnemiesDefeated_,
+        mainPlayerHealth_, mainPlayerInvulnerability_, run_.kills,
         run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> InstanceRecord& { return instances_.at(i); },
         [this](const InstanceRecord& enemy) {
@@ -1314,7 +1313,6 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 mainActivationY_ = 0;
                 mainEnemiesActivated_ = 0;
                 mainInstancesRetired_ = 0;
-                mainEnemiesDefeated_ = 0;
                 mainJumps_ = 0;
                 mainBulletCount_ = 0;
                 mainCurrencyCount_ = 0;
@@ -1999,7 +1997,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
     digest.addI32(mainActivationY_);
     digest.addU32(mainEnemiesActivated_);
     digest.addU32(mainInstancesRetired_);
-    digest.addU32(mainEnemiesDefeated_);
+    digest.addU32(run_.kills);
     digest.addU32(mainJumps_);
     digest.addU32(static_cast<std::uint32_t>(mainBulletCount_));
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {

@@ -8,6 +8,14 @@ This is an integration audit, not a claim that these effects are implemented.
 
 ## Death is not just removal plus a gem reward
 
+`global.killCount` belongs to the run, not the room. The VM assigns zero in
+`scrGlobalStuff` (called by `scrInitialize`/`ResetPlayer`), increments it in
+`scrEnemyDeath`, and reads it in `DeathMenu`/`EndMenu` Draw. `scrNextLevel` and
+player Create do not reset it. Both live adapters use `RunSession::kills`,
+preserving the results total across rmMain reentry and clearing it on new-run
+reset. This ownership rule does not validate their current immediate death
+accounting or replace the missing source death-effect sequence.
+
 `SkeletonActor::step` already exposes the source call sequence. Its live owner
 must complete each effect's Create synchronously before running the next call.
 Batching all effect creation after currency generation changes the shared RNG
