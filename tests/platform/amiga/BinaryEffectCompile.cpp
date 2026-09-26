@@ -441,6 +441,22 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseLifecycle.h"
 #include "core/CorpseMotion.h"
 #include "core/CorpseAnimation.h"
+#include "core/CorpseEffects.h"
+namespace {
+struct CorpseOwnerHooks {
+    bool birth(unsigned,const downwell::CorpseAnimation&){return true;}
+    bool retire(unsigned,const downwell::CorpseAnimation&){return true;}
+    CorpseOwnerHooks& queries(unsigned,downwell::CorpseAnimation&){return *this;}
+    bool wall(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=false;return true;}
+    bool tile(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=false;return true;}
+    bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
+};
+}
+bool compileCorpseOwner(downwell::CorpseEffects<8>& owner,downwell::GameMakerRandom& random){
+    CorpseOwnerHooks hooks;
+    return owner.create({}, {},false,random,hooks)&&
+        owner.dispatch(owner.beginPhase(),[](auto,auto& effect){return effect.advanceImage();},hooks)&&owner.clear(hooks);
+}
 bool compileCorpseAnimation(downwell::CorpseAnimation& corpse,int sprite){
     return corpse.setSprite(sprite,[](const auto&){return true;})&&corpse.advanceImage();
 }

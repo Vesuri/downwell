@@ -144,6 +144,15 @@ test: verify-corpse-motion
 test: verify-out-of-view-lifetime
 test: verify-corpse-creation-integration
 test: verify-corpse-animation
+test: verify-corpse-effects
+
+.PHONY: verify-corpse-effects
+verify-corpse-effects: build/corpse-effects-test
+	./build/corpse-effects-test
+
+build/corpse-effects-test: tests/core/CorpseEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CorpseEffectsTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-corpse-animation
 verify-corpse-animation: build/corpse-animation-test

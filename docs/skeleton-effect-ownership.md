@@ -115,6 +115,20 @@ updates plus setter/failure cases; the connected creation test uses this actual
 setter with a publication test double. Corpse depth 1000 equals smoke depth,
 so live Draw must preserve same-depth instance ordering across both families.
 
+`CorpseEffects<Capacity>` owns bounded corpse lifetimes. It publishes the
+constructor position and default sprite before synchronous Create queries;
+failed publication/Create remains available for cleanup, not silent reuse.
+The scheduler captures a cutoff before each global phase and dispatches the
+appropriate event per eligible lifetime, retaining outer alarm-index ordering.
+Retirement callbacks run before slots are freed. Capacity exhaustion consumes
+no RNG, room clearing does not rewind handles, and dispatch failures latch the
+owner invalid until explicit cleanup. Callbacks cannot mutate the same store;
+they may synchronously create other effect families. The owner retains no
+borrowed callbacks, so world copies use freshly bound adapters.
+`verify-corpse-effects` checks phase exclusion, capacity, pre-Create publication,
+reused slots, culling and cleanup. It is not a substitute for the live world's
+shared instance registry, cross-family ordering or collision membership.
+
 `CorpseMotion` implements ordinary Step: custom-real gravity and damping,
 parent-56 motion probes, bounce/settling and the bounded 1–16 floor search.
 Area 3 divides displacement by four without changing stored velocities. It
