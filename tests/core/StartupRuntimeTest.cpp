@@ -37,6 +37,19 @@ void testDesktopBootState() {
             "rmInit creation code configures recovered camera size");
 }
 
+void testFailedRoomLoadStopsUpdates() {
+    downwell::RoomPack invalidPack(nullptr, 0);
+    downwell::StartupRuntime runtime(downwell::PlatformProfile::desktop, &invalidPack);
+    require(!runtime.roomLoadSucceeded(), "invalid room pack reports failed entry");
+    const auto tick = runtime.tick();
+    const auto instances = runtime.activeInstanceCount();
+    const auto calls = runtime.implementedCodeCalls();
+    for (unsigned i = 0; i < 4; ++i) runtime.step(i % 2 != 0);
+    require(runtime.tick() == tick && runtime.activeInstanceCount() == instances &&
+                runtime.implementedCodeCalls() == calls && !runtime.roomDestinationSet(),
+            "failed room entry stops subsequent ticks and dispatch without retry");
+}
+
 void testNonDesktopSkipsSplash() {
     downwell::StartupRuntime runtime(downwell::PlatformProfile::nonDesktop);
     runtime.step(false);
@@ -799,6 +812,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
 int main(int argc, char** argv) {
     testDesktopBootState();
+    testFailedRoomLoadStopsUpdates();
     testNonDesktopSkipsSplash();
     testRecoveredDesktopTiming();
     testAdvanceInputUsesPressEdges();

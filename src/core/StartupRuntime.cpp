@@ -295,7 +295,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool right,
                                   bool fire,
                                   bool anyInput) {
-    if (run_.levelClearActive || !run_.effectsSucceeded) return; // Result owner uses stepLevelClear.
+    if (run_.levelClearActive || !run_.effectsSucceeded ||
+        !roomLoadSucceeded_ || !deferredCommandsSucceeded_) return; // Result owner uses stepLevelClear.
     if(roomId_==mainRoomId)
         run_.advanceFlashAnimation();
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
@@ -401,6 +402,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;}))return;
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
+    if (!roomLoadSucceeded_ || !deferredCommandsSucceeded_ || !run_.effectsSucceeded) return;
     if (roomId_ == mainRoomId) {
         run_.exitDither.step(mainCameraRenderViewY(), surfaceHeight);
         updateMainBullets();
