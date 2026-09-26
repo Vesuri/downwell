@@ -439,6 +439,20 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/DeadBodyCreation.h"
 #include "core/CorpseBirth.h"
 #include "core/CorpseLifecycle.h"
+#include "core/CorpseMotion.h"
+namespace {
+struct CorpseMotionEvents {
+    bool meeting(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=true;return true;}
+    int area(){return 3;}
+    int restInPieces(){return 2;}
+    bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
+    bool create(int,downwell::MotionBinary64,downwell::MotionBinary64){return true;}
+    void destroy(){}
+};
+}
+bool compileCorpseMotion(downwell::CorpseMotion& corpse,bool stopped){
+    CorpseMotionEvents events;return corpse.step(stopped,events);
+}
 namespace {
 struct CorpseBirthQueries {
     bool wall(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=true;return true;}

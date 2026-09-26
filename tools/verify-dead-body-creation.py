@@ -23,6 +23,7 @@ for name,digest in {
 }.items():
     assert sha256((export / f"Assembly/gml_Object_{name}_Create_0.asm").read_bytes()).hexdigest() == digest
 for event,digest in {
+    "Step_0": "ece87bc038a5d6ee43fb6cf5e9d238ac12f30182d4765c748602f5e2215eebd5",
     "Alarm_0": "c66e3d24e7a8fd8cbcaf0e06dc3457cae0aea183604afe5d578cd7b6f0ab535a",
     "Alarm_1": "1d019f4c251b3e928cd9e7e1e43ef6fdee1c1ac2b44926914947097b10d7763b",
     "Alarm_2": "aabeb387894e077ae2089bfcf7a6f485401b32a0599400fb78fdffe079108e9f",

@@ -104,6 +104,19 @@ alarm-index order, precise contact admission and actual lifetime removal.
 `verify-corpse-lifecycle` covers successful ordering, gates and failure paths;
 it does not establish live upgrade support.
 
+`CorpseMotion` implements ordinary Step: custom-real gravity and damping,
+parent-56 motion probes, bounce/settling and the bounded 1–16 floor search.
+Area 3 divides displacement by four without changing stored velocities. It
+publishes rounded Y before X. Rest in Pieces reads its level again after the
+first object-272 Create, optionally creates four more, then creates three
+object-274 effects before requesting retirement. Each birth completes before
+the next and failures invalidate the component. The final flash assignment
+still executes after successful retirement requests and during time-stop.
+Frozen Step refunds only positive alarms 0–2 and leaves alarm 3 untouched.
+`verify-corpse-motion` checks 6,272 scalar query tapes, upgrade/freeze gates and
+partial failures. The owner still supplies original collision admission,
+global scheduling, animation and End Step culling; this is not live parity.
+
 `DebrisBirth` implements that object-370 Create with four ordered RNG draws,
 custom binary64 motion/rate fields and narrowed builtin animation fields.
 `make verify-debris-birth` pins the input/export/resource/assembly identities
