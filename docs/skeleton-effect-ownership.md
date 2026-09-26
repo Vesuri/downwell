@@ -115,6 +115,15 @@ updates plus setter/failure cases; the connected creation test uses this actual
 setter with a publication test double. Corpse depth 1000 equals smoke depth,
 so live Draw must preserve same-depth instance ordering across both families.
 
+`CorpseDraw` and `DebrisDraw` share `EffectSpriteDraw` routing. Corpse commands
+retain the fractional subimage, published coordinates and horizontal scale;
+the source keeps vertical scale, angle, alpha and blend at defaults on these
+paths. Both death/low-spec direct drawing and normal surface admission remain
+distinct. Sprite 172 and 206 planar artwork, including mirrored variants, is
+converted offline and checked against source-relative pixel anchors. The shared
+asset reader exposes checked borrowed corpse views. Routing/asset tests do not
+establish live same-depth ordering or the original GPU's fractional sampling.
+
 `CorpseEffects<Capacity>` owns bounded corpse lifetimes. It publishes the
 constructor position and default sprite before synchronous Create queries;
 failed publication/Create remains available for cleanup, not silent reuse.

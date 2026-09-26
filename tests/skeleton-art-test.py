@@ -46,7 +46,7 @@ except ValueError:
     pass
 else:
     raise AssertionError("general palette guard was weakened")
-for ident in (84, 91, 96, 115, 116, 117, 205, 206, 207, 208, 460):
+for ident in (84, 91, 96, 115, 116, 117, 172, 205, 206, 207, 208, 460):
     sprite = resources["sprites"][ident]
     if ident in (91,115,116):
         assert len(sprite["frames"]) == (6 if ident == 91 else 4)
@@ -83,7 +83,7 @@ for ident in (84, 91, 96, 115, 116, 117, 205, 206, 207, 208, 460):
                         expected[wx, y-sprite["originY"]] = pen
             assert planar_pixels(records[ident+62000*flip, frame]) == expected, (ident,frame,flip,"planar")
             checked += 1
-            if ident in (91,115,116,117,206):
+            if ident in (91,115,116,117,172,206):
                 assert (63000+ident, frame*8+flip*4) not in records
                 continue
             first = records[63000+ident, frame*8+flip*4]

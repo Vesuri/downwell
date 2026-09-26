@@ -1,4 +1,5 @@
 #include "core/DebrisDraw.h"
+#include "core/CorpseDraw.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cstdio>
@@ -22,6 +23,16 @@ int main(){
         const auto before=random;
         DebrisDraw::Command command;
         assert(DebrisDraw::prepare(effect,view,death,lowSpec,exists,command));
+        CorpseAnimation corpse;corpse.x=effect.x;corpse.y=effect.y;corpse.flash=flash;
+        corpse.destroyRequested=destroyed;corpse.spriteId=206;corpse.imageIndex={0x3f400000u};
+        corpse.imageXscale={0xbf800000u};CorpseDraw::Command body;
+        assert(CorpseDraw::prepare(corpse,view,death,lowSpec,exists,body));
+        assert(body.placement.target==command.placement.target);
+        if(body.placement.target!=EffectSurfacePlacement::hidden){
+            assert(body.sprite==206&&body.imageIndex.bits==0x3f400000u&&body.scaleX.bits==0xbf800000u);
+            assert(body.placement.x.high==command.placement.x.high&&body.placement.x.low==command.placement.x.low);
+            assert(body.placement.y.high==command.placement.y.high&&body.placement.y.low==command.placement.y.low);
+        }
         const bool draw=!destroyed&&flash<=0;
         const auto target=!draw?EffectSurfacePlacement::hidden:
             death||lowSpec?EffectSurfacePlacement::direct:
@@ -45,6 +56,10 @@ int main(){
     assert(!DebrisDraw::prepare(effect,invalid,false,false,true,unchanged));
     assert(unchanged.sprite==123);
     assert(DebrisDraw::sourceDepth==-1000);
+    assert(CorpseDraw::sourceDepth==1000);
+    CorpseAnimation invalidCorpse;invalidCorpse.valid=false;
+    CorpseDraw::Command preserved;preserved.sprite=123;
+    assert(!CorpseDraw::prepare(invalidCorpse,view,false,false,true,preserved)&&preserved.sprite==123);
     effect.x.bits=0x41440000u;effect.y.bits=0x41c40000u; // 12.25, 24.5
     assert(DebrisDraw::prepare(effect,view,false,false,true,unchanged));
     assert(unchanged.placement.x.high==0x40020000u&&unchanged.placement.x.low==0); // 2.25

@@ -58,6 +58,8 @@ int main(){
     assert(bind() && pack==good);
     Assets::Asset debris{};
     assert(!assets.debris(91,0,debris)); // Older pack has no optional debris.
+    assert(!assets.corpse(172,false,debris)&&!assets.corpse(206,true,debris));
+    assert(!assets.corpse(65536+172,false,debris));
     std::array<std::uint8_t,794> expanded{};
     for(unsigned i=0;i<20;++i)expanded[i]=good[i];
     expanded[11]=32;
@@ -91,5 +93,6 @@ int main(){
     assert(!assets.debris(91,0,debris) && debris.low==expanded.data()+788);
     assert(!assets.bind(nullptr,0));
     assert(!assets.debris(115,0,debris));
+    assert(!assets.corpse(206,false,debris));
     std::printf("Effect assets: shared color/mask payloads, signed origins, 458 truncations and %u malformed records rejected\n",invalid);
 }

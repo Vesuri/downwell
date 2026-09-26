@@ -25,6 +25,7 @@ for name,digest in {
 }.items():
     assert sha256((export / f"Assembly/gml_Object_{name}_Create_0.asm").read_bytes()).hexdigest() == digest
 for event,digest in {
+    "Draw_0": "ac27f4219f2706c07122b7b06c1549709c5be5f5697777c4560daa12f4d68854",
     "Step_2": "71aaac10eef02f61e15327032a995fe459f49451cd38b8434e071ec96268b315",
     "Collision_parentPBullet": "e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",
     "Collision_subparentEnemy": "e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",

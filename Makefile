@@ -222,6 +222,7 @@ build/dead-body-creation-test: tests/core/DeadBodyCreationTest.cpp $(wildcard sr
 .PHONY: verify-debris-draw
 verify-debris-draw: build/debris-draw-test
 	python3 tools/verify-debris-create.py
+	python3 tools/verify-dead-body-creation.py
 	python3 tools/verify-effect-depths.py
 	./build/debris-draw-test
 

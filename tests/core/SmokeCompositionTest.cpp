@@ -17,6 +17,10 @@ int main(int argc,char**argv){
     assert(argc==2);std::ifstream file(argv[1],std::ios::binary);
     const std::vector<std::uint8_t> pack{std::istreambuf_iterator<char>(file),{}};
     EffectMaskAssets assets;assert(assets.bind(pack.data(),pack.size()));
+    for(unsigned sprite:{172u,206u})for(bool mirrored:{false,true}){
+        EffectMaskAssets::Asset corpse;assert(assets.corpse(sprite,mirrored,corpse));
+        assert(corpse.low&&corpse.high&&corpse.mask.data);
+    }
     for(unsigned sprite:{91u,115u,116u})for(unsigned frame=0;frame<(sprite==91?6u:4u);++frame){
         EffectMaskAssets::Asset debris;
         assert(assets.debris(sprite,frame,debris));

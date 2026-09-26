@@ -441,6 +441,12 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseLifecycle.h"
 #include "core/CorpseMotion.h"
 #include "core/CorpseAnimation.h"
+#include "core/CorpseDraw.h"
+bool compileCorpseDraw(const downwell::CorpseAnimation& corpse,
+                       const downwell::EffectSurfacePlacement::View& view,
+                       downwell::CorpseDraw::Command& out){
+    return downwell::CorpseDraw::prepare(corpse,view,false,false,true,out);
+}
 #include "core/CorpseEffects.h"
 namespace {
 struct CorpseOwnerHooks {

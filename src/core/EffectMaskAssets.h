@@ -28,6 +28,10 @@ public:
         const unsigned frames=sprite==91?6:sprite==115||sprite==116?4:0;
         return ready_ && frame<frames && resolve(pack_,size_,count_,sprite,frame,out);
     }
+    bool corpse(unsigned sprite,bool mirrored,Asset& out)const{
+        return ready_&&(sprite==172||sprite==206)&&
+            resolve(pack_,size_,count_,sprite+(mirrored?62000:0),0,out);
+    }
     bool bind(const std::uint8_t* pack,std::size_t size){
         // Failed rebind must not leave a formerly valid, now stale view live.
         ready_=false;

@@ -100,6 +100,7 @@ SELECTIONS = {
         166: None,   # sprFrogIdle
         168: None,   # sprFrogAir
         170: None,   # sprFrogPrepare
+        172: None,   # sprFrogDead: initial corpse artwork, planar only
         173: None,   # sprFrogDamage
         177: None,   # sprEnmSnail
         178: None,   # sprEnmSnailHit
@@ -567,7 +568,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
                 encoded.append((metadata, 768 + frame_index, stride, data))
             if profile == "game" and sprite_id in (127, 139, 550, 568, 569,
                     0, 1, 3, 12, 15, 27, 31, 37,
-                    153, 154, 163, 164, 166, 168, 170, 173, 177, 186, 187, 188, 206, 278):
+                    153, 154, 163, 164, 166, 168, 170, 172, 173, 177, 186, 187, 188, 206, 278):
                 mirrored = canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
                 pixels = [pixel_to_pen(pixel) for pixel in mirrored.get_flattened_data()]
                 stride, data = encode_planar(pixels, mirrored.width, mirrored.height)
