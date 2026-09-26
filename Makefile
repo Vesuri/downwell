@@ -252,7 +252,7 @@ test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-moti
 verify-time-shard-burst: build/time-shard-burst-test
 	./build/time-shard-burst-test
 
-build/time-shard-burst-test: tests/core/TimeShardBurstTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+build/time-shard-burst-test: tests/core/TimeShardBurstTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardBurstTest.cpp src/core/GameMakerRandom.cpp
 

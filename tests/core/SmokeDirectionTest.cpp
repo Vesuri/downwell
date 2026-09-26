@@ -24,7 +24,9 @@ int main(){
         check(same(y,snap(-(float(std::sin(double(radian)))*speed))));++cases;
     };
     for(unsigned i=0;i<100000;++i)run(random.random(2)+2,random.random(359));
+    for(unsigned i=0;i<100000;++i)run(random.random(5)+1,random.random(630)-45);
     for(double angle:{0.,0.000001,45.,90.,180.,270.,359.})for(double speed:{0.,2.,3.,4.})run(speed,angle);
+    for(double angle:{-585.,-45.,-0.000001,-0.0,360.,540.,585.})for(double speed:{0.,1.,5.,6.})run(speed,angle);
     for(float value:{-0.000101f,-0.000099f,0.000099f,0.000101f,0.99999f,1.00001f,-0.99999f,-1.00001f}){
         MotionBinary64 result;
         check(downwell::SmokeDirection::component({0x40800000u},number(double(value)/4),false,result));

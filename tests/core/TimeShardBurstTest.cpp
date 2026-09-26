@@ -3,6 +3,9 @@
 // 2403af36b17616f6b2f86e2fe55c31b0b94fe93bd65433d5a0fc99044adf2d6a.
 // data.win: c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8.
 #include "core/GameMakerRandom.h"
+#include "core/SmokeDirection.h"
+#include "core/SmokeTrig.h"
+#include <cmath>
 #include <cassert>
 #include <cstring>
 #include <cstdio>
@@ -52,5 +55,25 @@ int main(){
         [&](auto,auto,bool y,auto& out){++components;if(y)return false;out=number(11);return true;}));
     assert(components==2 && effects.size()==1 && effects.get(burst.shard));
     same(effects.get(burst.shard)->xsp,11); // No rollback after successful X write.
+    for(unsigned seed=0;seed<512;++seed){
+        TimeShardEffects<3> live;TimeShardBurst b;GameMakerRandom random(seed);
+        assert(b.emit({}, {},{}, {},false,random,live,lookup,
+            [&](auto,auto,auto,auto,auto& out){out=number(seed%360);return true;},
+            [&](auto length,auto angle,bool vertical,auto& out){
+                MotionBinary64 x,y;
+                if(!SmokeDirection::vector(length,angle,x,y,smokeTrig))return false;
+                out=vertical?y:x;
+                // Check the actual published component after source narrowing
+                // and fractional snap, separately from burst RNG sequencing.
+                auto real=[](MotionBinary64 n){unsigned long long bits=(static_cast<unsigned long long>(n.high)<<32)|n.low;double d;std::memcpy(&d,&bits,8);return d;};
+                const float radians=(float(real(angle))*float(3.14159265358979323846))/180.f;
+                float v=float(real(length))*float(vertical?std::sin(double(radians)):std::cos(double(radians)));
+                if(vertical)v=-v;
+                double integral;const float fractional=float(std::modf(double(v),&integral));
+                same(out,std::abs(fractional)<.0001f?double(float(integral)):double(v));
+                return true;
+            }));
+        assert(live.size()==3 && random.drawCount()==24);
+    }
     std::puts("Shard burst: 2048 source-order/RNG cases, repeated field lookup, synchronous births and partial failures passed");
 }

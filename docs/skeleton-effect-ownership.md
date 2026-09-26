@@ -188,8 +188,12 @@ records executable, exporter, path, table and output hashes plus decoder version
 storage. Evaluation preserves each scalar/packed lane operation and rounding
 boundary; it does not replace the source polynomial with host libm.
 
-The supported contract is nonnegative smoke radians and nearest-even FP mode,
-with explicit zero results. Other tiny/general inputs and the runner's alternate
+The supported contract includes smoke and shard radians in [-11,11] under
+nearest-even FP mode, with signed-zero results. The runner's entry guards at
+0x74b621 and 0x74b7e1 strip the sign before range testing; the polynomial itself
+receives the signed argument. Direction wrappers admit speed [0,6] and angles
+[-585,585], without normalizing angles before the source float operations.
+Other tiny/general inputs and the runner's alternate
 FP-environment fallbacks are not implemented. Establishing the original runtime
 FP mode and native execution cost remains necessary before live admission.
 The scalar test evaluates the same exported operations with host doubles and

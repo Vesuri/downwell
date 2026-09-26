@@ -34,12 +34,12 @@ int main(){
         const float boundary=float((i+0.5)*3.14159265358979323846/32);
         compare(boundary);compare(std::nextafter(boundary,0.f));compare(std::nextafter(boundary,7.f));
     }
-    for(auto invalid:{number(-1),number(8),MotionBinary64{0x7ff00000u,0},MotionBinary64{0,1}}){
+    for(auto invalid:{number(-12),number(12),MotionBinary64{0x7ff00000u,0},MotionBinary64{0,1}}){
         auto c=number(2),s=number(3);
         check(!downwell::smokeTrig(invalid,c,s) && real(c)==2 && real(s)==3);
     }
-    for(unsigned i=0;i<20000;++i){
-        const float angle=i<360?float(i):float(random.random(359));
+    for(unsigned i=0;i<40000;++i){
+        const float angle=i<1171?float(int(i)-585):float(random.random(1170)-585);
         const float multiplied=angle*float(3.14159265358979323846),radian=multiplied/180.f;
         MotionBinary64 c,s;
         if(!downwell::smokeTrig(number(radian),c,s)){std::fprintf(stderr,"unsupported %u %g\n",i,radian);std::abort();}
