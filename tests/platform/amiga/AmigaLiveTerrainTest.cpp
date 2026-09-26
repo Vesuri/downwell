@@ -253,6 +253,49 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
     }
     require(native.endReached() && reference.endReached() && native.fragmentCount() == 19,
             "complete native generation ends with nineteen fragments");
+    if (!interleave) {
+        AmigaTerrainFragment forecast[19];
+        Commands forecastCommands;
+        downwell::GameMakerRandom forecastRandom;
+        unsigned forecastEnemies = 0;
+        require(amigaBuildInitialAreaOneTerrain(patterns, forecast, 19,
+                    nullptr, 0, forecastEnemies, &forecastRandom,
+                    nullptr, 0, nullptr, collect, &forecastCommands),
+                "complete forecast succeeds with current source-backed RNG semantics");
+        compareRandom(forecastRandom, referenceRandom);
+        require(forecastCommands.size() == commands.size(),
+                "forecast emits every incremental Create exactly once");
+        for (unsigned i = 0; i < commands.size(); ++i) {
+            const auto& a = forecastCommands[i];
+            const auto& b = commands[i];
+            require(a.objectId == b.objectId && a.x == b.x && a.y == b.y &&
+                    a.scaleX == b.scaleX && a.scaleY == b.scaleY &&
+                    a.imageSpeed == b.imageSpeed && a.imageIndex == b.imageIndex &&
+                    a.velocityX == b.velocityX && a.velocityY == b.velocityY &&
+                    a.direction == b.direction && a.moveSpeed == b.moveSpeed &&
+                    a.motionInitialized == b.motionInitialized &&
+                    a.integerImageIndex == b.integerImageIndex &&
+                    a.integerScaleX == b.integerScaleX &&
+                    a.integerVelocityX == b.integerVelocityX &&
+                    a.integerVelocityY == b.integerVelocityY &&
+                    a.integerDirection == b.integerDirection &&
+                    a.integerMoveSpeed == b.integerMoveSpeed &&
+                    a.motionState == b.motionState && a.auxiliaryState == b.auxiliaryState &&
+                    a.grounded == b.grounded && a.active == b.active,
+                    "forecast preserves ordered Create data");
+            for (unsigned alarm = 0; alarm < 12; ++alarm)
+                require(a.alarms.get(alarm) == b.alarms.get(alarm),
+                        "forecast preserves Create alarm state");
+        }
+        for (unsigned i = 0; i < 19; ++i)
+            require(forecast[i].pattern.family == fragments[i].pattern.family &&
+                    forecast[i].pattern.sourceIndex == fragments[i].pattern.sourceIndex &&
+                    forecast[i].y == fragments[i].y &&
+                    forecast[i].reversed == fragments[i].reversed &&
+                    forecast[i].sideRoom == fragments[i].sideRoom &&
+                    forecast[i].appendPillars == fragments[i].appendPillars,
+                    "forecast preserves every incremental fragment");
+    }
     unsigned tileCount = 0;
     unsigned blocks = 0;
     for (const auto& command : commands) if (command.objectId == 92) ++blocks;

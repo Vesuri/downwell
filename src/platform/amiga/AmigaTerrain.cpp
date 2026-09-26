@@ -217,9 +217,11 @@ bool amigaBuildInitialAreaOneTerrain(
     enemyCount = builder.enemyCount();
     if (decorationCount != 0)
         *decorationCount = builder.decorationCount();
+    // Success is structural, not a historical RNG draw total. The forecast
+    // regression compares ordered Create output and complete RNG state with
+    // incremental generation under the current source-backed choice rules.
     const bool valid = !builder.failed() && builder.endReached() &&
-        builder.fragmentCount() == amigaInitialTerrainFragmentCount &&
-        random.drawCount() == 4770;
+        builder.fragmentCount() == amigaInitialTerrainFragmentCount;
     if (valid && randomAfter != 0)
         *randomAfter = random;
     return valid;

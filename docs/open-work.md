@@ -57,10 +57,10 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Resolve forecast-terrain setup failure at frame 532 in the strict adapter
-  gate, then complete both combat tapes with exact creation and published-
-  coordinate comparisons. Audit the forecast's pinned RNG checkpoint against
-  source-backed choice semantics rather than merely accepting new totals.
+- Restore full-page scrolling coverage in the strict adapter gate's
+  post-landing route (currently fails at frame 1374), then complete both combat
+  tapes with exact creation and published-coordinate comparisons. Preserve
+  the coverage requirement and distinguish route changes from simulation bugs.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,

@@ -867,8 +867,30 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
     const unsigned breakableCount = amigaCollectTerrainBreakables(
         patterns, terrain, amigaInitialTerrainFragmentCount,
         breakableX, breakableY, amigaTerrainBreakableCapacity);
-    require(breakableCount == 124,
-            "all recovered area-one breakables fit native storage");
+    unsigned expectedBreakables = 0;
+    for (const auto& fragment : terrain) {
+        for (unsigned row = 0; row < fragment.pattern.rowCount; ++row) {
+            std::uint32_t width = 0;
+            require(patterns.rowWidth(fragment.pattern, row, width),
+                    "forecast pattern row is readable");
+            for (unsigned column = 0; column < width; ++column) {
+                char symbol = 0;
+                require(patterns.cell(fragment.pattern, column, row, symbol),
+                        "forecast pattern cell is readable");
+                if (symbol != 'B') continue;
+                require(expectedBreakables < breakableCount,
+                        "each forecast B cell fits native breakable storage");
+                const int x = fragment.reversed ? 320 - (column + 1) * 16
+                                                : 160 + (column + 1) * 16;
+                require(breakableX[expectedBreakables] == x - 240 &&
+                        breakableY[expectedBreakables] == fragment.y + int(row) * 16 - 176,
+                        "forecast B cells retain serialized positions and order");
+                ++expectedBreakables;
+            }
+        }
+    }
+    require(expectedBreakables > 0 && breakableCount == expectedBreakables,
+            "forecast breakables contain exactly the selected pattern B cells");
     AmigaTerrainCollisionContext terrainContext = {
         &rooms, &terrainRoom, &patterns, terrain,
         amigaInitialTerrainFragmentCount, &forecast
