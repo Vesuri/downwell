@@ -92,5 +92,15 @@ int main(int argc,char**argv){
     assert(!surface.add(invalid,0,0));verify();
     assert(surface.add(shade.image,INT_MIN,INT_MAX));verify();
     clear();verify();
+    // Jump between the first and last row, erase all coverage, and clear an
+    // already empty surface. Row-range retention must not resurrect color.
+    const unsigned char dot[]={0x80,0},black[]={0,0};
+    const Asset point{{{dot,2,1,1,2},black,black},0,0};
+    for(unsigned cycle=0;cycle<64;++cycle){
+        clear();verify();
+        stamp(point,cycle%160,cycle%2?0:283,false);verify();
+        stamp(point,cycle%160,cycle%2?0:283,true);verify();
+        clear();clear();verify();
+    }
     std::puts("Palette effects: 256 source gem/smoke/shade frames plus 760 shifted all-pen overwrite cases passed");
 }

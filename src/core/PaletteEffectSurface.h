@@ -13,10 +13,11 @@ public:
     struct Asset {Mask alpha;const std::uint8_t* low;const std::uint8_t* high;};
     PaletteEffectSurface(){for(unsigned y=0;y<Height;++y)first_[y]=words;}
     void clear(){
-        for(unsigned y=0;y<Height;++y){
+        for(unsigned y=firstRow_;y<lastRow_;++y){
             for(unsigned x=first_[y];x<last_[y];++x){const unsigned at=y*words+x;alpha_[at]=low_[at]=high_[at]=0;}
             first_[y]=words;last_[y]=0;
         }
+        firstRow_=Height;lastRow_=0;
     }
     bool add(const Asset& asset,int x,int y){
         if(!asset.low || !asset.high)return false;
@@ -30,6 +31,8 @@ public:
         if(top<0)top=0;
         if(right>int(Width))right=Width;
         if(bottom>int(Height))bottom=Height;
+        if(top<int(firstRow_))top=firstRow_;
+        if(bottom>int(lastRow_))bottom=lastRow_;
         if(left>=right || top>=bottom)return false;
         const unsigned first=unsigned(left)/16,last=unsigned(right-1)/16;
         for(unsigned y=unsigned(top);y<unsigned(bottom);++y){
@@ -45,7 +48,7 @@ public:
         return false;
     }
     template<class Emit> void visit(Emit emit)const{
-        for(unsigned y=0;y<Height;++y)for(unsigned x=first_[y];x<last_[y];++x){
+        for(unsigned y=firstRow_;y<lastRow_;++y)for(unsigned x=first_[y];x<last_[y];++x){
             const unsigned at=y*words+x;const auto a=alpha_[at];
             if(a)emit(x*16,y,a,std::uint16_t(low_[at]&a),std::uint16_t(high_[at]&a));
         }
@@ -60,6 +63,8 @@ private:
         high_[at]=std::uint16_t((high_[at]&~a)|(hi&a));
         if(unsigned(x)<first_[y])first_[y]=unsigned(x);
         if(unsigned(x)+1>last_[y])last_[y]=unsigned(x)+1;
+        if(y<firstRow_)firstRow_=y;
+        if(y+1>lastRow_)lastRow_=y+1;
     }
     static std::uint16_t read(const std::uint8_t* row,unsigned sx,unsigned left){
         if(!row)return 0;
@@ -93,6 +98,9 @@ private:
     }
     std::uint16_t alpha_[words*Height]{},low_[words*Height]{},high_[words*Height]{};
     std::uint16_t first_[Height]{},last_[Height]{};
+    // Clear/publication of an untouched surface is constant-time. Subtraction
+    // never expands this conservative range, including when it removes all alpha.
+    std::uint16_t firstRow_=Height,lastRow_=0;
 };
 }
 #endif

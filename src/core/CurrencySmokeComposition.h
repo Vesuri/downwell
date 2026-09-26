@@ -47,7 +47,7 @@ public:
             });
         }
         if(!okay){surface_.clear();return false;}
-        surface_.visit([&](unsigned,unsigned,std::uint16_t,std::uint16_t,std::uint16_t){visible_=true;});
+        visible_=surface_.intersects(0,0,160,284);
         return true;
     }
 private:

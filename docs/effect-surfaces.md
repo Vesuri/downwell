@@ -187,8 +187,12 @@ The default viewport is 160 by 284. This scratch lives in ordinary RAM, not in
 a displayed bitplane or the AmigaDOS stack. It holds one coverage plane and
 per-row dirty word bounds (at most 6,820 bytes), not two full color surfaces.
 
-Clear visits only the previous touched word spans. Shade stamps do not expand
-those spans; the consumer receives only nonzero result words with viewport
+Clear visits only the previous touched word spans. The palette surface also
+tracks a conservative first/last touched row, making clear/publication of an
+untouched surface constant-time. Shade stamps do not expand these ranges;
+complete subtraction retains the range until clear so stale color words are
+still erased. Overlap queries stop at the first covered pixel. The consumer
+receives only nonzero result words with viewport
 coordinates. Consumers still own retained-background restoration, final painter
 order and publishing pixels to the target buffer. This helper does not allocate
 Chip RAM, rebuild DMA sprites, scroll a framebuffer or consume game RNG.
