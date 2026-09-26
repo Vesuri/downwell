@@ -207,6 +207,7 @@ public:
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const LevelExit& levelExit() const { return run_.levelExit; }
     const GoalTimeField& goalField() const { return run_.goalField; }
+    unsigned goalFieldBirthBoundary() const { return run_.goalFieldBirthBoundary; }
     bool goalStopped() const { return run_.goalStopped; }
     bool exitDitherRequested() const { return run_.exitDitherRequested; }
     const ExitDither& exitDither() const { return run_.exitDither; }

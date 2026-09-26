@@ -123,6 +123,55 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 int main(int argc, char** argv) {
     {
         std::vector<UBYTE> base(downwellGameRingBytes), actual(base.size()), expected(base.size());
+        for (unsigned i = 0; i < base.size(); ++i) base[i] = i * 19 + 7;
+        actual = base;
+        AmigaTimeFields retained;
+        downwell::OrdinaryTimeFields<64> fields;
+        for (unsigned i = 0; i < 64; ++i)
+            require(fields.adoptCreate(160 + (i % 8) * 22, 4000 + (i / 8) * 38,
+                i * 67108863u), "dense field fixture capacity");
+        downwell::GoalTimeField goal;
+        goal.x = 240; goal.y = 4140;
+        goal.radius = downwell::HudReal::integer(129);
+        for (unsigned trial = 0; trial <= 64; ++trial) {
+            const unsigned origin = trial * 29 % downwellGameRingHeight;
+            const int viewX = trial % 16 == 15 ? 80 : 160;
+            const int viewY = 3970 + int(trial) * 3;
+            downwell::TimeFieldOutlines shape;
+            shape.set(fields, goal, true, trial, viewX, viewY, downwellPlayfieldX);
+            require(retained.prepare(actual.data(), origin, shape, false, [](unsigned) { return false; }),
+                "all 64 fields and exit fit viewport word storage");
+            retained.draw();
+            expected = base;
+            AmigaRenderer oracle;
+            amigaRendererInit(&oracle, expected.data(), nullptr);
+            amigaRendererSetGameOrigin(&oracle, origin);
+            amigaRendererSetClipRect(&oracle, downwellPlayfieldX, 0, downwellPlayfieldWidth, downwellDisplayHeight);
+            auto circle = [&](int x, int y, downwell::HudReal radius) {
+                radius.exponent += 8;
+                downwell::GoalFieldOutline outline;
+                outline.setRasterCircle(x-viewX+downwellPlayfieldX, y-viewY, int(radius.floor()));
+                outline.draw([&](int px, int py, int pen) { amigaRendererFillRect(&oracle, px, py, 1, 1, pen); });
+            };
+            if (viewX != 80) for (unsigned i = 64; i; --i) {
+                if (i == trial) circle(goal.x, goal.y, goal.radius);
+                const auto& field = *fields.at(i-1);
+                circle(field.x, field.y, field.radius);
+            }
+            if (viewX != 80 && trial == 0) circle(goal.x, goal.y, goal.radius);
+            require(actual == expected, "merged fields match independent ordered composition and side-camera hiding");
+            require(retained.prepare(actual.data(), origin, shape, false, [](unsigned) { return false; }),
+                "retained multi-field snapshot");
+            retained.draw();
+            require(retained.lastWordWrites == 0, "unchanged field collection writes no pixels");
+        }
+        downwell::TimeFieldOutlines absent;
+        require(retained.prepare(actual.data(), 0, absent, false, [](unsigned) { return false; }), "field teardown");
+        require(actual == base, "all fields restore terrain on retirement");
+        std::cout << "65 dense ordinary/exit field retention and painter-order comparisons passed\n";
+    }
+    {
+        std::vector<UBYTE> base(downwellGameRingBytes), actual(base.size()), expected(base.size());
         for (unsigned i = 0; i < base.size(); ++i) base[i] = i * 71 + 13;
         AmigaGoalField retained;
         downwell::GoalTimeField field;

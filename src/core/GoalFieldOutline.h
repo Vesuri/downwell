@@ -15,13 +15,17 @@ struct GoalFieldOutline {
         const int cameraX = viewX + 80;
         if (!present || cameraX <= 160 || cameraX >= 320 ||
             field.y + 132 < viewY || field.y - 132 >= viewY + 284) return;
-        static constexpr int cosine[24] = {
-            32768,31651,28378,23170,16384,8481,0,-8481,-16384,-23170,-28378,-31651,
-            -32768,-31651,-28378,-23170,-16384,-8481,0,8481,16384,23170,28378,31651};
         auto radius = field.radius;
         radius.exponent += 8;
         const int base = static_cast<int>(radius.floor());
         if (base < 128 * 256 || base >= 130 * 256) return;
+        setRasterCircle(field.x - viewX + screenX, field.y - viewY, base);
+    }
+    // Presentation-only Q8 radius. Collision continues to use resource masks.
+    void setRasterCircle(int x, int y, int base) {
+        static constexpr int cosine[24] = {
+            32768,31651,28378,23170,16384,8481,0,-8481,-16384,-23170,-28378,-31651,
+            -32768,-31651,-28378,-23170,-16384,-8481,0,8481,16384,23170,28378,31651};
         visible = true;
         for (unsigned ring = 0; ring < 3; ++ring) {
             const int r = base + (ring == 1 ? -256 : ring == 2 ? 256 : 0);
@@ -32,8 +36,8 @@ struct GoalFieldOutline {
                 return unit < 0 ? -rounded : rounded;
             };
             for (unsigned i = 0; i < 24; ++i)
-                points[ring][i] = {field.x - viewX + screenX + component(cosine[i]),
-                    field.y - viewY + component(cosine[(i + 18) % 24])};
+                points[ring][i] = {x + component(cosine[i]),
+                    y + component(cosine[(i + 18) % 24])};
         }
     }
     bool same(const GoalFieldOutline& other) const {

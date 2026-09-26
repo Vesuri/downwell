@@ -769,7 +769,7 @@ static void redrawResultsChoices(AmigaRenderer* renderer, const AmigaPortRuntime
 // Each display ring independently owes modified rows of the private backing.
 static AmigaGameplayRows gameplayRows;
 static AmigaLaserSight gameplayRays[2];
-static AmigaGoalField gameplayFields[2];
+static AmigaTimeFields gameplayFields[2];
 static Bitmap* terrainCopyTarget;
 static const Bitmap* terrainCopyBacking;
 static unsigned terrainCopyBuffer;
@@ -1080,8 +1080,9 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
     gDownwellGameplayGame = (const UBYTE*)display.data;
     alignas(2) static UBYTE expected[downwellGameRingBytes];
     for (unsigned byte = 0; byte < downwellGameRingBytes; ++byte) expected[byte] = memory.game()[byte];
-    static downwell::GoalFieldOutline fieldOracle;
-    fieldOracle.set(port.goalField(), port.levelExitPresent(), 160 + port.cameraOffsetX(),
+    static downwell::TimeFieldOutlines fieldOracle;
+    fieldOracle.set(port.timeFields(), port.goalField(), port.levelExitPresent(),
+                    port.goalFieldBirthBoundary(), 160 + port.cameraOffsetX(),
                     34 + port.cameraOffsetY(), downwellPlayfieldX);
     if (fieldOracle.visible) {
         AmigaRenderer oracle;
@@ -2621,8 +2622,9 @@ int main(void) {
                 }
             }
             DW_PROFILE_PHASE(profileSprite);
-            static downwell::GoalFieldOutline fieldShape;
-            fieldShape.set(port.goalField(), port.levelExitPresent(), worldViewX, worldViewY, downwellPlayfieldX);
+            static downwell::TimeFieldOutlines fieldShape;
+            fieldShape.set(port.timeFields(), port.goalField(), port.levelExitPresent(),
+                port.goalFieldBirthBoundary(), worldViewX, worldViewY, downwellPlayfieldX);
             bool fieldChanged = !gameplayFields[back].matches(
                 (UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape);
             if (!fieldChanged && fieldShape.visible)

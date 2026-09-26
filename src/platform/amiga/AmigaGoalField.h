@@ -2,18 +2,20 @@
 #define DOWNWELL_AMIGA_GOAL_FIELD_H
 #include "AmigaRenderer.h"
 #include "core/GoalFieldOutline.h"
+#include "core/TimeFieldOutlines.h"
 
 // Per-display sparse word overlay. Restore only departing coverage; publish
 // final colours directly, never clearing continuing pixels. Drain DMA first.
 // Shared scratch lives only inside prepare(), so pending draws are independent.
-class AmigaGoalField {
+template<class Shape = downwell::GoalFieldOutline> class AmigaFieldOverlay {
     struct Word { UWORD offset, mask, under[2], paint[2], kept; };
-    static constexpr unsigned capacity = 1024;
+    // Every word touched by the clipped viewport, including partial edge words.
+    static constexpr unsigned capacity = ((downwellPlayfieldWidth + 30) / 16) * downwellDisplayHeight;
     Word saved_[capacity];
     unsigned count_ = 0, origin_ = 0;
     UBYTE* target_ = nullptr;
     bool valid_ = false, pending_ = false;
-    downwell::GoalFieldOutline shape_;
+    Shape shape_;
     struct Scratch {
         Word words[capacity];
         UWORD index[downwellGameRingPlaneBytes / 2] = {};
@@ -30,12 +32,12 @@ class AmigaGoalField {
 public:
     unsigned lastWordWrites = 0;
     bool present() const { return valid_ || pending_; }
-    bool matches(UBYTE* target, unsigned origin, const downwell::GoalFieldOutline& shape) const {
+    bool matches(UBYTE* target, unsigned origin, const Shape& shape) const {
         return valid_ && target == target_ && origin == origin_ && shape.same(shape_);
     }
     void discard() { count_ = 0; valid_ = pending_ = false; }
     template<class DirtyRow>
-    bool prepare(UBYTE* target, unsigned origin, const downwell::GoalFieldOutline& shape,
+    bool prepare(UBYTE* target, unsigned origin, const Shape& shape,
                  bool underlyingChanged, DirtyRow dirtyRow) {
         lastWordWrites = 0;
         if (target != target_) { discard(); target_ = target; }
@@ -97,4 +99,6 @@ public:
         pending_ = false; valid_ = true;
     }
 };
+using AmigaGoalField = AmigaFieldOverlay<>;
+using AmigaTimeFields = AmigaFieldOverlay<downwell::TimeFieldOutlines>;
 #endif

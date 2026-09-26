@@ -45,6 +45,19 @@ a second draw. Remaining ownership, lookup and rendering work is in the queue.
 
 ## Dynamic field Draw ordering
 
+`TimeFieldOutlines` takes a read-only snapshot of ordinary and goal fields in
+this merged order. It stores visible circle centres and Q8 radii, expands one
+three-ring outline at a time, and consumes no random values. SDL and the native
+retained overlay use the same presentation snapshot. Collision still uses the
+serialized masks, never these randomized outline radii.
+
+The native overlay saves underlying bits by viewport word, combines overlapping
+fields in painter order and restores only departing coverage. Its capacity is
+bounded by all words intersecting the 160-by-284 viewport, including partial
+edge words, rather than by one circle's expected footprint. Storage is ordinary
+RAM; this adds no Chip bitplanes or scrolling repaint path. The 24-segment/Q8
+integer raster remains an adaptation, not an original Windows GPU coverage proof.
+
 The compatibility depth table maps both `parentTimeField` and `goalTimeField`
 to 10000 (name/depth array slots 48 and 328). The compatibility
 `instance_create` obtains that depth through `object_get_depth` and calls

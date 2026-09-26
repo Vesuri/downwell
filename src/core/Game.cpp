@@ -1,5 +1,5 @@
 #include "Game.h"
-#include "GoalFieldOutline.h"
+#include "TimeFieldOutlines.h"
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
 #include "AmmoDividers.h"
@@ -304,8 +304,9 @@ void Game::renderMain(Renderer& renderer) const {
                                        1.0F, 1.0F, 0.0F);
     }
 
-    GoalFieldOutline field;
-    field.set(startup_.goalField(), startup_.levelExitPresent(),
+    TimeFieldOutlines field;
+    field.set(startup_.timeFields(), startup_.goalField(), startup_.levelExitPresent(),
+              startup_.goalFieldBirthBoundary(),
               static_cast<int>(viewX), static_cast<int>(viewY));
 
     // Enemy Step has already selected its presentation, including hit/wake

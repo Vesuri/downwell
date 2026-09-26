@@ -38,7 +38,7 @@ throughout integration, not only after content is complete.
   dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
   nor shop control-lock is a substitute for this state.
 - Add Timeout-damage creation of ordinary object-82 time fields. Integrate
-  precise sprite-597 masks, field lookup ordering and rendering for
+  precise sprite-597 masks and field lookup ordering for
   all ordinary fields alongside exit fields. Complete Draw scheduling across
   other object families and live time-stop/activation state;
   querying only the exit field does not cover `parentTimeField`.
