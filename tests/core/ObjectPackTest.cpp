@@ -160,6 +160,19 @@ void testDecodeAndInheritance() {
 
 void testValidation() {
     std::vector<std::uint8_t> bytes = makePack();
+    for(unsigned flags=0;flags<32;++flags){
+        bytes=makePack();bytes[downwell::ObjectPack::headerSize+20]=flags;
+        const downwell::ObjectPack properties(bytes.data(),bytes.size());
+        downwell::RunnerObjectFamilies<2> family;
+        require(family.bindInstanceFlags(properties),"bind all serialized property combinations");
+        const unsigned expected=0x10u|((flags&2)?1u:0u)|((flags&1)?2u:0u)|
+            (flags&4u)|((flags&16)?0x80u:0u);
+        require(*family.flags(0)==expected,"physics is not managed and visible/solid bits are transposed");
+    }
+    bytes=makePack();bytes[4]=2;
+    require(downwell::ObjectPack(bytes.data(),bytes.size()).error()==downwell::ObjectPackError::unsupportedVersion,
+            "legacy pack without managed properties is rejected");
+    bytes=makePack();
     bytes[4] = 1;
     require(downwell::ObjectPack(bytes.data(), bytes.size()).error() ==
                 downwell::ObjectPackError::unsupportedVersion,
@@ -199,6 +212,8 @@ void testGeneratedPack(const char* path) {
             "generated object pack has audited totals");
     downwell::RunnerObjectFamilies<386> collisionFamilies;
     require(collisionFamilies.bindSpatialFlags(pack),"derive initial spatial flags from recovered collisions");
+    downwell::RunnerObjectFamilies<386> instanceFamilies;
+    require(instanceFamilies.bindInstanceFlags(pack),"derive runtime instance property flags");
     unsigned participants=0;
     for(unsigned id=0;id<pack.objectCount();++id){
         bool participates=false;
@@ -217,6 +232,11 @@ void testGeneratedPack(const char* path) {
         }
         require(*collisionFamilies.flags(id)==(participates?0x18u:0x10u),
                 "initial collision flags match expanded event endpoint ancestry");
+        downwell::PackedObject properties;require(pack.object(id,properties),"read property flags");
+        require(properties.managed(),"all pinned OBJT resources retain their managed flag");
+        const unsigned expected=*collisionFamilies.flags(id)|(properties.solid()?1u:0u)|
+            (properties.visible()?2u:0u)|(properties.persistent()?4u:0u)|0x80u;
+        require(*instanceFamilies.flags(id)==expected,"runtime flags map serialized properties without conflating bit layouts");
         participants+=participates;
     }
     require(participants>0 && participants<pack.objectCount(),"collision flags do not indiscriminately index every object");

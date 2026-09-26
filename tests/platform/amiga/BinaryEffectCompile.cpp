@@ -324,6 +324,8 @@ bool compileObjectFamilies(downwell::RunnerObjectFamilies<386>& families,
 }
 bool compileInitialSpatialFlags(downwell::RunnerObjectFamilies<386>& families,
     const downwell::ObjectPack& objects){return families.bindSpatialFlags(objects);}
+bool compileInitialInstanceFlags(downwell::RunnerObjectFamilies<386>& families,
+    const downwell::ObjectPack& objects){return families.bindInstanceFlags(objects);}
 #include "core/RunnerSpatialObjectPreparation.h"
 downwell::RunnerSpatialObjectPreparation::Path compileObjectPreparation(
     downwell::RunnerSpatialIndex<64>& index,std::uint32_t& flags,

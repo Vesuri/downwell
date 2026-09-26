@@ -21,7 +21,7 @@ fields rather than mapping C/C++ structures over the bytes.
 | Offset | Type | Meaning |
 | ---: | --- | --- |
 | 0 | char[4] | `DWOB` magic |
-| 4 | u16 | Format version, currently 2 |
+| 4 | u16 | Format version, currently 3 |
 | 6 | u16 | Header size, 40 |
 | 8 | u32 | Source manifest schema, currently 3 |
 | 12 | u32 | Object count, 386 for the pinned build |
@@ -52,7 +52,17 @@ The generated `.manifest.json` sidecar records source and input hashes, extracti
 tool identity, reviewed assembly hashes, generator hash and output hash. Both
 payload and sidecar are ignored build products.
 
-Flag bits 0–3 are visible, solid, persistent, and uses-physics respectively.
+Flag bits 0–4 are visible, solid, persistent, uses-physics and managed respectively.
+Version 3 adds managed; version 2 is rejected rather than silently treating an
+omitted property as false. The generator reads OBJT record offset `0x0c` directly
+from hash-validated, read-only `data.win`, checking adjacent visible/solid/depth/
+persistent fields against the UTMT manifest. All 386 pinned objects are managed.
+The provenance sidecar records this additional input and field location.
+
+Runner loader `0x479328..0x4793bb` maps solid, visible, persistent and managed
+to runtime flag bits `1`, `2`, `4` and `0x80`. These are not DWOB bit positions;
+`RunnerObjectFamilies::bindInstanceFlags` combines them with recovered spatial
+and collision-endpoint flags. Other runtime event-cache bits are not implied.
 Names remain in the auditable JSON manifest and are not duplicated.
 
 ## Event-binding record — 16 bytes

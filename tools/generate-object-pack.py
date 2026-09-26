@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 MAGIC = b"DWOB"
-VERSION = 2
+VERSION = 3
 MANIFEST_SCHEMA = 3
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 EXPECTED_OBJECTS = 386
@@ -26,6 +26,7 @@ OBJECT_VISIBLE = 1 << 0
 OBJECT_SOLID = 1 << 1
 OBJECT_PERSISTENT = 1 << 2
 OBJECT_USES_PHYSICS = 1 << 3
+OBJECT_MANAGED = 1 << 4
 
 
 def require(condition, message):
@@ -65,7 +66,36 @@ def dynamic_depths(assembly_dir, objects):
     return result
 
 
-def build_pack(manifest, creation_depths):
+def managed_properties(source, objects):
+    """OBJT +0x0c, consumed by runner 0x479396..0x4793b8."""
+    payload = source.read_bytes()
+    require(hashlib.sha256(payload).hexdigest() == SOURCE_SHA256, "unexpected source data.win hash")
+    require(payload[:4] == b"FORM" and struct.unpack_from("<I", payload, 4)[0] == len(payload)-8,
+            "invalid source FORM extent")
+    offset = 8
+    while offset < len(payload):
+        tag, size = struct.unpack_from("<4sI", payload, offset)
+        end = offset + 8 + size
+        require(end <= len(payload), "invalid chunk extent")
+        if tag == b"OBJT":
+            count = struct.unpack_from("<I", payload, offset+8)[0]
+            require(count == len(objects), "OBJT/manifest count mismatch")
+            pointers = struct.unpack_from("<" + "I" * count, payload, offset+12)
+            result = []
+            for obj, pointer in zip(objects, pointers):
+                require(offset+12+4*count <= pointer and pointer+36 <= end, "invalid OBJT record")
+                visible, managed, solid, depth, persistent = struct.unpack_from("<IIIiI", payload, pointer+8)
+                require(bool(visible) == obj["Visible"] and bool(solid) == obj["Solid"] and
+                        depth == obj["Depth"] and bool(persistent) == obj["Persistent"],
+                        "OBJT properties disagree with manifest")
+                require(managed in (0, 1), "unexpected managed property")
+                result.append(bool(managed))
+            return result
+        offset = end
+    raise ValueError("missing OBJT")
+
+
+def build_pack(manifest, creation_depths, managed):
     require(manifest.get("schemaVersion") == MANIFEST_SCHEMA,
             f"expected manifest schema {MANIFEST_SCHEMA}")
     require(manifest.get("source", {}).get("sha256") == SOURCE_SHA256,
@@ -75,6 +105,7 @@ def build_pack(manifest, creation_depths):
     binding_records = []
     objects = manifest["resources"]["objects"]
     require(len(creation_depths) == len(objects), "creation depth count mismatch")
+    require(len(managed) == len(objects), "managed property count mismatch")
     for object_index, obj in enumerate(objects):
         require(obj["id"] == object_index,
                 "object IDs are not contiguous resource-table indices")
@@ -98,6 +129,8 @@ def build_pack(manifest, creation_depths):
             flags |= OBJECT_PERSISTENT
         if obj["UsesPhysics"]:
             flags |= OBJECT_USES_PHYSICS
+        if managed[object_index]:
+            flags |= OBJECT_MANAGED
         object_records.append(OBJECT.pack(
             obj["id"],
             obj["spriteId"],
@@ -150,15 +183,18 @@ def main():
                         default=root / "extracted/utmt-0.9.2.0/manifest.json")
     parser.add_argument("--output", type=Path,
                         default=root / "generated/downwell-objects.dwob")
+    parser.add_argument("--source", type=Path, default=root / "data/data.win")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     payload = build_pack(manifest, dynamic_depths(args.manifest.parent / "Assembly",
-                                               manifest["resources"]["objects"]))
+                                               manifest["resources"]["objects"]),
+                         managed_properties(args.source, manifest["resources"]["objects"]))
     digest = hashlib.sha256(payload).hexdigest()
     provenance = (json.dumps({
         "formatVersion": VERSION, "source": manifest["source"],
+        "managedPropertySource": {"chunk": "OBJT", "recordOffset": 12, "sha256": SOURCE_SHA256},
         "extractor": manifest["extractor"], "assemblySha256": DEPTH_INPUTS,
         "manifestSha256": hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
         "generatorSha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),

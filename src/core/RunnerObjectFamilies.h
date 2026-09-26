@@ -12,6 +12,18 @@ public:
     void clear(){count_=0;good_=false;}
     bool valid()const{return good_;}
     unsigned size()const{return count_;}
+    // Loaded property bits from 0x47934b..0x4793b8 plus collision endpoints.
+    // This is not a complete event-cache flag word.
+    bool bindInstanceFlags(const ObjectPack& pack){
+        if(!bindSpatialFlags(pack))return false;
+        for(unsigned i=0;i<count_;++i){
+            PackedObject object;
+            if(!pack.object(i,object)){clear();return false;}
+            entries_[i].flags|=(object.solid()?1u:0u)|(object.visible()?2u:0u)|
+                (object.persistent()?4u:0u)|(object.managed()?0x80u:0u);
+        }
+        return true;
+    }
     // Spatial-relevant subset of runner +0x50: constructor enables 0x10;
     // expanded collision-event endpoints get 0x08. Serialized visibility,
     // solidity, managed-object and event-cache bits are not represented here.

@@ -37,6 +37,7 @@ struct PackedObject {
     bool solid() const { return (flags & 2U) != 0; }
     bool persistent() const { return (flags & 4U) != 0; }
     bool usesPhysics() const { return (flags & 8U) != 0; }
+    bool managed() const { return (flags & 16U) != 0; }
 };
 
 struct PackedObjectEvent {
@@ -48,7 +49,7 @@ struct PackedObjectEvent {
 
 class ObjectPack {
 public:
-    static constexpr std::uint16_t formatVersion = 2;
+    static constexpr std::uint16_t formatVersion = 3;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 40;

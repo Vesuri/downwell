@@ -15,6 +15,7 @@ for start, end, digest in (
     (0x4627d0, 0x46281c, "0ca6095a8151103bf924542f817fd86226f3edbce56733c6faf45d694bc4975e"),
     (0x4633e0, 0x463445, "e8f7c44bc1af35f9f644d3adf261f62d9714daaccc3cd8f64eba9cfdf30f0411"),
     # Constructor -> object binding -> ancestor-inclusive tail insertion.
+    (0x479328, 0x4793bb, "e09bfccc39cfcb82c81dce4f49ef2632dd3998b67324d967efe88a843b421a18"),
     # Deferred reconciliation: room-list order, not pending-request order.
     # Layer-element integration hook and its stable unlink/head/tail primitives.
     (0x4266e0, 0x42679c, "dd0babd9e0005cfafac6148ce742b90df2f432e0b00dee603bfe59dabb17fa31"),
