@@ -39,6 +39,10 @@ int main(){
     BloodEffects<2> owner;GameMakerRandom random(1),reference(1);
     const auto first=owner.create({}, {},{}),second=owner.create({}, {},{});
     const auto cutoff=owner.beginPhase();
+    const auto before=owner.get(second)->savedSpeed.bits;
+    unsigned queries=0;
+    assert(!owner.stepChecked(cutoff,[&](auto handle,const auto&,bool&){++queries;assert(handle==second);return false;}));
+    assert(queries==1 && owner.get(second)->savedSpeed.bits==before);
     assert(first && second && !owner.create({}, {},{}));
     owner.get(first)->destroyRequested=true;owner.retireRequested();
     const auto third=owner.create({}, {},{});assert(third>second && !owner.get(first));

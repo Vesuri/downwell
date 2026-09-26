@@ -46,10 +46,19 @@ public:
     // allowed(handle,effect) evaluates TimeStopBound per instance at Step.
     // It must not mutate this owner. Blood has no smoke-wall response.
     template<class Allowed> bool step(Phase phase,Allowed allowed){
+        return stepChecked(phase,[&](Handle handle,const BloodEffect& effect,bool& result){
+            result=allowed(handle,effect);return true;
+        });
+    }
+    // Checked world queries distinguish unsupported geometry from a real
+    // time-stop result. On failure, do not step the affected instance.
+    template<class Query> bool stepChecked(Phase phase,Query query){
         for(unsigned i=0;i<count_;++i){
             auto& slot=slots_[order_[i]];
-            if(slot.handle<=phase.newest && !slot.effect.destroyRequested &&
-               !slot.effect.step(allowed(slot.handle,static_cast<const BloodEffect&>(slot.effect))))return false;
+            if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
+            bool allowed=false;
+            if(!query(slot.handle,static_cast<const BloodEffect&>(slot.effect),allowed) ||
+               !slot.effect.step(allowed))return false;
         }
         return true;
     }

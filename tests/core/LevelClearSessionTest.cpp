@@ -6,6 +6,20 @@ static void require(bool ok, const char* why) {
 }
 int main() {
     using namespace downwell;
+    {
+        RunSession failed;GameMakerRandom rng(123);
+        require(failed.emitBloodBurst(MotionBinary64::fromInteger(240),{},rng),"failure fixture births");
+        unsigned calls=0;
+        failed.stepBloodBound(failed.bloodEffects.beginPhase(),true,480,
+            [&](const auto&,bool&){++calls;return false;});
+        require(!failed.effectsSucceeded && calls==1,"unsupported field query latches session failure");
+        failed.bloodEffects.visitNewest([&](auto,const auto& effect){
+            require(effect.savedSpeed.bits==0xbf800000u,"failed query must not freeze or move an instance");
+        });
+        const auto draws=rng.drawCount();
+        require(!failed.emitBloodBurst({}, {},rng) && rng.drawCount()==draws,"latched failure consumes no further RNG");
+        failed.reset();require(failed.effectsSucceeded && failed.bloodEffects.size()==0,"reset clears failed ownership");
+    }
     RunSession run;
     PlayerMotion player(false, 10000);
     GameMakerRandom random(17);
@@ -34,6 +48,16 @@ int main() {
     unsigned allowedQueries=0;
     run.stepBlood(bloodPhase,[&](auto,const auto&){++allowedQueries;return false;});
     require(allowedQueries==2 && run.effectsSucceeded,"session dispatches per-instance time-stop query");
+    unsigned extraFields=0;
+    run.stepBloodBound(bloodPhase,false,480,[&](const auto&,bool&){++extraFields;return false;});
+    require(run.effectsSucceeded && extraFields==0,"inactive pTimeStop skips field queries");
+    run.goalField.x=240;run.goalField.y=176;
+    run.stepBloodBound(bloodPhase,true,480,[&](const auto&,bool&){++extraFields;return false;});
+    require(run.effectsSucceeded && extraFields==0,"owned goal field allows effects during global stop");
+    run.levelExitPresent=false;
+    run.stepBloodBound(bloodPhase,true,480,[&](const auto&,bool& hit){++extraFields;hit=false;return true;});
+    require(run.effectsSucceeded && extraFields==2,"outside all fields freezes both blood instances");
+    run.levelExitPresent=true;
     run.bloodEffects.visitNewest([&](auto,const BloodEffect& effect){
         require(effect.imageIndex.bits==0x3f000000u && effect.imageSpeed.bits==0,
                 "earlier animation remains visible when Step freezes movement");

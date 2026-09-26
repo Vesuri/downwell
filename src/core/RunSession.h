@@ -21,6 +21,8 @@
 #include "FlashBallEffects.h"
 #include "SmokeEffects.h"
 #include "BloodEffects.h"
+#include "TimeStopBound.h"
+#include "BloodGoalContact.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -61,6 +63,23 @@ struct RunSession {
     bool emitBloodBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=bloodEffects.burst(x,y,random);
         return effectsSucceeded;
+    }
+    // pTimeStop is supplied by the source player/controller phase, not inferred
+    // from goalStopped or control lock. OtherFields covers parentTimeField
+    // instances beyond the owned goal field and returns query success + overlap.
+    template<class OtherFields> void stepBloodBound(BloodEffects<32>::Phase phase,
+        bool pTimeStop,int roomWidth,OtherFields otherFields){
+        if(!effectsSucceeded)return;
+        effectsSucceeded=bloodEffects.stepChecked(phase,[&](auto,const BloodEffect& effect,bool& allowed){
+            return TimeStopBound::evaluate(pTimeStop,effect.x.promoted(),effect.y.promoted(),roomWidth,
+                [&](auto,auto,bool& inField){
+                    if(levelExitPresent){
+                        if(!BloodGoalContact::query(effect,goalField,inField))return false;
+                        if(inField)return true;
+                    }
+                    return otherFields(effect,inField);
+                },allowed);
+        });
     }
     void advanceSmokeAnimation(){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.advanceAnimation(smokeEffects.beginPhase());

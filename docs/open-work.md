@@ -33,6 +33,10 @@ throughout integration, not only after content is complete.
   before rewards and retirement.
 - Connect natural death/stomp/hit events to real effect owners, including flash
   balls; fixture-triggered rendering is not sufficient.
+- Connect the player's source Begin Step `checkStop`/`pTimeStop` transitions
+  and parent-time-field queries to both world schedulers before activating blood
+  dispatch. Preserve transition effects, RNG and audio order; neither goal-stop
+  nor shop control-lock is a substitute for this state.
 - Register skeletons and owned bones in shared gameplay. Connect animation,
   alarms, Step, collision and End Step, player/bullet damage, rewards, capacity
   failure, out-of-view retirement and both renderers.

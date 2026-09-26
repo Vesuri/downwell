@@ -4,6 +4,12 @@
 #include "core/BloodCollisionBounds.h"
 #include "core/BloodMaskSample.h"
 #include "core/BloodGoalContact.h"
+#include "core/RunSession.h"
+bool compileBloodSession(downwell::RunSession& run,bool stopped){
+    run.stepBloodBound(run.bloodEffects.beginPhase(),stopped,480,
+        [](const auto&,bool& hit){hit=false;return true;});
+    return run.effectsSucceeded;
+}
 bool compileBloodGoal(const downwell::BloodEffect& effect,const downwell::GoalTimeField& field,bool& hit){
     return downwell::BloodGoalContact::query(effect,field,hit);
 }
