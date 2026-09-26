@@ -1142,7 +1142,7 @@ test: generate-room-pack generate-object-pack generate-sprite-pack generate-font
 	./$(ROOM_TEST_TARGET)
 	./$(ROOM_PACK_TEST_TARGET) generated/downwell-rooms.dwrm
 	./$(OBJECT_PACK_TEST_TARGET) generated/downwell-objects.dwob
-	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp
+	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp generated/downwell-sprite-masks.dwsm
 	./$(FONT_PACK_TEST_TARGET) generated/downwell-fonts.dwfn
 	./$(BUILDER_PATTERN_PACK_TEST_TARGET) generated/downwell-builder-patterns.dwbp
 	./$(AREA_ONE_BUILDER_TEST_TARGET) generated/downwell-builder-patterns.dwbp
@@ -1193,9 +1193,9 @@ verify-object-pack: $(OBJECT_PACK_TEST_TARGET)
 generate-sprite-pack:
 	tools/generate-sprite-pack.py
 
-verify-sprite-pack: $(SPRITE_PACK_TEST_TARGET)
+verify-sprite-pack: $(SPRITE_PACK_TEST_TARGET) generate-collision-masks
 	tools/generate-sprite-pack.py --check
-	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp
+	./$(SPRITE_PACK_TEST_TARGET) generated/downwell-sprites.dwsp generated/downwell-sprite-masks.dwsm
 
 generate-font-pack:
 	tools/generate-font-pack.py

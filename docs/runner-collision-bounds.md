@@ -53,6 +53,30 @@ rejection and failed rounding. This verifies composition of the decoded data and
 geometry routines; it is not a live Windows runtime/FP-mode comparison or proof
 that the adapter is wired into gameplay.
 
+`RunnerSpatialInstances::collideCompatibility` joins the ordinary compatibility
+branch of `0x464d30` to resource lookup and `RunnerMaskPair`. Self and instance
+flags `0x100001` are rejected before refresh (distinct from query candidate
+filter `0x100003`). With updates enabled, the other instance refreshes before
+self, and only dirty instances refresh; update-disabled calls refresh neither.
+Broad phase uses strict binary32 comparisons against inclusive far edges plus
+one. It does not normalize/reorder cached rectangles or substitute integer
+overlap tests.
+
+Only after overlap does the routine resolve masks/artwork and require nonzero
+resource frame counts. Two rectangular-mode resources hit without mask pixels
+or image-index conversion. If either is precise, both stored mask frames are
+selected by truncating image indices then signed-modulo wrapping by mask count.
+An unavailable payload fails the owner rather than returning a spurious miss.
+Special artwork with an explicit ordinary mask follows that mask; unsupported
+special-resource dispatch without an override is rejected. This adapter does
+not implement the separate compatibility-off pair routine.
+
+The resource-backed sprite test connects `place` through this adapter to the
+pair kernel and obtains a generation-checked field identity. It checks refresh
+order, update-disabled cache behavior, mask overrides, direct-versus-query flag
+gates and missing payloads. Actual gameplay lifecycle/scheduler hooks and the
+runtime FP/trigonometry verification remain separate requirements.
+
 ## Unrotated ordinary-sprite branch
 
 `0x46616d..0x466328` treats each axis in this order, narrowing every operation

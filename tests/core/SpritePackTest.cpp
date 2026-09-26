@@ -31,7 +31,7 @@ void testBasicValidation() {
             "bad sprite-pack magic is rejected");
 }
 
-void testGeneratedPack(const char* path) {
+void testGeneratedPack(const char* path,const char* maskPath) {
     std::ifstream input(path, std::ios::binary);
     const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(input)),
                                           std::istreambuf_iterator<char>());
@@ -44,6 +44,69 @@ void testGeneratedPack(const char* path) {
     const downwell::SpriteCollisionPack compact(compactBytes.data(),compactBytes.size());
     require(compact.valid()&&compact.spriteCount()==pack.spriteCount(),"compact collision table validates");
     require(compactBytes.size()==26700,"collision-only table excludes atlas payload and frame mappings");
+    std::ifstream maskInput(maskPath,std::ios::binary);
+    const std::vector<std::uint8_t> maskBytes((std::istreambuf_iterator<char>(maskInput)),{});
+    const downwell::SpriteMaskPack masks(maskBytes.data(),maskBytes.size());
+    require(masks.valid(),"all-partner mask pack resolves");
+    {
+        using Collisions=downwell::RunnerSpatialInstances<4,8>;
+        Collisions collisions;Collisions::Sprite visuals[2];
+        visuals[0].spriteId=84;visuals[1].spriteId=597;
+        visuals[1].imageIndex.bits=0xc0f80000; // -7.75 truncates then wraps onto the one mask.
+        require(collisions.attach({0,1},3,{})&&collisions.attach({1,1},1,{}),"attach collision partners");
+        std::vector<unsigned> refreshOrder;
+        auto round=[](auto v,std::int32_t& pixel){return v.promoted().roundPixel(pixel);};
+        auto noTrig=[](auto,auto&,auto&){require(false,"unrotated pair must not request trig");return false;};
+        auto refresh=[&](downwell::InstanceHandle h,bool publish){
+            refreshOrder.push_back(h.slot);
+            return collisions.refreshSprite(h,0x30,false,compact,visuals[h.slot],true,noTrig,round,publish);
+        };
+        bool hit=false;
+        auto collide=[&](bool update,const downwell::SpriteMaskPack& pixels){
+            return collisions.collideCompatibility({0,1},{1,1},visuals[0],visuals[1],compact,pixels,{},
+                update,refresh,noTrig,round,hit);
+        };
+        require(collide(true,masks)&&hit&&refreshOrder==std::vector<unsigned>({1,0}),
+            "source collision dispatch refreshes candidate before self then samples original masks");
+        struct Graph {
+            std::uint32_t value=0x30;
+            bool valid()const{return true;}
+            const std::uint32_t* flags(unsigned)const{return &value;}
+            bool isA(int child,int parent)const{return child==parent;}
+            bool markSpatialFamily(unsigned){return true;}
+        } graph;
+        Collisions::Result selected;
+        require(collisions.place({0,1},1,{}, {},false,graph,refresh,
+            [&](auto a,auto b,bool update,bool& found){
+                require(a.slot==0&&b.slot==1,"query resolves lifetime-safe candidate handles");
+                return collisions.collideCompatibility(a,b,visuals[a.slot],visuals[b.slot],compact,masks,{},
+                    update,refresh,noTrig,round,found);
+            },selected)&&selected.found&&selected.handle.slot==1&&selected.handle.generation==1,
+            "instance-place owner reaches resource-backed pair dispatch and returns field identity");
+        require(collisions.move({0,1},{0x42200000},{},0x30),"move blood away from the field");
+        refreshOrder.clear();
+        require(collide(false,masks)&&!hit&&refreshOrder.empty()&&(collisions.resolve({0,1})->flags&8),
+            "update-disabled collision leaves dirty caches untouched and uses current sampling position");
+        require(collide(true,masks)&&!hit&&refreshOrder==std::vector<unsigned>({0}),
+            "updated separated pair fails broad phase");
+        require(collisions.move({0,1},{},{},0x30),"restore blood position");
+        visuals[1].spriteId=84;visuals[1].imageIndex.bits=0x7f800000;
+        require(refresh({1,1},true),"refresh second rectangular resource");
+        downwell::SpriteMaskPack unavailable(nullptr,0);
+        require(collide(true,unavailable)&&hit,"rectangular pair requires neither mask pixels nor image-index conversion");
+        visuals[1].maskId=597;visuals[1].imageIndex={};
+        require(refresh({1,1},true)&&collide(true,masks)&&hit,"explicit precise mask selects stored pixels despite rectangular art");
+        require(collisions.setExclusions({1,1},2),"set source flag 2");
+        require(collide(true,masks)&&hit,"direct pair gate excludes 0x100001, unlike query candidate gate 0x100003");
+        require(collisions.setExclusions({1,1},1),"exclude candidate");
+        refreshOrder.clear();
+        require(collide(true,unavailable)&&!hit&&refreshOrder.empty(),"excluded pair returns before refresh/resource reads");
+        require(collisions.setExclusions({1,1},0),"restore eligibility");
+        visuals[1].maskId=9999;
+        require(collide(true,masks)&&!hit,"invalid explicit mask does not fall back in pair dispatch");
+        visuals[1].maskId=597;hit=true;
+        require(!collide(true,unavailable)&&!collisions.valid()&&hit,"missing mask payload fails owner without returning a false miss");
+    }
     using Owner=downwell::RunnerSpatialInstances<2,4>;
     Owner owner;
     require(owner.attach({0,1},0,{}),"attach metadata-backed collision instance");
@@ -96,7 +159,10 @@ void testGeneratedPack(const char* path) {
     visual.maskId=9999;visual.angle.bits=0x7f800000;
     require(owner.refreshSprite({0,3},0x30,false,compact,visual,true,noTrig,round,true),
         "missing resource resolves before angle or special-state processing");
-    visual.maskId=-1;visual.angle={};
+    visual.maskId=84;visual.angle={};
+    require(owner.refreshSprite({0,3},0x30,false,compact,visual,true,noTrig,round,true),
+        "explicit ordinary mask can override special artwork state");
+    visual.maskId=-1;
     require(!owner.refreshSprite({0,3},0x30,false,compact,visual,true,noTrig,round,true)&&!owner.valid(),
         "resolved special state cannot silently use ordinary sprite bounds");
     owner.clear();require(owner.attach({0,4},0,{}),"attach fractional bounds case");
@@ -179,7 +245,8 @@ void testGeneratedPack(const char* path) {
 
 int main(int argc, char** argv) {
     testBasicValidation();
-    if (argc == 2) testGeneratedPack(argv[1]);
+    require(argc==3,"sprite and collision-mask pack paths required");
+    testGeneratedPack(argv[1],argv[2]);
     std::cout << "sprite pack tests passed\n";
     return 0;
 }

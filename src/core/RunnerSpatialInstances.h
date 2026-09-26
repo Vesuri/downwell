@@ -8,6 +8,7 @@
 #include "RunnerPlaceQuery.h"
 #include "RunnerSpriteBounds.h"
 #include "SpriteCollisionPack.h"
+#include "RunnerMaskPair.h"
 namespace downwell {
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,
@@ -30,7 +31,7 @@ public:
     struct Result {bool found=false;InstanceHandle handle{};};
     struct Sprite {
         std::int32_t spriteId=-1,maskId=-1;
-        Real scaleX{0x3f800000},scaleY{0x3f800000},angle{};
+        Real scaleX{0x3f800000},scaleY{0x3f800000},angle{},imageIndex{};
     };
     bool valid()const{return good_ && index_.valid();}
     // Clear retires memberships but preserves generation high-water marks.
@@ -102,13 +103,61 @@ public:
         if(!pack.collisionSprite(sprite.spriteId,sprite.maskId,resource))
             return refresh(h,objectFlags,allPrepared,nullptr,false,publish);
         const auto& s=entries_[h.slot].state;
-        if(s.special||!Math::valid(sprite.angle))return checked(false);
+        if((s.special&&sprite.maskId<0)||!Math::valid(sprite.angle))return checked(false);
         const bool rotated=(sprite.angle.bits&0x7fffffffu)!=0;
         Real cosine{},sine{};Box bounds;
         if(rotated&&!trig(sprite.angle,cosine,sine))return checked(false);
         if(!RunnerSpriteBounds::fromSprite(resource,s.x,s.y,sprite.scaleX,sprite.scaleY,
             rotated,cosine,sine,compatibility,round,bounds))return checked(false);
         return refresh(h,objectFlags,allPrepared,&bounds,resource.collisionMode==1,publish);
+    }
+    // Ordinary compatibility-mode branch of 0x464d30. refreshBounds(handle,
+    // publish) must resolve that handle's current sprite properties. The other
+    // instance refreshes FIRST, and update=false suppresses both lazy refreshes.
+    // Non-compatibility and special-resource dispatch are not approximated here.
+    template<class Refresh,class Trig,class Round>
+    bool collideCompatibility(InstanceHandle self,InstanceHandle other,
+        const Sprite& a,const Sprite& b,const SpriteCollisionPack& sprites,
+        const SpriteMaskPack& masks,const RunnerMaskDispatch& dispatch,bool publish,
+        Refresh refreshBounds,Trig inverseTrig,Round round,bool& hit){
+        if(!valid()||!live(self)||!live(other))return false;
+        auto& first=entries_[self.slot].state;auto& second=entries_[other.slot].state;
+        if(self.slot==other.slot || ((first.flags|second.flags)&0x100001u)){hit=false;return true;}
+        if((first.special&&a.maskId<0)||(second.special&&b.maskId<0))return checked(false);
+        if(publish){
+            if((second.flags&8u)&&!checked(refreshBounds(other,true)))return false;
+            if((first.flags&8u)&&!checked(refreshBounds(self,true)))return false;
+        }
+        // Compatibility mode adds binary32 1 to each inclusive far edge and
+        // uses a strict comparison. Do not replace this with integer overlap.
+        const Real near[]={second.bounds.left,first.bounds.left,second.bounds.top,first.bounds.top};
+        const Real far[]={first.bounds.right,second.bounds.right,first.bounds.bottom,second.bounds.bottom};
+        for(unsigned i=0;i<4;++i){
+            Real upper;
+            if(!Math::valid(near[i])||!Math::valid(far[i])||
+                !Math::sub(far[i],Real{0xbf800000},upper))return checked(false);
+            if(!Math::less(near[i],upper)){hit=false;return true;}
+        }
+        if(!sprites.valid())return checked(false);
+        PackedSpriteCollision resources[2];
+        if(!sprites.collisionSprite(a.spriteId,a.maskId,resources[0])||!resources[0].frameCount||
+           !sprites.collisionSprite(b.spriteId,b.maskId,resources[1])||!resources[1].frameCount){hit=false;return true;}
+        if(!resources[0].collisionMode&&!resources[1].collisionMode){hit=true;return true;}
+        if(!masks.valid())return checked(false);
+        const Sprite* visuals[]={&a,&b};const State* states[]={&first,&second};
+        RunnerMaskPair::Shape shapes[2];
+        for(unsigned i=0;i<2;++i){
+            const auto& v=*visuals[i];const auto& s=*states[i];const auto& r=resources[i];
+            unsigned frame;
+            if(!RunnerMaskPair::storedFrame(v.imageIndex,r.collisionMaskCount,frame)||
+                !masks.mask(unsigned(v.maskId<0?v.spriteId:v.maskId),frame,shapes[i].mask))return checked(false);
+            shapes[i].x=s.x;shapes[i].y=s.y;shapes[i].bounds=s.bounds;
+            shapes[i].transform={v.scaleX,v.scaleY,v.angle};
+            shapes[i].originX=r.originX;shapes[i].originY=r.originY;shapes[i].frameCount=r.frameCount;
+        }
+        RunnerMaskPair::Result result;
+        if(!checked(RunnerMaskPair::test(shapes[0],shapes[1],dispatch,inverseTrig,round,result)))return false;
+        hit=result.hit;return true;
     }
     // 0x501f70: remove old bounds (retry at root), clear indexed flag, then
     // unlink both dirty memberships. Missing resources may have changed the

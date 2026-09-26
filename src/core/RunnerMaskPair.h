@@ -21,6 +21,13 @@ struct RunnerMaskPair {
     // The runner returns only hit. First pixel is retained here for testing the
     // source's X-outer/Y-inner scan and diagnosing divergent mask coordinates.
     struct Result {bool hit=false;int x=0,y=0;};
+    static bool storedFrame(Real imageIndex,unsigned count,unsigned& result){
+        if(!Math::valid(imageIndex)||!count||count>0x7fffffffu)return false;
+        int frame;
+        if(!truncate(imageIndex,frame))return false;
+        const int remainder=frame%int(count);
+        result=unsigned(remainder<0?remainder+int(count):remainder);return true;
+    }
     // inverseTrig(degrees,c,s) must supply source-narrowed inverse-rotation
     // cosine/sine. round implements the source's integer position rounding.
     // Unsupported arithmetic/assets leave result unchanged, never a false hit.

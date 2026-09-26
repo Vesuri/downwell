@@ -63,6 +63,14 @@ int main(int argc,char** argv){
     SpriteCollisionPack sprites(spriteBytes.data(),spriteBytes.size());
     assert(masks.valid()&&sprites.valid());
     RunnerMaskDispatch dispatch;
+    for(int integer=-17;integer<=17;++integer)for(unsigned count=1;count<=8;++count){
+        unsigned frame=99;const float image=float(integer)+(integer<0?-0.75f:0.75f);
+        assert(Pair::storedFrame(bits(image),count,frame));
+        assert(frame==unsigned((integer%int(count)+int(count))%int(count)));
+    }
+    unsigned unchanged=99;
+    assert(!Pair::storedFrame({},0,unchanged)&&unchanged==99);
+    assert(!Pair::storedFrame({0x7f800000},1,unchanged)&&unchanged==99);
     unsigned paths[3]={},hits=0,misses=0;
     for(unsigned i=0;i<4446;++i){
         Pair::Shape a,b;

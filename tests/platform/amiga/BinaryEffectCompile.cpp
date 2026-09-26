@@ -55,6 +55,15 @@ bool compileSpatialSpriteRefresh(downwell::RunnerSpatialInstances<64,64>& owner,
         [&](auto,auto& c,auto& s){c=cosine;s=sine;return true;},
         [](auto value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},true);
 }
+bool compileOwnedCollision(downwell::RunnerSpatialInstances<64,64>& owner,
+    const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks,
+    const downwell::RunnerSpatialInstances<64,64>::Sprite* visuals,bool& hit){
+    auto trig=[](auto,auto& c,auto& s){c={0x3f800000};s={};return true;};
+    auto round=[](auto value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);};
+    return owner.collideCompatibility({0,1},{1,1},visuals[0],visuals[1],sprites,masks,{},true,
+        [&](auto h,bool publish){return owner.refreshSprite(h,0x30,false,sprites,visuals[h.slot],true,trig,round,publish);},
+        trig,round,hit);
+}
 bool compilePlaceQuery(downwell::RunnerImageValue& x,downwell::RunnerImageValue& y,
     std::uint32_t& flags,downwell::RunnerPlaceQuery::Box& box,downwell::RunnerPlaceQuery::Result& result){
     using Query=downwell::RunnerPlaceQuery;
