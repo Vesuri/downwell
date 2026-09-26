@@ -3,8 +3,8 @@
 
 namespace downwell {
 
-// Transitional arithmetic adapters. Rules below are shared; ultimately both
-// callers should store the same fixed-point state, removing FloatPlayerMath.
+// Transitional arithmetic adapters. Rules below are shared; neither adapter
+// establishes the original VM's binary64 storage/rounding semantics.
 struct FixedPlayerMath {
     using Number = long;
     static constexpr Number ratio(int numerator, int denominator = 1) {
@@ -36,22 +36,22 @@ void applyPlayerHorizontalInput(typename Math::Number& speed, int& facing,
         if (left) {
             speed -= acceleration;
             if (speed > 0) speed -= turnBoost;
+            if (speed < -maximum) speed = -maximum;
         } else {
             speed += acceleration;
             if (speed < 0) speed += turnBoost;
+            if (speed > maximum) speed = maximum;
         }
         facing = left ? -1 : 1;
-        if (speed < -maximum) speed = -maximum;
-        if (speed > maximum) speed = maximum;
     } else if (left && right) {
         speed = 0;
         facing = 1; // source right branch executes last
-    } else if (speed < 0) {
-        speed += friction;
-        if (speed > -threshold) speed = 0;
-    } else if (speed > 0) {
-        speed -= friction;
-        if (speed < threshold) speed = 0;
+    } else {
+        // scrPlMovement blocks 77..80: subtract sign(xsp)*friction, then
+        // test abs(new xsp). Crossing zero alone does not stop movement.
+        if (speed < 0) speed += friction;
+        else if (speed > 0) speed -= friction;
+        if (speed > -threshold && speed < threshold) speed = 0;
     }
 }
 } // namespace downwell

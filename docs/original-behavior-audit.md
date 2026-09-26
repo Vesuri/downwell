@@ -11,6 +11,24 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 VM-backed registration, latch/release and collision-phase camera snaps on both
 adapters, plus the remaining original-runner and achievement caveats.
 
+## Horizontal control arithmetic
+
+`scrPlMovement`'s non-water living-player path applies left and right input
+in that order, then forces zero speed when both are held. Each acceleration
+branch clamps only in its input direction; an opposite-directed external
+impulse is not capped by that branch. With neither key held, VM blocks 77–80
+subtract `sign(xsp)` times ground/air friction and then test `abs(xsp) < 0.3`.
+Do not replace this with a sign-crossing test: sufficiently small grounded
+speed reverses and remains nonzero after friction.
+
+The audited UTMT assembly `gml_GlobalScript_scrPlMovement.asm` has SHA-256
+`3ff0e28b9dcef221ed9dd6a1ceb801bef746d7538016547fbe49a60af0177644`.
+`PlayerControlsTest` compares branch behavior against a direct source-order
+transcription over grounded/airborne, both input bits and control-lock states.
+Its fixed/float cases verify rules within each arithmetic adapter; they do
+not establish VM binary64 storage fidelity, water behavior, wall feedback or
+the complete movement script. Those remain governed by the single work queue.
+
 ## Cavern level-dependent enemy spawning
 
 `gml_GlobalScript_builderCavern.asm`, blocks 12–38, consumes
