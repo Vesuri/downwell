@@ -514,7 +514,7 @@ void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm)
 
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
-    if (run_.levelClearActive || !run_.effectsSucceeded) return {}; // Result owner uses stepLevelClear.
+    if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
     // Only valid unit-sequence state is admitted through the effect owner.
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();
@@ -663,6 +663,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                                               : -(int)((-bottom) / 256);
         generationSucceeded_ = generationStep_(generationContext_, *this,
                                                enemyRandom_, bottomCeiling);
+        if (!generationSucceeded_) return {};
     }
 
     /*

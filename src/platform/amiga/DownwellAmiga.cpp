@@ -2374,7 +2374,7 @@ int main(void) {
             }
 #endif
             if (!port.effectsSucceeded()) { exitCode=20; break; }
-            if (!port.generationSucceeded()) break;
+            if (!port.generationSucceeded()) { exitCode=20; break; }
 #ifndef DOWNWELL_REPLAY_VERIFY
             // Invalidate before selecting a precomposed side-room ring.
             invalidateShopRaster(port.shops());

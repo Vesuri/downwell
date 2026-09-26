@@ -17,6 +17,31 @@ static PlayerDamageNumber snapshot(const PlayerDamageNumbers<8>& owner){
 }
 int main(){
     {
+        // Inject failure at the synchronous generation boundary. Earlier
+        // creation is retained, but bullets and later phases must not advance.
+        GameplayWorld encounter(0,true,0,false);
+        for(unsigned tick=0;tick<100 && !encounter.bulletCount();++tick)
+            encounter.step(tick%10<5?4:0);
+        assert(encounter.bulletCount()>0);
+        struct Failure { unsigned calls=0; int bulletY=0; } failure;
+        encounter.configureGenerationStep([](void* context,GameplayWorld& world,GameMakerRandom&,int){
+            auto& state=*static_cast<Failure*>(context);
+            ++state.calls;
+            state.bulletY=world.bulletAt(0).y;
+            assert(world.configureEnemy(0,116,153,1,0,0,0,15,0));
+            return false;
+        },&failure);
+        encounter.step(0);
+        assert(!encounter.generationSucceeded() && failure.calls==1);
+        assert(encounter.enemyCount()==1 && encounter.enemyAt(0).active);
+        assert(encounter.bulletAt(0).y==failure.bulletY);
+        assert(encounter.health()==4); // No later contact with the created bat.
+        const auto stoppedTick=encounter.tick();
+        encounter.step(4);
+        assert(encounter.tick()==stoppedTick && failure.calls==1);
+        assert(encounter.bulletAt(0).y==failure.bulletY);
+    }
+    {
         // Capacity fault fixture: retain emitted shots outside all collision
         // geometry and refill ammo. This is not a natural combat replay.
         GameplayWorld encounter(0,true,0,false);

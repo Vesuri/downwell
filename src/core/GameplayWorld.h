@@ -71,7 +71,8 @@ public:
     using WallContactResolver = bool (*)(void*,const downwell::ContactBounds&,unsigned&);
     // Called once after existing alarms and camera Step, before bullets and
     // enemy motion. Receives the shared RNG and ceil(world-space view bottom).
-    // A false return latches generationSucceeded() until explicitly rebound.
+    // A false return stops this frame and future steps until explicitly rebound;
+    // completed Create effects are retained, not rolled back.
     using GenerationStep = bool (*)(void*, GameplayWorld&,
                                     downwell::GameMakerRandom&, int);
     void configureGenerationStep(GenerationStep step, void* context) {
