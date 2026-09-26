@@ -56,6 +56,18 @@ int main(){
         assert(encounter.enemyAt(1).active&&encounter.enemyAt(1).health==15);
         assert(encounter.enemiesDefeated()==0&&encounter.player().speedYFixed()>=0);
     }
+    {
+        GameplayWorld encounter(0,false,10000,false);
+        assert(encounter.configureEnemy(0,116,153,0,12,0,0,1,
+            int(GameplayWorld::gemCapacity+1)*10));
+        assert(encounter.configureEnemy(1,116,153,0,12,0,0,1,0));
+        encounter.step(4); // Replay fire bit; first shot's segment reaches y=12.
+        assert(!encounter.effectsSucceeded()&&encounter.gemCount()==GameplayWorld::gemCapacity);
+        assert(encounter.enemyAt(0).active&&encounter.enemyAt(0).health==-8);
+        assert(encounter.enemyAt(1).active&&encounter.enemyAt(1).health==1);
+        assert(encounter.enemiesDefeated()==0&&encounter.bulletCount()==1);
+        assert(encounter.bulletAt(0).y==4&&encounter.bulletAt(0).trajectory.y.pixel==4);
+    }
     GameplayWorld target(0,true,0,false);bool born=false;
     target.configureGenerationStep([](void* context,GameplayWorld& world,GameMakerRandom&,int){
         auto& born=*static_cast<bool*>(context);
@@ -69,6 +81,35 @@ int main(){
     RoomPack roomPack(rooms.data(),rooms.size());ObjectPack objectPack(objects.data(),objects.size());
     BuilderPatternPack builderPack(patterns.data(),patterns.size());
     assert(roomPack.valid()&&objectPack.valid()&&builderPack.valid());
+    {
+        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
+        encounter.skipToGameForTesting();Input fire{};fire.fire=true;
+        InstanceRecord* victim=nullptr;
+        for(unsigned tick=0;tick<6000&&(!victim||!encounter.mainBulletCount());++tick){
+            fire.right=(tick/90)%2==0;fire.left=!fire.right;fire.fire=tick%10<5;
+            if(encounter.mainPlayerY()<1264){fire.left=encounter.mainPlayerX()>242;fire.right=encounter.mainPlayerX()<238;}
+            encounter.step(fire,false);victim=nullptr;
+            for(unsigned i=0;i<encounter.activeInstanceCount();++i){
+                const int object=encounter.instanceAt(i).objectId;
+                if(object==111||object==113||object==116||object==117||object==119){
+                    victim=&const_cast<InstanceRecord&>(encounter.instanceAt(i));break;
+                }
+            }
+        }
+        assert(victim&&encounter.mainBulletCount());
+        // Capacity fault injection at the next real projectile segment, not
+        // an original-game encounter fixture or a replacement actor definition.
+        const auto before=encounter.mainBulletAt(0);
+        victim->x=int(before.x);victim->y=int(before.y)+4;
+        victim->preciseX=float(victim->x);victim->preciseY=float(victim->y);
+        victim->active=true;victim->activationPending=false;victim->health=1;
+        victim->reward=int(StartupRuntime::mainCurrencyCapacity+1)*10;
+        const auto defeats=encounter.mainEnemiesDefeated();
+        encounter.step(fire,false);
+        assert(!encounter.effectsSucceeded()&&encounter.mainCurrencyCount()==StartupRuntime::mainCurrencyCapacity);
+        assert(victim->active&&victim->health==-8&&encounter.mainEnemiesDefeated()==defeats);
+        assert(encounter.mainBulletCount()&&encounter.mainBulletAt(0).y==before.y);
+    }
     StartupRuntime host(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
     host.skipToGameForTesting();assert(host.inMainRoom()&&host.roomLoadSucceeded());
     {

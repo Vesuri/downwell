@@ -36,8 +36,16 @@ immediate enemy retirement, defeat count and player bounce. A failed reward
 retains prior combo changes and partial gem births, but stops contact traversal
 and publication. Both worlds stop before entering that pass if an earlier
 effect failed. This does not validate the adapter's immediate-retirement
-approximation against the original later enemy death Step, nor cover the
-separate bullet-impact path.
+approximation against the original later enemy death Step.
+
+Bullet impacts similarly return an explicit failed result after unsuccessful
+reward creation, retaining prior damage and hit state without counting defeat
+or retiring the enemy. Checked projectile dispatch distinguishes failure from
+ordinary shot consumption: retain completed animation/initialization, but stop
+before later collision queries, motion, position publication and retirement.
+SDL compaction preserves the failed shot and untouched tail along with prior
+successful retirements. Both worlds stop before later actors after failure.
+These capacity-fault contracts do not establish original collision/death timing.
 
 | Source call | Owned objects / side effects required |
 | --- | --- |

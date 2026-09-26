@@ -54,7 +54,7 @@ int main() {
             }
         } random;
         unsigned defeated = 0, rewards = 0;
-        const auto reward = [&] { ++rewards; };
+        const auto reward = [&] { ++rewards; return true; };
         for (int object : {113, 116, 117}) {
             enemy = Enemy{}; enemy.objectId = object;
             auto impact = applyStandardBulletImpact(enemy, defeated, random, reward);
@@ -92,6 +92,12 @@ int main() {
         require(enemy.health == 6 && enemy.batHit.pendingDirection == 271 &&
                     enemy.batHit.pendingFraction == 26624,
                 "surviving live impact queues the supplied spread-adjusted direction");
+        enemy.health=1;
+        const auto oldDefeated=defeated;
+        const auto failed=applyStandardBulletImpact(enemy,defeated,random,[]{return false;});
+        require(failed.kind==BulletImpactKind::failed&&failed.sound==-1&&enemy.active&&
+            enemy.health==-8&&defeated==oldDefeated,
+            "failed bullet reward retains damage but does not retire, count defeat or publish sound");
     }
     {
         struct PlayerProbe {

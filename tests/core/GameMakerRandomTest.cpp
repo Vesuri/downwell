@@ -153,7 +153,7 @@ void testRicochetChoice() {
     unsigned defeated = 0, rewards = 0;
     for (unsigned shot = 0; shot < 1024; ++shot) {
         const int sound = 30 + reference.nextU32() % 2;
-        const auto impact = downwell::applyStandardBulletImpact(enemy, defeated, actual, [&] { ++rewards; });
+        const auto impact = downwell::applyStandardBulletImpact(enemy, defeated, actual, [&] { ++rewards; return true; });
         require(impact.sound == sound && impact.kind == downwell::BulletImpactKind::immune &&
                 actual.drawCount() == shot + 1 && enemy.health == 15 && !defeated && !rewards,
                 "immune impacts choose one sound with one word and no damage/reward");

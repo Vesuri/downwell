@@ -79,6 +79,31 @@ int main() {
                     "later updates preserve initialization RNG and advance animation through expiry");
         }
     }
+    for(unsigned failure=0;failure<3;++failure){
+        struct Bullet {
+            int x=-1,y=-1;
+            downwell::ProjectileAnimation animation;
+            downwell::MachineGunTrajectory trajectory;
+        } bullet;
+        bullet.trajectory.reset(20,10);
+        Random rng;bool healthy=failure!=0,alive=true;
+        unsigned enemies=0,walls=0;
+        require(!downwell::stepMachineGunProjectileChecked(bullet,rng,
+            [&](const auto&){++enemies;if(failure==1)healthy=false;return false;},
+            [&](const auto&){++walls;healthy=false;return true;},
+            alive,[&]{return healthy;},0,0),"checked projectile reports terminal callback failure");
+        require(alive&&bullet.x==-1&&bullet.y==-1&&bullet.trajectory.y.pixel==10,
+            "failed projectile does not publish alive state, position, movement or expiry");
+        require(enemies==(failure?1u:0u)&&walls==(failure==2?1u:0u)&&rng.draws==(failure?1u:0u),
+            "failure preserves completed initialization and forbids later queries");
+        downwell::ProjectileAnimation expected;if(failure)expected.advance();
+        require(bullet.animation.index.equal(expected.index),"completed animation is retained without rollback");
+        require(!downwell::stepMachineGunProjectileChecked(bullet,rng,
+            [&](const auto&){require(false,"failed projectile retried enemy query");return false;},
+            [&](const auto&){require(false,"failed projectile retried wall query");return false;},
+            alive,[&]{return healthy;},0,0)&&bullet.animation.index.equal(expected.index),
+            "failed owner cannot retry projectile initialization or animation");
+    }
     downwell::MachineGunTrajectory motion; motion.reset(20,10);
     unsigned wallQueries = 0;
     require(!downwell::stepMachineGunBullet(motion, random,

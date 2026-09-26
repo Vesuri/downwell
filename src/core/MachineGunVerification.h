@@ -78,7 +78,7 @@ inline MachineGunVerificationResult verifyMachineGun() {
                     FrogHitState frogHit;
                     SnailHitState snailHit;
                 } enemy;
-                const auto impact = applyStandardBulletImpact(enemy, defeated, random, [] {}, shot.high,
+                const auto impact = applyStandardBulletImpact(enemy, defeated, random, [] {return true;}, shot.high,
                                                               shot.trajectory.direction);
                 correct &= impact.kind == BulletImpactKind::damaged &&
                     enemy.health == (shot.high ? 25 : 31) && enemy.batHit.pending;

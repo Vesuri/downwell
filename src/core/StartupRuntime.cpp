@@ -405,6 +405,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if (roomId_ == mainRoomId) {
         run_.exitDither.step(mainCameraRenderViewY(), surfaceHeight);
         updateMainBullets();
+        if(!run_.effectsSucceeded)return;
         updateMainEnemies();
         run_.stepSmoke(smokeStepPhase,random_);
         run_.collideSmokeWalls([&](const ContactBounds& query,auto emit){
@@ -668,7 +669,8 @@ void StartupRuntime::updateMainBullets() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
-        const bool alive = stepMachineGunProjectile(bullet, random_,
+        bool alive=false;
+        const bool succeeded=stepMachineGunProjectileChecked(bullet, random_,
           [this, &bullet](const ProjectileSegment& path) {
             InstanceRecord* enemy = mainBulletEnemyCollision(path);
             if (enemy != nullptr) {
@@ -678,8 +680,10 @@ void StartupRuntime::updateMainBullets() {
                         spawnMainCurrency(static_cast<float>(enemy->x),
                                           static_cast<float>(enemy->y),
                                           enemy->reward);
+                        return run_.effectsSucceeded;
                     }, bullet.gemHigh, bullet.trajectory.direction);
                 if (impact.kind == BulletImpactKind::ignored) return false;
+                if (impact.kind == BulletImpactKind::failed) return true;
                 ++soundPlayRequests_;
                 return true;
             }
@@ -697,7 +701,14 @@ void StartupRuntime::updateMainBullets() {
                 return true;
             }
             return false;
-          }, 0, mainCameraMotion_.viewTopQ12(), surfaceHeight);
+          },alive,[this]{return run_.effectsSucceeded;},0,mainCameraMotion_.viewTopQ12(),surfaceHeight);
+        if(!succeeded){
+            // Keep the failed shot's completed initialization and all untouched
+            // later shots, while retaining earlier successful retirements.
+            mainBullets_[write++]=bullet;
+            for(std::size_t next=index+1;next<mainBulletCount_;++next)mainBullets_[write++]=mainBullets_[next];
+            mainBulletCount_=write;return;
+        }
         if (alive)
             mainBullets_[write++] = bullet;
     }

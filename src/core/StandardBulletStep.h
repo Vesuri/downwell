@@ -31,27 +31,48 @@ inline bool fractionalBulletOutsideView(MachineGunTrajectory::Coordinate y,
 // The adapters retain their current enemy-first impact scheduling. This
 // shares the source's first-Step initialization, full segment query and
 // retained fractional movement; it is not a full VM collision-event scheduler.
-template<class Random, class Enemy, class Wall>
-bool stepMachineGunBullet(MachineGunTrajectory& motion, Random& random,
-                         Enemy enemy, Wall wall) {
+// Healthy observes terminal callback failure, separately from a consumed shot.
+// On failure leave alive untouched and retain only work already completed.
+template<class Random,class Enemy,class Wall,class Healthy>
+bool stepMachineGunBulletChecked(MachineGunTrajectory& motion,Random& random,
+    Enemy enemy,Wall wall,bool& alive,Healthy healthy) {
+    if(!healthy())return false;
     motion.initialize(random);
     const ProjectileSegment path(motion);
-    const bool alive = !enemy(path) && !wall(path);
+    bool consumed=enemy(path);
+    if(!healthy())return false;
+    if(!consumed){consumed=wall(path);if(!healthy())return false;}
     motion.advance();
+    alive=!consumed;return true;
+}
+template<class Random,class Enemy,class Wall>
+bool stepMachineGunBullet(MachineGunTrajectory& motion,Random& random,Enemy enemy,Wall wall){
+    bool alive=false;
+    stepMachineGunBulletChecked(motion,random,enemy,wall,alive,[]{return true;});
     return alive;
 }
 
 // Complete implemented projectile update. Storage adapters supply collision
 // queries and their world origin, not a second animation/motion/expiry order.
 // Consumed shots still finish this update; owners retire/compact them afterward.
-template<class Bullet, class Random, class Enemy, class Wall>
-bool stepMachineGunProjectile(Bullet& bullet, Random& random, Enemy enemy, Wall wall,
-                             int originY, long viewTopQ12, int viewHeight = 284) {
+template<class Bullet,class Random,class Enemy,class Wall,class Healthy>
+bool stepMachineGunProjectileChecked(Bullet& bullet,Random& random,Enemy enemy,Wall wall,
+    bool& alive,Healthy healthy,int originY,long viewTopQ12,int viewHeight=284){
+    if(!healthy())return false;
     bullet.animation.advance();
-    const bool alive = stepMachineGunBullet(bullet.trajectory, random, enemy, wall);
+    bool moving=false;
+    if(!stepMachineGunBulletChecked(bullet.trajectory,random,enemy,wall,moving,healthy))return false;
     bullet.x = bullet.trajectory.x.pixel;
     bullet.y = bullet.trajectory.y.pixel;
-    return !fractionalBulletOutsideView(bullet.trajectory.y, originY, viewTopQ12, viewHeight) && alive;
+    alive=!fractionalBulletOutsideView(bullet.trajectory.y,originY,viewTopQ12,viewHeight)&&moving;
+    return true;
+}
+template<class Bullet,class Random,class Enemy,class Wall>
+bool stepMachineGunProjectile(Bullet& bullet,Random& random,Enemy enemy,Wall wall,
+    int originY,long viewTopQ12,int viewHeight=284){
+    bool alive=false;
+    stepMachineGunProjectileChecked(bullet,random,enemy,wall,alive,[]{return true;},originY,viewTopQ12,viewHeight);
+    return alive;
 }
 
 // Vertical usual-gun subset. scrBulCheckSolid suppresses wall processing

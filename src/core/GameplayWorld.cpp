@@ -680,7 +680,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 continue;
             bulletChanged = true;
             const long cameraCentreQ12 = 176L * 4096 + viewCameraYQ8() * 16;
-            bullet.active = downwell::stepMachineGunProjectile(bullet, enemyRandom_,
+            bool alive=false;
+            if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
                 [this, &bullet](const downwell::ProjectileSegment& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
                         EnemyState& enemy = enemies_[enemyIndex];
@@ -694,7 +695,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                             continue;
                         const auto impact = downwell::applyStandardBulletImpact(
                             enemy, enemiesDefeated_, enemyRandom_,
-                            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); },
+                            [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); return run_.effectsSucceeded; },
                             bullet.gemHigh, bullet.trajectory.direction);
                         return impact.kind != downwell::BulletImpactKind::ignored;
                     }
@@ -750,7 +751,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                                     return true;
                     }
                     return false;
-                }, 176, cameraCentreQ12 - 142L * 4096);
+                },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096))return {};
+            bullet.active=alive;
         }
     }
 

@@ -3,7 +3,7 @@
 #include "MachineGunProfile.h"
 #include <cstdint>
 namespace downwell {
-enum class BulletImpactKind { ignored, immune, damaged, defeated };
+enum class BulletImpactKind { ignored, immune, damaged, defeated, failed };
 struct BulletImpact { BulletImpactKind kind; int sound; };
 
 // Implemented machine gun: non-piercing, nine/fifteen damage, retained direction.
@@ -27,7 +27,7 @@ BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
     if (enemy.objectId == 116) enemy.batHit.queueTurns(directionTurns);
     enemy.health -= machineGunProfile(gemHigh).damage;
     if (enemy.health > 0) return {BulletImpactKind::damaged, 29};
-    reward();
+    if(!reward())return {BulletImpactKind::failed,-1};
     enemy.active = false;
     ++defeated;
     return {BulletImpactKind::defeated, 29};
