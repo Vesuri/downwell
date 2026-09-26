@@ -222,6 +222,13 @@ struct RunSession {
             [&](int x,int y){return createTimeField(x,y,random);});
         return effectsSucceeded;
     }
+    void advanceFlashAnimation(){
+        if(effectsSucceeded)effectsSucceeded=flashEffects.advanceAnimation(flashEffects.beginAnimation());
+    }
+    bool emitFlashBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
+        if(effectsSucceeded)effectsSucceeded=flashEffects.skeletonBurst(x,y,random);
+        return effectsSucceeded;
+    }
     void advanceBloodAnimation(){
         if(effectsSucceeded)effectsSucceeded=bloodEffects.advanceAnimation(bloodEffects.beginPhase());
     }

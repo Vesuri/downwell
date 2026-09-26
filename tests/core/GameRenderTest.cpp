@@ -420,6 +420,21 @@ int main() {
         }
     }
     {
+        auto failedStorage=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
+        auto& failedGame=*failedStorage;
+        auto& failedRuntime=const_cast<downwell::StartupRuntime&>(failedGame.startup());
+        failedRuntime.skipToGameForTesting();
+        unsigned bursts=0;
+        while(failedRuntime.emitFlashBurst({},{}))require(++bursts<9,"bounded flash capacity fixture");
+        const auto draws=failedRuntime.randomDrawCount(),tick=failedGame.tick();
+        failedGame.update({});
+        require(failedGame.finished()&&!failedGame.simulationSucceeded(),"host reports simulation failure separately from ordinary quit");
+        require(failedRuntime.randomDrawCount()==draws&&failedGame.tick()==tick,"failed update does not continue simulation");
+        failedRuntime.reset(downwell::PlatformProfile::desktop);
+        failedGame.update({});
+        require(!failedGame.simulationSucceeded()&&failedGame.tick()==tick,"Game failure is terminal even if inner runtime is reset");
+    }
+    {
         auto flashStorage = std::make_unique<downwell::Game>(&rooms,&objects,&builders);
         auto& flashGame = *flashStorage;
         auto& runtime=const_cast<downwell::StartupRuntime&>(flashGame.startup());

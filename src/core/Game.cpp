@@ -87,21 +87,28 @@ Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
 }
 
 void Game::update(const Input& input, std::uint32_t restartSeed) {
+    const auto failed=[&] {
+        if(simulationSucceeded_ && startup_.effectsSucceeded())return false;
+        simulationSucceeded_=false;finished_=true;return true;
+    };
+    if(failed())return;
     finished_ = finished_ || input.quit;
     if (startup_.levelClearActive()) {
         bool confirm = input.fire;
         startup_.stepLevelClear(confirm, input.left && !left_, input.right && !right_, heartGoal_,
             [](LevelClearSelection::Effect, unsigned) {});
+        if(failed())return;
         if (startup_.nextLevelRequested()) {
             startup_.loadNextAreaOneLevel(input);
             if (!startup_.roomLoadSucceeded()) finished_ = true;
         }
     } else {
         startup_.step(input, input.fire && !fire_);
+        if(failed())return;
         if (startup_.levelResultRequested())
             startup_.enterLevelClear(startup_.playStyle(), heartGoal_);
     }
-    if(!startup_.effectsSucceeded())finished_=true;
+    if(failed())return;
     const auto action = startup_.deathResults().inputEffects.action;
     if (action != DeathMenuSequence::Action::None &&
         !startup_.restartFromResults(action, restartSeed)) finished_ = true;

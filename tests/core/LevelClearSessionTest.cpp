@@ -7,6 +7,25 @@ static void require(bool ok, const char* why) {
 int main() {
     using namespace downwell;
     {
+        RunSession run;GameMakerRandom random(84);
+        for(unsigned i=0;i<31;++i)require(run.flashEffects.create({}, {},random)!=0,"flash capacity fixture");
+        auto oracle=run.flashEffects;auto expectedRandom=random;
+        require(!oracle.skeletonBurst({}, {},expectedRandom),"partial flash burst reaches capacity");
+        require(!run.emitFlashBurst({}, {},random)&&!run.effectsSucceeded,"flash burst failure latches session");
+        require(run.flashEffects.birthSequence().next==33,"successful partial flash birth remains");
+        require(random.drawCount()==expectedRandom.drawCount(),"partial flash RNG retained");
+        for(unsigned i=0;i<16;++i)require(random.stateWord(i)==expectedRandom.stateWord(i),"partial flash RNG state");
+        require(!run.emitFlashBurst({}, {},random)&&random.drawCount()==expectedRandom.drawCount(),"failed flash burst is not retried");
+        run.advanceFlashAnimation();
+        for(unsigned i=0;i<32;++i)require(run.flashEffects.slot(i).effect.timeline.bits==0x3f800000u,"failed session does not animate flashes");
+        run.reset();require(run.effectsSucceeded,"reset clears session failure");
+        require(run.emitFlashBurst({}, {},random),"flash creation resumes after reset");
+        // Fault injection tests propagation, not an original-game numeric input.
+        auto& damaged=const_cast<FlashBallEffect&>(run.flashEffects.slot(0).effect);
+        damaged.timeline.bits=0x7f800000u;
+        run.advanceFlashAnimation();require(!run.effectsSucceeded,"unsupported flash animation latches failure");
+    }
+    {
         RunSession run;
         auto create=[&](){return run.createDamageNumber(MotionBinary64::fromInteger(240),
             MotionBinary64::fromInteger(500),MotionBinary64::fromInteger(1),{});};

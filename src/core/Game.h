@@ -26,6 +26,7 @@ public:
     void render(Renderer& renderer) const;
     bool finished() const { return finished_; }
     bool renderingSucceeded() const { return renderingSucceeded_; }
+    bool simulationSucceeded() const { return simulationSucceeded_; }
     std::uint64_t tick() const { return tick_; }
     const StartupRuntime& startup() const { return startup_; }
 
@@ -45,6 +46,7 @@ private:
     bool fire_ = false;
     bool left_ = false, right_ = false, heartGoal_ = false;
     bool finished_ = false;
+    bool simulationSucceeded_ = true;
 };
 
 } // namespace downwell

@@ -298,7 +298,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool anyInput) {
     if (run_.levelClearActive) return; // Result owner uses stepLevelClear.
     if(roomId_==mainRoomId)
-        run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
+        run_.advanceFlashAnimation();
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
     if(roomId_==mainRoomId)run_.advanceCorpseExpiryAnimation();
     ++tick_;

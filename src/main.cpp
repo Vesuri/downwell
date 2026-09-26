@@ -68,6 +68,7 @@ int main() {
                         builderPatternPack.valid() ? &builderPatternPack : nullptr, &effectAssets);
     while (!game.finished()) {
         game.update(platform.pollInput(), static_cast<std::uint32_t>(SDL_GetPerformanceCounter()));
+        if (!game.simulationSucceeded()) return 20;
         game.render(platform);
         if (!game.renderingSucceeded()) return 20;
         platform.present();

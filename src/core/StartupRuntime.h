@@ -206,7 +206,7 @@ public:
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
     bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y){return run_.emitSmokeBurst(x,y,random_);}
     bool emitFlashBurst(MotionBinary64 x,MotionBinary64 y) {
-        return run_.flashEffects.skeletonBurst(x,y,random_);
+        return run_.emitFlashBurst(x,y,random_);
     }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
     const OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}

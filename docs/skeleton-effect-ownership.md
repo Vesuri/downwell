@@ -21,6 +21,16 @@ owning simulation: do not retry the event, award later rewards, or retire the
 actor as though the sequence completed. `verify-skeleton-actor` injects failures
 at each of these boundaries as well as checking the successful source order.
 
+Both runtime adapters route flash bursts and pre-Step flash animation through
+`RunSession`'s shared `effectsSucceeded` latch. Failed bursts retain earlier
+children and consumed random words; subsequent effect calls and animation must
+not retry the partial operation. Room/run reset clears the failure only after
+retiring owned effects. This is a port capacity/error contract, not a claim
+about Windows allocation failure or completed natural skeleton integration.
+The SDL `Game` latches simulation failure separately from ordinary quit and
+does not dispatch more updates afterward. The executable returns 20 before
+rendering/presenting the failed update, matching the Amiga effect-error path.
+
 | Source call | Owned objects / side effects required |
 | --- | --- |
 | `scrEnemyDeath` | Combo/kill counters, gunshot stop, achievement state, moment delay and level-begin cue |

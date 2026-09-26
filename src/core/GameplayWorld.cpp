@@ -516,7 +516,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive) return {}; // Result owner uses stepLevelClear.
     // Only valid unit-sequence state is admitted through the effect owner.
-    run_.flashEffects.advanceAnimation(run_.flashEffects.beginAnimation());
+    run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
     // Runner advances existing instances' animation before Begin Step/alarms.

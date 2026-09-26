@@ -11,6 +11,17 @@
 using namespace downwell;
 static std::vector<unsigned char> load(const char* name){std::ifstream f(name,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 static void equalRandom(const GameMakerRandom& a,const GameMakerRandom& b){assert(a.drawCount()==b.drawCount());for(unsigned i=0;i<16;++i)assert(a.stateWord(i)==b.stateWord(i));}
+template<class World> static void flashFailure(World& world){
+    unsigned bursts=0;
+    while(world.emitFlashBurst({},{}))assert(++bursts<9);
+    assert(!world.effectsSucceeded());
+    const auto random=world.randomState();
+    const auto births=world.flashEffects().birthSequence().next;
+    assert(!world.emitFlashBurst({},{}));
+    assert(!world.emitSmokeBurst({},{}));
+    equalRandom(random,world.randomState());
+    assert(world.flashEffects().birthSequence().next==births);
+}
 int main(){
     // Native world: fixture births during generation belong to a later Step.
     GameplayWorld world(0,true,0,false);
@@ -48,6 +59,7 @@ int main(){
     world.smokeEffects().visitNewest([&](auto key,const auto&){assert(key>=smokeSequence.next);});
     for(unsigned i=0;i<32;++i)if(world.flashEffects().slot(i).handle)
         assert(world.flashEffects().slot(i).handle>=flashSequence.next);
+    flashFailure(world);
 
     // Scheduler cutoff must follow alarm births and precede ordinary-Step births.
     InstanceStore<1> instances;instances.create(1,1,1,false);auto* instance=instances.find(1);
@@ -84,5 +96,6 @@ int main(){
     assert(host.smokeEffects().birthSequence().next==hostSequence.next);
     assert(host.emitSmokeBurst({},{}));
     host.smokeEffects().visitNewest([&](auto key,const auto&){assert(key>=hostSequence.next);});
+    flashFailure(host);
     std::puts("Smoke worlds: Create RNG, generation/phase exclusion, next-step motion, host lifetime, exhaustion and reset passed");
 }
