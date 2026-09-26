@@ -17,7 +17,8 @@ enum class PackedRoomLoadResult {
     capacityExceeded,
     duplicateInstanceId,
     invalidLayerMembership,
-    invalidObject
+    invalidObject,
+    lifecycleFailure
 };
 
 template <std::size_t Capacity>
@@ -37,7 +38,8 @@ public:
 
     template <typename InstanceHandler,
               typename RoomCreationHandler,
-              typename DeferredCommandHandler>
+              typename DeferredCommandHandler,
+              typename Lifecycle = NoInstanceLifecycle>
     static PackedRoomLoadResult enter(InstanceStore<Capacity>& instances,
                                       const RoomPack& pack,
                                       std::int32_t roomId,
@@ -45,7 +47,8 @@ public:
                                       InstanceHandler instanceHandler,
                                       RoomCreationHandler roomCreationHandler,
                                       DeferredCommandHandler deferredCommandHandler,
-                                      const ObjectPack* objects = nullptr) {
+                                      const ObjectPack* objects = nullptr,
+                                      Lifecycle lifecycle = {}) {
         if (!pack.valid())
             return PackedRoomLoadResult::invalidPack;
         if(objects && !objects->valid())return PackedRoomLoadResult::invalidObject;
@@ -93,11 +96,12 @@ public:
         const LoadRoomResult result = RoomLoader<Capacity>::enter(
             instances, roomId, definitions.data(), room.instanceCount,
             firstGameRoom, instanceHandler, roomCreationHandler,
-            deferredCommandHandler);
+            deferredCommandHandler,lifecycle);
         if (result == LoadRoomResult::capacityExceeded)
             return PackedRoomLoadResult::capacityExceeded;
         if (result == LoadRoomResult::duplicateInstanceId)
             return PackedRoomLoadResult::duplicateInstanceId;
+        if(result==LoadRoomResult::lifecycleFailure)return PackedRoomLoadResult::lifecycleFailure;
         return PackedRoomLoadResult::success;
     }
 

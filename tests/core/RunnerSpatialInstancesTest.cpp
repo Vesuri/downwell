@@ -1,5 +1,6 @@
 #include "core/RunnerSpatialInstances.h"
 #include "core/InstanceStore.h"
+#include "core/RoomLoader.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -170,6 +171,50 @@ int main(){
         }));
         assert(!births.pendingSpatial()&&births.pendingCollision()==1);
         assert(births.retire({1,1})&&!births.pendingCollision());
+    }
+    {
+        InstanceStore<64> lifetimes;Owner space;Graph family;family.values[1]=0x30;
+        std::vector<unsigned> sequence;
+        struct Lifecycle {
+            InstanceStore<64>& store;Owner& owner;Graph& graph;std::vector<unsigned>& sequence;
+            bool birth(InstanceHandle h,const InstanceRecord& record){
+                assert(store.resolve(h)==&record&&record.spriteId==84&&record.maskId==597);
+                Owner::State state;
+                assert(state.x.assign(MotionBinary64::fromInteger(record.x)));
+                assert(state.y.assign(MotionBinary64::fromInteger(record.y)));
+                if(!owner.attach(h,record.objectId,state))return false;
+                sequence.push_back(100+record.instanceId);
+                return owner.publishBirth(h,graph,[&](InstanceHandle handle,bool publish){
+                    const auto* s=owner.resolve(handle);assert(s);
+                    Owner::Box bounds{s->x,s->y,s->x,s->y};
+                    return owner.refresh(handle,*graph.flags(record.objectId),false,&bounds,false,publish);
+                });
+            }
+            bool retire(InstanceHandle h,const InstanceRecord& record){
+                assert(store.resolve(h)==&record);sequence.push_back(200+record.instanceId);
+                return owner.retire(h);
+            }
+        } lifecycle{lifetimes,space,family,sequence};
+        RoomInstanceDefinition firstRoom[2]={{1,1,true},{2,1,false}};
+        RoomInstanceDefinition nextRoom[1]={{3,1,false}};
+        for(auto& r:firstRoom){r.spriteId=84;r.maskId=597;}
+        nextRoom[0].spriteId=84;nextRoom[0].maskId=597;
+        auto events=[&](InstanceRecord& record,RoomInstancePhase phase){
+            if(phase!=RoomInstancePhase::preCreate)return;
+            for(unsigned i=0;i<lifetimes.size();++i)if(&lifetimes.at(i)==&record){
+                const auto* state=space.resolve(lifetimes.handleAt(i));
+                assert(state&&(state->flags&0x8000)&&!(state->flags&8));
+            }
+            sequence.push_back(300+record.instanceId);
+        };
+        auto noRoom=[](int){};auto noDeferred=[](auto&){};
+        assert(RoomLoader<64>::enter(lifetimes,7,firstRoom,2,true,events,noRoom,noDeferred,lifecycle)==LoadRoomResult::success);
+        const auto persistent=lifetimes.handleAt(0),retired=lifetimes.handleAt(1);
+        assert(RoomLoader<64>::enter(lifetimes,8,nextRoom,1,false,events,noRoom,noDeferred,lifecycle)==LoadRoomResult::success);
+        assert((sequence==std::vector<unsigned>{101,301,102,302,202,103,303}));
+        assert(space.resolve(persistent)&&lifetimes.resolve(persistent)&&!space.resolve(retired));
+        const auto fresh=lifetimes.handleAt(1);
+        assert(fresh.slot==retired.slot&&fresh.generation!=retired.generation&&space.resolve(fresh));
     }
     std::puts("Spatial instances: lifetime reuse, ordered first hits, query branches, queue retirement and failure latching passed");
 }

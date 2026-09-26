@@ -162,12 +162,37 @@ void testSynchronousChildBirthFailure() {
     }
 }
 
+void testLifecycleFailureStopsCreate(){
+    const auto bytes=makeObjectPack();downwell::ObjectPack objects(bytes.data(),bytes.size());
+    downwell::InstanceStore<4> instances;downwell::DeferredInstanceQueue<3> queue;
+    for(int i=0;i<3;++i)require(queue.enqueueCreate(0,i,20),"queue lifecycle fixture");
+    unsigned births=0,creates=0;std::uint32_t next=100;
+    struct Lifecycle {
+        downwell::InstanceStore<4>& store;unsigned& births;
+        bool birth(downwell::InstanceHandle h,const downwell::InstanceRecord& record){
+            require(store.resolve(h)==&record&&record.maskId==99&&record.spriteId==12,
+                "dynamic lifecycle sees initialized resources through a live handle");
+            return ++births!=2;
+        }
+    } lifecycle{instances,births};
+    auto create=[&](auto& record){
+        require(births==creates+1&&record.instanceId==100,"birth publication precedes Create");++creates;
+    };
+    require(queue.apply(instances,objects,20,next,create,lifecycle)==downwell::ApplyInstanceCommandsResult::lifecycleFailure,
+        "failed birth publication propagates explicitly");
+    require(births==2&&creates==1&&instances.size()==2&&next==102,
+        "failed birth runs no Create and prevents subsequent allocations");
+    require(queue.apply(instances,objects,20,next,create,lifecycle)==downwell::ApplyInstanceCommandsResult::lifecycleFailure&&
+        births==2&&creates==1&&next==102,"retry does not replay earlier publication or Create side effects");
+}
+
 } // namespace
 
 int main() {
     testApplyIsOrderedAndAtomic();
     testQueueOverflowIsSticky();
     testSynchronousChildBirthFailure();
+    testLifecycleFailureStopsCreate();
     std::cout << "deferred instance queue tests passed\n";
     return 0;
 }

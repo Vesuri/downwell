@@ -214,6 +214,24 @@ void testPackedRoomLoader() {
         noDeferred,&invalidObjects)==downwell::PackedRoomLoadResult::invalidObject&&
         initialized==2&&withDefaults.size()==2&&withDefaults.at(0).maskId==777,
         "invalid object metadata is rejected before any room transition or callback");
+    struct RejectBirth : downwell::NoInstanceLifecycle {
+        bool birth(downwell::InstanceHandle,const downwell::InstanceRecord&)const{return false;}
+    } reject;
+    downwell::InstanceStore<3> failedBirth;
+    initialized=0;
+    require(downwell::PackedRoomLoader<3>::enter(failedBirth,pack,7,true,phases,noRoomCode,
+        noDeferred,&objects,reject)==downwell::PackedRoomLoadResult::lifecycleFailure&&
+        initialized==0&&failedBirth.size()==1,
+        "packed loader propagates registration failure before any PreCreate callback");
+    struct RejectRetirement : downwell::NoInstanceLifecycle {
+        bool retire(downwell::InstanceHandle,const downwell::InstanceRecord&)const{return false;}
+    } rejectRetirement;
+    downwell::InstanceStore<3> failedRetirement;
+    require(failedRetirement.create(999,1,6,false)==downwell::CreateInstanceResult::success,"seed retirement failure");
+    require(downwell::PackedRoomLoader<3>::enter(failedRetirement,pack,7,false,phases,noRoomCode,
+        noDeferred,&objects,rejectRetirement)==downwell::PackedRoomLoadResult::lifecycleFailure&&
+        initialized==0&&failedRetirement.size()==1&&failedRetirement.find(999)->roomId==6,
+        "failed retirement propagates without creating new room instances");
 
     std::vector<std::uint8_t> damaged = bytes;
     // Final membership is changed from instance 100066 to 100065, making one

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_ROOM_LOADER_H
 
 #include "InstanceStore.h"
+#include "InstanceLifecycle.h"
 #include <cstddef>
 #include <cstdint>
 
@@ -37,13 +38,16 @@ enum class RoomInstancePhase {
 enum class LoadRoomResult {
     success,
     capacityExceeded,
-    duplicateInstanceId
+    duplicateInstanceId,
+    lifecycleFailure
 };
 
 // Loads ordered room definitions after validating the whole transition. Event
 // Instance and room-code handlers must not mutate storage. The optional
 // deferred-command handler is the one mutation boundary: it runs after room
 // creation code and before Room Start.
+// Lifecycle failures stop a partially applied transition; external publication
+// cannot be rolled back. Callers must stop rather than retry the transition.
 template <std::size_t Capacity>
 class RoomLoader {
 public:
@@ -63,7 +67,8 @@ public:
 
     template <typename InstanceHandler,
               typename RoomCreationHandler,
-              typename DeferredCommandHandler>
+              typename DeferredCommandHandler,
+              typename Lifecycle = NoInstanceLifecycle>
     static LoadRoomResult enter(InstanceStore<Capacity>& instances,
                                 std::int32_t roomId,
                                 const RoomInstanceDefinition* definitions,
@@ -71,19 +76,26 @@ public:
                                 bool firstGameRoom,
                                 InstanceHandler instanceHandler,
                                 RoomCreationHandler roomCreationHandler,
-                                DeferredCommandHandler deferredCommandHandler) {
+                                DeferredCommandHandler deferredCommandHandler,
+                                Lifecycle lifecycle = {}) {
         const LoadRoomResult validation =
             validate(instances, definitions, definitionCount);
         if (validation != LoadRoomResult::success)
             return validation;
 
-        instances.enterRoom(roomId);
+        if (!instances.enterRoom(roomId, [&](InstanceHandle h, const InstanceRecord& record) {
+            return lifecycle.retire(h, record);
+        }))
+            return LoadRoomResult::lifecycleFailure;
         for (std::size_t index = 0; index < definitionCount; ++index) {
             const RoomInstanceDefinition& definition = definitions[index];
-            instances.create(definition.instanceId,
+            const auto created = instances.create(definition.instanceId,
                              definition.objectId,
                              roomId,
                              definition.persistent,definition.depth);
+            if (created != CreateInstanceResult::success)
+                return created == CreateInstanceResult::full ?
+                    LoadRoomResult::capacityExceeded : LoadRoomResult::duplicateInstanceId;
             InstanceRecord& instance = *instances.find(definition.instanceId);
             instance.x = definition.x;
             instance.y = definition.y;
@@ -98,6 +110,8 @@ public:
             instance.depth = definition.depth;
             instance.spriteId = definition.spriteId;
             instance.maskId = definition.maskId;
+            if (!lifecycle.birth(instances.handleAt(instances.size() - 1), instance))
+                return LoadRoomResult::lifecycleFailure;
             instanceHandler(instance, RoomInstancePhase::preCreate);
             instanceHandler(instance, RoomInstancePhase::create);
             instanceHandler(instance, RoomInstancePhase::instanceCreation);

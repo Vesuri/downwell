@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_DEFERRED_INSTANCE_QUEUE_H
 
 #include "InstanceStore.h"
+#include "InstanceLifecycle.h"
 #include "ObjectPack.h"
 #include <array>
 #include <cstddef>
@@ -15,7 +16,8 @@ enum class ApplyInstanceCommandsResult {
     instanceStoreFull,
     unknownObject,
     duplicateInstanceId,
-    allocatorExhausted
+    allocatorExhausted,
+    lifecycleFailure
 };
 
 struct DeferredCreateInstance {
@@ -82,12 +84,12 @@ public:
         return enqueueCreate(DeferredCreateInstance(objectId, x, y));
     }
 
-    template <std::size_t InstanceCapacity, typename CreateHandler>
+    template <std::size_t InstanceCapacity, typename CreateHandler,typename Lifecycle = NoInstanceLifecycle>
     ApplyInstanceCommandsResult apply(InstanceStore<InstanceCapacity>& instances,
                                       const ObjectPack& objects,
                                       std::int32_t roomId,
                                       std::uint32_t& nextInstanceId,
-                                      CreateHandler createHandler) {
+                                      CreateHandler createHandler,Lifecycle lifecycle = {}) {
         if (applyFailure_ != ApplyInstanceCommandsResult::success)
             return applyFailure_;
         if (overflowed_)
@@ -146,6 +148,10 @@ public:
             instance.active = command.active;
             instance.activationPending = !command.active;
             instance.alarms = command.alarms;
+            if(!lifecycle.birth(instances.handleAt(instances.size()-1),instance)){
+                applyFailure_=ApplyInstanceCommandsResult::lifecycleFailure;
+                return applyFailure_;
+            }
             createHandler(instance);
         }
         clear();

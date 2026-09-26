@@ -320,6 +320,17 @@ changed by PreCreate. `StartupRuntime` supplies that metadata on initial entry
 and room changes. Resource identity storage does not itself register spatial
 membership or publish bounds; those hooks still belong at the birth boundary.
 
+Room and deferred loaders accept an explicit lifecycle adapter. `birth` runs
+after stored properties are initialized but before PreCreate/Create, and room
+entry invokes `retire` through the store before invalidating old handles. Adapter
+failure returns `lifecycleFailure` and stops later callbacks; deferred batches
+latch that result so retry cannot replay earlier Create side effects. Room-load
+failure is terminal for the current transition, not an atomic rollback of prior
+retirements or births. Tests connect the room adapter to spatial attachment and
+immediate bounds publication, checking persistent handles and slot reuse across
+two rooms. Production stores without a registry use the no-op adapter; live
+collision-owner installation and activation/mutation hooks are still required.
+
 Immediately before direct publication, `0x4879ca..0x4879f3` checks the new
 object's `0x28` flags. If absent, it walks parents and, on a prepared ancestor,
 sets `0x20` on the new object's record only. `RunnerObjectFamilies::prepareBirth`

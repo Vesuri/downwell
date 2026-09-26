@@ -27,6 +27,19 @@ bool compileMaskPair(const downwell::RunnerMaskPair::Shape& a,
 #include "core/RunnerPlaceQuery.h"
 #include "core/RunnerSpatialInstances.h"
 #include "core/RunnerObjectFamilies.h"
+#include "core/RoomLoader.h"
+bool compileRoomSpatialLifecycle(downwell::InstanceStore<4>& store,
+    downwell::RunnerSpatialInstances<4,8>& owner,const downwell::RoomInstanceDefinition* rooms,unsigned count){
+    struct Lifecycle {
+        downwell::RunnerSpatialInstances<4,8>& owner;
+        bool birth(downwell::InstanceHandle h,const downwell::InstanceRecord& record){
+            return owner.attach(h,record.objectId,{});
+        }
+        bool retire(downwell::InstanceHandle h,const downwell::InstanceRecord&){return owner.retire(h);}
+    } lifecycle{owner};
+    return downwell::RoomLoader<4>::enter(store,2,rooms,count,false,
+        [](auto&,auto){},[](int){},[](auto&){},lifecycle)==downwell::LoadRoomResult::success;
+}
 bool compileSpatialInstances(downwell::RunnerSpatialInstances<64,64>& owner,
     downwell::RunnerObjectFamilies<386>& graph,downwell::InstanceHandle self,
     downwell::RunnerSpatialInstances<64,64>::Result& result){
