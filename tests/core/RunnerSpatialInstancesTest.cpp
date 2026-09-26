@@ -1,6 +1,7 @@
 #include "core/RunnerSpatialInstances.h"
 #include "core/InstanceStore.h"
 #include "core/RoomLoader.h"
+#include "core/EventScheduler.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -23,6 +24,44 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    {
+        InstanceStore<64> records;Owner space;
+        records.create(1,1,7,false);
+        const auto h=records.handleAt(0);
+        assert(space.attach(h,1,{}));
+        auto activate=[&](InstanceHandle handle,const InstanceRecord& old,bool active){
+            assert(records.resolve(handle)==&old);
+            assert(bool(space.resolve(handle)->flags&2u)==!old.active);
+            return space.setActive(handle,active,0x38);
+        };
+        auto membership=[&](InstanceHandle handle,const InstanceRecord&,bool registered){
+            return space.registerObject(handle,registered);
+        };
+        const auto exact=[](int,int){return false;};
+        assert(records.requestActivation(h,false,activate));
+        assert(!records.resolve(h)->active&&records.resolve(h)->activationPending);
+        assert(records.registeredObjectCount(1,exact)==1); // Still registered this phase.
+        assert(records.reconcileObjectMembership(membership));
+        assert(records.registeredObjectCount(1,exact)==0&&(space.resolve(h)->flags&0x80000));
+        assert(records.requestActivation(h,true,activate));
+        assert(space.pendingSpatial()==1&&space.pendingCollision()==1);
+        unsigned begins=0;
+        assert(EventScheduler<64>::runStep(records,
+            [](const InstanceRecord&){return AlarmBank::FiredMask(0);},
+            [&](InstanceRecord&,StepEvent event){
+                if(event.phase==StepEventPhase::beginStep){
+                    ++begins;assert(records.registeredObjectCount(1,exact)==0);
+                }else assert(records.registeredObjectCount(1,exact)==1);
+            },[](StepEventPhase){},membership));
+        assert(begins==1&&!(space.resolve(h)->flags&0x80002));
+        assert(!records.requestActivation(h,false,[](InstanceHandle,const InstanceRecord&,bool){return false;}));
+        assert(records.resolve(h)->active&&!records.resolve(h)->activationPending);
+        assert(records.erase(1,[&](InstanceHandle handle,const InstanceRecord&){return space.retire(handle);}));
+        records.create(2,1,7,false);
+        bool called=false;
+        assert(!records.requestActivation(h,false,[&](InstanceHandle,const InstanceRecord&,bool){called=true;return true;}));
+        assert(!called&&records.at(0).active);
+    }
     {
         Owner activation;Owner::State clean;clean.flags=0;
         InstanceHandle a{0,1},b{1,1},c{2,1};

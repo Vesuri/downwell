@@ -1040,9 +1040,9 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
                                       enemy.active, enemy.activationPending};
         },
         [this](unsigned index) {
-            auto& enemy = instances_.at(index);
-            enemy.active = true;
-            enemy.activationPending = false;
+            // The frontier enumerates live slots without structural mutation.
+            // Use the request boundary; membership is reconciled after Begin Step.
+            instances_.requestActivation(instances_.handleAt(index),true);
         });
 
     const bool wasGrounded = mainPlayerMotion_.grounded();

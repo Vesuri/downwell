@@ -343,6 +343,14 @@ bool compileSpatialActivation(downwell::RunnerSpatialInstances<4,8>& owner,
     downwell::InstanceHandle handle,bool active,std::uint32_t objectFlags) {
     return owner.setActive(handle,active,objectFlags);
 }
+bool compileStoredSpatialActivation(downwell::InstanceStore<4>& store,
+    downwell::RunnerSpatialInstances<4,8>& owner,downwell::InstanceHandle handle,
+    bool active,std::uint32_t objectFlags) {
+    return store.requestActivation(handle,active,
+        [&](downwell::InstanceHandle h,const downwell::InstanceRecord&,bool requested){
+            return owner.setActive(h,requested,objectFlags);
+        });
+}
 unsigned compileRoomMembership(downwell::RunnerRoomMembership<64>& rooms,
     unsigned slot,downwell::RunnerImageValue depth,std::uint64_t dormant) {
     if(!rooms.bind(slot,depth))return 0;

@@ -122,6 +122,24 @@ public:
         return const_cast<InstanceRecord*>(static_cast<const InstanceStore&>(*this).resolve(handle));
     }
 
+    // Explicit activation requests are not destruction. Notify collision state
+    // while the old flags are still observable; defer object-list changes until
+    // room reconciliation. A callback failure stops the caller, without changing
+    // the record. External side effects are not rolled back. The callback must
+    // not mutate this store or its records.
+    bool requestActivation(InstanceHandle handle,bool active) {
+        return requestActivation(handle,active,
+            [](InstanceHandle,const InstanceRecord&,bool){return true;});
+    }
+    template<class Publish>
+    bool requestActivation(InstanceHandle handle,bool active,Publish publish) {
+        auto* record=resolve(handle);
+        if(!record || !publish(handle,static_cast<const InstanceRecord&>(*record),active))return false;
+        record->active=active;
+        record->activationPending=!active;
+        return true;
+    }
+
     // Object changes must use this boundary rather than writing objectId.
     // Rebinding appends even when the object and lifetime are unchanged.
     bool bindObject(InstanceHandle handle,std::int32_t objectId,bool registered=true) {

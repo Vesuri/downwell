@@ -71,6 +71,15 @@ from immediate bit `2`. Pending room requests and activation traversal-cache
 invalidation remain scheduler responsibilities. These owner methods are not
 yet wired to all live activation writes.
 
+`InstanceStore::requestActivation` supplies the immediate request boundary for
+stored instances: it passes the old record and a lifetime-checked handle to an
+explicit callback before updating active/pending state, without changing object
+membership. Rejected requests leave the record unchanged; stale handles never
+invoke the callback. The main-room `StartupRuntime` frontier uses this boundary
+with the default callback pending complete collision-owner installation.
+The spatial integration test connects requests to `setActive` and phase-end
+publication to `registerObject`, including a full dormant-to-active cycle.
+
 The region predicate activates only when `(flags & 0x100003) == 2` and the
 inside/outside request matches its region result. These immediate routines
 do not themselves call ancestor-list unlink/rebind.
