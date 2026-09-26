@@ -338,12 +338,11 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                     !indexAdd(index, secondX, y, solidCell)) return false;
             }
     }
+    index.nextLanding.clear();
     for (unsigned column = 0; column < AmigaTerrainIndex::columns; ++column) {
-        unsigned next = 0;
         for (int row = AmigaTerrainIndex::rows - 1; row >= 0; --row) {
             const unsigned cell = row * AmigaTerrainIndex::columns + column;
-            if (index.cells[cell] & (landingCell | breakableCell)) next = row + 1;
-            index.nextLanding[cell] = next;
+            if (index.cells[cell] & (landingCell | breakableCell)) index.nextLanding.insert(column,row);
         }
     }
     return true;
@@ -379,16 +378,7 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
         if (!indexAdd(index, x, y, flags, &cell)) return false;
     }
     DW_GENERATION_SCOPE(profileGeneratedLanding);
-    const std::uint16_t landing = cell / AmigaTerrainIndex::columns + 1;
-    // An existing closer landing terminates the update. No clearing, full-map
-    // scan or allocation is required when a new section becomes live.
-    for (;;) {
-        auto& next = index.nextLanding[cell];
-        if (next && next <= landing) break;
-        next = landing;
-        if (cell < AmigaTerrainIndex::columns) break;
-        cell -= AmigaTerrainIndex::columns;
-    }
+    index.nextLanding.insert(cell%AmigaTerrainIndex::columns,cell/AmigaTerrainIndex::columns);
     return true;
 }
 

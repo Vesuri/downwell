@@ -1652,6 +1652,14 @@ test-amiga-gameplay-draw-list: build/amiga-gameplay-draw-list-test build/amiga-g
 	./build/amiga-gameplay-draw-list-replay-test
 test: test-amiga-gameplay-draw-list
 
+.PHONY: test-amiga-landing-index
+build/amiga-landing-index-test: tests/platform/amiga/AmigaLandingIndexTest.cpp src/platform/amiga/AmigaLandingIndex.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+test-amiga-landing-index: build/amiga-landing-index-test
+	./build/amiga-landing-index-test
+test: test-amiga-landing-index
+
 .PHONY: test-amiga-terrain-raster
 build/amiga-terrain-raster-test: tests/platform/amiga/AmigaTerrainRasterTest.cpp tests/platform/amiga/SelectionBitmapStub.cpp src/platform/amiga/AmigaTerrainRaster.cpp src/platform/amiga/AmigaGameplayRows.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build

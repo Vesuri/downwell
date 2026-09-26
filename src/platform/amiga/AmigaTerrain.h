@@ -6,6 +6,7 @@
 #include "core/GameMakerRandom.h"
 #include "core/RoomPack.h"
 #include "core/TerrainWallContacts.h"
+#include "AmigaLandingIndex.h"
 
 class GameplayWorld;
 using AmigaPortRuntime = GameplayWorld;
@@ -135,14 +136,14 @@ struct AmigaTerrainCollisionContext {
 struct AmigaTerrainIndex {
     enum { columns = 128, rows = 512, minX = -512 };
     unsigned char cells[columns * rows];
-    std::uint16_t nextLanding[columns * rows]; // row+1; zero means no candidate
+    AmigaLandingIndex nextLanding; // candidate bits; row+1/zero query encoding
     downwell::TerrainWallContacts<> wallContacts;
     bool wallContactsComplete = false;
 };
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index);
 // Add an actual recovered Create event, not a probabilistic pattern symbol.
-// Requires an initialized index. Only links above the new landing are patched.
+// Requires an initialized index. Candidate insertion does not scan earlier rows.
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
                            bool initialRoomWall = false);
 bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y);

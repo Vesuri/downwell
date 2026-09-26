@@ -90,6 +90,19 @@ must not clear the other's debt. A Copper rebuild does not itself invalidate
 retained pixels. Fixed-capacity draw-list failure must prevent publication,
 not silently omit actors.
 
+## Terrain landing candidates
+
+`AmigaLandingIndex` stores candidate occupancy in 128 columns of 512 bits
+(8 KiB). Insertion sets one bit synchronously during Create; it cannot defer
+visibility until the next frame or pattern cell. Queries search at or below the
+requested row and return row+1, or zero when no candidate exists.
+
+Occupancy is not breakable lifetime state. The collision resolver must still
+reject inactive breakables and continue to the next candidate. Keep room-build
+and live-insertion eligibility unchanged, including their distinct solid/landing
+flags. The bitmap test compares every intermediate insertion against the old
+nearest-floor table; live terrain tests cover generation and collision behavior.
+
 ## Retained ammo HUD contract
 
 Compose damaged HUD strips in the retained Fast-RAM image and publish only
