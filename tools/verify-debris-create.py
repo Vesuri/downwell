@@ -16,6 +16,7 @@ obj = manifest["resources"]["objects"][370]
 assert (obj["id"], obj["name"], obj["parentId"], obj["spriteId"]) == (370, "breakablesDebris", -1, 91)
 event = next(e for e in obj["events"] if e["eventType"] == 0 and e["eventSubtype"] == 0)
 assert event["actions"] == [{"codeId": 2722, "codeName": "gml_Object_breakablesDebris_Create_0"}]
+assert not any(e["eventType"] == 7 and e["eventSubtype"] == 7 for e in obj["events"])
 assembly = (export / "Assembly/gml_Object_breakablesDebris_Create_0.asm").read_bytes()
 assert sha256(assembly).hexdigest() == "7eeeed80e7b0eeb7c293fd5dbf872ab9644985906dbe9addc7bbefaba1a91417"
 for name, digest in {
@@ -23,6 +24,7 @@ for name, digest in {
     "Alarm_0": "d7288b2999ecc62b3f8db25a0313f8144cf903161c68062d4cb8181c8fbcd7dd",
     "Alarm_1": "3b7a34c872f9265143d15f3052836d739c30e20f3668d9446ebe86ab8e13a1dc",
     "Alarm_2": "790f7e88f5b3bca443bafdaca3a2f2fcc946cd55e05cc25a17875a5828e99738",
+    "Collision_objPlayer_n": "e14dac0a7386d3f986e505aa6a23ba025b66de1ae6796ef8eb1e098f17370010",
 }.items():
     assert sha256((export / f"Assembly/gml_Object_breakablesDebris_{name}.asm").read_bytes()).hexdigest() == digest
 print("Pinned object-370 Create: no parent or relocation, four RNG draws and area artwork")

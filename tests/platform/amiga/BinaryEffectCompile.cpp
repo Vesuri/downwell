@@ -433,6 +433,8 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 }
 #include "core/DebrisBirth.h"
 #include "core/DebrisMotion.h"
+#include "core/DebrisAnimation.h"
+bool compileDebrisAnimation(downwell::DebrisAnimation& effect){return effect.advanceImage();}
 bool compileDebrisMotion(downwell::DebrisMotion& effect,downwell::GameMakerRandom& random,bool stopped){
     effect.advanceAlarm(0);
     return effect.step(stopped,random,[](auto,auto,bool& hit){hit=false;return true;});

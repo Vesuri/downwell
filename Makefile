@@ -134,6 +134,17 @@ test: verify-flash-effects
 test: verify-smoke-birth
 test: verify-debris-birth
 test: verify-debris-motion
+test: verify-debris-animation
+
+.PHONY: verify-debris-animation
+verify-debris-animation: build/debris-animation-test
+	python3 tools/verify-runner-image-fields.py
+	python3 tools/verify-animation-metadata.py
+	./build/debris-animation-test
+
+build/debris-animation-test: tests/core/DebrisAnimationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/DebrisAnimationTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-debris-motion
 verify-debris-motion: build/debris-motion-test

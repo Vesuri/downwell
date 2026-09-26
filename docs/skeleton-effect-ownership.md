@@ -87,8 +87,24 @@ complete RNG state across 8,192 branch tapes, plus alarm/freeze/failure cases.
 The owner must provide source-equivalent time-stop and precise collision
 decisions, publish coordinate mutations to collision ownership, schedule
 animation separately and retire requested lifetimes at the proper boundary.
-Player collision, Draw, pool ownership and live death integration are outside
-this Step component's verification scope.
+The player collision event is empty (pinned by the source verifier), unlike
+the shard's kick response. Draw, pool ownership and live death integration are
+outside this Step component's verification scope.
+
+`DebrisAnimation` uses the same `EffectSequenceAnimation` mapping as shards,
+with four keys for rock/wood sprites 115/116 and six for sprite 91. Create can
+write an index through 7; the runner's float division, fractional-cycle mapping,
+near-key snap and sequence normalization must run before adding animation speed.
+Do not replace this with an integer frame modulo or merge the two normalization
+steps. The shared mapping deliberately admits only these four/six-key tracks
+and nonnegative written indices through 7. No Animation End handler exists for
+object 370, so wrapping never requests destruction. The global animation phase
+uses the previous stored speed before Begin Step/alarms/ordinary Step.
+
+`make verify-debris-animation` checks 200,000 inverse mappings, boundary cases
+and 76,800 updates with pause, reverse playback and reuse. The unchanged shard
+animation gate separately checks the six-key consumer. These are scalar/source
+and portable-code checks, not proof of live event scheduling or rendered parity.
 
 `SkeletonEffectBursts.h` now implements the skeleton's smoke/flash count and
 birth-coordinate arithmetic, calling the child creator synchronously per birth.
