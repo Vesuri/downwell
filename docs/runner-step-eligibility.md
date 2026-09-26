@@ -22,6 +22,15 @@ does not itself exclude the child from that later phase. This does not prove
 collision traversal, draw eligibility, activation flags, or ordering among
 instances of the same object. Those remain separate integration questions.
 
+The decoded host's `EventScheduler` snapshots `InstanceHandle` lifetimes rather
+than numeric instance IDs. Deleting a not-yet-visited record and reusing its ID
+must not transfer phase eligibility to the replacement. Handle resolution also
+follows surviving records through compaction without linear ID searches.
+Each phase snapshot costs eight bytes per capacity slot; this is not the
+Amiga `GameplayWorld` actor scheduler and does not establish source object-list
+traversal or deferred activation membership. Those integrations remain in the
+[work queue](open-work.md).
+
 `BoneProjectileStore::beginPhase()` captures a monotonic handle cutoff before
 any actor executes that phase. `visitPhase()` excludes newer handles and
 retired instances, including a newly created child occupying a not-yet-visited

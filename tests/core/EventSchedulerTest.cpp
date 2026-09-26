@@ -145,6 +145,41 @@ void testDeletionAndCreationAcrossPhases() {
             "new instance joins at the next phase");
 }
 
+void testReusedIdCannotInheritPhaseEligibility() {
+    using Phase = downwell::StepEventPhase;
+    for (auto replacePhase : {Phase::beginStep, Phase::alarm, Phase::step, Phase::endStep}) {
+        downwell::InstanceStore<3> instances;
+        instances.create(1, 10, 7, false);
+        instances.create(2, 20, 7, false);
+        instances.create(3, 30, 7, false);
+        for (unsigned i = 0; i < 3; ++i) {
+            instances.at(i).alarms.set(0, 1);
+            instances.at(i).alarms.set(1, 1);
+        }
+        unsigned replaced = 0, survivorEvents = 0, laterBirthEvents = 0;
+        downwell::EventScheduler<3>::runStep(instances,
+            [](const downwell::InstanceRecord&) { return downwell::AlarmBank::allEvents; },
+            [&](downwell::InstanceRecord& instance, downwell::StepEvent event) {
+                if (instance.objectId == 40) {
+                    require(event.phase != replacePhase,
+                        "new lifetime cannot inherit old ID eligibility within any phase");
+                    ++laterBirthEvents;
+                }
+                if (instance.objectId == 30 && event.phase == replacePhase) ++survivorEvents;
+                if (instance.instanceId != 1 || event.phase != replacePhase || replaced) return;
+                ++replaced;
+                require(instances.erase(2), "retire not-yet-visited lifetime");
+                require(instances.create(2, 40, 7, false) == downwell::CreateInstanceResult::success,
+                    "reuse numeric ID and freed slot after compaction");
+                instances.find(2)->alarms.set(1, 1);
+            });
+        require(replaced == 1 && survivorEvents == (replacePhase == Phase::alarm ? 2u : 1u),
+            "compaction preserves surviving lifetime dispatch");
+        require((laterBirthEvents != 0) == (replacePhase != Phase::endStep),
+            "replacement joins subsequent phase snapshots only");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -153,6 +188,7 @@ int main() {
     testDeletionDuringAlarm();
     testActiveStateAndMissingAlarmEvent();
     testDeletionAndCreationAcrossPhases();
+    testReusedIdCannotInheritPhaseEligibility();
     std::cout << "event scheduler tests passed\n";
     return 0;
 }
