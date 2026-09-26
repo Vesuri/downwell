@@ -3,6 +3,10 @@
 #include "core/RunnerSpatialNode.h"
 #include "core/RunnerSpatialIndex.h"
 #include "core/RunnerSpatialDirtyQueue.h"
+#include "core/RunnerSpatialBoundsUpdate.h"
+bool compileRunnerSpatialBoundsUpdate(downwell::RunnerSpatialIndex<256>& index,downwell::RunnerSpatialSplit::Box box,std::uint32_t& flags){
+    return downwell::RunnerSpatialBoundsUpdate::publish(index,123,0x30,flags,false,box,box);
+}
 bool compileRunnerSpatialDirtyQueue(downwell::RunnerSpatialDirtyQueue<256>& queue,unsigned slot){
     return queue.mark(slot)&&queue.remove(slot);
 }

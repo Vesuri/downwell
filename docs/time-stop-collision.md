@@ -261,6 +261,26 @@ The generic sprite/mask fallback must not be inferred from this path alone.
 and these two eligibility predicates. Retire membership before reusing a slot;
 the scheduler still owns mutation hooks, bounds refresh and the separate list.
 
+Direct bounds publication has a different gate. The tail of `0x466010` clears
+instance bounds-dirty flag `0x08`, then calls `0x5020a0` only when its update
+argument remains enabled. A missing mask/sprite disables that argument. Calls
+that request bounds computation without publication must remain distinct.
+
+`0x5020a0` permits an already-indexed instance (`0x8000`) past the `0x100003`
+exclusion; it still requires object flag `0x10` and the global/object/instance
+preparation condition above. It normalizes both old and new rectangle endpoints,
+removes existing membership with root-bounds retry, inserts the new rectangle
+at level zero and sets `0x8000`. Not-found removal does not suppress insertion.
+There is no unchanged-bounds shortcut, so even an identical republished rectangle
+can change traversal order through last-entry removal and append.
+
+`RunnerSpatialBoundsUpdate` connects those operations to the shared index.
+Its tests distinguish direct publication from the outer dirty-pass skip,
+check unchanged-bounds reordering and reversed endpoints, and preserve flags
+on unsupported input. The caller must propagate failures and must not invoke
+publication on the source's no-update/no-resource paths. This adapter does not
+replace live sprite lookup, bounds calculation or mutation scheduling.
+
 `RunnerSpatialNode` supplies the six-slot node, last-entry replacement and
 original-order split distribution using index links rather than native pointers.
 Its component tests cover every removal slot, reappend, internal/leaf distinction,

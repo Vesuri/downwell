@@ -40,6 +40,12 @@ public:
         return !(instanceFlags&0x100003u) && (objectFlags&0x10u) &&
             (allPrepared || (objectFlags&0x28u) || (instanceFlags&0x20u));
     }
+    // Direct bounds publication (0x5020a0) has no outer dirty-pass skip:
+    // membership bit 0x8000 bypasses the 0x100003 exclusion.
+    static bool shouldPublishBounds(std::uint32_t objectFlags,std::uint32_t instanceFlags,bool allPrepared){
+        return ((instanceFlags&0x8000u) || !(instanceFlags&0x100003u)) &&
+            (objectFlags&0x10u) && (allPrepared || (objectFlags&0x28u) || (instanceFlags&0x20u));
+    }
 private:
     Link links_[Capacity]={};unsigned head_=End,count_=0;
 };

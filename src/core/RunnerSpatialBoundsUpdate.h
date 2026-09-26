@@ -1,0 +1,33 @@
+#ifndef DOWNWELL_CORE_RUNNER_SPATIAL_BOUNDS_UPDATE_H
+#define DOWNWELL_CORE_RUNNER_SPATIAL_BOUNDS_UPDATE_H
+#include "RunnerSpatialDirtyQueue.h"
+#include "RunnerSpatialSplit.h"
+namespace downwell {
+// 0x5020a0: direct publication after bounds recalculation. Sprite/mask lookup
+// and the caller's update-enable argument determine whether this is invoked.
+// Old/new bounds can have reversed endpoints; normalize as the runner does.
+struct RunnerSpatialBoundsUpdate {
+    using Math=RunnerSpatialSplit;
+    using Box=Math::Box;
+    template<class Index> static bool publish(Index& index,std::uint32_t id,
+        std::uint32_t objectFlags,std::uint32_t& instanceFlags,bool allPrepared,Box oldBox,Box newBox){
+        if(!RunnerSpatialDirtyQueue<1>::shouldPublishBounds(objectFlags,instanceFlags,allPrepared))return true;
+        if(!normalize(oldBox) || !normalize(newBox))return false;
+        if(instanceFlags&0x8000u){
+            bool removed=false;
+            if(!index.remove(oldBox,id,true,removed))return false;
+            // A failed lookup does not prevent the source's insertion.
+        }
+        if(!index.insert(newBox,id))return false;
+        instanceFlags|=0x8000u;return true;
+    }
+private:
+    static bool normalize(Box& box){
+        if(!Math::valid(box.left)||!Math::valid(box.top)||!Math::valid(box.right)||!Math::valid(box.bottom))return false;
+        if(Math::less(box.right,box.left)){auto a=box.left;box.left=box.right;box.right=a;}
+        if(Math::less(box.bottom,box.top)){auto a=box.top;box.top=box.bottom;box.bottom=a;}
+        return true;
+    }
+};
+}
+#endif
