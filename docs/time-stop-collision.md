@@ -179,8 +179,8 @@ That root receives the old root first and the split sibling second. Thus the
 selector's comparison against root `+0x04` is against tree height, not entry
 count or a fixed population threshold. Splitting and subsequent updates can
 change traversal order; the append rule alone does not establish oldest-first
-lookup once the tree branches. Removal/reinsertion and the set/order of
-instances populating the shared index still need auditing.
+lookup once the tree branches. The removal contract is below; the set/order
+of instances populating the shared index still needs auditing.
 
 ### Spatial split contract
 
@@ -210,6 +210,41 @@ subnormal/nonfinite inputs and unsupported arithmetic without changing output.
 `make verify-runner-spatial-split` compares it with a scalar binary32 reference
 and pins the audited executable regions. This is a component check, not
 execution of the Windows routine or proof of live field-selection fidelity.
+
+### Removal, condensation and dirty-instance updates
+
+Recursive removal `0x502b40` visits intersecting children in ascending entry
+order. At a leaf it compares instance pointers in entry order; successful
+removal copies the last entry over the removed slot and decrements the count
+(`0x502c68`). It returns zero for success, one for not found.
+
+On return from a child, a surviving count of at least two causes its parent's
+bounding box to be recomputed. Otherwise the child is prepended to a detached
+node list and its parent slot is removed with the same last-entry replacement
+(`0x502c15`). This is unlike object-list removal: spatial removal can change
+the first matching instance even without changing any survivor's coordinates.
+
+`0x502a80` processes detached nodes in list order, reinserting each node's
+remaining entries in ascending array order via `0x4ffe70` at that node's tree
+level, then recycles the detached node. Ancestors detached later during unwind
+are prepended ahead of descendants. After reinsertion, a root with one child
+and positive level is replaced by that child. `0x502990` optionally retries a
+failed removal using the entire root's bounds, rather than only the supplied
+old bounds.
+
+Dirty processing `0x502ca0` walks the intrusive list rooted at `0x8a6100`.
+For the audited eligible sprite-bound path it saves old bounds, recalculates
+current bounds, removes an already indexed instance with retry enabled, and
+inserts its new bounds at level zero. It then unlinks the dirty-list entry.
+Thus movement is not simply an in-place bounding-box update. Dirty-list
+enqueuing, eligibility flags and all mutation callers still require integration
+evidence before reproducing a whole encounter's tree history.
+
+`RunnerSpatialNode` supplies the six-slot node, last-entry replacement and
+original-order split distribution using index links rather than native pointers.
+Its component tests cover every removal slot, reappend, internal/leaf distinction,
+split ordering and failure preservation. It does not yet own condensation,
+index traversal or the dirty queue.
 
 `tools/verify-runner-field-lookup.py` pins these reviewed bytes. It does not
 prove spatial-tree construction/update order or the

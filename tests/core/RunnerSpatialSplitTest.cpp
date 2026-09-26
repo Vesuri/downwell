@@ -1,4 +1,5 @@
 #include "core/RunnerSpatialSplit.h"
+#include "core/RunnerSpatialNode.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -49,6 +50,40 @@ static void check(const Box (&boxes)[7]){
     assert(counts[0]>=2 && counts[1]>=2 && counts[0]+counts[1]==7);
 }
 int main(){
+    using Node=downwell::RunnerSpatialNode;
+    for(unsigned removed=0;removed<6;++removed){
+        Node node;
+        for(unsigned i=0;i<6;++i)assert(node.append({{},100+i,200+i}));
+        assert(!node.append({}));
+        assert(node.eraseInstance(200+removed));assert(node.count==5);
+        for(unsigned i=0;i<5;++i){
+            const unsigned expected=i==removed?5:i;
+            assert(node.entries[i].instance==200+expected);
+            assert(node.entries[i].child==100+expected);
+        }
+        assert(!node.eraseInstance(200+removed));assert(!node.erase(5));
+        assert(node.append({{},999,200+removed}));
+        assert(node.entries[5].instance==200+removed);
+        Node sibling;sibling.level=9;
+        assert(node.split({{},888,777},sibling));
+        assert(node.count==5 && sibling.count==2 && sibling.level==0);
+        // Equal boxes seed indices 0/1; distribution is array order, not
+        // seed/assignment order. The reinserted instance remains at index 5.
+        assert(node.entries[4].instance==200+removed);
+        assert(sibling.entries[0].instance==(removed==1?205:201));
+        assert(sibling.entries[1].instance==777);
+    }
+    Node branch;branch.level=2;
+    for(unsigned i=0;i<6;++i)assert(branch.append({{},i+1,i+101}));
+    assert(!branch.eraseInstance(101)); // Internal nodes are removed by slot.
+    assert(branch.erase(0));assert(branch.entries[0].child==6);
+    assert(branch.append({{},7,107}));
+    Node sibling;sibling.level=8;
+    Node::Entry bad;bad.bounds.left.bits=0x7f800000u;
+    assert(!branch.split(bad,sibling));
+    assert(branch.count==6 && branch.entries[0].child==6 && sibling.level==8);
+    assert(!branch.split({},branch));assert(branch.count==6);
+    assert(branch.split({},sibling));assert(sibling.level==2 && branch.level==2);
     Box boxes[7]={};check(boxes);
     Split::Box identical[7]={};Split::Result result;
     assert(Split::partition(identical,result));
@@ -76,5 +111,5 @@ int main(){
     assert(!Split::partition(identical,result)); // Area overflow is not infinity.
     for(unsigned i=0;i<7;++i)assert(result.group[i]==tied[i]);
     assert(result.count[0]==5 && result.count[1]==2);
-    std::puts("Spatial split: 8192 binary32 comparisons, equal-growth tie/minimum-fill and atomic invalid-input rejection passed");
+    std::puts("Spatial nodes: swap-last removal/reinsert, stable split distribution; 8192 binary32 partitions, tie/minimum-fill and atomic failure checks passed");
 }
