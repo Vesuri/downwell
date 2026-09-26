@@ -9,6 +9,10 @@ bool compileOrdinaryTimeField(downwell::OrdinaryTimeField& field,downwell::GameM
     field.create(240,512,random);field.advanceDraw(false,random);
     return field.meetsRelativeBounds(bounds);
 }
+#include "core/OrdinaryTimeFields.h"
+bool compileOrdinaryTimeFieldOrder(downwell::OrdinaryTimeFields<64>& fields,downwell::GoalTimeField& goal,downwell::GameMakerRandom& random,unsigned boundary){
+    return fields.advanceDraw(false,random,true,boundary,[&]{goal.advanceDraw(false,random);});
+}
 #include "core/TimeStopGoalContact.h"
 bool compileTimeStopGoalContact(downwell::RunnerImageValue x,downwell::RunnerImageValue scale,const downwell::GoalTimeField& field,bool& hit){
     return downwell::TimeStopGoalContact::query(downwell::TimeStopGoalContact::Mask::Player,x,x,scale,scale,field,hit);

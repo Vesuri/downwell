@@ -1,4 +1,6 @@
 #include "core/OrdinaryTimeField.h"
+#include "core/OrdinaryTimeFields.h"
+#include "core/GoalTimeField.h"
 #include "core/DeferredInstanceQueue.h"
 #include <cassert>
 #include <cmath>
@@ -9,6 +11,29 @@
 using namespace downwell;
 static double value(HudReal n){return std::ldexp(double(n.mantissa),n.exponent-52);}
 int main(){
+    for(unsigned seed=0;seed<64;++seed)for(unsigned boundary=0;boundary<=5;++boundary){
+        OrdinaryTimeFields<5> fields;GoalTimeField goal;
+        GameMakerRandom actual(seed),expected(seed);
+        for(unsigned i=0;i<5;++i)assert(fields.adoptCreate(240,int(i),i));
+        unsigned calls=0;
+        assert(fields.advanceDraw(false,actual,true,boundary,[&]{++calls;goal.advanceDraw(false,actual);}));
+        for(unsigned i=5;i>0;--i){
+            if(i==boundary)assert(value(goal.radius)==128+double(expected.nextU32())/2147483648.0);
+            assert(value(fields.at(i-1)->radius)==24+double(expected.nextU32())/2147483648.0);
+        }
+        if(boundary==0)assert(value(goal.radius)==128+double(expected.nextU32())/2147483648.0);
+        assert(calls==1 && actual.drawCount()==expected.drawCount() && actual.stateIndex()==expected.stateIndex());
+        for(unsigned i=0;i<16;++i)assert(actual.stateWord(i)==expected.stateWord(i));
+        const auto goalRadius=goal.radius;
+        assert(fields.advanceDraw(true,actual,true,boundary,[&]{goal.advanceDraw(true,actual);}));
+        assert(actual.drawCount()==6 && goal.radius.equal(goalRadius));
+        assert(!fields.advanceDraw(false,actual,true,6,[&]{assert(false);}));
+        assert(actual.drawCount()==6);
+        assert(fields.advanceDraw(false,actual,false,999,[&]{assert(false);}));
+        assert(actual.drawCount()==11);
+        fields.clear();assert(fields.advanceDraw(false,actual,true,0,[&]{goal.advanceDraw(false,actual);}));
+        assert(actual.drawCount()==12);
+    }
     GameMakerRandom rng(42),reference(42);
     for(unsigned i=0;i<65536;++i){
         const auto n=OrdinaryTimeField::nextRadius(rng);
@@ -59,5 +84,5 @@ int main(){
     assert(OrdinaryTimeField::meetsRelativeBounds({-2147483647,2147483647,-2147483647,2147483647}));
     assert(!OrdinaryTimeField::meetsRelativeBounds({0,0,0,1}));
     assert(!OrdinaryTimeField::meetsRelativeBounds({-2147483647,-2147483646,0,1}));
-    std::printf("Ordinary time field: 65536 exact radius draws, frozen/offscreen Draw rules, %u mask comparisons\n",checked);
+    std::printf("Ordinary time field: 384 merged Draw orders, 65536 exact radius draws, frozen/offscreen Draw rules, %u mask comparisons\n",checked);
 }

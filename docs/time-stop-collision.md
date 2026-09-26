@@ -43,6 +43,38 @@ Builder object-82 initialization already consumes the Create random word:
 world registration must retain that result, not call Create again and consume
 a second draw. Remaining ownership, lookup and rendering work is in the queue.
 
+## Dynamic field Draw ordering
+
+The compatibility depth table maps both `parentTimeField` and `goalTimeField`
+to 10000 (name/depth array slots 48 and 328). The compatibility
+`instance_create` obtains that depth through `object_get_depth` and calls
+`instance_create_depth`; zero depths in the serialized object records are not
+the dynamic-instance depth.
+
+Read-only Windows disassembly gives this chain:
+
+- Registration `0x52cd31` binds `instance_create_depth` to `0x529840`.
+- The wrapper calls `0x4fdcf0`, which calls room allocation `0x4878f0`
+  before dispatching PreCreate and Create.
+- Allocation writes depth at instance offset `0x178` and calls `0x487610`
+  with the room list at offset `0x80`.
+- Insertion traverses from the list head, comparing new depth with stored
+  depth (`0x17c`). The `jae` at `0x487657` inserts before an equal-depth node;
+  only a smaller depth advances through next links (`0x150`).
+- Draw traversal at `0x490f11` starts at room offset `0x84` and follows those
+  next links. The tile-interleaved traversal at `0x48e9a0` uses the same head
+  and next links, dispatching event type 8/subtype 0.
+
+Thus equal-depth dynamic fields whose depth is unchanged draw newest first.
+An exit field must be interleaved at its creation boundary, not unconditionally
+drawn before or after all ordinary fields. `OrdinaryTimeFields::advanceDraw`
+accepts the ordinary-field count at exit-field birth for this merge. The
+callback must not create fields or mutate their owner. Inactive/hidden fields,
+depth changes, and interleaving with other Draw-event families require their
+own scheduler handling; this is not proof of complete global Draw ordering.
+`tools/verify-runner-field-draw.py` pins the reviewed executable bytes, not an
+execution trace of the original game.
+
 ## Unrotated transformed sampling
 
 The unrotated precise path at Windows runner `0x4b9227..0x4b93f6`

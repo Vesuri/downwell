@@ -261,6 +261,7 @@ test: verify-ordinary-time-field
 .PHONY: verify-ordinary-time-field
 verify-ordinary-time-field: build/ordinary-time-field-test
 	./build/ordinary-time-field-test
+	python3 tools/verify-runner-field-draw.py
 
 generated/downwell-time-field-mask.h: generated/time-stop-masks.json tools/verify-time-stop-masks.py
 	python3 tools/verify-time-stop-masks.py --generate
@@ -268,7 +269,7 @@ generated/downwell-time-field-mask.h: generated/time-stop-masks.json tools/verif
 generated/downwell-time-field-mask.mask: generated/downwell-time-field-mask.h
 	@test -f $@ || python3 tools/verify-time-stop-masks.py --generate
 
-build/ordinary-time-field-test: tests/core/OrdinaryTimeFieldTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/downwell-time-field-mask.h generated/downwell-time-field-mask.mask
+build/ordinary-time-field-test: tests/core/OrdinaryTimeFieldTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/downwell-time-field-mask.h generated/downwell-time-field-mask.mask generated/downwell-goal-mask.h
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/OrdinaryTimeFieldTest.cpp src/core/GameMakerRandom.cpp
 
