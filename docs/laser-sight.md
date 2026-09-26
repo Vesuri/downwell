@@ -45,7 +45,9 @@ centred newly created emitters. The native weapon fixture also exercises four
 centred zero-spread shots and their RNG counts; it is a focused CPU check, not
 a native full-upgrade playthrough or rendered laser test.
 
-## Remaining work
+## Ray implementation and verification scope
+
+Outstanding fidelity and performance tasks are tracked in [open-work.md](open-work.md).
 
 ### Shared stepped-ray foundation
 

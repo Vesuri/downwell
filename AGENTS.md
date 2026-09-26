@@ -33,6 +33,13 @@ Downwell to an SDL host reference implementation and then to native Amiga 500
 - Commit tools, manifests without copyrighted payloads, hand-authored code,
   and documentation. Do not commit original or byte-for-byte derived assets.
 
+## Work tracking
+
+- Keep `docs/open-work.md` as the sole unfinished-work queue. Remove completed
+  items and record implementation/test history in commits, not status reports.
+- Keep technical contracts and source evidence in focused references without
+  maintaining separate priority lists.
+
 ## Builds
 
 - Host: `make`, then `make run`.

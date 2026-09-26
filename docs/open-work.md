@@ -57,6 +57,10 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
+- Initialize SDL frog precise motion state at Create, matching the original
+  event and the Amiga adapter. The strict paired-state gate currently fails at
+  tick 163 because SDL defers this initialization until movement; preserve the
+  exact comparison and rerun it after correcting initialization.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,
@@ -67,6 +71,8 @@ Reference: [area-two recovery](area-two-recovery.md).
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.
+- Verify Laser Sight's original collision-line rounding, mask behavior and GPU
+  rasterization; host/native agreement alone does not establish these.
 - Fill resource/manifest gaps needed by new features: masks, glyph/kerning data,
   room layers and extension dependencies. Preserve IDs and input/tool hashes;
   check decompiled code against VM instructions.
@@ -93,10 +99,18 @@ ports does not count as parity with the original.
   Re-profile after integration changes; average FPS is not the criterion.
 - Remove unnecessary terrain recomposition and transfers. Preserve circular
   hardware scrolling, static terrain backing and incremental restoration.
+- Profile generation CPU costs without changing RNG consumption or synchronous
+  Create ordering. Shop and exit Create effects must precede the next pattern
+  cell's random draw; spreading generation over frames is not behavior-neutral.
+- Break down ammo HUD costs into geometry, damage scanning and changed-word
+  publication. Keep the static rim intact and update only changed pixels.
 - Reduce selection layout/content and transition preparation costs while
   retaining static layers and pointer-driven movement.
 - Measure new actor/effect costs in dense scenes. Keep a portable reference
   when introducing selected 68000 assembly optimizations.
+- Repeat low-overhead timing tapes and correctness gates after changes, with
+  separate horizontal-shop and dense-encounter cases. Distinguish instrumentation
+  overhead from ordinary gameplay cost.
 
 References: [gameplay performance](gameplay-performance-current.md),
 [level completion](level-clear-profile.md), [profiling](amiga-profiling.md).

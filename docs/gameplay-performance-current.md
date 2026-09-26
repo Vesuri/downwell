@@ -414,19 +414,7 @@ these are copies of exported data, not runtime pixel conversion.
 Evidence: `/tmp/downwell-gameplay-current-probes.log`. Probe overhead is
 material; low-overhead FPS must remain the throughput measure.
 
-## Next performance work
-
-1. Break down generation CPU work and optimize the largest costs while
-   preserving exact RNG consumption and synchronous Create ordering. The
-   `GameplayWorld::createGeneratedInstance` handoff explicitly requires shop
-   and exit Create effects before the next pattern-cell random draw. Moving
-   generation earlier or spreading it over frames is not behavior-neutral.
-2. Revisit the 4.10 ms average ammo-path cost, distinguishing geometry,
-   damage scanning and actual changed-word publication. Retain the existing
-   static rim and incremental update rules.
-3. Re-run the same low-overhead tape after each change, plus correctness
-   gates. Add separate fixtures for horizontal shop transitions and dense
-   encounters; this tape alone cannot prove a worst-case 20 ms budget.
+Performance follow-up is tracked in [the work queue](open-work.md#5-meet-the-amiga-frame-budget).
 
 ## Rejected experiment: bounded RNG remainder
 

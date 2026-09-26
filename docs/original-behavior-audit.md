@@ -212,7 +212,7 @@ guard and existing transitions, not the still-missing field effects.
 
 The historical tick-600/666/702 failures below are superseded by the current
 shared-simulation work documented in `shared-simulation-migration.md` and
-`feature-parity.md`. Both 6,000-update continuations now pass the combat and
+the git log. Both 6,000-update continuations now pass the combat and
 death/survival checks with live fractional machine-gun spread: firing phase 6
 finishes with health 0, kills 7, currency 74 and best combo 2 on both adapters;
 phase 5 survives with 2, 6, 76 and 2. Phase 1 now survives to the exit, so it

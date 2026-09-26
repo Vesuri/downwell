@@ -9,8 +9,8 @@ between ports alone is insufficient. Update this table when adding behavior.
 
 Resource IDs, enabled caps and flag mappings were checked against local UTMT
 0.9.2.0 exports of `scrUpgrades`, `scrIncrementPug` and `scrGainUg`. Arithmetic
-for recently wired upgrades was checked against their VM assembly, as recorded
-in [feature-parity.md](feature-parity.md). Input release SHA-256:
+for wired upgrades was checked against their VM assembly; implementation and
+verification history is in the git log. Input release SHA-256:
 `c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8`.
 Recovered files are under `extracted/utmt-0.9.2.0/{Assembly,CodeEntries}`;
 do not commit those payloads. Script/event names below identify audit entry

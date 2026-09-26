@@ -42,7 +42,7 @@ The final gate and a second independent `--check` pass; evidence is in
 `/tmp/downwell-area-two-patterns-final.log`. No emulator run is needed for
 this exporter-only change, and no playable build options were changed.
 
-## Next implementation boundary
+## Builder integration contract
 
 `scrBuilderCreation` selects `scrLevelPat2` for area 2. VM setup gives
 `extraColumn=3`, `levelLength=13+global.level`, `genCount=-10`, and
