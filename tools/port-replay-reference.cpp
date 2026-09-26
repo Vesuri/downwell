@@ -5,6 +5,7 @@
 #include "core/PlayerDeathVerification.h"
 #include "core/MachineGunVerification.h"
 #include "core/GameplayWorld.h"
+#include "core/RunnerSpatialVerification.h"
 
 #include <cinttypes>
 #include <cstdio>
@@ -49,5 +50,8 @@ int main() {
     const auto animatedBones=downwell::verifyBoneAnimation();
     if(animatedBones.failures) return 9;
     std::printf("BONE_ANIMATION %u %08x %u\n",animatedBones.updates,animatedBones.digest,animatedBones.failures);
+    const auto spatial=downwell::verifyRunnerSpatialMutations();
+    if(spatial.failures) return 10;
+    std::printf("SPATIAL %u %08x %u\n",spatial.checks,spatial.digest,spatial.failures);
     return 0;
 }

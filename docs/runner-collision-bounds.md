@@ -301,3 +301,23 @@ in all three paths, using a separate host arithmetic transcription and injected
 trigonometric values. Explicit fixtures distinguish scan order and truncation
 from rounding. This is arithmetic/composition evidence, not proof of the
 original runtime FP mode, complete instance collision dispatch, or live wiring.
+
+## Cross-target mutation tape
+
+`RunnerSpatialVerification.h` supplies the `SPATIAL` result in the host/native
+replay comparison. It checks transform writes (including signed zero, alpha and
+tint dependencies), all 256 low object-flag combinations in both preparation
+modes, intermediate binding callback state, dirty queues, retirement and handle
+reuse. Assertions contribute an explicit failure count independently of the
+state digest; the host reference refuses to produce a passing result on failure.
+
+Build `build/port-replay-reference` for the host. The native tape uses
+`REPLAY_VERIFY=1 SKIP_TO_GAME=1` and `amiga/verify_replay.sh`, with
+`VERIFY_TIMEOUT_SECONDS` bounding emulator/debugger execution. Restore the
+ordinary Amiga build after verification, including after failure. The debugger
+also checks the task-stack guard before publishing the comparison marker.
+
+This exercises the portable collision owner's mutation paths on 68000, not a
+live encounter, rendered output, timing budget, resource residency or the
+Windows runner itself. Original-source contracts and live integration remain
+separate requirements.

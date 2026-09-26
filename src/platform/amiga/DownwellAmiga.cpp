@@ -266,6 +266,7 @@ extern "C" { volatile ULONG gDownwellStackGuardReady; }
 #include "core/MotionBinary64Verification.h"
 #include "core/PlayerDeathVerification.h"
 #include "core/MachineGunVerification.h"
+#include "core/RunnerSpatialVerification.h"
 extern "C" {
 volatile ULONG gReplayComplete;
 volatile ULONG gReplayFrames;
@@ -286,6 +287,7 @@ volatile ULONG gBoneReplayDigest, gBoneReplayUpdates, gBoneReplayFailures;
 volatile ULONG gBoneBenchDigest, gBoneBenchFailures, gBoneBenchFields;
 volatile ULONG gBoneCreateDigest, gBoneCreateCount, gBoneCreateFailures;
 volatile ULONG gBoneAnimationDigest, gBoneAnimationCount, gBoneAnimationFailures;
+volatile ULONG gSpatialChecks, gSpatialDigest, gSpatialFailures;
 
 __attribute__((noinline, used)) void downwellReplayComplete(void) {
     __asm__ volatile("" ::: "memory");
@@ -3098,6 +3100,8 @@ int main(void) {
             const auto animatedBones=downwell::verifyBoneAnimation();
             gBoneAnimationDigest=animatedBones.digest; gBoneAnimationCount=animatedBones.updates;
             gBoneAnimationFailures=animatedBones.failures;
+            const auto spatial=downwell::verifyRunnerSpatialMutations();
+            gSpatialChecks=spatial.checks;gSpatialDigest=spatial.digest;gSpatialFailures=spatial.failures;
             gReplayComplete = 1;
             downwellReplayComplete();
             for (;;) platform.waitVblank();
