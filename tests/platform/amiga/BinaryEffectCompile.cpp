@@ -12,6 +12,13 @@
 #include "core/TimeShardMotion.h"
 #include "core/TimeShardAnimation.h"
 #include "core/TimeShardEffects.h"
+#include "core/TimeShardBurst.h"
+bool compileTimeShardBurst(downwell::TimeShardBurst& burst,downwell::TimeShardEffects<24>& owner,downwell::GameMakerRandom& random){
+    return burst.emit({}, {},{}, {},false,random,owner,
+        [](auto,auto,auto& id,auto&,auto&){id=-4;return true;},
+        [](auto,auto,auto,auto,auto& out){out={};return true;},
+        [](auto length,auto,bool,auto& out){out=length;return true;});
+}
 bool compileTimeShardEffects(downwell::TimeShardEffects<24>& owner,downwell::GameMakerRandom& random,bool stopped){
     const auto phase=owner.beginPhase();
     owner.advanceAlarm(phase,0);
