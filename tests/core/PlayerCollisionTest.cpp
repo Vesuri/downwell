@@ -55,6 +55,11 @@ int main() {
         const int bottom=int(std::nearbyint(float(float(py-4.f)+12.f)))-1;
         const bool expected=right>=origin-8&&left<=origin+7&&bottom>=origin-8&&top<=origin+7;
         require(hit==expected,"live box query matches runner rounded bounds");
+        int centreX=0,centreY=0;
+        require(downwell::PlayerBoxContact::terrainCentre(x,y,origin,origin,centreX,centreY)&&
+            centreX+origin-4==left&&centreX+origin+3==right&&
+            centreY+origin-4==top&&centreY+origin+7==bottom,
+            "terrain adapter reproduces all four original rounded mask edges");
         const bool legacy=x+3*unit>=-8*unit&&x-4*unit<=7*unit&&
             y+7*unit>=-8*unit&&y-4*unit<=7*unit;
         differences+=hit!=legacy;
@@ -81,6 +86,13 @@ int main() {
     require(Math::ceilAbs(-4 * unit - 1) == 5 * unit,
             "a fractional velocity beyond an integer extends the predictive probe");
     long x = 0, y = 10 * unit + unit / 4;
+    for(unsigned failAt:{1u,2u}){
+        long failedY=y;int direction=99;unsigned calls=0;
+        const bool ok=downwell::resolveVerticalSolidCollisionChecked<Math>(0L,failedY,-5632L,
+            [&](long,long,bool& hit){++calls;hit=true;return calls!=failAt;},direction);
+        require(!ok&&calls==failAt&&direction==99&&failedY==(failAt==1?y:10*unit),
+                "checked vertical probes stop at failure and retain only completed position writes");
+    }
     auto hit = downwell::resolveSolidCollision<Math>(x, y, 0L, -5632L,
         [](long, long py) { return py <= 7 * unit; });
     require(hit.x == 0 && hit.y == -1 && y == 8 * unit,

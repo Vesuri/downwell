@@ -794,14 +794,16 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                   << " rows=" << runtime.mainBuilderRowsGenerated()
                   << " specials=" << runtime.mainBuilderSpecialObjectsGenerated() << '\n';
         // This is a tape-specific regression, not a Windows trajectory oracle.
-        // Spread consumes one RNG word at each bullet's first Step. This
-        // corrected-choice tape selects scrRightPat1 pattern 0: v,O,_,@,{,}, no J.
+        // Rounded player-mask X in upward terrain probes changes this route's
+        // trajectory and later selection. The pre-correction movement reproduces
+        // pattern 0/row 89; the corrected tape selects pattern 4/row 94.
+        // Both recovered patterns contain v,O,_,@,{,} and no J torch marker.
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 0 &&
+                    runtime.mainBuilderLastRightPattern() == 4 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
-                    runtime.mainBuilderRowsGenerated() == 89,
+                    runtime.mainBuilderRowsGenerated() == 94,
                 "the first scheduled side room preserves deterministic selection and rows");
         require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
                 "every special marker in deterministic right-room pattern is interpreted");
@@ -821,7 +823,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         require(!foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
-                "pattern 0 emits its utility/reward IDs without inventing a J torch marker");
+                "pattern 4 emits its utility/reward IDs without inventing a J torch marker");
     }
 }
 

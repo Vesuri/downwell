@@ -36,6 +36,7 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
         c.run.gems.observeDeathMovement(c.death.movementDead(), c.currency.gameGem);
     }, &context);
     DW_PROFILE_PHASE(profilePlayerMotion);
+    player.configureCollisionOrigin(originX,originY);
     const auto motion = player.step(input,
         controlsLocked || run.shops.noControl || run.exitControlsLocked,
         death.movementDead(), run.shops.interactable, run.goalStopped, run.gemHigh);

@@ -68,6 +68,12 @@ struct PlayerPreciseVerification {
         const long right=rounded(x+(origin+4)*1280L)-1;
         result.check(hit==(right>=origin-8&&left<=origin+7));
         result.word(hit);
+        for(long y=0;y<2;++y){
+            int cx=0,cy=0;
+            result.check(PlayerBoxContact::terrainCentre(x,y,origin,176,cx,cy));
+            result.check(cx==left+4-origin&&cy==0);
+            result.word(static_cast<unsigned>(cx));result.word(static_cast<unsigned>(cy));
+        }
     }
     return result;
 }

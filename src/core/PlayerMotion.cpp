@@ -5,6 +5,7 @@
 #include "core/StateDigest.h"
 #include "core/MachineGunProfile.h"
 #include "core/ForcedPlayerJump.h"
+#include "core/PlayerBoxContact.h"
 
 namespace {
 enum {
@@ -297,15 +298,19 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
         if (solidResolver_ != 0 && speedY_ < 0) {
             long collisionX = x_ * 5;
             long collisionY = y_ * 5 + verticalPositionRemainder_;
-            const int hit = downwell::resolveVerticalSolidCollision<downwell::FixedCollisionMath>(
+            int hit=0;
+            const bool checked = downwell::resolveVerticalSolidCollisionChecked<downwell::FixedCollisionMath>(
                 collisionX, collisionY, speedY_ * 5 + gravityRemainder_,
-                [this](long px, long py) {
-                    // Keep the existing solid adapter's pixel quantization;
-                    // rounding X here alone would disagree with side contacts.
-                    const int x = (int)(px / 1280);
-                    const int y = (int)(py / 1280);
-                    return solidMaskAt(x, y);
-                });
+                [this](long px, long py,bool& found) {
+                    int x,y;
+                    if(!downwell::PlayerBoxContact::terrainCentre(px,py,collisionOriginX_,collisionOriginY_,x,y))return false;
+                    found=solidMaskAt(x,y);return true;
+                },hit);
+            if(!checked){
+                y_=collisionY/5;
+                verticalPositionRemainder_=static_cast<int>(collisionY%5);
+                motionSucceeded_=false;return {};
+            }
             if (hit < 0) {
                 y_ = collisionY / 5;
                 verticalPositionRemainder_ = (int)(collisionY % 5);

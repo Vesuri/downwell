@@ -31,6 +31,7 @@ public:
     // stops the step without rolling back earlier movement/script effects.
     typedef bool (*BreakBoxResolver)(void* context, long x, long y, bool& found);
     bool motionSucceeded() const { return motionSucceeded_; }
+    void configureCollisionOrigin(int x,int y){collisionOriginX_=x;collisionOriginY_=y;}
     void configureBreakBoxResolver(BreakBoxResolver resolver, void* context) {
         breakBoxResolver_ = resolver;
         breakBoxContext_ = context;
@@ -111,6 +112,9 @@ public:
 
 private:
     bool motionSucceeded_ = true;
+    // World-owned coordinate adapter, rebound before each shared gameplay
+    // step like the terrain callbacks; not an independently simulated field.
+    int collisionOriginX_=0,collisionOriginY_=0;
     static int fixedToPixel(long value);
     static unsigned integerSquareRoot(unsigned value);
     void beginSpin();

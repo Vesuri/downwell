@@ -22,17 +22,21 @@ typename Math::Number ceilingResponse(typename Math::Number x,
 // Do not call the full two-axis script with an artificial zero X velocity:
 // its rounded X probe can move a fractional X into an adjacent wall.
 template<class Math, class Query>
-int resolveVerticalSolidCollision(typename Math::Number x,
-    typename Math::Number& y, typename Math::Number vy, Query meeting) {
+bool resolveVerticalSolidCollisionChecked(typename Math::Number x,
+    typename Math::Number& y, typename Math::Number vy, Query meeting,int& result) {
     using N = typename Math::Number;
     const int sign = (vy > 0) - (vy < 0);
     const N delta = sign * Math::unit();
     const N magnitude = vy < 0 ? -vy : vy;
     const N probe = Math::round(y) + sign * Math::ceilAbs(vy);
-    if (!meeting(x, probe)) return 0;
+    bool hit=false;
+    if(!meeting(x,probe,hit))return false;
+    if(!hit){result=0;return true;}
     y = Math::round(y);
     N move = 0;
-    while (!meeting(x, y + move + delta)) {
+    for(;;){
+        if(!meeting(x,y+move+delta,hit))return false;
+        if(hit)break;
         move += delta;
         if ((move < 0 ? -move : move) >= magnitude) {
             move = 0;
@@ -40,7 +44,18 @@ int resolveVerticalSolidCollision(typename Math::Number x,
         }
     }
     y += move;
-    return sign;
+    result=sign;return true;
+}
+
+template<class Math, class Query>
+int resolveVerticalSolidCollision(typename Math::Number x,
+    typename Math::Number& y, typename Math::Number vy, Query meeting) {
+    int result=0;
+    resolveVerticalSolidCollisionChecked<Math>(x,y,vy,
+        [&](typename Math::Number px,typename Math::Number py,bool& hit){
+            hit=meeting(px,py);return true;
+        },result);
+    return result;
 }
 
 // scrCheckCollisionWith, VM blocks 1..40. This resolves contact positions and

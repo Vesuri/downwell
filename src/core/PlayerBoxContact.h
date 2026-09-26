@@ -3,6 +3,7 @@
 #include "RunnerSpriteBounds.h"
 #include "SpriteCollisionPack.h"
 #include "DivideBinary64.h"
+#include "GameMakerRounding.h"
 namespace downwell {
 // scrPlayerInit mask 31 and objBox_n's explicit mask 585 are rectangular.
 // These descriptors are checked against the collision pack by the tests.
@@ -12,6 +13,29 @@ struct PlayerBoxContact {
     using Bounds=RunnerSpriteBounds::Box;
     static constexpr PackedSpriteCollision player{12,12,8,8,15,19,0,1,4};
     static constexpr PackedSpriteCollision box{8,8,0,0,15,15,0,1,1};
+    // Adapter for the existing four-corner/indexed terrain backend. Return a
+    // relative integer centre only when it reproduces the original 8x12 mask
+    // bounds. The backend need not be replaced to stop truncating VM queries.
+    static bool terrainCentre(long x,long y,int originX,int originY,int& outX,int& outY){
+        if(x<(-2147483647L-1)||x>2147483647L||y<(-2147483647L-1)||y>2147483647L||
+           originX< -1000000||originX>1000000||originY< -1000000||originY>1000000)return false;
+        // Live upward probes have Q8 X and integer Y. In this range binary32
+        // preserves every Q8 bit, including the +/-4 margin operations, so no
+        // software float division/bounds construction is needed per probe.
+        if(x%5==0 && y%1280==0 && originX>=-16384 && originX<=16384){
+            const long absolute=x/5+originX*256L;
+            if(absolute>=-8387584L&&absolute<=8387584L){
+                outX=static_cast<int>(roundGameMakerQ8(absolute)-originX);
+                outY=static_cast<int>(y/1280);return true;
+            }
+        }
+        Bounds b;
+        std::int32_t left,right,top,bottom;
+        if(!prepare(x,y,originX,originY,b)||!b.left.promoted().roundPixel(left)||
+           !b.right.promoted().roundPixel(right)||!b.top.promoted().roundPixel(top)||
+           !b.bottom.promoted().roundPixel(bottom)||right-left!=7||bottom-top!=11)return false;
+        outX=left+4-originX;outY=top+4-originY;return true;
+    }
     static bool test(long x,long y,int originX,int originY,int boxX,int boxY,bool& hit){
         Bounds bounds;
         return prepare(x,y,originX,originY,bounds)&&testPrepared(bounds,boxX,boxY,hit);

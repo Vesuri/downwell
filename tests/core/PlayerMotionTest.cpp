@@ -169,6 +169,17 @@ int main() {
     require(failedCeiling.motionSucceeded(),"room initialization clears terminal player failure");
 
     PlayerMotion gravityPrecision(false, 10000);
+    for(int direction:{-1,1}){
+        PlayerMotion fractionalCeiling(true);
+        fractionalCeiling.configureSolidResolver([](void*,int,int){return false;},&direction,-60,60,
+            [](void* context,int x,int y){return x==*static_cast<int*>(context)&&y<=-12;});
+        downwell::Input movingJump;movingJump.fire=true;
+        movingJump.left=direction<0;movingJump.right=direction>0;
+        for(unsigned i=0;i<3;++i)fractionalCeiling.step(movingJump);
+        require(fractionalCeiling.motionSucceeded()&&fractionalCeiling.offsetYFixed()==-11*256&&
+                fractionalCeiling.speedYFixed()==0,
+                "fractional upward query rounds X instead of truncating away the ceiling");
+    }
     // Source scrGravity_n: exactly .2 per update, capped at 7.
     long fifthsPosition = 0;
     long fifthsSpeed = 0;
