@@ -39,6 +39,14 @@ bool compileSpatialBirth(downwell::RunnerSpatialInstances<64,64>& owner,
         return owner.refresh(h,0x30,false,&box,false,publish);
     });
 }
+bool compileSpatialSpriteRefresh(downwell::RunnerSpatialInstances<64,64>& owner,
+    downwell::InstanceHandle handle,const downwell::SpriteCollisionPack& pack,
+    const downwell::RunnerSpatialInstances<64,64>::Sprite& sprite,
+    downwell::RunnerImageValue cosine,downwell::RunnerImageValue sine){
+    return owner.refreshSprite(handle,0x30,false,pack,sprite,true,
+        [&](auto,auto& c,auto& s){c=cosine;s=sine;return true;},
+        [](auto value,std::int32_t& pixel){return value.promoted().roundPixel(pixel);},true);
+}
 bool compilePlaceQuery(downwell::RunnerImageValue& x,downwell::RunnerImageValue& y,
     std::uint32_t& flags,downwell::RunnerPlaceQuery::Box& box,downwell::RunnerPlaceQuery::Result& result){
     using Query=downwell::RunnerPlaceQuery;

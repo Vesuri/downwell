@@ -2,6 +2,7 @@
 #include "core/EnemyPresentation.h"
 #include "core/RunnerSpriteBounds.h"
 #include "core/SpriteCollisionPack.h"
+#include "core/RunnerSpatialInstances.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -43,6 +44,11 @@ void testGeneratedPack(const char* path) {
     const downwell::SpriteCollisionPack compact(compactBytes.data(),compactBytes.size());
     require(compact.valid()&&compact.spriteCount()==pack.spriteCount(),"compact collision table validates");
     require(compactBytes.size()==26700,"collision-only table excludes atlas payload and frame mappings");
+    using Owner=downwell::RunnerSpatialInstances<2,4>;
+    Owner owner;
+    require(owner.attach({0,1},0,{}),"attach metadata-backed collision instance");
+    auto round=[](downwell::RunnerImageValue v,std::int32_t& pixel){return v.promoted().roundPixel(pixel);};
+    auto noTrig=[](auto,auto&,auto&){require(false,"zero angle must not invoke trigonometry");return false;};
     for(unsigned id=0;id<pack.spriteCount();++id){
         downwell::PackedSprite full;downwell::PackedSpriteCollision small;
         require(pack.sprite(id,full)&&compact.sprite(id,small),"both metadata views resolve every ID");
@@ -51,7 +57,60 @@ void testGeneratedPack(const char* path) {
             full.marginRight==small.marginRight&&full.marginBottom==small.marginBottom&&
             full.collisionMode==small.collisionMode&&full.collisionMaskCount==small.collisionMaskCount&&
             full.frameCount==small.frameCount,"all source collision fields agree across views");
+        Owner::Sprite visual;visual.spriteId=id;
+        downwell::RunnerSpriteBounds::Box expected;
+        require(downwell::RunnerSpriteBounds::fromSprite(full,{}, {},visual.scaleX,visual.scaleY,
+            false,{}, {},true,round,expected),"full metadata bounds resolve");
+        require(owner.refreshSprite({0,1},0x30,false,compact,visual,true,noTrig,round,true),
+            "compact metadata drives owner publication");
+        const auto* actual=owner.resolve({0,1});
+        require(actual->bounds.left.bits==expected.left.bits&&actual->bounds.top.bits==expected.top.bits&&
+            actual->bounds.right.bits==expected.right.bits&&actual->bounds.bottom.bits==expected.bottom.bits&&
+            actual->flags==(0x8000u|(full.collisionMode==1?0x200u:0u)),
+            "all sprite resources update cached bounds, precise and indexed flags");
     }
+    Owner::Sprite visual;visual.spriteId=84;visual.maskId=597;
+    require(owner.refreshSprite({0,1},0x30,false,compact,visual,true,noTrig,round,true)&&
+        (owner.resolve({0,1})->flags&0x200),"explicit precise mask overrides rectangular artwork in owner");
+    visual.maskId=9999;
+    require(owner.refreshSprite({0,1},0x30,false,compact,visual,true,noTrig,round,true)&&
+        owner.resolve({0,1})->flags==0x8000&&owner.resolve({0,1})->bounds.left.bits==0,
+        "missing explicit mask collapses cache without discarding existing index membership");
+    require(owner.retire({0,1}),"resource-backed stale bounds retire with root retry");
+    require(owner.attach({0,2},0,{}),"reuse retired slot for rotated metadata adapter");
+    visual.maskId=-1;visual.angle.bits=0x42b40000; // 90 degrees, explicit narrowed trig input.
+    auto quarterTurn=[](auto angle,auto& cosine,auto& sine){
+        require(angle.bits==0x42b40000,"trig receives the original binary32 degrees");
+        cosine={};sine={0x3f800000};return true;
+    };
+    require(owner.refreshSprite({0,2},0x30,false,compact,visual,true,quarterTurn,round,false),
+        "rotated refresh can update cache without publishing");
+    const auto* rotated=owner.resolve({0,2});
+    require(rotated->flags==0&&rotated->bounds.left.bits==0xbf800000&&
+        rotated->bounds.right.bits==0x3f800000&&rotated->bounds.top.bits==0xc0000000&&
+        rotated->bounds.bottom.bits==0x3f800000,"rotated adapter uses collision margins and update flag");
+    require(!owner.refreshSprite({0,2},0x30,false,downwell::SpriteCollisionPack(nullptr,0),
+        visual,true,quarterTurn,round,true)&&!owner.valid(),"invalid asset pack fails loudly instead of resolving no sprite");
+    owner.clear();Owner::State special;special.special=true;
+    require(owner.attach({0,3},0,special),"attach unsupported special state");
+    visual.maskId=9999;visual.angle.bits=0x7f800000;
+    require(owner.refreshSprite({0,3},0x30,false,compact,visual,true,noTrig,round,true),
+        "missing resource resolves before angle or special-state processing");
+    visual.maskId=-1;visual.angle={};
+    require(!owner.refreshSprite({0,3},0x30,false,compact,visual,true,noTrig,round,true)&&!owner.valid(),
+        "resolved special state cannot silently use ordinary sprite bounds");
+    owner.clear();require(owner.attach({0,4},0,{}),"attach fractional bounds case");
+    visual.angle.bits=0x80000000;visual.scaleX.bits=0xbf000000; // Negative zero angle, mirrored half scale.
+    unsigned roundCalls=0;
+    auto rejectRound=[&](auto,std::int32_t&){++roundCalls;return false;};
+    require(owner.refreshSprite({0,4},0x30,false,compact,visual,false,noTrig,rejectRound,false)&&!roundCalls,
+        "fractional mode and negative-zero angle bypass rounding and trigonometry");
+    const auto fractional=owner.resolve({0,4})->bounds;
+    require(!owner.refreshSprite({0,4},0x30,false,compact,visual,true,noTrig,rejectRound,true)&&roundCalls==1,
+        "rounding failure propagates without publication");
+    require(!owner.valid()&&owner.resolve({0,4})->bounds.left.bits==fractional.left.bits&&
+        owner.resolve({0,4})->bounds.right.bits==fractional.right.bits,
+        "failed bounds calculation does not replace the last cached rectangle");
     require(!downwell::SpriteCollisionPack(nullptr,0).valid(),"null compact table rejected");
     for(auto length:{std::size_t(0),std::size_t(23),compactBytes.size()-1})
         require(!downwell::SpriteCollisionPack(compactBytes.data(),length).valid(),"truncated compact table rejected");

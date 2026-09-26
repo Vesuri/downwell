@@ -35,6 +35,24 @@ lookup or mask geometry. The reviewed ranges are pinned by
 `tools/verify-runner-field-lookup.py`; component tests cover missing-resource
 birth, retained old entries, restoration and update-disabled refresh.
 
+`RunnerSpatialInstances::refreshSprite` joins compact `DWSC` metadata lookup,
+ordinary sprite geometry and this finalization. It applies an explicit mask ID
+before the artwork ID; invalid explicit masks do not fall back. A valid pack
+with a missing resource takes the source's position-collapse path, while an
+invalid pack fails the owner instead of masquerading as an absent sprite.
+Resolved special resources are rejected rather than approximated with ordinary
+geometry. The caller still owns resource-kind support, source trigonometry and
+the integer-rounding policy. Zero (including negative zero) angle bypasses trig;
+fractional compatibility-off geometry bypasses integer rounding.
+
+The sprite-pack gate exercises this adapter across all 741 recovered metadata
+records and checks owner flags/cache publication against the full artwork
+metadata view. It also covers mask overrides, missing-resource retirement,
+rotated geometry supplied with explicit trigonometric inputs, special-resource
+rejection and failed rounding. This verifies composition of the decoded data and
+geometry routines; it is not a live Windows runtime/FP-mode comparison or proof
+that the adapter is wired into gameplay.
+
 ## Unrotated ordinary-sprite branch
 
 `0x46616d..0x466328` treats each axis in this order, narrowing every operation

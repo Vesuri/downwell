@@ -6,6 +6,8 @@
 #include "RunnerSpatialBoundsUpdate.h"
 #include "RunnerSpatialPosition.h"
 #include "RunnerPlaceQuery.h"
+#include "RunnerSpriteBounds.h"
+#include "SpriteCollisionPack.h"
 namespace downwell {
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,
@@ -26,6 +28,10 @@ public:
         bool special=false;
     };
     struct Result {bool found=false;InstanceHandle handle{};};
+    struct Sprite {
+        std::int32_t spriteId=-1,maskId=-1;
+        Real scaleX{0x3f800000},scaleY{0x3f800000},angle{};
+    };
     bool valid()const{return good_ && index_.valid();}
     // Clear retires memberships but preserves generation high-water marks.
     // Replacing the external handle domain requires replacing this owner too.
@@ -80,6 +86,29 @@ public:
         auto& s=entries_[h.slot].state;
         return checked(RunnerSpatialBoundsUpdate::finishRefresh(index_,h.slot,
             objectFlags,s.flags,allPrepared,s.bounds,bounds,s.x,s.y,precise,publish));
+    }
+    // Ordinary resource adapter for 0x466010. A corrupt/unavailable pack is a
+    // port failure, not the source's missing sprite case. An invalid explicit
+    // mask ID does NOT fall back to artwork. Trig receives binary32 degrees and
+    // must implement the source angle conversion and narrowed cosine/sine.
+    // Rounding policy is explicit until the runtime FP environment is verified.
+    template<class Trig,class Round>
+    bool refreshSprite(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
+        const SpriteCollisionPack& pack,const Sprite& sprite,bool compatibility,
+        Trig trig,Round round,bool publish){
+        if(!valid()||!live(h))return false;
+        if(!pack.valid())return checked(false);
+        PackedSpriteCollision resource;
+        if(!pack.collisionSprite(sprite.spriteId,sprite.maskId,resource))
+            return refresh(h,objectFlags,allPrepared,nullptr,false,publish);
+        const auto& s=entries_[h.slot].state;
+        if(s.special||!Math::valid(sprite.angle))return checked(false);
+        const bool rotated=(sprite.angle.bits&0x7fffffffu)!=0;
+        Real cosine{},sine{};Box bounds;
+        if(rotated&&!trig(sprite.angle,cosine,sine))return checked(false);
+        if(!RunnerSpriteBounds::fromSprite(resource,s.x,s.y,sprite.scaleX,sprite.scaleY,
+            rotated,cosine,sine,compatibility,round,bounds))return checked(false);
+        return refresh(h,objectFlags,allPrepared,&bounds,resource.collisionMode==1,publish);
     }
     // 0x501f70: remove old bounds (retry at root), clear indexed flag, then
     // unlink both dirty memberships. Missing resources may have changed the
