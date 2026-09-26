@@ -351,6 +351,25 @@ void Game::renderMain(Renderer& renderer) const {
     drawShopPrompts(startup_.shops(), false, [&](int sprite, int frame, int x, int y) {
         renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
     });
+    // Compatibility depths: direct gems 10000, bullets 0, player -50000.
+    // Surface-composited gems still belong to the later controller Draw.
+    for (std::size_t index = 0; !composite && index < startup_.mainCurrencyCount(); ++index) {
+        const StartupRuntime::MainCurrencyState& gem =
+            startup_.mainCurrencyAt(index);
+        if (!gem.motion.lifetime.visible()) continue;
+        renderer.drawSprite(gem.large ? 134 : 133,
+                            gem.motion.animation.frame(),
+                            static_cast<int>(gem.x - viewX),
+                            static_cast<int>(gem.y - viewY));
+    }
+    for (std::size_t index = 0; index < startup_.mainBulletCount(); ++index) {
+        const StartupRuntime::MainBulletState& bullet =
+            startup_.mainBulletAt(index);
+        renderer.drawSpriteTransformed(machineGunProfile(bullet.gemHigh).sprite, bullet.animation.frame(),
+                            static_cast<int>(bullet.x - viewX),
+                            static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
+                            static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
+    }
     if (startup_.mainPlayerVisible())
         renderer.drawSpriteTransformed(
             startup_.mainPlayerSpriteId(),
@@ -367,23 +386,6 @@ void Game::renderMain(Renderer& renderer) const {
         line.draw([&](int x, int y) {
             renderer.fillRect(x, y, 1, 1, {255, 0, 0, 255});
         });
-    }
-    for (std::size_t index = 0; index < startup_.mainBulletCount(); ++index) {
-        const StartupRuntime::MainBulletState& bullet =
-            startup_.mainBulletAt(index);
-        renderer.drawSpriteTransformed(machineGunProfile(bullet.gemHigh).sprite, bullet.animation.frame(),
-                            static_cast<int>(bullet.x - viewX),
-                            static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
-                            static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
-    }
-    for (std::size_t index = 0; !composite && index < startup_.mainCurrencyCount(); ++index) {
-        const StartupRuntime::MainCurrencyState& gem =
-            startup_.mainCurrencyAt(index);
-        if (!gem.motion.lifetime.visible()) continue;
-        renderer.drawSprite(gem.large ? 134 : 133,
-                            gem.motion.animation.frame(),
-                            static_cast<int>(gem.x - viewX),
-                            static_cast<int>(gem.y - viewY));
     }
     // __global_object_depths: fxFlashBall is -200000, in front of the
     // player (-50000), ordinary projectiles (0) and currency (10000).

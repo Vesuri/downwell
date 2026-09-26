@@ -49,6 +49,30 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         if (!append( sprite, frame,
             downwellPlayfieldX + x - worldViewX, y - worldViewY, 0)) ready = false;
     });
+#ifndef DOWNWELL_REPLAY_VERIFY
+    for (unsigned index = 0; !compositeCurrency && index < port.gemSlotEnd(); ++index) {
+        // Direct Draw depth 10000 precedes bullet 0 and player -50000.
+        const auto& gem = port.gemAt(index);
+        if (gem.active && gem.motion.lifetime.visible() && !append(
+                (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),
+                downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
+                playerStartY + gem.y - port.cameraOffsetY(), 0))
+            ready = false;
+    }
+#endif
+
+    for (unsigned index = 0; index < port.bulletSlotEnd(); ++index) {
+        const auto& bullet = port.bulletAt(index);
+        // The pack generator checks every possible nearest-pixel
+        // sample over 267..273 degrees for all twelve source frames:
+        // the spread-adjusted artwork equals this offline quarter
+        // turn. Other angles/guns need separately verified variants.
+        if (bullet.active && !append(
+                downwell::machineGunProfile(bullet.gemHigh).sprite, 768 + bullet.animation.frame(),
+                downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
+                playerStartY + bullet.y - port.cameraOffsetY(), 0))
+            ready = false;
+    }
     if (port.playerVisible() && !append(
             (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
             (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),
@@ -71,28 +95,6 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         if (count == capacity) { failedSprite = gameplayRayMarker; ready = false; }
         else actors[count++] = {gameplayRayMarker, 0, 0, 0, 0};
     }
-    for (unsigned index = 0; index < port.bulletSlotEnd(); ++index) {
-        const auto& bullet = port.bulletAt(index);
-        // The pack generator checks every possible nearest-pixel
-        // sample over 267..273 degrees for all twelve source frames:
-        // the spread-adjusted artwork equals this offline quarter
-        // turn. Other angles/guns need separately verified variants.
-        if (bullet.active && !append(
-                downwell::machineGunProfile(bullet.gemHigh).sprite, 768 + bullet.animation.frame(),
-                downwellPlayfieldX + 80 + bullet.x - port.cameraOffsetX(),
-                playerStartY + bullet.y - port.cameraOffsetY(), 0))
-            ready = false;
-    }
-#ifndef DOWNWELL_REPLAY_VERIFY
-    for (unsigned index = 0; !compositeCurrency && index < port.gemSlotEnd(); ++index) {
-        const auto& gem = port.gemAt(index);
-        if (gem.active && gem.motion.lifetime.visible() && !append(
-                (UWORD)(gem.large ? 134 : 133), (UWORD)gem.motion.animation.frame(),
-                downwellPlayfieldX + 80 + gem.x - port.cameraOffsetX(),
-                playerStartY + gem.y - port.cameraOffsetY(), 0))
-            ready = false;
-    }
-#endif
 
     // Original compatibility depth -200000: ahead of ordinary gameplay,
     // but behind the controller's effect-surface publication (-300000).

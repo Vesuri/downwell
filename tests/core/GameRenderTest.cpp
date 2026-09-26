@@ -451,6 +451,23 @@ int main() {
             runtime.step(false);
         }
         if(std::getenv("DOWNWELL_FLASH_RENDER_ONLY")) {
+            unsigned bulletsSeen=0,playersSeen=0;
+            for(unsigned tick=0;tick<32;++tick){
+                downwell::Input fire;fire.fire=true;runtime.step(fire,false);
+                RecordingRenderer capture;flashGame.render(capture);
+                int previousDepth=20000;
+                for(int sprite:capture.spriteOrder){
+                    int depth;
+                    if(sprite==133||sprite==134)depth=10000;
+                    else if(sprite==458||sprite==459){depth=0;++bulletsSeen;}
+                    else if(sprite==runtime.mainPlayerSpriteId()){depth=-50000;++playersSeen;}
+                    else if(sprite==96)depth=-200000;
+                    else continue;
+                    require(depth<=previousDepth,"original direct gem/bullet/player/flash depth order");
+                    previousDepth=depth;
+                }
+            }
+            require(bulletsSeen&&playersSeen,"live painter test covers fired bullets and player");
             std::puts("Production host flash ownership, camera projection and retirement passed");
             return 0;
         }

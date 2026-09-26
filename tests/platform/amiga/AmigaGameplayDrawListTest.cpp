@@ -40,6 +40,18 @@ int main() {
 #endif
         downwell::drawShopKeepers(world.shops(),[&](int s,unsigned f,int x,int y) { emit(s,f,110+x-vx,y-vy); });
         downwell::drawShopPrompts(world.shops(),false,[&](int s,unsigned f,int x,int y) { emit(s,f,110+x-vx,y-vy); });
+#ifndef DOWNWELL_REPLAY_VERIFY
+        for(unsigned i=0;i<world.gemSlotEnd();++i) {
+            const auto& g=world.gemAt(i);
+            if(g.active && g.motion.lifetime.visible()) emit(g.large?134:133,g.motion.animation.frame(),
+                190+g.x-world.cameraOffsetX(),142+g.y-world.cameraOffsetY());
+        }
+#endif
+        for(unsigned i=0;i<world.bulletSlotEnd();++i) {
+            const auto& b=world.bulletAt(i);
+            if(b.active) emit(downwell::machineGunProfile(b.gemHigh).sprite,768+b.animation.frame(),
+                190+b.x-world.cameraOffsetX(),142+b.y-world.cameraOffsetY());
+        }
         if(world.playerVisible()) emit(world.player().spriteId(world.deathSequence().movementDead()),
             world.player().spriteFrame(world.deathSequence().movementDead(),world.deathSequence().animation),
             190+downwell::roundGameMakerQ8(world.player().offsetXFixed())-world.cameraOffsetX(),
@@ -51,24 +63,23 @@ int main() {
             world.player().facing()<0);
         assert(list.rayVisible==!world.goalStopped());
         if(list.rayVisible) expected.push_back({gameplayRayMarker,0,0,0,0});
-        for(unsigned i=0;i<world.bulletSlotEnd();++i) {
-            const auto& b=world.bulletAt(i);
-            if(b.active) emit(downwell::machineGunProfile(b.gemHigh).sprite,768+b.animation.frame(),
-                190+b.x-world.cameraOffsetX(),142+b.y-world.cameraOffsetY());
-        }
-#ifndef DOWNWELL_REPLAY_VERIFY
-        for(unsigned i=0;i<world.gemSlotEnd();++i) {
-            const auto& g=world.gemAt(i);
-            if(g.active && g.motion.lifetime.visible()) emit(g.large?134:133,g.motion.animation.frame(),
-                190+g.x-world.cameraOffsetX(),142+g.y-world.cameraOffsetY());
-        }
-#endif
 #ifndef DOWNWELL_REPLAY_VERIFY
         world.flashEffects().visitNewest([&](const downwell::FlashBallEffect& effect){
             emit(96,effect.drawFrame(),110+effect.pixelX()-vx,effect.pixelY()-vy);++flashDraws;
         });
 #endif
         assert(list.count==expected.size());
+        int previousDepth=20000;
+        for(unsigned i=0;i<list.count;++i){
+            const unsigned sprite=list.actors[i].sprite;
+            int depth;
+            if(sprite==133||sprite==134)depth=10000;
+            else if(sprite==458||sprite==459)depth=0;
+            else if(sprite==unsigned(world.player().spriteId(world.deathSequence().movementDead())))depth=-50000;
+            else if(sprite==96)depth=-200000;
+            else continue;
+            assert(depth<=previousDepth);previousDepth=depth;
+        }
         for(unsigned i=0;i<list.count;++i) {
             const auto& a=list.actors[i]; const auto& b=expected[i];
             assert(a.sprite==b.sprite && a.frame==b.frame && a.x==b.x && a.y==b.y && a.flip==b.flip);
