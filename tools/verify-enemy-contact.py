@@ -30,6 +30,17 @@ assert manifest["resources"]["objects"][269]["spriteId"] == 460
 assert manifest["resources"]["objects"][269]["textureMaskId"] == -1
 assert manifest["resources"]["objects"][225]["spriteId"] == 84
 assert manifest["resources"]["objects"][225]["textureMaskId"] == -1
+for object_id in (98, 278, 279):
+    parent = object_id
+    while parent != 57:
+        assert parent >= 0, (object_id, "shop child is not parentWall")
+        parent = manifest["resources"]["objects"][parent]["parentId"]
+# A one-way platform belongs to parentThinwall, not parentWall. Player landing
+# queries therefore cannot stand in for smoke's collision-event target family.
+parent = 93
+while parent >= 0:
+    assert parent != 57
+    parent = manifest["resources"]["objects"][parent]["parentId"]
 assert {event["eventSubtype"] for event in manifest["resources"]["objects"][225]["events"]
         if event["eventType"] == 4} == {57, 88}
 water_collision = (root / "extracted/utmt-0.9.2.0/Assembly/gml_Object_fxSmoke_Collision_parentWater.asm").read_text()

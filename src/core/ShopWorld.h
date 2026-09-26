@@ -6,6 +6,7 @@
 #include "InteractionPrompt.h"
 #include "Input.h"
 #include "ProjectileSegment.h"
+#include "EnemyContact.h"
 namespace downwell {
 // Bounded world ownership and static child masks, separate from shop rendering.
 // Coordinates passed here are integer mask-query positions. Full fractional
@@ -65,6 +66,15 @@ struct ShopWorld {
             y + 7 >= shop.y - 1 && y - 4 <= shop.y + 8;
     }
     struct Rectangle { int left, top, right, bottom; };
+    template<class Emit>
+    bool visitWallContacts(const ContactBounds& query,Emit emit)const {
+        bool okay=true;
+        visitPlayerSolids([&](const Rectangle& wall) {
+            const ContactBounds bounds{wall.left,wall.right+1,wall.top,wall.bottom+1};
+            if(okay && contactBoundsOverlap(query,bounds))okay=emit();
+        });
+        return okay;
+    }
     template<class Visit>
     void visitPlayerSolids(Visit visit) const {
         if (!allocatedCount) return; // Ordinary first-level queries stay cheap.

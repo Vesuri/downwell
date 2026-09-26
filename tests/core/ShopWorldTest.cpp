@@ -60,6 +60,44 @@ int main() {
             return value;
         }, [&] { require(randomCalls == 4, "farewell choice follows stock"); ++randomCalls; return 0u; }, 4, 1);
         const unsigned creationCalls = randomCalls;
+        unsigned multipleContacts=0;
+        for(int y=-25;y<25;++y)for(int x=-15;x<105;++x){
+            const downwell::ContactBounds smoke{x-2,x+2,y-1,y+2};
+            unsigned expected=0,actual=0;
+            auto hit=[&](int left,int top,int right,int bottom){
+                if(x+1>=left && x-2<=right && y+1>=top && y-1<=bottom)++expected;
+            };
+            hit(-8,0,7,15);hit(34,0,93,7);
+            for(int i=0;i<3;++i)hit(36+19*i,-18,53+19*i,-1);
+            require(world.visitWallContacts(smoke,[&](){++actual;return true;}) && actual==expected,
+                "smoke contacts preserve every overlapping source shop child");
+            multipleContacts+=actual>1;
+        }
+        require(multipleContacts>0,"contact fixture includes overlapping case/table and adjacent cases");
+        require(!world.visitWallContacts({40,44,-1,2},[](){return false;}),"wall callback failure propagates");
+        {
+            downwell::RunSession run;
+            run.shops=world;
+            struct Random { unsigned draws=0;std::uint32_t nextU32(){++draws;return 0;} } random;
+            const auto handle=run.smokeEffects.create(downwell::MotionBinary64::fromInteger(45),{},random);
+            require(handle!=0,"session collision fixture creates smoke at the table/case seam");
+            auto& smoke=*run.smokeEffects.get(handle);
+            const auto before=smoke.speed;
+            run.collideSmokeShopWalls();
+            require(smoke.speed.high==before.high && smoke.speed.low==before.low,"nocol suppresses live shop responses");
+            smoke.alarm0();
+            run.collideSmokeShopWalls();
+            double expected=2.0;expected*=0.2;expected*=0.2;
+            std::uint64_t bits;std::memcpy(&bits,&expected,sizeof(bits));
+            require(run.effectsSucceeded && smoke.speed.high==std::uint32_t(bits>>32) &&
+                smoke.speed.low==std::uint32_t(bits) && random.draws==3,
+                "shared session applies separate case and table responses without RNG");
+            smoke.destroyRequested=true;
+            const auto retiredSpeed=smoke.speed;
+            run.collideSmokeShopWalls();
+            require(smoke.speed.high==retiredSpeed.high && smoke.speed.low==retiredSpeed.low,
+                "pending smoke destruction suppresses shop collision dispatch");
+        }
         // Independently enumerate the source default child rectangles, rather
         // than deriving expected hits from visitPlayerSolids itself.
         for (int y = -25; y < 25; ++y) for (int x = -15; x < 105; ++x) {

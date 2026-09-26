@@ -54,6 +54,10 @@ struct RunSession {
     void stepSmoke(SmokeEffects<32>::Phase phase,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.step(phase,random);
     }
+    void collideSmokeShopWalls(){
+        if(effectsSucceeded)effectsSucceeded=smokeEffects.collideWalls(smokeEffects.beginPhase(),
+            [&](const ContactBounds& bounds,auto emit){return shops.visitWallContacts(bounds,emit);});
+    }
     bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y,GameMakerRandom& random){
         if(effectsSucceeded)effectsSucceeded=smokeEffects.skeletonBurst(x,y,random);
         return effectsSucceeded;

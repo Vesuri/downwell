@@ -123,6 +123,14 @@ Water's empty event must not be treated as wall contact. The metadata, target
 families and event instructions are checked by `verify-enemy-contact.py`.
 Live terrain enumerators are tracked in the single work queue.
 
+Both gameplay adapters dispatch shop-wall contacts through `RunSession` after
+smoke Step. `ShopWorld::visitWallContacts` enumerates the table, three cases and
+the extant invisible wall individually, including sold cases. All these child
+types descend from parentWall; the counter itself is not a substitute. One-way
+platform object 93 is not a parentWall descendant and must not be admitted by
+reusing a player-landing query. The native terrain occupancy grid merges
+instances, so it cannot yet supply the per-instance terrain contact contract.
+
 ### Native smoke distance gate
 
 `point_distance` at 0x53d5b0 rounds coordinate differences, squares and their sum

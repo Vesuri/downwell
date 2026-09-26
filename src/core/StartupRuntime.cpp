@@ -398,6 +398,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         updateMainBullets();
         updateMainEnemies();
         run_.stepSmoke(smokeStepPhase,random_);
+        run_.collideSmokeShopWalls();
         updateMainEnemyInteractions();
         run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);

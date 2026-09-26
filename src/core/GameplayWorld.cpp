@@ -837,6 +837,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
     DW_PROFILE_PHASE(profileEnemyContact);
     run_.stepSmoke(smokeStepPhase,enemyRandom_);
+    run_.collideSmokeShopWalls();
     downwell::stepEnemyContacts(enemyCount_, player_, health_, invulnerability_,
         enemiesDefeated_, run_.combo.state, run_.upgrades.levels[7] != 0,
         [this](unsigned i) -> EnemyState& { return enemies_[i]; },
