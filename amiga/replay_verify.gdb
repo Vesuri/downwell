@@ -32,6 +32,7 @@ printf "DOWNWELL_REPLAY_RESULT BONE_ANIMATION %u %08x %u\n", gBoneAnimationCount
 printf "DOWNWELL_REPLAY_RESULT SPATIAL %u %08x %u\n", gSpatialChecks, gSpatialDigest, gSpatialFailures
 printf "DOWNWELL_REPLAY_RESULT CORPSE %u %08x %u\n", gCorpseChecks, gCorpseDigest, gCorpseFailures
 printf "DOWNWELL_REPLAY_RESULT DAMAGE_NUMBER %u %08x %u\n", gDamageNumberChecks, gDamageNumberDigest, gDamageNumberFailures
+printf "DOWNWELL_REPLAY_RESULT PLAYER_PRECISE %u %08x %u\n", gPlayerPreciseChecks, gPlayerPreciseDigest, gPlayerPreciseFailures
 shell touch .run/gdb-ready.marker
 detach
 quit

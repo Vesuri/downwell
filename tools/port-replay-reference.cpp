@@ -8,6 +8,7 @@
 #include "core/RunnerSpatialVerification.h"
 #include "core/CorpseVerification.h"
 #include "core/DamageNumberVerification.h"
+#include "core/PlayerPreciseVerification.h"
 
 #include <cinttypes>
 #include <cstdio>
@@ -61,5 +62,8 @@ int main() {
     const auto numbers=downwell::verifyDamageNumbers();
     if(numbers.failures)return 12;
     std::printf("DAMAGE_NUMBER %u %08x %u\n",numbers.checks,numbers.digest,numbers.failures);
+    const auto precise=downwell::verifyPlayerPrecise();
+    if(precise.failures)return 13;
+    std::printf("PLAYER_PRECISE %u %08x %u\n",precise.checks,precise.digest,precise.failures);
     return 0;
 }
