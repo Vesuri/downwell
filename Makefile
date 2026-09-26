@@ -138,6 +138,17 @@ test: verify-debris-animation
 test: verify-debris-effects
 test: verify-debris-draw
 test: verify-dead-body-creation
+test: verify-corpse-birth
+
+.PHONY: verify-corpse-birth
+verify-corpse-birth: build/corpse-birth-test
+	python3 tools/verify-dead-body-creation.py
+	python3 tools/verify-runner-move-snap.py
+	./build/corpse-birth-test
+
+build/corpse-birth-test: tests/core/CorpseBirthTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/CorpseBirthTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-dead-body-creation
 verify-dead-body-creation: build/dead-body-creation-test

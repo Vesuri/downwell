@@ -77,6 +77,20 @@ hooks, including sprite assignment's animation/collision consequences.
 `verify-dead-body-creation` pins the VM script and checks scalar branch
 boundaries, synchronous caller mutations and terminal callback failures.
 
+`CorpseBirth` supplies inherited object-90 defaults and object-263 Create,
+including the three initial random draws and terrain-dependent relocation.
+Its wall adapter queries parent 57; its tile adapter queries layer 100. The
+owner publishes the constructor position before Create and each subsequent
+builtin coordinate write through the supplied publication callback.
+The source short-circuits wall/tile checks, samples X before Y, tests candidate
+walls but origin tiles, increases radius to 36, and applies the last candidate
+after 33 blocked attempts. Keep these quirks: correcting them changes behavior
+and the random stream. Move-snap uses float division and integer nearest-even
+rounding before multiplication. `verify-corpse-birth` checks the pinned Create
+events/runner, full RNG state, query coordinates, publication order and failures.
+Step, collisions, animation, lifetime ownership and live admission remain
+separate work; this test does not establish the world's collision decisions.
+
 `DebrisBirth` implements that object-370 Create with four ordered RNG draws,
 custom binary64 motion/rate fields and narrowed builtin animation fields.
 `make verify-debris-birth` pins the input/export/resource/assembly identities

@@ -437,6 +437,18 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/DebrisAnimation.h"
 #include "core/DebrisEffects.h"
 #include "core/DeadBodyCreation.h"
+#include "core/CorpseBirth.h"
+namespace {
+struct CorpseBirthQueries {
+    bool wall(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=true;return true;}
+    bool tile(downwell::MotionBinary64,downwell::MotionBinary64,bool& hit){hit=false;return true;}
+    bool publish(downwell::RunnerImageValue,downwell::RunnerImageValue){return true;}
+};
+}
+bool compileCorpseBirth(downwell::CorpseBirth& birth,downwell::GameMakerRandom& random){
+    CorpseBirthQueries queries;
+    return birth.create({}, {},false,random,queries);
+}
 namespace {
 struct CorpseCompileEvents {
     unsigned trace=0;

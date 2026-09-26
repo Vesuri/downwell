@@ -17,3 +17,8 @@ assert (obj["id"], obj["name"], obj["parentId"]) == (263, "objDeadBody", 90)
 assembly = (export / "Assembly/gml_GlobalScript_scrDeadBody.asm").read_bytes()
 assert sha256(assembly).hexdigest() == "2245353309bd2ac8cb2006f0e162803fb1df0079b8ab2f42dcd20ac469425e08"
 print("Pinned scrDeadBody: synchronous object-263 Create, ordered overrides and caller xsp mutation")
+for name,digest in {
+    "objDeadBody": "c16d01975d0ec7438dc9f4d01099ef9e9a85a11ece015940ec655ef91831d793",
+    "parentShootableThing": "f5c0c5d89f5db5d6ecc01a01c961592fb0a0e413eda14df7c402ed936f487a40",
+}.items():
+    assert sha256((export / f"Assembly/gml_Object_{name}_Create_0.asm").read_bytes()).hexdigest() == digest
