@@ -247,7 +247,15 @@ build/blood-bounds-test: tests/core/BloodCollisionBoundsTest.cpp $(wildcard src/
 test: verify-time-stop-bound
 test: verify-player-time-stop
 test: verify-time-change
-test: verify-time-shard-birth
+test: verify-time-shard-birth verify-time-shard-lifecycle
+.PHONY: verify-time-shard-lifecycle
+verify-time-shard-lifecycle: build/time-shard-lifecycle-test
+	./build/time-shard-lifecycle-test
+
+build/time-shard-lifecycle-test: tests/core/TimeShardLifecycleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardLifecycleTest.cpp src/core/GameMakerRandom.cpp
+
 .PHONY: verify-time-shard-birth
 verify-time-shard-birth: build/time-shard-birth-test
 	./build/time-shard-birth-test

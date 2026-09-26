@@ -8,6 +8,11 @@
 #include "core/PlayerTimeStop.h"
 #include "core/TimeChangeEffect.h"
 #include "core/TimeShardBirth.h"
+#include "core/TimeShardLifecycle.h"
+bool compileTimeShardLifecycle(downwell::TimeShardLifecycle& shard,downwell::GameMakerRandom& random,unsigned alarm){
+    shard.advanceAlarm(alarm);
+    return shard.playerContact({},downwell::MotionBinary64::fromInteger(-1),random);
+}
 bool compileTimeShard(downwell::TimeShardBirth& shard,downwell::GameMakerRandom& random){
     return shard.create({}, {},false,random);
 }
