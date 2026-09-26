@@ -217,6 +217,18 @@ without changing the lifetime or active flag, and repeated publication is a
 no-op. Direct writes to a record's `objectId` bypass this contract and must not
 be used. `visitObject` returns the matching lifetime handle and const record.
 
+The explicit `bindObject` callback can update an external owner's membership
+before changing the stored object ID. It receives the old record and fails
+without changing that record if publication fails. The collision owner's
+`rebindObjectMembership` preserves the lifetime and appends even a same-object
+binding, with registration controlled explicitly rather than by active flags.
+This is only `0x46b830..0x46b8b2` membership behavior, not the complete object
+property operation. The subsequent source code copies mask/depth, changes flags
+and sprite, and queues bounds refreshes; for an unprepared non-solid object when
+global preparation is disabled, it calls `0x501f70` to remove spatial/dirty
+membership without destroying the instance. Those property effects must be
+connected separately before treating this as a complete live object change.
+
 The store preserves persistent memberships when compacting for room entry;
 source-specific room-transition rebinding still belongs to the room owner.
 Decoded-host deferred activation publishes at event-phase boundaries; other

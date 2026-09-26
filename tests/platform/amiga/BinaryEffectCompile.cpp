@@ -329,6 +329,14 @@ downwell::RunnerSpatialObjectPreparation::Path compileObjectPreparation(
 }
 #include "core/RunnerRoomMembership.h"
 #include "core/EventScheduler.h"
+bool compileSpatialObjectRebind(downwell::InstanceStore<4>& store,
+    downwell::RunnerSpatialInstances<4,8>& owner,downwell::InstanceHandle handle,
+    int object,bool registered) {
+    return store.bindObject(handle,object,registered,
+        [&](downwell::InstanceHandle h,const downwell::InstanceRecord&,int next,bool member){
+            return owner.rebindObjectMembership(h,next,member);
+        });
+}
 bool compileSpatialMembershipStep(downwell::InstanceStore<4>& store,
     downwell::RunnerSpatialInstances<4,8>& owner) {
     return downwell::EventScheduler<4>::runStep(store,

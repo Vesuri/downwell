@@ -143,8 +143,16 @@ public:
     // Object changes must use this boundary rather than writing objectId.
     // Rebinding appends even when the object and lifetime are unchanged.
     bool bindObject(InstanceHandle handle,std::int32_t objectId,bool registered=true) {
+        return bindObject(handle,objectId,registered,
+            [](InstanceHandle,const InstanceRecord&,std::int32_t,bool){return true;});
+    }
+    // Callback observes the old object and must not mutate this store. Only
+    // membership/identity is changed here, not the new object's default fields.
+    template<class Publish>
+    bool bindObject(InstanceHandle handle,std::int32_t objectId,bool registered,Publish publish) {
         auto* instance=resolve(handle);
         if(!instance || objectId<0)return false;
+        if(!publish(handle,static_cast<const InstanceRecord&>(*instance),objectId,registered))return false;
         objectMembership_.unbind(handle.slot);
         instance->objectId=objectId;
         if(registered)objectMembership_.bind(handle.slot,objectId,handle.generation);

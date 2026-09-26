@@ -60,6 +60,17 @@ public:
         if(registered)flags&=~0x80000u;else flags|=0x80000u;
         return true;
     }
+    // Membership portion of 0x46b830 only, before new object properties are
+    // applied. Even same-object binding appends anew. Registration is an
+    // explicit argument, not inferred from activation flags. The caller must
+    // separately apply the resource/flag/queue effects at 0x46b8b2..0x46b968.
+    bool rebindObjectMembership(InstanceHandle h,int object,bool registered){
+        if(!valid()||!live(h)||object<0)return false;
+        membership_.unbind(h.slot);
+        entries_[h.slot].object=object;
+        if(registered)membership_.bind(h.slot,object,h.generation);
+        return true;
+    }
     // Collision side of 0x4627d0/0x467640. Room pending requests and traversal
     // cache invalidation belong to the scheduler. Do NOT rebind object lists
     // here, or synthesize bounds-dirty bit 8: reactivation queues a refresh even

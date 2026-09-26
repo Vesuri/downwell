@@ -180,6 +180,29 @@ int main(){
     assert(owner.place(self,1,{}, {},false,graph,refresh,precise,result));
     assert(!result.found&&preciseOrder.empty());
     assert(owner.registerObject(a,true));
+    b=attach(90,2);
+    auto rebind=[&](InstanceHandle h,const InstanceRecord& old,int object,bool registered){
+        assert(store.resolve(h)==&old);
+        return owner.rebindObjectMembership(h,object,registered);
+    };
+    modes.clear();
+    assert(owner.place(self,0,{}, {},false,graph,refresh,precise,result));
+    assert(result.found&&result.handle.slot==a.slot&&modes[0]);
+    const auto oldFlags=owner.resolve(a)->flags;
+    assert(store.bindObject(a,1,true,rebind)); // Same object still appends.
+    modes.clear();
+    assert(owner.place(self,0,{}, {},false,graph,refresh,precise,result));
+    assert(result.found&&result.handle.slot==b.slot&&modes[0]);
+    assert(owner.resolve(a)->flags==oldFlags&&store.resolve(a)->objectId==1);
+    assert(store.bindObject(a,2,true,rebind));
+    assert(owner.place(self,1,{}, {},false,graph,refresh,precise,result)&&!result.found);
+    assert(store.bindObject(b,2,false,rebind));
+    assert(owner.place(self,2,{}, {},false,graph,refresh,precise,result));
+    assert(result.found&&result.handle.slot==a.slot&&owner.resolve(b));
+    assert(!store.bindObject(a,1,true,[](InstanceHandle,const InstanceRecord&,int,bool){return false;}));
+    assert(store.resolve(a)->objectId==2);
+    assert(!owner.rebindObjectMembership({a.slot,a.generation+1},1,true));
+    assert(!owner.rebindObjectMembership(a,-1,true)&&owner.valid());
     assert(owner.move(self,{0x3f800000},{},0x38));
     assert(!owner.flush([](InstanceHandle,bool){return false;}));
     assert(!owner.valid());
