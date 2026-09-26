@@ -11,7 +11,7 @@ set $stack_guard = (unsigned long *)SysBase->ThisTask->tc_SPLower
 set $guard_word = 0
 while $guard_word < 64
     if $stack_guard[$guard_word] != 0x57ac6a4d
-        printf "Replay exhausted the 256-byte task-stack safety margin\n"
+        printf "Replay exhausted the 256-byte task-stack safety margin (first stage %u, word %u, stack %p..%p)\n", gReplayStackFailureStage, $guard_word, SysBase->ThisTask->tc_SPLower, SysBase->ThisTask->tc_SPUpper
         quit 1
     end
     set $guard_word = $guard_word + 1
@@ -25,6 +25,7 @@ printf "Bone motion benchmark: 1000 two-axis updates, %u PAL fields\n", gBoneBen
 printf "DOWNWELL_REPLAY_RESULT BONE_CREATE %u %08x %u\n", gBoneCreateCount, gBoneCreateDigest, gBoneCreateFailures
 printf "DOWNWELL_REPLAY_RESULT BONE_ANIMATION %u %08x %u\n", gBoneAnimationCount, gBoneAnimationDigest, gBoneAnimationFailures
 printf "DOWNWELL_REPLAY_RESULT SPATIAL %u %08x %u\n", gSpatialChecks, gSpatialDigest, gSpatialFailures
+printf "DOWNWELL_REPLAY_RESULT CORPSE %u %08x %u\n", gCorpseChecks, gCorpseDigest, gCorpseFailures
 shell touch .run/gdb-ready.marker
 detach
 quit

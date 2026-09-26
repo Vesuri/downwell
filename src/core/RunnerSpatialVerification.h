@@ -1,6 +1,9 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_VERIFICATION_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_VERIFICATION_H
 #include "RunnerSpatialInstances.h"
+#ifndef DOWNWELL_PLATFORM_AMIGA
+#include <new>
+#endif
 namespace downwell {
 // CPU-independent mutation tape. Expected flags/queue membership are checked
 // separately from the digest; equal host/target failures must never pass.
@@ -11,14 +14,17 @@ struct RunnerSpatialVerification {
     void check(bool value){++checks;if(!value)++failures;}
     void word(std::uint32_t value){digest=(digest^value)*16777619u;}
 };
-inline RunnerSpatialVerification verifyRunnerSpatialMutations(){
+// Keep this fixture's sizeable owner scratch off the small target task stack.
+// Placement construction also avoids unsupported guarded-static runtime calls.
+[[gnu::noinline]] inline RunnerSpatialVerification verifyRunnerSpatialMutations(){
     RunnerSpatialVerification result;
     using Owner=RunnerSpatialInstances<2,8>;
+    alignas(Owner) static std::uint8_t storage[sizeof(Owner)];
     const InstanceHandle h{0,1};
     const std::uint32_t values[]={0u,0x80000000u,0x3f800000u,0x40000000u,0xbf800000u};
     for(unsigned axis=0;axis<3;++axis)for(auto bits:values)
     for(unsigned tinted=0;tinted<2;++tinted)for(unsigned faded=0;faded<2;++faded){
-        Owner owner;Owner::State clean;clean.flags=0;
+        auto& owner=*new (storage) Owner;Owner::State clean;clean.flags=0;
         result.check(owner.attach(h,1,clean));
         Owner::Sprite sprite;
         auto& target=axis==0?sprite.scaleX:axis==1?sprite.scaleY:sprite.angle;
@@ -37,7 +43,7 @@ inline RunnerSpatialVerification verifyRunnerSpatialMutations(){
         result.word(owner.pendingSpatial());result.word(owner.pendingCollision());
     }
     for(unsigned objectFlags=0;objectFlags<256;++objectFlags)for(unsigned prepared=0;prepared<2;++prepared){
-        Owner owner;Owner::State state;state.flags=0x200070u;
+        auto& owner=*new (storage) Owner;Owner::State state;state.flags=0x200070u;
         result.check(owner.attach(h,1,state));
         const Owner::Box box{};
         result.check(owner.refresh(h,0x38,false,&box,false,true));

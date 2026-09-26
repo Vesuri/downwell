@@ -6,6 +6,7 @@
 #include "core/MachineGunVerification.h"
 #include "core/GameplayWorld.h"
 #include "core/RunnerSpatialVerification.h"
+#include "core/CorpseVerification.h"
 
 #include <cinttypes>
 #include <cstdio>
@@ -53,5 +54,8 @@ int main() {
     const auto spatial=downwell::verifyRunnerSpatialMutations();
     if(spatial.failures) return 10;
     std::printf("SPATIAL %u %08x %u\n",spatial.checks,spatial.digest,spatial.failures);
+    const auto corpses=downwell::verifyCorpses();
+    if(corpses.failures)return 11;
+    std::printf("CORPSE %u %08x %u\n",corpses.checks,corpses.digest,corpses.failures);
     return 0;
 }

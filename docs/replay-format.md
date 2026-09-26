@@ -80,25 +80,47 @@ make verify-cross-replay
 The target builds a verification-only 68000 executable, boots it as an A500 in
 FS-UAE, feeds the embedded bytes through the same `ReplayReader` used on the
 host, and reads the completed digest at a named GDB breakpoint. The host and
-Amiga must both report 64 frames and `9f0d3943e7900d2b`. The target then cleanly
+Amiga must report identical frame counts, digests and coverage. The host runner
+prints the expected result for the current source; do not use an older stored
+transcript as the authority. The target then cleanly
 rebuilds the ordinary joystick-driven executable, preventing verification flags
 from leaking into an interactive build.
 
 The gate also runs the same isolated 400-update `GemVerification` fixture on
-host and target. Its schema-2 digest is `9543220ed0d8e596` and required coverage
-mask is `3f`: free motion, homing, acquisition, terrain contact, expiry and
+host and target. Required coverage is defined by `gemVerificationCoverage`:
+free motion, homing, acquisition, terrain contact, expiry and
 attracted survival past expiry must all occur. Every update hashes authoritative
 motion, lifetime, homing and animation fields plus RNG draw count/index; final
 RNG words and the coverage mask are included. Collection is tested but not
 applied, deliberately keeping gems alive to reach lifetime boundaries.
 
-The full result line is:
+The gate also checks player death, machine-gun, binary64 motion, bone creation/
+animation, spatial mutations and corpse execution. Inspect the complete current
+host result with:
 
-```text
-64 9f0d3943 e7900d2b 400 9543220e d0d8e596 3f
+```sh
+make build/port-replay-reference
+./build/port-replay-reference
 ```
 
-Both digests and coverage must agree; a host fixture with missing coverage
+All digests and coverage must agree; a host fixture with missing coverage
 fails before comparison. This is cross-CPU verification of the shared code,
 not validation of its remaining approximations against Windows. The fixture
 is compiled out of normal Amiga builds and does not affect frame time.
+
+`CorpseVerification` runs 32 seeded owned creation/motion/animation/expiration
+tapes, hashing published and precise positions, velocities, animation, alarms
+and full RNG state. Its 1,184 independent checks must report zero failures;
+matching failure counts are not success. The standalone regression is
+`make verify-corpse-replay`. Verification scratch storage uses aligned static
+bytes and placement construction, not the small Amiga task stack or guarded
+local-static initialization. The debugger checks the stack safety margin before
+accepting results. This fixture uses controlled no-contact queries; it does not
+prove live spatial integration, original-game fidelity or frame-budget fit.
+
+The native gate retains a 256-byte stack canary and records the first failing
+checkpoint without resetting it. Diagnostic stage numbers are: 1 startup/gameplay,
+2 gems, 3 player death, 4 machine gun, 5 motion, 6 motion benchmark, 7 bones,
+8 bone benchmark, 9 bone creation, 10 bone animation, 11 spatial mutations and
+12 corpses. Both spatial and corpse fixtures reconstruct their scratch owners
+in static storage; they are sequential test workloads, not reentrant APIs.
