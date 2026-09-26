@@ -170,6 +170,12 @@ bool compileCurrencySmokeComposition(downwell::CurrencySmokeComposition& composi
         smoke,assets,view,settings,[&](auto emit){emit(view.x,view.y);},
         [](downwell::MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);});
 }
+#include "core/RunnerObjectMembership.h"
+unsigned compileObjectMembership(downwell::RunnerObjectMembership<64>& registry,
+    unsigned slot,int object,std::uint32_t identity,int parent) {
+    if(!registry.bind(slot,object,identity))return 0;
+    return registry.count(parent,[](int child,int ancestor){return child==ancestor+1;});
+}
 bool compileSmokeComposition(downwell::SmokeComposition& composition,
     const downwell::SmokeEffects<32>& smoke,const downwell::EffectMaskAssets& assets,
     const downwell::EffectSurfacePlacement::View& view,

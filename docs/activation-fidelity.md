@@ -86,8 +86,15 @@ before moving the current instance:
 Thus completed deactivate/reconcile/reactivate/reconcile cycles append an
 instance to its object's registration list anew. A deactivate/reactivate pair
 before reconciliation need not move membership at all. Multiple promotions
-append in inactive-list traversal order, not request order. Spatial-index
-effects of the room integration hook require separate tracing.
+append in inactive-list traversal order, not request order.
+
+The integration hook `0x4266e0` is gated by global byte `0xb57f18` and instance
+flag `0x400`. It looks up the instance's layer/element, unlinks that element
+through `0x424b20`, and inserts it at the layer-element list tail when flag `2`
+is set (`0x412c20`) or at the head when clear (`0x412a00`). These linked-list
+primitives do not publish collision-tree bounds. Keep layer ordering separate
+from object/ancestor membership and the spatial dirty pass; do not add a
+collision-index remove/insert merely because this hook is called.
 
 The frame loop calls Begin Step dispatcher `0x50b7e0(1)` at `0x50dc81`, then
 calls the reconciliation wrapper at `0x50dc89`, after the dispatcher returns.
