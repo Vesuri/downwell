@@ -4,6 +4,10 @@
 #include "core/BloodCollisionBounds.h"
 #include "core/BloodMaskSample.h"
 #include "core/BloodGoalContact.h"
+#include "core/TimeStopGoalContact.h"
+bool compileTimeStopGoalContact(downwell::RunnerImageValue x,downwell::RunnerImageValue scale,const downwell::GoalTimeField& field,bool& hit){
+    return downwell::TimeStopGoalContact::query(downwell::TimeStopGoalContact::Mask::Player,x,x,scale,scale,field,hit);
+}
 #include "core/RunSession.h"
 #include "core/PlayerTimeStop.h"
 #include "core/TimeChangeEffect.h"

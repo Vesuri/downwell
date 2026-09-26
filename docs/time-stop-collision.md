@@ -22,6 +22,26 @@ must agree with [the runner collision rules](runner-collision-bounds.md).
 
 ## Player event boundary
 
+The unrotated precise path at Windows runner `0x4b9227..0x4b93f6`
+narrows reciprocal scales to binary32. For each negative reciprocal it
+subtracts one from the corresponding position before inverse sampling.
+Each subtraction, multiply and origin addition rounds separately to binary32;
+sample coordinates are truncated before canvas and stored-mask lookup.
+
+Compatibility bounds at `0x46616d..0x466328` compute the lower edge as
+`float(float((margin-origin)*scale)+position)` and the upper edge as
+`float(float(width*scale)+lower)`. They round both edges, swap if needed,
+and subtract one from the upper inclusive edge. Computing the upper edge
+independently from the position is not the same arithmetic contract.
+
+`TimeStopGoalContact` specializes these rules for the two rectangular masks
+above and an integral-centred, scale-2 goal field. It returns half-open bounds
+internally, then tests shared solid pixels in X/Y traversal order. It does not
+handle rotated actors or other time-field resources. Unsupported numeric
+inputs fail explicitly. The nearest-even bounds assumption still requires
+original-runtime FP-mode verification; source pinning and host scalar tests
+are not execution of the Windows collision routine.
+
 In `objPlayer_n` Begin Step, `scrPlMovement` precedes clock accounting. The
 source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.
 Camera/interactable queries follow, then the time-stop transition query uses
