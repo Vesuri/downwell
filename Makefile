@@ -715,6 +715,15 @@ build/player-time-stop-test: tests/core/PlayerTimeStopTest.cpp src/core/PlayerTi
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/PlayerTimeStopTest.cpp
 
+.PHONY: verify-player-horizontal-binary64
+test: verify-player-horizontal-binary64
+verify-player-horizontal-binary64: build/player-horizontal-binary64-test
+	./build/player-horizontal-binary64-test
+
+build/player-horizontal-binary64-test: tests/core/PlayerHorizontalBinary64Test.cpp src/core/PlayerHorizontalBinary64.h src/core/MotionBinary64.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/PlayerHorizontalBinary64Test.cpp
+
 test: verify-goal-field-bounds
 .PHONY: verify-goal-field-bounds
 verify-goal-field-bounds: build/goal-field-bounds-test
