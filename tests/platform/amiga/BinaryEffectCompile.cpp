@@ -5,6 +5,9 @@
 bool compileRunnerSpatialIndex(downwell::RunnerSpatialIndex<256>& index,downwell::RunnerSpatialSplit::Box box,unsigned id,unsigned& found){
     return index.insert(box,id)&&index.query(box,[&](unsigned hit){found=hit;return false;});
 }
+bool compileRunnerSpatialRemoval(downwell::RunnerSpatialIndex<256>& index,downwell::RunnerSpatialSplit::Box box,unsigned id,bool& removed){
+    return index.remove(box,id,true,removed);
+}
 bool compileRunnerSpatialNode(downwell::RunnerSpatialNode& node,downwell::RunnerSpatialNode& sibling,const downwell::RunnerSpatialNode::Entry& entry,unsigned index){
     return node.erase(index)&&node.append(entry)&&node.split(entry,sibling);
 }

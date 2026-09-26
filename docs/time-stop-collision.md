@@ -246,19 +246,26 @@ Its component tests cover every removal slot, reappend, internal/leaf distinctio
 split ordering and failure preservation. It does not yet own condensation,
 index traversal or the dirty queue.
 
-`RunnerSpatialIndex` owns fixed-capacity nodes for insertion and broad-phase
-queries. It descends by least binary32 area enlargement (then least area, then
+`RunnerSpatialIndex` owns fixed-capacity nodes for insertion, removal and
+broad-phase queries. It descends by least binary32 area enlargement (then least area, then
 earliest slot), propagates splits, and creates roots with the old child before
 the new sibling. Queries use closed bounding boxes and depth-first ascending
 entry order; a callback can stop the entire traversal at the first precise hit.
 An invalid insertion, unsupported arithmetic or exhausted node capacity latches
 failure and prevents queries until reset. Invalid query bounds alone do not
-change a valid index. The owner still lacks removal/condensation and live
-dirty-instance scheduling; it is not an `instance_place` replacement yet.
+change a valid index. Removal implements last-entry replacement, underfill
+detachment, original-level reinsertion and single-child root collapse. Recycled
+nodes return to a free list only after their surviving entries are reinserted.
+Its optional root-bounds retry follows the source wrapper. Not-found reports a
+successful operation with `removed=false`; mutation failure leaves that output
+untouched and disables the index until reset. Live dirty-instance scheduling
+and eligibility remain outside this owner; it is not an `instance_place`
+replacement yet.
 
 The scalar reference test compares ordered query results and first-hit stops
-through multi-level insertions, not just unordered hit sets. It also covers
-empty queries, touching bounds, split/root capacity exhaustion and reset. This
+through multi-level insertions and remove/reinsert sequences, not just unordered
+hit sets. It also covers empty queries, touching bounds, split/root capacity
+exhaustion, stale-bounds retry, root collapse, reclaimed-node reuse and reset. This
 does not establish original-game encounter ordering until the same instances
 and mutation sequence populate the index.
 

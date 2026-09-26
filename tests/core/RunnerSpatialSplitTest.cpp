@@ -52,14 +52,14 @@ struct ReferenceTree {
         for(const auto& e:nodes[n].entries)out=merge(out,e.box);
         return out;
     }
-    int add(unsigned n,Entry e){
-        if(nodes[n].level){
+    int add(unsigned n,Entry e,int level=0){
+        if(nodes[n].level>level){
             unsigned best=0;float growth=INFINITY,oldArea=INFINITY;
             for(unsigned i=0;i<nodes[n].entries.size();++i){
                 Box b=nodes[n].entries[i].box;float size=area(b),delta=area(merge(b,e.box))-size;
                 if(delta<growth || (delta==growth && size<oldArea)){best=i;growth=delta;oldArea=size;}
             }
-            unsigned child=nodes[n].entries[best].link;int split=add(child,e);
+            unsigned child=nodes[n].entries[best].link;int split=add(child,e,level);
             nodes[n].entries[best].box=bounds(child);
             if(split<0)return -1;
             e={bounds(unsigned(split)),unsigned(split)};
@@ -74,9 +74,38 @@ struct ReferenceTree {
         return int(sibling);
     }
     void insert(Box b,unsigned id){
-        int sibling=add(root,{b,id});if(sibling<0)return;
+        insertEntry({b,id},0);
+    }
+    void insertEntry(Entry entry,int level){
+        int sibling=add(root,entry,level);if(sibling<0)return;
         Node parent{nodes[root].level+1,{{bounds(root),root},{bounds(unsigned(sibling)),unsigned(sibling)}}};
         root=unsigned(nodes.size());nodes.push_back(parent);
+    }
+    bool erase(unsigned n,Box query,unsigned id,std::vector<unsigned>& detached){
+        for(unsigned i=0;i<nodes[n].entries.size();++i){
+            Entry entry=nodes[n].entries[i];
+            if(nodes[n].level){
+                auto b=entry.box;
+                if(query[0]>b[2] || query[2]<b[0] || query[1]>b[3] || query[3]<b[1])continue;
+                if(!erase(entry.link,query,id,detached))continue;
+                if(nodes[entry.link].entries.size()>=2){nodes[n].entries[i].box=bounds(entry.link);return true;}
+                detached.push_back(entry.link);
+            }else if(entry.link!=id)continue;
+            nodes[n].entries[i]=nodes[n].entries.back();nodes[n].entries.pop_back();return true;
+        }
+        return false;
+    }
+    bool remove(Box query,unsigned id,bool retry){
+        std::vector<unsigned> detached;
+        bool found=erase(root,query,id,detached);
+        if(!found && retry && !nodes[root].entries.empty())found=erase(root,bounds(root),id,detached);
+        if(!found)return false;
+        for(auto it=detached.rbegin();it!=detached.rend();++it){
+            auto entries=nodes[*it].entries;int level=nodes[*it].level;
+            for(auto e:entries)insertEntry(e,level);
+        }
+        if(nodes[root].level && nodes[root].entries.size()==1)root=nodes[root].entries[0].link;
+        return true;
     }
     void visit(unsigned n,Box query,std::vector<unsigned>& hits)const{
         for(const auto& e:nodes[n].entries){
@@ -147,9 +176,11 @@ int main(){
     }
     for(unsigned trial=0;trial<32;++trial){
         downwell::RunnerSpatialIndex<256> tree;ReferenceTree scalar;
+        Box live[200];
         for(unsigned id=0;id<200;++id){
             float x=(int(random()%4096)-2048)/8.0f,y=(int(random()%4096)-2048)/8.0f;
             Box b={x,y,x+float(random()%512)/8,y+float(random()%512)/8};
+            live[id]=b;
             assert(tree.insert(packed(b),id));scalar.insert(b,id);
             assert(tree.height()==scalar.nodes[scalar.root].level);
             std::vector<unsigned> actual,expected;
@@ -163,6 +194,31 @@ int main(){
         Box all={-10000,-10000,10000,10000};std::vector<unsigned> actual,expected;
         assert(tree.query(packed(all),[&](unsigned hit){actual.push_back(hit);return true;}));
         scalar.visit(scalar.root,all,expected);assert(actual==expected && actual.size()==200);
+        auto compare=[&](){
+            actual.clear();expected.clear();
+            assert(tree.query(packed(all),[&](unsigned hit){actual.push_back(hit);return true;}));
+            scalar.visit(scalar.root,all,expected);assert(actual==expected);
+            assert(tree.height()==scalar.nodes[scalar.root].level);
+        };
+        for(unsigned move=0;move<128;++move){
+            unsigned id=random()%200;bool removed=false;
+            // Deliberately stale pruning bounds exercise the root retry path.
+            Box old=move%3?live[id]:Box{9000,9000,9001,9001};
+            assert(tree.remove(packed(old),id,true,removed) && removed);
+            assert(scalar.remove(old,id,true));compare();
+            float x=(int(random()%4096)-2048)/8.0f,y=(int(random()%4096)-2048)/8.0f;
+            live[id]={x,y,x+8,y+8};
+            assert(tree.insert(packed(live[id]),id));scalar.insert(live[id],id);compare();
+        }
+        bool removed=true;
+        assert(tree.remove(packed(all),999,false,removed) && !removed);compare();
+        for(unsigned id=0;id<200;++id){
+            assert(tree.remove(packed(live[id]),id,false,removed) && removed);
+            assert(scalar.remove(live[id],id,false));compare();
+        }
+        assert(tree.height()==0 && tree.nodeCount()==1);
+        // Repeated full refill must reuse reclaimed slots, not exhaust the pool.
+        for(unsigned id=0;id<200;++id)assert(tree.insert(packed(live[id]),id));
         tree.clear();assert(tree.valid() && tree.height()==0 && tree.nodeCount()==1);
         assert(tree.query(packed(all),[](unsigned){assert(false);return true;}));
     }
@@ -184,8 +240,11 @@ int main(){
     downwell::RunnerSpatialIndex<1> small;
     for(unsigned i=0;i<6;++i)assert(small.insert({},i));
     assert(!small.insert({},6) && !small.valid());
+    bool removalResult=true;
+    assert(!small.remove({},0,true,removalResult) && removalResult);
     assert(!small.query({},[](unsigned){assert(false);return true;}));
     assert(!small.insert({},7));small.clear();assert(small.insert({},8));
+    assert(!small.remove(invalid,8,true,removalResult) && removalResult && !small.valid());
     // Capacity for the split sibling but not its new root also fails closed.
     downwell::RunnerSpatialIndex<2> rootFailure;
     for(unsigned i=0;i<6;++i)assert(rootFailure.insert({},i));
@@ -203,5 +262,5 @@ int main(){
     assert(!Split::partition(identical,result)); // Area overflow is not infinity.
     for(unsigned i=0;i<7;++i)assert(result.group[i]==tied[i]);
     assert(result.count[0]==5 && result.count[1]==2);
-    std::puts("Spatial index: 6400 ordered scalar-reference queries/first hits, multilevel insertion, capacity failure; 8192 partitions and node removal checks passed");
+    std::puts("Spatial index: 6400 insertion/first-hit and 14624 mutation-order comparisons, 4096 moves, root retry/collapse/reuse; 8192 partitions passed");
 }
