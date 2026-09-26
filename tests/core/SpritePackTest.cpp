@@ -134,8 +134,23 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 "collision owner retains 30.5 rather than rounded record position");
         require(storedOwner.flush([&](auto h,bool publish){return lifecycle.refresh(h,*records.resolve(h),publish);}),
                 "dirty pass refreshes through stored resources");
+        auto& animated=properties[born.slot];
+        animated.sprite.imageIndex.bits=0x41000000u; // 8, beyond the one-frame skeleton sprite.
+        animated.timeline.bits=0x41000000u;animated.cachedFrame.bits=0x40000000u;
+        require(lifecycle.sprite(born,records.at(0),205)&&animated.sprite.spriteId==205&&
+                animated.sprite.imageIndex.bits==0&&animated.timeline.bits==0&&
+                animated.cachedFrame.bits==0xbf800000u&&(storedOwner.resolve(born)->flags&8u),
+                "stored sprite mutation applies resource-backed sequence resets and invalidation");
+        require(storedOwner.flush([&](auto h,bool publish){return lifecycle.refresh(h,*records.resolve(h),publish);}),
+                "sprite mutation refreshes collision bounds through the same owner");
+        animated.cachedFrame.bits=0x40000000u;
+        require(lifecycle.sprite(born,records.at(0),205)&&animated.cachedFrame.bits==0x40000000u&&
+                !(storedOwner.resolve(born)->flags&8u)&&storedOwner.pendingSpatial()==0,
+                "same sprite preserves cached frame and clean bounds");
         auto wrong=records.at(0);wrong.objectId=35;
-        require(!lifecycle.move(born,wrong,{}, {})&&!lifecycle.refresh(old,records.at(0),true),
+        require(!lifecycle.move(born,wrong,{}, {})&&!lifecycle.refresh(old,records.at(0),true)&&
+                !lifecycle.sprite(born,wrong,206)&&!lifecycle.sprite(old,records.at(0),206)&&
+                animated.sprite.spriteId==205,
                 "wrong-object snapshots and expired handles cannot mutate collision ownership");
         require(records.clear([&](auto h,const auto& record){return lifecycle.retire(h,record);}),"retire dynamic birth before next room");
         definition.rotation=30.0f;
