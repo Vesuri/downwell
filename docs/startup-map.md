@@ -83,7 +83,7 @@ set to zero, so the first branch always wins. With splash enabled, the object
 advances a timed splash state before calling `room_goto(20)`; without it, the
 transition happens immediately.
 
-This gives the first bounded host milestone:
+The startup event sequence is:
 
 ```text
 load authoritative entry room
@@ -93,16 +93,6 @@ load authoritative entry room
 → transition deterministically to rmMenu (resource ID 20)
 ```
 
-The first implementation should model event ordering and state changes without
-trying to render the complete menu. That keeps the slice small while exercising
-the parts of GameMaker semantics needed by the rest of the port: room ordering,
-instance creation, Create/End Step/Alarm events, persistence, globals, arrays,
-script calls and room transitions.
-
-## Host status
-
-`src/core/StartupRuntime` now implements this bounded state model independently
-of SDL. Tests pin the recovered initialization state, immediate non-desktop
-transition, input-driven splash skipping, alarm delays, and the automatic
-desktop transition at tick 731. The current SDL view is deliberately diagnostic
-and contains no extracted art.
+Preserve room ordering, synchronous instance creation, Create/End Step/Alarm
+events, persistent globals and room transitions when implementing this sequence.
+Outstanding integration and verification belong in [remaining work](open-work.md).

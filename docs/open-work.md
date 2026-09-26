@@ -139,6 +139,12 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   publication. Keep the static rim intact and update only changed pixels.
 - Reduce selection layout/content and transition preparation costs while
   retaining static layers and pointer-driven movement.
+- Reduce time-field outline coverage construction without changing Draw RNG
+  consumption or source geometry. Measure geometry and word publication
+  separately; changed-only writes alone do not guarantee cheap preparation.
+- Reduce initial selection-canvas and offer-bank preparation stalls. Measure
+  asset staging and Chip/Fast residency tradeoffs separately from steady-state
+  navigation; preserve original heading, icon and carousel animation.
 - Measure new actor/effect costs in dense scenes. Keep a portable reference
   when introducing selected 68000 assembly optimizations.
 - Profile controller composition and overlap-aware sprite assignment on dense

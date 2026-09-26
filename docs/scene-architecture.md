@@ -66,6 +66,22 @@ must not clear the other's debt. A Copper rebuild does not itself invalidate
 retained pixels. Fixed-capacity draw-list failure must prevent publication,
 not silently omit actors.
 
+## Retained ammo HUD contract
+
+Compose damaged HUD strips in the retained Fast-RAM image and publish only
+differing words independently in each plane. Do not clear visible Chip RAM
+before repainting the same content. The palette is `01=white`, `10=red`,
+`11=opaque black`; toggling only the first plane cannot represent every
+white/black transition. Preserve genuine rim movement during recharge jiggle.
+
+Cache divider geometry by capacity and recharge offset, but retain the general
+source-equivalent path for unsupported cache ranges and consumption values.
+Derive constant rim spans from artwork rather than assumed dimensions. Damage
+must include old/new label ink, pending wide-label backing repairs and exposed
+edges. Scene reconstruction invalidates the retained image. Validate optimized
+composition against the complete ordered draw sequence, including clipping,
+capacity changes and every meter offset.
+
 ## Verification scope
 
 Fresh scalar composition provides a retained-buffer oracle. Host tests do not
