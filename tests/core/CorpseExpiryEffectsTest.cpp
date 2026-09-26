@@ -78,5 +78,32 @@ int main(){
     session.reset();assert(session.effectsSucceeded&&!session.corpseExpiryEffects.size());
     assert(session.emitCorpseExpiry({},{}));session.clearCorpseExpiry();
     assert(!session.corpseExpiryEffects.size());
+    CorpseLifecycle linked;linked.x={0x42c00000u};linked.y={0x43400000u};linked.explosionFx=102;
+    linked.alarms.set(0,2);unsigned destroyed=0,metadataReads=0;
+    auto frames=[&](int id){
+        assert(id==102&&!linked.destroyRequested&&linked.myExplosion);
+        assert(session.corpseExpiryEffects.get(linked.myExplosion));++metadataReads;return 12u;
+    };
+    auto destroy=[&](){assert(linked.destroyRequested&&metadataReads==1);++destroyed;};
+    assert(session.advanceCorpseAlarm(linked,0,frames,destroy));
+    assert(!session.corpseExpiryEffects.size()&&!destroyed&&!metadataReads);
+    assert(session.advanceCorpseAlarm(linked,0,frames,destroy));
+    assert(destroyed==1&&session.corpseExpiryEffects.size()==1);
+    const auto* effect=session.corpseExpiryEffects.get(linked.myExplosion);
+    assert(effect&&effect->x.bits==linked.x.bits&&effect->y.bits==linked.y.bits);
+    assert(session.advanceCorpseAlarm(linked,0,frames,destroy)&&destroyed==1);
+    for(unsigned i=0;i<40;++i)session.advanceCorpseExpiryAnimation();
+    assert(!session.corpseExpiryEffects.size());
+    // Child capacity failure must not retire the parent or consume the event twice.
+    session.reset();for(unsigned i=0;i<32;++i)assert(session.emitCorpseExpiry({},{}));
+    linked={};linked.alarms.set(0,1);
+    assert(!session.advanceCorpseAlarm(linked,0,frames,destroy));
+    assert(!linked.valid&&!linked.destroyRequested&&!linked.myExplosion&&destroyed==1);
+    assert(!session.advanceCorpseAlarm(linked,0,frames,destroy)&&destroyed==1);
+    // Metadata/publication failure retains the already-created child for cleanup.
+    session.reset();linked={};linked.alarms.set(0,1);
+    assert(!session.advanceCorpseAlarm(linked,0,[](int){return 0u;},destroy));
+    assert(!linked.valid&&!linked.destroyRequested&&linked.myExplosion&&session.corpseExpiryEffects.size()==1);
+    session.reset();assert(session.effectsSucceeded&&!session.corpseExpiryEffects.size());
     std::puts("Corpse expiry ownership: connected alarm, phase cutoffs, stable reuse, capacity and partial cleanup passed");
 }

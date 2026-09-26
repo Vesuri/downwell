@@ -2,6 +2,10 @@ inline void* operator new(__SIZE_TYPE__,void* address) noexcept{return address;}
 #include "core/CorpseVerification.h"
 #include "core/CorpseExpiryEffect.h"
 #include "core/CorpseExpiryEffects.h"
+#include "core/RunSession.h"
+bool compileSessionCorpseAlarm(downwell::RunSession& session,downwell::CorpseLifecycle& corpse){
+    return session.advanceCorpseAlarm(corpse,0,[](int id){return id==102?12u:0u;},[](){});
+}
 downwell::CorpseVerification compileCorpseVerification(){return downwell::verifyCorpses();}
 bool compileCorpseExpiry(downwell::CorpseExpiryEffect& effect,downwell::MotionBinary64 x,
     downwell::MotionBinary64 y,int sprite,unsigned frames){

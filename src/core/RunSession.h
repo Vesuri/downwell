@@ -22,6 +22,7 @@
 #include "SmokeEffects.h"
 #include "BloodEffects.h"
 #include "CorpseExpiryEffects.h"
+#include "CorpseLifecycle.h"
 #include "TimeStopBound.h"
 #include "BloodGoalContact.h"
 #include "TimeStopGoalContact.h"
@@ -62,9 +63,34 @@ struct RunSession {
         bool sprite(unsigned,const CorpseExpiryEffect&){return true;}
         bool retire(unsigned,const CorpseExpiryEffect&){return true;}
     };
-    bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
+    std::uint32_t createCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
+        if(!effectsSucceeded)return 0;
         ExpiryHooks hooks;
-        if(effectsSucceeded)effectsSucceeded=corpseExpiryEffects.create(x,y,hooks)!=0;
+        const auto child=corpseExpiryEffects.create(x,y,hooks);
+        effectsSucceeded=child!=0;return child;
+    }
+    bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){
+        return createCorpseExpiry(x,y)!=0;
+    }
+    // Shared alarm adapter: complete child Create, assign the source-selected
+    // sprite, then request parent retirement. The scheduler supplies verified
+    // nonempty unit-track frame counts and lifetime removal, not event rules.
+    template<class Frames,class Destroy>
+    bool advanceCorpseAlarm(CorpseLifecycle& corpse,unsigned index,Frames frames,Destroy destroy){
+        if(!effectsSucceeded)return false;
+        struct Events {
+            RunSession& session;Frames& frames;Destroy& retire;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){
+                if(object!=242)return false;
+                child=session.createCorpseExpiry(x,y);return child!=0;
+            }
+            bool sprite(std::uint32_t child,int id){
+                ExpiryHooks hooks;
+                return session.corpseExpiryEffects.setSprite(child,id,frames(id),hooks);
+            }
+            void destroy(){retire();}
+        } events{*this,frames,destroy};
+        effectsSucceeded=corpse.advanceAlarm(index,events);
         return effectsSucceeded;
     }
     void advanceCorpseExpiryAnimation(){

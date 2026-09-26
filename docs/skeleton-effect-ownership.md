@@ -129,6 +129,14 @@ Host rendering retains fractional coordinates; native raster projection uses
 the existing nearest-pixel convention. Integer-position command tests cover
 both renderers; fractional GPU raster equivalence remains unverified. Explicit
 world emission in tests is not evidence of a natural skeleton death chain.
+`RunSession::advanceCorpseAlarm` is the shared production adapter for alarms:
+it invokes the source lifecycle with synchronous creation into the room-owned
+expiry pool, then resolves the requested sprite's unit-track frame count and
+requests parent retirement. Its caller supplies resource metadata and removal,
+not a second implementation of the event. Pool exhaustion and unsupported
+sprite metadata latch session failure. A child created before setter failure
+remains owned until cleanup; the parent is not retired on that failure. The
+natural corpse scheduler must invoke this adapter for each source alarm index.
 
 `CorpseLifecycle` implements alarms 0–3 and the Knife and Fork player-contact
 event. Alarm 0 completes object-242 Create before assigning its sprite and
