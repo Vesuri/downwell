@@ -4,6 +4,7 @@
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include "SkeletonEffectBursts.h"
+#include "EnemyContact.h"
 namespace downwell {
 // Fixed storage with explicit global phase cutoffs. Birth completes Create
 // synchronously; first Step's extra RNG draw is not consumed at birth. The world
@@ -68,6 +69,29 @@ public:
             else order_[kept++]=order_[i];
         }
         count_=kept;
+    }
+    // contacts(bounds, emit) enumerates each colliding parentWall instance,
+    // returning success. It must not mutate this owner or collapse overlapping
+    // walls to a boolean. Capture the phase at Collision entry, not Step entry.
+    // Water's empty override needs no dispatch; it must not be reported as wall.
+    template<class Contacts> bool collideWalls(Phase phase,Contacts contacts){
+        for(unsigned i=0;i<count_;++i){
+            auto& slot=slots_[order_[i]];
+            auto& effect=slot.effect;
+            if(slot.handle>phase.newest || effect.destroyRequested || effect.noCollision)continue;
+            std::int32_t x,y;
+            if(!effect.x.promoted().roundPixel(x) || !effect.y.promoted().roundPixel(y) ||
+               x<(-2147483647-1)+2 || x>2147483647-2 ||
+               y<(-2147483647-1)+1 || y>2147483647-2)return false;
+            auto bounds=contactSpriteBounds(84);
+            bounds.left+=x;bounds.right+=x;bounds.top+=y;bounds.bottom+=y;
+            bool okay=true;
+            if(!contacts(bounds,[&](){
+                if(okay)okay=effect.collideWall();
+                return okay;
+            }) || !okay)return false;
+        }
+        return true;
     }
     template<class Draw> void visitNewest(Draw draw)const{
         for(unsigned i=0;i<count_;++i){const auto& slot=slots_[order_[i]];draw(slot.handle,slot.effect);}

@@ -10,7 +10,7 @@ assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee49275
 assert manifest["extractor"]["version"] == "0.9.2.0"
 header = (root / "src/core/EnemyContact.h").read_text()
 records = re.findall(r"case (\d+): return \{(-?\d+), (-?\d+), (-?\d+), (-?\d+)\};", header)
-assert {int(row[0]) for row in records} == {31, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 208, 278, 460}
+assert {int(row[0]) for row in records} == {31, 84, 133, 134, 153, 154, 157, 162, 163, 164, 166, 177, 186, 208, 278, 460}
 for row in records:
     sprite = manifest["resources"]["sprites"][int(row[0])]
     assert sprite["id"] == int(row[0])
@@ -28,6 +28,18 @@ assert manifest["resources"]["objects"][248]["textureMaskId"] == -1
 assert manifest["resources"]["objects"][116]["spriteId"] == 153
 assert manifest["resources"]["objects"][269]["spriteId"] == 460
 assert manifest["resources"]["objects"][269]["textureMaskId"] == -1
+assert manifest["resources"]["objects"][225]["spriteId"] == 84
+assert manifest["resources"]["objects"][225]["textureMaskId"] == -1
+assert {event["eventSubtype"] for event in manifest["resources"]["objects"][225]["events"]
+        if event["eventType"] == 4} == {57, 88}
+water_collision = (root / "extracted/utmt-0.9.2.0/Assembly/gml_Object_fxSmoke_Collision_parentWater.asm").read_text()
+assert not [line for line in water_collision.splitlines()
+            if line.strip() and not line.startswith((".", ":"))]
+smoke_collision = (root / "extracted/utmt-0.9.2.0/Assembly/gml_Object_fxSmoke_Collision_parentWall.asm").read_text()
+assert [line.strip() for line in smoke_collision.splitlines()
+        if line.strip() and not line.startswith((".", ":"))] == [
+    "push.v self.nocol", "conv.v.b", "not.b", "bf [end]",
+    "push.v self.smokesp", "push.d 0.2", "mul.d.v", "pop.v.v self.smokesp"]
 assert manifest["resources"]["rooms"][11]["name"] == "rmMain"
 assert manifest["resources"]["rooms"][11]["width"] == 480
 # Skeleton has its own Collision event, not typStompable's yy > ply+2 test.
@@ -47,4 +59,4 @@ assert instructions == [
     "pushi.e 2", "conv.i.v", "pushi.e 3", "conv.i.v", "pushi.e 1", "conv.i.v",
     "call.i gml_Script_scrTypicalDamage(argc=3)", "popz.v",
 ]
-print("15 enemy/player/currency/bone contact rectangles match pinned source metadata")
+print("16 enemy/player/currency/bone/smoke contact rectangles and smoke wall response match pinned source")

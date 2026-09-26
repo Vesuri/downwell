@@ -109,6 +109,20 @@ Create SHA-256 `725336f892c1c024ccb1285545b93f683be5cca16815f0b626c82eaa496a221b
 Step SHA-256 `4398d86951dc87ba221561327498a924f5b97e14ba65f13b30c71377206e8263`.
 Those hashes identify the reviewed UTMT assembly, not a Windows execution test.
 
+### Smoke collision dispatch contract
+
+The smoke owner's `collideWalls` accepts a contact enumerator, not a solid-point
+predicate. It uses sprite 84's serialized axis-aligned mask: relative half-open
+bounds `[-2,2) x [-1,2)`, placed at published builtin x/y, not private xx/yy.
+The enumerator must emit once for each overlapping `parentWall` instance and
+must not mutate the smoke owner. Capture the eligibility cutoff at Collision
+entry; reusing the ordinary Step cutoff would omit intervening births. Each
+contact applies the source smokesp multiplication separately. The nocol gate and
+pending destruction suppress queries; query/arithmetic failure propagates.
+Water's empty event must not be treated as wall contact. The metadata, target
+families and event instructions are checked by `verify-enemy-contact.py`.
+Live terrain enumerators are tracked in the single work queue.
+
 ### Native smoke distance gate
 
 `point_distance` at 0x53d5b0 rounds coordinate differences, squares and their sum

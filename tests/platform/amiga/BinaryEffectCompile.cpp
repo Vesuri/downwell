@@ -8,6 +8,9 @@ bool compilePaletteEffect(downwell::PaletteEffectSurface<>& surface,
 #include "core/SmokeComposition.h"
 #include "core/CurrencySmokeComposition.h"
 #include "core/SmokeEffects.h"
+bool compileSmokeContacts(downwell::SmokeEffects<32>& smoke){
+    return smoke.collideWalls(smoke.beginPhase(),[](downwell::ContactBounds,auto emit){return emit();});
+}
 bool compileCurrencySmokeComposition(downwell::CurrencySmokeComposition& composition,
     const downwell::SmokeEffects<32>& smoke,const downwell::EffectMaskAssets& assets,
     const downwell::EffectSurfacePlacement::View& view,

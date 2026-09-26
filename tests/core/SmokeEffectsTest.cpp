@@ -57,5 +57,34 @@ int main(){
     const auto beforeRetirement=rng.drawCount();
     check(reuse.advanceAnimation(reuse.beginPhase()) && reuse.size()==0);
     check(reuse.step(reuse.beginPhase(),rng) && rng.drawCount()==beforeRetirement);
+    downwell::SmokeEffects<4> collisions;
+    const auto older=collisions.create(downwell::MotionBinary64::fromInteger(20),
+        downwell::MotionBinary64::fromInteger(30),rng);
+    const auto phase=collisions.beginPhase();
+    const auto newer=collisions.create({}, {},rng);
+    collisions.get(newer)->noCollision=false;
+    unsigned queries=0;
+    // nocol skips querying, and post-cutoff births cannot receive this phase.
+    check(collisions.collideWalls(phase,[&](auto,auto){++queries;return true;}));
+    check(!queries);
+    auto& smoke=*collisions.get(older);
+    smoke.noCollision=false;
+    smoke.xx=downwell::MotionBinary64::fromInteger(999); // NOT the collision coordinate
+    const auto oldSpeed=smoke.speed,oldXsp=smoke.xsp,oldYsp=smoke.ysp;
+    const auto oldRate=smoke.imageSpeed.bits;
+    const auto collisionDraws=rng.drawCount();
+    auto expectedSpeed=oldSpeed;
+    for(unsigned i=0;i<3;++i){downwell::MotionBinary64 next;
+        check(downwell::multiplyBinary64(expectedSpeed,{0x3fc99999u,0x9999999au},next));expectedSpeed=next;
+    }
+    check(collisions.collideWalls(phase,[&](auto bounds,auto emit){
+        ++queries;check(bounds.left==18 && bounds.right==22 && bounds.top==29 && bounds.bottom==32);
+        return emit() && emit() && emit();
+    }));
+    check(queries==1 && same(smoke.speed,expectedSpeed) && same(smoke.xsp,oldXsp) &&
+        same(smoke.ysp,oldYsp) && smoke.imageSpeed.bits==oldRate && rng.drawCount()==collisionDraws);
+    check(!collisions.collideWalls(phase,[](auto,auto){return false;}));
+    smoke.destroyRequested=true;
+    check(collisions.collideWalls(phase,[](auto,auto){check(false);return true;}));
     std::printf("Smoke owner: %u births, phase exclusion, retirement, capacity and stable reuse passed\n",births);
 }
