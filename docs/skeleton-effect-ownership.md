@@ -106,6 +106,29 @@ and 76,800 updates with pause, reverse playback and reuse. The unchanged shard
 animation gate separately checks the six-key consumer. These are scalar/source
 and portable-code checks, not proof of live event scheduling or rendered parity.
 
+`DebrisEffects<Capacity>` owns bounded storage and monotonic, owner-local
+lifetime keys. Capturing a cutoff at global phase entry excludes later births
+from that phase, including reused low slots. Clearing a room does not rewind
+keys. Animation, individual alarm indices and Step are separate entry points;
+the global scheduler must retain its outer alarm-index traversal across types.
+Per-effect time-stop and precise collision callbacks return success separately
+from their boolean result. Neither a failed query nor capacity exhaustion is
+silently replaced by a miss or dropped effect.
+
+Birth and retirement callbacks allow external collision membership to be
+published before use/reuse. Adapters are passed per operation, not stored as
+borrowed pointers that would become invalid after a world copy. Callback/query
+failure latches an invalid owner; subsequent simulation is rejected. Explicit
+teardown can release remaining handles without repeating already-successful
+retirements. Full capacity rejects a birth before its four RNG draws.
+
+`make verify-debris-effects` checks phase exclusion, per-instance freezing,
+newest-first local visitation, alarm destruction, callback order, failed
+publication/query handling and repeated slot reuse. This local owner is not
+yet a unified game-instance registry. Global cross-family event/Draw ordering,
+coordinate publication, scene residency and live death admission remain the
+responsibility of the integrating world scheduler.
+
 `SkeletonEffectBursts.h` now implements the skeleton's smoke/flash count and
 birth-coordinate arithmetic, calling the child creator synchronously per birth.
 The scope is exactly the skeleton's (5,1) smoke and (6,2,10) flash parameters;

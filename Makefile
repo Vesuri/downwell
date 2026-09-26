@@ -135,6 +135,15 @@ test: verify-smoke-birth
 test: verify-debris-birth
 test: verify-debris-motion
 test: verify-debris-animation
+test: verify-debris-effects
+
+.PHONY: verify-debris-effects
+verify-debris-effects: build/debris-effects-test
+	./build/debris-effects-test
+
+build/debris-effects-test: tests/core/DebrisEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DebrisEffectsTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-debris-animation
 verify-debris-animation: build/debris-animation-test
