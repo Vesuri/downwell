@@ -13,6 +13,11 @@
 #include "core/TimeShardAnimation.h"
 #include "core/TimeShardEffects.h"
 #include "core/TimeShardBurst.h"
+#include "core/RunnerPointDirection.h"
+bool compilePointDirection(downwell::MotionBinary64 x,downwell::MotionBinary64 y,downwell::MotionBinary64& out){
+    return downwell::RunnerPointDirection::evaluate({}, {},x,y,out,
+        [](auto dy,auto,auto& angle){angle=dy;return true;});
+}
 bool compileTimeShardBurst(downwell::TimeShardBurst& burst,downwell::TimeShardEffects<24>& owner,downwell::GameMakerRandom& random){
     return burst.emit({}, {},{}, {},false,random,owner,
         [](auto,auto,auto& id,auto&,auto&){id=-4;return true;},
