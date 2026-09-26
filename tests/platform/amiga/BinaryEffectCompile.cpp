@@ -444,6 +444,8 @@ bool compileBinaryEffect(downwell::BinaryEffectSurface<>& surface,
 #include "core/CorpseEffects.h"
 namespace {
 struct CorpseOwnerHooks {
+    bool sprite(unsigned,const downwell::CorpseAnimation&){return true;}
+    bool facing(unsigned,const downwell::CorpseAnimation&){return true;}
     bool birth(unsigned,const downwell::CorpseAnimation&){return true;}
     bool retire(unsigned,const downwell::CorpseAnimation&){return true;}
     CorpseOwnerHooks& queries(unsigned,downwell::CorpseAnimation&){return *this;}
@@ -454,7 +456,8 @@ struct CorpseOwnerHooks {
 }
 bool compileCorpseOwner(downwell::CorpseEffects<8>& owner,downwell::GameMakerRandom& random){
     CorpseOwnerHooks hooks;
-    return owner.create({}, {},false,random,hooks)&&
+    downwell::DeadBodySource source;source.imageXscale=downwell::MotionBinary64::fromInteger(1);
+    return owner.createFromDeath(source,206,{},102,false,random,hooks)&&
         owner.dispatch(owner.beginPhase(),[](auto,auto& effect){return effect.advanceImage();},hooks)&&owner.clear(hooks);
 }
 bool compileCorpseAnimation(downwell::CorpseAnimation& corpse,int sprite){

@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_CORPSE_EFFECTS_H
 #define DOWNWELL_CORE_CORPSE_EFFECTS_H
 #include "CorpseAnimation.h"
+#include "DeadBodyCreation.h"
 namespace downwell {
 // Owner-local monotonic handles, not Windows instance IDs. Global schedulers
 // merge event order across families; a phase cutoff excludes subsequent births.
@@ -35,6 +36,44 @@ public:
         auto&& queries=hooks.queries(slot.handle,slot.effect);
         if(!slot.effect.create(x,y,rip,random,queries)){good_=false;return 0;}
         return slot.handle;
+    }
+    // Shared scrDeadBody entry point. Custom fields stay in the owned corpse;
+    // sprite/facing writes publish through the external collision adapter.
+    // Caller mutations in source must be applied to the dying enemy by its
+    // scheduler. Failure is terminal for this owner, including full capacity.
+    template<class Random,class Hooks>
+    bool createFromDeath(DeadBodySource& source,int sprite,MotionBinary64 impact,
+                         int explosion,bool rip,Random& random,Hooks& hooks){
+        if(!good_)return false;
+        struct Events {
+            CorpseEffects& owner;Random& random;Hooks& hooks;bool rip;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,std::uint32_t& child){
+                if(object!=263)return false;
+                child=owner.create(x,y,rip,random,hooks);return child!=0;
+            }
+            bool sprite(Handle h,int next){
+                auto* corpse=owner.get(h);
+                return corpse&&corpse->setSprite(next,[&](const auto& state){return hooks.sprite(h,state);});
+            }
+            bool verticalSpeed(Handle h,MotionBinary64 value){
+                auto* corpse=owner.get(h);if(!corpse)return false;corpse->ysp=value;return true;
+            }
+            bool facing(Handle h,MotionBinary64 value){
+                auto* corpse=owner.get(h);RunnerImageValue next;
+                if(!corpse||!next.assign(value))return false;
+                const auto old=corpse->imageXscale.bits;
+                if(next.bits==old||!((next.bits|old)&0x7fffffffu))return true;
+                corpse->imageXscale=next;return hooks.facing(h,*corpse);
+            }
+            bool explosion(Handle h,int id){
+                auto* corpse=owner.get(h);if(!corpse)return false;corpse->explosionFx=id;return true;
+            }
+            bool horizontalSpeed(Handle h,MotionBinary64 value){
+                auto* corpse=owner.get(h);if(!corpse)return false;corpse->xsp=value;return true;
+            }
+        } events{*this,random,hooks,rip};
+        if(!createDeadBody(source,sprite,impact,explosion,events)){good_=false;return false;}
+        return true;
     }
     // One global phase at a time: animation, ONE alarm index, Step, contact or
     // End Step. The caller supplies the corresponding checked event adapter.

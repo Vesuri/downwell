@@ -9,6 +9,10 @@ struct Hooks {
     std::vector<unsigned> born,retired;
     bool failBirth=false,failQuery=false,failRetire=false;
     unsigned current=0;
+    unsigned spriteWrites=0,facingWrites=0;
+    bool failSprite=false,failFacing=false;
+    bool sprite(unsigned h,const CorpseAnimation& c){assert(h==current&&c.spriteId==206);++spriteWrites;return !failSprite;}
+    bool facing(unsigned h,const CorpseAnimation& c){assert(h==current&&c.imageXscale.bits==0xbf800000u);++facingWrites;return !failFacing;}
     bool birth(unsigned h,const CorpseAnimation& c){born.push_back(h);current=h;assert(c.spriteId==172&&c.imageIndex.bits==0);return !failBirth;}
     Hooks& queries(unsigned h,CorpseAnimation&){assert(h==current&&!born.empty());return *this;}
     bool wall(MotionBinary64,MotionBinary64,bool& hit){assert(current==born.back());hit=false;return !failQuery;}
@@ -51,5 +55,32 @@ int main(){
     }
     std::sort(hooks.retired.begin(),hooks.retired.end());
     assert(hooks.born==hooks.retired); // Every published lifetime retired once.
-    std::puts("Corpse owner: pre-Create publication, capacity, phase cutoffs, reuse, culling and failure cleanup passed");
+    for(unsigned failure=0;failure<4;++failure){
+        CorpseEffects<1> owned;Hooks adapter;GameMakerRandom rng(17);
+        DeadBodySource source;source.imageXscale=MotionBinary64::fromInteger(-1);
+        adapter.failSprite=failure==1;adapter.failFacing=failure==2;
+        if(failure==3)assert(owned.create({}, {},false,rng,adapter));
+        const auto before=rng.drawCount();
+        assert(owned.createFromDeath(source,206,MotionBinary64::fromInteger(9),102,true,rng,adapter)==(failure==0));
+        assert(rng.drawCount()==before+(failure==3?0:3));
+        if(!failure){
+            const auto* corpse=owned.get(source.myDeadBody);assert(corpse);
+            assert(corpse->ysp.high==0x40100000u&&corpse->xsp.high==0xc0180000u);
+            assert(source.xsp.high==0xbff80000u&&corpse->health==1&&corpse->hitEffect==1);
+            assert(adapter.spriteWrites==1&&adapter.facingWrites==1);
+        }else{
+            assert(!owned.valid()&&!owned.get(source.myDeadBody));
+            assert(!owned.createFromDeath(source,206,{},102,false,rng,adapter));
+            assert(rng.drawCount()==before+(failure==3?0:3));
+        }
+        assert(owned.clear(adapter));assert(adapter.born==adapter.retired);
+    }
+    {
+        CorpseEffects<1> owned;Hooks adapter;GameMakerRandom rng(17);DeadBodySource source;
+        source.imageXscale=MotionBinary64::fromInteger(1);
+        assert(owned.createFromDeath(source,172,{},102,false,rng,adapter));
+        assert(!adapter.spriteWrites&&!adapter.facingWrites); // Same resource and scale are not dirty writes.
+        assert(owned.clear(adapter));
+    }
+    std::puts("Corpse owner: death-wrapper integration, pre-Create publication, capacity, phase cutoffs, reuse, culling and failure cleanup passed");
 }

@@ -129,6 +129,16 @@ borrowed callbacks, so world copies use freshly bound adapters.
 reused slots, culling and cleanup. It is not a substitute for the live world's
 shared instance registry, cross-family ordering or collision membership.
 
+`CorpseEffects::createFromDeath` connects `scrDeadBody` to actual owned creation
+and field assignment. It calls the common sprite setter and publishes changed
+facing values through the world adapter; unchanged resource/scale writes do
+not dirty collision state. Custom velocities and explosion ID stay with the
+owned corpse. The returned caller fields still must be published back to the
+dying enemy. Any failed stage, including exhausted capacity, invalidates this
+operation's owner so a partial death sequence cannot be retried. The 3,840-chain
+integration gate now uses this entry point, not an independently assembled
+test-only implementation of corpse creation and setters.
+
 `CorpseMotion` implements ordinary Step: custom-real gravity and damping,
 parent-56 motion probes, bounce/settling and the bounded 1–16 floor search.
 Area 3 divides displacement by four without changing stored velocities. It
