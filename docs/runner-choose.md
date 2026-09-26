@@ -39,6 +39,21 @@ lists of up to 65,535 entries. The RNG unit test covers all those counts over
 32 seeds, comparing selection, draw count, index and all sixteen state words.
 A singleton case also pins the next word of the existing WELL test vector.
 
+### Bounded remainder arithmetic
+
+`SmallUnsignedRemainder` keeps `% divisor` as its portable oracle. Its 68000
+twin uses the remainder returned by `DIVU.W`, reducing the high word before
+appending the low word. Every divide has a high word smaller than the nonzero
+16-bit divisor, so the quotient fits without overflow. Integer ranges reuse
+that reduced remainder across successive words; divisor 65,536 takes the
+power-of-two path. Power-of-two choices still consume their one WELL word,
+including singleton choices; integer ranges still consume both words.
+
+The native replay gate compares both forms over every valid divisor, including
+maximum dividends and maximum legal reduced high words. RNG and ordered Create
+tests separately check stream consumption; arithmetic equivalence alone does
+not verify that a VM call site selected the correct RNG operation.
+
 **Migration is partial.** The shared area-one builder and
 `BuilderRewardChoice` now use `chooseIndexSmall` where their implemented VM
 branches call `choose`. Other sites mix genuine `irandom`

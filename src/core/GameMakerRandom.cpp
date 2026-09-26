@@ -1,4 +1,5 @@
 #include "GameMakerRandom.h"
+#include "SmallUnsignedRemainder.h"
 #include <cassert>
 #include <limits>
 
@@ -62,11 +63,6 @@ std::uint64_t GameMakerRandom::irandom(std::uint64_t upperInclusive) {
     return positive63 % (upperInclusive + 1U);
 }
 
-std::uint32_t GameMakerRandom::chooseIndexSmall(std::uint32_t count) {
-    assert(count > 0 && count <= 0xffffU);
-    return nextU32() % count;
-}
-
 std::uint32_t GameMakerRandom::irandomSmall(
     std::uint32_t upperInclusive) {
     assert(upperInclusive <= 0xffffU);
@@ -81,9 +77,9 @@ std::uint32_t GameMakerRandom::irandomSmall(
      * divisor of at most 65536, appending each low 16-bit word to a
      * remainder fits uint32_t. No multiplication or 2^32 remainder needed.
      */
-    std::uint32_t remainder = high % divisor;
-    remainder = ((remainder << 16U) | (low >> 16U)) % divisor;
-    return ((remainder << 16U) | (low & 0xffffU)) % divisor;
+    std::uint32_t remainder = SmallUnsignedRemainder::full(high, divisor);
+    remainder = SmallUnsignedRemainder::append(remainder, static_cast<std::uint16_t>(low >> 16U), divisor);
+    return SmallUnsignedRemainder::append(remainder, static_cast<std::uint16_t>(low), divisor);
 }
 
 std::uint32_t GameMakerRandom::randomIntegerSmall(

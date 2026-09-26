@@ -1,4 +1,5 @@
 #include "core/GameMakerRandom.h"
+#include "core/SmallUnsignedRemainderVerification.h"
 #include "core/TitleParticleRandom.h"
 #include "core/GemMotion.h"
 #include "core/StandardBulletImpact.h"
@@ -243,6 +244,8 @@ void testSmallScaledRealPath() {
 } // namespace
 
 int main() {
+    require(downwell::verifySmallUnsignedRemainder()==0,
+            "bounded remainders match portable modulus for every 16-bit divisor");
     testWell512Vector();
     testIntegerRangeAndReset();
     testRealRange();

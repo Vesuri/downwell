@@ -264,6 +264,7 @@ extern "C" { volatile ULONG gDownwellStackGuardReady; }
 #ifdef DOWNWELL_REPLAY_VERIFY
 #include "core/GemVerification.h"
 #include "core/MotionBinary64Verification.h"
+#include "core/SmallUnsignedRemainderVerification.h"
 #include "core/PlayerDeathVerification.h"
 #include "core/MachineGunVerification.h"
 #include "core/RunnerSpatialVerification.h"
@@ -284,6 +285,7 @@ volatile ULONG gWeaponReplayDigestHigh;
 volatile ULONG gWeaponReplayDigestLow;
 volatile ULONG gWeaponReplayCoverage;
 volatile ULONG gMotionReplayDigest, gMotionReplayUpdates, gMotionReplayFailures;
+volatile ULONG gSmallRemainderFailures;
 volatile ULONG gMotionBenchDigest, gMotionBenchFailures, gMotionBenchFields;
 volatile ULONG gBoneReplayDigest, gBoneReplayUpdates, gBoneReplayFailures;
 volatile ULONG gBoneBenchDigest, gBoneBenchFailures, gBoneBenchFields;
@@ -3138,6 +3140,7 @@ int main(void) {
             gReplayFrames = port.tick();
             gReplayDigestHigh = (ULONG)(lastPortCheckpoint >> 32);
             gReplayDigestLow = (ULONG)lastPortCheckpoint;
+            gSmallRemainderFailures = downwell::verifySmallUnsignedRemainder();
             downwellReplayCheckStack(1);
             const auto gems = downwell::verifyGemSimulation();
             downwellReplayCheckStack(2);

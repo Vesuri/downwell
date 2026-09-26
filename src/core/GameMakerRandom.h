@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include "SmallUnsignedRemainder.h"
 
 namespace downwell {
 
@@ -23,7 +24,17 @@ public:
     // including count == 1. Not interchangeable with irandom(count - 1).
     // Nonempty small lists only; integer-to-float rounding in the runner is
     // exact throughout this range.
-    std::uint32_t chooseIndexSmall(std::uint32_t count);
+    // Keep literal list sizes visible to callers: powers of two reduce to a
+    // mask instead of paying a generic helper call in hot gameplay paths.
+#if defined(__GNUC__)
+    __attribute__((always_inline))
+#endif
+    std::uint32_t chooseIndexSmall(std::uint32_t count) {
+        assert(count > 0 && count <= 0xffffU);
+        const auto value = nextU32();
+        if (!(count & (count - 1U))) return value & (count - 1U);
+        return SmallUnsignedRemainder::full(value, count);
+    }
     // Exact irandom path for the small inclusive ranges used by Downwell's
     // generators. This preserves the runner's 63-bit modulus without asking
     // a 68000 target for 64-bit division.

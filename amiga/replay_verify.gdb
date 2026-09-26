@@ -3,6 +3,11 @@ set confirm off
 set remotetimeout 30
 tbreak downwellReplayComplete
 continue
+if gSmallRemainderFailures != 0
+    printf "Small-divisor remainder failures: %lu\n", gSmallRemainderFailures
+    quit 1
+end
+printf "Small-divisor remainder: 196605 native/portable comparisons passed\n"
 if gDownwellStackGuardReady != 1
     printf "Target could not install the replay task-stack guard\n"
     quit 1
