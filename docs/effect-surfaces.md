@@ -50,6 +50,14 @@ overlay above directly drawn gems would incorrectly leave gem pixels visible
 inside shade holes. Live integration must migrate both producers together.
 The currency Draw assembly is pinned by `verify-effect-depths.py`.
 
+Currency Step publishes rounded `xx`/`yy` into its builtin `x`/`y` before Draw;
+the private integration fractions must not be passed directly to `drawFx` or
+truncated at drawing time. Both adapters use `GemMotion::rounded` for that
+publication. Its signed nearest-even operation is applied relative to the even
+integer main-room origin (240,176), preserving absolute tie parity. The source
+Step tail is pinned alongside Draw, and live combat comparisons include both
+published coordinates as well as the private motion state.
+
 ### Compatibility depths
 
 Do not use the zero `Depth` fields in the GMS2 object records as draw order.

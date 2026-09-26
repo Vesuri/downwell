@@ -1703,20 +1703,25 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     "shared currency, run total, streak and timer agree on every combat frame");
             // Both adapters retain live gems in birth order. Compare that
             // order and authoritative movement, not a sorted multiset.
-            std::vector<std::array<long, 10>> nativeGems, referenceGems;
+            std::vector<std::array<long, 12>> nativeGems, referenceGems;
             for (unsigned i = 0; i < gameplay.gemCapacity; ++i) {
                 const auto& gem = gameplay.gemAt(i);
                 if (gem.active) nativeGems.push_back({static_cast<long>(gem.age), gem.amount,
                     gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
                     gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted,
-                    gem.motion.attractorAtBirth});
+                    gem.motion.attractorAtBirth,gem.x,gem.y});
             }
             for (unsigned i = 0; i < reference.mainCurrencyCount(); ++i) {
                 const auto& gem = reference.mainCurrencyAt(i);
+                if(gem.age){
+                    require(gem.x==240+downwell::GemMotion::rounded(gem.motion.x) &&
+                            gem.y==176+downwell::GemMotion::rounded(gem.motion.y),
+                            "currency Step publishes source-rounded pixels, not fractional motion");
+                }
                 referenceGems.push_back({static_cast<long>(gem.age), gem.amount,
                     gem.motion.animation.rateTenths, static_cast<long>(gem.motion.animation.phaseTenths),
                     gem.motion.x, gem.motion.y, gem.motion.vx, gem.motion.vy, gem.motion.attracted,
-                    gem.motion.attractorAtBirth});
+                    gem.motion.attractorAtBirth,static_cast<long>(gem.x-240),static_cast<long>(gem.y-176)});
             }
             if (nativeGems != referenceGems)
                 std::cerr << "COMBAT GEM DIFFERENCE tick=" << gameplay.tick()

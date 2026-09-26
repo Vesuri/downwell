@@ -716,8 +716,11 @@ void StartupRuntime::updateMainCurrency() {
             continue;
         }
         gem.age = gem.motion.lifetime.age;
-        gem.x = mainPlayerOriginX_ + gem.motion.x / 12800.0F;
-        gem.y = mainPlayerOriginY_ + gem.motion.y / 12800.0F;
+        // objCurrency Step publishes round(xx/yy), not the private fractional
+        // integration coordinates. Both adapters use the same signed ties-even
+        // operation. Main-room origins (240,176) are even integer offsets.
+        gem.x = mainPlayerOriginX_ + GemMotion::rounded(gem.motion.x);
+        gem.y = mainPlayerOriginY_ + GemMotion::rounded(gem.motion.y);
         gem.speedX = gem.motion.vx / 12800.0F;
         gem.speedY = gem.motion.vy / 12800.0F;
         gem.attracted = gem.motion.attracted;

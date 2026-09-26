@@ -26,6 +26,9 @@ assembly("gml_Object_fxFlashBall_Create_0",
 currency = assembly("gml_Object_objCurrency_Draw_0",
     "db549eaf1588afac76046e7d4c13374cf40e8975d5e0cca7384e57d7e968f9bd")
 assert "call.i gml_Script_drawFx(argc=0)" in currency and "draw_self" not in currency
+currency_step = assembly("gml_Object_objCurrency_Step_0",
+    "eef98cd1ea85b43303c5a5b58bcb7725655fa3c65d8836176afbea41bbc66f95")
+assert "push.v self.xx\ncall.i round(argc=1)\npop.v.v self.x\npush.v self.yy\ncall.i round(argc=1)\npop.v.v self.y" in currency_step
 # The reviewed table tail maps names via asset_get_index. These indices are
 # NOT resource IDs; pairing by array index before resolving names is essential.
 depths = {int(index): int(value) for value, index in re.findall(
