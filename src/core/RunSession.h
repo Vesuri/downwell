@@ -24,6 +24,7 @@
 #include "TimeStopBound.h"
 #include "BloodGoalContact.h"
 #include "TimeStopGoalContact.h"
+#include "OrdinaryTimeFields.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -52,7 +53,12 @@ struct RunSession {
     FlashBallEffects<32> flashEffects;
     SmokeEffects<32> smokeEffects;
     BloodEffects<32> bloodEffects;
+    OrdinaryTimeFields<64> timeFields;
     bool effectsSucceeded=true;
+    bool adoptTimeField(int x,int y,std::uint32_t radiusWord){
+        if(effectsSucceeded)effectsSucceeded=timeFields.adoptCreate(x,y,radiusWord);
+        return effectsSucceeded;
+    }
     void advanceBloodAnimation(){
         if(effectsSucceeded)effectsSucceeded=bloodEffects.advanceAnimation(bloodEffects.beginPhase());
     }
@@ -183,6 +189,7 @@ struct RunSession {
         flashEffects.clear();
         smokeEffects.clear();
         bloodEffects.clear();
+        timeFields.clear();
         // Room creation is followed by Draw before the next Step/Alarm phase.
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);
@@ -274,6 +281,7 @@ struct RunSession {
         flashEffects.clear();
         smokeEffects.clear();
         bloodEffects.clear();
+        timeFields.clear();
         effectsSucceeded=true;
         sideCameraLockers.clear();
         gemHigh = false;

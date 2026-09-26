@@ -997,6 +997,8 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 return runtime->registerShop(command.x, command.y) != nullptr;
             if (command.objectId == 306)
                 runtime->registerLevelExit(command.y);
+            if (command.objectId == 82 && !runtime->run_.adoptTimeField(
+                command.x,command.y,command.timeFieldRadiusWord()))return false;
             if (command.objectId == 62) {
                 // Materialize Create before the later camera Step, retaining
                 // prior queued instances' creation order and the real record.
@@ -1796,6 +1798,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     run_.flashEffects.clear();
     run_.smokeEffects.clear();
     run_.bloodEffects.clear();
+    run_.timeFields.clear();
     run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};

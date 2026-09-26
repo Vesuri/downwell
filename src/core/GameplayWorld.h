@@ -224,6 +224,8 @@ public:
             return registerShop(command.x, command.y) != nullptr;
         }
         if (command.objectId == 306) registerLevelExit(command.y);
+        if (command.objectId == 82)
+            return run_.adoptTimeField(command.x,command.y,command.timeFieldRadiusWord());
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
         if (!terrain(command)) return false;
         if (command.objectId == 92) {
@@ -311,6 +313,7 @@ public:
     }
     const downwell::ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
+    const downwell::OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
     bool cameraSideLocked() const { return cameraMotion_.sideLocked; }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(cameraMotion_); }
     // Read-only rendering hint: entering a camera column may collide with a

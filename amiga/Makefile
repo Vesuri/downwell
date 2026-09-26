@@ -153,6 +153,9 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 
 $(OBJECTS): obj/startup-options
 $(OBJECTS): $(REPO)/generated/downwell-goal-mask.h
+$(OBJECTS): $(REPO)/generated/downwell-time-field-mask.h
+$(REPO)/generated/downwell-time-field-mask.h: $(REPO)/tools/export-time-stop-masks.csx $(REPO)/tools/verify-time-stop-masks.py $(REPO)/data/data.win
+	$(MAKE) -C $(REPO) generated/downwell-time-field-mask.h
 $(OBJECTS): $(REPO)/generated/smoke-trig.inc
 
 $(REPO)/generated/smoke-trig.inc: $(REPO)/tools/export-smoke-trig.py $(REPO)/data/Downwell.exe

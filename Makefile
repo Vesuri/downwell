@@ -617,7 +617,7 @@ HOST_CHECK_HEADERS := $(wildcard src/core/*.h src/platform/amiga/*.h)
 $(OBJECTS) $(TEST_TARGETS) $(PORT_REPLAY_REFERENCE_TARGET) $(AREA_ONE_TRACE_TARGET) $(AREA_ONE_BUILDER_TEST_TARGET) $(AMIGA_LIVE_TERRAIN_TEST_TARGET) build/gameplay-player-step-test build/gem-homing-test build/frog-behavior-test build/bat-motion-test build/enemy-contact-test: generated/downwell-goal-mask.h
 build/goal-time-field-test build/shop-world-test build/level-clear-session-test build/combo-state-test: generated/downwell-goal-mask.h
 
-generated/downwell-goal-mask.h: tools/generate-goal-mask.py tools/export-goal-mask.csx data/data.win
+generated/downwell-goal-mask.h: tools/generate-goal-mask.py tools/export-goal-mask.csx data/data.win generated/downwell-time-field-mask.h
 	python3 tools/generate-goal-mask.py
 
 generated/downwell-goal-mask.mask: generated/downwell-goal-mask.h

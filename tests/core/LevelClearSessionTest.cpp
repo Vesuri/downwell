@@ -7,6 +7,15 @@ static void require(bool ok, const char* why) {
 int main() {
     using namespace downwell;
     {
+        RunSession fields;
+        for(unsigned i=0;i<64;++i)require(fields.adoptTimeField(240,int(i),i),"field capacity fixture");
+        require(!fields.adoptTimeField(240,65,65) && !fields.effectsSucceeded && fields.timeFields.size()==64,
+            "field capacity failure is explicit and preserves existing instances");
+        require(!fields.adoptTimeField(240,66,66),"field failure remains latched");
+        fields.reset();require(fields.effectsSucceeded && fields.timeFields.size()==0 && !fields.timeFields.at(0),
+            "new run retires time fields and clears capacity failure");
+    }
+    {
         RunSession failed;GameMakerRandom rng(123);
         require(failed.emitBloodBurst(MotionBinary64::fromInteger(240),{},rng),"failure fixture births");
         unsigned calls=0;
@@ -21,6 +30,7 @@ int main() {
         failed.reset();require(failed.effectsSucceeded && failed.bloodEffects.size()==0,"reset clears failed ownership");
     }
     RunSession run;
+    require(run.adoptTimeField(240,900,42),"old room owns an ordinary time field");
     PlayerMotion player(false, 10000);
     GameMakerRandom random(17);
     CurrencyAccount currency;
@@ -72,6 +82,7 @@ int main() {
     require(flashCount==0,"room retirement clears flash effects without resetting the whole run");
     require(run.smokeEffects.size()==0,"room retirement clears smoke ownership");
     require(run.bloodEffects.size()==0,"room retirement clears blood ownership");
+    require(run.timeFields.size()==0,"room retirement clears ordinary time fields");
     require(!run.enterLevelClear(0, heart, health, player, random) && random.drawCount() == draws + bloodDraws + 1,
         "duplicate room entry cannot consume another Create random word");
     unsigned tick = 0, advances = 0, dithers = 0;

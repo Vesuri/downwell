@@ -200,6 +200,7 @@ public:
         return run_.flashEffects.skeletonBurst(x,y,random_);
     }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
+    const OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
     bool cameraSideLocked() const { return mainCameraMotion_.sideLocked; }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(mainCameraMotion_); }
     void registerLevelExit(int y) { run_.createLevelExit(480, y, random_, mainCameraMotion_); }

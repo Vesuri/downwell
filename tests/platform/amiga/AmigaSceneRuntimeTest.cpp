@@ -356,6 +356,13 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
 
 void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             const downwell::StartupRuntime& reference) {
+    require(amiga.timeFields().size()==reference.timeFields().size(),
+        "both worlds retain every ordinary time-field birth");
+    for(unsigned i=0;i<amiga.timeFields().size();++i){
+        const auto& a=*amiga.timeFields().at(i);const auto& b=*reference.timeFields().at(i);
+        require(a.x==b.x && a.y==b.y && a.radius.equal(b.radius),
+            "ordinary field coordinates, creation order and radius agree");
+    }
     require(reference.inMainRoom(),
             "reference remains in gameplay during comparison");
     require(amiga.sideCameraDigest() == reference.sideCameraDigest(),
@@ -583,6 +590,14 @@ void testGeneratedWorldHandoff(const downwell::ObjectPack& objects) {
     unsigned terrainCalls = 0;
     const auto terrain = [&](const downwell::DeferredCreateInstance&) { ++terrainCalls; return true; };
     downwell::DeferredCreateInstance rejected{111, 248, 192};
+    downwell::DeferredCreateInstance fieldCommand{82,240,900};
+    fieldCommand.setTimeFieldRadiusWord(0xffffffffu);
+    const auto fieldDraws=world.randomDrawCount();
+    require(world.createGeneratedInstance(fieldCommand,objects,terrain) && terrainCalls==0 &&
+        world.timeFields().size()==1 && world.timeFields().at(0)->x==240 &&
+        world.timeFields().at(0)->y==900 && world.timeFields().at(0)->radius.equal(
+            downwell::OrdinaryTimeField::radiusFromWord(0xffffffffu)) && world.randomDrawCount()==fieldDraws,
+        "time field registration adopts Create without terrain painting or a second RNG draw");
     require(!world.createGeneratedInstance(rejected, objects,
                 [](const downwell::DeferredCreateInstance&) { return false; }) && world.enemyCount() == 0,
             "terrain-registration failure prevents actor creation");
@@ -2241,6 +2256,13 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
 }
 
 int main(int argc, char** argv) {
+    if(argc>=4 && std::getenv("DOWNWELL_VERIFY_GENERATED_HANDOFF")){
+        const auto bytes=readFile(argv[2]);
+        const downwell::ObjectPack objects(bytes.data(),bytes.size());
+        testGeneratedWorldHandoff(objects);
+        std::cout << "Generated world handoff passed\n";
+        return 0;
+    }
     if (argc >= 4 && (std::getenv("DOWNWELL_VERIFY_NATURAL_EXIT") || std::getenv("DOWNWELL_VERIFY_ROUTE_SWEEP"))) {
         testNaturalExit(argv[1], argv[2], argv[3]);
         return 0;
