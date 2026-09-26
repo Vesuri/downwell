@@ -46,23 +46,29 @@ public:
         for (unsigned i = 0; i < next.count; ++i) next.index[next.words[i].offset / 2] = 0;
         next.count = 0;
         bool overflow = false;
-        shape.drawClipped(downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,
-                          downwellDisplayHeight,[&](int x, int y, int pen) {
+        shape.drawClippedSpans(downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,
+                          downwellDisplayHeight,[&](int first,int end,int y,int pen) {
             unsigned row = origin + static_cast<unsigned>(y);
             if (row >= downwellGameRingHeight) row -= downwellGameRingHeight;
-            const unsigned offset = row * downwellBytesPerPlaneLine + (x / 16) * 2;
-            auto& slot = next.index[offset / 2];
-            if (!slot) {
-                if (next.count == capacity) { overflow = true; return; }
-                slot = ++next.count;
-                next.words[slot - 1] = {static_cast<UWORD>(offset),0,{0,0},{0,0},0};
+            const unsigned rowOffset = row * downwellBytesPerPlaneLine;
+            for(int x=first;x<end;){
+                const int wordEnd=(x|15)+1;
+                const int nextX=wordEnd<end?wordEnd:end;
+                const unsigned offset = rowOffset + (x / 16) * 2;
+                auto& slot = next.index[offset / 2];
+                if (!slot) {
+                    if (next.count == capacity) { overflow = true; return; }
+                    slot = ++next.count;
+                    next.words[slot - 1] = {static_cast<UWORD>(offset),0,{0,0},{0,0},0};
+                }
+                auto& word = next.words[slot - 1];
+                const UWORD mask = (0xffffu >> (x&15)) & (0xffffu << (15-((nextX-1)&15)));
+                word.mask |= mask;
+                for (unsigned plane = 0; plane < 2; ++plane)
+                    word.paint[plane] = (pen & (1u << plane)) ? word.paint[plane] | mask
+                        : word.paint[plane] & static_cast<UWORD>(~mask);
+                x=nextX;
             }
-            auto& word = next.words[slot - 1];
-            const UWORD mask = 0x8000u >> (x & 15);
-            word.mask |= mask;
-            for (unsigned plane = 0; plane < 2; ++plane)
-                word.paint[plane] = (pen & (1u << plane)) ? word.paint[plane] | mask
-                    : word.paint[plane] & static_cast<UWORD>(~mask);
         });
         if (overflow) return false;
         for (unsigned i = 0; i < count_; ++i) {

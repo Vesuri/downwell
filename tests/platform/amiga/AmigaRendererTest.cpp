@@ -155,6 +155,15 @@ int main(int argc, char** argv) {
                     got.push_back(px);got.push_back(py);got.push_back(pen);
                 });
                 require(got==expected,"clipped outline preserves ordered raster, endpoints and pens");
+                std::vector<int> pixels((right-left)*(bottom-top)),spans(pixels.size());
+                for(unsigned i=0;i<expected.size();i+=3)
+                    pixels[(expected[i+1]-top)*(right-left)+expected[i]-left]=expected[i+2];
+                actual.drawClippedSpans(left,top,right,bottom,[&](int first,int end,int row,int pen){
+                    require(first>=left&&first<end&&end<=right&&row>=top&&row<bottom,
+                        "outline spans are nonempty and clipped");
+                    for(int px=first;px<end;++px)spans[(row-top)*(right-left)+px-left]=pen;
+                });
+                require(spans==pixels,"coalesced spans preserve final coverage and pen priority");
             }
         }
         std::cout << "1024 outline radii and 3072 ordered clipping comparisons passed\n";

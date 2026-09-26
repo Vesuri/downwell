@@ -52,6 +52,13 @@ struct TimeFieldOutlines {
             outline.drawClipped(left,top,right,bottom,plot);
         }
     }
+    template<class Span> void drawClippedSpans(int left,int top,int right,int bottom,Span span) const {
+        GoalFieldOutline outline;
+        for(unsigned i=0;i<count;++i){
+            outline.setRasterCircle(circles[i].x,circles[i].y,circles[i].radius);
+            outline.drawClippedSpans(left,top,right,bottom,span);
+        }
+    }
 };
 }
 #endif

@@ -75,6 +75,23 @@ struct GoalFieldOutline {
                 });
             }
     }
+    // Coalesce consecutive, same-colour horizontal coverage. Preserve the
+    // pixel raster above as the oracle; never interpolate a different edge.
+    // Span right is exclusive, and each span stays within the supplied clip.
+    template<class Span> void drawClippedSpans(int left,int top,int right,int bottom,Span span) const {
+        bool pending=false;
+        int first=0,end=0,row=0,colour=0;
+        drawClipped(left,top,right,bottom,[&](int x,int y,int pen){
+            if(pending && y==row && pen==colour && x>=first-1 && x<=end){
+                if(x<first)first=x;
+                if(x>=end)end=x+1;
+            }else{
+                if(pending)span(first,end,row,colour);
+                first=x;end=x+1;row=y;colour=pen;pending=true;
+            }
+        });
+        if(pending)span(first,end,row,colour);
+    }
 };
 }
 #endif
