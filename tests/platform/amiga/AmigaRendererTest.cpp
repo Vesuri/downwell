@@ -123,6 +123,43 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 
 int main(int argc, char** argv) {
     {
+        // Independent pre-optimization vertex formula and complete ordered
+        // pixel stream, not just a final bitmap that could hide overdraw.
+        constexpr int cosine[24]={32768,31651,28378,23170,16384,8481,0,-8481,-16384,-23170,-28378,-31651,
+            -32768,-31651,-28378,-23170,-16384,-8481,0,8481,16384,23170,28378,31651};
+        for(int minimum:{24,128}) for(int fraction=0;fraction<512;++fraction){
+            const int x=-140+(fraction*17)%580,y=-150+(fraction*31)%600;
+            downwell::GoalFieldOutline actual,reference;
+            actual.setRasterCircle(x,y,minimum*256+fraction);reference.visible=true;
+            for(unsigned ring=0;ring<3;++ring){
+                const int radius=minimum*256+fraction+(ring==1?-256:ring==2?256:0);
+                auto component=[&](int unit){
+                    const unsigned long product=static_cast<unsigned short>(radius)*
+                        static_cast<unsigned short>(unit<0?-unit:unit);
+                    const int rounded=int((product+(1L<<22))>>23);
+                    return unit<0?-rounded:rounded;
+                };
+                for(unsigned i=0;i<24;++i)
+                    reference.points[ring][i]={x+component(cosine[i]),y+component(cosine[(i+18)%24])};
+            }
+            require(actual.same(reference),"symmetric outline preserves every original rounded vertex");
+            for(unsigned clip=0;clip<3;++clip){
+                const int left=clip==0?downwellPlayfieldX:clip==1?x:x+200;
+                const int top=clip==0?0:y;
+                const int right=left+(clip==0?160:clip==1?1:0),bottom=top+(clip==0?284:1);
+                std::vector<int> expected,got;
+                reference.draw([&](int px,int py,int pen){
+                    if(px>=left&&px<right&&py>=top&&py<bottom){expected.push_back(px);expected.push_back(py);expected.push_back(pen);}
+                });
+                actual.drawClipped(left,top,right,bottom,[&](int px,int py,int pen){
+                    got.push_back(px);got.push_back(py);got.push_back(pen);
+                });
+                require(got==expected,"clipped outline preserves ordered raster, endpoints and pens");
+            }
+        }
+        std::cout << "1024 outline radii and 3072 ordered clipping comparisons passed\n";
+    }
+    {
         std::vector<UBYTE> base(downwellGameRingBytes), actual(base.size()), expected(base.size());
         for (unsigned i = 0; i < base.size(); ++i) base[i] = i * 19 + 7;
         actual = base;

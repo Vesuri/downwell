@@ -45,6 +45,13 @@ struct TimeFieldOutlines {
             outline.draw(plot);
         }
     }
+    template<class Plot> void drawClipped(int left,int top,int right,int bottom,Plot plot) const {
+        GoalFieldOutline outline;
+        for (unsigned i = 0; i < count; ++i) {
+            outline.setRasterCircle(circles[i].x, circles[i].y, circles[i].radius);
+            outline.drawClipped(left,top,right,bottom,plot);
+        }
+    }
 };
 }
 #endif

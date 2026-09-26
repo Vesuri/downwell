@@ -46,9 +46,8 @@ public:
         for (unsigned i = 0; i < next.count; ++i) next.index[next.words[i].offset / 2] = 0;
         next.count = 0;
         bool overflow = false;
-        shape.draw([&](int x, int y, int pen) {
-            if (x < downwellPlayfieldX || x >= downwellPlayfieldX + downwellPlayfieldWidth ||
-                y < 0 || y >= downwellDisplayHeight) return;
+        shape.drawClipped(downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,
+                          downwellDisplayHeight,[&](int x, int y, int pen) {
             unsigned row = origin + static_cast<unsigned>(y);
             if (row >= downwellGameRingHeight) row -= downwellGameRingHeight;
             const unsigned offset = row * downwellBytesPerPlaneLine + (x / 16) * 2;

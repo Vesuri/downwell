@@ -23,21 +23,23 @@ struct GoalFieldOutline {
     }
     // Presentation-only Q8 radius. Collision continues to use resource masks.
     void setRasterCircle(int x, int y, int base) {
-        static constexpr int cosine[24] = {
-            32768,31651,28378,23170,16384,8481,0,-8481,-16384,-23170,-28378,-31651,
-            -32768,-31651,-28378,-23170,-16384,-8481,0,8481,16384,23170,28378,31651};
+        static constexpr unsigned short cosine[6] = {32768,31651,28378,23170,16384,8481};
         visible = true;
         for (unsigned ring = 0; ring < 3; ++ring) {
             const int r = base + (ring == 1 ? -256 : ring == 2 ? 256 : 0);
-            const auto component = [r](int unit) {
-                const unsigned long magnitude = static_cast<unsigned short>(r) *
-                    static_cast<unsigned short>(unit < 0 ? -unit : unit);
-                const int rounded = static_cast<int>((magnitude + (1L << 22)) >> 23);
-                return unit < 0 ? -rounded : rounded;
-            };
-            for (unsigned i = 0; i < 24; ++i)
-                points[ring][i] = {x + component(cosine[i]),
-                    y + component(cosine[(i + 18) % 24])};
+            // Six unique magnitudes; the other quadrants reuse their exact
+            // rounded values. Keep unsigned 16x16 multiplication on 68000.
+            int c[7]; c[6] = 0;
+            for (unsigned i = 0; i < 6; ++i) {
+                const unsigned long magnitude = static_cast<unsigned short>(r) * cosine[i];
+                c[i] = static_cast<int>((magnitude + (1L << 22)) >> 23);
+            }
+            for (unsigned i = 0; i < 6; ++i) {
+                points[ring][i] = {x+c[i], y+c[6-i]};
+                points[ring][i+6] = {x-c[6-i], y+c[i]};
+                points[ring][i+12] = {x-c[i], y-c[6-i]};
+                points[ring][i+18] = {x+c[6-i], y-c[i]};
+            }
         }
     }
     bool same(const GoalFieldOutline& other) const {
@@ -55,6 +57,22 @@ struct GoalFieldOutline {
             for (unsigned i = 0; i < 24; ++i) {
                 const auto a = points[ring][i], b = points[ring][(i + 1) % 24];
                 LaserSightLine{a.x,a.y,b.x,b.y}.draw([&](int x, int y) { plot(x, y, ring == 2 ? 2 : 1); });
+            }
+    }
+    // Reject whole off-screen edges without changing endpoint/error state on
+    // intersecting edges. Geometric endpoint clipping would alter Bresenham
+    // coverage and therefore cannot replace this conservative rejection.
+    template<class Plot> void drawClipped(int left,int top,int right,int bottom,Plot plot) const {
+        if (!visible || left >= right || top >= bottom) return;
+        for (unsigned ring = 0; ring < 3; ++ring)
+            for (unsigned i = 0; i < 24; ++i) {
+                const auto a = points[ring][i], b = points[ring][(i+1)%24];
+                if ((a.x < left && b.x < left) || (a.x >= right && b.x >= right) ||
+                    (a.y < top && b.y < top) || (a.y >= bottom && b.y >= bottom)) continue;
+                LaserSightLine{a.x,a.y,b.x,b.y}.draw([&](int x,int y) {
+                    if (x >= left && x < right && y >= top && y < bottom)
+                        plot(x,y,ring == 2 ? 2 : 1);
+                });
             }
     }
 };
