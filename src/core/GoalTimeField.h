@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GOAL_TIME_FIELD_H
 #include "GameMakerRandom.h"
 #include "HudReal.h"
+#include "EnemyContact.h"
 #include "../../generated/downwell-goal-mask.h"
 namespace downwell {
 // goalTimeField Create/Draw, audited against the VM assembly. Advance once
@@ -13,11 +14,19 @@ struct GoalTimeField {
     // Create. Draw's randomized radius does not change the collision mask.
     // Player uses sprPlayerIdle's rectangle (-4..3,-4..7).
     bool meetsPlayer(int px, int py) const {
-        const int left = px - 4 - (x - 128), right = left + 8;
-        int top = py - 4 - (y - 128), bottom = top + 12;
-        if (right <= 0 || left >= 256 || bottom <= 0 || top >= 256) return false;
-        if (top < 0) top = 0;
-        if (bottom > 256) bottom = 256;
+        return meetsRelativeBounds({px-x-4,px-x+4,py-y-4,py-y+8});
+    }
+    // Half-open integer pixel bounds relative to the field's centre. The
+    // caller resolves the source actor's transform/bbox before invoking this.
+    // Clip before translating so even extreme rectangle bounds are safe.
+    static bool meetsRelativeBounds(ContactBounds bounds) {
+        if(bounds.left>=bounds.right || bounds.top>=bounds.bottom ||
+           bounds.right<=-128 || bounds.left>=128 ||
+           bounds.bottom<=-128 || bounds.top>=128)return false;
+        const int left=(bounds.left < -128 ? -128 : bounds.left)+128;
+        const int right=(bounds.right > 128 ? 128 : bounds.right)+128;
+        const int top=(bounds.top < -128 ? -128 : bounds.top)+128;
+        const int bottom=(bounds.bottom > 128 ? 128 : bounds.bottom)+128;
         for (int row = top / 2; row <= (bottom - 1) / 2; ++row) {
             const int a = goalMaskRows[row][0] * 2;
             const int b = goalMaskRows[row][1] * 2;

@@ -2,6 +2,10 @@
 #include "core/BloodEffect.h"
 #include "core/BloodEffects.h"
 #include "core/TimeStopBound.h"
+#include "core/GoalTimeField.h"
+bool compileGoalFieldBounds(downwell::ContactBounds bounds){
+    return downwell::GoalTimeField::meetsRelativeBounds(bounds);
+}
 bool compileTimeStopBound(bool stopped,downwell::MotionBinary64 x,int width,bool inField,bool& allowed){
     return downwell::TimeStopBound::evaluate(stopped,x,{},width,
         [&](auto,auto,bool& hit){hit=inField;return true;},allowed);

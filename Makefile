@@ -227,6 +227,15 @@ build/smoke-distance-test: tests/core/SmokeDistanceTest.cpp $(wildcard src/core/
 .PHONY: verify-smoke-effect
 test: verify-blood-effect
 test: verify-time-stop-bound
+test: verify-goal-field-bounds
+.PHONY: verify-goal-field-bounds
+verify-goal-field-bounds: build/goal-field-bounds-test
+	./build/goal-field-bounds-test
+
+build/goal-field-bounds-test: tests/core/GoalFieldBoundsTest.cpp $(wildcard src/core/*.h) generated/downwell-goal-mask.h generated/downwell-goal-mask.mask
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/GoalFieldBoundsTest.cpp
+
 .PHONY: verify-time-stop-bound
 verify-time-stop-bound: build/time-stop-bound-test
 	./build/time-stop-bound-test
