@@ -120,11 +120,52 @@ void testQueueOverflowIsSticky() {
     require(instances.empty(), "overflowed queue leaves storage unchanged");
 }
 
+void testSynchronousChildBirthFailure() {
+    const auto bytes = makeObjectPack();
+    const downwell::ObjectPack objects(bytes.data(), bytes.size());
+    for (bool duplicate : {false, true}) {
+        downwell::InstanceStore<3> instances;
+        downwell::DeferredInstanceQueue<2> queue;
+        queue.enqueueCreate(0, 10, 20);
+        queue.enqueueCreate(0, 30, 40);
+        std::uint32_t nextId = 100, callbacks = 0;
+        const auto childCreate = [&](downwell::InstanceRecord& parent) {
+            ++callbacks;
+            require(parent.instanceId == 100, "first parent dispatches before child births");
+            require(instances.create(nextId, 0, 20, false) == downwell::CreateInstanceResult::success,
+                "synchronous child consumes a live slot");
+            if (!duplicate) {
+                ++nextId;
+                require(instances.create(nextId++, 0, 20, false) == downwell::CreateInstanceResult::success,
+                    "second child consumes remaining capacity after queue preflight");
+            }
+        };
+        const auto expected = duplicate ? downwell::ApplyInstanceCommandsResult::duplicateInstanceId :
+            downwell::ApplyInstanceCommandsResult::instanceStoreFull;
+        require(queue.apply(instances, objects, 20, nextId, childCreate) == expected,
+            "post-callback birth rejection returns explicit failure");
+        const auto afterFailure = nextId;
+        require(callbacks == 1 && instances.size() == (duplicate ? 2u : 3u) &&
+                nextId == (duplicate ? 101u : 103u),
+            "failed parent has no callback and earlier children remain owned");
+        require(queue.apply(instances, objects, 20, nextId, childCreate) == expected &&
+                callbacks == 1 && nextId == afterFailure,
+            "partial failure is sticky and cannot replay synchronous side effects");
+        queue.clear();
+        instances.clear();
+        queue.enqueueCreate(0, 50, 60);
+        require(queue.apply(instances, objects, 20, nextId, [](downwell::InstanceRecord&) {}) ==
+                downwell::ApplyInstanceCommandsResult::success,
+            "explicit queue reset permits a new creation batch");
+    }
+}
+
 } // namespace
 
 int main() {
     testApplyIsOrderedAndAtomic();
     testQueueOverflowIsSticky();
+    testSynchronousChildBirthFailure();
     std::cout << "deferred instance queue tests passed\n";
     return 0;
 }

@@ -64,6 +64,7 @@ public:
     void clear() {
         count_ = 0;
         overflowed_ = false;
+        applyFailure_ = ApplyInstanceCommandsResult::success;
     }
 
     std::size_t size() const { return count_; }
@@ -87,6 +88,8 @@ public:
                                       std::int32_t roomId,
                                       std::uint32_t& nextInstanceId,
                                       CreateHandler createHandler) {
+        if (applyFailure_ != ApplyInstanceCommandsResult::success)
+            return applyFailure_;
         if (overflowed_)
             return ApplyInstanceCommandsResult::queueFull;
         if (count_ > InstanceCapacity - instances.size())
@@ -108,9 +111,19 @@ public:
         for (std::size_t index = 0; index < count_; ++index) {
             const DeferredCreateInstance& command = commands_[index];
             const PackedObject& definition = definitions[index];
-            const std::uint32_t instanceId = nextInstanceId++;
-            instances.create(instanceId, command.objectId, roomId,
-                             definition.persistent());
+            const std::uint32_t instanceId = nextInstanceId;
+            // Earlier synchronous Create callbacks can consume capacity or
+            // IDs after preflight. Never dereference a rejected birth, nor
+            // replay already-dispatched callbacks after partial failure.
+            const auto created = instances.create(instanceId, command.objectId, roomId,
+                                                  definition.persistent());
+            if (created != CreateInstanceResult::success) {
+                applyFailure_ = created == CreateInstanceResult::full ?
+                    ApplyInstanceCommandsResult::instanceStoreFull :
+                    ApplyInstanceCommandsResult::duplicateInstanceId;
+                return applyFailure_;
+            }
+            ++nextInstanceId;
             InstanceRecord& instance = *instances.find(instanceId);
             instance.x = command.x;
             instance.y = command.y;
@@ -140,6 +153,7 @@ public:
     }
 
 private:
+    ApplyInstanceCommandsResult applyFailure_ = ApplyInstanceCommandsResult::success;
     std::array<DeferredCreateInstance, CommandCapacity> commands_{};
     std::size_t count_ = 0;
     bool overflowed_ = false;
