@@ -146,6 +146,11 @@ test: verify-corpse-creation-integration
 test: verify-corpse-animation
 test: verify-corpse-effects
 test: verify-corpse-replay
+test: verify-runner-fp-startup
+
+.PHONY: verify-runner-fp-startup
+verify-runner-fp-startup:
+	python3 tools/verify-runner-fp-startup.py
 test: verify-corpse-expiry
 test: verify-corpse-expiry-owner
 

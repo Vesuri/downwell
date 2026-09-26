@@ -75,6 +75,7 @@ References: [skeleton effects](skeleton-effect-ownership.md),
 [animation fields](runner-image-fields.md).
 
 Precise-mask reference: [collision bounds](runner-collision-bounds.md).
+FP-mode evidence and remaining runtime checks: [CRT startup](runner-fp-startup.md).
 
 ## 2. Make catacombs playable
 
