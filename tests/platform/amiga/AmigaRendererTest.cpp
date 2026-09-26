@@ -123,6 +123,28 @@ void requireRuntimeSprite(const std::vector<UBYTE>& pack,
 
 int main(int argc, char** argv) {
     {
+        unsigned lines=0;
+        for(int x0=-8;x0<=8;++x0)for(int y0=-8;y0<=8;++y0)
+          for(int x1=-8;x1<=8;++x1)for(int y1=-8;y1<=8;++y1){
+            downwell::LaserSightLine line{x0,y0,x1,y1};
+            std::vector<int> expected,actual;
+            // Independent integer-ratio construction: do not duplicate the
+            // rasterizer's evolving error accumulator. Ties advance the minor
+            // axis away from the starting point, including reversed lines.
+            const int dx=std::abs(x1-x0),dy=std::abs(y1-y0);
+            const int major=std::max(dx,dy),minor=std::min(dx,dy);
+            for(int step=0;step<=major;++step){
+                const int small=major?(2*step*minor+major)/(2*major):0;
+                expected.push_back(x0+(x0<x1?1:-1)*(dx>=dy?step:small));
+                expected.push_back(y0+(y0<y1?1:-1)*(dx>=dy?small:step));
+            }
+            line.draw([&](int x,int y){actual.push_back(x);actual.push_back(y);});
+            require(actual==expected,"line raster matches independent ordered pixels in every octant");
+            ++lines;
+        }
+        std::cout<<lines<<" independent line-raster comparisons passed\n";
+    }
+    {
         // Independent pre-optimization vertex formula and complete ordered
         // pixel stream, not just a final bitmap that could hide overdraw.
         constexpr int cosine[24]={32768,31651,28378,23170,16384,8481,0,-8481,-16384,-23170,-28378,-31651,
