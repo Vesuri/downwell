@@ -266,6 +266,16 @@ PreCreate, placed overrides, transition retirement and failure propagation.
 Production installation still requires all later mutation paths to use the same
 owner and the separate compact gameplay pools to participate in its identities.
 
+The adapter's explicit `move` takes binary32 coordinates from the actor motion
+owner; it does not substitute the diagnostic integer `InstanceRecord::x/y`.
+Its refresh entry point reuses the stored sprite properties during dirty passes.
+Activation, movement and refresh validate both lifetime and object identity before
+selecting graph flags. Deferred-queue tests cover inactive dynamic birth, the
+compatibility depth override, command image-index writes, Create ordering,
+deferred deactivation, reactivation and a fractional move followed by refresh.
+Wrong-object snapshots and stale handles are rejected. Routing each live actor's
+actual setter sites through these entries remains required.
+
 `RunnerSpatialInstances::removeSpatialMembership` exposes the live-instance
 `0x501f70` operation separately from retirement. It removes indexed bounds with
 root retry, clears only the indexed flag and unlinks both dirty queues, retaining

@@ -76,6 +76,7 @@ public:
     const State* resolve(InstanceHandle h)const{
         return live(h)?&entries_[h.slot].state:nullptr;
     }
+    int objectId(InstanceHandle h)const{return live(h)?entries_[h.slot].object:-1;}
     bool attach(InstanceHandle h,int object,State state){
         if(!valid() || h.slot>=Capacity || !h.generation || object<0 ||
             entries_[h.slot].object>=0 || h.generation<=entries_[h.slot].generation ||

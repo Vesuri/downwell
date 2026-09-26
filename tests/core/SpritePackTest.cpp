@@ -6,6 +6,7 @@
 #include "core/RunnerObjectFamilies.h"
 #include "core/StoredCollisionLifecycle.h"
 #include "core/RoomLoader.h"
+#include "core/DeferredInstanceQueue.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -110,6 +111,33 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         const auto old=records.handleAt(0);
         require(downwell::RoomLoader<4>::enter(records,8,nullptr,0,false,event,room,deferred,lifecycle)==downwell::LoadRoomResult::success&&
                 !storedOwner.resolve(old)&&records.empty(),"room transition retires the resource-backed owner");
+        downwell::DeferredInstanceQueue<2> births;
+        downwell::DeferredCreateInstance command(82,30,60);command.active=false;
+        command.scaleX=0.5f;command.imageIndex=2.5f;
+        require(births.enqueueCreate(command),"queue inactive resource-backed birth");
+        std::uint32_t next=400;unsigned creates=0;
+        require(births.apply(records,objects,8,next,[&](downwell::InstanceRecord& record){
+            ++creates;const auto h=records.handleAt(0);int depth;
+            require(storedOwner.resolve(h)&&!(storedOwner.resolve(h)->flags&8u)&&
+                    (storedOwner.resolve(h)->flags&2u),"inactive dynamic birth refreshes bounds before Create");
+            require(properties[h.slot].depth.promoted().roundPixel(depth)&&depth==field.creationDepth&&record.depth==depth,
+                    "dynamic compatibility depth supersedes serialized binding depth");
+            require(properties[h.slot].sprite.imageIndex.bits==0x40200000u,"command index is installed after default sprite binding");
+        },lifecycle)==downwell::ApplyInstanceCommandsResult::success&&creates==1,"dynamic resource lifecycle reaches Create once");
+        const auto born=records.handleAt(0);
+        require(records.reconcileObjectMembership([&](auto h,const auto& record,bool member){return lifecycle.membership(h,record,member);}),
+                "dormant dynamic birth leaves active object list");
+        require(records.requestActivation(born,true,[&](auto h,const auto& record,bool active){return lifecycle.activation(h,record,active);}),
+                "activate dynamic birth through collision adapter");
+        require(lifecycle.move(born,records.at(0),{0x41f40000u},{0x42700000u}),"move using explicit fractional actor position");
+        require(storedOwner.resolve(born)->x.bits==0x41f40000u&&records.at(0).x==30,
+                "collision owner retains 30.5 rather than rounded record position");
+        require(storedOwner.flush([&](auto h,bool publish){return lifecycle.refresh(h,*records.resolve(h),publish);}),
+                "dirty pass refreshes through stored resources");
+        auto wrong=records.at(0);wrong.objectId=35;
+        require(!lifecycle.move(born,wrong,{}, {})&&!lifecycle.refresh(old,records.at(0),true),
+                "wrong-object snapshots and expired handles cannot mutate collision ownership");
+        require(records.clear([&](auto h,const auto& record){return lifecycle.retire(h,record);}),"retire dynamic birth before next room");
         definition.rotation=30.0f;
         require(downwell::RoomLoader<4>::enter(records,9,&definition,1,false,event,room,deferred,lifecycle)==downwell::LoadRoomResult::lifecycleFailure&&
                 callbacks==1&&!storedOwner.valid(),"unsupported bounds calculation stops before PreCreate and invalidates collision owner");

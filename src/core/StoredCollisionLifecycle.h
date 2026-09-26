@@ -33,19 +33,33 @@ struct StoredCollisionLifecycle {
         p.sprite.scaleX=stored(record.scaleX);p.sprite.scaleY=stored(record.scaleY);
         p.sprite.angle=stored(record.rotation);p.sprite.imageIndex=stored(record.imageIndex);
         return owner.publishBirth(h,graph,[&](InstanceHandle live,bool publish){
-            return owner.refreshSprite(live,*graph.flags(unsigned(record.objectId)),allPrepared,
-                                       sprites,p.sprite,true,trig,round,publish);
+            return refresh(live,record,publish);
         });
+    }
+    bool refresh(InstanceHandle h,const InstanceRecord& record,bool publish){
+        const auto* flags=matchingFlags(h,record);
+        return flags&&owner.refreshSprite(h,*flags,allPrepared,sprites,properties[h.slot].sprite,
+                                          true,trig,round,publish);
+    }
+    // Fractional position comes explicitly from the actor's authoritative motion
+    // state, never from a rounded record or a guessed per-frame synchronization.
+    bool move(InstanceHandle h,const InstanceRecord& record,RunnerImageValue x,RunnerImageValue y){
+        const auto* flags=matchingFlags(h,record);
+        return flags&&owner.move(h,x,y,*flags);
     }
     bool retire(InstanceHandle h,const InstanceRecord&){return owner.retire(h);}
     bool membership(InstanceHandle h,const InstanceRecord&,bool registered){
         return owner.registerObject(h,registered);
     }
     bool activation(InstanceHandle h,const InstanceRecord& record,bool active){
-        const auto* flags=graph.flags(unsigned(record.objectId));
+        const auto* flags=matchingFlags(h,record);
         return flags&&owner.setActive(h,active,*flags);
     }
 private:
+    const std::uint32_t* matchingFlags(InstanceHandle h,const InstanceRecord& record)const{
+        if(!owner.valid()||record.objectId<0||owner.objectId(h)!=record.objectId)return nullptr;
+        return graph.flags(unsigned(record.objectId));
+    }
     static RunnerImageValue stored(float value){
         static_assert(sizeof(float)==4,"Stored runner fields require binary32");
         RunnerImageValue result;std::memcpy(&result.bits,&value,4);return result;
