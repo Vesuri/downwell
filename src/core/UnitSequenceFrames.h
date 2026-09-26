@@ -3,7 +3,9 @@
 #include "SequenceTimeline.h"
 namespace downwell {
 // Only for verified consecutive keys (time i, length 1, frame value i),
-// e.g. skeleton sprites 205–208 and bone 460. Not a generic track evaluator.
+// The pinned export verifies this shape for every nonempty original sprite.
+// Empty sprites and per-second playback conversion remain caller concerns.
+// Not a generic arbitrary-track evaluator.
 struct UnitSequenceFrames {
     static bool evaluate(RunnerImageValue position, unsigned frames, RunnerImageValue& image) {
         if (!frames || frames > 65535 || !SequenceTimeline::valid(position)) return false;

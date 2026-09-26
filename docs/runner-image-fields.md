@@ -164,6 +164,17 @@ but live ownership and reconciliation still prevent enabling the new actor.
 
 ## Skeleton animation owner
 
+The full pinned UTMT export now includes sequence tracks for all 741 sprites,
+not just the initial eight actor/effect resources. Every track is a single
+`GMSpriteFramesTrack` with consecutive keys `(time=i, length=1, value=i)`;
+there are 3,152 keys in total, no nested tracks, messages or moments. Sequence
+length equals frame count. IDs 125, 159 and 582 are empty; the positive-length
+unit evaluator must not be invoked for them. IDs 399, 626, 738, 739 and 740 use
+per-second playback; the other 736 use one frame per game frame. The verifier
+checks each track and matches sequence playback metadata to sprite metadata.
+This establishes the unit-key data domain for a shared sprite setter/evaluator,
+not general arbitrary-track support, live animation parity or runtime FP mode.
+
 `SkeletonAnimation` now joins the recovered timing state with a separate
 sequence position and the idle/throw/hit sprites 208/207/205 (6/8/1 frames).
 Its default sprite comes from object 120's serialized metadata. Advancement
