@@ -696,7 +696,8 @@ void StartupRuntime::updateMainBullets() {
 
 void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
                                        bool attracted) {
-    spawnCurrencyReward(amount,
+    if(!run_.effectsSucceeded)return;
+    const auto reward=spawnCurrencyReward(amount,
         static_cast<int>(roundGameMakerCoordinate(x)) - mainPlayerOriginX_,
         static_cast<int>(roundGameMakerCoordinate(y)) - mainPlayerOriginY_,
         attracted, static_cast<unsigned>(mainCurrencyCapacity - mainCurrencyCount_), random_,
@@ -712,6 +713,7 @@ void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
         gem.speedX = gem.motion.vx / 12800.0F;
         gem.speedY = gem.motion.vy / 12800.0F;
     }, run_.upgrades.levels[10] != 0);
+    if(!reward.complete)run_.effectsSucceeded=false;
 }
 
 void StartupRuntime::updateMainCurrency() {

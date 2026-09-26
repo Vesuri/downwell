@@ -284,6 +284,15 @@ int main() {
         if (crowdedRewards.gemAt(i).active)
             rewardTotal += crowdedRewards.gemAt(i).amount;
     require(rewardTotal == 140, "crowded rewards do not silently lose currency");
+    for(int reward:{640,650}){
+        AmigaPortRuntime fullReward(300);
+        require(fullReward.configureEnemy(0,111,163,0,5,0,0,5,reward),"configure capacity-boundary reward");
+        fullReward.step(0);
+        require(fullReward.gemCount()==AmigaPortRuntime::gemCapacity,
+                "all completed reward births remain owned at the capacity boundary");
+        require(fullReward.effectsSucceeded()==(reward==640),
+                "native world distinguishes exact fit from a truncated reward");
+    }
     // Retire the oldest slot and mark its successor. A second birth must not
     // jump ahead of that surviving gem in the next simulation traversal.
     const_cast<AmigaPortRuntime::GemState&>(crowdedRewards.gemAt(0)).active = false;
@@ -304,7 +313,7 @@ int main() {
     {
         downwell::GameMakerRandom random(47), expected(47);
         int amounts[4] = {}, count = 0;
-        const unsigned births = downwell::spawnCurrencyReward(23, 4, 8, true, 4, random,
+        const auto births = downwell::spawnCurrencyReward(23, 4, 8, true, 4, random,
             [&](const downwell::CurrencyBirth& birth) {
                 amounts[count++] = birth.amount;
                 require(birth.large == (birth.amount == 10) && birth.motion.attracted &&
@@ -315,28 +324,35 @@ int main() {
             downwell::GemMotion motion;
             motion.initialize(4, 8, true, expected);
         }
-        require(births == 4 && count == 4 && amounts[0] == 10 && amounts[1] == 10 &&
+        require(births.complete && births.emitted == 4 && count == 4 && amounts[0] == 10 && amounts[1] == 10 &&
                     amounts[2] == 2 && amounts[3] == 2 && random.nextU32() == expected.nextU32(),
                 "source reward split preserves odd remainder and exactly one Create RNG sequence per gem");
         require(downwell::spawnCurrencyReward(12, 4, 8, false, 2, random,
             [&](const downwell::CurrencyBirth& birth) {
                 require(birth.motion.attractorAtBirth && !birth.motion.attracted,
                         "reward creation snapshots Gem Attractor without immediately attracting gems");
-            }, true) == 2, "upgraded reward creates both large and small gems");
+            }, true).complete, "upgraded reward creates both large and small gems");
         for (unsigned i = 0; i < 2; ++i) {
             downwell::GemMotion upgraded;
             upgraded.initialize(4, 8, false, expected, true);
         }
         require(random.drawCount() == expected.drawCount(), "Attractor adds no creation RNG draws");
         const auto before = random.drawCount();
-        require(downwell::spawnCurrencyReward(20, 0, 0, false, 0, random,
-                    [&](const downwell::CurrencyBirth&) { ++count; }) == 0 &&
+        const auto full=downwell::spawnCurrencyReward(20, 0, 0, false, 0, random,
+                    [&](const downwell::CurrencyBirth&) { ++count; });
+        require(!full.complete && full.emitted==0 &&
                     random.drawCount() == before && count == 4,
                 "a full port pool emits nothing and consumes no phantom-birth RNG");
-        require(downwell::spawnCurrencyReward(-1, 0, 0, false, 4, random,
-                    [&](const downwell::CurrencyBirth&) { ++count; }) == 0 &&
+        const auto empty=downwell::spawnCurrencyReward(-1, 0, 0, false, 4, random,
+                    [&](const downwell::CurrencyBirth&) { ++count; });
+        require(empty.complete && empty.emitted==0 &&
                     random.drawCount() == before,
                 "nonpositive rewards create no gems");
+        const auto partial=downwell::spawnCurrencyReward(23,0,0,false,1,random,
+                    [&](const downwell::CurrencyBirth& birth){require(birth.amount==10,"partial birth remains a large gem");++count;});
+        downwell::GemMotion first;first.initialize(0,0,false,expected);
+        require(!partial.complete&&partial.emitted==1&&count==5&&random.drawCount()==expected.drawCount(),
+                "partial reward reports failure while retaining completed Create and its exact RNG consumption");
         struct Slot { bool active; int id; } slots[] = {{false, 0}, {true, 1}, {false, 2}, {true, 3}};
         require(downwell::compactCurrencySlots(slots, 4) == 2 && slots[0].id == 1 &&
                     slots[1].id == 3 && !slots[2].active && !slots[3].active,

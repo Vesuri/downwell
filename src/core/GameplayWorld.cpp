@@ -170,19 +170,15 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
 
 void GameplayWorld::spawnReward(const EnemyState& enemy, bool attracted)
 {
+    if(!run_.effectsSucceeded)return;
     unsigned next = downwell::compactCurrencySlots(gems_, gemSlotEnd_);
     unsigned available = gemCapacity - next;
     // Exhausted keys cannot alias a retired lifetime. Bound births before
     // Create consumes RNG, just as for exhausted storage capacity.
     const std::uint32_t identities = nextGemLifetimeId_ ?
         0xffffffffu - nextGemLifetimeId_ + 1u : 0u;
-    if (identities < available) {
-        available = identities;
-        const unsigned births = enemy.reward > 0 ?
-            unsigned(enemy.reward / 10 + (enemy.reward % 10 + 1) / 2) : 0;
-        if (births > available) run_.effectsSucceeded = false;
-    }
-    downwell::spawnCurrencyReward(enemy.reward, enemy.x, enemy.y, attracted,
+    if (identities < available) available = identities;
+    const auto reward=downwell::spawnCurrencyReward(enemy.reward, enemy.x, enemy.y, attracted,
         available, enemyRandom_, [this, &enemy, attracted, &next](const downwell::CurrencyBirth& birth) {
         GemState& gem = gems_[next++];
         gem.lifetimeId = nextGemLifetimeId_++;
@@ -200,6 +196,7 @@ void GameplayWorld::spawnReward(const EnemyState& enemy, bool attracted)
         gem.active = true;
     }, run_.upgrades.levels[10] != 0);
     gemSlotEnd_ = next;
+    if(!reward.complete)run_.effectsSucceeded=false;
 }
 
 unsigned GameplayWorld::gemCount() const

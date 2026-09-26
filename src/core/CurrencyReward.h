@@ -8,12 +8,17 @@ struct CurrencyBirth {
     int amount;
     bool large;
 };
+struct CurrencyRewardResult {
+    unsigned emitted;
+    bool complete;
+};
 
 // scrCurrencySpawn: tens first, then twos (including an odd final remainder).
-// The fixed port capacity is explicit; rejected births consume no RNG. Source
+// The fixed port capacity is explicit; rejected births consume no RNG and an
+// incomplete result is terminal for the owning simulation. Source
 // allocation failure and Create's embedded-wall relocation remain separate work.
 template<class Random, class Emit>
-unsigned spawnCurrencyReward(int amount, int x, int y, bool attracted,
+CurrencyRewardResult spawnCurrencyReward(int amount, int x, int y, bool attracted,
                              unsigned available, Random& random, Emit emit, bool attractor = false) {
     unsigned emitted = 0;
     while (amount > 0 && emitted < available) {
@@ -25,7 +30,9 @@ unsigned spawnCurrencyReward(int amount, int x, int y, bool attracted,
         amount -= birth.amount;
         ++emitted;
     }
-    return emitted;
+    // Earlier synchronous Creates stay committed on exhaustion. The caller
+    // must latch failure, not treat a truncated reward as a successful death.
+    return {emitted,amount<=0};
 }
 
 // A sparse backend must not insert new instances before surviving older
