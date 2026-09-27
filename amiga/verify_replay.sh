@@ -23,7 +23,7 @@ fi
 
 EXPECTED="$("$REFERENCE")"
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
-printf 'cd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
+printf 'Stack 8192\ncd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f out/Downwell.exe "$DH1/Downwell"
 rm -f "$RUN"/state/*.uss "$RUN/gdb-out.log" "$RUN/fsuae-replay.log" \
   "$RUN/gdb-ready.marker"

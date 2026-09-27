@@ -179,6 +179,10 @@ the complete room-to-object-to-code routing path.
 
 ## Amiga toolchain
 
+The executable requires an 8 KiB task stack (`Stack 8192` when launching
+manually). The supplied launchers set it; an undersized stack returns code 20
+before game initialization. This does not change the 68000 CPU requirement.
+
 ```sh
 . amiga/env.sh
 make -C amiga

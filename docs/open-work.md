@@ -30,8 +30,9 @@ behavior, both backend integrations and relevant original-game verification.
   activation/rebinding and lifetime-safe instance lookup. A boolean hit or Draw
   order cannot identify the field that determines shard direction.
   Extend the SDL clock-query owner's coverage to identity-bearing and other
-  gameplay queries; register the native world's heterogeneous lifetimes in the
-  resource-backed owner before replacing its unindexed collision adapters.
+  gameplay queries; register the remaining native field, effect and projectile
+  lifetimes in the resource-backed owner before replacing its unindexed
+  collision adapters. Complete original room creation order across families.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding

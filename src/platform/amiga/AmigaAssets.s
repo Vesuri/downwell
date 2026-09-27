@@ -63,6 +63,13 @@ amiga_object_pack:
 amiga_object_pack_end:
 
 	.balign 4
+	.globl amiga_collision_pack
+amiga_collision_pack:
+	.incbin "../generated/downwell-sprites.dwsc"
+	.globl amiga_collision_pack_end
+amiga_collision_pack_end:
+
+	.balign 4
 	.globl amiga_builder_pack
 amiga_builder_pack:
 	.incbin "../generated/downwell-builder-patterns.dwbp"

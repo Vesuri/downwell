@@ -379,6 +379,34 @@ scheduler integration remain separate work.
 
 ## Cross-target mutation tape
 
+### Native resource residency and lifetime publication
+
+The Amiga executable embeds the same generated `downwell-sprites.dwsc`
+metadata as the host and constructs `GameplayCollisionOwner` before its world.
+Player, enemy, breakable and terrain births/setters/retirements publish through
+that owner, including in-place Retry. Its storage is static, not on the task
+stack; the current 68000 layout consumes 1,360,382 bytes before the 26,700-byte
+sprite metadata pack. This is an expanded-memory development configuration,
+not evidence of stock-A500 memory fit.
+
+The task requires an 8 KiB stack. Launch scripts set it explicitly; the small
+entry wrapper returns 20 before entering the application if less is supplied.
+Scene verification preserves a 256-byte stack guard and records the first
+failing boundary without resetting it. `verify_stack_stage.gdb` is diagnostic:
+its marker means the breakpoint was reached, not that the reported stage passed.
+
+This wiring does not replace the native world's existing collision callbacks:
+other families and their original scheduling still need integration. Precise
+mask payloads are not yet resident in the native executable, and wall End Step
+is not dispatched by its production scheduler. The registered terrain supplies
+the retained painter, with changed-wall notifications routed to sparse row
+damage. No broad collision-parity or frame-budget claim follows from this.
+
+Spatial insertion uses a bounded descent path and reverse unwind rather than
+recursive split frames. Child selection, bounds propagation and sibling order
+remain source-ordered. The independent scalar-tree comparison includes a
+2,400-instance terrain grid as well as removal/reinsertion tapes.
+
 `RunnerSpatialVerification.h` supplies the `SPATIAL` result in the host/native
 replay comparison. It checks transform writes (including signed zero, alpha and
 tint dependencies), all 256 low object-flag combinations in both preparation

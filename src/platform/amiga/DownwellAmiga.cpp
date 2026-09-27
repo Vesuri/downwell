@@ -76,6 +76,7 @@ __attribute__((noinline, used)) void downwellShopLiveReady() { __asm__ volatile(
 #include "framework/Sprite.h"
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
+#include "core/GameplayCollisionOwner.h"
 #include "core/PortCheckpoint.h"
 #include "core/PortReplay.h"
 #include "core/RoomPack.h"
@@ -104,6 +105,8 @@ extern const UBYTE amiga_room_pack[];
 extern const UBYTE amiga_room_pack_end[];
 extern const UBYTE amiga_object_pack[];
 extern const UBYTE amiga_object_pack_end[];
+extern const UBYTE amiga_collision_pack[];
+extern const UBYTE amiga_collision_pack_end[];
 extern const UBYTE amiga_builder_pack[];
 extern const UBYTE amiga_builder_pack_end[];
 }
@@ -261,6 +264,21 @@ volatile ULONG gDownwellResultsBackdropChecks;
 
 #if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_REPLAY_VERIFY)
 extern "C" { volatile ULONG gDownwellStackGuardReady; }
+#endif
+#ifdef DOWNWELL_SCENE_VERIFY
+extern "C" { volatile ULONG gDownwellSceneStackFailureStage; }
+extern "C" __attribute__((noinline,used)) void downwellSceneStackFailed(){
+    __asm__ volatile("" ::: "memory");
+}
+__attribute__((noinline)) static void checkSceneStack(ULONG stage){
+    if(gDownwellSceneStackFailureStage||!gDownwellStackGuardReady)return;
+    const volatile ULONG* guard=(const volatile ULONG*)SysBase->ThisTask->tc_SPLower;
+    for(unsigned i=0;i<64;++i)if(guard[i]!=0x57ac6a4d){
+        gDownwellSceneStackFailureStage=stage;downwellSceneStackFailed();return;
+    }
+}
+#else
+static inline void checkSceneStack(ULONG){}
 #endif
 
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -1172,7 +1190,9 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
 }
 #endif
 
-int main(void) {
+// Keep the large application's frame out of the entry wrapper so a caller
+// with an undersized task stack can fail before any deep initialization.
+__attribute__((noinline)) static int runDownwell(void) {
 #if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_REPLAY_VERIFY)
     // The emulator debugger cannot reliably write target memory. Initialize
     // the canary on the CPU, below this frame with room for this loop itself.
@@ -1192,12 +1212,31 @@ int main(void) {
     int worldViewX = mainViewX;
     int worldViewY = mainInitialViewY;
     unsigned oldShopArt[downwell::ShopWorld::capacity] = {};
+    const downwell::ObjectPack objects(amiga_object_pack,
+        (unsigned long)(amiga_object_pack_end-amiga_object_pack));
+    const downwell::SpriteCollisionPack collisionSprites(amiga_collision_pack,
+        (unsigned long)(amiga_collision_pack_end-amiga_collision_pack));
+    if(!objects.valid()||!collisionSprites.valid())return 20;
+    checkSceneStack(1);
+    // Ownership precedes player construction and survives in-place run resets.
+    // Keep these bounded tables off the AmigaDOS stack, like the world itself.
+    alignas(downwell::GameplayCollisionOwner) static UBYTE collisionStorage[sizeof(downwell::GameplayCollisionOwner)];
+    auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
+        downwell::GameplayTerrainInstances::Presentation::bind(wallDamage));
+    if(!collisionOwner.valid())return 20;
+    checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
-        AmigaPortRuntime(initialRingOrigin);
+        AmigaPortRuntime(initialRingOrigin,true,0,false,collisionOwner.enemyBinding(),
+            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain());
 #else
     AmigaPortRuntime& port = *new (portRuntimeStorage)
-        AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true);
+        AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true,collisionOwner.enemyBinding(),
+            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain());
+#endif
+    if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
+    checkSceneStack(3);
+#ifndef DOWNWELL_REPLAY_VERIFY
 #ifdef DOWNWELL_SCENE_VERIFY
     // Exercise in-place recreation on the real 68000 before binding terrain.
     // Finish at the ordinary entry state so the complete scene oracle applies.
@@ -1208,6 +1247,7 @@ int main(void) {
             initialRingOrigin) != downwell::ResultsDestination::gameplay ||
         port.health() != 4 || port.runStage().area != 1 || port.tick() != 0)
         return 20;
+    checkSceneStack(4);
 #endif
 #endif
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -1300,9 +1340,6 @@ int main(void) {
     const downwell::RoomPack rooms(
         amiga_room_pack,
         (unsigned long)(amiga_room_pack_end - amiga_room_pack));
-    const downwell::ObjectPack objects(
-        amiga_object_pack,
-        (unsigned long)(amiga_object_pack_end - amiga_object_pack));
     const downwell::BuilderPatternPack builders(
         amiga_builder_pack,
         (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));
@@ -1356,6 +1393,7 @@ int main(void) {
             return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
         }
         terrainCollision.index = &terrainIndex;
+        checkSceneStack(5);
         port.configureLandingResolver(amigaResolveTerrainLanding,
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
@@ -1382,7 +1420,8 @@ int main(void) {
         memory.release();
         return 20;
     }
-    AmigaGardenScene gardenScene(memory.menuForeground(), memory.menuBackground(),
+    alignas(AmigaGardenScene) static UBYTE gardenStorage[sizeof(AmigaGardenScene)];
+    auto& gardenScene=*new(gardenStorage) AmigaGardenScene(memory.menuForeground(), memory.menuBackground(),
         memory.menuEntry(), memory.copper(), memory.copper() + downwellCopperWords,
         downwellCopperWords);
 #ifndef DOWNWELL_REPLAY_VERIFY
@@ -1433,7 +1472,8 @@ int main(void) {
     UWORD* const dynamicCopperWords[2] = {
         memory.copper(), memory.copper() + downwellCopperWords
     };
-    AmigaGameplayScene gameplayScene(dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
+    alignas(AmigaGameplayScene) static UBYTE gameplayStorage[sizeof(AmigaGameplayScene)];
+    auto& gameplayScene=*new(gameplayStorage) AmigaGameplayScene(dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
     gameplayScene.setBackingRange(worldViewY, worldViewY + downwellDisplayHeight);
 #ifndef DOWNWELL_REPLAY_VERIFY
     clear.bindDisplay(dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
@@ -1444,11 +1484,14 @@ int main(void) {
                   "Selection borders must fit the smaller retired HUD buffer");
     DownwellSplashCopperList splashBlankList(
         memory.copper() + downwellCopperWords * 2, downwellCopperWords);
-    AmigaPublisherScene publisherScene(
+    alignas(AmigaPublisherScene) static UBYTE publisherStorage[sizeof(AmigaPublisherScene)];
+    auto& publisherScene=*new(publisherStorage) AmigaPublisherScene(
         memory.copper() + downwellCopperWords * 3, downwellCopperWords);
-    AmigaCreditsScene creditsScene(
+    alignas(AmigaCreditsScene) static UBYTE creditsStorage[sizeof(AmigaCreditsScene)];
+    auto& creditsScene=*new(creditsStorage) AmigaCreditsScene(
         memory.copper() + downwellCopperWords * 4, downwellCopperWords);
-    AmigaControlsScene controlsScene(
+    alignas(AmigaControlsScene) static UBYTE controlsStorage[sizeof(AmigaControlsScene)];
+    auto& controlsScene=*new(controlsStorage) AmigaControlsScene(
         memory.copper() + downwellCopperWords * 5,
         dynamicCopperWords[0], dynamicCopperWords[1], downwellCopperWords);
     UBYTE* stagedBuffer = memory.menuForeground();
@@ -2340,7 +2383,9 @@ int main(void) {
                                  !port.registerSideCameraLocker(95, 288))) return 20;
             const bool wasSideLocked = port.cameraSideLocked();
 #endif
+            checkSceneStack(6);
             const AmigaPortFrame result = port.step(packedInput);
+            checkSceneStack(7);
 #ifdef DOWNWELL_CAMERA_VERIFY
             if (!wasSideLocked && port.cameraSideLocked()) ++gDownwellCameraLocks;
             if (wasSideLocked && !port.cameraSideLocked()) ++gDownwellCameraReleases;
@@ -3229,4 +3274,11 @@ int main(void) {
     gDownwellClearPhase = 100 + exitCode; downwellClearProbe();
 #endif
     return exitCode;
+}
+
+int main(void){
+    const ULONG lower=(ULONG)SysBase->ThisTask->tc_SPLower;
+    const ULONG upper=(ULONG)SysBase->ThisTask->tc_SPUpper;
+    if(upper<lower||upper-lower<8192)return 20;
+    return runDownwell();
 }
