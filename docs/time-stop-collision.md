@@ -963,8 +963,16 @@ processing. The stored host player routes it through its generation-checked
 movement binding before changing the record's coordinates. Rejection retains
 earlier motion/clock changes and stops subsequent phases. Deferred host bullet
 emission keeps an explicit copy of the pre-movement muzzle coordinates, not
-the newly published record. Native player lifetime registration is still needed
-to attach its external collision owner at this shared boundary. Positions here
+the newly published record. The native world has a separate published player
+record in world coordinates, with a generation-checked single-slot lifetime and
+a borrowed birth/movement/retirement binding. Constructor birth is checked;
+Retry and next-level entry retire the previous key and preserve the monotonic
+generation sequence. Death alone does not retire the player object. Failed
+movement retains the old public coordinates, and failed retirement stops before
+replacement. As with native enemy/box keys, this identity is family-local, not
+an original runtime instance ID. The default binding remains empty; source
+sprite/mask/transform publication and global collision registration are still
+required before the native player can use the resource-backed owner. Positions here
 remain derived from the existing fixed-point motion; this is not a migration
 to the runner's full binary64 integration or sequential X/Y setter semantics.
 Camera/interactable queries follow, then the time-stop transition query uses

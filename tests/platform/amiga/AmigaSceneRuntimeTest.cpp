@@ -1232,8 +1232,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const auto carriedInventory = gameplay.upgrades();
             const int carriedCapacity = gameplay.player().ammoCapacity();
             downwell::Input heldEntry; heldEntry.fire = true;
+            const auto oldPlayerHandle=gameplay.playerHandle();
             require(gameplay.prepareNextAreaOneLevel(heldEntry, 319) && reference.loadNextAreaOneLevel(heldEntry),
                 "both runtime adapters accept completed departure into the next area-one level");
+            require(!gameplay.findPlayer(oldPlayerHandle)&&gameplay.findPlayer(gameplay.playerHandle())&&
+                    gameplay.playerHandle().generation>oldPlayerHandle.generation,
+                    "next level retires the old player and publishes a fresh lifetime");
             require(gameplay.runStage().level == completedLevel + 1 &&
                 reference.runStage().level == completedLevel + 1 &&
                 !gameplay.levelClearActive() && !reference.levelClearActive() &&

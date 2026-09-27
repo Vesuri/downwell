@@ -36,7 +36,9 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
-    if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership()) return downwell::ResultsDestination::none;
+    if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
+    const auto playerLifecycle=playerLifecycle_;
+    const auto nextPlayerIdentity=nextPlayerLifetimeId_;
     const auto enemyLifecycle=enemyLifecycle_;
     const auto breakableLifecycle=breakableLifecycle_;
     const auto nextBreakableIdentity=nextBreakableLifetimeId_;
@@ -57,6 +59,11 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
+    // Construction above has no bound player owner. Recreate its lifetime
+    // only after restoring the run and the preserved monotonic key sequence.
+    playerLifecycle_=playerLifecycle;
+    playerInstance_.lifetimeId=0;
+    nextPlayerLifetimeId_=nextPlayerIdentity;
     run_.restart(action, records);
     if(!run_.timeFields.restoreEmptyBirthSequence(fieldBirths))run_.effectsSucceeded=false;
     if(!run_.smokeEffects.restoreEmptyBirthSequence(smokeBirths)||
@@ -66,13 +73,14 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
        !run_.corpseExpiryEffects.restoreEmptyBirthSequence(expiryBirths))run_.effectsSucceeded=false;
     run_.nextForegroundBirth=foregroundBirth;
     enemyRandom_.setSeed(seed);
+    if(!birthPlayerOwnership())return downwell::ResultsDestination::none;
     return destination;
 }
 
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
-    if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership()) return false;
+    if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
@@ -110,15 +118,16 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     cameraMotion_.reset(240, 176);
     cameraY_ = cameraPixelY_ = cameraPixelX_ = activationY_ = 0;
     ringOrigin_ = initialRingOrigin % ringHeight;
-    return true;
+    return birthPlayerOwnership();
 }
 
 GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    bool startsGrounded,
                                    int landingOffset,
                                    bool followCamera, EnemyLifecycleBinding enemyLifecycle,
-                                   BreakableLifecycleBinding breakableLifecycle)
-    : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), player_(startsGrounded, landingOffset), tick_(0),
+                                   BreakableLifecycleBinding breakableLifecycle,
+                                   PlayerLifecycleBinding playerLifecycle)
+    : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), playerLifecycle_(playerLifecycle), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       cameraPixelX_(0), activationY_(0),
@@ -191,6 +200,35 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
         gems_[index].attracted = false;
         gems_[index].active = false;
     }
+    birthPlayerOwnership();
+}
+
+bool GameplayWorld::birthPlayerOwnership() {
+    if(!run_.effectsSucceeded||!nextPlayerLifetimeId_) {
+        run_.effectsSucceeded=false;return false;
+    }
+    playerInstance_={240+int(downwell::roundGameMakerQ8(player_.offsetXFixed())),
+                     176+int(downwell::roundGameMakerQ8(player_.offsetYFixed())),
+                     true,nextPlayerLifetimeId_++};
+    if(!playerLifecycle_.birth(playerHandle(),playerInstance_)) {
+        run_.effectsSucceeded=false;return false;
+    }
+    return true;
+}
+
+bool GameplayWorld::retirePlayerOwnership() {
+    if(!playerInstance_.lifetimeId)return true;
+    if(!playerLifecycle_.retire(playerHandle(),playerInstance_)) {
+        run_.effectsSucceeded=false;return false;
+    }
+    playerInstance_.lifetimeId=0;playerInstance_.active=false;return true;
+}
+
+bool GameplayWorld::publishPlayerPosition(int x,int y) {
+    if(!playerInstance_.lifetimeId||!playerLifecycle_.integerPosition(playerHandle(),playerInstance_,x,y)) {
+        run_.effectsSucceeded=false;return false;
+    }
+    playerInstance_.x=x;playerInstance_.y=y;return true;
 }
 
 void GameplayWorld::spawnReward(const EnemyState& enemy, bool attracted)
@@ -694,7 +732,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }, &headBreak);
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
-        cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142);
+        cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142,false,
+        [this](int x,int y){return publishPlayerPosition(x,y);});
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
     if (headBreak.index >= 0) {

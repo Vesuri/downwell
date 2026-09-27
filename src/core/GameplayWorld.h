@@ -177,12 +177,24 @@ public:
         std::uint32_t lifetimeId;
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
+    struct PlayerInstance {
+        int x=240,y=176; // Published world coordinates, not motion accumulators.
+        bool active=true;
+        std::uint32_t lifetimeId=0;
+    };
+    using PlayerLifecycleBinding = downwell::RecordLifecycleBinding<PlayerInstance>;
     explicit GameplayWorld(unsigned initialRingOrigin,
                               bool startsGrounded = true,
                               int landingOffset = 0,
                               bool followCamera = false,
                               EnemyLifecycleBinding enemyLifecycle = {},
-                              BreakableLifecycleBinding breakableLifecycle = {});
+                              BreakableLifecycleBinding breakableLifecycle = {},
+                              PlayerLifecycleBinding playerLifecycle = {});
+    downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
+    const PlayerInstance* findPlayer(downwell::InstanceHandle handle) const {
+        return handle.slot==0&&handle.generation&&handle.generation==playerInstance_.lifetimeId
+            ? &playerInstance_ : nullptr;
+    }
     const Breakable* findBreakable(downwell::InstanceHandle handle) const {
         if(handle.slot>=breakableCount_||!handle.generation)return nullptr;
         const auto& box=breakables_[handle.slot];
@@ -442,6 +454,12 @@ public:
 private:
     EnemyLifecycleBinding enemyLifecycle_;
     BreakableLifecycleBinding breakableLifecycle_;
+    PlayerLifecycleBinding playerLifecycle_;
+    PlayerInstance playerInstance_;
+    std::uint32_t nextPlayerLifetimeId_=1;
+    bool birthPlayerOwnership();
+    bool retirePlayerOwnership();
+    bool publishPlayerPosition(int x,int y);
     bool inactivateBreakable(unsigned index);
     bool retireBreakable(unsigned index);
     bool clearBreakableOwnership();

@@ -340,7 +340,65 @@ void testNativeBoxLifecycle(){
             "rejected birth latches failure before later appends");
 }
 
+struct NativePlayerAudit {
+    downwell::InstanceHandle live{};
+    unsigned births=0,retirements=0,moves=0,calls=0,fail=0;
+    bool birth(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p){
+        ++calls;++births;
+        require(h.slot==0&&h.generation>live.generation&&p.lifetimeId==h.generation&&p.active&&p.x==240&&p.y==176,
+                "native player birth publishes fresh world-coordinate identity");
+        live=h;return fail!=1;
+    }
+    bool retire(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p){
+        ++calls;++retirements;
+        require(h.generation==live.generation&&p.lifetimeId==h.generation&&p.active,
+                "player retirement still resolves the active old lifetime");
+        return fail!=2;
+    }
+    bool move(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p,
+              downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+        ++calls;++moves;
+        require(h.generation==live.generation&&p.lifetimeId==h.generation&&p.active&&
+                x.promoted().valid()&&y.promoted().valid(),"player movement targets current lifetime");
+        return fail!=3;
+    }
+    bool activation(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,bool){return true;}
+    bool membership(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,bool){return true;}
+};
+
+void testNativePlayerLifecycle(){
+    using Binding=GameplayWorld::PlayerLifecycleBinding;
+    for(unsigned fail:{0u,1u,2u,3u}){
+        NativePlayerAudit audit;audit.fail=fail==1?1:0;
+        GameplayWorld world(0,true,0,false,{},{},Binding::bindMovement(audit));
+        const auto old=world.playerHandle();
+        require(audit.births==1&&world.effectsSucceeded()==(fail!=1),"constructor checks player birth");
+        if(fail==1){world.step(0);require(audit.calls==1,"failed birth prevents updates");continue;}
+        audit.fail=fail;
+        for(unsigned i=0;i<10&&world.effectsSucceeded();++i)world.step(2);
+        require(world.effectsSucceeded()==(fail!=3),"player movement rejection is terminal");
+        if(fail==3){
+            require(world.findPlayer(old)->x==240&&world.findPlayer(old)->y==176&&audit.moves==1,
+                    "rejected publication retains prior public position");
+            const auto calls=audit.calls;world.step(0);require(audit.calls==calls,"failed player publication stays latched");
+            continue;
+        }
+        require(world.findPlayer(old)->x==240+downwell::roundGameMakerQ8(world.player().offsetXFixed())&&
+                world.findPlayer(old)->y==176+downwell::roundGameMakerQ8(world.player().offsetYFixed()),
+                "accepted player publication follows shared rounded world position");
+        const auto destination=world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,0);
+        require((destination==downwell::ResultsDestination::none)==(fail==2),"Retry checks player retirement");
+        if(fail==2){
+            require(world.findPlayer(old)&&audit.births==1&&!world.effectsSucceeded(),"failed retirement preserves old identity");
+        }else{
+            require(!world.findPlayer(old)&&world.findPlayer(world.playerHandle())&&audit.births==2&&audit.retirements==1&&
+                    world.playerHandle().generation>old.generation,"Retry preserves binding and never revives an old player handle");
+        }
+    }
+}
+
 int main() {
+    testNativePlayerLifecycle();
     testNativeBoxLifecycle();
     testNativeEnemyLifecycle();
     {
