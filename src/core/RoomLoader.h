@@ -39,7 +39,8 @@ enum class LoadRoomResult {
     success,
     capacityExceeded,
     duplicateInstanceId,
-    lifecycleFailure
+    lifecycleFailure,
+    callbackFailure
 };
 
 // Loads ordered room definitions after validating the whole transition. Event
@@ -70,6 +71,25 @@ public:
               typename DeferredCommandHandler,
               typename Lifecycle = NoInstanceLifecycle>
     static LoadRoomResult enter(InstanceStore<Capacity>& instances,
+                                std::int32_t roomId,
+                                const RoomInstanceDefinition* definitions,
+                                std::size_t definitionCount,
+                                bool firstGameRoom,
+                                InstanceHandler instanceHandler,
+                                RoomCreationHandler roomCreationHandler,
+                                DeferredCommandHandler deferredCommandHandler,
+                                Lifecycle lifecycle = {}) {
+        return enterChecked(instances,roomId,definitions,definitionCount,firstGameRoom,
+            [&](InstanceRecord& instance,RoomInstancePhase phase){instanceHandler(instance,phase);return true;},
+            [&](std::int32_t room){roomCreationHandler(room);return true;},
+            [&](InstanceStore<Capacity>& store){deferredCommandHandler(store);return true;},lifecycle);
+    }
+
+    // Checked event boundaries preserve partial effects but stop all later
+    // events. The owner must latch failure and must not retry this transition.
+    template <typename InstanceHandler,typename RoomCreationHandler,
+              typename DeferredCommandHandler,typename Lifecycle = NoInstanceLifecycle>
+    static LoadRoomResult enterChecked(InstanceStore<Capacity>& instances,
                                 std::int32_t roomId,
                                 const RoomInstanceDefinition* definitions,
                                 std::size_t definitionCount,
@@ -112,16 +132,17 @@ public:
             instance.maskId = definition.maskId;
             if (!lifecycle.birth(instances.handleAt(instances.size() - 1), instance))
                 return LoadRoomResult::lifecycleFailure;
-            instanceHandler(instance, RoomInstancePhase::preCreate);
-            instanceHandler(instance, RoomInstancePhase::create);
-            instanceHandler(instance, RoomInstancePhase::instanceCreation);
+            if(!instanceHandler(instance, RoomInstancePhase::preCreate) ||
+               !instanceHandler(instance, RoomInstancePhase::create) ||
+               !instanceHandler(instance, RoomInstancePhase::instanceCreation))
+                return LoadRoomResult::callbackFailure;
         }
 
-        if (firstGameRoom)
-            dispatchAll(instances, RoomInstancePhase::gameStart, instanceHandler);
-        roomCreationHandler(roomId);
-        deferredCommandHandler(instances);
-        dispatchAll(instances, RoomInstancePhase::roomStart, instanceHandler);
+        if (firstGameRoom && !dispatchAll(instances, RoomInstancePhase::gameStart, instanceHandler))
+            return LoadRoomResult::callbackFailure;
+        if(!roomCreationHandler(roomId) || !deferredCommandHandler(instances) ||
+           !dispatchAll(instances, RoomInstancePhase::roomStart, instanceHandler))
+            return LoadRoomResult::callbackFailure;
         return LoadRoomResult::success;
     }
 
@@ -152,14 +173,14 @@ private:
     }
 
     template <typename InstanceHandler>
-    static void dispatchAll(InstanceStore<Capacity>& instances,
+    static bool dispatchAll(InstanceStore<Capacity>& instances,
                             RoomInstancePhase phase,
                             InstanceHandler& handler) {
         for (std::size_t index = 0; index < instances.size(); ++index) {
             InstanceRecord& instance = instances.at(index);
-            if (instance.active)
-                handler(instance, phase);
+            if (instance.active && !handler(instance, phase))return false;
         }
+        return true;
     }
 };
 

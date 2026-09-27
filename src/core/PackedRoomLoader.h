@@ -18,7 +18,8 @@ enum class PackedRoomLoadResult {
     duplicateInstanceId,
     invalidLayerMembership,
     invalidObject,
-    lifecycleFailure
+    lifecycleFailure,
+    callbackFailure
 };
 
 template <std::size_t Capacity>
@@ -49,6 +50,20 @@ public:
                                       DeferredCommandHandler deferredCommandHandler,
                                       const ObjectPack* objects = nullptr,
                                       Lifecycle lifecycle = {}) {
+        return enterChecked(instances,pack,roomId,firstGameRoom,
+            [&](InstanceRecord& instance,RoomInstancePhase phase){instanceHandler(instance,phase);return true;},
+            [&](std::int32_t room){roomCreationHandler(room);return true;},
+            [&](InstanceStore<Capacity>& store){deferredCommandHandler(store);return true;},objects,lifecycle);
+    }
+
+    template <typename InstanceHandler,typename RoomCreationHandler,
+              typename DeferredCommandHandler,typename Lifecycle = NoInstanceLifecycle>
+    static PackedRoomLoadResult enterChecked(InstanceStore<Capacity>& instances,
+                                      const RoomPack& pack,std::int32_t roomId,bool firstGameRoom,
+                                      InstanceHandler instanceHandler,
+                                      RoomCreationHandler roomCreationHandler,
+                                      DeferredCommandHandler deferredCommandHandler,
+                                      const ObjectPack* objects = nullptr,Lifecycle lifecycle = {}) {
         if (!pack.valid())
             return PackedRoomLoadResult::invalidPack;
         if(objects && !objects->valid())return PackedRoomLoadResult::invalidObject;
@@ -93,7 +108,7 @@ public:
             }
         }
 
-        const LoadRoomResult result = RoomLoader<Capacity>::enter(
+        const LoadRoomResult result = RoomLoader<Capacity>::enterChecked(
             instances, roomId, definitions.data(), room.instanceCount,
             firstGameRoom, instanceHandler, roomCreationHandler,
             deferredCommandHandler,lifecycle);
@@ -102,6 +117,7 @@ public:
         if (result == LoadRoomResult::duplicateInstanceId)
             return PackedRoomLoadResult::duplicateInstanceId;
         if(result==LoadRoomResult::lifecycleFailure)return PackedRoomLoadResult::lifecycleFailure;
+        if(result==LoadRoomResult::callbackFailure)return PackedRoomLoadResult::callbackFailure;
         return PackedRoomLoadResult::success;
     }
 

@@ -161,11 +161,42 @@ void testDeferredCreationPrecedesRoomStart() {
 
 } // namespace
 
+static void testCheckedRoomCallbacks(){
+    using namespace downwell;
+    const RoomInstanceDefinition definitions[]={{100,1,false},{101,2,false}};
+    // 6 creation callbacks, 2 Game Start, room code, deferred publication,
+    // and 3 Room Start callbacks (including the deferred child).
+    for(unsigned failAt=1;failAt<=14;++failAt){
+        InstanceStore<3> instances;
+        unsigned calls=0,roomWrites=0;
+        auto instance=[&](InstanceRecord& record,RoomInstancePhase){
+            ++record.health;return ++calls!=failAt;
+        };
+        auto room=[&](std::int32_t){++roomWrites;return ++calls!=failAt;};
+        auto deferred=[&](auto& store){
+            require(store.create(200,3,7,false)==CreateInstanceResult::success,"deferred checked child birth");
+            return ++calls!=failAt;
+        };
+        const auto result=RoomLoader<3>::enterChecked(instances,7,definitions,2,true,instance,room,deferred);
+        const unsigned completed=failAt<14?failAt:13;
+        require(result==(failAt<14?LoadRoomResult::callbackFailure:LoadRoomResult::success),
+            "checked room callback failure reaches the owner");
+        require(calls==completed,"room failure stops every later callback");
+        require(instances.size()==(completed<=3?1u:completed<10?2u:3u),
+            "room failure preserves completed births and prevents later ones");
+        unsigned writes=0;
+        for(unsigned i=0;i<instances.size();++i)writes+=instances.at(i).health;
+        require(writes==completed-(completed>=9?1u:0u)-(completed>=10?1u:0u) &&
+            roomWrites==(completed>=9?1u:0u),"room failure retains earlier callback writes");
+    }
+}
+
 int main() {
     testFirstRoomOrder();
     testDestinationRoomKeepsPersistentFirst();
     testValidationIsAtomic();
     testDeferredCreationPrecedesRoomStart();
+    testCheckedRoomCallbacks();
     std::cout << "room loader tests passed\n";
     return 0;
 }

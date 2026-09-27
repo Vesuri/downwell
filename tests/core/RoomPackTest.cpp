@@ -164,6 +164,16 @@ void testPackedRoomLoader() {
     const std::vector<std::uint8_t> bytes = makePack();
     const downwell::RoomPack pack(bytes.data(), bytes.size());
     downwell::InstanceStore<3> instances;
+    for(unsigned failAt=1;failAt<=12;++failAt){
+        downwell::InstanceStore<3> checked;
+        unsigned calls=0;
+        const auto result=downwell::PackedRoomLoader<3>::enterChecked(checked,pack,7,true,
+            [&](auto&,auto){return ++calls!=failAt;},
+            [&](auto){return ++calls!=failAt;},
+            [&](auto&){return ++calls!=failAt;});
+        require(result==downwell::PackedRoomLoadResult::callbackFailure&&calls==failAt,
+            "packed loader preserves checked callback failure without later dispatch");
+    }
     const auto noInstanceEvents = [](downwell::InstanceRecord&,
                                      downwell::RoomInstancePhase) {};
     const auto noRoomCode = [](std::int32_t) {};

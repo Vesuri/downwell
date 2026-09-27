@@ -1869,24 +1869,28 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
 }
 
 void StartupRuntime::gotoRoom(int roomId) {
+    if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
     const auto instanceHandler = [this](InstanceRecord& instance,
                                         RoomInstancePhase phase) {
         dispatchInstancePhase(instance, phase);
+        return deferredCommandsSucceeded_ && run_.effectsSucceeded;
     };
     const auto roomCreationHandler = [this](std::int32_t loadedRoomId) {
         dispatchRoomCreation(loadedRoomId);
+        return deferredCommandsSucceeded_ && run_.effectsSucceeded;
     };
     const auto deferredHandler = [this, roomId](
                                      InstanceStore<instanceCapacity>& instances) {
         flushDeferredInstances(instances, roomId);
+        return deferredCommandsSucceeded_ && run_.effectsSucceeded;
     };
     if (roomPack_ != nullptr) {
-        roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
+        roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enterChecked(
             instances_, *roomPack_, roomId, false,
             instanceHandler, roomCreationHandler,
             deferredHandler,objectPack_) == PackedRoomLoadResult::success;
     } else {
-        roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
+        roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enterChecked(
             instances_, roomId, nullptr, 0, false,
             instanceHandler, roomCreationHandler,
             deferredHandler) == LoadRoomResult::success;
