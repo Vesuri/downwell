@@ -25,6 +25,40 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    // collision_point does not share position_meeting's preparation/index
+    // branch. Registration order and exclusion flags alone gate candidates.
+    for(unsigned mode=0;mode<6;++mode){
+        Owner owner;Graph graph;Owner::State state;state.kind=7;
+        assert(owner.attach({9,1},1,state)&&owner.attach({4,1},2,state)&&owner.attach({2,1},3,state));
+        assert(owner.move({9,1},{0x3f800000},{},0x18));
+        assert(owner.move({4,1},{0x40000000},{},0x18));
+        if(mode==1)assert(owner.setExclusions({9,1},2));
+        if(mode==2){assert(owner.retire({9,1}));assert(owner.attach({9,2},1,state));}
+        const auto pending=owner.pendingSpatial();
+        const auto pendingCollision=owner.pendingCollision();
+        unsigned calls=0;Owner::Result result{true,{55,99}};
+        const bool ok=owner.collisionPointVm({9,1},0,MotionBinary64{0x3ff00000,1},
+            MotionBinary64{0x80000000,0},mode==3,graph,
+            [&](InstanceHandle h,auto x,auto y,bool& hit){
+                ++calls;assert(x.bits==0x3f800000&&y.bits==0x80000000);
+                assert(h.slot==((mode==1||mode==2||mode==3)?4u:calls==1?9u:4u));
+                hit=mode!=4;return mode!=5;
+            },result);
+        assert(owner.pendingSpatial()==pending&&owner.pendingCollision()==pendingCollision);
+        for(auto flags:graph.values)assert(flags==0x10); // No family preparation.
+        if(mode==5){assert(!ok&&!owner.valid()&&result.handle.slot==55);continue;}
+        assert(ok&&owner.valid());
+        if(mode==4){assert(!result.found&&calls==2);continue;}
+        assert(result.found&&calls==1&&result.handle.slot==((mode==1||mode==2||mode==3)?4u:9u));
+    }
+    {
+        Owner owner;Graph graph;assert(owner.attach({1,1},1,{}));
+        Owner::Result result{true,{55,99}};unsigned calls=0;
+        const auto candidate=[&](auto,auto,auto,bool&){++calls;return true;};
+        assert(!owner.collisionPointVm({},0,{0x7ff00000u,0},{},false,graph,candidate,result));
+        assert(!owner.valid()&&calls==0&&result.handle.slot==55);
+        assert(!owner.collisionPointVm({},0,{},{},false,graph,candidate,result)&&calls==0);
+    }
     {
         Owner owner;Owner::State state;state.x={0x43704000};state.y={0x43308000};
         const InstanceHandle h{0,1};assert(owner.attach(h,0,state));
@@ -322,7 +356,13 @@ int main(){
                     ++begins;assert(records.registeredObjectCount(1,exact)==0);
                 }else assert(records.registeredObjectCount(1,exact)==1);
             },[](StepEventPhase){},membership));
-        assert(begins==1&&!(space.resolve(h)->flags&0x80002));
+        // Reactivation is reconciled after the Begin Step snapshot.
+        assert(begins==0&&!(space.resolve(h)->flags&0x80002));
+        assert(EventScheduler<64>::runStep(records,
+            [](const InstanceRecord&){return AlarmBank::FiredMask(0);},
+            [&](InstanceRecord&,StepEvent event){if(event.phase==StepEventPhase::beginStep)++begins;},
+            [](StepEventPhase){},membership));
+        assert(begins==1);
         assert(!records.requestActivation(h,false,[](InstanceHandle,const InstanceRecord&,bool){return false;}));
         assert(records.resolve(h)->active&&!records.resolve(h)->activationPending);
         assert(records.erase(1,[&](InstanceHandle handle,const InstanceRecord&){return space.retire(handle);}));

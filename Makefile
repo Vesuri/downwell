@@ -487,6 +487,7 @@ test: verify-machine-gun-source-motion
 .PHONY: verify-machine-gun-source-motion
 verify-machine-gun-source-motion: build/machine-gun-source-motion-test
 	python3 tools/verify-machine-gun.py
+	python3 tools/verify-runner-line-point.py
 	python3 tools/verify-runner-smoke-geometry.py
 	python3 tools/verify-runner-effect-ranges.py
 	./build/machine-gun-source-motion-test

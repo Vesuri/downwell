@@ -518,6 +518,32 @@ public:
         if(!checked(good))return false;
         hit=result;return true;
     }
+    // collision_point object-resource path, 0x4fd79c. This is deliberately NOT
+    // point()/position_meeting: no family preparation, no index query and no
+    // global dirty flush. Each candidate owns its lazy bounds refresh. Return
+    // the first eligible registration, not a closest hit or storage-slot order.
+    // Special all/instance selectors and collect-all are separate entry points.
+    template<class Graph,class Candidate>
+    bool collisionPointVm(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        bool notMe,const Graph& graph,Candidate candidate,Result& result){
+        if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        Real nx,ny;
+        if(!checked(nx.assign(x)&&ny.assign(y))||(notMe&&!live(self)))return false;
+        Result next;bool good=true;
+        membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
+            [&](unsigned slot,std::uint32_t generation){
+                const InstanceHandle h{slot,generation};
+                const auto* state=resolve(h);
+                if(!state){good=false;return false;}
+                if((state->flags&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation))return true;
+                bool hit=false;
+                if(!candidate(h,nx,ny,hit)){good=false;return false;}
+                if(hit){next={true,h};return false;}
+                return true;
+            });
+        if(!checked(good))return false;
+        result=next;return true;
+    }
     // Borrow exact registrations for phase snapshots; callbacks cannot mutate
     // membership. The scheduler supplies phase-specific exclusion flags.
     template<class Visit> bool visitRegistrations(Visit visit)const{

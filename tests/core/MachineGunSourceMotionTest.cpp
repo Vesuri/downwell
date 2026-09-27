@@ -57,6 +57,10 @@ int main(){
             const double ex=double(x)+vx,ey=double(y)+vy;
             MotionBinary64 px,py;
             check(motion.endpoint(px,py)&&same(px,ex)&&same(py,ey));
+            downwell::RunnerLineArguments line;
+            check(motion.lineArguments(line)&&same(line.x1.promoted(),x)&&same(line.y1.promoted(),y)&&
+                same(line.x2.promoted(),float(ex))&&same(line.y2.promoted(),float(ey)));
+            check(same(motion.x.promoted(),x)&&same(motion.y.promoted(),y));
             if(ex!=double(float(ex))||ey!=double(float(ey)))++differentEndpoints;
             const float local=float(double(x)-240.);
             if(float(double(float(double(local)+vx))+240.)!=float(ex))++localRoundingDifferences;

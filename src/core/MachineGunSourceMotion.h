@@ -5,11 +5,13 @@
 #include "SmokeTrig.h"
 #include "MachineGunProfile.h"
 #include "DivideBinary64.h"
+#include "RunnerLineArguments.h"
 namespace downwell {
 // Arithmetic contract for bulletStandard Step, not its event scheduler.
 // Always store ABSOLUTE room coordinates: translating before the builtin
 // float setter changes rounding. Local drawing offsets are backend work.
-// Collision queries use endpoint() BEFORE commitPosition() narrows x/y.
+// endpoint() retains the VM expression; lineArguments() then applies the
+// collision_line wrapper's independent float narrowing, without moving x/y.
 // The live Q20 adapter is not replaced until it can consume these endpoints
 // and preserve synchronous muzzle Create / collision / destruction ordering.
 class MachineGunSourceMotion {
@@ -53,6 +55,10 @@ public:
         auto nx=x.promoted(),ny=y.promoted();
         if(!nx.add(xsp)||!ny.add(ysp))return false;
         px=nx;py=ny;return true;
+    }
+    bool lineArguments(RunnerLineArguments& args)const{
+        MotionBinary64 px,py;
+        return endpoint(px,py)&&args.assign(x.promoted(),y.promoted(),px,py);
     }
     // Publisher is invoked before committing the arithmetic owner's field,
     // matching the lifecycle adapters' checked write contract. A later failure

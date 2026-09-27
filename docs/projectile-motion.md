@@ -20,8 +20,11 @@ first consumer, not different GameMaker functions. The admitted speed interval
 extends through 8; the existing angle/radian restrictions are unchanged.
 
 `MachineGunSourceMotion` preserves absolute-room binary32 x/y and binary64
-xsp/ysp. `endpoint()` returns promoted x+xsp and y+ysp without narrowing for the
-solid line query. `commitPosition(publish)` models the later coordinate arithmetic,
+xsp/ysp. `endpoint()` returns the VM's promoted x+xsp and y+ysp expressions.
+The `collision_line` wrapper at 0x528ba0 independently narrows all four inputs
+with `fstp dword` before dispatching 0x4fd370. `lineArguments()` models this
+boundary without moving the bullet; candidate geometry must use these narrowed
+arguments, not the intermediate double sums. `commitPosition(publish)` models the later coordinate arithmetic,
 including separate X-before-Y binary32 writes on every update. Its publisher
 receives each intermediate position before committing that axis to the motion
 owner. A failed second write retains the completed first write; the enclosing
@@ -43,6 +46,30 @@ callbacks. Division by 10 must not be replaced by multiplication by rounded
 0.1. Wall damage/effects/destruction follow the loop; final X/Y movement still
 runs after a destruction request. Selector identity, those side effects and
 deferred retirement belong to the scheduler, not this arithmetic component.
+
+## Collision lookup boundaries
+
+`verify-runner-line-point.py` pins the reviewed registrations, wrappers and
+dispatch bodies. `collision_point` (wrapper 0x528df0, dispatcher 0x4fd6e0)
+narrows X/Y and returns the selected instance ID or -4. Its object-resource
+branch starts at the ancestor-inclusive registration list at object +0x44,
+skips caller only when `notme` is true, rejects flags 0x100003 and calls
+candidate 0x465520. It returns the first hit. It does not call object-family
+preparation or flush the spatial index. `collisionPointVm` implements this
+object-resource branch in the shared owner, with candidate geometry supplied
+explicitly; the candidate still owns lazy bounds refresh. It must not be
+replaced with the indexed `position_meeting` path. All/instance-ID selectors
+and collect-all are outside this entry point.
+
+Line dispatcher 0x4fd370 differs: it calls 0x500d30 to choose list/spatial
+search. The spatial branch flushes dirty bounds, orders endpoints by X (ties
+take the reverse branch), forms float differences, and traverses 0x500860
+using callback 0x5014c0. That callback filters flags, kind 1, family and `notme`
+before candidate 0x4650b0; it stops on the first hit rather than sorting by
+distance. The fallback object list also returns its first hit. The exact line
+traversal and candidate geometry must be implemented before switching live
+projectile selection; the existing rectangle-segment intersection is not a
+verified replacement.
 
 This component is not yet the live trajectory owner: the live Q20/Q32 adapter
 must be replaced together with its collision endpoints, angle consumers,

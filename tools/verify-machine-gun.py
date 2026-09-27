@@ -81,7 +81,7 @@ assert ("push.v self.y\npush.v self.ysp\nadd.v.v\n"
         "push.v self.x\npush.v self.xsp\nadd.v.v\n"
         "push.v self.y\npush.v self.x\ncall.i collision_line(argc=7)") in solid
 assert step.index("call.i gml_Script_scrEffectSpawn(argc=6)") < step.index("pop.v.i self.allSet")
-print("VM solid queries use unrounded upcoming endpoints, after synchronous muzzle Create")
+print("VM computes upcoming endpoint arguments after synchronous muzzle Create; runner wrapper owns narrowing")
 approach = solid.split(":[7]", 1)[1].split(":[10]", 1)[0]
 assert ("push.v self.y\npush.v self.ysp\npushi.e 10\nconv.i.d\ndiv.d.v\nadd.v.v\npop.v.v self.y\n"
         "push.v self.x\npush.v self.xsp\npushi.e 10\nconv.i.d\ndiv.d.v\nadd.v.v\npop.v.v self.x") in approach
