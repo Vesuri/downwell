@@ -2,6 +2,7 @@
 #include "core/PackedRoomLoader.h"
 #include "core/PackedRoomLayerLoader.h"
 #include "core/RunnerLayerBackground.h"
+#include "core/RunnerLayerBackgrounds.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -182,6 +183,50 @@ void testBackgroundConstruction(){
         source.type=1;source.backgroundFlags=32;
         require(!downwell::RunnerLayerBackground::create(source,background)&&background.initialized,"unknown flags leave output unchanged");
     }
+}
+
+void testBackgroundOwner(){
+    using Registry=downwell::RunnerLayerInstances<2,4>;
+    Registry registry;Registry::Layers layers;
+    downwell::RunnerLayerBackgrounds<2,4,1> backgrounds;
+    unsigned layer=2;
+    require(layers.insertAfterEquals(17,0,false,layer)&&registry.reserve(layers,layer,100)&&
+        registry.reserve(layers,layer,101),"mixed layer seed");
+    downwell::RunnerDepthService::Instance a,b;
+    require(registry.attach(layers,layer,100,{0,1},a,false)&&
+        registry.attach(layers,layer,101,{1,1},b,true),"mixed instance bindings");
+    downwell::PackedRoomLayer source{};source.type=1;source.layerId=17;source.backgroundSpriteId=-1;
+    source.backgroundColor=0xff000000u;source.backgroundFlags=1;
+    auto active=[&](unsigned e){const auto* r=registry.get(e);return r&&r->sourceId==100;};
+    require(backgrounds.create(layers,layer,source,active),"background inserts after active instance prefix");
+    std::vector<unsigned> order;
+    require(layers.visitElements(layer,[&](unsigned e){order.push_back(e);return true;}),"mixed element traversal");
+    require(order.size()==3&&order[0]==registry.find(100)&&order[2]==registry.find(101)&&
+        backgrounds.get(order[1])&&!registry.get(order[1]),"background and instance slots never alias");
+    const unsigned element=order[1];
+    auto initialize=[&](auto other){return registry.initializeRoom(layers,
+        [](unsigned,downwell::InstanceHandle&,downwell::RunnerDepthService::Instance*&){return false;},
+        [](auto){return true;},[&](unsigned e){const auto* r=registry.get(e);return r&&r->sourceId==101;},
+        [](int,unsigned&){return false;},other);};
+    require(initialize([&](unsigned e){return backgrounds.initialize(e);})&&backgrounds.get(element)->background.initialized,
+        "mixed initialization dispatches background owner");
+    require(!backgrounds.create(layers,layer,source,active)&&layers.elementCount(layer)==3,"background capacity failure preserves links");
+    require(!backgrounds.retire(layers,registry.find(100))&&registry.get(registry.find(100)),"background owner cannot retire an instance");
+    require(backgrounds.retire(layers,element)&&!backgrounds.get(element)&&layers.elementCount(layer)==2,"background retirement frees only its slot");
+    require(backgrounds.create(layers,layer,source,active)&&backgrounds.get(element)&&
+        !backgrounds.get(element)->background.initialized,"reused background slot resets initialization state");
+    downwell::RunnerLayerBackgrounds<2,4,0> empty;
+    require(!empty.create(layers,layer,source,active),"zero background capacity fails");
+    Registry failedRegistry;Registry::Layers failedLayers;
+    downwell::RunnerLayerBackgrounds<2,4,1> failedBackgrounds;
+    unsigned failedLayer=2;
+    require(failedLayers.insertAfterEquals(17,0,false,failedLayer)&&
+        failedBackgrounds.create(failedLayers,failedLayer,source,[](unsigned){return false;}),"unknown initialization seed");
+    require(!failedRegistry.initializeRoom(failedLayers,
+        [](unsigned,downwell::InstanceHandle&,downwell::RunnerDepthService::Instance*&){return false;},
+        [](auto){std::abort();return false;},[](unsigned){std::abort();return false;},
+        [](int,unsigned&){return false;})&&!failedBackgrounds.get(0)->background.initialized,
+        "missing non-instance initializer stops before global pass and normalization");
 }
 
 void testValidation() {
@@ -368,20 +413,31 @@ void testGeneratedPack(const char* path) {
         require(pack.room(roomIndex,room),"generated layer room");
         downwell::RunnerLayers<16,1200> layers;
         downwell::RunnerLayerInstances<16,1200> registry;
+        downwell::RunnerLayerBackgrounds<16,1200,2> backgrounds;
         unsigned published=0;
         require(downwell::PackedRoomLayerLoader::load(pack,room.roomId,layers,registry,
-            [&](unsigned,const auto& layer){
+            [&](unsigned slot,const auto& layer){
                 require(sourceIds.loadedMaximum==int(expectedMaximum),"ID floor updates after serialized layer completion");
                 if(layer.layerId>expectedMaximum)expectedMaximum=layer.layerId;
-                ++published;return true;
+                ++published;
+                return layer.type!=1||backgrounds.create(layers,slot,layer,[](unsigned){return false;});
             },&sourceIds),"all original room memberships load");
         require(published==room.layerCount,"all layer metadata published");
         require(sourceIds.loadedMaximum==int(expectedMaximum),"process maximum preserved across loaded rooms");
+        require(registry.initializeRoom(layers,
+            [](unsigned,downwell::InstanceHandle&,downwell::RunnerDepthService::Instance*&){return true;},
+            [](auto){return true;},[](unsigned){return false;},[](int,unsigned&){return false;},
+            [&](unsigned e){return backgrounds.initialize(e);}),"all original mixed layer elements initialize");
         for(unsigned l=0;l<room.layerCount;++l){
             downwell::PackedRoomLayer packed;require(pack.roomLayer(room,l,packed),"generated layer");
             const auto slot=layers.find(int(packed.layerId));unsigned remaining=packed.membershipCount;
             require(layers.get(slot)&&!layers.get(slot)->dynamic&&layers.get(slot)->depth==packed.depth,"fixed layer identity/depth");
             require(layers.visitElements(slot,[&](unsigned e){
+                if(packed.type==1){
+                    const auto* background=backgrounds.get(e);
+                    return background&&background->background.initialized&&!registry.get(e)&&
+                        background->background.spriteId==packed.backgroundSpriteId&&layers.elementCount(slot)==1;
+                }
                 if(!remaining)return false;
                 std::uint32_t id;
                 return pack.membership(packed.firstMembership+--remaining,id)&&registry.get(e)&&
@@ -461,6 +517,7 @@ int main(int argc, char** argv) {
     testDecode();
     testBackgroundDecode();
     testBackgroundConstruction();
+    testBackgroundOwner();
     testValidation();
     testPackedRoomLoader();
     testLayerStartup();

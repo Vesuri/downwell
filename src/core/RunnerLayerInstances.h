@@ -131,10 +131,17 @@ public:
     template<class Lookup,class Globals,class Inactive,class CreateLayer>
     bool initializeRoom(Layers& layers,Lookup lookup,Globals globals,
         Inactive inactive,CreateLayer create){
+        return initializeRoom(layers,lookup,globals,inactive,create,[](unsigned){return false;});
+    }
+    // Mixed element lists use their non-instance owner for initialization.
+    // Unknown/unowned slots must fail, not silently disappear from traversal.
+    template<class Lookup,class Globals,class Inactive,class CreateLayer,class Other>
+    bool initializeRoom(Layers& layers,Lookup lookup,Globals globals,
+        Inactive inactive,CreateLayer create,Other other){
         if(!layers.succeeded())return false;
         if(!layers.visitLayers([&](unsigned layer,const auto&){
             return layers.visitElements(layer,[&](unsigned element){
-                return initializeReserved(layers,element,lookup);
+                return get(element)?initializeReserved(layers,element,lookup):other(element);
             });
         }))return false;
         if(!globals([&](std::uint32_t sourceId,InstanceHandle h,

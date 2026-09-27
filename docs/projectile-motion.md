@@ -739,6 +739,16 @@ and all 24 recovered backgrounds construct through this shared representation.
 This does not yet allocate/link background elements, consume their source IDs,
 advance animation or implement Draw; those remain owner integration work.
 
+`RunnerLayerBackgrounds` supplies bounded payload ownership and shared element
+slot allocation. It links backgrounds using the existing non-instance insertion
+rule (after the contiguous active-instance prefix), dispatches initialization,
+and frees only its own element on retirement. The instance registry now accepts
+a separate non-instance initialization callback; missing ownership is an error,
+not a silently omitted element. The original-room fixture loads all 25 rooms
+with both instance placeholders and background elements and runs their mixed
+initialization. Slots remain separate from source element IDs: process-wide
+element ID allocation, animation, Draw and live owner installation remain open.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;
