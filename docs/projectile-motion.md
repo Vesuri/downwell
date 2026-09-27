@@ -686,6 +686,19 @@ survive this pass. Exhaustive tests cover all 256 inactive masks across two
 layers, traversal order, repeated invocation and terminal-owner rejection.
 The live room-entry adapter still needs to invoke the complete sequence.
 
+The shared `RoomLoader::enterChecked` and `PackedRoomLoader::enterChecked`
+accept a checked destination-preparation callback after old nonpersistent
+instances retire and before the first new birth. The original calls layer
+initialization at `0x50ff88`, before the serialized birth loop at `0x50ff9f`.
+This boundary lets an owner prepare fixed layers, bind surviving instances and
+normalize their elements before any new PreCreate/Create callback observes
+them. Preparation must not structurally mutate the instance store. Validation
+and retirement failures suppress it; its own failure preserves earlier
+retirement but suppresses every subsequent birth and event. The packed-room
+fixture now loads its layer reservations through this boundary rather than
+preparing them outside room entry. The live runtimes currently retain the
+default no-op callback pending installation of their complete layer owners.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

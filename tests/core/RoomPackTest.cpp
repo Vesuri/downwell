@@ -324,9 +324,6 @@ void testLayerStartup(){
     using Layers=downwell::RunnerLayers<2,3>;using Registry=downwell::RunnerLayerInstances<2,3>;
     Layers layers;Registry registry;
     unsigned metadataCalls=0;
-    require(downwell::PackedRoomLayerLoader::load(pack,7,layers,registry,[&](unsigned,const auto& l){
-        ++metadataCalls;return l.layerId==13&&l.visible();
-    })&&metadataCalls==1,"prepare fixed layer metadata");
     struct Binding {
         Layers& layers;Registry& registry;
         bool birth(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
@@ -339,7 +336,12 @@ void testLayerStartup(){
     require(downwell::PackedRoomLoader<3>::enterChecked(store,pack,7,true,[&](auto& r,auto){
         ++events;const unsigned element=registry.find(r.instanceId);
         return element!=Registry::End&&store.resolve(registry.get(element)->instance)==&r;
-    },[](int){return true;},[](auto&){return true;},nullptr,binding)==downwell::PackedRoomLoadResult::success&&events,
+    },[](int){return true;},[](auto&){return true;},nullptr,binding,[&](auto& survivors,int room){
+        require(survivors.empty()&&events==0&&room==7,"layer preparation before first birth");
+        return downwell::PackedRoomLayerLoader::load(pack,room,layers,registry,[&](unsigned,const auto& l){
+            ++metadataCalls;return l.layerId==13&&l.visible();
+        })&&layers.normalizeRoomInstances([](unsigned){return false;});
+    })==downwell::PackedRoomLoadResult::success&&events&&metadataCalls==1,
         "real packed room creation binds layers before first instance event");
     std::vector<unsigned> ids;
     layers.visitElements(layers.find(13),[&](unsigned e){ids.push_back(registry.get(e)->sourceId);return true;});

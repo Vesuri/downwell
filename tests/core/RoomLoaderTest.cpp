@@ -245,6 +245,45 @@ static void testBroadcastRetirement(){
     }
 }
 
+void testRoomPreparationBoundary(){
+    for(unsigned mode=0;mode<4;++mode){
+        downwell::InstanceStore<4> store;
+        require(store.create(1,10,7,true)==downwell::CreateInstanceResult::success&&
+            store.create(2,11,7,false)==downwell::CreateInstanceResult::success,"preparation source room");
+        const auto survivor=store.handleAt(0),retired=store.handleAt(1);
+        std::vector<unsigned> trace;
+        struct Lifecycle {
+            std::vector<unsigned>& trace;bool fail;
+            bool retire(downwell::InstanceHandle,const downwell::InstanceRecord& r){
+                require(r.instanceId==2,"only nonpersistent record retires");trace.push_back(1);return !fail;
+            }
+            bool birth(downwell::InstanceHandle,const downwell::InstanceRecord&){trace.push_back(3);return true;}
+        } lifecycle{trace,mode==2};
+        const downwell::RoomInstanceDefinition definitions[]={{mode==3?1u:3u,12,false}};
+        const auto result=downwell::RoomLoader<4>::enterChecked(store,8,definitions,1,false,
+            [&](auto&,auto){trace.push_back(4);return true;},
+            [&](int){trace.push_back(5);return true;},[&](auto&){trace.push_back(6);return true;},lifecycle,
+            [&](auto& instances,int room){
+                require(room==8&&instances.size()==1&&instances.resolve(survivor)&&!instances.resolve(retired),
+                    "preparation receives survivors after retirement but before new births");
+                trace.push_back(2);return mode!=1;
+            });
+        if(mode==0){
+            require(result==downwell::LoadRoomResult::success&&trace==std::vector<unsigned>({1,2,3,4,4,4,5,6,4,4}),
+                "preparation occurs once between retirement and birth, before all creation callbacks");
+        }else if(mode==1){
+            require(result==downwell::LoadRoomResult::callbackFailure&&trace==std::vector<unsigned>({1,2})&&
+                store.size()==1&&store.resolve(survivor)&&!store.resolve(retired),"preparation failure retains retirement and stops birth");
+        }else if(mode==2){
+            require(result==downwell::LoadRoomResult::lifecycleFailure&&trace==std::vector<unsigned>({1}),
+                "retirement failure suppresses preparation");
+        }else{
+            require(result==downwell::LoadRoomResult::duplicateInstanceId&&trace.empty()&&store.size()==2,
+                "validation precedes preparation and any destructive transition");
+        }
+    }
+}
+
 int main() {
     {
         downwell::InstanceStore<4> instances;
@@ -277,6 +316,7 @@ int main() {
     testCheckedRoomCallbacks();
     testCreateRetirementAndReplacement();
     testBroadcastRetirement();
+    testRoomPreparationBoundary();
     std::cout << "room loader tests passed\n";
     return 0;
 }

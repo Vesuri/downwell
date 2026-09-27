@@ -6,6 +6,12 @@
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayerInstances.h"
 #include "core/PackedRoomLayerLoader.h"
+#include "core/RoomLoader.h"
+bool compileRoomPreparation(downwell::InstanceStore<4>& store){
+    return downwell::RoomLoader<4>::enterChecked(store,1,nullptr,0,false,
+        [](auto&,auto){return true;},[](int){return true;},[](auto&){return true;},
+        downwell::NoInstanceLifecycle{},[](auto&,int){return true;})==downwell::LoadRoomResult::success;
+}
 bool compilePackedLayers(const downwell::RoomPack& pack,int room,downwell::RunnerLayers<4,16>& layers,
     downwell::RunnerLayerInstances<4,16>& registry,downwell::RunnerLayerIds& ids){
     return downwell::PackedRoomLayerLoader::load(pack,room,layers,registry,[](unsigned,const auto&){return true;},&ids);

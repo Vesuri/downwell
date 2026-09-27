@@ -57,13 +57,15 @@ public:
     }
 
     template <typename InstanceHandler,typename RoomCreationHandler,
-              typename DeferredCommandHandler,typename Lifecycle = NoInstanceLifecycle>
+              typename DeferredCommandHandler,typename Lifecycle = NoInstanceLifecycle,
+              typename RoomPreparation = NoRoomPreparation>
     static PackedRoomLoadResult enterChecked(InstanceStore<Capacity>& instances,
                                       const RoomPack& pack,std::int32_t roomId,bool firstGameRoom,
                                       InstanceHandler instanceHandler,
                                       RoomCreationHandler roomCreationHandler,
                                       DeferredCommandHandler deferredCommandHandler,
-                                      const ObjectPack* objects = nullptr,Lifecycle lifecycle = {}) {
+                                      const ObjectPack* objects = nullptr,Lifecycle lifecycle = {},
+                                      RoomPreparation prepareRoom = {}) {
         if (!pack.valid())
             return PackedRoomLoadResult::invalidPack;
         if(objects && !objects->valid())return PackedRoomLoadResult::invalidObject;
@@ -111,7 +113,7 @@ public:
         const LoadRoomResult result = RoomLoader<Capacity>::enterChecked(
             instances, roomId, definitions.data(), room.instanceCount,
             firstGameRoom, instanceHandler, roomCreationHandler,
-            deferredCommandHandler,lifecycle);
+            deferredCommandHandler,lifecycle,prepareRoom);
         if (result == LoadRoomResult::capacityExceeded)
             return PackedRoomLoadResult::capacityExceeded;
         if (result == LoadRoomResult::duplicateInstanceId)

@@ -43,6 +43,10 @@ enum class LoadRoomResult {
     callbackFailure
 };
 
+struct NoRoomPreparation {
+    template<class Store> bool operator()(Store&,std::int32_t) const{return true;}
+};
+
 // Loads ordered room definitions after validating the whole transition.
 // Creation handlers may synchronously create/retire instances. Resolve the
 // original lifetime again between callbacks: destruction or compaction must
@@ -91,7 +95,8 @@ public:
     // Checked event boundaries preserve partial effects but stop all later
     // events. The owner must latch failure and must not retry this transition.
     template <typename InstanceHandler,typename RoomCreationHandler,
-              typename DeferredCommandHandler,typename Lifecycle = NoInstanceLifecycle>
+              typename DeferredCommandHandler,typename Lifecycle = NoInstanceLifecycle,
+              typename RoomPreparation = NoRoomPreparation>
     static LoadRoomResult enterChecked(InstanceStore<Capacity>& instances,
                                 std::int32_t roomId,
                                 const RoomInstanceDefinition* definitions,
@@ -100,7 +105,7 @@ public:
                                 InstanceHandler instanceHandler,
                                 RoomCreationHandler roomCreationHandler,
                                 DeferredCommandHandler deferredCommandHandler,
-                                Lifecycle lifecycle = {}) {
+                                Lifecycle lifecycle = {},RoomPreparation prepareRoom = {}) {
         const LoadRoomResult validation =
             validate(instances, definitions, definitionCount);
         if (validation != LoadRoomResult::success)
@@ -110,6 +115,12 @@ public:
             return lifecycle.retire(h, record);
         }))
             return LoadRoomResult::lifecycleFailure;
+        // Original 0x50ff88 initializes destination layers before the new
+        // room instance loop. Old nonpersistent lifetimes are already gone;
+        // the callback can bind survivors before any new birth/Create event.
+        // It must not structurally mutate the instance store. Failure retains
+        // the completed retirement prefix and stops all subsequent callbacks.
+        if(!prepareRoom(instances,roomId))return LoadRoomResult::callbackFailure;
         for (std::size_t index = 0; index < definitionCount; ++index) {
             const RoomInstanceDefinition& definition = definitions[index];
             const auto created = instances.create(definition.instanceId,
