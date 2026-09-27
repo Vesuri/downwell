@@ -19,7 +19,42 @@ struct TerrainAudit {
     bool activation(InstanceHandle,const GameplayTerrainInstances::Record&,bool){return true;}
     bool membership(InstanceHandle,const GameplayTerrainInstances::Record&,bool){return true;}
 };
+struct TerrainDestructionAudit:TerrainAudit {
+    unsigned destroys=0,activations=0;bool rejectDestroy=false,rejectActivation=false;
+    bool move(InstanceHandle,const GameplayTerrainInstances::Record&,RunnerImageValue,RunnerImageValue){return true;}
+    bool sprite(InstanceHandle,const GameplayTerrainInstances::Record&,int){return true;}
+    bool imageIndex(InstanceHandle,const GameplayTerrainInstances::Record&,RunnerImageValue){return true;}
+    bool markDestroyed(InstanceHandle h,const GameplayTerrainInstances::Record& r){
+        assert(store->find(h)==&r&&!r.destroyRequested);++destroys;return !rejectDestroy;
+    }
+    bool activation(InstanceHandle h,const GameplayTerrainInstances::Record& r,bool){
+        assert(store->find(h)==&r&&r.destroyRequested&&r.active);++activations;return !rejectActivation;
+    }
+};
 int main(){
+    for(unsigned failure=0;failure<3;++failure){
+        TerrainDestructionAudit audit;audit.rejectDestroy=failure==1;audit.rejectActivation=failure==2;
+        auto terrain=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(audit));
+        audit.store=terrain.get();assert(terrain->append(60,32,48,true));
+        const auto h=terrain->handle(0);const auto* record=terrain->find(h);
+        assert(terrain->requestDestroy(h)==(failure!=1)&&audit.destroys==1);
+        if(failure!=1){
+            assert(terrain->requestDestroy(h)&&audit.destroys==1);
+            assert(terrain->activation(h,false)==(failure==0)&&audit.activations==1);
+        }
+        assert(terrain->find(h)==record&&terrain->size()==1&&record->destroyRequested==(failure!=1));
+        assert(record->active==(failure!=0)&&terrain->valid()==(failure==0));
+        if(failure){
+            assert(!terrain->requestDestroy(h)&&!terrain->activation(h,false)&&audit.destroys==1);
+        }else{
+            assert(terrain->clear()&&audit.retires==1&&!terrain->find(h));
+        }
+    }
+    {
+        auto terrain=std::make_unique<GameplayTerrainInstances>();assert(terrain->append(60,0,0,true));
+        const auto h=terrain->handle(0);
+        assert(!terrain->requestDestroy(h)&&!terrain->find(h)->destroyRequested&&!terrain->valid());
+    }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
@@ -119,6 +154,13 @@ int main(){
     assert(owner->population(60,count)&&count==2);
     GameplayCollisionView::Record terrainRecord;
     assert(GameplayCollisionView(*world).resolve(wall,terrainRecord)&&terrainRecord.terrain==owner->terrain().find(wallLocal));
+    const auto* dying=terrainRecord.terrain;
+    assert(owner->terrain().requestDestroy(wallLocal)&&dying->destroyRequested&&
+        owner->terrain().size()==3&&owner->terrain().find(wallLocal)==dying&&
+        (owner->state(wall)->flags&1u)&&!(owner->state(otherWall)->flags&1u));
+    assert(owner->terrain().requestDestroy(wallLocal)); // repeated request retains the same lifetime
+    assert(owner->terrain().activation(wallLocal,false)&&!dying->active&&
+        (owner->state(wall)->flags&3u)==3u&&owner->terrain().find(wallLocal)==dying);
     // A backend rejection must not invent an identity for a cell it rejected.
     assert(!world->createGeneratedInstance({60,1,2},objects,[](const auto&){return false;})&&owner->terrain().size()==3);
     world->step(0);

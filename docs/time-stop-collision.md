@@ -1172,6 +1172,15 @@ state digest includes those fields. An unsupported terrain room-creation code
 fails without undoing its already-published birth/Create prefix. This is the
 wall-specific room-code path, not a general VM room-script interpreter; it does
 not yet drive native drawing, adjacency or retained background replacement.
+The native terrain store has a separate checked destruction request: it publishes
+the owner's destroyed collision-exclusion bit, then marks the record without
+erasing it or changing its handle. A following activation callback can therefore
+still resolve the same record, as required by the wall event's destroy-then-
+deactivate sequence. Failed publication latches the terrain store; previously
+accepted effects remain, and later callbacks do not execute. Repeated accepted
+destruction requests do not republish. Room clear retires those retained records
+normally. Per-event cleanup and activation-membership reconciliation are still
+required before live wall dispatch; this API does not implement those boundaries.
 Generated records have no authored ID. Their local lifetime keys remain separate
 from source IDs. Unsupported room transforms/pre-create properties are rejected
 when identity tracking is installed, not silently flattened. A room-load guard

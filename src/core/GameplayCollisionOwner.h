@@ -85,6 +85,10 @@ private:
         }
         bool retire(InstanceHandle local,const Record& r){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.retire(h));}
+        bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
+            if(!key(local,r,h))return false;
+            const auto* state=parent.owner_.resolve(h);
+            return state&&parent.check(parent.owner_.setExclusions(h,(state->flags&0x100003u)|1u));}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.registerObject(h,member));}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
@@ -109,7 +113,7 @@ private:
     Binding<GameplayWorld::EnemyState,View::Kind::enemy> enemies_{*this};
     Binding<GameplayWorld::Breakable,View::Kind::breakable> boxes_{*this};
     Binding<GameplayTerrainInstances::Record,View::Kind::terrain> terrainBinding_{*this};
-    GameplayTerrainInstances terrain_{GameplayTerrainInstances::Binding::bindAnimation(terrainBinding_)};
+    GameplayTerrainInstances terrain_{GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_)};
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites):objects_(objects),sprites_(sprites){
         good_=sprites.valid()&&families_.bindInstanceFlags(objects);

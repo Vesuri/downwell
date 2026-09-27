@@ -21,6 +21,7 @@ public:
         int creationCodeId=-1;
         int spriteId=-1,imageIndex=0,imageSpeed=1;
         WallEndStepState wall{};
+        bool destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayTerrainInstances(Binding binding={}):binding_(binding){}
@@ -71,6 +72,21 @@ public:
         if(r.creationCodeId==-1)return true;
         if(r.objectId!=60||!wallRoomCreation(r.creationCodeId,r.wall))return good_=false;
         return true;
+    }
+    bool requestDestroy(InstanceHandle h){
+        if(!good_||!find(h))return good_=false;
+        auto& r=records_[h.slot];
+        if(r.destroyRequested)return true;
+        // Publish collision exclusion before marking the local record. Keep
+        // its address and identity alive through the remainder of the event.
+        if(!binding_.markDestroyed(h,r))return good_=false;
+        r.destroyRequested=true;return true;
+    }
+    bool activation(InstanceHandle h,bool active){
+        if(!good_||!find(h))return good_=false;
+        auto& r=records_[h.slot];
+        if(!binding_.activation(h,r,active))return good_=false;
+        r.active=active;return true;
     }
     bool clear(){
         if(!good_)return false;
