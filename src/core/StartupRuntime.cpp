@@ -2359,6 +2359,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         }
         digest.addBool(instance.motionInitialized);
         digest.addBool(instance.grounded);
+        if(instance.objectId==238)digest.addBool(instance.destroyRequested);
         digest.addBool(instance.frogLanded);
         if (instance.objectId == 113) {
             digest.addBool(instance.frogMotionInitialized);

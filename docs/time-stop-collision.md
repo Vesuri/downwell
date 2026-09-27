@@ -1,5 +1,27 @@
 # Time-stop collision inputs
 
+## Ordinary Destroy versus storage retirement
+
+The Windows `instance_destroy` registration at `0x52cd80` selects wrapper
+`0x529b30`. With no arguments, the wrapper selects self and enables Destroy;
+`0x528490` dispatches to `0x4fdf60` for the ordinary, non-delayed branch.
+That routine guards reentry with bit `0x80`, invokes Destroy and Clean Up
+events, then marks bit `1` and increments the destruction counter. It returns
+without removing spatial/list storage. Downwell object 238 has neither handler.
+The bit is immediately excluded by `instance_number`'s object-family scan
+(`0x4fe49b`, mask `0x140003`) and the previously audited place-query filters.
+`tools/verify-runner-destroy.py` pins these reviewed bytes to the source binary;
+it is not runtime proof of generic destruction or managed/delayed branches.
+
+Shard Step therefore publishes a destroy mark before its later population and
+out-of-view work, while continuing the current event's final rounded x/y
+setters. The stored record and generation remain valid for that continuation;
+physical retirement still happens at the owner cleanup boundary. A second
+destroy request in the same event does not republish it. Failed marking is
+terminal. The full runner cleanup schedule and cross-family interleaving remain
+to be integrated; marking must not be confused with eager spatial removal or
+ordinary activation changes.
+
 ## Shard registration contract
 
 `TimeShardEffects` distinguishes its monotonic phase/lifetime handle from a

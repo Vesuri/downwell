@@ -14,6 +14,8 @@ struct World {
     bool publishAnimation(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++animations;return fail!=4;}
     bool publishStep(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++steps;return fail!=5;}
     bool publishAlarm(std::uint32_t,std::uint32_t,const TimeShardAnimation&){return fail!=6;}
+    unsigned destroys=0;
+    bool destroyed(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++destroys;return fail!=7;}
     bool birth(std::uint32_t h,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
         assert(h && x.promoted().valid() && y.promoted().valid());++births;events.push_back(1);
         assert(rng.drawCount()==6*creates);
@@ -30,6 +32,20 @@ struct World {
     }
 };
 int main(){
+    for(bool reject:{false,true}){
+        GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
+        assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);
+        effects.get(h)->shardLimit=0;world.fail=reject?7:0;
+        unsigned outsideCalls=0;
+        const bool ok=effects.step(effects.beginPhase(),true,random,
+            [](auto,const auto&,auto,auto,bool& hit){hit=false;return true;},
+            [&](auto,const auto& s,bool& retire){++outsideCalls;assert(s.destroyRequested&&world.destroys==1);
+                retire=true;return true;});
+        assert(ok!=reject&&world.destroys==1);
+        assert(outsideCalls==(reject?0u:1u)&&world.retires==(reject?0u:1u));
+        if(reject)assert(!effects.succeeded()&&!effects.clear());
+        else assert(!effects.get(h));
+    }
     for(unsigned failure:{4u,5u,6u}){
         GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
         assert(effects.bindPhases(world)&&effects.phasesBoundTo(world));

@@ -89,6 +89,7 @@ public:
         b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
             return static_cast<Owner*>(p)->birthAt(h,r,x,y);
         };
+        b.destroyed_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->markDestroyed(h,r);};
         return b;
     }
     bool birthAt(InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y)const{
@@ -96,6 +97,7 @@ public:
         // birth-then-move sequence with different insertion history.
         return birthAt_&&birthAt_(context_,h,r,x,y);
     }
+    bool markDestroyed(InstanceHandle h,const Record& r)const{return destroyed_&&destroyed_(context_,h,r);}
     template<class Owner> static RecordLifecycleBinding bindInstanceQueries(Owner& owner){
         auto b=bindQueries(owner);
         b.instancePlace_=[](void* p,InstanceHandle h,const Record& r,int object,
@@ -152,6 +154,7 @@ private:
     void* context_=nullptr;
     bool (*birth_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*birthAt_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
+    bool (*destroyed_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*retire_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;

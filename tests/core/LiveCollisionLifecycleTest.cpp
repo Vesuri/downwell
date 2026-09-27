@@ -124,6 +124,10 @@ int main(){
         require(adapter.birthAt(key,shard,x,y),"fractional shard inserted directly");
         const auto* born=positioned->owner.resolve(key);
         require(born&&born->x.bits==x.bits&&born->y.bits==y.bits,"birth preserves published fractional coordinates");
+        const auto pending=positioned->owner.pendingSpatial();
+        require(adapter.markDestroyed(key,shard)&&positioned->owner.resolve(key)&&
+                (positioned->owner.resolve(key)->flags&1u)&&positioned->owner.pendingSpatial()==pending,
+                "Destroy marks query exclusion without releasing lifetime or queue membership");
         require(adapter.retire(key,shard)&&!positioned->owner.resolve(key),"positioned lifetime retirement");
         auto production=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         const auto binding=production->binding();
@@ -196,6 +200,19 @@ int main(){
                     r->x==x&&r->y==y&&r->imageSpeed==0&&r->alarms.get(0)==s->alarm0,
                     "stopped shard still publishes motion, zero animation speed and paused lifetime");
         }
+        shards.get(3)->shardLimit=2;
+        bool observedDestroy=false;
+        require(world->stepTimeShards(registration,shards,shards.beginPhase(),true,
+            [&](auto local,const auto& effect,bool& retire){
+                retire=false;
+                if(local==3){
+                    const auto* record=world->instance(first+2);
+                    observedDestroy=record&&record->destroyRequested&&effect.destroyRequested&&shards.size()==2;
+                    retire=true; // Repeated source Destroy must be idempotent.
+                }
+                return true;
+            })&&observedDestroy&&!world->instance(first+2)&&shards.size()==2,
+            "Destroy excludes immediately, continues outOfView, then releases storage");
         require(shards.clear()&&world->activeInstanceCount()==count&&shardOwner->valid(),"world retirement removes every shard record");
         for(unsigned i=0;i<3;++i)require(!world->instance(first+i),"retired source ID no longer resolves");
         world->step({},false);require(world->effectsSucceeded(),"world continues after registered burst retirement");

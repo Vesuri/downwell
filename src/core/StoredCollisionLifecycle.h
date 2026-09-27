@@ -74,6 +74,10 @@ struct StoredCollisionLifecycle {
         return flags&&owner.changeTransform(h,properties[h.slot].sprite,field,value,alpha,blend,*flags);
     }
     bool retire(InstanceHandle h,const InstanceRecord&){return owner.retire(h);}
+    bool markDestroyed(InstanceHandle h,const InstanceRecord& record){
+        const auto* state=owner.resolve(h);
+        return matchingFlags(h,record)&&state&&owner.setExclusions(h,(state->flags&0x100003u)|1u);
+    }
     bool membership(InstanceHandle h,const InstanceRecord&,bool registered){
         return owner.registerObject(h,registered);
     }

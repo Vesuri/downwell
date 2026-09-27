@@ -3,14 +3,19 @@
 #include "TimeShardLifecycle.h"
 #include "MultiplyBinary64.h"
 namespace downwell {
+struct NoTimeShardDestroy {bool operator()()const{return true;}};
 struct TimeShardMotion : TimeShardLifecycle {
     // meeting is the source sprite-mask query against sParentSolid (56).
     // count is queried after embedded retirement. outside implements outOfView
     // using the OLD published y, including its rmMain-only destruction rule.
     // A destroy request does not abort the remainder of this source event.
-    template<class Random,class Meeting,class Count,class Outside>
-    bool step(bool stopped,Random& random,Meeting meeting,Count count,Outside outside){
+    template<class Random,class Meeting,class Count,class Outside,class Destroy=NoTimeShardDestroy>
+    bool step(bool stopped,Random& random,Meeting meeting,Count count,Outside outside,Destroy destroy={}){
         if(destroyRequested)return true;
+        auto requestDestroy=[&](){
+            if(destroyRequested)return true;
+            destroyRequested=true;return destroy();
+        };
         if(!xsp.valid() || !ysp.valid())return false;
         if(!stopped){
             if(!ysp.add(less(ysp,MotionBinary64::fromInteger(-1))?hardGravity:gravity) ||
@@ -64,13 +69,13 @@ struct TimeShardMotion : TimeShardLifecycle {
                 if(!hit)yy=probe;
             }
             if(!meeting(xx,yy,hit))return false;
-            if(hit)destroyRequested=true;
+            if(hit&&!requestDestroy())return false;
         }
         dflash=disappearing?-dflash:-1;
-        if(count()>shardLimit)destroyRequested=true;
+        if(count()>shardLimit&&!requestDestroy())return false;
         bool retire=false;
         if(!outside(*this,retire))return false;
-        if(retire)destroyRequested=true;
+        if(retire&&!requestDestroy())return false;
         std::int32_t px,py;
         return xx.roundPixel(px) && yy.roundPixel(py) &&
             x.assign(MotionBinary64::fromInteger(px)) && y.assign(MotionBinary64::fromInteger(py));

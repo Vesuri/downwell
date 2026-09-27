@@ -567,7 +567,11 @@ build/time-change-effects-test: tests/core/TimeChangeEffectsTest.cpp $(wildcard 
 test: verify-time-shard-birth verify-time-shard-lifecycle verify-time-shard-motion verify-time-shard-animation verify-time-shard-effects verify-time-shard-burst verify-point-direction
 .PHONY: verify-point-direction
 test: verify-portable-atan
-test: verify-time-stop-effects
+test: verify-time-stop-effects verify-runner-destroy
+
+.PHONY: verify-runner-destroy
+verify-runner-destroy:
+	python3 tools/verify-runner-destroy.py
 test: verify-typical-player-damage
 test: verify-player-damage
 test: verify-forced-player-jump

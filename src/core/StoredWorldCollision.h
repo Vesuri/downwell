@@ -61,6 +61,7 @@ public:
         if(h.slot>=capacity||ids_[h.slot]!=r.instanceId||!adapter_.retire(h,r))return false;
         ids_[h.slot]=0;return true;
     }
+    bool markDestroyed(InstanceHandle h,const InstanceRecord& r){return resolve(h)==&r&&adapter_.markDestroyed(h,r);}
     bool activation(InstanceHandle h,const InstanceRecord& r,bool active){return adapter_.activation(h,r,active);}
     bool membership(InstanceHandle h,const InstanceRecord& r,bool registered){return adapter_.membership(h,r,registered);}
     bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){return adapter_.move(h,r,x,y);}

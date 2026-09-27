@@ -44,6 +44,7 @@ struct InstanceRecord {
     std::int32_t depth = 0;
     bool persistent = false;
     bool active = true;
+    bool destroyRequested = false; // Excluded now; storage may survive the current event.
     bool activationPending = false;
     std::int32_t health = 0;
     std::int32_t reward = 0;

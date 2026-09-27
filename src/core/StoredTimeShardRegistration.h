@@ -98,13 +98,19 @@ public:
         auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;
         std::int32_t x,y;
         if(!r||!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y))return fail();
-        // A retiring effect completes its source event but must not acquire
-        // another spatial entry just before removal from the registry.
-        if(!effect.destroyRequested&&!lifecycle_.integerPosition(e->key,*r,x,y))return fail();
+        // Destroy excludes queries immediately but does not abort the source
+        // event's final x/y setters. Storage survives until event cleanup.
+        if(!lifecycle_.integerPosition(e->key,*r,x,y))return fail();
         r->x=x;r->y=y;r->preciseX=stored(effect.x);r->preciseY=stored(effect.y);
         r->imageSpeed=stored(effect.imageSpeed);
         r->alarms.set(0,effect.alarm0);r->alarms.set(1,effect.alarm1);r->alarms.set(2,effect.alarm2);
         return true;
+    }
+    bool destroyed(std::uint32_t local,std::uint32_t id,const TimeShardAnimation&){
+        if(!succeeded_)return false;
+        auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;
+        if(!r||!lifecycle_.markDestroyed(e->key,*r))return fail();
+        r->destroyRequested=true;return true;
     }
 };
 }
