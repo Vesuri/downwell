@@ -296,4 +296,47 @@ void lifetimeRoomInitialization(){
     require(duplicate.adopt(survivor)&&!duplicate.birth({1,1},100,{},false)&&!duplicate.resolve({1,1}),
         "birth cannot duplicate an adopted source identity before initialization");
 }
-int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
+void roomUninitialization(){
+    using R=RunnerLayerInstances<4,8>;using Owner=RunnerLayerLifetimes<4,8,4>;
+    R registry;R::Layers layers;RunnerLayerIds catalog;Owner owner(layers,registry,catalog);
+    unsigned layer=4;require(layers.insertAfterEquals(17,10,false,layer)&&registry.reserve(layers,layer,100),"exit seed");
+    require(owner.birth({0,1},100,{},false)&&owner.writeDepth({0,1},MotionBinary64::fromInteger(15)),"pending exit setter");
+    const unsigned element=registry.find(100);
+    require(owner.uninitializeRoom([](unsigned){return false;}),"uninitialize room instance elements");
+    const auto* survivor=owner.resolve({0,1});
+    require(survivor&&!survivor->depth.attached&&survivor->depth.layerId==-1&&
+        survivor->depth.depth.bits==0x41700000u&&owner.pendingDepths()==1,
+        "uninitialization clears attachment but preserves lifetime, depth and pending write");
+    require(registry.find(100)==element&&!registry.get(element)->instance.generation&&
+        layers.elementOwner(element)==layer&&layers.elementCount(layer)==1,
+        "uninitialized element remains in its original layer");
+    require(owner.uninitializeRoom([](unsigned){return false;})&&owner.pendingDepths()==1,
+        "uninitialization repeat is a no-op");
+    require(owner.initializeRoom([](auto visit){return visit(InstanceHandle{0,1});},[](unsigned){return false;})&&
+        owner.resolve({0,1})->depth.depth.bits==0x41700000u&&owner.serviceDepths()&&
+        layers.get(layers.find(owner.resolve({0,1})->depth.layerId))->depth==15,
+        "retained depth request migrates after serialized reinitialization");
+    require(owner.writeDepth({0,1},MotionBinary64::fromInteger(20))&&
+        owner.uninitializeRoom([](unsigned){return false;})&&owner.serviceDepths()&&owner.pendingDepths()==0,
+        "depth service skips unattached survivors without requiring an element binding");
+
+    Registry r;Layers l;unsigned fixed=2;require(l.insertAfterEquals(7,0,false,fixed),"lookup exit seed");
+    RunnerDepthService::Instance original,replacement;replacement.attached=true;replacement.layerId=99;
+    replacement.depth.bits=0x41280000u;
+    require(r.attach(l,fixed,100,{0,1},original,false),"lookup exit bound element");
+    const unsigned e=r.find(100);
+    require(!r.uninitialize(l,e,[](unsigned,InstanceHandle&,RunnerDepthService::Instance*&){return false;})&&
+        r.get(e)->instance.generation==1,"failed lookup leaves binding intact");
+    require(r.uninitialize(l,e,[&](unsigned id,InstanceHandle& h,RunnerDepthService::Instance*& out){
+        require(id==100,"uninitialize source identity");h={3,2};out=&replacement;return true;
+    })&&original.attached&&!replacement.attached&&replacement.layerId==-1&&replacement.depth.bits==0x41280000u,
+        "uninitialize resolves source ID rather than clearing the cached lifetime");
+    require(r.uninitialize(l,e,[](unsigned,InstanceHandle&,RunnerDepthService::Instance*&){return false;}),
+        "uninitialized element does not repeat global lookup");
+    RunnerDepthService::Instance missing;
+    require(r.attach(l,fixed,101,{1,1},missing,false)&&
+        r.uninitialize(l,r.find(101),[](unsigned,InstanceHandle&,RunnerDepthService::Instance*&){return true;})&&
+        !r.get(r.find(101))->instance.generation&&missing.attached,
+        "absent global instance still clears the element without touching cached state");
+}
+int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}

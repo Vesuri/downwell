@@ -50,6 +50,11 @@ assert region(0x7fe384, 6) == b"depth\0"
 assert struct.unpack("<d", region(0x7fcc90, 8))[0] == 20.0
 assert struct.unpack("<f", region(0x7fcc98, 4))[0] == 255.0
 for start, end, digest in (
+    # Room exit uninitializes elements in forward order. Type 2 looks up the
+    # source ID, clears attachment/ID (not depth), and retains element links.
+    (0x414960, 0x4149dc, "cccc29acda794280e269928e34aa40f1415ed983e47967492eaabee0869268ff"),
+    (0x414c50, 0x414c8a, "e09d862c8bf049f5b1fce0a95ec22578bffb3ebf29795a2d6d039ca37deba518"),
+    (0x50e791, 0x50e79d, "bcc4cf1446e0e92357c864fe9781bb3319f58e39c8fcf3d3180e96ff0a6b6b2e"),
     (0x48f0a0, 0x48f0ce, "856591947d3ad925a1b2c74121e0d42a779ebd948074a6ed84e22d573eee6ed6"),
     (0x48f1ce, 0x48f3e7, "d870fccbf690e0e4893c813bfa847930f78107ff9be5ef0a107de38b90f72779"),
     # Background payload: unit scales, raw animation copies, RGB/alpha split;

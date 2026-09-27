@@ -87,8 +87,11 @@ public:
     bool serviceDepths(){
         if(!succeeded())return false;
         return pending_.service([&](unsigned slot){
-            auto& state=states_[slot];const auto element=registry_.find(state.handle);
-            if(!resolve(state.handle)||element==Registry::End)return false;
+            auto& state=states_[slot];
+            if(!resolve(state.handle))return false;
+            if(!state.depth.attached)return true;
+            const auto element=registry_.find(state.handle);
+            if(element==Registry::End)return false;
             return RunnerDepthService::apply(layers_,state.depth,element,
                 [&](unsigned e){return e==element;},
                 [&](int depth,unsigned& out){return ids_.createDynamic(layers_,depth,out);},
@@ -110,6 +113,25 @@ public:
         states_[h.slot]=State{};return true;
     }
     unsigned pendingDepths()const{return pending_.size();}
+    // 0x414c50: forward room layers/elements, retaining their links. This
+    // boundary is distinct from freeing the room or retiring its instances.
+    // In particular it does not discard surviving pending depth requests.
+    template<class Other> bool uninitializeRoom(Other other){
+        if(!succeeded())return false;
+        return layers_.visitLayers([&](unsigned layer,const auto&){
+            return layers_.visitElements(layer,[&](unsigned e){
+                if(!registry_.get(e))return other(e);
+                return registry_.uninitialize(layers_,e,
+                    [&](std::uint32_t id,InstanceHandle& h,RunnerDepthService::Instance*& out){
+                        out=nullptr;
+                        for(unsigned i=0;i<I;++i)if(states_[i].handle.generation&&states_[i].sourceId==id){
+                            h=states_[i].handle;out=&states_[i].depth;break;
+                        }
+                        return true;
+                    });
+            });
+        })||fail();
+    }
 private:
     bool fail(){good_=false;return false;}
     Layers& layers_;Registry& registry_;RunnerLayerIds& ids_;

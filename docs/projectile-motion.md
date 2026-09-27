@@ -790,6 +790,21 @@ saved fixed layer during fallback, and carry adopted lifetimes through deferred
 depth service and retirement. Live room teardown/transfer and installation are
 still required; these tests do not establish persistent-room gameplay parity.
 
+Room-layer uninitialization is a separate boundary, not instance retirement.
+The original `0x414c50` visits forward layers and forward elements; its type-2
+handler at `0x41498b` looks up the source instance ID, clears attachment bit
+`0x400` and the saved layer ID to -1, then nulls the element's instance and
+initialized flag. It does not overwrite depth or unlink/free the element.
+The ordinary nonpersistent-room exit calls this before room destruction at
+`0x50e798`. `RunnerLayerInstances::uninitialize` and the lifetime owner's
+`uninitializeRoom` model this boundary, including absent global instances and
+repeated uninitialization. Non-instance elements require their own callback.
+The operation itself does not remove queued depth requests; a later service
+on an unattached instance is a no-op, while service after rebinding uses the
+new attachment. Tests exercise both timings without asserting that every room
+transition schedules them identically. Full room destruction, survivor transfer
+and persistent-room storage remain the live room owner's responsibility.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

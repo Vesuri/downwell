@@ -13,7 +13,7 @@ bool compileLayerLifetimes(downwell::RunnerLayerLifetimes<4,16,8>& owner,downwel
 bool compileLayerRoomLifetimes(downwell::RunnerLayerLifetimes<4,16,8>& owner,
     const downwell::RunnerLayerLifetimes<4,16,8>::State& state){
     return owner.adopt(state)&&owner.initializeRoom([&](auto visit){return visit(state.handle);},
-        [](unsigned){return false;});
+        [](unsigned){return false;})&&owner.uninitializeRoom([](unsigned){return false;});
 }
 #include "core/PackedRoomLayerLoader.h"
 #include "core/RunnerLayerBackground.h"

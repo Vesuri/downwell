@@ -52,6 +52,24 @@ public:
         if(element==End||entries_[element].sourceId!=sourceId||!layers.detach(element))return false;
         entries_[element]=Entry{};return true;
     }
+    // 0x41498b: uninitialize a bound type-2 element without deleting its
+    // room membership. Source lookup, not the cached pointer, finds the
+    // instance whose attachment fields are cleared. Depth is untouched.
+    template<class Lookup>
+    bool uninitialize(Layers& layers,unsigned element,Lookup lookup){
+        if(!layers.succeeded()||!get(element))return false;
+        auto& entry=entries_[element];
+        if(!entry.instance.generation)return true;
+        if(entry.sourceId<=0x7fffffffu){
+            InstanceHandle h;RunnerDepthService::Instance* state=nullptr;
+            if(!lookup(entry.sourceId,h,state))return false;
+            if(state){
+                if(!h.generation||h.slot==0xffffffffu)return false;
+                state->attached=false;state->layerId=-1;
+            }
+        }
+        entry.instance={};return true;
+    }
     // Search only this room for the attachment described by the instance.
     // Missing layer/element or a different lifetime is a source no-op. Do not
     // clear the instance's attached flag, saved ID or depth: the destination
