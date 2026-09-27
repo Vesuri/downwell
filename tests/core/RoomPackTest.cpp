@@ -333,19 +333,46 @@ void testLayerStartup(){
         bool retire(downwell::InstanceHandle h,const downwell::InstanceRecord& r){return registry.retire(layers,r.instanceId,h);}
     } binding{layers,registry};
     downwell::InstanceStore<3> store;unsigned events=0;
+    require(store.create(513,10,6,true)==downwell::CreateInstanceResult::success,"persistent source instance");
+    store.find(513)->active=false;
+    const auto persistentHandle=store.handleAt(0);
+    downwell::RunnerDepthService::Instance persistentState;
+    persistentState.layerId=13; // Saved fixed-layer identity wins over depth.
+    persistentState.depth.bits=0x41280000u;
+    downwell::RunnerStepSnapshot<3> globalOrder;
+    std::vector<unsigned> initializationLookups;
     require(downwell::PackedRoomLoader<3>::enterChecked(store,pack,7,true,[&](auto& r,auto){
         ++events;const unsigned element=registry.find(r.instanceId);
         return element!=Registry::End&&store.resolve(registry.get(element)->instance)==&r;
     },[](int){return true;},[](auto&){return true;},nullptr,binding,[&](auto& survivors,int room){
-        require(survivors.empty()&&events==0&&room==7,"layer preparation before first birth");
-        return downwell::PackedRoomLayerLoader::load(pack,room,layers,registry,[&](unsigned,const auto& l){
+        require(survivors.size()==1&&survivors.resolve(persistentHandle)&&events==0&&room==7,"layer preparation before first birth");
+        if(!downwell::PackedRoomLayerLoader::load(pack,room,layers,registry,[&](unsigned,const auto& l){
             ++metadataCalls;return l.layerId==13&&l.visible();
-        })&&layers.normalizeRoomInstances([](unsigned){return false;});
+        })||!survivors.captureGlobalInstanceOrder(globalOrder))return false;
+        return registry.initializeRoom(layers,
+            [&](unsigned id,downwell::InstanceHandle& h,downwell::RunnerDepthService::Instance*& state){
+                initializationLookups.push_back(id);
+                if(id==513){h=persistentHandle;state=&persistentState;}
+                return true;
+            },[&](auto visit){
+                for(unsigned i=0;i<globalOrder.size();++i){
+                    const auto h=globalOrder.handle(i);const auto* r=survivors.resolve(h);
+                    if(!r||!visit(r->instanceId,h,persistentState,!r->active))return false;
+                }
+                return true;
+            },[&](unsigned e){
+                const auto* entry=registry.get(e);
+                if(!entry||!entry->instance.generation)return false;
+                const auto* r=survivors.resolve(entry->instance);
+                require(r!=nullptr,"normalization lifetime resolves");return !r->active;
+            },[](int,unsigned&){return false;});
     })==downwell::PackedRoomLoadResult::success&&events&&metadataCalls==1,
         "real packed room creation binds layers before first instance event");
     std::vector<unsigned> ids;
     layers.visitElements(layers.find(13),[&](unsigned e){ids.push_back(registry.get(e)->sourceId);return true;});
-    require(ids==std::vector<unsigned>({100066,100065}),"packed startup retains reserved element order");
+    require(initializationLookups==std::vector<unsigned>({100066,100065}),"serialized initialization precedes new births in element order");
+    require(ids==std::vector<unsigned>({100066,100065,513})&&persistentState.attached&&persistentState.layerId==13,
+        "packed startup binds survivor then normalizes it behind reserved births");
     require(!downwell::PackedRoomLayerLoader::load(pack,7,layers,registry,[](unsigned,const auto&){return true;}),"reject loading over live layer owner");
     Layers rejected;Registry rejectedRegistry;
     require(!downwell::PackedRoomLayerLoader::load(pack,7,rejected,rejectedRegistry,[](unsigned,const auto&){return false;})&&

@@ -122,6 +122,27 @@ public:
         }
         return attach(layers,layer,sourceId,h,state,inactive);
     }
+    // Instance-element projection of 0x413500. Other serialized element types
+    // must be initialized by their owner before this projection can represent
+    // a complete room. Globals visits allocated instances in original global
+    // hash order; it must not create/retire instances. Lookup uses the same
+    // contract as initializeReserved. Inactive accepts an element slot and
+    // must reject null references (and validate the borrowed lifetime).
+    template<class Lookup,class Globals,class Inactive,class CreateLayer>
+    bool initializeRoom(Layers& layers,Lookup lookup,Globals globals,
+        Inactive inactive,CreateLayer create){
+        if(!layers.succeeded())return false;
+        if(!layers.visitLayers([&](unsigned layer,const auto&){
+            return layers.visitElements(layer,[&](unsigned element){
+                return initializeReserved(layers,element,lookup);
+            });
+        }))return false;
+        if(!globals([&](std::uint32_t sourceId,InstanceHandle h,
+            RunnerDepthService::Instance& state,bool dormant){
+            return attachRoomFallback(layers,sourceId,h,state,dormant,create);
+        }))return false;
+        return layers.normalizeRoomInstances(inactive);
+    }
 private:
     unsigned free(const Layers& layers)const{
         for(unsigned i=0;i<ElementCapacity;++i)

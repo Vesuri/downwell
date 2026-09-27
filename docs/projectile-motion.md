@@ -699,6 +699,17 @@ fixture now loads its layer reservations through this boundary rather than
 preparing them outside room entry. The live runtimes currently retain the
 default no-op callback pending installation of their complete layer owners.
 
+`RunnerLayerInstances::initializeRoom` composes the three instance-layer stages:
+forward layer/element initialization (`0x413500..0x413549`), caller-provided
+global-instance traversal, and inactive-tail normalization. It propagates stage
+failure without executing later stages or rolling back published bindings.
+The packed-room preparation fixture connects this operation to a real
+`InstanceStore` survivor and the two serialized births: the inactive survivor
+resolves its saved fixed-layer ID, moves behind the reserved elements, and
+retains its lifetime while the new instances fill those reservations.
+This is the type-2 instance projection only; non-instance serialized elements
+still need their own initialization, and live owners are not installed yet.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

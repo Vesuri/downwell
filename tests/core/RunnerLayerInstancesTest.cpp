@@ -207,4 +207,33 @@ void rebindRelease(){
     }
 }
 }
-int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
+void roomInitializationFailures(){
+    for(unsigned mode=0;mode<3;++mode){
+        Registry registry;Layers layers;unsigned layer=Layers::End;
+        require(layers.insertAfterEquals(17,0,false,layer)&&registry.reserve(layers,layer,100)&&
+            registry.reserve(layers,layer,101),"room initialization seed");
+        RunnerDepthService::Instance existing,missing;missing.layerId=17;
+        unsigned globals=0,normalizations=0;
+        const bool ok=registry.initializeRoom(layers,
+            [&](unsigned id,InstanceHandle& h,RunnerDepthService::Instance*& state){
+                if(mode==1)return false;
+                if(id==100){h={50,1};state=&existing;}
+                return true;
+            },[&](auto visit){
+                ++globals;
+                require(existing.attached,"global pass follows serialized binding");
+                if(!visit(100,{50,1},existing,false)||!visit(101,{51,1},missing,true))return false;
+                return mode!=2;
+            },[&](unsigned e){++normalizations;return registry.get(e)->sourceId==101;},
+            [](int,unsigned&){return false;});
+        require(ok==(mode==0),"initialization propagates stage failure");
+        if(mode==1)require(!globals&&!normalizations&&!existing.attached&&!missing.attached,
+            "serialized failure suppresses global pass and normalization");
+        else{
+            require(globals==1&&existing.attached&&missing.attached,"completed publications survive later failure");
+            require(normalizations==(mode==0?2u:0u),"global failure suppresses normalization");
+            require(ids(layers,registry,layer)==std::vector<unsigned>({100,101}),"bound entries retain valid ownership");
+        }
+    }
+}
+int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}

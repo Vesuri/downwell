@@ -23,6 +23,15 @@ bool compileLayerInstances(downwell::RunnerLayerInstances<4,16>& registry,downwe
     unsigned layer,unsigned id,downwell::InstanceHandle handle,downwell::RunnerDepthService::Instance& state){
     return registry.reserve(layers,layer,id)&&registry.attach(layers,layer,id,handle,state,false)&&registry.retire(layers,id,handle);
 }
+bool compileRoomLayerInitialization(downwell::RunnerLayerInstances<4,16>& registry,
+    downwell::RunnerLayers<4,16>& layers,downwell::RunnerDepthService::Instance& state,
+    downwell::InstanceHandle handle,unsigned sourceId){
+    return registry.initializeRoom(layers,
+        [&](unsigned id,downwell::InstanceHandle& h,downwell::RunnerDepthService::Instance*& out){
+            if(id==sourceId){h=handle;out=&state;}return true;
+        },[&](auto visit){return visit(sourceId,handle,state,false);},
+        [](unsigned){return false;},[](int,unsigned&){return false;});
+}
 bool compileLayerDraw(const downwell::RunnerLayers<4,16>& layers,unsigned flags){
     return downwell::RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},
         [](unsigned,const auto&){return true;},[&](unsigned,auto& e){e={2,flags,true,true,true,true};return true;},
