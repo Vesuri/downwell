@@ -36,6 +36,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
+    if (!run_.effectsSucceeded || !clearEnemyOwnership()) return downwell::ResultsDestination::none;
+    const auto enemyLifecycle=enemyLifecycle_;
     const auto records = run_.records();
     const auto nextBulletIdentity=nextBulletLifetimeId_;
     const auto nextEnemyIdentity=nextEnemyLifetimeId_;
@@ -48,7 +50,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto flashBirths=run_.flashEffects.birthSequence();
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
-    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true);
+    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle);
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
@@ -67,6 +69,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
+    if (!run_.effectsSucceeded || !clearEnemyOwnership()) return false;
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
@@ -110,8 +113,8 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
 GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    bool startsGrounded,
                                    int landingOffset,
-                                   bool followCamera)
-    : player_(startsGrounded, landingOffset), tick_(0),
+                                   bool followCamera, EnemyLifecycleBinding enemyLifecycle)
+    : enemyLifecycle_(enemyLifecycle), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       cameraPixelX_(0), activationY_(0),
@@ -232,6 +235,29 @@ GameplayWorld::gemAt(unsigned index) const
     return gems_[index < gemCapacity ? index : 0];
 }
 
+bool GameplayWorld::publishEnemyActivation(const EnemyState& enemy, bool active) {
+    if (enemyLifecycle_.activation({enemy.identitySlot,enemy.lifetimeId},enemy,active)) return true;
+    run_.effectsSucceeded=false;
+    return false;
+}
+
+bool GameplayWorld::retireEnemyOwnership(EnemyState& enemy) {
+    if (enemy.identitySlot>=enemyCapacity) return true;
+    if (!enemyLifecycle_.retire({enemy.identitySlot,enemy.lifetimeId},enemy)) {
+        run_.effectsSucceeded=false;
+        return false;
+    }
+    enemyIdentitySlots_[enemy.identitySlot]=false;
+    enemy.identitySlot=0xffffu;
+    return true;
+}
+
+bool GameplayWorld::clearEnemyOwnership() {
+    for(unsigned i=0;i<enemyCount_;++i)
+        if(!retireEnemyOwnership(enemies_[i])) return false;
+    return true;
+}
+
 bool GameplayWorld::configureEnemy(unsigned index, int objectId,
                                       int spriteId, int x, int y,
                                       int speedX, int speedY,
@@ -241,7 +267,7 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
                                       int direction, int moveSpeed,
                                       bool active, bool grounded, bool awake)
 {
-    if (index >= enemyCapacity)
+    if (index >= enemyCapacity || !run_.effectsSucceeded)
         return false;
     if (!nextEnemyLifetimeId_) {
         run_.effectsSucceeded = false;
@@ -249,6 +275,7 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     }
     EnemyState& enemy = enemies_[index];
     unsigned slot=enemy.identitySlot;
+    if(index<enemyCount_ && !retireEnemyOwnership(enemy))return false;
     if(index>=enemyCount_ || slot>=enemyCapacity){
         slot=0;
         while(slot<enemyCapacity&&enemyIdentitySlots_[slot])++slot;
@@ -299,6 +326,10 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     enemy.activationPending = !active;
     if (enemyCount_ <= index)
         enemyCount_ = index + 1;
+    if(!enemyLifecycle_.birth({enemy.identitySlot,enemy.lifetimeId},enemy)) {
+        run_.effectsSucceeded=false;
+        return false;
+    }
     return true;
 }
 
@@ -580,6 +611,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                                                enemy.active, enemy.activationPending};
         },
         [this](unsigned i) {
+            if (!publishEnemyActivation(enemies_[i],true)) return false;
             enemies_[i].active = true;
             enemies_[i].activationPending = false;
             return true;
@@ -717,7 +749,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                         const auto impact = downwell::applyStandardBulletImpact(
                             enemy, run_.kills, enemyRandom_,
                             [this, &enemy] { run_.combo.state.enemyDefeated(); spawnReward(enemy, false); return run_.effectsSucceeded; },
-                            bullet.gemHigh, bullet.trajectory.direction);
+                            bullet.gemHigh, bullet.trajectory.direction,
+                            [this](const EnemyState& record){return publishEnemyActivation(record,false);});
                         return impact.kind != downwell::BulletImpactKind::ignored;
                     }
                     return false;
@@ -868,9 +901,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 enemy.imagePhase = 0; enemy.imageRemainder = 0;
                 enemy.alarm0 = 0; enemy.alarm1 = hitAlarm;
             }
-            enemy.active = enemy.snail.step([this](int x, int y) {
+            const bool alive = enemy.snail.step([this](int x, int y) {
                 return solidResolver_(solidResolverContext_, x, y);
             });
+            if (!alive && !publishEnemyActivation(enemy,false)) return {};
+            enemy.active = alive;
             if (!enemy.active)
                 continue;
             enemy.preciseX = enemy.snail.x / 5;
@@ -931,7 +966,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         [this](int x,int y) {
             return run_.contactDamageNumber(player_.frameStartXFixed(),player_.frameStartYFixed(),
                 x,y,240,176);
-        })) return {};
+        },[this](const EnemyState& enemy){return publishEnemyActivation(enemy,false);})) return {};
 
     DW_PROFILE_PHASE(profileGems);
     for (unsigned gemIndex = 0; gemIndex < gemSlotEnd_; ++gemIndex) {
@@ -972,7 +1007,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         },
         [this, &retiredEnemies](unsigned i) {
             const unsigned index = i - retiredEnemies;
-            enemyIdentitySlots_[enemies_[index].identitySlot]=false;
+            if(!retireEnemyOwnership(enemies_[index]))return false;
             for (unsigned next = index + 1; next < enemyCount_; ++next)
                 enemies_[next - 1] = enemies_[next];
             --enemyCount_;

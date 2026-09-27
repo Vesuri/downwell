@@ -734,10 +734,18 @@ routes fatal bullet/stomp responses and snail expiry to its checked activation
 binding with `false` before clearing the record's active flag. This removes
 collision visibility while retaining the stored lifetime until ordinary erasure;
 it does not set `activationPending` as a dormant deactivation request would.
-The default binding and native contact callbacks remain empty until their owner
-is installed. This boundary is not evidence
+The native compact enemy store uses the same borrowed binding specialized for
+its own record type. It publishes fully initialized births, checked replacement
+and out-of-view retirement, frontier activation, fatal-contact/snail inactivation,
+and old-record retirement before Retry or the next level. Retry retains the
+binding and generation counter. Failure is terminal, with completed earlier
+callbacks retained. Native handles remain family-local; movement/resource writes,
+object-list traversal and other families are not supplied by this binding.
+The default bindings remain empty until their resource-backed owner is installed.
+This boundary is not evidence
 that the current immediate death response matches the runner's deferred enemy
-death events. Native expiry and room-clear ownership still need integration.
+death events. Whole-world room-clear ownership across other families still needs
+integration.
 
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty

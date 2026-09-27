@@ -17,28 +17,30 @@ struct NoInstanceLifecycle {
 // Borrowed, allocation-free binding for non-templated world adapters. Install
 // before their first birth. The owner must outlive the world and must not be
 // shared with a copy of it. An empty binding preserves the unindexed runtime.
-class InstanceLifecycleBinding {
+template<class Record>
+class RecordLifecycleBinding {
 public:
-    template<class Owner> static InstanceLifecycleBinding bind(Owner& owner) {
-        InstanceLifecycleBinding b;
+    template<class Owner> static RecordLifecycleBinding bind(Owner& owner) {
+        RecordLifecycleBinding b;
         b.context_=&owner;
-        b.birth_=[](void* p,InstanceHandle h,const InstanceRecord& r){return static_cast<Owner*>(p)->birth(h,r);};
-        b.retire_=[](void* p,InstanceHandle h,const InstanceRecord& r){return static_cast<Owner*>(p)->retire(h,r);};
-        b.activation_=[](void* p,InstanceHandle h,const InstanceRecord& r,bool v){return static_cast<Owner*>(p)->activation(h,r,v);};
-        b.membership_=[](void* p,InstanceHandle h,const InstanceRecord& r,bool v){return static_cast<Owner*>(p)->membership(h,r,v);};
+        b.birth_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->birth(h,r);};
+        b.retire_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->retire(h,r);};
+        b.activation_=[](void* p,InstanceHandle h,const Record& r,bool v){return static_cast<Owner*>(p)->activation(h,r,v);};
+        b.membership_=[](void* p,InstanceHandle h,const Record& r,bool v){return static_cast<Owner*>(p)->membership(h,r,v);};
         return b;
     }
-    bool birth(InstanceHandle h,const InstanceRecord& r)const{return !birth_||birth_(context_,h,r);}
-    bool retire(InstanceHandle h,const InstanceRecord& r)const{return !retire_||retire_(context_,h,r);}
-    bool activation(InstanceHandle h,const InstanceRecord& r,bool v)const{return !activation_||activation_(context_,h,r,v);}
-    bool membership(InstanceHandle h,const InstanceRecord& r,bool v)const{return !membership_||membership_(context_,h,r,v);}
+    bool birth(InstanceHandle h,const Record& r)const{return !birth_||birth_(context_,h,r);}
+    bool retire(InstanceHandle h,const Record& r)const{return !retire_||retire_(context_,h,r);}
+    bool activation(InstanceHandle h,const Record& r,bool v)const{return !activation_||activation_(context_,h,r,v);}
+    bool membership(InstanceHandle h,const Record& r,bool v)const{return !membership_||membership_(context_,h,r,v);}
 private:
     void* context_=nullptr;
-    bool (*birth_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
-    bool (*retire_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
-    bool (*activation_)(void*,InstanceHandle,const InstanceRecord&,bool)=nullptr;
-    bool (*membership_)(void*,InstanceHandle,const InstanceRecord&,bool)=nullptr;
+    bool (*birth_)(void*,InstanceHandle,const Record&)=nullptr;
+    bool (*retire_)(void*,InstanceHandle,const Record&)=nullptr;
+    bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
+    bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;
 };
+using InstanceLifecycleBinding = RecordLifecycleBinding<InstanceRecord>;
 
 } // namespace downwell
 

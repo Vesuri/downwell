@@ -31,6 +31,7 @@
 #include "core/BatHitState.h"
 #include "core/BatBehavior.h"
 #include "core/InstanceHandle.h"
+#include "core/InstanceLifecycle.h"
 
 #include <cstdint>
 
@@ -167,10 +168,12 @@ public:
         bool active;
     };
 
+    using EnemyLifecycleBinding = downwell::RecordLifecycleBinding<EnemyState>;
     explicit GameplayWorld(unsigned initialRingOrigin,
                               bool startsGrounded = true,
                               int landingOffset = 0,
-                              bool followCamera = false);
+                              bool followCamera = false,
+                              EnemyLifecycleBinding enemyLifecycle = {});
     GameplayFrame step(std::uint8_t packedInput);
     void initializeEntryInput(bool fireHeld) { player_.initializeEntryInput(fireHeld); }
     void configureLandingProfile(const int* offsets, unsigned count) {
@@ -423,6 +426,10 @@ public:
     std::uint64_t trajectoryDigest() const { return trajectory_.value(); }
 
 private:
+    EnemyLifecycleBinding enemyLifecycle_;
+    bool publishEnemyActivation(const EnemyState& enemy, bool active);
+    bool retireEnemyOwnership(EnemyState& enemy);
+    bool clearEnemyOwnership();
     // Normal gameplay reads camMain's published pixel position. Preserve the
     // synthetic replay fixture's explicit camera track when following is off.
     long viewCameraYQ8() const { return followCamera_ ? cameraPixelY_ * 256L : cameraY_; }

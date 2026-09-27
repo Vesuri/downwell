@@ -68,7 +68,88 @@ struct GenerationOrderProbe {
 
 } // namespace
 
+struct NativeEnemyLifecycleAudit {
+    using Enemy=GameplayWorld::EnemyState;
+    struct Entry { unsigned generation=0;bool live=false,active=false; } entries[GameplayWorld::enemyCapacity]{};
+    unsigned births=0,retires=0,activations=0,inactivations=0,calls=0,fail=0;
+    bool birth(downwell::InstanceHandle h,const Enemy& e){
+        ++calls;if(fail==1)return false;
+        require(h.slot<GameplayWorld::enemyCapacity&&!entries[h.slot].live&&
+                h.generation>entries[h.slot].generation,"native birth uses a fresh generation");
+        entries[h.slot]={h.generation,true,e.active};++births;return true;
+    }
+    bool retire(downwell::InstanceHandle h,const Enemy&){
+        ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation,
+                        "native retirement resolves before invalidation");
+        if(fail==2)return false;
+        entries[h.slot].live=false;++retires;return true;
+    }
+    bool activation(downwell::InstanceHandle h,const Enemy& e,bool active){
+        ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&
+                        e.active!=active&&entries[h.slot].active==e.active,
+                        "native activation callback observes previous visibility");
+        if(fail==(active?3u:4u))return false;
+        entries[h.slot].active=active;
+        if(active)++activations;else ++inactivations;
+        return true;
+    }
+    bool membership(downwell::InstanceHandle,const Enemy&,bool){return true;}
+};
+
+void testNativeEnemyLifecycle(){
+    using Binding=GameplayWorld::EnemyLifecycleBinding;
+    NativeEnemyLifecycleAudit audit;
+    GameplayWorld world(300,true,0,false,Binding::bind(audit));
+    world.configureSolidResolver(noSolid,nullptr);
+    require(world.configureEnemy(0,111,163,100,-2000,0,0,5,6)&&
+            world.configureEnemy(1,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false)&&
+            world.configureEnemy(2,116,153,40,-168,0,0,15,12,0,0,-1,-1,180,320,false),
+            "native lifecycle fixture births");
+    const auto survivor=world.enemyHandle(world.enemyAt(1).lifetimeId);
+    world.step(0);
+    require(audit.retires==1&&world.findEnemy(survivor),"retirement precedes compaction without losing survivor");
+    require(audit.activations==1,"native frontier publishes dormant activation");
+    world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
+    require(audit.retires==3&&!world.findEnemy(survivor)&&
+            world.configureEnemy(0,111,163,0,5,0,0,5,6)&&audit.births==4,
+            "Retry retires old ownership and retains borrowed binding for new births");
+    audit.fail=2;
+    const auto beforeReset=world.enemyHandle(world.enemyAt(0).lifetimeId);
+    require(world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300)==
+                downwell::ResultsDestination::none&&world.findEnemy(beforeReset)&&!world.effectsSucceeded(),
+            "failed Retry retirement stops before reconstructing world or losing the old handle");
+    const auto resetCalls=audit.calls;
+    world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
+    require(audit.calls==resetCalls,"failed clear cannot replay owner callbacks");
+
+    for(unsigned failure=0;failure<=4;++failure){
+        NativeEnemyLifecycleAudit checked;
+        GameplayWorld runtime(300,true,0,false,Binding::bind(checked));
+        if(failure==1)checked.fail=1;
+        const bool born=runtime.configureEnemy(0,111,163,0,failure==3?-168:5,0,0,5,6,0,0,-1,-1,0,0,failure!=3);
+        require(born==(failure!=1),"birth callback failure is returned");
+        checked.fail=failure;
+        if(failure==2){
+            const auto h=runtime.enemyHandle(runtime.enemyAt(0).lifetimeId);
+            require(!runtime.configureEnemy(0,111,163,0,5,0,0,5,6)&&runtime.findEnemy(h),
+                    "failed replacement retirement preserves original handle");
+        }else if(failure!=1)runtime.step(0);
+        if(!failure){
+            require(runtime.effectsSucceeded()&&checked.inactivations==1&&runtime.enemiesDefeated()==1,
+                    "stomp publishes native inactivation before defeat");
+            continue;
+        }
+        require(!runtime.effectsSucceeded(),"native lifecycle failure latches");
+        const auto tick=runtime.tick(),calls=checked.calls;
+        runtime.step(0);
+        require(runtime.tick()==tick&&checked.calls==calls&&
+                !runtime.configureEnemy(1,111,163,0,5,0,0,5,6),
+                "failed native owner permits neither further steps nor births");
+    }
+}
+
 int main() {
+    testNativeEnemyLifecycle();
     {
         AmigaPortRuntime indexed(0), fallback(0);
         int xs[129], ys[129];
