@@ -238,6 +238,7 @@ int main(){
         require(world->roomLoadSucceeded()&&world->deferredCommandsSucceeded()&&owner->collectCollisionPairs(*pairs,true),
             "collect source-resource collision candidates from live room births");
         require(pairs->size()>0,"generated room exercises collision candidates");
+        unsigned preciseHits=0;
         for(unsigned i=0;i<pairs->size();++i){
             const auto* pair=pairs->at(i);
             const auto* a=owner->resolve(pair->self);const auto* b=owner->resolve(pair->other);
@@ -252,7 +253,14 @@ int main(){
                 "live pair directions resolve handlers using actual lifetime identities");
             if(hasForward)require(forward.eventType==4&&forward.codeId>=0,"forward handler has source code binding");
             if(hasBackward)require(backward.eventType==4&&backward.codeId>=0,"reverse handler has source code binding");
+            bool hit=false;std::uint32_t before=0,after=0;
+            require(owner->collisionOverlap(pair->self,pair->other,hit)&&
+                owner->collisionFlags(pair->other,before)&&owner->queueCollision(pair->other)&&
+                owner->collisionFlags(pair->other,after)&&before==after,
+                "live precise pair query and collision requeue preserve instance flags");
+            preciseHits+=hit;
         }
+        require(preciseHits>0,"live shard/player pairs exercise precise-mask overlap");
         require(owner->collectCollisionPairs(*pairs,true)&&owner->valid(),
             "next collection resolves retained animated masks through real sprite resources");
     }

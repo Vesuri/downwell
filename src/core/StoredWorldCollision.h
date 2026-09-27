@@ -77,6 +77,23 @@ public:
         const auto* a=resolve(self);const auto* b=resolve(other);
         return a&&b&&adapter_.objects.collisionEvent(a->objectId,b->objectId,found,event);
     }
+    bool collisionFlags(InstanceHandle h,std::uint32_t& flags)const{
+        if(!valid()||!resolve(h))return false;
+        const auto* state=owner_.resolve(h);if(!state)return false;
+        flags=state->flags;return true;
+    }
+    bool queueCollision(InstanceHandle h){
+        if(!valid()||!resolve(h))return false;
+        const auto* flags=families_.flags(unsigned(owner_.objectId(h)));
+        return flags&&owner_.queueCollision(h,*flags);
+    }
+    bool collisionOverlap(InstanceHandle self,InstanceHandle other,bool& hit){
+        if(!valid())return false;
+        return adapter_.collide(*this,self,other,false,masks_,RunnerMaskDispatch{},
+            [](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
+                angle.bits^=0x80000000u;return Trig{}(angle,c,s);
+            },hit);
+    }
     bool activation(InstanceHandle h,const InstanceRecord& r,bool active){return adapter_.activation(h,r,active);}
     bool membership(InstanceHandle h,const InstanceRecord& r,bool registered){return adapter_.membership(h,r,registered);}
     bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){return adapter_.move(h,r,x,y);}

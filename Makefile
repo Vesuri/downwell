@@ -121,7 +121,15 @@ build/wall-draw-lookup-test: tests/core/WallDrawLookupTest.cpp src/core/WallDraw
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 
-test: verify-wall-draw-lookup verify-runner-collision-phase verify-runner-collision-pairs
+test: verify-wall-draw-lookup verify-runner-collision-phase verify-runner-collision-pairs verify-runner-collision-dispatch
+
+.PHONY: verify-runner-collision-dispatch
+verify-runner-collision-dispatch: build/runner-collision-dispatch-test
+	./build/runner-collision-dispatch-test
+
+build/runner-collision-dispatch-test: tests/core/RunnerCollisionDispatchTest.cpp src/core/RunnerCollisionDispatch.h src/core/InstanceHandle.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 
 .PHONY: verify-runner-collision-pairs
 verify-runner-collision-pairs: build/runner-collision-pairs-test

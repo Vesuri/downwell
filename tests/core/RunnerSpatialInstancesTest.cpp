@@ -25,6 +25,19 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    {
+        Owner owner;RunnerCollisionPairs<64,1> pairs;
+        const InstanceHandle h{0,1};assert(owner.attach(h,0,{}));
+        assert(owner.queueCollision(h,0x10)&&owner.pendingCollision()==0);
+        assert(owner.queueCollision(h,8)&&owner.queueCollision(h,8));
+        assert(owner.pendingCollision()==1&&owner.pendingSpatial()==0&&owner.resolve(h)->flags==8);
+        assert(!owner.queueCollision({0,2},8)&&owner.pendingCollision()==1);
+        assert(owner.collectCollisionPairs(pairs,true,
+            [](InstanceHandle,bool){assert(false);return false;},
+            [](InstanceHandle,InstanceHandle,bool&){assert(false);return false;},
+            [](InstanceHandle,unsigned&){assert(false);return false;}));
+        assert(owner.pendingCollision()==0&&pairs.size()==0);
+    }
     // Actual index traversal and collision queue, not a supplied slot order.
     for(unsigned mode=0;mode<5;++mode){
         Owner owner;Graph graph;graph.values[1]=0x18;

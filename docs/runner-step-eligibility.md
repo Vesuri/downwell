@@ -9,11 +9,27 @@ at `0x50decc`. It reconciles again at `0x50ded1`, then calls End Step at
 the alternative path is not modeled by this boundary.
 
 The collision pass calls pair processing `0x5030d0` at `0x5025cb`. Pair
-processing checks overlap and destruction flags, then invokes event type 4
+processing checks overlap and then inactivity flag `0x2`, then invokes event type 4
 at `0x5031a6` and `0x5031b5`, swapping self/other and selecting the other
 object's ID. Solid-instance position rollback/reapplication surrounds those
 calls. This establishes a separate phase and bidirectional dispatch, not the
 complete candidate ordering, mask rules or solid response semantics.
+
+The precise-overlap routine separately excludes destroyed instances (`0x1`)
+and flag `0x100000`; do not confuse that with the wrapper's explicit shift by
+one at `0x5030f0`/`0x5030fd`. After inactivity checks, `0x501ef0` prepends OTHER
+to the collision queue if its object flags contain `0x8`, without dirtying its
+spatial bounds. Both event directions run without another wrapper exclusion
+check. The dispatcher still owns its room-transition guards.
+
+`RunnerCollisionDispatch` preserves this checked operation sequence. If either
+instance is solid, it rolls back self then other (including path position),
+dispatches both directions, and rereads solid flags. Post-event solidity causes
+motion preparation for both instances, followed by movement for both, a second
+overlap test, and another rollback only if overlap remains. The source uses
+binary32 additions when applying motion (`0x5031e3..0x503248`). The portable
+protocol does not substitute fixed-point additions: concrete motion/path and
+event-context callbacks remain required before live scheduler admission.
 
 `tools/verify-runner-collision-phase.py` pins these reviewed regions through
 the existing whole-executable hash guard. The scheduler's optional checked

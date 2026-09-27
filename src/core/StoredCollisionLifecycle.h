@@ -119,6 +119,17 @@ struct StoredCollisionLifecycle {
     // Records is a read-only resolve(handle) view. It must honor generations;
     // it need not expose or copy the world's underlying storage container.
     template<class Records,class InverseTrig>
+    bool collide(const Records& records,InstanceHandle a,InstanceHandle b,bool publish,
+                 const SpriteMaskPack& masks,const RunnerMaskDispatch& dispatch,
+                 InverseTrig inverseTrig,bool& hit){
+        const auto* first=records.resolve(a);const auto* second=records.resolve(b);
+        if(!first||!second||!matchingFlags(a,*first)||!matchingFlags(b,*second))return false;
+        return owner.collideCompatibility(a,b,properties[a.slot].sprite,properties[b.slot].sprite,
+            sprites,masks,dispatch,publish,[&](InstanceHandle h,bool update){
+                const auto* r=records.resolve(h);return r&&refresh(h,*r,update);
+            },inverseTrig,round,hit);
+    }
+    template<class Records,class InverseTrig>
     bool placeVm(const Records& records,InstanceHandle self,int object,
                  MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,
                  const RunnerMaskDispatch& dispatch,InverseTrig inverseTrig,
@@ -131,10 +142,7 @@ struct StoredCollisionLifecycle {
         };
         return owner.placeVm(self,object,x,y,allPrepared,graph,refreshBounds,
             [&](InstanceHandle a,InstanceHandle b,bool publish,bool& hit){
-                const auto* first=records.resolve(a);const auto* second=records.resolve(b);
-                if(!first||!second||!matchingFlags(a,*first)||!matchingFlags(b,*second))return false;
-                return owner.collideCompatibility(a,b,properties[a.slot].sprite,properties[b.slot].sprite,
-                    sprites,masks,dispatch,publish,refreshBounds,inverseTrig,round,hit);
+                return collide(records,a,b,publish,masks,dispatch,inverseTrig,hit);
             },result);
     }
     // place_meeting (runner 0x4fee30) uses the same search with collect-all
