@@ -21,6 +21,11 @@ bool nativeOwnedScript(GameplayWorld& world,const downwell::SpriteCollisionPack&
 bool nativeActorDraw(const GameplayWorld& world){
     return world.visitRoomActors([](auto,downwell::InstanceHandle key,auto){return key.generation!=0;});
 }
+bool nativeBoxWrites(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle h,
+    downwell::MotionBinary64 health,int& parent){
+    return owner.projectileWallParent(h,parent)&&owner.projectileBoxHealth(h,health)&&
+        owner.projectileBoxHealthWrite(h,health)&&owner.projectileBoxHit(h);
+}
 downwell::ResultsDestination nativeScriptRetry(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects){
     return world.restartFromResultsWithScriptEffects(downwell::DeathMenuSequence::Action::Retry,43,300,effects);
 }
@@ -393,11 +398,37 @@ int main(){
         assert(a.wallHp.high==0x3ff00000u&&!a.wallHp.low&&a.wallHp.high==b.wallHp.high&&
             a.breakSound==174&&a.breakSound==b.breakSound&&a.haveGem==2&&a.haveGem==b.haveGem&&
             !a.hit&&!b.hit&&!a.drilled&&!b.drilled&&!a.autoTile&&!b.autoTile&&!a.checked&&!b.checked);
+        InstanceHandle selected;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,{0,1},selected));
+        GameplayCollisionOwner::Owner::Result line;
+        const auto xroom=MotionBinary64::fromInteger(240),yroom=MotionBinary64::fromInteger(512);
+        assert(owner->projectileNonPreciseLine({},59,xroom,yroom,xroom,yroom,false,line)&&line.found&&
+            line.handle.slot==selected.slot&&line.handle.generation==selected.generation);
+        selected=line.handle;
+        int parent=-123;MotionBinary64 hp;
+        assert(owner->projectileWallParent(selected,parent)&&parent==84&&owner->projectileBoxHealth(selected,hp));
+        const auto flags=owner->state(selected)->flags;
+        const MotionBinary64 fractional{0xbfe00000u,0}; // -0.5, never clamped to zero.
+        assert(owner->projectileBoxHealthWrite(selected,fractional)&&owner->projectileBoxHit(selected)&&
+            owner->projectileBoxHealth(selected,hp)&&hp.high==fractional.high&&!hp.low&&native->state.hit&&
+            native->active&&!native->destroyRequested&&owner->state(selected)->flags==flags&&
+            world->randomDrawCount()==draws);
+        assert(world->markBreakableDestroyed({0,1})&&owner->projectileBoxHealthWrite(selected,{})&&
+            owner->projectileBoxHit(selected)&&owner->prepareDraw());
+        hp={0x3ff00000u,0};parent=-123;
+        assert(!owner->projectileBoxHealth(selected,hp)&&hp.high==0x3ff00000u&&
+            !owner->projectileWallParent(selected,parent)&&parent==-123&&
+            !owner->projectileBoxHealthWrite(selected,fractional)&&!owner->projectileBoxHit(selected));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)!=ResultsDestination::none);
         const int x=0,y=336;assert(world->appendBreakables(&x,&y,1));
         const auto* fresh=world->findBreakable({0,2});
         assert(fresh&&fresh->state.breakSound==171&&!fresh->state.haveGem&&!fresh->state.hit&&
             fresh->state.wallHp.high==0x3ff00000u);
+        assert(!owner->projectileBoxHealthWrite(selected,fractional)&&!fresh->state.hit);
+        InstanceHandle replacement;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::breakable,{0,2},replacement));
+        assert(!owner->projectileBoxHealthWrite(replacement,{0x7ff00000u,0})&&
+            !owner->projectileBoxHit(replacement)&&!fresh->state.hit&&fresh->state.wallHp.high==0x3ff00000u);
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

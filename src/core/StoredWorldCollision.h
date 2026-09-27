@@ -81,6 +81,24 @@ public:
         return record&&record->instanceId==ids_[h.slot]&&
             record->objectId==owner_.objectId(h)?record:nullptr;
     }
+    bool projectileWallParent(InstanceHandle h,int& parent)const{
+        const auto* r=resolve(h);PackedObject object;
+        if(!valid()||!r||!adapter_.objects.findObject(r->objectId,object))return false;
+        parent=object.parentId;return true;
+    }
+    bool projectileBoxHealth(InstanceHandle h,MotionBinary64& health)const{
+        const auto* r=resolve(h);
+        if(!valid()||!r||r->objectId!=92)return false;
+        health=r->box.wallHp;return true;
+    }
+    bool projectileBoxHealthWrite(StartupRuntime& world,InstanceHandle h,MotionBinary64 health){
+        const auto* r=resolve(h);
+        return valid()&&runtime_==&world&&r&&r->objectId==92&&world.publishBoxHealth(h,health);
+    }
+    bool projectileBoxHit(StartupRuntime& world,InstanceHandle h){
+        const auto* r=resolve(h);
+        return valid()&&runtime_==&world&&r&&r->objectId==92&&world.publishBoxHit(h);
+    }
     bool birth(InstanceHandle h,const InstanceRecord& r){
         if(!valid()||h.slot>=capacity||ids_[h.slot]||!r.instanceId||!adapter_.birth(h,r))return false;
         ids_[h.slot]=r.instanceId;return true;

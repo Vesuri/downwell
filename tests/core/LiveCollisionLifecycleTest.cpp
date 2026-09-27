@@ -151,6 +151,42 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach box field world");world->skipToGameForTesting();
+        InstanceHandle selected{};
+        for(unsigned tick=0;tick<600&&!selected.generation;++tick){
+            for(unsigned i=0;i<world->activeInstanceCount();++i)
+                if(world->instanceAt(i).objectId==92&&world->instanceAt(i).active){selected=world->instanceHandleAt(i);break;}
+            if(!selected.generation)world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+        }
+        require(selected.generation&&world->effectsSucceeded(),"natural generation supplies a box");
+        const auto* candidate=owner->resolve(selected);InstancePlaceResult line;
+        const auto x=MotionBinary64::fromInteger(candidate->x),y=MotionBinary64::fromInteger(candidate->y);
+        require(owner->nonPreciseLine({},92,x,y,x,y,false,line)&&line.id>=100000&&
+            line.handle.slot==selected.slot&&line.handle.generation==selected.generation,
+            "box field writes use the source line selector's retained identity");
+        selected=line.handle;
+        int parent=-123;MotionBinary64 hp;
+        require(owner->projectileWallParent(selected,parent)&&parent==84&&owner->projectileBoxHealth(selected,hp)&&
+            hp.high==0x3ff00000u&&!hp.low,"box target resolves direct parent and Create health");
+        const auto draws=world->randomDrawCount();const auto* box=owner->resolve(selected);
+        const auto active=box->active,destroyed=box->destroyRequested;
+        const MotionBinary64 fractional{0xbfe00000u,0};
+        require(owner->projectileBoxHealthWrite(*world,selected,fractional)&&owner->projectileBoxHit(*world,selected)&&
+            owner->projectileBoxHealth(selected,hp)&&hp.high==fractional.high&&!hp.low&&
+            owner->resolve(selected)->box.hit&&owner->resolve(selected)->active==active&&
+            owner->resolve(selected)->destroyRequested==destroyed&&world->randomDrawCount()==draws,
+            "health/hit writes retain fractional overkill, membership and RNG");
+        auto wrong=selected;++wrong.generation;hp={0x3ff00000u,0};parent=-123;
+        require(!owner->projectileBoxHealth(wrong,hp)&&hp.high==0x3ff00000u&&
+            !owner->projectileWallParent(wrong,parent)&&parent==-123&&
+            !owner->projectileBoxHealthWrite(*world,wrong,{})&&!owner->projectileBoxHit(*world,wrong),
+            "stale generation cannot read or write box fields");
+        require(world->restartFromResults(DeathMenuSequence::Action::Retry,43)&&!owner->resolve(selected)&&
+            !owner->projectileBoxHealthWrite(*world,selected,fractional),"Retry invalidates retained box selection");
+    }
     for(unsigned failure=1;failure<=7;++failure){
         auto owner=std::make_unique<ProjectileFailureOwner>(objects,sprites,masks);owner->reject=failure;
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

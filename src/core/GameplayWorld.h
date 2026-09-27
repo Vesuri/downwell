@@ -334,6 +334,14 @@ public:
         const auto& box=breakables_[handle.slot];
         return box.lifetimeId==handle.generation ? &box : nullptr;
     }
+    bool publishBoxHealth(downwell::InstanceHandle h,downwell::MotionBinary64 health){
+        if(!run_.effectsSucceeded||!findBreakable(h)||!health.valid())return run_.effectsSucceeded=false;
+        breakables_[h.slot].state.wallHp=health;return true;
+    }
+    bool publishBoxHit(downwell::InstanceHandle h){
+        if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+        breakables_[h.slot].state.hit=true;return true;
+    }
     GameplayFrame step(std::uint8_t packedInput);
     // Engine destruction mark, after any game Destroy/CleanUp callbacks.
     // Keep the typed record until the owner's Draw-entry cleanup.

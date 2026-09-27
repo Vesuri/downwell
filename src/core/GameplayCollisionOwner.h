@@ -275,6 +275,29 @@ public:
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
+    // These take selected shared collision handles, not box-array indices.
+    // Game fields can still be written after a destruction mark; only actual
+    // room cleanup invalidates the handle. No activation/retirement happens.
+    bool projectileWallParent(InstanceHandle h,int& parent)const{
+        PackedObject object;
+        if(!valid()||!resolves(h)||!objects_.findObject(owner_.objectId(h),object))return false;
+        parent=object.parentId;return true;
+    }
+    bool projectileBoxHealth(InstanceHandle h,MotionBinary64& health)const{
+        View::Record record;
+        if(!valid()||!resolves(h)||!View(*world_).resolve(h,record)||!record.breakable)return false;
+        health=record.breakable->state.wallHp;return true;
+    }
+    bool projectileBoxHealthWrite(InstanceHandle h,MotionBinary64 health){
+        View::Kind kind;InstanceHandle local;
+        return valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::breakable&&
+            world_->publishBoxHealth(local,health);
+    }
+    bool projectileBoxHit(InstanceHandle h){
+        View::Kind kind;InstanceHandle local;
+        return valid()&&resolves(h)&&View::decode(h,kind,local)&&kind==View::Kind::breakable&&
+            world_->publishBoxHit(local);
+    }
     bool population(int object,unsigned& count)const{return valid()&&owner_.instanceNumber(object,families_,count);}
     bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
         RunnerImageValue px,py;bool result=false;

@@ -130,6 +130,20 @@ public:
     const InstanceRecord* resolveInstance(InstanceHandle handle) const {
         return instances_.resolve(handle);
     }
+    // Script field writes do not remove collision membership. objBox_n Step
+    // owns destruction; a retained selection must resolve its lifetime again
+    // after every synchronous Create, rather than retaining a record pointer.
+    bool publishBoxHealth(InstanceHandle h,MotionBinary64 health){
+        auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=92||!health.valid())
+            return run_.effectsSucceeded=false;
+        r->box.wallHp=health;return true;
+    }
+    bool publishBoxHit(InstanceHandle h){
+        auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;
+        r->box.hit=true;return true;
+    }
     InstanceHandle instanceHandleAt(std::size_t index)const{return instances_.handleAt(index);}
     bool publishWallImage(InstanceHandle h,int frame){
         auto* r=instances_.resolve(h);

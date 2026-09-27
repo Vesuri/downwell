@@ -74,6 +74,16 @@ hit-write storage. This is not the full box Create/Step implementation:
 non-cavern/glitch/ground-room variants, original damage/destruction timing,
 effects, audio, chain reactions and gem/debris emission still require wiring.
 
+The stored and native collision owners expose `projectileWallParent` and
+`projectileBoxHealth`/`projectileBoxHealthWrite`/`projectileBoxHit` for the
+selected lifetime. Parent lookup uses the direct serialized parent, not an
+ancestor test. Each access resolves the selection again; no record pointer is
+retained across callbacks. Health is binary64 (including fractional overkill),
+and health/hit writes do not change activation, collision membership or RNG.
+Native marked boxes remain accessible until room cleanup; retired/reused
+handles are rejected. These are target adapters for the pending source bullet
+integration, not a change to the current live gun's immediate removal path.
+
 ## Collision lookup boundaries
 
 `verify-runner-line-point.py` pins the reviewed registrations, wrappers and
