@@ -96,32 +96,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     anyInput_ = false;
     resetSceneState();
 
-    // rmInit instance order in the recovered room data.
-    const RoomInstanceDefinition definitions[] = {
-        {controllerInstanceId, 37, true},
-        {initRoomInstanceId, 36, false}
-    };
-    const auto instanceHandler = [this](InstanceRecord& instance,
-                                        RoomInstancePhase phase) {
-        dispatchInstancePhase(instance, phase);
-    };
-    const auto roomCreationHandler = [this](std::int32_t roomId) {
-        dispatchRoomCreation(roomId);
-    };
-    const auto deferredHandler = [this](InstanceStore<instanceCapacity>& instances) {
-        flushDeferredInstances(instances, entryRoomId);
-    };
-    if (roomPack_ != nullptr) {
-        roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enter(
-            instances_, *roomPack_, entryRoomId, true,
-            instanceHandler, roomCreationHandler,
-            deferredHandler,objectPack_) == PackedRoomLoadResult::success;
-    } else {
-        roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enter(
-            instances_, entryRoomId, definitions, 2, true,
-            instanceHandler, roomCreationHandler,
-            deferredHandler) == LoadRoomResult::success;
-    }
+    loadRoom(entryRoomId, true);
 }
 
 void StartupRuntime::resetSceneState() {
@@ -1869,6 +1844,10 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
 }
 
 void StartupRuntime::gotoRoom(int roomId) {
+    loadRoom(roomId, false);
+}
+
+void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
     if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
     const auto instanceHandler = [this](InstanceRecord& instance,
                                         RoomInstancePhase phase) {
@@ -1886,12 +1865,18 @@ void StartupRuntime::gotoRoom(int roomId) {
     };
     if (roomPack_ != nullptr) {
         roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enterChecked(
-            instances_, *roomPack_, roomId, false,
+            instances_, *roomPack_, roomId, firstGameRoom,
             instanceHandler, roomCreationHandler,
             deferredHandler,objectPack_) == PackedRoomLoadResult::success;
     } else {
+        // Bounded fallback's rmInit instances, in recovered creation order.
+        const RoomInstanceDefinition definitions[] = {
+            {controllerInstanceId, 37, true},
+            {initRoomInstanceId, 36, false}
+        };
         roomLoadSucceeded_ = RoomLoader<instanceCapacity>::enterChecked(
-            instances_, roomId, nullptr, 0, false,
+            instances_, roomId, firstGameRoom ? definitions : nullptr,
+            firstGameRoom ? 2 : 0, firstGameRoom,
             instanceHandler, roomCreationHandler,
             deferredHandler) == LoadRoomResult::success;
     }

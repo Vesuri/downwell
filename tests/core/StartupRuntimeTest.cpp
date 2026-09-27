@@ -50,6 +50,48 @@ void testFailedRoomLoadStopsUpdates() {
             "failed room entry stops subsequent ticks and dispatch without retry");
 }
 
+void testInitialDeferredFailureStopsRoomStart(const downwell::RoomPack* rooms = nullptr) {
+    // Artificial bindings exercise the real runtime failure boundary, not the
+    // original game's event mapping. Create requests an unavailable child;
+    // Room Start would initialize the controller if dispatch wrongly continued.
+    using Pack = downwell::ObjectPack;
+    std::vector<std::uint8_t> bytes(Pack::headerSize + 38 * Pack::objectRecordSize +
+                                    2 * Pack::bindingRecordSize, 0);
+    const auto put = [&](std::size_t offset, std::uint64_t value, unsigned size = 4) {
+        for (unsigned i=0;i<size;++i) bytes[offset+i]=std::uint8_t(value>>(8*i));
+    };
+    bytes[0]='D'; bytes[1]='W'; bytes[2]='O'; bytes[3]='B';
+    put(4,Pack::formatVersion,2); put(6,Pack::headerSize,2);
+    put(8,Pack::manifestSchema); put(12,38); put(16,2);
+    put(20,Pack::sourceHashPrefix,8);
+    for(unsigned i=0;i<38;++i) {
+        const auto offset=Pack::headerSize+i*Pack::objectRecordSize;
+        put(offset,i); put(offset+4,0xffffffff); put(offset+8,0xffffffff);
+        put(offset+12,0xffffffff);
+        if(i==37) put(offset+28,2);
+    }
+    const auto binding=Pack::headerSize+38*Pack::objectRecordSize;
+    put(binding,0); put(binding+8,714); // Create: enqueue objDitherFade (382).
+    put(binding+Pack::bindingRecordSize,7);
+    put(binding+Pack::bindingRecordSize+4,4); // Other / Room Start.
+    put(binding+Pack::bindingRecordSize+8,869);
+    const Pack objects(bytes.data(),bytes.size());
+    require(objects.valid(), "failure-injection object pack is structurally valid");
+    auto runtime=std::make_unique<downwell::StartupRuntime>(
+        downwell::PlatformProfile::desktop,rooms,&objects);
+    for(unsigned reset=0;reset<2;++reset) {
+        require(!runtime->roomLoadSucceeded() && !runtime->deferredCommandsSucceeded(),
+                "initial deferred birth failure marks room entry failed");
+        require(runtime->initTimes()==0 && runtime->ditherFadeSpawnRequests()==1 &&
+                runtime->activeInstanceCount()==2,
+                "failed entry retains prior work but never dispatches Room Start");
+        const auto digest=runtime->stateDigest();
+        runtime->step(true);
+        require(runtime->stateDigest()==digest, "failed initial entry cannot advance or retry");
+        runtime->reset(downwell::PlatformProfile::desktop);
+    }
+}
+
 void testNonDesktopSkipsSplash() {
     downwell::StartupRuntime runtime(downwell::PlatformProfile::nonDesktop);
     runtime.step(false);
@@ -126,6 +168,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         std::istreambuf_iterator<char>());
     const downwell::RoomPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "generated room pack is valid");
+    testInitialDeferredFailureStopsRoomStart(&pack);
 
     std::vector<std::uint8_t> objectBytes;
     if (objectPath != nullptr) {
@@ -832,6 +875,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 int main(int argc, char** argv) {
     testDesktopBootState();
     testFailedRoomLoadStopsUpdates();
+    testInitialDeferredFailureStopsRoomStart();
     testNonDesktopSkipsSplash();
     testRecoveredDesktopTiming();
     testAdvanceInputUsesPressEdges();

@@ -358,6 +358,7 @@ private:
                      std::int32_t codeId,
                      bool advancePressed = false);
     void gotoRoom(int roomId);
+    void loadRoom(int roomId, bool firstGameRoom);
     void resetSceneState();
     InstanceRecord* initRoomInstance();
     const InstanceRecord* initRoomInstance() const;
