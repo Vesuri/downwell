@@ -80,7 +80,8 @@ retains the marked record, and either failure stops subsequent execution.
 An entirely unindexed fixture marks its local record; an installed owner
 must provide destruction publication rather than silently retaining a
 query-visible field. Other effect families still require their owned cleanup
-dispatch, and the native entrance-field lifetime is not registered yet.
+dispatch. Native entrance lifetimes use the corresponding typed-store mark
+and room-entry owner sweep; see [native ownership](runner-collision-bounds.md).
 
 Phase-bound `TimeShardEffects` consequently retains marked storage through
 alarms, Step and subsequent births until `retireRequested()` is called at an

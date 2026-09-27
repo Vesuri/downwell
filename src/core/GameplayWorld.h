@@ -199,7 +199,7 @@ public:
                               const PlayerLifecycleBinding& playerLifecycle = {},
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
-    enum class PhaseBoundary { beginStep, alarm, step, collision, endStep };
+    enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
     void configureEnemyStepOrder(bool (*capture)(void*,EnemyStepOrder&),void* context){
         enemyOrderCapture_=capture;enemyOrderContext_=context;
@@ -470,6 +470,20 @@ public:
         return camera.pixelY() - 142;
     }
     const downwell::GameplayGoalFields& goalFieldInstances()const{return goalFieldInstances_;}
+    bool retireMarkedGoalField(downwell::InstanceHandle h){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&goalFieldInstances_.retireMarked(h);
+    }
+    // Finish the supported room-entry Create sequence. The indexed owner
+    // reconciles then sweeps in room order; unindexed fixtures own local cleanup.
+    bool createRoomStartField(){
+        if(!run_.effectsSucceeded)return false;
+        downwell::InstanceHandle h;
+        if(!goalFieldInstances_.create(240,192,371,&h))return run_.effectsSucceeded=false;
+        if(!run_.createStartField(240,192,enemyRandom_))return false;
+        if(!run_.startFieldPresent&&!goalFieldInstances_.requestDestroy(h))return run_.effectsSucceeded=false;
+        if(!reconcilePhase(PhaseBoundary::roomEntry))return false;
+        return run_.effectsSucceeded=goalFieldInstances_.cleanupMarked();
+    }
     bool bindGoalFieldLifecycle(downwell::GameplayGoalFields::Binding binding){
         return run_.effectsSucceeded=run_.effectsSucceeded&&goalFieldInstances_.bind(binding);
     }
@@ -509,13 +523,14 @@ public:
     bool prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin);
     template<class Builder>
     bool initializeAreaOneBuilder(Builder& builder, int x, int y, unsigned style = 0) {
+        if(!run_.effectsSucceeded)return false;
         if (run_.stage.area != 1 || run_.stage.level < 1 || run_.stage.level > 3 || style > 4) return false;
         downwell::AreaOneBuilder::Setup setup;
         setup.level = unsigned(run_.stage.level);
         setup.style = style;
         setup.member = run_.upgrades.levels[14] != 0;
         builder.resetRoom(x, y, enemyRandom_, setup);
-        return run_.createStartField(240,192,enemyRandom_);
+        return createRoomStartField();
     }
     const downwell::LevelClearController& levelClear() const { return run_.levelClear; }
     const downwell::LevelClearPresentation::Frame& levelClearFrame() const { return run_.levelClearFrame; }

@@ -38,6 +38,7 @@ struct GoalAudit {
     unsigned reject=0;
     std::uint64_t draws=0;
     unsigned stage=0;
+    bool roomBoundary=false;
     using Record=GameplayGoalFields::Record;
     bool birth(InstanceHandle h,const Record& r){
         assert(world->goalFieldInstances().find(h)==&r&&r.scaleX==1&&r.scaleY==1&&world->randomDrawCount()==draws);
@@ -51,8 +52,15 @@ struct GoalAudit {
     }
     bool retire(InstanceHandle h,const Record& r){
         assert(world->goalFieldInstances().find(h)==&r&&r.scaleX==2&&r.scaleY==2);
+        if(r.objectId==371)assert(roomBoundary&&r.destroyRequested);
         stage=4;return reject!=stage;
     }
+    bool markDestroyed(InstanceHandle h,const Record& r){
+        assert(world->goalFieldInstances().find(h)==&r&&r.objectId==371&&r.scaleX==2&&r.scaleY==2&&
+            !r.destroyRequested&&world->randomDrawCount()==draws+1);
+        stage=5;return reject!=stage;
+    }
+    bool mask(InstanceHandle,const Record&,int){return true;}
     bool activation(InstanceHandle,const Record&,bool){return true;}
     bool membership(InstanceHandle,const Record&,bool){return true;}
     bool move(InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue){return true;}
@@ -60,6 +68,31 @@ struct GoalAudit {
     bool imageIndex(InstanceHandle,const Record&,RunnerImageValue){return true;}
 };
 int main(){
+    for(unsigned failure=0;failure<=6;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+        GoalAudit audit{world.get(),failure,world->randomDrawCount(),0};
+        assert(world->bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(audit)));
+        world->configurePhaseBoundary([](void* p,GameplayWorld::PhaseBoundary phase){
+            auto& a=*static_cast<GoalAudit*>(p);
+            const auto h=a.world->goalFieldInstances().handle(0);
+            assert(phase==GameplayWorld::PhaseBoundary::roomEntry&&a.world->goalFieldInstances().find(h)->destroyRequested);
+            a.roomBoundary=true;return a.reject!=6;
+        },&audit);
+        assert(world->createRoomStartField()==(failure==0));
+        assert(world->randomDrawCount()==audit.draws+(failure==0||failure>=4?1:0));
+        const auto* record=world->goalFieldInstances().find({0,1});
+        if(!failure)assert(!record&&audit.roomBoundary);
+        else{
+            assert(record&&!world->effectsSucceeded()&&record->destroyRequested==(failure==4||failure==6));
+            assert(!world->createRoomStartField());
+            struct BuilderProbe {
+                bool called=false;
+                void resetRoom(int,int,GameMakerRandom&,const AreaOneBuilder::Setup&){called=true;}
+            } builder;
+            const auto draws=world->randomDrawCount();
+            assert(!world->initializeAreaOneBuilder(builder,0,0)&&!builder.called&&world->randomDrawCount()==draws);
+        }
+    }
     for(unsigned failure=1;failure<=4;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);
         GoalAudit audit{world.get(),failure,world->randomDrawCount(),0};
@@ -552,6 +585,26 @@ int main(){
         for(unsigned i=0;i<100;++i)fieldWorld->step(0);
         assert(fieldWorld->levelResultRequested()&&fieldWorld->enterLevelClear(0,false)&&
             fieldsOwner->population(255,population)&&population==0);
+        bool heart=false;
+        for(unsigned i=0;i<400&&!fieldWorld->nextLevelRequested();++i){
+            bool confirm=true;
+            assert(fieldWorld->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){}));
+        }
+        assert(fieldWorld->prepareNextAreaOneLevel({},300)&&fieldWorld->runStage().level==2);
+        const auto startDraws=fieldWorld->randomDrawCount();
+        assert(fieldWorld->createRoomStartField()&&fieldWorld->startTimeField()&&
+            fieldsOwner->population(371,population)&&population==1&&fieldWorld->randomDrawCount()==startDraws+1);
+        const auto startLocal=fieldWorld->goalFieldInstances().handle(0);
+        InstanceHandle startKey;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,startLocal,startKey));
+        assert(fieldsOwner->state(startKey)&&fieldsOwner->properties(startKey)->sprite.scaleX.bits==0x40000000u&&
+            fieldsOwner->properties(startKey)->sprite.scaleY.bits==0x40000000u);
+        assert(fieldWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        fieldWorld->confirmFirstStage();
+        const auto firstIdentity=fieldWorld->goalFieldInstances().birthSequence();
+        assert(fieldWorld->createRoomStartField()&&!fieldWorld->startTimeField()&&!fieldsOwner->state(startKey)&&
+            fieldsOwner->population(371,population)&&population==0&&
+            !fieldWorld->goalFieldInstances().find({0,firstIdentity})&&fieldsOwner->valid());
     }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     {

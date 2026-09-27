@@ -1441,7 +1441,17 @@ __attribute__((noinline)) static int runDownwell(void) {
                                       &terrainCollision);
         port.configureSolidResolver(amigaResolveTerrainSolid,
                                     &terrainCollision, amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
-        liveBuilder.resetInitialCheckpoint(enemyRandom);
+        liveBuilder.resetInitialCheckpointBeforeEntrance(enemyRandom);
+        port.configureEnemyRandom(enemyRandom);
+        if(!port.createRoomStartField()){
+            platform.restore();
+            FreeMem(startupCopperWords,4*sizeof(UWORD));
+            memory.release();
+            gDownwellStartupFailure=6;
+            downwellStartupFailed();
+            return 20;
+        }
+        enemyRandom=port.randomState();
 #ifdef DOWNWELL_NATURAL_VERIFY
         AmigaNaturalRouteVerification::entry(liveBuilder, enemyRandom);
 #endif

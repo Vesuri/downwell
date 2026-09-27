@@ -60,7 +60,7 @@ private:
         static int object(const Record& r){
             if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
             if constexpr(Kind==View::Kind::timeField)return 82;
-            if constexpr(Kind==View::Kind::goalField)return 255;
+            if constexpr(Kind==View::Kind::goalField)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
         bool key(InstanceHandle local,const Record& r,InstanceHandle& out,bool birth=false){
@@ -170,10 +170,11 @@ public:
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
-        if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindTransforms(goals_)))return check(false);
+        if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(goals_)))return check(false);
         world_=&world;
-        world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary){
-            return static_cast<GameplayCollisionOwner*>(context)->reconcileActivation();
+        world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary phase){
+            auto& owner=*static_cast<GameplayCollisionOwner*>(context);
+            return owner.reconcileActivation()&&(phase!=GameplayWorld::PhaseBoundary::roomEntry||owner.prepareDraw());
         },this);
         world.configureEnemyStepOrder([](void* context,GameplayWorld::EnemyStepOrder& snapshot){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -304,7 +305,8 @@ public:
         if(!check(cleaned))return false;
         destructionPending_=false;return true;
     }
-    // Invoke at Draw entry, not at an inter-Step reconciliation boundary.
+    // Invoke at Draw entry or after room-entry reconciliation, never at an
+    // ordinary inter-Step reconciliation boundary.
     // Retire through the typed stores, retaining identity across compaction.
     // Player destruction remains unsupported rather than silently discarded.
     bool prepareDraw(){
@@ -315,6 +317,7 @@ public:
                 case View::Kind::terrain:return record.terrain==terrain_.find(local)&&terrain_.retireMarked(local);
                 case View::Kind::enemy:return record.enemy==world_->resolveEnemyLifetime(local)&&world_->retireMarkedEnemy(local);
                 case View::Kind::breakable:return record.breakable==world_->findBreakable(local)&&world_->retireMarkedBreakable(local);
+                case View::Kind::goalField:return record.goalField==world_->goalFieldInstances().find(local)&&world_->retireMarkedGoalField(local);
                 default:return false;
             }
         });

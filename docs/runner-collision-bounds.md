@@ -399,27 +399,35 @@ initialization. Runtime Create publishes birth before consuming its radius RNG;
 builder adoption preserves the already-consumed sample. Field Draw changes only
 radius, not the collision sprite or transform, so it does not rebuild bounds.
 
-Native object-255 exit fields use a separate 64-slot lifetime store after the
+Native object-255 exit fields and their object-371 entrance descendants share a 64-slot lifetime store after the
 ordinary-field keys. Each synchronous goal child publishes resource defaults,
 then scale X=2 and scale Y=2, before `RunSession` consumes radius RNG. Repeated
 exit creation retains earlier collision identities rather than rebinding the
 latest goal's slot. Room exit and Retry retire these records; Retry preserves
 the monotonic birth cursor and binding. Partial birth/scale/retirement failures
 are terminal and retain accepted mutations. This does not establish complete
-cross-family child order (room-end setters remain unregistered), add native
-entrance fields, or enable identity-bearing field selection. The existing
+cross-family child order (room-end setters remain unregistered) or enable
+identity-bearing field selection. The existing
 single-goal presentation model also does not yet draw multiple overlapping
 goal fields from a deliberately repeated exit fixture.
+
+Entrance Create uses that same default/both-scales publication before the
+shared radius sample. On level one it publishes a destroy mark, then room-entry
+reconciliation and the owner's room-ordered cleanup retire the marked record.
+Later levels retain the entrance field and its original scaled collision mask.
+The initial seed-2 checkpoint stops at draw 330; the live entrance Create
+consumes draw 331, instead of importing a post-Create RNG cursor and skipping
+the field's ownership. Forecast-only terrain fixtures can still request the
+post-entrance checkpoint. Failed marking/reconciliation/retirement is terminal.
 
 Room teardown retires fields in their own creation order before invalidating
 keys. A failed callback preserves completed retirements, retains the failed
 record, and makes the owner terminal. Retry preserves the binding and monotonic
 birth sequence, so a reused field slot cannot resolve an old handle. Tests
 cover real generated-command adoption, native registry population/resources,
-Retry, and callback failure/RNG ordering. This adds 29,316 bytes to the native
-registry's static storage (measured from `collisionStorage` in the target ELF).
+Retry, and callback failure/RNG ordering.
 It does not finish cross-family room creation/teardown order or admit field
-selection queries: start/goal fields and effect lifetimes still need registration.
+selection queries: relevant effect/projectile lifetimes still need registration.
 
 The task requires an 8 KiB stack. Launch scripts set it explicitly; the small
 entry wrapper returns 20 before entering the application if less is supplied.

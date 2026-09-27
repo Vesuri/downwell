@@ -85,8 +85,9 @@ struct LiveSceneWorld {
             require(port.initializeAreaOneBuilder(builder, -16, 704), "native continuation initializes the current level on its owned RNG");
         } else {
             downwell::GameMakerRandom random;
-            builder.resetInitialCheckpoint(random);
+            builder.resetInitialCheckpointBeforeEntrance(random);
             port.configureEnemyRandom(random);
+            require(port.createRoomStartField(),"native initial checkpoint executes entrance Create before room cleanup");
         }
         generation.dirtyFirst = 0; generation.dirtyEnd = AmigaGameplayGeneration::worldRows;
         generation.bind(port);
