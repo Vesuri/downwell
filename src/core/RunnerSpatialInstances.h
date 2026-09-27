@@ -12,6 +12,7 @@
 #include "RunnerSpriteBounds.h"
 #include "SpriteCollisionPack.h"
 #include "RunnerMaskPair.h"
+#include "RunnerMaskPoint.h"
 #include "RunnerSpriteChange.h"
 #include "ObjectPack.h"
 namespace downwell {
@@ -324,6 +325,52 @@ public:
         RunnerMaskPair::Result result;
         if(!checked(RunnerMaskPair::test(shapes[0],shapes[1],dispatch,inverseTrig,round,result)))return false;
         hit=result.hit;return true;
+    }
+    // Ordinary candidate portion of position_meeting, 0x465520. The outer
+    // query owns suppression, inactivity, family filtering and traversal.
+    // Dirty bounds refresh precedes even destroyed/bounds rejection here.
+    template<class Refresh,class Trig,class Round>
+    bool pointCandidate(InstanceHandle h,const Sprite& sprite,Real x,Real y,
+        bool compatibility,bool precise,const SpriteCollisionPack& sprites,
+        const SpriteMaskPack& masks,Refresh refreshBounds,Trig inverseTrig,
+        Round round,bool& hit){
+        if(!valid()||!live(h))return false;
+        auto& state=entries_[h.slot].state;
+        if(!Math::valid(x)||!Math::valid(y)||(state.special&&sprite.maskId<0))return checked(false);
+        if((state.flags&8u)&&!checked(refreshBounds(h,true)))return false;
+        const auto& b=state.bounds;
+        // Fractional mode shrinks the far edge by float 0.00001; it is not
+        // the half-open cached box used by the broad spatial index.
+        const Real extension=compatibility?Real{0x3f800000}:Real{0xb727c5ac};
+        Real right,bottom;
+        if(!Math::valid(b.left)||!Math::valid(b.top)||!Math::valid(b.right)||!Math::valid(b.bottom)||
+           !Math::sub(b.right,Math::negate(extension),right)||
+           !Math::sub(b.bottom,Math::negate(extension),bottom))return checked(false);
+        if(!Math::less(x,right)||Math::less(x,b.left)||!Math::less(y,bottom)||Math::less(y,b.top)||
+           (state.flags&0x100001u)){hit=false;return true;}
+        if(!sprites.valid())return checked(false);
+        PackedSpriteCollision resource;
+        if(!sprites.collisionSprite(sprite.spriteId,sprite.maskId,resource)||!resource.frameCount){hit=false;return true;}
+        // Admitted pack modes are axis-aligned box (0) and precise (1), not
+        // rotated-box or skeletal resources with their extra point gates.
+        if(!precise||!resource.collisionMode){hit=true;return true;}
+        RunnerMaskPoint::Shape shape;
+        std::int32_t px,py;
+        // The Windows fistp sequence is query Y, query X, instance Y, X.
+        if(!checked(round(y,py)&&round(x,px)&&round(state.y,shape.y)&&round(state.x,shape.x)))return false;
+        shape.originX=resource.originX;shape.originY=resource.originY;
+        shape.scaleX=sprite.scaleX;shape.scaleY=sprite.scaleY;shape.angle=sprite.angle;
+        // No serialized masks: 0x4bbbb0 cannot expand any, so 0x4ba85f
+        // returns true. Distinguish this from a missing/corrupt offline pack.
+        if(!resource.collisionMaskCount){hit=true;return true;}
+        unsigned frame;SpriteMaskPack::Mask mask;
+        // Missing offline mask bytes are not evidence for the runner's
+        // lazy-mask-unavailable fallback. Fail instead of inventing a hit.
+        if(!masks.valid()||!RunnerMaskPair::storedFrame(sprite.imageIndex,resource.collisionMaskCount,frame)||
+           !masks.mask(unsigned(sprite.maskId<0?sprite.spriteId:sprite.maskId),frame,mask))return checked(false);
+        bool result;
+        if(!checked(RunnerMaskPoint::contains(shape,mask,px,py,inverseTrig,result)))return false;
+        hit=result;return true;
     }
     // 0x501f70: remove old bounds (retry at root), clear indexed flag, then
     // unlink both dirty memberships. Missing resources may have changed the

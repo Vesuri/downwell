@@ -346,6 +346,20 @@ the runtime's x87 rounding mode, skeletal/rotated-box resource gates, mask
 availability fallback, broad-query traversal or live point-query integration.
 Those outer operations must be connected before wall corner events can use it.
 
+`RunnerSpatialInstances::pointCandidate` implements the ordinary per-instance
+gate at `0x465520`: refresh dirty bounds first, reject outside bounds or flags
+`0x100001`, select explicit mask instead of artwork, reject missing/zero-frame
+resources, then optionally sample the precise mask. Near edges are inclusive;
+far edges are exclusive after adding binary32 `1` in compatibility mode or
+`-0.00001` otherwise. The candidate itself does not filter inactive instances;
+that belongs to the outer traversal. Rounding callbacks execute in source
+order: query Y, query X, instance Y, instance X. Negative image indices use
+positive mask-count modulo. Zero serialized mask count preserves the source's
+unexpanded-mask true fallback; missing required offline mask bytes are a port
+failure, not permission to invent that fallback. Candidate tests cover 1,680
+combinations plus lifetime rejection, frame selection and terminal failure.
+This candidate method is not yet connected to live point-query traversal.
+
 ## Cross-target mutation tape
 
 `RunnerSpatialVerification.h` supplies the `SPATIAL` result in the host/native

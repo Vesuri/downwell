@@ -2118,5 +2118,7 @@ verify-runner-mask-point:
 	python3 tools/verify-runner-mask-point.py
 	$(CXX) -Isrc $(CXXFLAGS) -o build/runner-mask-point-test tests/core/RunnerMaskPointTest.cpp
 	./build/runner-mask-point-test
+	$(CXX) -Isrc $(CXXFLAGS) -o build/runner-point-candidate-test tests/core/RunnerPointCandidateTest.cpp
+	./build/runner-point-candidate-test
 
 -include $(DEPS)
