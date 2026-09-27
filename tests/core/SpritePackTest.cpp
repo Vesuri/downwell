@@ -156,6 +156,30 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 !lifecycle.sprite(born,wrong,206)&&!lifecycle.sprite(old,records.at(0),206)&&
                 animated.sprite.spriteId==205,
                 "wrong-object snapshots and expired handles cannot mutate collision ownership");
+        require(!lifecycle.rebind(born,wrong,35,true)&&!lifecycle.rebind(old,records.at(0),35,true)&&
+                storedOwner.objectId(born)==82,
+                "rebind rejects stale handles and wrong old-object snapshots before changing identity");
+        const auto rebind=[&](auto h,const auto& record,int object,bool registered){
+            require(record.objectId==storedOwner.objectId(h),"rebind callback sees matching old identity");
+            return lifecycle.rebind(h,record,object,registered);
+        };
+        const auto oldPosition=*storedOwner.resolve(born);
+        downwell::PackedObject playerDefaults;require(objects.findObject(35,playerDefaults),"read player binding defaults");
+        require(records.bindObject(born,35,true,rebind)&&storedOwner.objectId(born)==35&&records.at(0).objectId==35,
+                "store and collision owner publish new object identity at the checked boundary");
+        const auto exactOnly=[](int,int){return false;};
+        require(records.registeredObjectCount(82,exactOnly)==0&&records.registeredObjectCount(35,exactOnly)==1,
+                "checked rebind removes the old object membership and registers the new one");
+        int reboundDepth;
+        require(animated.sprite.maskId==playerDefaults.textureMaskId&&animated.sprite.spriteId==playerDefaults.spriteId&&
+                animated.depth.promoted().roundPixel(reboundDepth)&&reboundDepth==playerDefaults.depth&&
+                animated.sprite.scaleX.bits==0x3f000000u&&storedOwner.resolve(born)->x.bits==oldPosition.x.bits&&
+                storedOwner.resolve(born)->y.bits==oldPosition.y.bits,
+                "rebind installs original resource defaults without discarding fractional position or placed scale");
+        require(records.bindObject(born,82,false,rebind)&&storedOwner.objectId(born)==82&&records.at(0).objectId==82,
+                "unregistered object rebind returns to the field identity without replacing its lifetime");
+        require(records.registeredObjectCount(82,exactOnly)==0&&records.registeredObjectCount(35,exactOnly)==0,
+                "unregistered rebind leaves neither object list populated");
         require(records.clear([&](auto h,const auto& record){return lifecycle.retire(h,record);}),"retire dynamic birth before next room");
         definition.rotation=30.0f;
         require(downwell::RoomLoader<4>::enter(records,9,&definition,1,false,event,room,deferred,lifecycle)==downwell::LoadRoomResult::lifecycleFailure&&

@@ -56,7 +56,8 @@ bool compileStoredCollisionBirth(downwell::RunnerSpatialInstances<4,8>& owner,
         lifecycle.sprite(handle,record,record.spriteId)&&
         lifecycle.transform(handle,record,downwell::RunnerSpatialInstances<4,8>::TransformField::scaleX,
                             {0x3f800000u},{0x3f800000u},0xffffffu)&&
-        lifecycle.refresh(handle,record,true);
+        lifecycle.refresh(handle,record,true)&&
+        lifecycle.rebind(handle,record,record.objectId,true);
 }
 bool compileResourceObjectBinding(downwell::RunnerSpatialInstances<4,8>& owner,
     downwell::InstanceHandle h,int object,downwell::RunnerSpatialInstances<4,8>::Properties& properties,

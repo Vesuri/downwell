@@ -30,6 +30,15 @@ not populate or rebuild the index: births, writes, activation, rebinding and
 retirement must already have been routed through the owner in source order.
 Live scheduler wiring remains in the shared work queue.
 
+Object identity changes use `InstanceStore::bindObject` with the collision
+adapter's `rebind` callback. The callback validates the old handle/object pair
+before applying the new object's membership and serialized mask/depth/sprite
+defaults. Position and transform fields survive this operation. The store then
+publishes the new object ID; it does not copy the new default fields into the
+legacy record. Callers must route those legacy field writes separately before
+using that record as presentation state. A failed external rebind is terminal,
+not permission to continue with the old store identity and a changed owner.
+
 ## Player and shard inputs
 
 The source player object 35 uses sprite 31 as its explicit collision mask,

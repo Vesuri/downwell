@@ -66,6 +66,14 @@ struct StoredCollisionLifecycle {
     bool membership(InstanceHandle h,const InstanceRecord&,bool registered){
         return owner.registerObject(h,registered);
     }
+    // InstanceStore::bindObject invokes this while the old object still
+    // resolves. Rebind membership and source defaults before the store changes
+    // identity; retain position and transform fields. A failed owner is terminal.
+    bool rebind(InstanceHandle h,const InstanceRecord& record,int object,bool registered){
+        if(!matchingFlags(h,record))return false;
+        return owner.bindObjectFromPacks(h,object,registered,properties[h.slot],
+                                        objects,sprites,graph,allPrepared);
+    }
     bool activation(InstanceHandle h,const InstanceRecord& record,bool active){
         const auto* flags=matchingFlags(h,record);
         return flags&&owner.setActive(h,active,*flags);
