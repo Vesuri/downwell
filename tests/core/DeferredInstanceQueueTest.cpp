@@ -220,6 +220,37 @@ void testCheckedCreateFailureStopsBatch(){
     }
 }
 
+void testNestedAllocatorExhaustion(){
+    using namespace downwell;
+    const auto bytes=makeObjectPack();ObjectPack objects(bytes.data(),bytes.size());
+    InstanceStore<8> instances;DeferredInstanceQueue<2> parents;
+    require(parents.enqueueCreate(0,10,20)&&parents.enqueueCreate(0,30,40),"nested parents queued");
+    std::uint32_t next=0xfffffffcu;
+    unsigned parentCalls=0,childCalls=0;
+    const auto create=[&](InstanceRecord& parent){
+        ++parentCalls;parent.health=77;
+        DeferredInstanceQueue<2> children;
+        require(children.enqueueCreate(0,50,60)&&children.enqueueCreate(0,70,80),"nested children queued");
+        return children.applyChecked(instances,objects,20,next,[&](InstanceRecord& child){
+            ++childCalls;child.health=88;return true;
+        })==ApplyInstanceCommandsResult::success;
+    };
+    require(parents.applyChecked(instances,objects,20,next,create)==ApplyInstanceCommandsResult::allocatorExhausted,
+        "children exhausting cursor stop the next parent after successful preflight");
+    require(next==0xffffffffu&&instances.size()==3&&parentCalls==1&&childCalls==2,
+        "nested exhaustion retains completed children without wrapping allocator");
+    for(unsigned i=0;i<3;++i)
+        require(instances.at(i).instanceId==0xfffffffcu+i&&instances.at(i).health==(i?88:77),
+            "parent and children retain ordered identities and Create writes");
+    require(parents.applyChecked(instances,objects,20,next,create)==ApplyInstanceCommandsResult::allocatorExhausted&&
+        parentCalls==1&&childCalls==2,"failed parent batch cannot replay nested Creates");
+    parents.clear();instances.clear();
+    require(parents.enqueueCreate(0,0,0),"fresh queue after retirement");
+    require(parents.applyChecked(instances,objects,20,next,create)==ApplyInstanceCommandsResult::allocatorExhausted&&
+        instances.empty()&&next==0xffffffffu&&parentCalls==1,
+        "retirement and queue reset cannot revive exhausted IDs");
+}
+
 } // namespace
 
 int main() {
@@ -228,6 +259,7 @@ int main() {
     testSynchronousChildBirthFailure();
     testLifecycleFailureStopsCreate();
     testCheckedCreateFailureStopsBatch();
+    testNestedAllocatorExhaustion();
     std::cout << "deferred instance queue tests passed\n";
     return 0;
 }

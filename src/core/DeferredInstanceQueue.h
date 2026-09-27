@@ -109,8 +109,10 @@ public:
             return ApplyInstanceCommandsResult::queueFull;
         if (count_ > InstanceCapacity - instances.size())
             return ApplyInstanceCommandsResult::instanceStoreFull;
-        if (static_cast<std::uint64_t>(nextInstanceId) + count_ >
-            static_cast<std::uint64_t>(0xffffffffU) + 1U)
+        // Reserve UINT32_MAX as the exhausted allocator cursor. A uint32
+        // cursor cannot represent the successor of that ID: allocating it
+        // would wrap to zero and permit stale IDs to be reused after erasure.
+        if (count_ > 0xffffffffU - nextInstanceId)
             return ApplyInstanceCommandsResult::allocatorExhausted;
 
         std::array<PackedObject, CommandCapacity> definitions{};
@@ -126,6 +128,13 @@ public:
         for (std::size_t index = 0; index < count_; ++index) {
             const DeferredCreateInstance& command = commands_[index];
             const PackedObject& definition = definitions[index];
+            // Synchronous child queues share this allocator and can exhaust
+            // it after our preflight. Preserve earlier births, but never
+            // dispatch another Create or let the cursor wrap.
+            if (nextInstanceId == 0xffffffffU) {
+                applyFailure_ = ApplyInstanceCommandsResult::allocatorExhausted;
+                return applyFailure_;
+            }
             const std::uint32_t instanceId = nextInstanceId;
             // Earlier synchronous Create callbacks can consume capacity or
             // IDs after preflight. Never dereference a rejected birth, nor
