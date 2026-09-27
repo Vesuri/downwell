@@ -11,6 +11,7 @@
 #include "core/GameplayContactProfileInput.h"
 #include "core/TimeShardBurst.h"
 #include "core/ProjectilePublication.h"
+#include "core/EffectSpawnScript.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -884,6 +885,50 @@ int main(){
                 "partial world burst preserves completed birth and exact RNG prefix");
         require(!world->emitTimeShards(burst,limited,{},{},{},{},false)&&world->randomDrawCount()==before+10,
                 "failed world burst is terminal");
+    }
+    {
+        auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
+        require(collision->attach(*world),"attach script-effect registration fixture");
+        world->skipToGameForTesting();
+        auto registration=world->scriptSpawnRegistration<2>();ScriptSpawnEffects<2> effects;
+        using Registration=decltype(registration);
+        struct Ops {
+            using Handle=unsigned;
+            Registration& registration;ScriptSpawnEffects<2>& effects;unsigned callerId=0;
+            bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& h){
+                if(object!=219)return false;h=effects.create(x,y,registration);return h!=0;
+            }
+            bool myFx(unsigned h){callerId=registration.sourceId(h);return callerId!=0;}
+            bool sprite(unsigned h,int id){return effects.setSprite(h,id,1,registration);}
+            bool imageSpeed(unsigned h,MotionBinary64 n){return effects.mutate(h,[&](auto& e){
+                return e.setValue(e.imageSpeed,n,[&](const auto& state){return registration.speed(h,state);});});}
+            bool imageAngle(unsigned h,MotionBinary64 n){return effects.mutate(h,[&](auto& e){
+                return e.setValue(e.angle,n,[&](const auto& state){return registration.angle(h,state);});});}
+            bool depth(unsigned h,MotionBinary64 n){return effects.mutate(h,[&](auto& e){
+                return e.setValue(e.depth,n,[&](const auto& state){return registration.depth(h,state);});});}
+        } ops{registration,effects};
+        const auto before=world->nextRuntimeInstanceId();const auto random=world->randomDrawCount();
+        const auto phase=effects.beginPhase();
+        require(EffectSpawnScript::run(ops,{0x406e0800u,0},{0x40afff00u,0},603,
+            {0x3fe00000u,0},MotionBinary64::fromInteger(270),{}),"source effect script publishes registered child and setters");
+        const auto* r=world->instance(before);
+        require(r&&ops.callerId==before&&world->nextRuntimeInstanceId()==before+1&&world->randomDrawCount()==random&&
+            r->objectId==219&&r->preciseX==240.25F&&r->preciseY==4095.5F&&r->spriteId==603&&
+            r->imageSpeed==0.5F&&r->rotation==270&&r->depth==0,"child uses real source ID, fractional position and caller overrides without RNG");
+        InstancePlaceResult result;
+        require(collision->collisionPoint({},219,{0x406e0800u,0},{0x40afff00u,0},false,false,result)&&result.id==int(before),
+            "script child participates in resource-backed collision membership");
+        const auto stale=result.handle;
+        require(effects.advanceAnimation(phase,registration)&&world->instance(before)->imageIndex==0,
+            "captured animation cutoff excludes synchronous child birth");
+        require(effects.advanceAnimation(effects.beginPhase(),registration)&&
+            effects.visitNewest([&](unsigned h,const auto& e){require(registration.image(h,e),"publish effect animation index");}),
+            "publish first child animation through source registry");
+        require(world->instance(before)->imageIndex==0.5F,"source record retains fractional image index");
+        require(effects.advanceAnimation(effects.beginPhase(),registration)&&!world->instance(before)&&
+            !collision->resolve(stale)&&ops.callerId==before&&world->effectsSucceeded(),
+            "animation retirement removes generation-checked membership without clearing caller ID");
     }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

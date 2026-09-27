@@ -166,6 +166,16 @@ order; the script caller's `myFx` must retain its assigned source ID even after
 the referenced effect dies. Failed publications latch the owner rather than
 silently skipping an effect or rolling back prior writes.
 
+The stored-world `scriptSpawnRegistration` bridge allocates object 219 from
+the real runtime ID sequence and publishes exact birth coordinates through
+`birthAt`, before caller-side sprite/speed/angle assignments. Its hooks bridge
+sprite, angle and animation-index changes to the resource collision owner;
+retirement removes the generation-checked world record. The admitted muzzle
+depth assignment is unchanged zero; nonzero depth is rejected until source
+pending-depth ordering is implemented. The bridge must outlive its effect
+owner and retire registrations before room teardown. It does not install an
+automatic Step handler or replace the live gun adapter by itself.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

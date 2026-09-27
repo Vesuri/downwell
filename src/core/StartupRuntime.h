@@ -20,6 +20,7 @@
 #include "PlayerMotion.h"
 #include "StoredTimeShardRegistration.h"
 #include "StoredTimeChangeRegistration.h"
+#include "StoredScriptSpawnRegistration.h"
 #include "TimeChangeEffects.h"
 #include "TimeStopEffects.h"
 #include "TimeShardBurst.h"
@@ -255,6 +256,9 @@ public:
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity> StoredTimeChangeRegistration<instanceCapacity,Capacity> timeChangeRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity,unsigned Registered,class Pause> bool createTimeChange(
