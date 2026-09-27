@@ -329,9 +329,25 @@ public:
     }
     bool terrainPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){
-        InstanceHandle self;Owner::Result result;
+        InstanceHandle self;
         if(!terrainQuery(object)||!masks.valid()||!View::encode(View::Kind::terrain,local,self)||
             !resolves(self))return check(false);
+        return registeredPlaceMeeting(self,object,x,y,masks,hit);
+    }
+    // Object 370 uses sParentSolid (56), including thin platforms and boxes.
+    // This queries registered lifetimes only; it is not evidence that every
+    // member of family 56 is already admitted by the live scene generator.
+    bool debrisPlaceMeeting(InstanceHandle local,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,bool& hit){
+        InstanceHandle self;
+        if(!valid()||!world_||!masks.valid()||!View::encode(View::Kind::debris,local,self)||
+           !resolves(self))return check(false);
+        return registeredPlaceMeeting(self,56,x,y,masks,hit);
+    }
+private:
+    bool registeredPlaceMeeting(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,bool& hit){
+        Owner::Result result;
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.placeVm(self,object,x,y,false,families_,update,
             [&](InstanceHandle a,InstanceHandle b,bool publish,bool& found){
@@ -341,6 +357,7 @@ public:
             },result))return check(false);
         hit=result.found;return true;
     }
+public:
     // self is a shared collision handle, not a terrain-local storage slot.
     // Keep the completed-family gate: projectile parent families must not be
     // queried until all of their lifetimes and setters are owned here.

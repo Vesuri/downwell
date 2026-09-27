@@ -4,6 +4,10 @@ bool nativeDebrisOwnership(GameplayWorld& world,downwell::DebrisEffects<2>& effe
     downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle& key){
     return world.spawnDebris(effects,{},{},1,key)&&owner.prepareDraw();
 }
+bool nativeDebrisQuery(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle local,
+    downwell::MotionBinary64 x,downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
+    return owner.debrisPlaceMeeting(local,x,y,masks,hit);
+}
 bool nativeScriptSpawn(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects,
     const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle& caller){
     return world.spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},
@@ -294,6 +298,58 @@ int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    // Family 56 is broader than either wall selector: thin platforms and
+    // shootable boxes must participate. These resource masks are rectangular;
+    // independently round their quarter-pixel edges, not the particle anchor.
+    for(int area:{1,2,4})for(int object:{60,93,92}){
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));
+        assert(scene->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}));
+        DebrisEffects<1> effects;InstanceHandle local,shared;
+        assert(scene->spawnDebris(effects,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(504),area,local));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,local,shared));
+        PackedSpriteCollision particle,target;PackedObject definition;
+        const auto* p=collision->properties(shared);
+        assert(p&&sprites.collisionSprite(p->sprite.spriteId,p->sprite.maskId,particle)&&!particle.collisionMode);
+        assert(objects.findObject(object,definition)&&
+            sprites.collisionSprite(object==92?definition.spriteId:terrainTileForArea(1),definition.textureMaskId,target)&&!target.collisionMode);
+        auto roundQuarter=[](int n){const int whole=n/4,tail=n%4;
+            return whole+int(tail>2||(tail==2&&(whole&1)));};
+        auto coordinate=[](int n){auto value=MotionBinary64::fromInteger(n);value.high-=2u<<20;return value;};
+        const auto before=*collision->state(shared);
+        unsigned hits=0,misses=0;
+        for(int y=492;y<=532;++y)for(int x=220;x<=260;++x)for(int fraction=0;fraction<4;++fraction){
+            const int qx=x*4+fraction,qy=y*4+fraction;
+            const int left=roundQuarter(qx+4*(particle.marginLeft-particle.originX));
+            const int right=roundQuarter(qx+4*(particle.marginRight-particle.originX+1))-1;
+            const int top=roundQuarter(qy+4*(particle.marginTop-particle.originY));
+            const int bottom=roundQuarter(qy+4*(particle.marginBottom-particle.originY+1))-1;
+            const bool expected=left<=240+target.marginRight-target.originX&&
+                right>=240+target.marginLeft-target.originX&&top<=512+target.marginBottom-target.originY&&
+                bottom>=512+target.marginTop-target.originY;
+            bool hit=!expected;
+            assert(collision->debrisPlaceMeeting(local,coordinate(qx),coordinate(qy),masks,hit)&&hit==expected);
+            hit?++hits:++misses;
+            assert(collision->state(shared)->x.bits==before.x.bits&&collision->state(shared)->y.bits==before.y.bits);
+        }
+        assert(hits&&misses);
+        if(object!=92){
+            const auto targetKey=collision->terrain().handle(0);bool hit=true;
+            const auto hitX=MotionBinary64::fromInteger(240+target.marginLeft-target.originX-particle.marginLeft+particle.originX);
+            const auto hitY=MotionBinary64::fromInteger(512+target.marginTop-target.originY-particle.marginTop+particle.originY);
+            assert(collision->terrain().activation(targetKey,false)&&collision->reconcileActivation());
+            assert(collision->debrisPlaceMeeting(local,hitX,hitY,masks,hit)&&!hit);
+            assert(collision->terrain().activation(targetKey,true)&&collision->reconcileActivation());
+            assert(collision->debrisPlaceMeeting(local,hitX,hitY,masks,hit)&&hit);
+            assert(collision->terrain().requestDestroy(targetKey));
+            assert(collision->debrisPlaceMeeting(local,hitX,hitY,masks,hit)&&!hit);
+        }
+        assert(effects.clear(collision->debris()));
+        bool unchanged=true;
+        assert(!collision->debrisPlaceMeeting(local,{},{},masks,unchanged)&&unchanged&&!collision->valid());
+    }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),

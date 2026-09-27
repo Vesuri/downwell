@@ -400,9 +400,21 @@ retires marked particles. Retry clears borrowed storage before reconstructing
 the world and retains the registry and monotonic identities. The native-owner
 tests cover all five area sprites, full birth RNG, fractional position writes,
 animation publication, marked-record retention and retry. This does not yet
-connect natural combat births, debris alarm/Step dispatch, collision queries or
+connect natural combat births, debris alarm/Step dispatch or
 Draw submission, nor the SDL stored-world owner. Those paths must be integrated
 before enabling the effect in normal gameplay.
+
+`GameplayCollisionOwner::debrisPlaceMeeting` supplies the native registered
+shape-query adapter for Step's `sParentSolid` (56). It uses the same binary32
+argument narrowing, family preparation, candidate dispatch and caller-position
+restoration as the reviewed `place_meeting`/`instance_place` search. It does not
+replace the broad solid family with wall-only, point or occupancy-grid queries.
+The resource-backed regression checks 60,516 quarter-pixel probes across all
+three debris sprites against walls, boxes and thin platforms, plus target
+deactivation/destruction and stale-caller failure. These pairs have rectangular
+collision resources; this matrix does not verify every precise-mask or rotated
+family member. Shop furniture and other still-unregistered solid actors remain
+a coverage gap before natural debris Step admission.
 
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed
