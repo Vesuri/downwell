@@ -2711,6 +2711,7 @@ int main(void) {
             compositeCurrency = false;
 #endif
             if (compositeCurrency) {
+                DW_PROFILE_SCOPE(profileControllerComposition);
                 using Real = downwell::MotionBinary64;
                 const downwell::EffectSurfacePlacement::View view{Real::fromInteger(worldViewX),Real::fromInteger(worldViewY),
                     Real::fromInteger(160),Real::fromInteger(284)};

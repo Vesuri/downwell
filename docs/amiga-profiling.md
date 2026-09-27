@@ -50,6 +50,15 @@ enclosing phase, so their costs are exclusive in the phase totals. Maximum Step
 cost can include first-update trigonometry; do not interpret it as the cost of
 every surviving number's update. Compile-time-disabled hooks change no state.
 
+Controller composition has its own nested phase 79: currency and smoke
+placement/stamping, enemy shade subtraction and final visibility testing.
+It is excluded from phase 42, which measures the surrounding actor-list
+collection. Older traces included both under 42; compare their combined totals
+when reading those traces, allowing for the extra instrumentation overhead.
+Returning from the nested scope starts another 42 bracket, so its call count
+is not a count of actor lists or frames. Neither phase includes later surface
+publication or hardware-sprite channel selection.
+
 The wrapper builds the selected instrumentation, runs the bounded debugger
 fixture and restores the ordinary startup build on exit, including failure.
 Results are copied to `amiga/.run/profile-fps.log` or `profile-probes.log`;

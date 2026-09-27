@@ -30,6 +30,7 @@ enum DownwellProfilePhase {
     profileGeneratedEnemy, profileGeneratedShop,
     profileContactDirection, profileDamageNumberCreate, profileDamageNumberStep,
     profileDamageNumberDraw,
+    profileControllerComposition,
     profilePhaseCount
 };
 
