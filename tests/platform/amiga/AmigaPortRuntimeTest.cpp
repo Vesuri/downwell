@@ -274,7 +274,74 @@ void testNativeEnemyLifecycle(){
     }
 }
 
+struct NativeBoxAudit {
+    downwell::InstanceHandle last{};
+    unsigned births=0,retirements=0,removals=0,calls=0,fail=0;
+    bool birth(downwell::InstanceHandle h,const GameplayWorld::Breakable& b){
+        ++calls;require(b.active&&h.generation==b.lifetimeId&&h.generation>last.generation,
+                        "box birth publishes a fresh identity and initialized position");
+        last=h;++births;return fail!=1;
+    }
+    bool retire(downwell::InstanceHandle h,const GameplayWorld::Breakable& b){
+        ++calls;require(h.generation&&h.generation==b.lifetimeId,"box retirement precedes invalidation");
+        ++retirements;return fail!=2;
+    }
+    bool activation(downwell::InstanceHandle h,const GameplayWorld::Breakable& b,bool active){
+        ++calls;require(b.active&&!active&&h.generation==b.lifetimeId,"box removal publishes before clearing active");
+        ++removals;return fail!=3;
+    }
+    bool membership(downwell::InstanceHandle,const GameplayWorld::Breakable&,bool){return true;}
+};
+
+void testNativeBoxLifecycle(){
+    using Binding=GameplayWorld::BreakableLifecycleBinding;
+    for(bool head:{false,true})for(unsigned fail:{0u,3u}){
+        NativeBoxAudit audit;audit.fail=fail;
+        GameplayWorld world(0,head,head?0:1000,false,{},Binding::bind(audit));
+        const int x=0,y=head?-24:12;
+        world.configureBreakables(&x,&y,1);
+        const auto handle=audit.last;
+        if(head)world.configureSolidResolver([](void* p,int x,int y){
+            return static_cast<GameplayWorld*>(p)->breakableActiveAt(0,-24)&&
+                   x>=-8&&x<=7&&y>=-32&&y<=-17;
+        },&world);
+        for(unsigned i=0;i<6&&world.effectsSucceeded()&&!audit.removals;++i)world.step(4);
+        require(audit.removals==1&&world.effectsSucceeded()==(fail==0),"both box contact paths check publication");
+        require(world.findBreakable(handle)&&world.findBreakable(handle)->active==(fail!=0)&&
+                world.blocksDestroyed()==(fail?0u:1u),"contact retains identity and changes active/count only on success");
+        if(fail){
+            const auto calls=audit.calls;world.step(4);
+            require(audit.calls==calls,"failed box contact stays latched");
+        }
+    }
+    NativeBoxAudit audit;
+    GameplayWorld world(0,true,0,false,{},Binding::bind(audit));
+    const int x=0,y=-2000,visible=100;
+    world.configureBreakables(&x,&y,1);const auto gone=audit.last;
+    world.step(0);
+    require(audit.retirements==1&&!world.findBreakable(gone),"out-of-view box lifetime retires");
+    world.configureBreakables(&x,&visible,1);const auto replaced=audit.last;
+    require(!world.findBreakable(gone)&&world.findBreakable(replaced)&&audit.retirements==1,
+            "reconfiguration cannot revive old handles or retire an already-retired box twice");
+    world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,0);
+    require(!world.findBreakable(replaced)&&audit.retirements==2,"Retry retires remaining boxes");
+    world.configureBreakables(&x,&visible,1);
+    require(audit.births==3&&audit.last.generation>replaced.generation,"Retry preserves binding and generation counter");
+    audit.fail=2;const auto retained=audit.last;
+    world.configureBreakables(&x,&visible,1);
+    require(!world.effectsSucceeded()&&world.findBreakable(retained)&&audit.births==3,
+            "failed replacement retirement preserves old lifetime and stops new birth");
+    const auto calls=audit.calls;world.configureBreakables(&x,&visible,1);
+    require(audit.calls==calls,"failed configuration cannot replay callbacks");
+    NativeBoxAudit rejected;rejected.fail=1;
+    GameplayWorld failed(0,true,0,false,{},Binding::bind(rejected));
+    failed.configureBreakables(&x,&visible,1);
+    require(!failed.effectsSucceeded()&&!failed.appendBreakables(&x,&visible,1)&&rejected.births==1,
+            "rejected birth latches failure before later appends");
+}
+
 int main() {
+    testNativeBoxLifecycle();
     testNativeEnemyLifecycle();
     {
         AmigaPortRuntime indexed(0), fallback(0);

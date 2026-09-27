@@ -170,11 +170,24 @@ public:
     };
 
     using EnemyLifecycleBinding = downwell::RecordLifecycleBinding<EnemyState>;
+    struct Breakable {
+        int x;
+        int y;
+        bool active;
+        std::uint32_t lifetimeId;
+    };
+    using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     explicit GameplayWorld(unsigned initialRingOrigin,
                               bool startsGrounded = true,
                               int landingOffset = 0,
                               bool followCamera = false,
-                              EnemyLifecycleBinding enemyLifecycle = {});
+                              EnemyLifecycleBinding enemyLifecycle = {},
+                              BreakableLifecycleBinding breakableLifecycle = {});
+    const Breakable* findBreakable(downwell::InstanceHandle handle) const {
+        if(handle.slot>=breakableCount_||!handle.generation)return nullptr;
+        const auto& box=breakables_[handle.slot];
+        return box.lifetimeId==handle.generation ? &box : nullptr;
+    }
     GameplayFrame step(std::uint8_t packedInput);
     void initializeEntryInput(bool fireHeld) { player_.initializeEntryInput(fireHeld); }
     void configureLandingProfile(const int* offsets, unsigned count) {
@@ -428,6 +441,11 @@ public:
 
 private:
     EnemyLifecycleBinding enemyLifecycle_;
+    BreakableLifecycleBinding breakableLifecycle_;
+    bool inactivateBreakable(unsigned index);
+    bool retireBreakable(unsigned index);
+    bool clearBreakableOwnership();
+    std::uint32_t nextBreakableLifetimeId_ = 1;
     bool publishEnemyActivation(const EnemyState& enemy, bool active);
     bool publishEnemyImage(const EnemyState& enemy,unsigned phase);
     bool publishEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value);
@@ -442,11 +460,6 @@ private:
     GenerationStep generationStep_ = nullptr;
     void* generationContext_ = nullptr;
     bool generationSucceeded_ = true;
-    struct Breakable {
-        int x;
-        int y;
-        bool active;
-    };
     static constexpr unsigned breakableCapacity = 512;
 
     PlayerMotion player_;

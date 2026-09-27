@@ -36,8 +36,10 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
-    if (!run_.effectsSucceeded || !clearEnemyOwnership()) return downwell::ResultsDestination::none;
+    if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership()) return downwell::ResultsDestination::none;
     const auto enemyLifecycle=enemyLifecycle_;
+    const auto breakableLifecycle=breakableLifecycle_;
+    const auto nextBreakableIdentity=nextBreakableLifetimeId_;
     const auto records = run_.records();
     const auto nextBulletIdentity=nextBulletLifetimeId_;
     const auto nextEnemyIdentity=nextEnemyLifetimeId_;
@@ -50,7 +52,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto flashBirths=run_.flashEffects.birthSequence();
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
-    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle);
+    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle);
+    nextBreakableLifetimeId_=nextBreakableIdentity;
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
@@ -69,7 +72,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
-    if (!run_.effectsSucceeded || !clearEnemyOwnership()) return false;
+    if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership()) return false;
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
@@ -113,8 +116,9 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
 GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    bool startsGrounded,
                                    int landingOffset,
-                                   bool followCamera, EnemyLifecycleBinding enemyLifecycle)
-    : enemyLifecycle_(enemyLifecycle), player_(startsGrounded, landingOffset), tick_(0),
+                                   bool followCamera, EnemyLifecycleBinding enemyLifecycle,
+                                   BreakableLifecycleBinding breakableLifecycle)
+    : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       cameraPixelX_(0), activationY_(0),
@@ -431,26 +435,56 @@ downwell::LaserSightRay GameplayWorld::traceLaserSight(
 void GameplayWorld::configureBreakables(const int* x, const int* y,
                                             unsigned count)
 {
+    if(!run_.effectsSucceeded)return;
     if (x == 0 || y == 0)
         return;
-    if (count > breakableCapacity)
-        count = breakableCapacity;
+    if (count > breakableCapacity) {run_.effectsSucceeded=false;return;}
+    if(!clearBreakableOwnership())return;
     breakableCount_ = 0;
     breakableIndexReady_ = true;
     for (auto& cell : breakableIndex_) cell = 0;
     blocksDestroyed_ = 0;
-    appendBreakables(x, y, count);
+    if(!appendBreakables(x, y, count))run_.effectsSucceeded=false;
+}
+
+bool GameplayWorld::inactivateBreakable(unsigned index) {
+    auto& box=breakables_[index];
+    if(!breakableLifecycle_.activation({index,box.lifetimeId},box,false)) {
+        run_.effectsSucceeded=false;return false;
+    }
+    box.active=false;return true;
+}
+
+bool GameplayWorld::retireBreakable(unsigned index) {
+    auto& box=breakables_[index];
+    if(!box.lifetimeId)return true;
+    if(!breakableLifecycle_.retire({index,box.lifetimeId},box)) {
+        run_.effectsSucceeded=false;return false;
+    }
+    box.lifetimeId=0;box.active=false;return true;
+}
+
+bool GameplayWorld::clearBreakableOwnership() {
+    for(unsigned i=0;i<breakableCount_;++i)
+        if(!retireBreakable(i))return false;
+    return true;
 }
 
 bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count)
 {
+    if(!run_.effectsSucceeded)return false;
     if (count > breakableCapacity - breakableCount_ || (count && (!x || !y)))
         return false;
+    if(count&&(!nextBreakableLifetimeId_||count-1>0xffffffffu-nextBreakableLifetimeId_))return false;
     for (unsigned source = 0; source < count; ++source) {
         const unsigned index = breakableCount_++;
         breakables_[index].x = x[source];
         breakables_[index].y = y[source];
         breakables_[index].active = true;
+        breakables_[index].lifetimeId = nextBreakableLifetimeId_++;
+        if(!breakableLifecycle_.birth({index,breakables_[index].lifetimeId},breakables_[index])) {
+            run_.effectsSucceeded=false;return false;
+        }
         if ((x[source] & 15) || (y[source] & 15) || x[source] < -512 ||
             x[source] >= 512 || y[source] < 0 || y[source] >= 8192) {
             breakableIndexReady_ = false;
@@ -649,7 +683,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             bool hit=false;
             if(!downwell::PlayerBoxContact::testPrepared(bounds,box.x+240,box.y+176,hit))return false;
             if (hit) {
-                box.active = false;
+                if(!runtime.inactivateBreakable(i))return false;
                 ++runtime.blocksDestroyed_;
                 context.index = (int)i;
                 found=true;
@@ -796,7 +830,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                         // Indexed selection already proved this exact hit.
                         if (block.active && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
                                                            block.y - 8, block.y + 8))) {
-                            block.active = false;
+                            if(!inactivateBreakable(blockIndex))return true;
                             if (destroyedBlockCount < destroyedCapacity) {
                                 destroyedBlockX[destroyedBlockCount] = block.x;
                                 destroyedBlockY[destroyedBlockCount] = block.y;
@@ -1080,7 +1114,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             const auto& box = breakables_[i];
             return downwell::LifetimeInstance{92, box.y + 176, box.active};
         },
-        [this](unsigned i) { breakables_[i].active = false; return true; });
+        [this](unsigned i) { return retireBreakable(i); });
     if(!boxesRetired){run_.effectsSucceeded=false;return {};}
 
     // Collision phase follows ordinary actor/generation/retirement work.

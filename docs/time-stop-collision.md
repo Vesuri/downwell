@@ -740,8 +740,18 @@ leaves the box active, does not increment the destroyed-block or sound counters,
 and stops subsequent simulation. This closes stale collision visibility at the
 existing removal boundary; it does not implement the original box's delayed
 `wallHp <= 0` Step, synchronous smoke/flash/debris creation, or chain reactions
-(`gml_Object_objBox_n_Step_0.asm`). Native breakable ownership still needs the
-corresponding registration and lifetime hooks before using the spatial owner.
+(`gml_Object_objBox_n_Step_0.asm`).
+Native breakables use fixed storage slots paired with monotonically increasing
+generation keys. Their borrowed lifecycle binding publishes births, contact
+inactivation, out-of-view retirement, and retirement before replacement, Retry
+or level change. Destroyed boxes retain their inactive stored lifetime until
+clear; out-of-view retirement invalidates the key immediately. Retry preserves
+the generation counter and binding. Rejected callbacks latch failure without
+replaying earlier successful notifications. Coordinates in these records remain
+local to the gameplay origin (240,176); a resource-backed adapter must map them
+to world coordinates and object 92. The default binding is empty, and these
+family-local handles alone do not establish global runner ordering or install
+the live spatial registry.
 The native compact enemy store uses the same borrowed binding specialized for
 its own record type. It publishes fully initialized births, checked replacement
 and out-of-view retirement, frontier activation, fatal-contact/snail inactivation,
