@@ -1543,6 +1543,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(gameplay.grantUpgrade(20) && reference.grantUpgrade(20),
                     "both live adapters grant the streak extension upgrade before combat");
         bool sawCandleDamage = false;
+        unsigned candleHits = 0, candleCountdowns = 0, candleExpiries = 0;
         if (candleFixture)
             require(gameplay.grantUpgrade(7) && reference.grantUpgrade(7),
                     "both live adapters grant Candle before the combat tape");
@@ -1614,6 +1615,8 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const bool hostWasRecorded = reference.runGemStatistics().recorded;
             const unsigned nativeShots = gameplay.player().shots(), hostShots = reference.mainShotsFired();
             const unsigned nativeJumps = gameplay.player().jumps(), hostJumps = reference.mainJumps();
+            const unsigned immunityBefore = gameplay.invulnerability();
+            const int healthBefore = gameplay.health();
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
             if (laserFixture && tick % 30 == 0) {
@@ -1872,8 +1875,20 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             require(gameplay.player().ammo() == reference.mainAmmo(),
                     "live charge agrees after all pickup effects, not just player movement");
             if (streakFixture && gameplay.gemStreakTimer() == 480) sawExtendedStreak = true;
-            if (candleFixture && gameplay.invulnerability() == 240)
-                sawCandleDamage = true;
+            if (candleFixture) {
+                const unsigned immunity = gameplay.invulnerability();
+                if (immunity == 240) {
+                    require(immunityBefore <= 1 && gameplay.health() < healthBefore,
+                            "Candle interval starts only on real damage after prior immunity expires");
+                    sawCandleDamage = true;
+                    ++candleHits;
+                } else if (immunityBefore > 0) {
+                    require(immunity + 1 == immunityBefore,
+                            "Candle immunity counts down once per live update");
+                    ++candleCountdowns;
+                    if (immunity == 0) ++candleExpiries;
+                }
+            }
             sawPairedCurrencyAnimation = sawPairedCurrencyAnimation || !nativeGems.empty();
             if (gameplay.player().spriteId(gameplay.deathSequence().movementDead()) != reference.mainPlayerSpriteId() ||
                     gameplay.player().spriteFrame(gameplay.deathSequence().movementDead()) != static_cast<unsigned>(reference.mainPlayerImageIndex()))
@@ -1931,6 +1946,12 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
         }
         require(!candleFixture || sawCandleDamage,
                 "Candle live fixture actually takes damage and publishes the extended interval");
+        if (candleFixture) {
+            require(candleHits >= 2 && candleExpiries >= 1 && candleCountdowns >= 240,
+                    "Candle route covers full expiry and a later real damage encounter");
+            std::cout << "CANDLE hits=" << candleHits << " countdowns=" << candleCountdowns
+                      << " expiries=" << candleExpiries << '\n';
+        }
         require(!laserFixture || sawLaserBullet, "Laser Sight live tape actually emits upgraded shots");
         require(!streakFixture || sawExtendedStreak,
                 "streak fixture actually earns gems and publishes the extended interval");

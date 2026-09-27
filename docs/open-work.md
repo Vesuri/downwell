@@ -98,9 +98,9 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Restore specialized damage/death encounter coverage: the Candle route does
-  not take damage, and the phase-six death route ends without kills or combo.
-  Retain their real-damage, reward and death/results assertions; use explicit
+- Restore specialized death encounter coverage: the phase-six death route
+  ends without kills or combo.
+  Retain its real-damage, reward and death/results assertions; use explicit
   deterministic encounter inputs rather than forcing health or enemy state.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
