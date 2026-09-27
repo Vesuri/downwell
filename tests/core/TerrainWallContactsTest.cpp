@@ -29,12 +29,43 @@ int main(){
     unsigned count=0;
     assert(index.visit({INT_MIN,INT_MAX,INT_MIN,INT_MAX},[](auto...){return true;},[&](){++count;return true;}));
     assert(count==walls.size() && multiple);
+    for(unsigned move=0;move<512;++move){
+        auto& w=walls[(move*37u)%walls.size()];
+        assert(index.removeOne(w.object,w.x,w.y));
+        w.x=int(move%31)*16-128;w.y=int(move%101)*16;
+        assert(index.append(w.object,w.x,w.y)&&index.size()==walls.size());
+        const downwell::ContactBounds q{w.x-9,w.x+9,w.y-8,w.y+8};
+        unsigned wanted=0,actual=0;
+        for(const auto& other:walls){
+            const int l=other.x-(other.object==293?9:8),r=other.x+(other.object==293?10:8);
+            const int t=other.y-(other.object==293?7:8),b=other.y+(other.object==293?9:8);
+            wanted+=q.right>l&&q.left<r&&q.bottom>t&&q.top<b;
+        }
+        assert(index.visit(q,[](auto...){return true;},[&](){++actual;return true;})&&actual==wanted);
+    }
     assert(!index.visit({INT_MIN,INT_MAX,INT_MIN,INT_MAX},[](auto...){return true;},[](){return false;}));
     index.clear();count=0;
     assert(index.visit({INT_MIN,INT_MAX,INT_MIN,INT_MAX},[](auto...){return true;},[&](){++count;return true;}) && !count);
     downwell::TerrainWallContacts<2> small;
     assert(small.append(60,0,0) && small.append(60,0,0) && !small.append(60,16,0));
     assert(small.append(93,0,0) && small.size()==2);
+    assert(!small.removeOne(93,0,0)&&!small.removeOne(60,16,0)&&small.size()==2);
+    assert(small.removeOne(60,0,0)&&small.size()==1);
+    count=0;
+    assert(small.visit({-8,8,-8,8},[](auto...){return true;},[&](){++count;return true;})&&count==1);
+    assert(small.append(293,32,32)&&small.size()==2);
+    // Repeatedly move the reused slot between rows while the duplicate wall
+    // remains. This catches stale bucket links and append-only capacity leaks.
+    int previousX=32,previousY=32;
+    for(unsigned i=0;i<8192;++i){
+        assert(small.removeOne(293,previousX,previousY)&&small.size()==1);
+        previousX=int(i%32)*16;previousY=int(i%512)*16;
+        assert(small.append(293,previousX,previousY)&&small.size()==2);
+        count=0;
+        assert(small.visit({INT_MIN,INT_MAX,INT_MIN,INT_MAX},[](auto...){return true;},[&](){++count;return true;})&&count==2);
+    }
+    assert(small.removeOne(60,0,0)&&!small.removeOne(60,0,0));
+    assert(small.removeOne(293,previousX,previousY)&&small.size()==0);
     small.clear();assert(!small.append(60,INT_MIN,0) && !small.append(92,0,8192) && !small.append(293,1,0));
     std::printf("Terrain wall contacts: %u scalar queries preserve duplicates, retirement, edges and failure\n",queries);
 }

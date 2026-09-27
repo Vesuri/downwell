@@ -10,17 +10,36 @@ template<unsigned Capacity=4096> class TerrainWallContacts {
 public:
     static constexpr unsigned rows=512;
     struct Record {std::int16_t x;std::uint16_t y,object,next;};
-    void clear(){for(auto& head:heads_)head=0;count_=0;}
+    void clear(){for(auto& head:heads_)head=0;count_=used_=free_=0;}
     unsigned size()const{return count_;}
     bool append(int object,int x,int y){
         if(object!=60 && object!=92 && object!=293)return true;
         if(count_==Capacity || x<-512 || x>=1536 || y<0 || y>=8192 || (x&15) || (y&15))return false;
         const unsigned row=unsigned(y)/16;
-        records_[count_]={std::int16_t(x),std::uint16_t(y),std::uint16_t(object),heads_[row]};
-        heads_[row]=++count_;return true;
+        const unsigned id=free_?free_:++used_;
+        if(free_)free_=records_[id-1].next;
+        records_[id-1]={std::int16_t(x),std::uint16_t(y),std::uint16_t(object),heads_[row]};
+        heads_[row]=std::uint16_t(id);++count_;return true;
+    }
+    // This cache reports contact multiplicity, not instance identity. Remove
+    // exactly one matching shape; coincident survivors retain their contacts.
+    // Only the authoritative lifetime owner may request removal. Slot reuse
+    // prepends the new birth to its row, never exposing old links in a new row.
+    bool removeOne(int object,int x,int y){
+        if((object!=60&&object!=92&&object!=293)||x<-512||x>=1536||y<0||y>=8192||(x&15)||(y&15))return false;
+        auto* link=&heads_[unsigned(y)/16];
+        while(*link){
+            const unsigned id=*link;auto& r=records_[id-1];
+            if(r.object==object&&r.x==x){
+                *link=r.next;r.next=std::uint16_t(free_);free_=id;--count_;return true;
+            }
+            link=&r.next;
+        }
+        return false;
     }
     // Active supplies retirement/breakable state from the owning simulation.
     // Emit is called once per matching instance, never once per occupied cell.
+    // Neither callback may mutate this cache while its row links are visited.
     template<class Active,class Emit>
     bool visit(const ContactBounds& query,Active active,Emit emit)const{
         if(query.left>=query.right || query.top>=query.bottom || query.right<=-521 ||
@@ -40,7 +59,7 @@ public:
 private:
     Record records_[Capacity];
     std::uint16_t heads_[rows]{};
-    unsigned count_=0;
+    unsigned count_=0,used_=0,free_=0;
 };
 }
 #endif
