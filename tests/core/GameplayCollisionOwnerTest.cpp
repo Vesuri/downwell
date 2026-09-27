@@ -10,6 +10,9 @@ bool nativeScriptSpawn(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& eff
 bool nativeScriptCleanup(downwell::GameplayCollisionOwner& owner,downwell::ScriptSpawnEffects<2>& effects){
     return owner.prepareDraw(effects);
 }
+bool nativeScriptTick(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects){
+    return world.stepWithScriptEffects(effects,0);
+}
 // Compile-only A500 gate: instantiate the public selectors without the host
 // fixture loader, filesystem, heap-backed assertions or C++ runtime headers.
 bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
@@ -289,10 +292,16 @@ int main(){
         assert(collision->properties(key)->sprite.spriteId==603&&collision->properties(key)->sprite.angle.bits==0x43870000u);
         unsigned count=0;assert(collision->population(219,count)&&count==1);
         assert(scene->advanceScriptEffectAnimation(effects,phase)&&effects.get(first)->imageIndex.bits==0);
-        assert(scene->advanceScriptEffectAnimation(effects,effects.beginPhase()));
+        assert(scene->stepWithScriptEffects(effects,0));
         assert(collision->properties(key)->sprite.imageIndex.bits==0x3f000000u);
-        assert(scene->advanceScriptEffectAnimation(effects,effects.beginPhase())&&collision->state(key)&&
-            (collision->state(key)->flags&1u)&&registration.size()==1&&collision->properties(key)->sprite.imageIndex.bits==0);
+        assert(collision->state(key)->previous.x.bits==effect->x.bits&&collision->state(key)->previous.y.bits==effect->y.bits);
+        const auto second=effects.create({}, {},registration);assert(second>first);
+        assert(effects.setSprite(second,602,1,registration));
+        assert(effects.mutate(second,[](auto& e){e.imageSpeed={0x3f000000u};return true;}));
+        assert(scene->stepWithScriptEffects(effects,0)&&collision->state(key)&&
+            (collision->state(key)->flags&1u)&&registration.size()==2&&collision->properties(key)->sprite.imageIndex.bits==0);
+        assert(effects.get(second)&&effects.get(second)->imageIndex.bits==0x3f000000u);
+        assert(scene->stepWithScriptEffects(effects,0)&&!effects.get(second)&&registration.size()==2);
         assert(collision->prepareDraw(effects));
         assert(!collision->state(key)&&registration.size()==0);
         assert(collision->population(219,count)&&count==0);

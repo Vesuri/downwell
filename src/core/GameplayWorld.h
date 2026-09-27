@@ -230,6 +230,28 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
+    void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
+    bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
+    bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
+    bool advanceScriptRoomAnimation(downwell::InstanceHandle key){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=scriptAnimation_&&scriptAnimation_(scriptAnimationContext_,key);
+    }
+    template<unsigned Capacity> bool stepWithScriptEffects(downwell::ScriptSpawnEffects<Capacity>& effects,std::uint8_t input){
+        if(!run_.effectsSucceeded)return false;
+        if(!roomAnimation_||scriptAnimation_||!scriptSpawnInstances_||!effects.boundTo(*scriptSpawnInstances_)||!effects.valid())
+            return run_.effectsSucceeded=false;
+        const auto phase=effects.beginPhase();
+        auto dispatch=[&](downwell::InstanceHandle key){
+            const auto* record=scriptSpawnInstances_->find(key);
+            return record&&effects.advanceRegisteredOne(key.generation,phase,*scriptSpawnInstances_);
+        };
+        scriptAnimationContext_=&dispatch;
+        scriptAnimation_=[](void* context,downwell::InstanceHandle key){return (*static_cast<decltype(dispatch)*>(context))(key);};
+        step(input);
+        scriptAnimation_=nullptr;scriptAnimationContext_=nullptr;
+        return run_.effectsSucceeded&&generationSucceeded_;
+    }
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
     void configureEnemyStepOrder(bool (*capture)(void*,EnemyStepOrder&),void* context){
         enemyOrderCapture_=capture;enemyOrderContext_=context;
@@ -597,6 +619,10 @@ public:
 
 private:
     EnemyLifecycleBinding enemyLifecycle_;
+    bool (*roomAnimation_)(void*)=nullptr;
+    void* roomAnimationContext_=nullptr;
+    bool (*scriptAnimation_)(void*,downwell::InstanceHandle)=nullptr;
+    void* scriptAnimationContext_=nullptr;
     bool (*phaseBoundary_)(void*,PhaseBoundary)=nullptr;
     void* phaseBoundaryContext_=nullptr;
     bool reconcilePhase(PhaseBoundary phase){

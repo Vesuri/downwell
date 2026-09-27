@@ -49,6 +49,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto terrainInstances=terrainInstances_;
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto phaseBoundary=phaseBoundary_;
+    const auto roomAnimation=roomAnimation_;
+    void* const roomAnimationContext=roomAnimationContext_;
     const auto enemyOrderCapture=enemyOrderCapture_;
     void* const enemyOrderContext=enemyOrderContext_;
     void* const phaseBoundaryContext=phaseBoundaryContext_;
@@ -79,6 +81,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     nextBreakableLifetimeId_=nextBreakableIdentity;
     scriptSpawnInstances_=scriptSpawnInstances;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
+    configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;
     bulletLifecycle_=bulletLifecycle;
@@ -743,6 +746,18 @@ void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm, int cameraX, lo
     enemy.grounded = enemy.crawler.latched;
 }
 
+bool GameplayWorld::advanceEnemyRoomAnimation(downwell::InstanceHandle key){
+    auto* enemy=const_cast<EnemyState*>(resolveEnemyLifetime(key));
+    if(!run_.effectsSucceeded||!enemy)return run_.effectsSucceeded=false;
+    downwell::advanceEnemyImageQ8(enemy->imagePhase,enemy->imageRemainder,enemy->imageSpeed);
+    return publishEnemyImage(*enemy,enemy->imagePhase);
+}
+bool GameplayWorld::advanceBulletRoomAnimation(downwell::InstanceHandle key){
+    auto* bullet=const_cast<BulletState*>(resolveBulletLifetime(key));
+    if(!run_.effectsSucceeded||!bullet)return run_.effectsSucceeded=false;
+    return run_.effectsSucceeded=bullet->animation.advance()&&bulletLifecycle_.imageIndex(key,*bullet,bullet->animation.index);
+}
+
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
@@ -751,6 +766,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
     if(!run_.effectsSucceeded)return {};
+    if(roomAnimation_){
+        if(!roomAnimation_(roomAnimationContext_)){run_.effectsSucceeded=false;return {};}
+    }else{
     for(unsigned i=0;i<bulletSlotEnd_;++i)if(bullets_[i].active){
         auto& bullet=bullets_[i];
         if(!bullet.animation.advance()||!bulletLifecycle_.imageIndex({bullet.identitySlot,bullet.lifetimeId},bullet,bullet.animation.index)){
@@ -763,6 +781,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         downwell::advanceEnemyImageQ8(enemies_[i].imagePhase,enemies_[i].imageRemainder,
                                      enemies_[i].imageSpeed);
         if(!publishEnemyImage(enemies_[i],enemies_[i].imagePhase))return {};
+    }
     }
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.

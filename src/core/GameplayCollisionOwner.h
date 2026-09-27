@@ -189,6 +189,22 @@ public:
         if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         world_=&world;
+        world.configureRoomAnimation([](void* context){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid())return false;
+            return self.check(self.room_.visitAnimationChecked([&](unsigned slot){
+                const auto shared=self.roomKeys_[slot];View::Record record;
+                View::Kind kind;InstanceHandle local;
+                if(!View::decode(shared,kind,local)||!View(*self.world_).resolve(shared,record)||
+                    !self.owner_.capturePrevious(shared))return false;
+                switch(kind){
+                    case View::Kind::enemy:return self.world_->advanceEnemyRoomAnimation(local);
+                    case View::Kind::bullet:return self.world_->advanceBulletRoomAnimation(local);
+                    case View::Kind::scriptEffect:return self.world_->advanceScriptRoomAnimation(local);
+                    default:return true;
+                }
+            }));
+        },this);
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary phase){
             auto& owner=*static_cast<GameplayCollisionOwner*>(context);
             return owner.reconcileActivation()&&(phase!=GameplayWorld::PhaseBoundary::roomEntry||owner.prepareDraw());

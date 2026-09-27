@@ -59,8 +59,10 @@ animation traversal before animation and Begin Step, using authoritative
 binary32 position rather than rounded drawing coordinates. This adds eight
 bytes per owner slot (16 KiB for 2,048 slots), without allocating per frame or
 dirtying spatial/collision queues. Legacy bindings without an external owner
-remain unchanged. Native heterogeneous-world snapshot integration and path
-state remain open.
+remain unchanged. The native collision owner likewise captures each registered
+active-room entry immediately before its animation dispatch (currently enemies,
+bullets and scoped script effects). Retry preserves the traversal binding.
+Unregistered families and path state remain open.
 
 `StartupRuntime::publishCollisionPosition` publishes exact binary32 x/y through
 the installed lifecycle owner, then updates integer drawing x/y. It must not
