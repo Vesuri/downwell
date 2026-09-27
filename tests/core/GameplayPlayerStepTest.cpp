@@ -25,6 +25,22 @@ struct Fixture {
 }
 
 int main() {
+    for(bool accept:{false,true}){
+        Fixture f;downwell::Input right;right.right=true;
+        bool called=false;
+        downwell::stepGameplayPlayer(f.player,f.death,f.run,f.currency,f.health,f.random,right,
+            240,176,160,34,false,[&](int x,int y){
+                called=true;
+                require(f.run.clock.ticks==1&&!f.run.shops.previous.right,
+                        "position publication follows clock but precedes shop input");
+                require(x==240+downwell::roundGameMakerQ8(f.player.offsetXFixed())&&
+                        y==176+downwell::roundGameMakerQ8(f.player.offsetYFixed()),
+                        "publish rounded source instance coordinates, not private fixed-point values");
+                return accept;
+            });
+        require(called&&f.run.effectsSucceeded==accept&&f.run.shops.previous.right==accept,
+                "rejected position publication stops later phases without undoing the clock");
+    }
     for(unsigned guard:{0u,1u,2u}){
         Fixture f;
         // An unsupported field makes an accidentally evaluated query fail.

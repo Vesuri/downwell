@@ -8,15 +8,20 @@
 #include "Profile.h"
 
 namespace downwell {
+struct NoPlayerPositionPublication {
+    bool operator()(int,int) const { return true; }
+};
 
 // Shared implemented objPlayer_n Begin Step phase. Owners bind terrain and
 // head-break callbacks first, then publish the returned motion and emit shots.
 // Activation remains before this phase; enemy alarms remain after it.
 // No renderer or instance-store representation is selected here.
+template<class PublishPosition=NoPlayerPositionPublication>
 inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     PlayerDeathSequence& death, RunSession& run, CurrencyAccount& currency,
     int& health, GameMakerRandom& random, const Input& input,
-    int originX, int originY, int viewX, int viewY, bool controlsLocked = false) {
+    int originX, int originY, int viewX, int viewY, bool controlsLocked = false,
+    PublishPosition publishPosition = {}) {
     death.beginStep(input.fire);
     run.combo.beginStep();
     struct Context {
@@ -61,6 +66,11 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     DW_PROFILE_PHASE(profilePlayerShops);
     const int shopPlayerX = originX + roundGameMakerQ8(player.offsetXFixed());
     const int shopPlayerY = originY + roundGameMakerQ8(player.offsetYFixed());
+    // Begin Step [25]: x=round(xx), y=round(yy), before camera/interactable
+    // queries. This publishes instance coordinates, not private accumulators.
+    if(!publishPosition(shopPlayerX,shopPlayerY)) {
+        run.effectsSucceeded=false;return motion;
+    }
     run.shops.observePlayer(shopPlayerX, shopPlayerY, player.grounded(), player.speedXFixed());
     int facing = player.facing();
     const auto shopRandom = [&random](unsigned lo, unsigned hi) {

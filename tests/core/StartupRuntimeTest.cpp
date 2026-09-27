@@ -32,6 +32,7 @@ struct LifecycleAudit {
     unsigned walkingTransforms=0;
     unsigned frogTransforms=0;
     unsigned batTransforms=0;
+    unsigned playerMoves=0;
     unsigned boxRemovals=0;
     bool rejectBoxRemoval=false;
     bool rejectBatScale=false;
@@ -80,8 +81,14 @@ struct LifecycleAudit {
         ++calls;require(matches(h,r)&&r.active,"movement resolves an active published lifetime");
         std::int32_t px,py;
         require(x.promoted().roundPixel(px)&&y.promoted().roundPixel(py),"published enemy coordinates are representable");
-        if(fail==6)return false;
-        ++moves;return true;
+        if(r.objectId==111||r.objectId==112||r.objectId==113||r.objectId==116||r.objectId==117||r.objectId==119){
+            if(fail==6)return false;
+            ++moves;
+        }else{
+            if(fail==10)return false;
+            ++playerMoves;
+        }
+        return true;
     }
     bool matches(downwell::InstanceHandle h,const downwell::InstanceRecord& r)const{
         return h.slot<entries.size()&&entries[h.slot].live&&entries[h.slot].generation==h.generation&&entries[h.slot].id==r.instanceId;
@@ -147,6 +154,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
               << " transforms=" << audit.transforms << '\n';
     require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&audit.sprites==audit.moves&&audit.indices>audit.sprites,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
+    require(audit.playerMoves>=1800,"live player publishes each Begin Step position to its owner");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
     for(bool reject:{false,true}){
@@ -271,7 +279,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         require(healthy(*runtime)&&snail&&!snail->active&&!snail->activationPending,
                 "wall-less snail stops before post-retirement movement and sprite publication");
     }
-    for(unsigned failure=0;failure<=9;++failure){
+    for(unsigned failure=0;failure<=10;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
             downwell::InstanceLifecycleBinding::bindTransforms(failing));

@@ -335,7 +335,7 @@ private:
     void syncMainBuilderState();
     void syncMainPlayerState();
     bool mainSolidAt(float x, float y) const;
-    void emitMainBullet(const InstanceRecord& instance);
+    void emitMainBullet(int x,int y);
     void updateMainBullets();
     bool publishMainInactivation(const InstanceRecord& record);
     bool publishMainEnemyImage(std::size_t index,unsigned phase);

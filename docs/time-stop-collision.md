@@ -958,6 +958,15 @@ field query stops before those later mutations; movement already performed is
 retained. The current motion helper still combines collision, integration and
 pose work, so this does not establish full source phase equivalence.
 The source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.
+The shared phase exposes a checked position-publication boundary before shop
+processing. The stored host player routes it through its generation-checked
+movement binding before changing the record's coordinates. Rejection retains
+earlier motion/clock changes and stops subsequent phases. Deferred host bullet
+emission keeps an explicit copy of the pre-movement muzzle coordinates, not
+the newly published record. Native player lifetime registration is still needed
+to attach its external collision owner at this shared boundary. Positions here
+remain derived from the existing fixed-point motion; this is not a migration
+to the runner's full binary64 integration or sequential X/Y setter semantics.
 Camera/interactable queries follow, then the time-stop transition query uses
 private `xx/yy`. `scrTimeShard` performs its own field lookup using the newly
 published `x/y`. These are different positions at the same event boundary.

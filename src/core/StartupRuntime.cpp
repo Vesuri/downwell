@@ -626,7 +626,7 @@ InstanceRecord* StartupRuntime::mainBulletEnemyCollision(const ProjectileSegment
     return nullptr;
 }
 
-void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
+void StartupRuntime::emitMainBullet(int x,int y) {
     if (!run_.effectsSucceeded) return;
     const int muzzleOffset = mainEmitter_.nextOffset();
     if (mainBulletCount_ >= mainBulletCapacity) {
@@ -634,10 +634,10 @@ void StartupRuntime::emitMainBullet(const InstanceRecord& instance) {
         return;
     }
     mainBullets_[mainBulletCount_++] = {
-        static_cast<float>(instance.x + muzzleOffset),
-        static_cast<float>(instance.y + 4), run_.gemHigh, {}, {}
+        static_cast<float>(x + muzzleOffset),
+        static_cast<float>(y + 4), run_.gemHigh, {}, {}
     };
-    mainBullets_[mainBulletCount_ - 1].trajectory.reset(instance.x + muzzleOffset, instance.y + 4,
+    mainBullets_[mainBulletCount_ - 1].trajectory.reset(x + muzzleOffset, y + 4,
                                                       run_.upgrades.levels[12] != 0);
     ++soundPlayRequests_;
 }
@@ -1212,9 +1212,17 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     input.left = inputLeft_;
     input.right = inputRight_;
     input.fire = inputFire_;
+    const int muzzleX=instance.x,muzzleY=instance.y;
     stepGameplayPlayer(mainPlayerMotion_, mainDeath_, run_, currencyAccount_,
         mainPlayerHealth_, random_, input, mainPlayerOriginX_, mainPlayerOriginY_,
-        mainCameraRenderViewX(), mainCameraRenderViewY(), controlsLocked_);
+        mainCameraRenderViewX(), mainCameraRenderViewY(), controlsLocked_,
+        [this,&instance](int x,int y){
+            for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==&instance){
+                if(!lifecycle_.integerPosition(instances_.handleAt(i),instance,x,y))return false;
+                instance.x=x;instance.y=y;return true;
+            }
+            return false;
+        });
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
     mainPlayerMotion_.configureLandingResolver(nullptr, nullptr);
@@ -1222,14 +1230,12 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if(!run_.effectsSucceeded)return;
     syncMainPlayerState();
     if (mainJumps_ != priorJumps) ++soundPlayRequests_;
-    if (mainShotsFired_ != priorShots) emitMainBullet(instance);
+    if (mainShotsFired_ != priorShots) emitMainBullet(muzzleX,muzzleY);
     if (!run_.effectsSucceeded) return;
     if (!wasGrounded && mainPlayerGrounded_) {
         ++mainLandings_;
         if (priorAmmo < mainAmmo_) ++soundPlayRequests_;
     }
-    instance.x = static_cast<std::int32_t>(roundGameMakerCoordinate(mainPlayerX_));
-    instance.y = static_cast<std::int32_t>(roundGameMakerCoordinate(mainPlayerY_));
     instance.imageIndex = mainPlayerImageIndex_;
 }
 
