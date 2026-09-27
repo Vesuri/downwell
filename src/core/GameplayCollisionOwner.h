@@ -163,7 +163,7 @@ private:
     Binding<GameplayExitControllers::Record,View::Kind::exitController> exits_{*this};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
-    GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindTransforms(scriptEffectsBinding_)};
+    GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindMaskDestruction(scriptEffectsBinding_)};
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
@@ -351,7 +351,15 @@ public:
     // ordinary inter-Step reconciliation boundary.
     // Retire through the typed stores, retaining identity across compaction.
     // Player destruction remains unsupported rather than silently discarded.
-    bool prepareDraw(){
+    bool prepareDraw(){return prepareDrawWithEffects([](InstanceHandle,const View::Record&){return false;});}
+    template<unsigned Capacity> bool prepareDraw(ScriptSpawnEffects<Capacity>& effects){
+        if(!effects.boundTo(scriptEffects_))return check(false);
+        return prepareDrawWithEffects([&](InstanceHandle local,const View::Record& record){
+            return record.scriptEffect&&scriptEffects_.retireMarked(local,*record.scriptEffect,effects);
+        });
+    }
+private:
+    template<class RetireEffect> bool prepareDrawWithEffects(RetireEffect retireEffect){
         return cleanupDestroyed([&](InstanceHandle shared,const View::Record& record){
             View::Kind kind;InstanceHandle local;
             if(!View::decode(shared,kind,local))return false;
@@ -361,6 +369,7 @@ public:
                 case View::Kind::breakable:return record.breakable==world_->findBreakable(local)&&world_->retireMarkedBreakable(local);
                 case View::Kind::goalField:return record.goalField==world_->goalFieldInstances().find(local)&&world_->retireMarkedGoalField(local);
                 case View::Kind::bullet:return record.bullet==world_->resolveBulletLifetime(local)&&world_->retireMarkedBullet(local);
+                case View::Kind::scriptEffect:return retireEffect(local,record);
                 default:return false;
             }
         });

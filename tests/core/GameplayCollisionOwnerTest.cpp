@@ -4,7 +4,11 @@ bool nativeScriptSpawn(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& eff
     const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle& caller){
     return world.spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},
         [&](int id,unsigned& frames){downwell::PackedSpriteCollision sprite;
-            if(!sprites.sprite(id,sprite))return false;frames=sprite.frameCount;return true;},caller);
+            if(!sprites.sprite(id,sprite))return false;frames=sprite.frameCount;return true;},caller)&&
+        world.advanceScriptEffectAnimation(effects,effects.beginPhase());
+}
+bool nativeScriptCleanup(downwell::GameplayCollisionOwner& owner,downwell::ScriptSpawnEffects<2>& effects){
+    return owner.prepareDraw(effects);
 }
 // Compile-only A500 gate: instantiate the public selectors without the host
 // fixture loader, filesystem, heap-backed assertions or C++ runtime headers.
@@ -287,7 +291,10 @@ int main(){
         assert(scene->advanceScriptEffectAnimation(effects,phase)&&effects.get(first)->imageIndex.bits==0);
         assert(scene->advanceScriptEffectAnimation(effects,effects.beginPhase()));
         assert(collision->properties(key)->sprite.imageIndex.bits==0x3f000000u);
-        assert(scene->advanceScriptEffectAnimation(effects,effects.beginPhase())&&!collision->state(key)&&registration.size()==0);
+        assert(scene->advanceScriptEffectAnimation(effects,effects.beginPhase())&&collision->state(key)&&
+            (collision->state(key)->flags&1u)&&registration.size()==1&&collision->properties(key)->sprite.imageIndex.bits==0);
+        assert(collision->prepareDraw(effects));
+        assert(!collision->state(key)&&registration.size()==0);
         assert(collision->population(219,count)&&count==0);
         assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
             scene->scriptSpawnInstances()==&registration);

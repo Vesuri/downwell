@@ -227,7 +227,7 @@ public:
     bool advanceScriptEffectAnimation(downwell::ScriptSpawnEffects<Capacity>& effects,
         typename downwell::ScriptSpawnEffects<Capacity>::Phase phase){
         if(!run_.effectsSucceeded)return false;
-        return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceAnimation(phase,*scriptSpawnInstances_);
+        return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;

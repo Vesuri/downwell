@@ -82,6 +82,28 @@ public:
         }
         count_=0;good_=true;return true; // Never reuse a lifetime key.
     }
+    // Registered animation walks the room list. It may mark its current
+    // lifetime, but cannot unlink it until the later room cleanup pass.
+    template<class Publish,class Mark> bool advanceDeferred(Phase phase,Publish publish,Mark mark){
+        if(!good_)return false;
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+            if(slot.handle>phase.newest||slot.effect.destroyRequested)continue;
+            if(!slot.effect.advanceImage([&](const auto&){return publish(slot.handle,static_cast<const Effect&>(slot.effect));})||
+               (slot.effect.destroyRequested&&!mark(slot.handle,static_cast<const Effect&>(slot.effect))))return good_=false;
+        }
+        return true;
+    }
+    template<class Hooks> bool retireMarked(Handle h,Hooks& hooks){
+        if(!good_)return false;
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+            if(slot.handle!=h)continue;
+            if(!slot.effect.valid||!slot.effect.destroyRequested||!hooks.retire(h,static_cast<const Effect&>(slot.effect)))return good_=false;
+            slot.handle=0;
+            for(unsigned j=i+1;j<count_;++j)order_[j-1]=order_[j];
+            --count_;return true;
+        }
+        return good_=false;
+    }
     template<class Visit> bool visitNewest(Visit visit)const{
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){const auto& slot=slots_[order_[i]];

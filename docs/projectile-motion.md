@@ -170,7 +170,9 @@ The stored-world `scriptSpawnRegistration` bridge allocates object 219 from
 the real runtime ID sequence and publishes exact birth coordinates through
 `birthAt`, before caller-side sprite/speed/angle assignments. Its hooks bridge
 sprite, angle and animation-index changes to the resource collision owner;
-retirement removes the generation-checked world record. The admitted muzzle
+Animation End marks the generation-checked world record and excludes it from
+collision queries without unlinking the room animation traversal. Explicit
+pre-Draw cleanup retires the marked record and its effect together. The admitted muzzle
 depth assignment is unchanged zero; nonzero depth is rejected until source
 pending-depth ordering is implemented. The bridge must outlive its effect
 owner and retire registrations before room teardown. It does not install an
@@ -199,7 +201,11 @@ ID; the native backend publishes its checked local handle.
 
 `advanceScriptEffectAnimation` consumes a caller-captured phase cutoff and
 latches failures into each runtime. The owner publishes every evaluated image
-index, including the wrapped index, before requesting Animation End retirement.
+index, including the wrapped index, before marking Animation End destruction.
+Marked lifetimes remain linked until explicit room cleanup; later animation
+passes skip them. Both backend cleanup entry points retire through the same
+effect owner and checked registration, retaining caller IDs. Neither animation
+marking nor cleanup failure may be retried on a failed runtime.
 Publication failure retains the computed timeline/index but does not run
 retirement; later phase calls on the failed runtime do nothing. Integrators
 must still capture and dispatch that phase at the original global animation

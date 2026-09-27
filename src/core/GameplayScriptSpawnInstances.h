@@ -8,7 +8,7 @@ namespace downwell {
 class GameplayScriptSpawnInstances {
 public:
     static constexpr unsigned capacity=64;
-    struct Record {const ScriptSpawnEffect* effect=nullptr;unsigned lifetimeId=0;bool active=true;};
+    struct Record {const ScriptSpawnEffect* effect=nullptr;unsigned lifetimeId=0;bool active=true,destroyRequested=false;};
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayScriptSpawnInstances(Binding binding={}):binding_(binding){}
     bool valid()const{return good_;}
@@ -49,6 +49,15 @@ public:
         const auto h=handle(local);const auto* r=find(h);
         if(!check(local,effect)||!binding_.retire(h,*r))return good_=false;
         records_[h.slot]={};--count_;return true;
+    }
+    bool destroyed(unsigned local,const ScriptSpawnEffect& effect){
+        const auto h=handle(local);const auto* r=find(h);
+        if(!check(local,effect)||!binding_.markDestroyed(h,*r))return good_=false;
+        records_[h.slot].destroyRequested=true;return true;
+    }
+    template<class Effects> bool retireMarked(InstanceHandle key,const Record& record,Effects& effects){
+        if(!good_||!effects.boundTo(*this)||find(key)!=&record||!record.destroyRequested)return good_=false;
+        return good_=effects.retireMarked(key.generation,*this);
     }
 private:
     bool check(unsigned local,const ScriptSpawnEffect& effect){

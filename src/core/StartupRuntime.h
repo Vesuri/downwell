@@ -278,7 +278,7 @@ public:
     bool advanceScriptEffectAnimation(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
         ScriptSpawnEffects<Capacity>& effects,typename ScriptSpawnEffects<Capacity>::Phase phase){
         if(!run_.effectsSucceeded)return false;
-        return run_.effectsSucceeded=registration.belongsTo(instances_)&&effects.advanceAnimation(phase,registration);
+        return run_.effectsSucceeded=registration.belongsTo(instances_)&&effects.advanceRegistered(phase,registration);
     }
     template<unsigned Capacity,unsigned Registered,class Pause> bool createTimeChange(
         StoredTimeChangeRegistration<instanceCapacity,Registered>& registration,TimeChangeEffects<Capacity>& changes,
@@ -378,6 +378,16 @@ public:
     }
     // Explicit pre-Draw cleanup boundary. Other effect families supply their
     // own retirement dispatch; they must not be silently erased as plain records.
+    template<unsigned Capacity,unsigned Registered,class Other> bool cleanupDestroyed(
+        StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,ScriptSpawnEffects<Capacity>& effects,
+        Other other){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=registration.belongsTo(instances_)&&effects.boundTo(registration)&&
+            instances_.cleanupDestroyed([&](InstanceHandle key,const InstanceRecord& record){
+                return record.objectId==219?registration.retireMarked(key,record,effects):other(key,record);
+            });
+        return run_.effectsSucceeded;
+    }
     template<unsigned Capacity,unsigned Registered,class Other> bool cleanupDestroyed(
         StoredTimeShardRegistration<instanceCapacity,Registered>& registration,TimeShardEffects<Capacity>& shards,
         Other other){

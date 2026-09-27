@@ -915,9 +915,14 @@ int main(){
         require(world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase()),
             "publish first child animation through source registry");
         require(world->instance(before)->imageIndex==0.5F,"source record retains fractional image index");
-        require(world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase())&&!world->instance(before)&&
+        require(world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase())&&world->instance(before)&&
+            world->instance(before)->destroyRequested&&world->instance(before)->imageIndex==0&&collision->resolve(stale),
+            "Animation End marks the wrapped record without unlinking room traversal");
+        require(collision->collisionPoint({},219,{0x406e0800u,0},{0x40afff00u,0},false,false,result)&&result.id==-4,
+            "marked effect is excluded from queries before cleanup");
+        require(world->cleanupDestroyed(registration,effects,[](InstanceHandle,const InstanceRecord&){return false;})&&!world->instance(before)&&
             !collision->resolve(stale)&&callerId==before&&world->effectsSucceeded(),
-            "animation retirement removes generation-checked membership without clearing caller ID");
+            "cleanup removes generation-checked membership without clearing caller ID");
         unsigned lookups=0;
         auto rejectFrames=[&](int,unsigned&){++lookups;return false;};
         const auto next=world->nextRuntimeInstanceId();

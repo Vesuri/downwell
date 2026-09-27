@@ -7,8 +7,14 @@ struct Hooks {
     unsigned births=0,sprites=0,retires=0;bool reject=false;
     unsigned images=0,rejectImage=0;
     unsigned lastImage=0,lastImageHandle=0;
+    unsigned published[16]{};bool hasPublished[16]{};
+    unsigned marks=0,rejectMark=0;
+    bool destroyed(unsigned h,const ScriptSpawnEffect& e){
+        assert(e.destroyRequested&&lastImageHandle==h&&lastImage==e.imageIndex.bits);return ++marks!=rejectMark;
+    }
     bool image(unsigned h,const ScriptSpawnEffect& e){
-        assert(!e.destroyRequested);lastImage=e.imageIndex.bits;lastImageHandle=h;
+        assert(!e.destroyRequested&&h<16);lastImage=e.imageIndex.bits;lastImageHandle=h;
+        published[h]=e.imageIndex.bits;hasPublished[h]=true;
         return ++images!=rejectImage;
     }
     bool birth(unsigned h,const ScriptSpawnEffect& e){
@@ -17,7 +23,7 @@ struct Hooks {
     }
     bool sprite(unsigned,const ScriptSpawnEffect& e){assert(e.frames==1);++sprites;return true;}
     bool retire(unsigned h,const ScriptSpawnEffect& e){
-        if(e.destroyRequested)assert(lastImageHandle==h&&lastImage==e.imageIndex.bits);
+        if(e.destroyRequested)assert(h<16&&hasPublished[h]&&published[h]==e.imageIndex.bits);
         ++retires;return !reject;
     }
 };
@@ -36,6 +42,32 @@ struct Ops {
         id,{0x3fe00000u,0},MotionBinary64::fromInteger(270),{});}
 };
 int main(){
+    {
+        ScriptSpawnEffects<2> effects;Hooks hooks;Ops ops{effects,hooks};
+        assert(ops.spawn(603));const auto first=ops.callerMyFx;
+        assert(ops.spawn(602));const auto second=ops.callerMyFx;
+        const auto phase=effects.beginPhase();
+        assert(effects.advanceRegistered(phase,hooks)&&effects.advanceRegistered(phase,hooks));
+        assert(hooks.marks==2&&hooks.retires==0&&hooks.images==4&&effects.size()==2&&!effects.get(first)&&!effects.get(second));
+        assert(effects.advanceRegistered(phase,hooks)&&hooks.images==4&&hooks.marks==2);
+        // Cleanup may traverse in a different order from the newest-first store.
+        assert(effects.retireMarked(first,hooks)&&effects.size()==1);
+        assert(effects.retireMarked(second,hooks)&&effects.size()==0&&hooks.retires==2);
+    }
+    for(unsigned failure=0;failure<2;++failure){
+        const bool rejectMark=failure!=0;
+        ScriptSpawnEffects<2> effects;Hooks hooks;Ops ops{effects,hooks};
+        assert(ops.spawn(603));const auto h=ops.callerMyFx;
+        assert(effects.advanceRegistered(effects.beginPhase(),hooks));
+        hooks.rejectMark=rejectMark?1:0;
+        assert(effects.advanceRegistered(effects.beginPhase(),hooks)!=rejectMark);
+        if(!rejectMark){hooks.reject=true;assert(!effects.retireMarked(h,hooks));}
+        assert(!effects.valid()&&effects.size()==1&&hooks.marks==1&&hooks.images==2);
+        const auto retires=hooks.retires;
+        assert(!effects.advanceRegistered(effects.beginPhase(),hooks)&&!effects.retireMarked(h,hooks));
+        assert(hooks.marks==1&&hooks.images==2&&hooks.retires==retires);
+        hooks.reject=false;assert(effects.clear(hooks));
+    }
     for(unsigned failure=1;failure<=2;++failure){
         ScriptSpawnEffects<2> effects;Hooks hooks;Ops ops{effects,hooks};
         assert(ops.spawn(603));hooks.rejectImage=failure;

@@ -83,6 +83,20 @@ public:
         if(!records_.erase(e->id,[&](InstanceHandle h,const InstanceRecord& r){return lifecycle_.retire(h,r);}))return fail();
         *e={};return true;
     }
+    bool destroyed(unsigned local,const ScriptSpawnEffect&){
+        if(!succeeded_)return false;
+        auto* e=entry(local);auto* r=e?record(*e):nullptr;
+        if(!r||!lifecycle_.markDestroyed(e->key,*r))return fail();
+        r->destroyRequested=true;return true;
+    }
+    template<class Effects> bool retireMarked(InstanceHandle key,const InstanceRecord& r,Effects& effects){
+        if(!succeeded_||!effects.boundTo(*this)||records_.resolve(key)!=&r||!r.destroyRequested)return fail();
+        for(const auto& e:entries_)if(e.local&&e.key.slot==key.slot&&e.key.generation==key.generation){
+            if(record(e)!=&r)return fail();
+            return effects.retireMarked(e.local,*this)||fail();
+        }
+        return fail();
+    }
 };
 }
 #endif
