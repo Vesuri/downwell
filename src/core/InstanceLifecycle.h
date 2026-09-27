@@ -23,6 +23,19 @@ struct NoInstanceLifecycle {
 template<class Record>
 class RecordLifecycleBinding {
 public:
+    // Add a borrowed layer observer without replacing collision/query ownership.
+    // Install before births; both owners must outlive every copy of this binding.
+    // Each callback follows successful primary publication. A failure stops the
+    // caller without rolling back the primary owner's completed mutation.
+    template<class Observer> bool observeLayers(Observer& observer){
+        if(layerContext_)return false;
+        layerContext_=&observer;
+        layerBirth_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Observer*>(p)->birth(h,r);};
+        layerRetire_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Observer*>(p)->retire(h,r);};
+        layerActivation_=[](void* p,InstanceHandle h,const Record& r,bool v){return static_cast<Observer*>(p)->activation(h,r,v);};
+        layerMembership_=[](void* p,InstanceHandle h,const Record& r,bool v){return static_cast<Observer*>(p)->membership(h,r,v);};
+        return true;
+    }
     template<class Owner> static RecordLifecycleBinding bind(Owner& owner) {
         RecordLifecycleBinding b;
         b.context_=&owner;
@@ -140,7 +153,7 @@ public:
     bool birthAt(InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y)const{
         // Missing positioned ownership must not silently round or become a
         // birth-then-move sequence with different insertion history.
-        return birthAt_&&birthAt_(context_,h,r,x,y);
+        return birthAt_&&birthAt_(context_,h,r,x,y)&&(!layerBirth_||layerBirth_(layerContext_,h,r));
     }
     bool markDestroyed(InstanceHandle h,const Record& r)const{return destroyed_&&destroyed_(context_,h,r);}
     template<class Owner> static RecordLifecycleBinding bindInstanceQueries(Owner& owner){
@@ -195,12 +208,25 @@ public:
     bool publishedPosition(InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y)const{
         return move_&&move_(context_,h,r,x,y);
     }
-    bool birth(InstanceHandle h,const Record& r)const{return !birth_||birth_(context_,h,r);}
-    bool retire(InstanceHandle h,const Record& r)const{return !retire_||retire_(context_,h,r);}
-    bool activation(InstanceHandle h,const Record& r,bool v)const{return !activation_||activation_(context_,h,r,v);}
-    bool membership(InstanceHandle h,const Record& r,bool v)const{return !membership_||membership_(context_,h,r,v);}
+    bool birth(InstanceHandle h,const Record& r)const{
+        return (!birth_||birth_(context_,h,r))&&(!layerBirth_||layerBirth_(layerContext_,h,r));
+    }
+    bool retire(InstanceHandle h,const Record& r)const{
+        return (!retire_||retire_(context_,h,r))&&(!layerRetire_||layerRetire_(layerContext_,h,r));
+    }
+    bool activation(InstanceHandle h,const Record& r,bool v)const{
+        return (!activation_||activation_(context_,h,r,v))&&(!layerActivation_||layerActivation_(layerContext_,h,r,v));
+    }
+    bool membership(InstanceHandle h,const Record& r,bool v)const{
+        return (!membership_||membership_(context_,h,r,v))&&(!layerMembership_||layerMembership_(layerContext_,h,r,v));
+    }
     bool sprite(InstanceHandle h,const Record& r,int next)const{return !sprite_||sprite_(context_,h,r,next);}
 private:
+    void* layerContext_=nullptr;
+    bool (*layerBirth_)(void*,InstanceHandle,const Record&)=nullptr;
+    bool (*layerRetire_)(void*,InstanceHandle,const Record&)=nullptr;
+    bool (*layerActivation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
+    bool (*layerMembership_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     void* context_=nullptr;
     bool (*birth_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*birthAt_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;

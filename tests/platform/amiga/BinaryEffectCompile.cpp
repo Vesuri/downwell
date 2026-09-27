@@ -6,6 +6,13 @@
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayerInstances.h"
 #include "core/RunnerLayerLifetimes.h"
+#include "core/StoredLayerLifecycle.h"
+#include "core/InstanceLifecycle.h"
+bool compileLayerObserver(downwell::InstanceLifecycleBinding& binding,
+    downwell::StoredLayerLifecycle<4,16,8>& observer,downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+    return binding.observeLayers(observer)&&binding.birth(h,r)&&binding.activation(h,r,false)&&
+        binding.membership(h,r,false)&&binding.retire(h,r);
+}
 bool compileLayerLifetimes(downwell::RunnerLayerLifetimes<4,16,8>& owner,downwell::InstanceHandle h,unsigned id){
     return owner.birth(h,id,{},false)&&owner.writeDepth(h,downwell::MotionBinary64::fromInteger(-60000))&&
         owner.serviceDepths()&&owner.retire(h);

@@ -816,6 +816,24 @@ survive replacement of the room's layer storage. This exercises the actual
 shared loader boundary, not the live SDL/Amiga scene drivers or the original
 runner's complete Room End/Cleanup event sequence.
 
+`RecordLifecycleBinding::observeLayers` adds a borrowed layer observer without
+replacing collision ownership or its movement/resource/query callbacks. Ordinary
+and positioned births notify it exactly once after successful primary birth;
+retirement and activation publication follow the same checked composition.
+Membership reconciliation first publishes the primary object membership, then
+relinks the layer element. Missing positioned ownership still fails before
+either birth callback; observing layers does not make `hasOwner()` claim spatial
+query support. Observer failure preserves prior primary publication and must
+terminate the calling world, just like existing lifecycle failures. Installing
+a second observer is rejected. The binding adds five pointers of storage.
+
+`StoredLayerLifecycle` translates stored source ID/depth/activation into the
+shared layer lifetime owner. Tests compose it with packed-room loading and with
+the real spatial owner for positioned time-change births and deferred cleanup.
+Normal game construction still needs room-owner installation, preparation and
+teardown before using this observer; adding observation alone cannot supply
+missing serialized layers or switch Draw traversal.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

@@ -6,6 +6,7 @@
 #include "core/RunnerLayerBackgroundDraw.h"
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayerLifetimes.h"
+#include "core/StoredLayerLifecycle.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -575,14 +576,10 @@ void testLayerRoomReentry(){
     require(store.create(513,10,6,true)==CreateInstanceResult::success,"reentry persistent instance");
     const auto survivor=store.handleAt(0);
     require(owner.adopt({survivor,513,{{0x41280000u},13,false,false},false}),"adopt preexisting survivor");
-    struct Binding {
-        Owner& owner;
-        bool birth(InstanceHandle h,const InstanceRecord& r){
-            RunnerImageValue depth;
-            return depth.assign(MotionBinary64::fromInteger(r.depth))&&owner.birth(h,r.instanceId,depth,!r.active);
-        }
-        bool retire(InstanceHandle h,const InstanceRecord&){return owner.retire(h);}
-    } binding{owner};
+    StoredLayerLifecycle<4,4,3> layerLifecycle{owner};
+    InstanceLifecycleBinding binding;
+    require(binding.observeLayers(layerLifecycle)&&!binding.hasOwner(),
+        "layer observation does not claim collision query ownership");
     RunnerStepSnapshot<3> globals;
     unsigned preparations=0,events=0;
     auto enter=[&](bool first){
@@ -617,6 +614,50 @@ void testLayerRoomReentry(){
         "serialized rebirth uses a new generation");
 }
 
+void testLayerLifecycleBinding(){
+    using namespace downwell;
+    using Registry=RunnerLayerInstances<2,3>;Registry registry;Registry::Layers layers;RunnerLayerIds ids;
+    RunnerLayerLifetimes<2,3,2> owner(layers,registry,ids);
+    StoredLayerLifecycle<2,3,2> observer{owner};
+    struct Primary {
+        RunnerLayerLifetimes<2,3,2>& owner;
+        bool good=true;unsigned calls=0;
+        bool birth(InstanceHandle h,const InstanceRecord&){++calls;require(!owner.resolve(h),"primary birth precedes layer observer");return good;}
+        bool retire(InstanceHandle h,const InstanceRecord&){++calls;require(owner.resolve(h),"primary retirement precedes layer observer");return good;}
+        bool activation(InstanceHandle h,const InstanceRecord&,bool active){
+            ++calls;require(owner.resolve(h)->inactive==active,"primary activation sees prior layer flag");return good;
+        }
+        bool membership(InstanceHandle h,const InstanceRecord&,bool registered){
+            ++calls;require(owner.resolve(h)->inactive==!registered,"membership sees already-published flag");return good;
+        }
+    } primary{owner};
+    auto binding=InstanceLifecycleBinding::bind(primary);
+    require(binding.observeLayers(observer)&&!binding.observeLayers(observer)&&binding.hasOwner(),
+        "observer installation preserves primary ownership and rejects replacement");
+    InstanceRecord record;record.instanceId=100;record.active=true;
+    const InstanceHandle h{0,1};
+    require(!binding.birthAt(h,record,{},{})&&!primary.calls&&!owner.resolve(h),
+        "layer observer cannot supply missing positioned collision birth");
+    primary.good=false;
+    require(!binding.birth(h,record)&&!owner.resolve(h),"primary failure suppresses observer");
+    primary.good=true;
+    require(binding.birth(h,record)&&owner.resolve(h),"composed birth publishes layer lifetime");
+    const auto copied=binding;
+    require(copied.activation(h,record,false)&&owner.resolve(h)->inactive&&copied.membership(h,record,false),
+        "copied borrowed binding retains separate activation and reconciliation");
+    require(copied.activation(h,record,true)&&!owner.resolve(h)->inactive&&copied.membership(h,record,true),
+        "reactivation reaches shared layer owner");
+    primary.good=false;
+    require(!binding.retire(h,record)&&owner.resolve(h),"primary retirement failure retains layer lifetime");
+    primary.good=true;
+    require(binding.retire(h,record)&&!owner.resolve(h),"successful retirement reaches both owners");
+    // Primary publication is intentionally not rolled back if the observer
+    // rejects capacity. The calling world must stop after false.
+    const unsigned before=primary.calls;
+    require(!binding.birth({2,1},record)&&primary.calls==before+1&&!owner.succeeded(),
+        "observer failure is returned after completed primary publication");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -629,6 +670,7 @@ int main(int argc, char** argv) {
     testPackedRoomLoader();
     testLayerStartup();
     testLayerRoomReentry();
+    testLayerLifecycleBinding();
     if (argc == 2)
         testGeneratedPack(argv[1]);
     std::cout << "room pack tests passed\n";

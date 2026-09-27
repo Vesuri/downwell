@@ -2,6 +2,7 @@
 #include "core/TerrainCreate.h"
 #include "core/RoomPack.h"
 #include "core/StoredCollisionLifecycle.h"
+#include "core/StoredLayerLifecycle.h"
 #include "core/StoredWorldCollision.h"
 #include "core/TimeChangeEffects.h"
 #include "core/EventScheduler.h"
@@ -301,12 +302,21 @@ int main(){
             bool instanceNumber(int,unsigned&){return false;}
         } lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
         InstanceStore<4> records;std::uint32_t nextId=100;int room=11,speed=60;bool healthy=true;
-        StoredTimeChangeRegistration<4,2> registration(records,&objects,InstanceLifecycleBinding::bindPositionedBirths(lifecycle),nextId,room,healthy);
+        RunnerLayerInstances<4,4> layerRegistry;RunnerLayerInstances<4,4>::Layers layers;RunnerLayerIds layerIds;
+        RunnerLayerLifetimes<4,4,4> layerOwner(layers,layerRegistry,layerIds);
+        StoredLayerLifecycle<4,4,4> layerObserver{layerOwner};
+        auto composed=InstanceLifecycleBinding::bindPositionedBirths(lifecycle);
+        require(composed.observeLayers(layerObserver),"observe scheduled effect lifetimes alongside spatial owner");
+        StoredTimeChangeRegistration<4,2> registration(records,&objects,composed,nextId,room,healthy);
         TimeChangeEffects<2> effects;require(effects.bind(registration),"bind scheduler-selected changes");
         require(effects.createAt({},{},speed,[](unsigned){return true;}),"first scheduled change");
         require(records.create(99,36,room,false,0)==CreateInstanceResult::success,"interleaved scheduler actor");
         records.find(99)->alarms.set(1,2);
         require(effects.createAt({},{},speed,[](unsigned){return true;}),"second scheduled change");
+        require(layerRegistry.find(100)!=layerRegistry.End&&layerRegistry.find(101)!=layerRegistry.End&&
+            layerOwner.resolve(layerRegistry.get(layerRegistry.find(100))->instance)&&
+            layerOwner.resolve(layerRegistry.get(layerRegistry.find(101))->instance),
+            "positioned effect births publish both spatial and layer ownership");
         speed=55;std::vector<unsigned> order;
         auto tick=[&]{return EventScheduler<4>::runStepChecked(records,
             [](const auto& r){return r.objectId==211?3u:2u;},
@@ -340,6 +350,8 @@ int main(){
                 "selected cleanup retires exactly one lifetime without sweeping marked siblings");
             return true;
         })&&retired==2&&records.size()==1,"scheduled changes retire through global cleanup");
+        require(layerRegistry.find(100)==layerRegistry.End&&layerRegistry.find(101)==layerRegistry.End,
+            "global effect cleanup also retires observed layer lifetimes");
         require(effects.createAt({},{},speed,[](unsigned){return true;}),"new lifetime after scheduled retirement");
         const auto changeId=nextId-1;
         StoredTimeShardRegistration<4,2> shardRegistration(records,&objects,InstanceLifecycleBinding::bindPositionedBirths(lifecycle),nextId,room,healthy);
