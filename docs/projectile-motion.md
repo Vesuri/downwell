@@ -749,6 +749,22 @@ with both instance placeholders and background elements and runs their mixed
 initialization. Slots remain separate from source element IDs: process-wide
 element ID allocation, animation, Draw and live owner installation remain open.
 
+Background Draw dispatch (`0x48f0a0`) first checks background visibility, then
+looks up the sprite. A missing sprite (not merely ID -1) selects a full-viewport
+colored quad at `0x48f1ce..0x48f3e7`; it is not a no-op or an unconditional clear.
+The runner temporarily establishes identity matrices, submits the quad with
+render-state/blending intact and restores the matrices. Color reconstruction
+multiplies binary32 alpha by 255, truncates to signed integer, clamps to 0–255,
+then combines that byte with low-24-bit color. Even zero-alpha quads dispatch.
+`RunnerLayerBackgroundDraw` supplies checked visibility/resource dispatch and
+this color calculation for finite normal/zero alpha in the integer-conversion
+domain. All serialized alpha bytes round-trip, with extra fractional/clamping
+and failure tests. Original-room tests route all 24 backgrounds through the
+mixed layer visitor, selecting 18 solid callbacks and six sprite callbacks.
+The callbacks remain backend contracts: viewport-quad rendering, sprite origin
+save/zero/restore, sprite tiling/stretching and animation are not implemented
+by this dispatcher or enabled in the live renderers yet.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

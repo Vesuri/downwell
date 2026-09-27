@@ -8,6 +8,11 @@
 #include "core/PackedRoomLayerLoader.h"
 #include "core/RunnerLayerBackground.h"
 #include "core/RunnerLayerBackgrounds.h"
+#include "core/RunnerLayerBackgroundDraw.h"
+bool compileBackgroundDraw(const downwell::RunnerLayerBackground& background,unsigned& color){
+    return downwell::RunnerLayerBackgroundDraw::visit(background,[](int,bool& exists){exists=false;return true;},
+        [&](unsigned value){color=value;return true;},[](const auto&){return false;});
+}
 bool compileLayerBackgroundOwner(downwell::RunnerLayerBackgrounds<4,16,2>& owner,
     downwell::RunnerLayers<4,16>& layers,unsigned layer,const downwell::PackedRoomLayer& source){
     return owner.create(layers,layer,source,[](unsigned){return false;});

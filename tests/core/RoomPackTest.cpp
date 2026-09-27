@@ -3,6 +3,8 @@
 #include "core/PackedRoomLayerLoader.h"
 #include "core/RunnerLayerBackground.h"
 #include "core/RunnerLayerBackgrounds.h"
+#include "core/RunnerLayerBackgroundDraw.h"
+#include "core/RunnerLayerDraw.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -178,11 +180,45 @@ void testBackgroundConstruction(){
         background.initialize();background.initialize();
         require(background.initialized&&background.spriteId==source.backgroundSpriteId&&background.alpha.bits==bits,
             "background initialization is idempotent and retains sprite-less payload");
+        unsigned color=0;
+        require(downwell::RunnerLayerBackgroundDraw::solidColor(background,color)&&color==source.backgroundColor,
+            "all serialized alpha bytes survive rounded quad color reconstruction");
         source.type=2;
         require(!downwell::RunnerLayerBackground::create(source,background)&&background.initialized,"wrong type leaves output unchanged");
         source.type=1;source.backgroundFlags=32;
         require(!downwell::RunnerLayerBackground::create(source,background)&&background.initialized,"unknown flags leave output unchanged");
     }
+}
+
+void testBackgroundDraw(){
+    downwell::RunnerLayerBackground background;background.flags=1;background.color=0x123456;
+    for(float alpha:{-1.f,-0.5f,0.f,0.001f,0.5f,0.999f,1.f,1.5f}){
+        std::memcpy(&background.alpha.bits,&alpha,4);
+        unsigned color=0;int expected=int(alpha*255.f);if(expected<0)expected=0;if(expected>255)expected=255;
+        require(downwell::RunnerLayerBackgroundDraw::solidColor(background,color)&&
+            color==(0x123456u|(unsigned(expected)<<24)),"quad alpha truncates after float multiplication then clamps");
+    }
+    background.alpha.bits=0x3f800000u;
+    unsigned lookups=0,fills=0,sprites=0;
+    auto lookup=[&](int id,bool& exists){++lookups;exists=id==740;return true;};
+    auto fill=[&](unsigned color){++fills;return color==0xff123456u;};
+    auto sprite=[&](const auto& b){++sprites;return b.spriteId==740;};
+    require(downwell::RunnerLayerBackgroundDraw::visit(background,lookup,fill,sprite)&&fills==1&&sprites==0,
+        "sprite-less background draws a colored viewport quad");
+    background.spriteId=999;
+    require(downwell::RunnerLayerBackgroundDraw::visit(background,lookup,fill,sprite)&&fills==2,"missing positive sprite also uses solid path");
+    background.spriteId=740;
+    require(downwell::RunnerLayerBackgroundDraw::visit(background,lookup,fill,sprite)&&sprites==1,"valid sprite dispatch");
+    background.flags=0;
+    require(downwell::RunnerLayerBackgroundDraw::visit(background,lookup,fill,sprite)&&lookups==3,"hidden background skips lookup and draw");
+    background.flags=1;
+    require(!downwell::RunnerLayerBackgroundDraw::visit(background,[](int,bool&){return false;},fill,sprite)&&
+        fills==2&&sprites==1,"lookup failure suppresses draw");
+    background.spriteId=-1;background.alpha.bits=0;
+    require(!downwell::RunnerLayerBackgroundDraw::visit(background,lookup,[&](unsigned c){++fills;return c!=0x123456u;},sprite)&&fills==3,
+        "zero-alpha quad still dispatches and propagates renderer failure");
+    background.alpha.bits=0x7fc00000u;unsigned color=42;
+    require(!downwell::RunnerLayerBackgroundDraw::solidColor(background,color)&&color==42,"unsupported alpha preserves output");
 }
 
 void testBackgroundOwner(){
@@ -428,6 +464,22 @@ void testGeneratedPack(const char* path) {
             [](unsigned,downwell::InstanceHandle&,downwell::RunnerDepthService::Instance*&){return true;},
             [](auto){return true;},[](unsigned){return false;},[](int,unsigned&){return false;},
             [&](unsigned e){return backgrounds.initialize(e);}),"all original mixed layer elements initialize");
+        unsigned backgroundDraws=0;
+        require(downwell::RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},
+            [](unsigned,const auto&){return true;},[&](unsigned e,auto& state){
+                state.type=backgrounds.get(e)?1:2;return true;
+            },[&](unsigned,unsigned e,auto action){
+                const auto* entry=backgrounds.get(e);
+                if(!entry||action!=downwell::RunnerLayerDraw::Action::other)return false;
+                ++backgroundDraws;
+                return downwell::RunnerLayerBackgroundDraw::visit(entry->background,
+                    [](int id,bool& exists){exists=id==740;return true;},
+                    [](unsigned color){return color==0xff000000u;},
+                    [](const auto& bg){return bg.spriteId==740;});
+            },[](unsigned,const auto&){return true;}),"original backgrounds dispatch through mixed layer Draw");
+        unsigned expectedBackgrounds=0;
+        for(unsigned l=0;l<room.layerCount;++l){downwell::PackedRoomLayer p;require(pack.roomLayer(room,l,p),"count room backgrounds");expectedBackgrounds+=p.type==1;}
+        require(backgroundDraws==expectedBackgrounds,"every original background appears in layer traversal");
         for(unsigned l=0;l<room.layerCount;++l){
             downwell::PackedRoomLayer packed;require(pack.roomLayer(room,l,packed),"generated layer");
             const auto slot=layers.find(int(packed.layerId));unsigned remaining=packed.membershipCount;
@@ -517,6 +569,7 @@ int main(int argc, char** argv) {
     testDecode();
     testBackgroundDecode();
     testBackgroundConstruction();
+    testBackgroundDraw();
     testBackgroundOwner();
     testValidation();
     testPackedRoomLoader();

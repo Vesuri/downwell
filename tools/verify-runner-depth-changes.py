@@ -50,6 +50,8 @@ assert region(0x7fe384, 6) == b"depth\0"
 assert struct.unpack("<d", region(0x7fcc90, 8))[0] == 20.0
 assert struct.unpack("<f", region(0x7fcc98, 4))[0] == 255.0
 for start, end, digest in (
+    (0x48f0a0, 0x48f0ce, "856591947d3ad925a1b2c74121e0d42a779ebd948074a6ed84e22d573eee6ed6"),
+    (0x48f1ce, 0x48f3e7, "d870fccbf690e0e4893c813bfa847930f78107ff9be5ef0a107de38b90f72779"),
     # Background payload: unit scales, raw animation copies, RGB/alpha split;
     # type-1 initialization jumps directly to the initialized-flag write.
     (0x413bc9, 0x413cb7, "fa67f36f83e09cdde02dc70cf91e79b181401c26aff8b396bd6e3f32a05a7075"),
