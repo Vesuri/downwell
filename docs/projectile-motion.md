@@ -765,6 +765,17 @@ The callbacks remain backend contracts: viewport-quad rendering, sprite origin
 save/zero/restore, sprite tiling/stretching and animation are not implemented
 by this dispatcher or enabled in the live renderers yet.
 
+`RunnerLayerLifetimes` composes instance attachment, generation-checked lifetime
+state, the deferred depth queue and depth migration over borrowed room layer
+owners. Reserved births use their fixed layer; dynamic births find/create a
+dynamic layer even if a fixed peer has matching depth. Flag publication and
+activation relinking remain distinct calls. Retirement cancels queued depth
+writes before storage-slot reuse; stale handles and capacity failures stop the
+adapter terminally. Tests connect multi-instance departure, singleton merging,
+merged layer-ID publication, a -60000 migration and generation reuse. This is
+the shared adapter, not live installation: persistent-state transfer and room
+preparation must be connected before either backend changes Draw traversal.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

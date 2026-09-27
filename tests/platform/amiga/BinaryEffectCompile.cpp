@@ -5,6 +5,11 @@
 #include "core/RunnerDepthChanges.h"
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayerInstances.h"
+#include "core/RunnerLayerLifetimes.h"
+bool compileLayerLifetimes(downwell::RunnerLayerLifetimes<4,16,8>& owner,downwell::InstanceHandle h,unsigned id){
+    return owner.birth(h,id,{},false)&&owner.writeDepth(h,downwell::MotionBinary64::fromInteger(-60000))&&
+        owner.serviceDepths()&&owner.retire(h);
+}
 #include "core/PackedRoomLayerLoader.h"
 #include "core/RunnerLayerBackground.h"
 #include "core/RunnerLayerBackgrounds.h"

@@ -1,6 +1,7 @@
 #include "core/RunnerLayerInstances.h"
 #include "core/InstanceStore.h"
 #include "core/RunnerLayerIds.h"
+#include "core/RunnerLayerLifetimes.h"
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -236,4 +237,31 @@ void roomInitializationFailures(){
         }
     }
 }
-int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
+void lifetimeDepthIntegration(){
+    using R=RunnerLayerInstances<4,8>;
+    R registry;R::Layers layers;RunnerLayerIds ids;require(ids.observeLoaded(131),"lifetime catalog floor");
+    unsigned fixed=4;require(layers.insertAfterEquals(17,0,false,fixed)&&registry.reserve(layers,fixed,100),"lifetime fixed reservation");
+    RunnerLayerLifetimes<4,8,4> owner(layers,registry,ids);
+    require(owner.birth({0,1},100,{0x41200000u},false)&&owner.resolve({0,1})->depth.layerId==17&&
+        owner.resolve({0,1})->depth.depth.bits==0,"placed birth fills reservation and publishes its depth");
+    require(owner.birth({1,1},101,{},false)&&owner.birth({2,1},102,{},false),"dynamic peer births");
+    require(owner.resolve({1,1})->depth.layerId==132&&owner.resolve({2,1})->depth.layerId==132,
+        "dynamic births do not reuse fixed layer at matching depth");
+    require(owner.writeDepth({1,1},MotionBinary64::fromInteger(5))&&owner.pendingDepths()==1&&
+        owner.resolve({1,1})->depth.layerId==132,"setter publishes before deferred migration");
+    require(owner.serviceDepths()&&owner.resolve({1,1})->depth.layerId==133,"shared-layer departure allocates destination");
+    require(owner.writeDepth({2,1},MotionBinary64::fromInteger(5))&&owner.serviceDepths()&&
+        owner.resolve({2,1})->depth.layerId==133&&layers.find(132)==R::Layers::End,"singleton move merges and publishes identity");
+    require(owner.publishInactive({2,1},true)&&owner.reconcileActivation({2,1}),"activation relinks same lifetime");
+    require(owner.writeDepth({2,1},MotionBinary64::fromInteger(-60000))&&owner.retire({2,1})&&
+        owner.pendingDepths()==0&&!owner.resolve({2,1}),"retirement cancels pending depth before slot reuse");
+    require(owner.birth({2,2},103,{},false)&&!owner.resolve({2,1})&&owner.resolve({2,2}),"generation checked slot reuse");
+    require(owner.writeDepth({1,1},MotionBinary64::fromInteger(-60000))&&owner.serviceDepths()&&
+        layers.get(layers.find(owner.resolve({1,1})->depth.layerId))->depth==-60000,"large depth jump preserves source migration");
+    require(!owner.writeDepth({2,1},MotionBinary64::fromInteger(1))&&!owner.succeeded()&&
+        !owner.retire({2,2})&&owner.resolve({2,2}),"stale lifetime stops owner without retiring replacement");
+    R fullRegistry;R::Layers fullLayers;RunnerLayerIds fullIds;
+    RunnerLayerLifetimes<4,8,0> full(fullLayers,fullRegistry,fullIds);
+    require(!full.birth({0,1},1,{},false)&&!full.succeeded(),"lifetime capacity fails terminally");
+}
+int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
