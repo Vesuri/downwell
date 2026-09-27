@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUN_SESSION_H
 #define DOWNWELL_CORE_RUN_SESSION_H
 #include "RunGemStatistics.h"
+#include "WallBackgroundTiles.h"
 #include "RunClock.h"
 #include "RunCombo.h"
 #include "RunStage.h"
@@ -61,6 +62,11 @@ struct RunSession {
     Consumables consumables;
     UpgradeInventory upgrades;
     ShopWorld shops;
+    WallBackgroundTiles<2048> wallBackground;
+    bool addWallBackground(MotionBinary64 x,MotionBinary64 y){
+        if(!effectsSucceeded)return false;
+        return effectsSucceeded=wallBackground.append(x,y);
+    }
     // Room-owned effects are reset on run/room retirement, not on a repaint.
     FlashBallEffects<32> flashEffects;
     SmokeEffects<32> smokeEffects;
@@ -416,6 +422,7 @@ struct RunSession {
         if (!levelClear.create(style, heartGoal, health, upgrades, player, random)) return false;
         levelClearActive = true;
         flashEffects.clear();
+        wallBackground.clear();
         smokeEffects.clear();
         bloodEffects.clear();
         clearCorpseExpiry();
@@ -523,6 +530,7 @@ struct RunSession {
         consumables = {};
         upgrades = {};
         shops.reset();
+        wallBackground.clear();
         flashEffects.clear();
         smokeEffects.clear();
         bloodEffects.clear();

@@ -386,6 +386,8 @@ public:
     bool emitCorpseExpiry(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
     const downwell::SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
+    const downwell::WallBackgroundTiles<2048>& wallBackgroundTiles()const{return run_.wallBackground;}
+    bool addWallBackground(downwell::MotionBinary64 x,downwell::MotionBinary64 y){return run_.addWallBackground(x,y);}
     bool emitSmokeBurst(downwell::MotionBinary64 x,downwell::MotionBinary64 y){
         return run_.emitSmokeBurst(x,y,enemyRandom_);
     }

@@ -1128,8 +1128,23 @@ explicit raster policy and emits only clipped rectangles, allowing retained
 cache repair/newly exposed strips rather than mandatory full-frame repainting.
 It preserves duplicate additions and fails capacity/arithmetic errors without
 discarding the accepted prefix. This is not a general layer/tile-ID engine.
-The store and its depth pass still need connection to both live schedulers and
-renderers; the background-tile primitive alone does not authorize retiring walls.
+`RunSession` owns a bounded 2048-patch store (about 32 KiB of coordinates),
+cleared on run reset and accepted level-complete room retirement. Checked
+append failure latches the session effect failure; rendering does not mutate
+the store. The stored-world digest includes its coordinates and validity.
+Both world adapters expose this room-owned store. SDL paints the patches after
+direct depth-10000 currency and before ordinary walls; Amiga's terrain painter
+includes them in fresh terrain composition. New native patches invalidate only
+their affected terrain rows, using the existing backing repair and display-buffer
+debt paths. Painting failure must not acknowledge those rows as clean.
+
+The wall End Step callback is still not dispatched in either live scheduler;
+normal gameplay therefore does not yet populate this store. Populated fixtures
+check SDL wall-relative ordering and state immutability, native clipped strip
+composition across ring wrap without changing HUD planes, and room retirement.
+These do not prove full cross-family depth ordering (especially native direct
+effects), source fractional raster policy, memory fit or live wall retirement.
+The background-tile integration alone does not authorize retiring walls.
 
 Room terrain enters through `GameplayWorld::loadRoomTerrain`, shared by native
 startup/re-entry and scene tests via `AmigaGameplayGeneration::loadRoom`.

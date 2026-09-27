@@ -2367,6 +2367,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addU64(sideCameraDigest());
     }
     digest.addU32(static_cast<std::uint32_t>(instances_.size()));
+    run_.wallBackground.appendState(digest);
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& instance = instances_.at(index);
         digest.addU32(instance.instanceId);

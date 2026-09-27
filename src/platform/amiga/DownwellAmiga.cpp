@@ -838,6 +838,7 @@ static void syncGameRows(Bitmap& destination, const Bitmap& backing, unsigned bu
 }
 
 
+static bool terrainPaintSucceeded=true;
 static void drawMainWorldSpan(
     AmigaRenderer* renderer,
     const downwell::RoomPack& rooms,
@@ -851,6 +852,7 @@ static void drawMainWorldSpan(
     int viewX, int viewY, int clipY, int clipHeight,
     int clipX = downwellPlayfieldX, int clipWidth = downwellPlayfieldWidth,
     bool refresh = false, unsigned refreshCause = 0) {
+    if(!terrainPaintSucceeded)return;
     const int firstWorldY = viewY + clipY;
     const int finalWorldY = firstWorldY + clipHeight;
     const bool forcedRefresh = refresh;
@@ -923,9 +925,11 @@ static void drawMainWorldSpan(
         amigaRendererClearGameRows(renderer, clipY, clipHeight, 0);
     downwellProfileTerrainSpan(viewX, firstWorldY, clipHeight, clipX, clipWidth,
         forcedRefresh ? 2 : terrainRaster.ready && cacheable ? 1 : 3, refreshCause);
-    AmigaTerrainPainter::paint(renderer, rooms, room, terrainCollision.index,
+    if(!AmigaTerrainPainter::paint(renderer, rooms, room, terrainCollision.index,
         terrainTiles, decorations, decorationCount, runtime, activeGamePack, activeGamePackEnd,
-        viewX, viewY, clipX, clipY, clipWidth, clipHeight);
+        viewX, viewY, clipX, clipY, clipWidth, clipHeight)){
+        terrainPaintSucceeded=false;return;
+    }
     if (terrainRaster.ready && cacheable && refresh) {
         AmigaHardware::blitterDrain();
         transferTerrainRows(renderer, viewX, firstWorldY, clipY, clipHeight, true);
@@ -1613,6 +1617,7 @@ int main(void) {
         int scrollDelta = 0;
         bool cameraXChanged = false;
         unsigned destroyedBlockCount = 0;
+        const unsigned oldWallTileCount=port.wallBackgroundTiles().size();
         int destroyedBlockX[AmigaPortRuntime::destroyedCapacity] = {0};
         int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
         DW_PROFILE_PHASE(profileWait);
@@ -2476,6 +2481,20 @@ int main(void) {
             terrainCopyBuffer = back;
             DW_PROFILE_PHASE(profileScroll);
             worldViewY += scrollDelta;
+            // Newly retained patches invalidate only their rows. Existing
+            // generation damage handling repairs the visible backing and both
+            // display debts, leaving clean circular-buffer rows untouched.
+            const auto& wallTiles=port.wallBackgroundTiles();
+            for(unsigned i=oldWallTileCount;i<wallTiles.size();++i){
+                std::int32_t y;
+                if(!wallTiles.at(i)->y.roundPixel(y)||y>2147483647-16){terrainPaintSucceeded=false;break;}
+                int first=y<0?0:y,end=y+16;
+                if(end>terrainRasterRows)end=terrainRasterRows;
+                if(first>=end)continue;
+                terrainRaster.invalidate(first,end);
+                if(first<liveGeneration.dirtyFirst)liveGeneration.dirtyFirst=first;
+                if(end>liveGeneration.dirtyEnd)liveGeneration.dirtyEnd=end;
+            }
             if (liveGeneration.dirtyFirst < liveGeneration.dirtyEnd) {
                 gameplayScene.invalidateStage();
                 // Discard dirty retained rows outside the current view. Visible
@@ -2664,10 +2683,11 @@ int main(void) {
                                 downwellProfileTerrainSpan(targetX, first + top, height,
                                     downwellPlayfieldX, downwellPlayfieldWidth, 1, 4);
                                 amigaRendererClearGameRows(&stage, top, height, 0);
-                                AmigaTerrainPainter::paint(&stage, rooms, mainRoom, terrainCollision.index,
+                                if(!AmigaTerrainPainter::paint(&stage, rooms, mainRoom, terrainCollision.index,
                                     terrainTiles, generatedDecorations, liveBuilder.decorationCount(), &port,
                                     activeGamePack, activeGamePackEnd, targetX, first,
-                                    downwellPlayfieldX, top, downwellPlayfieldWidth, height);
+                                    downwellPlayfieldX, top, downwellPlayfieldWidth, height))
+                                    return terrainPaintSucceeded=false;
                                 AmigaHardware::blitterDrain();
                                 return true;
                             });
@@ -2818,6 +2838,7 @@ int main(void) {
                     gameplayRegularSpriteCount,
                     enemySprites[back], palette, port.ringOrigin()))
                 frameReady = false;
+            if(!terrainPaintSucceeded){exitCode=20;break;}
             if (!frameReady) {
                 downwellGameplayRenderFailure();
                 break;

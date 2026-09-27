@@ -7,7 +7,7 @@
 // allocation, simulation, buffer publication or whole-frame redraw policy.
 class AmigaTerrainPainter {
 public:
-    static void paint(AmigaRenderer* renderer,
+    static bool paint(AmigaRenderer* renderer,
         const downwell::RoomPack& rooms, const downwell::PackedRoom& room,
         const AmigaTerrainIndex* terrainIndex, const AmigaTerrainTiles& terrainTiles,
         const AmigaTerrainDecoration* decorations, unsigned decorationCount,

@@ -1,4 +1,5 @@
 #include "AmigaTerrainPainter.h"
+#include "AmigaWallBackground.h"
 #include "core/GameplayWorld.h"
 #include "core/Profile.h"
 #include "core/ShopFixtures.h"
@@ -38,7 +39,7 @@ static UWORD mainWallFrame(const AmigaTerrainIndex* terrainIndex,
 }
 }
 
-void AmigaTerrainPainter::paint(AmigaRenderer* renderer,
+bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
     const downwell::RoomPack& rooms, const downwell::PackedRoom& room,
     const AmigaTerrainIndex* terrainIndex, const AmigaTerrainTiles& terrainTiles,
     const AmigaTerrainDecoration* decorations, unsigned decorationCount,
@@ -64,6 +65,10 @@ void AmigaTerrainPainter::paint(AmigaRenderer* renderer,
                                   downwellPlayfieldX + x - viewX, y - viewY, 0);
     };
     amigaRendererSetClipRect(renderer, clipX, clipY, clipWidth, clipHeight);
+    if(runtime&&!amigaPaintWallBackground(renderer,runtime->wallBackgroundTiles(),
+        viewX,viewY,clipX,clipY,clipWidth,clipHeight)){
+        amigaRendererClearClipRect(renderer);return false;
+    }
     {
     DW_PROFILE_SCOPE(profileTerrainWalls);
     if (terrainIndex)
@@ -113,4 +118,5 @@ void AmigaTerrainPainter::paint(AmigaRenderer* renderer,
             drawGameAsset(renderer, sprite, frame, downwellPlayfieldX + x - viewX, y - viewY, 0);
     });
     amigaRendererClearClipRect(renderer);
+    return true;
 }

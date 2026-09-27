@@ -9,6 +9,7 @@
 #include "core/RunSession.h"
 #include "core/StateDigest.h"
 #include "core/StoredWorldCollision.h"
+#include <algorithm>
 #include <cstring>
 #include <cmath>
 #include <cstdio>
@@ -42,6 +43,8 @@ public:
     }
     void clearClipRect() override { ++clearClipCount; }
     void fillRect(int x, int y, int w, int h, downwell::Color color) override {
+        if(recordWallTile&&x==134&&y==35&&w==16&&h==16&&color.r==0&&color.g==0&&color.b==0&&color.a==255)
+            spriteOrder.push_back(-739);
         if (w == 1 && h == 1 && color.r == 255 && !color.g && !color.b) ++redPixels;
         if (x == 110 && y == 0 && w == 160 && h == 284 &&
             color.r == 255 && color.g == 255 && color.b == 255 && color.a == 255)
@@ -82,6 +85,7 @@ public:
         if (sprite == 127) ++triggerDraws;
     }
     unsigned bulletDraws = 0;
+    bool recordWallTile=false;
     unsigned redPixels = 0;
     std::vector<float> bulletAngles;
     bool spreadBulletDrawn = false;
@@ -419,6 +423,19 @@ int main() {
         }
         require((splashStages&0x7eu)==0x7eu&&garden&&style&&gameplay==120,
             "production boot traverses all six splash stages, garden and style selection into gameplay");
+    }
+    {
+        auto tileGame=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
+        auto& runtime=const_cast<downwell::StartupRuntime&>(tileGame->startup());runtime.skipToGameForTesting();
+        require(runtime.addWallBackground(downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+24),
+            downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewY()+35)),"store room-owned wall patch");
+        const auto digest=runtime.stateDigest();
+        RecordingRenderer tiles;tiles.recordWallTile=true;tileGame->render(tiles);
+        require(tileGame->renderingSucceeded()&&runtime.stateDigest()==digest,"drawing retained tiles preserves state");
+        auto firstTile=std::find(tiles.spriteOrder.begin(),tiles.spriteOrder.end(),-739);
+        auto firstWall=std::find(tiles.spriteOrder.begin(),tiles.spriteOrder.end(),51);
+        require(firstTile!=tiles.spriteOrder.end()&&firstWall!=tiles.spriteOrder.end()&&firstTile<firstWall,
+            "depth-100 tile is drawn at its room-relative position before ordinary walls");
     }
     {
         std::ifstream file("generated/amiga-game.dwap",std::ios::binary);

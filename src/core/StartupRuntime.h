@@ -424,6 +424,8 @@ public:
     bool emitCorpseExpiry(MotionBinary64 x,MotionBinary64 y){return run_.emitCorpseExpiry(x,y);}
     const SmokeEffects<32>& smokeEffects() const {return run_.smokeEffects;}
     bool effectsSucceeded()const{return run_.effectsSucceeded;}
+    const WallBackgroundTiles<2048>& wallBackgroundTiles()const{return run_.wallBackground;}
+    bool addWallBackground(MotionBinary64 x,MotionBinary64 y){return run_.addWallBackground(x,y);}
     bool emitSmokeBurst(MotionBinary64 x,MotionBinary64 y){return run_.emitSmokeBurst(x,y,random_);}
     bool emitFlashBurst(MotionBinary64 x,MotionBinary64 y) {
         return run_.emitFlashBurst(x,y,random_);
