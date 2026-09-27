@@ -113,6 +113,16 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 
 all: $(TARGET)
 
+.PHONY: verify-wall-draw-lookup
+verify-wall-draw-lookup: build/wall-draw-lookup-test
+	./build/wall-draw-lookup-test
+
+build/wall-draw-lookup-test: tests/core/WallDrawLookupTest.cpp src/core/WallDrawLookup.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
+
+test: verify-wall-draw-lookup
+
 .PHONY: generate-area-two-patterns verify-area-two-patterns
 .PHONY: verify-catacomb-symbols
 .PHONY: verify-skeleton-throw

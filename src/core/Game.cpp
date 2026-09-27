@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "WallDrawLookup.h"
 #include "TimeFieldOutlines.h"
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
@@ -285,14 +286,12 @@ void Game::renderMain(Renderer& renderer) const {
         }, [](Real n,std::int32_t& out){return n.roundPixel(out);});
         if (!renderingSucceeded_) return;
     }
-    const auto hasWallAt = [this](std::int32_t x, std::int32_t y) {
-        for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
-            const InstanceRecord& candidate = startup_.instanceAt(index);
-            if (candidate.active && candidate.objectId == 60 &&
-                candidate.x == x && candidate.y == y)
-                return true;
-        }
-        return false;
+    WallDrawLookup<StartupRuntime::instanceCapacity> walls;
+    walls.rebuild(startup_.activeInstanceCount(), [this](std::size_t i) -> const InstanceRecord& {
+        return startup_.instanceAt(i);
+    });
+    const auto hasWallAt = [&walls](std::int32_t x, std::int32_t y) {
+        return walls.contains(x, y);
     };
 
     // objWall_n computes this four-neighbour bit mask on its first End Step.
