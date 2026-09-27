@@ -213,7 +213,7 @@ int main(){
                 return true;
             })&&observedDestroy&&world->instance(first+2)&&world->instance(first+2)->destroyRequested&&shards.size()==2,
             "Destroy excludes immediately and continues outOfView without phase-local storage release");
-        require(world->retireTimeShard(registration,shards,first+2)&&!world->instance(first+2)&&
+        require(world->cleanupDestroyed(registration,shards,[](auto,const auto&){return false;})&&!world->instance(first+2)&&
                 world->instance(first)&&world->instance(first+1),"selected cleanup releases only the marked world lifetime");
         require(shards.clear()&&world->activeInstanceCount()==count&&shardOwner->valid(),"world retirement removes every shard record");
         for(unsigned i=0;i<3;++i)require(!world->instance(first+i),"retired source ID no longer resolves");

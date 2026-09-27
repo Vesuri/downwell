@@ -21,6 +21,17 @@ public:
         entries_[slot].next=entries_[slot].previous=End;entries_[slot].list=-1;return true;
     }
     void clear(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(head_[list]);}
+    // Marked-record cleanup (0x48bbb0) differs from activation reconciliation:
+    // active list first, inactive list second. The visitor may remove only its
+    // current entry; save the successor before dispatch. No births/rebinding.
+    template<class Visit> bool visitCleanupChecked(Visit visit){
+        for(unsigned list=0;list<2;++list)for(unsigned slot=head_[list];slot!=End;){
+            const unsigned next=entries_[slot].next;
+            if(!visit(slot))return false;
+            slot=next;
+        }
+        return true;
+    }
     // Callbacks can publish external membership, but must not mutate this owner.
     template<class Inactive,class Publish> void reconcile(Inactive inactive,Publish publish){
         reconcileChecked(inactive,[&](unsigned slot,bool registered){

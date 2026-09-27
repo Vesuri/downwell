@@ -174,6 +174,18 @@ public:
         }
         run_.effectsSucceeded=false;return false;
     }
+    // Explicit pre-Draw cleanup boundary. Other effect families supply their
+    // own retirement dispatch; they must not be silently erased as plain records.
+    template<unsigned Capacity,unsigned Registered,class Other> bool cleanupDestroyed(
+        StoredTimeShardRegistration<instanceCapacity,Registered>& registration,TimeShardEffects<Capacity>& shards,
+        Other other){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=registration.belongsTo(instances_)&&shards.phasesBoundTo(registration)&&
+            instances_.cleanupDestroyed([&](InstanceHandle key,const InstanceRecord& record){
+                return record.objectId==238?registration.retireMarked(key,record,shards):other(key,record);
+            });
+        return run_.effectsSucceeded;
+    }
     bool menuPlayerNapping() const { return menuPlayerNapping_; }
     int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }

@@ -212,6 +212,21 @@ public:
         return nullptr;
     }
 
+    // Dispatch marked lifetimes in the runner's room-list cleanup order. The
+    // family owner must remove exactly this record (including its external
+    // memberships), and must not create or rebind records during the callback.
+    // Resolve again after dispatch: success without retirement is an error.
+    // Earlier successful removals survive a later failure; callers must latch it.
+    template<class Retire> bool cleanupDestroyed(Retire retire){
+        return roomMembership_.visitCleanupChecked([&](unsigned slot){
+            const InstanceHandle key{slot,slots_[slot].generation};
+            const auto* record=resolve(key);
+            if(!record)return false;
+            if(!record->destroyRequested)return true;
+            return retire(key,*record)&&!resolve(key);
+        });
+    }
+
     InstanceRecord* find(std::uint32_t instanceId) {
         for (std::size_t index = 0; index < size_; ++index) {
             if (records_[index].instanceId == instanceId)

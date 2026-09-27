@@ -129,6 +129,38 @@ void testOwnedObjectMembership() {
     store.clear();require(ids(store).empty(),"clear retires all membership");
 }
 
+void testMarkedRoomCleanup() {
+    for(unsigned failure=0;failure<3;++failure){
+        downwell::InstanceStore<5> store;
+        store.create(1,238,7,false,30);store.create(2,211,7,false,10);
+        store.create(3,238,7,false,20);store.create(4,82,7,false,0);
+        const auto inactive=store.handleAt(1);
+        require(store.requestActivation(inactive,false),"request inactive cleanup candidate");
+        store.reconcileObjectMembership();
+        for(unsigned id:{1u,2u,3u})store.find(id)->destroyRequested=true;
+        std::vector<unsigned> retired;
+        const bool ok=store.cleanupDestroyed([&](auto key,const auto& record){
+            const auto id=record.instanceId;
+            require(store.resolve(key)==&record,"selected generation resolves before retirement");
+            retired.push_back(id);
+            if(id==1&&failure)return failure==2; // false, or lying success without retirement
+            return store.erase(id);
+        });
+        require(ok==(failure==0),"cleanup requires checked, actual retirement");
+        require(retired==(failure?std::vector<unsigned>{3,1}:std::vector<unsigned>{3,1,2}),
+            "cleanup follows active depth order then inactive order across families");
+        require(!store.find(3)&&store.find(4),"successful prefix removed, live sibling preserved");
+        require((store.find(1)!=nullptr)==bool(failure)&&(store.find(2)!=nullptr)==bool(failure),
+            "failure preserves selected and unvisited lifetimes");
+        if(!failure){
+            require(!store.resolve(inactive),"inactive lifetime no longer resolves");
+            store.create(5,238,7,false,15);
+            unsigned calls=0;require(store.cleanupDestroyed([&](auto,const auto&){++calls;return false;})&&calls==0,
+                "reused slot has no stale destruction flag or cleanup membership");
+        }
+    }
+}
+
 } // namespace
 
 int main() {
@@ -137,6 +169,7 @@ int main() {
     testRoomTransitionKeepsPersistentInstances();
     testStableHandles();
     testOwnedObjectMembership();
+    testMarkedRoomCleanup();
     std::cout << "instance store tests passed\n";
     return 0;
 }

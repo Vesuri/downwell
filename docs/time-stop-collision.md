@@ -47,6 +47,16 @@ Live, stale, foreign or failed selections stop the operation without recycling
 the selected storage or retiring siblings. These are explicit sweep operations;
 the automatic mixed-family traversal still needs to be connected.
 
+`InstanceStore::cleanupDestroyed` traverses current room membership, active
+before inactive, and dispatches marked records to their family owners. Removal
+of the current record is allowed; births/rebinding or removal of other records
+during this traversal are not. A successful callback must actually retire its
+selected generation. Failure preserves the already-completed prefix and stops
+before later families. `StartupRuntime::cleanupDestroyed` routes shards through
+their registration and requires an explicit dispatcher for other families. This
+boundary is exercised with the live collision owner; normal frame scheduling
+and the remaining family dispatchers are not yet wired to it.
+
 ## Shard registration contract
 
 `TimeShardEffects` distinguishes its monotonic phase/lifetime handle from a
