@@ -84,6 +84,18 @@ public:
         return b;
     }
     bool hasPlaceMeeting()const{return placeMeeting_!=nullptr;}
+    template<class Owner> static RecordLifecycleBinding bindPositionedBirths(Owner& owner){
+        auto b=bindInstanceQueries(owner);
+        b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
+            return static_cast<Owner*>(p)->birthAt(h,r,x,y);
+        };
+        return b;
+    }
+    bool birthAt(InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y)const{
+        // Missing positioned ownership must not silently round or become a
+        // birth-then-move sequence with different insertion history.
+        return birthAt_&&birthAt_(context_,h,r,x,y);
+    }
     template<class Owner> static RecordLifecycleBinding bindInstanceQueries(Owner& owner){
         auto b=bindQueries(owner);
         b.instancePlace_=[](void* p,InstanceHandle h,const Record& r,int object,
@@ -139,6 +151,7 @@ public:
 private:
     void* context_=nullptr;
     bool (*birth_)(void*,InstanceHandle,const Record&)=nullptr;
+    bool (*birthAt_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
     bool (*retire_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;

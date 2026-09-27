@@ -43,7 +43,7 @@ public:
         if(!valid()||(runtime_&&runtime_!=&runtime))return false;
         runtime_=&runtime;return true;
     }
-    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindInstanceQueries(*this);}
+    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindPositionedBirths(*this);}
     const InstanceRecord* resolve(InstanceHandle h)const{
         if(!runtime_||!owner_.resolve(h))return nullptr;
         const auto* record=runtime_->instance(ids_[h.slot]);
@@ -51,6 +51,10 @@ public:
     }
     bool birth(InstanceHandle h,const InstanceRecord& r){
         if(!valid()||h.slot>=capacity||ids_[h.slot]||!r.instanceId||!adapter_.birth(h,r))return false;
+        ids_[h.slot]=r.instanceId;return true;
+    }
+    bool birthAt(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+        if(!valid()||h.slot>=capacity||ids_[h.slot]||!r.instanceId||!adapter_.birthAt(h,r,x,y))return false;
         ids_[h.slot]=r.instanceId;return true;
     }
     bool retire(InstanceHandle h,const InstanceRecord& r){

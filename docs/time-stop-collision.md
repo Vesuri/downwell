@@ -21,6 +21,14 @@ registration of all effect families, publication during movement/animation and
 exact synchronous Destroy boundaries still need scheduler integration; the
 standalone owner tests do not prove those properties.
 
+The stored collision adapter provides an explicit `birthAt` path for these
+dynamic effects. It receives the already-narrowed binary32 coordinates and
+publishes the spatial birth at that position once, without first inserting at
+the legacy integer drawing coordinates. Nonfinite input is rejected before
+attaching the lifetime. Existing room/terrain `birth` calls retain their integer
+contract. A missing positioned-birth binding is a failure, not an integer
+fallback; callers must preserve this boundary when connecting shard registration.
+
 ## Query mutation contract
 
 The object-selector `instance_place` wrapper (`0x4fe560..0x4fe8b1`) is not a

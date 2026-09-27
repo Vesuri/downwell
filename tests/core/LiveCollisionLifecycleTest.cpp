@@ -108,6 +108,34 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto positioned=std::make_unique<Storage>();
+        require(positioned->families.bindInstanceFlags(objects),"positioned birth families");
+        Lifecycle adapter{positioned->owner,positioned->properties,objects,sprites,positioned->families,{}, {}};
+        InstanceRecord shard;shard.instanceId=105186;shard.objectId=238;
+        PackedObject definition;require(objects.findObject(238,definition),"shard resource");
+        shard.spriteId=definition.spriteId;shard.maskId=definition.textureMaskId;shard.depth=definition.creationDepth;
+        shard.x=1000;shard.y=1000; // Drawing snapshot deliberately differs.
+        const InstanceHandle key{0,1};
+        const RunnerImageValue x{0x41820000u},y{0xbf000000u}; // 16.25, -0.5
+        require(!InstanceLifecycleBinding{}.birthAt(key,shard,x,y),"missing positioned birth is not silent success");
+        require(!adapter.birthAt(key,shard,{0x7f800000u},y)&&!positioned->owner.resolve(key),
+                "nonfinite birth rejected before attaching lifetime");
+        require(adapter.birthAt(key,shard,x,y),"fractional shard inserted directly");
+        const auto* born=positioned->owner.resolve(key);
+        require(born&&born->x.bits==x.bits&&born->y.bits==y.bits,"birth preserves published fractional coordinates");
+        require(adapter.retire(key,shard)&&!positioned->owner.resolve(key),"positioned lifetime retirement");
+        auto production=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        const auto binding=production->binding();
+        require(!binding.birthAt(key,shard,x,{0x7fc00000u})&&production->valid(),
+                "production binding rejects NaN before ownership mutation");
+        require(binding.birthAt(key,shard,x,y)&&binding.retire(key,shard),
+                "production positioned birth and retirement share ID ownership");
+        // Legacy room/terrain births retain their integer coordinate contract.
+        require(adapter.birth({0,2},shard),"legacy integer birth unchanged");
+        born=positioned->owner.resolve({0,2});
+        require(born&&born->x.bits==0x447a0000u&&born->y.bits==0x447a0000u,"legacy birth remains at integer snapshot");
+    }
     auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"bind full source families");
     RecordingLifecycle lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
     auto runtime=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

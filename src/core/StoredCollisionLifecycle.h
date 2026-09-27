@@ -19,9 +19,17 @@ struct StoredCollisionLifecycle {
     Round round;
     bool allPrepared=false;
     bool birth(InstanceHandle h,const InstanceRecord& record){
+        RunnerImageValue x,y;
+        return x.assign(MotionBinary64::fromInteger(record.x))&&
+               y.assign(MotionBinary64::fromInteger(record.y))&&birthAt(h,record,x,y);
+    }
+    // Dynamic effects use narrowed published coordinates, not the legacy
+    // integer drawing fields. Insert at the final birth position exactly once;
+    // an integer insertion followed by move changes spatial traversal history.
+    bool birthAt(InstanceHandle h,const InstanceRecord& record,RunnerImageValue x,RunnerImageValue y){
+        if(!x.promoted().valid()||!y.promoted().valid())return false;
         typename Owner::State state;
-        if(!state.x.assign(MotionBinary64::fromInteger(record.x))||
-           !state.y.assign(MotionBinary64::fromInteger(record.y)))return false;
+        state.x=x;state.y=y;
         if(!record.active)state.flags|=2u;
         if(!owner.attach(h,record.objectId,state))return false;
         auto& p=properties[h.slot];p={};
