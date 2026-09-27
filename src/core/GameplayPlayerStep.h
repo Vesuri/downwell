@@ -12,6 +12,7 @@ struct NoPlayerPositionPublication {
     bool operator()(int,int) const { return true; }
 };
 struct NoPlayerScalePublication { bool operator()(int)const{return true;} };
+struct NoPlayerTimeTransition { bool operator()(const PlayerMotion&,int,int)const{return true;} };
 struct UnindexedPlayerGoalContact {
     bool operator()(RunSession& run,MotionBinary64 x,MotionBinary64 y,int facing,bool& hit)const{
         return run.playerGoalContact(x,y,facing,hit);
@@ -23,12 +24,12 @@ struct UnindexedPlayerGoalContact {
 // Activation remains before this phase; enemy alarms remain after it.
 // No renderer or instance-store representation is selected here.
 template<class PublishPosition=NoPlayerPositionPublication,class PublishScale=NoPlayerScalePublication,
-         class GoalContact=UnindexedPlayerGoalContact>
+         class GoalContact=UnindexedPlayerGoalContact,class TimeTransition=NoPlayerTimeTransition>
 inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     PlayerDeathSequence& death, RunSession& run, CurrencyAccount& currency,
     int& health, GameMakerRandom& random, const Input& input,
     int originX, int originY, int viewX, int viewY, bool controlsLocked = false,
-    PublishPosition publishPosition = {},PublishScale publishScale={},GoalContact goalContact={}) {
+    PublishPosition publishPosition = {},PublishScale publishScale={},GoalContact goalContact={},TimeTransition timeTransition={}) {
     death.beginStep(input.fire);
     run.combo.beginStep();
     struct Context {
@@ -84,6 +85,9 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
         run.effectsSucceeded=false;return motion;
     }
     run.shops.observePlayer(shopPlayerX, shopPlayerY, player.grounded(), player.speedXFixed());
+    // objPlayer_n Begin Step [42..79], after published x/y and interaction
+    // observation. A failed synchronous transition must stop later work.
+    if(!timeTransition(player,shopPlayerX,shopPlayerY)){run.effectsSucceeded=false;return motion;}
     int facing = player.facing();
     const auto shopRandom = [&random](unsigned lo, unsigned hi) {
         return lo + random.irandomSmall(hi - lo);

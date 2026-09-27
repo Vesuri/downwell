@@ -399,6 +399,43 @@ int main(){
         require(!world->stepWithTimeStopEffects(shards,changes,state,Input{})&&
             world->instance(foreignId)->alarms.get(1)==1,"failed live alarm dispatch cannot be retried");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach live player-transition world");world->skipToGameForTesting();world->registerLevelExit(176);
+        TimeStopEffects<16> state;auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
+        require(state.shards.bindPhases(shards)&&state.changes.bind(changes),"bind player-transition families");
+        unsigned pauses=0,hooks=0;std::uint32_t first=0;
+        auto transition=[&](const InstanceRecord& player,const PlayerMotion& motion,int ox,int oy){
+            ++hooks;if(!first)first=world->nextRuntimeInstanceId();
+            TimeStopEffects<16>::PlayerPose pose;
+            // Exact projection of the current portable motion representation;
+            // this does not assert that its Q8 motion matches all original FP paths.
+            require(pose.x.assign(MotionBinary64::fromInteger(player.x))&&pose.y.assign(MotionBinary64::fromInteger(player.y))&&
+                divideBinary64(MotionBinary64::fromInteger(motion.offsetXFixed()),MotionBinary64::fromInteger(256),pose.xx)&&
+                divideBinary64(MotionBinary64::fromInteger(motion.offsetYFixed()),MotionBinary64::fromInteger(256),pose.yy)&&
+                pose.xx.add(MotionBinary64::fromInteger(ox))&&pose.yy.add(MotionBinary64::fromInteger(oy))&&
+                divideBinary64(MotionBinary64::fromInteger(motion.speedXFixed()),MotionBinary64::fromInteger(256),pose.xsp)&&
+                divideBinary64(MotionBinary64::fromInteger(motion.speedYFifths()),MotionBinary64::fromInteger(1280),pose.ysp),
+                "project current motion at actual Begin Step boundary");
+            const auto draws=world->randomDrawCount();
+            return world->beginTimeStop(shards,changes,state,pose,false,[](auto){return false;},[&](auto effect){
+                if(effect==PlayerTimeStop::Effect::change)++pauses;
+                if(effect==PlayerTimeStop::Effect::enterSound)require(world->randomDrawCount()==draws+48,
+                    "both transition bursts precede later world phases");
+                return true;
+            });
+        };
+        require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,transition)&&hooks==1&&pauses==1&&
+            state.player.stopped&&state.shards.size()==6&&state.changes.sourceId(1)==first+3&&
+            state.shards.sourceId(4)==first+4,"normal player Begin Step creates source-ordered transition families");
+        require(state.shards.get(1)->timeline.bits==0&&world->instance(first)->alarms.get(2)==29&&
+            world->instance(first+3)->alarms.get(1)==1,
+            "Begin Step births miss preceding animation but join same-tick alarms and Step");
+        require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,transition)&&hooks==2&&pauses==1,
+            "held field does not recreate the transition on the next world tick");
+        require(state.reset(),"retire live transition fixture before teardown");
+    }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
     {
         auto shardOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

@@ -1283,6 +1283,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
                 return lifecycle_.placeMeeting(instances_.handleAt(i),instance,255,
                     MotionBinary64::fromInteger(instance.x),MotionBinary64::fromInteger(instance.y),hit);
             return false;
+        },[this,&instance](const PlayerMotion&,int,int){
+            return !timeEffectDispatch_||timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::playerBegin,0);
         });
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);

@@ -137,13 +137,14 @@ public:
     bool playerOutsideTimeStopSides(MotionBinary64 x,bool& outside);
     bool timeShardOutsideView(RunnerImageValue publishedY,bool& retire);
     // Scoped animation/alarm/Step ownership for one ordinary world tick. No borrowed
-    // callback survives the call. Player contacts and player transitions
-    // are not supplied by this adapter yet.
-    enum class TimeEffectPhase {animation,alarm,step};
-    template<unsigned Capacity,unsigned Registered,unsigned Changes> bool stepWithTimeStopEffects(
+    // callback survives the call. Contacts are not supplied yet. The optional
+    // transition callback runs at the shared player's source Begin Step boundary.
+    struct NoTimeTransition {bool operator()(const InstanceRecord&,const PlayerMotion&,int,int)const{return true;}};
+    enum class TimeEffectPhase {animation,alarm,step,playerBegin};
+    template<unsigned Capacity,unsigned Registered,unsigned Changes,class Transition=NoTimeTransition> bool stepWithTimeStopEffects(
         StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
-        const Input& input,bool advancePressed=false){
+        const Input& input,bool advancePressed=false,Transition transition={}){
         if(!run_.effectsSucceeded)return false;
         if(timeEffectDispatch_||!state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
             !shards.belongsTo(instances_)||!changes.belongsTo(instances_)||
@@ -151,6 +152,7 @@ public:
             run_.effectsSucceeded=false;return false;
         }
         auto dispatch=[&](InstanceRecord& record,TimeEffectPhase phase,unsigned index){
+            if(phase==TimeEffectPhase::playerBegin)return transition(record,mainPlayerMotion_,mainPlayerOriginX_,mainPlayerOriginY_);
             if(phase==TimeEffectPhase::animation)return shards.dispatchAnimation(record,state.shards);
             if(phase==TimeEffectPhase::step)return shards.dispatchStep(record,state.shards,state.player.stopped,random_,
                 [&](const auto& effect,bool& retire){return timeShardOutsideView(effect.y,retire);});

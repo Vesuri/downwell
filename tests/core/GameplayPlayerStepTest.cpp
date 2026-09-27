@@ -25,6 +25,21 @@ struct Fixture {
 }
 
 int main() {
+    for(bool accept:{false,true}){
+        Fixture f;downwell::Input right;right.right=true;unsigned transitions=0;bool published=false;
+        downwell::stepGameplayPlayer(f.player,f.death,f.run,f.currency,f.health,f.random,right,
+            240,176,160,34,false,[&](int,int){published=true;return true;},downwell::NoPlayerScalePublication{},
+            downwell::UnindexedPlayerGoalContact{},[&](const auto& motion,int x,int y){
+                ++transitions;
+                require(published&&f.run.clock.ticks==1&&!f.run.shops.previous.right,
+                    "transition follows position/clock but precedes later shop processing");
+                require(&motion==&f.player&&x==240+downwell::roundGameMakerQ8(motion.offsetXFixed())&&
+                    y==176+downwell::roundGameMakerQ8(motion.offsetYFixed()),"transition sees authoritative current player motion");
+                return accept;
+            });
+        require(transitions==1&&f.run.effectsSucceeded==accept&&f.run.shops.previous.right==accept,
+            "transition failure stops subsequent shared player work");
+    }
     for(unsigned guard:{0u,1u,2u})for(bool accept:{false,true})for(bool hit:{false,true}){
         Fixture f;f.run.goalStopped=guard==1;f.death.active=guard==2;
         unsigned calls=0;
