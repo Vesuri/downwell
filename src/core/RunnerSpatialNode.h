@@ -35,9 +35,20 @@ struct RunnerSpatialNode {
         for(unsigned i=0;i<6;++i)bounds[i]=entries[i].bounds;
         bounds[6]=incoming.bounds;RunnerSpatialSplit::Result groups;
         if(!RunnerSpatialSplit::partition(bounds,groups))return false;
-        RunnerSpatialNode next[2];next[0].level=next[1].level=level;
-        for(unsigned i=0;i<7;++i)next[groups.group[i]].append(i<6?entries[i]:incoming);
-        *this=next[0];sibling=next[1];return true;
+        // All fallible work is complete. Compact group zero in place while
+        // appending group one to the sibling; retain source array order.
+        // Copy incoming first because callers may pass one of our entries.
+        const Entry last=incoming;
+        sibling.level=level;sibling.count=0;count=0;
+        for(unsigned i=0;i<6;++i){
+            const Entry value=entries[i];
+            if(groups.group[i])sibling.append(value);
+            else append(value);
+        }
+        if(groups.group[6])sibling.append(last);else append(last);
+        for(unsigned i=count;i<6;++i)entries[i]=Entry{};
+        for(unsigned i=sibling.count;i<6;++i)sibling.entries[i]=Entry{};
+        return true;
     }
 };
 }

@@ -160,6 +160,26 @@ int main(){
     assert(branch.count==6 && branch.entries[0].child==6 && sibling.level==8);
     assert(!branch.split({},branch));assert(branch.count==6);
     assert(branch.split({},sibling));assert(sibling.level==2 && branch.level==2);
+    // In-place compaction must preserve an incoming entry that aliases either
+    // destination. Compare it with the same split using a detached copy.
+    for(unsigned alias=0;alias<7;++alias){
+        Node source;
+        for(unsigned i=0;i<6;++i)assert(source.append({{},i+1,i+11}));
+        Node other;assert(other.append({{},99,199}));
+        Node reference=source,referenceOther=other;
+        const Node::Entry incoming=alias<6?source.entries[alias]:other.entries[0];
+        assert(reference.split(incoming,referenceOther));
+        assert(source.split(alias<6?source.entries[alias]:other.entries[0],other));
+        for(unsigned output=0;output<2;++output){
+            const auto& actual=output?other:source;
+            const auto& expected=output?referenceOther:reference;
+            assert(actual.count==expected.count);
+            for(unsigned i=0;i<6;++i){
+                assert(actual.entries[i].child==expected.entries[i].child);
+                assert(actual.entries[i].instance==expected.entries[i].instance);
+            }
+        }
+    }
     Box boxes[7]={};check(boxes);
     Split::Box identical[7]={};Split::Result result;
     assert(Split::partition(identical,result));
