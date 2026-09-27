@@ -453,7 +453,36 @@ This is not yet the full runtime layer owner. The room adapter must provide
 source ID allocation, fixed-layer loader order, type/null/activation predicates,
 hash-equivalent lookup and external attached/current-element publication. The
 binary32 depth setter, unique deferred queue and instance migration service
-still need connection, followed by the selected Draw walk in both backends.
+still need live connection, followed by the selected Draw walk in both backends.
+
+`RunnerDepthChanges` models immediate binary32 setter publication and the unique
+first-request-order queue. Numerically equal writes preserve the old bits,
+including signed zero. Retirement stable-compacts the queue before slot reuse.
+Service follows activation maintenance and clears the queue only after every
+callback succeeds. Failure is terminal, so a successfully migrated prefix cannot
+be replayed. Its callbacks cannot recursively mutate the pending queue; the
+selected layer service does not dispatch game events.
+
+`RunnerDepthService` composes that queue with `RunnerLayers`. It truncates the
+requested binary32 depth toward zero, converts the old integer layer depth to
+binary32, and rounds the subtraction to binary32 before testing absolute distance
+strictly below 20. The same-integer-depth path retains the fractional field;
+the singleton-layer move also retains it. A failed singleton type/identity
+check exits without fallback. Migration detaches, finds/reuses or creates a
+dynamic destination, and publishes its integer depth back to the instance.
+The signed-int-range normal/zero subset is checked explicitly; subnormal,
+nonfinite and out-of-range conversions fail rather than silently approximating
+the x86 invalid-conversion result.
+
+Connected component tests cover the queue and layer owner together, including
+the -60000 box-impact depth, small-move merging with external layer-ID
+publication, retirement, reused layer slots and terminal allocation/publication
+failures. A threshold matrix covers both sides of 20, fractional requests,
+large layer depths, singleton/multiple elements and fixed/dynamic layers.
+These components are not yet invoked by the live world schedulers. Adapters
+still need source identity allocation, instance-field/lookup synchronization,
+current-element bookkeeping and the original phase boundaries; component
+agreement is not proof of a naturally spawned or correctly drawn box effect.
 
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing

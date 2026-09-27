@@ -2,6 +2,14 @@
 #include "core/InstanceStore.h"
 #include "core/RunnerLayerElements.h"
 #include "core/RunnerLayers.h"
+#include "core/RunnerDepthChanges.h"
+bool compileDepthChanges(downwell::RunnerDepthChanges<16>& queue,downwell::RunnerLayers<4,16>& layers,
+    downwell::RunnerDepthService::Instance& instance,unsigned element,downwell::MotionBinary64 value){
+    return queue.request(element,instance.depth,value)&&queue.service([&](unsigned e){
+        return downwell::RunnerDepthService::apply(layers,instance,e,[&](unsigned found){return e==found;},
+            [](int,unsigned&){return false;},[](unsigned,int){return true;},[](unsigned){return false;});
+    });
+}
 bool compileLayers(downwell::RunnerLayers<4,16>& owner,unsigned slot,int depth){
     return owner.move(slot,depth,true,[](unsigned,int){return true;},[](unsigned){return false;});
 }

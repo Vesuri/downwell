@@ -340,10 +340,11 @@ build/dead-body-creation-test: tests/core/DeadBodyCreationTest.cpp $(wildcard sr
 
 .PHONY: verify-debris-draw
 .PHONY: verify-runner-depth-changes
-verify-runner-depth-changes: build/runner-layer-elements-test build/runner-layers-test
+verify-runner-depth-changes: build/runner-layer-elements-test build/runner-layers-test build/runner-depth-changes-test
 	python3 tools/verify-runner-depth-changes.py
 	./build/runner-layer-elements-test
 	./build/runner-layers-test
+	./build/runner-depth-changes-test
 test: verify-runner-depth-changes
 
 build/runner-layer-elements-test: tests/core/RunnerLayerElementsTest.cpp src/core/RunnerLayerElements.h
@@ -351,6 +352,10 @@ build/runner-layer-elements-test: tests/core/RunnerLayerElementsTest.cpp src/cor
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
 build/runner-layers-test: tests/core/RunnerLayersTest.cpp src/core/RunnerLayers.h src/core/RunnerLayerElements.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
+build/runner-depth-changes-test: tests/core/RunnerDepthChangesTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
