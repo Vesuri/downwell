@@ -357,6 +357,23 @@ public:
         if(!checked(nx.assign(x)&&ny.assign(y)))return false;
         return place(self,object,nx,ny,allPrepared,graph,refreshBounds,precise,result);
     }
+    // Object-resource branch of instance_number (0x4fe49b). This is NOT the
+    // raw registration count used by collision preparation below. Filtering
+    // flags does not unlink membership or alter the selected search strategy.
+    // Special negative/instance-ID selectors are outside this entry point.
+    template<class Graph> bool instanceNumber(int object,const Graph& graph,unsigned& result)const{
+        if(!valid()||object<0||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        unsigned count=0;bool good=true;
+        membership_.visit(object,[&](int child,int parent){return graph.isA(child,parent);},
+            [&](unsigned slot,std::uint32_t generation){
+                const auto* state=resolve({slot,generation});
+                if(!state){good=false;return false;}
+                if(!(state->flags&0x140003u))++count;
+                return true;
+            });
+        if(!good)return false;
+        result=count;return true;
+    }
     // Graph supplies validated flags/isA/markSpatialFamily. refreshBounds(h,
     // publish) resolves assets and calls refresh above (or handles/rejects a
     // special resource). precise(a,b,publish,hit) owns the exact pair test and

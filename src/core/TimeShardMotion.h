@@ -72,7 +72,10 @@ struct TimeShardMotion : TimeShardLifecycle {
             if(hit&&!requestDestroy())return false;
         }
         dflash=disappearing?-dflash:-1;
-        if(count()>shardLimit&&!requestDestroy())return false;
+        // Negative count is an adapter failure, never a VM population value.
+        const int population=count();
+        if(population<0)return false;
+        if(population>shardLimit&&!requestDestroy())return false;
         bool retire=false;
         if(!outside(*this,retire))return false;
         if(retire&&!requestDestroy())return false;

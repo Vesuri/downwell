@@ -59,6 +59,17 @@ and the remaining family dispatchers are not yet wired to it.
 
 ## Shard registration contract
 
+Phase-bound shard Step obtains `instance_number(fxTimeShard)` from the world
+collision owner, not its private effect pool size. The object-resource query
+walks ancestor-inclusive registration and filters flags `0x140003`, matching
+`0x4fe49b`. Raw registration counts used for collision-search preparation remain
+unchanged. Destroy exclusion is immediate while storage survives; inactive and
+other source-excluded records do not contribute. Missing/failed ownership stops
+Step before later out-of-view work. Tests include two independently registered
+shard pools sharing one world and a population-triggered destruction which a
+pool-local count would miss. Negative and instance-ID selector branches are not
+implemented by this object-resource entry point.
+
 `TimeShardEffects` distinguishes its monotonic phase/lifetime handle from a
 world-assigned numeric instance ID. A borrowed registration adapter receives
 the narrowed birth coordinates before object-238 Create consumes RNG, then the

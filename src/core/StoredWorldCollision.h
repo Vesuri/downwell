@@ -62,6 +62,9 @@ public:
         ids_[h.slot]=0;return true;
     }
     bool markDestroyed(InstanceHandle h,const InstanceRecord& r){return resolve(h)==&r&&adapter_.markDestroyed(h,r);}
+    bool instanceNumber(int object,unsigned& result)const{
+        return valid()&&owner_.instanceNumber(object,families_,result);
+    }
     bool activation(InstanceHandle h,const InstanceRecord& r,bool active){return adapter_.activation(h,r,active);}
     bool membership(InstanceHandle h,const InstanceRecord& r,bool registered){return adapter_.membership(h,r,registered);}
     bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){return adapter_.move(h,r,x,y);}

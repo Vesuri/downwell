@@ -90,7 +90,13 @@ public:
             return static_cast<Owner*>(p)->birthAt(h,r,x,y);
         };
         b.destroyed_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->markDestroyed(h,r);};
+        b.number_=[](void* p,int object,unsigned& count){return static_cast<Owner*>(p)->instanceNumber(object,count);};
         return b;
+    }
+    bool instanceNumber(int object,unsigned& result)const{
+        unsigned count=0;
+        if(!number_||!number_(context_,object,count))return false;
+        result=count;return true;
     }
     bool birthAt(InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y)const{
         // Missing positioned ownership must not silently round or become a
@@ -155,6 +161,7 @@ private:
     bool (*birth_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*birthAt_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
     bool (*destroyed_)(void*,InstanceHandle,const Record&)=nullptr;
+    bool (*number_)(void*,int,unsigned&)=nullptr;
     bool (*retire_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;

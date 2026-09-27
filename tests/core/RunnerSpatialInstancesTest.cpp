@@ -25,6 +25,25 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    {
+        Owner owner;Graph graph;unsigned count=999;
+        assert(owner.instanceNumber(0,graph,count)&&count==0);
+        for(unsigned i=0;i<6;++i){
+            Owner::State state;
+            state.flags=i==2?1u:i==3?2u:i==4?0x40000u:i==5?0x100000u:0u;
+            assert(owner.attach({i,1},i==0?0:1,state));
+        }
+        assert(owner.instanceNumber(0,graph,count)&&count==2);
+        assert(owner.instanceNumber(1,graph,count)&&count==1);
+        assert(owner.instanceNumber(2,graph,count)&&count==0);
+        assert(owner.setExclusions({1,1},1u)&&owner.instanceNumber(0,graph,count)&&count==1);
+        assert(owner.resolve({1,1})); // Marking excludes before physical cleanup.
+        assert(owner.setActive({1,1},true,*graph.flags(1))&&owner.instanceNumber(0,graph,count)&&count==1);
+        assert(owner.retire({1,1})&&owner.attach({1,2},1,{})&&owner.instanceNumber(0,graph,count)&&count==2);
+        assert(owner.registerObject({1,2},false)&&owner.instanceNumber(0,graph,count)&&count==1);
+        count=999;assert(!owner.instanceNumber(-3,graph,count)&&count==999);
+        assert(!owner.instanceNumber(4,graph,count)&&count==999);
+    }
     // VM coordinates retain fractions and narrow only once, in absolute room
     // space. Compare the boundary with a scalar double -> float conversion,
     // including both sides of binary32 ties and negative coordinates.

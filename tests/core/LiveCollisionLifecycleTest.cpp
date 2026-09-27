@@ -169,6 +169,8 @@ int main(){
                 MotionBinary64::fromInteger(2),MotionBinary64::fromInteger(-3),false),"world burst completes");
         require(world->randomDrawCount()==draws+24&&world->nextRuntimeInstanceId()==first+3&&
                 burst.shard==first+2&&world->activeInstanceCount()==count+3,"burst uses shared world RNG and IDs");
+        unsigned population=999;
+        require(shardOwner->instanceNumber(238,population)&&population==3,"world counts registered shard family");
         for(unsigned i=0;i<3;++i){
             const auto* r=world->instance(first+i);const auto* effect=shards.get(i+1);
             require(r&&effect&&r->objectId==238&&r->spriteId==definition.spriteId&&r->maskId==definition.textureMaskId&&
@@ -200,7 +202,11 @@ int main(){
                     r->x==x&&r->y==y&&r->imageSpeed==0&&r->alarms.get(0)==s->alarm0,
                     "stopped shard still publishes motion, zero animation speed and paused lifetime");
         }
-        shards.get(3)->shardLimit=2;
+        auto otherRegistration=world->timeShardRegistration<3>();TimeShardEffects<3> otherShards;
+        require(otherShards.bindPhases(otherRegistration)&&world->emitTimeShards(burst,otherShards,
+                {0x43704000u},{0x43308000u},{},{},false),"second effect pool registers in same world");
+        require(shardOwner->instanceNumber(238,population)&&population==6,"population spans effect pools");
+        shards.get(3)->shardLimit=5; // Local size is only three; world population is six.
         bool observedDestroy=false;
         require(world->stepTimeShards(registration,shards,shards.beginPhase(),true,
             [&](auto local,const auto& effect,bool& retire){
@@ -208,6 +214,8 @@ int main(){
                 if(local==3){
                     const auto* record=world->instance(first+2);
                     observedDestroy=record&&record->destroyRequested&&effect.destroyRequested&&shards.size()==2;
+                    require(shardOwner->instanceNumber(238,population)&&population==5,
+                        "source population excludes marked shard inside its continuing Step");
                     retire=true; // Repeated source Destroy must be idempotent.
                 }
                 return true;
@@ -215,6 +223,7 @@ int main(){
             "Destroy excludes immediately and continues outOfView without phase-local storage release");
         require(world->cleanupDestroyed(registration,shards,[](auto,const auto&){return false;})&&!world->instance(first+2)&&
                 world->instance(first)&&world->instance(first+1),"selected cleanup releases only the marked world lifetime");
+        require(otherShards.clear(),"retire second pool after population verification");
         require(shards.clear()&&world->activeInstanceCount()==count&&shardOwner->valid(),"world retirement removes every shard record");
         for(unsigned i=0;i<3;++i)require(!world->instance(first+i),"retired source ID no longer resolves");
         world->step({},false);require(world->effectsSucceeded(),"world continues after registered burst retirement");

@@ -35,6 +35,11 @@ public:
     StoredTimeShardRegistration(const StoredTimeShardRegistration&)=delete;
     StoredTimeShardRegistration& operator=(const StoredTimeShardRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    bool population(unsigned& result){
+        if(!succeeded_)return false;
+        if(!lifecycle_.instanceNumber(238,result))return fail();
+        return true;
+    }
     bool birth(std::uint32_t local,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
         if(!succeeded_)return false;
         Entry* free=nullptr;

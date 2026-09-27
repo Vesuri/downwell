@@ -33,6 +33,7 @@ public:
     template<class World> bool bindPhases(World& world){
         if(!bind(world))return false;
         deferCleanup_=true;
+        population_=[](void* p,unsigned& count){return static_cast<World*>(p)->population(count);};
         animation_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
             return static_cast<World*>(p)->publishAnimation(h,id,effect);
         };
@@ -131,7 +132,11 @@ public:
             if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
             if(!slot.effect.step(stopped,random,
                 [&](auto x,auto y,bool& hit){return meeting(slot.handle,static_cast<const TimeShardAnimation&>(slot.effect),x,y,hit);},
-                [&](){return int(size());},
+                [&](){
+                    unsigned count=size();
+                    if(population_&&(!population_(context_,count)||count>0x7fffffffu))return -1;
+                    return static_cast<int>(count);
+                },
                 [&](const auto& effect,bool& retire){return outside(slot.handle,effect,retire);},
                 [&](){return !destroyed_||destroyed_(context_,slot.handle,slot.sourceId,slot.effect);})||
                (step_&&!step_(context_,slot.handle,slot.sourceId,slot.effect))){
@@ -191,6 +196,7 @@ private:
     // or the next Create. Unbound component fixtures retain eager cleanup.
     bool deferCleanup_=false;
     void* context_=nullptr;
+    bool (*population_)(void*,unsigned&)=nullptr;
     bool (*birth_)(void*,Handle,const TimeShardAnimation&,std::uint32_t&)=nullptr;
     bool (*created_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
     bool (*retire_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
