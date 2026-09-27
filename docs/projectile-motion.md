@@ -515,9 +515,15 @@ layer owner, with checked callbacks for layer visibility, begin/end operations,
 element lookup and presentation. Tests cover reverse layer/forward element
 order, equal-depth peers, layer termination, hidden layers, callback failures
 and 1,024 instance flag/lookup combinations. Non-instance element types remain
-backend dispatch responsibilities. The helper currently prohibits structural
-mutation during callbacks; original Draw-time removal, insertion, layer scripts,
-shader setup and non-instance rendering still require adapter integration/audit.
+backend dispatch responsibilities. The element walk saves each successor before
+dispatch (`0x4904c6..0x4904cb`). Synchronous head insertion therefore does not
+draw the new element in that pass. A tail insertion is visited only if an
+unvisited predecessor subsequently reads its link: appending while drawing the
+old tail does not visit the new tail until the next pass. Tests cover each of
+three birth positions, head/tail insertion and the following Draw pass. This is
+not a frozen frame snapshot. Draw-time element retirement/reuse, layer movement
+or removal, layer scripts, shader setup and non-instance rendering still require
+adapter integration/audit; callbacks must not perform the unaudited mutations.
 It is not yet a replacement for either live renderer's room-list adapter.
 
 #### Activation and layer membership

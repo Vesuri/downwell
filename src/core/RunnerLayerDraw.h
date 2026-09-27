@@ -24,8 +24,10 @@ struct RunnerLayerDraw {
     }
     // Callback failure stops the whole traversal. endLayer still runs the
     // layer's end callback and proceeds to the next layer. Hidden layers run
-    // neither callback. Callbacks must not mutate layer/element links here;
-    // original Draw-time structural mutation requires an adapter audit.
+    // neither callback. Element insertion is allowed: the runner saves the
+    // successor before dispatch, not an entire frame snapshot. Callbacks must
+    // not retire/reuse elements or move/remove layers until those lifetimes
+    // have been audited in the adapter.
     template<class Layers,class Visible,class Begin,class Lookup,class Draw,class End>
     static bool visit(const Layers& layers,Visible visible,Begin begin,Lookup lookup,Draw draw,End end){
         if(!layers.succeeded())return false;
@@ -33,7 +35,7 @@ struct RunnerLayerDraw {
             if(!visible(slot,layer))return true;
             if(!begin(slot,layer))return false;
             bool stopped=false;
-            const bool ok=layers.visitElements(slot,[&](unsigned element){
+            const bool ok=layers.visitDrawElements(slot,[&](unsigned element){
                 Element state;if(!lookup(element,state))return false;
                 const auto result=action(state);
                 if(result==Action::endLayer){stopped=true;return false;}

@@ -80,5 +80,36 @@ void roomActivation(){
     require(draw()==std::vector<unsigned>({1,0,2}),"promotions enter layer head");
     calls.clear();require(reconcile()&&calls.empty()&&draw()==std::vector<unsigned>({1,0,2}),"unchanged reconciliation does not reorder");
 }
+void drawBirths(){
+    // Real Draw dispatch with synchronous insertion, not a precomputed list.
+    // Head births are deferred; tail births are visible this frame only if
+    // an unvisited predecessor will subsequently read their link.
+    for(unsigned birthAt=0;birthAt<3;++birthAt)for(bool append:{false,true}){
+        RunnerLayers<1,4> layers;unsigned layer=1;
+        require(layers.insertAfterEquals(10,0,false,layer),"birth test layer");
+        for(unsigned e=0;e<3;++e)
+            require(layers.attach(layer,e,true,true,[](unsigned){return false;}),"birth test initial elements");
+        std::vector<unsigned> trace;
+        bool spawned=false;
+        auto run=[&](){return RunnerLayerDraw::visit(layers,
+            [](unsigned,const auto&){return true;},[](unsigned,const auto&){return true;},
+            [](unsigned,auto& out){out={2,0x10,true,true,true,false};return true;},
+            [&](unsigned,unsigned e,Action){
+                trace.push_back(e);
+                if(e==birthAt&&!spawned){
+                    spawned=true;
+                    return layers.attach(layer,3,true,append,[](unsigned){return false;});
+                }
+                return true;
+            },[](unsigned,const auto&){return true;});};
+        require(run(),"Draw birth insertion");
+        auto expected=std::vector<unsigned>({0,1,2});
+        if(append&&birthAt<2)expected.push_back(3);
+        require(trace==expected,"saved successor controls same-frame birth eligibility");
+        trace.clear();require(run(),"Draw after insertion");
+        require(trace==(append?std::vector<unsigned>({0,1,2,3}):std::vector<unsigned>({3,0,1,2})),
+            "next Draw includes birth exactly once in link order");
+    }
 }
-int main(){dispatch();traversal();roomActivation();std::cout<<"Selected layer Draw order and 1024 instance-dispatch cases verified\n";}
+}
+int main(){dispatch();traversal();roomActivation();drawBirths();std::cout<<"Selected layer Draw order, synchronous births and 1024 instance-dispatch cases verified\n";}

@@ -104,6 +104,9 @@ public:
     template<class Visit> bool visitElements(unsigned layer,Visit visit)const{
         return get(layer)&&elements_.visitForward(layer,visit);
     }
+    template<class Visit> bool visitDrawElements(unsigned layer,Visit visit)const{
+        return get(layer)&&elements_.visitDraw(layer,visit);
+    }
 private:
     void eraseEmpty(unsigned slot){unlink(slot);layers_[slot]=Layer{};}
     void unlink(unsigned slot){

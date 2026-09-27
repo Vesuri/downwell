@@ -14,7 +14,8 @@ public:
     // 0x4128d0: explicit append wins; otherwise type-2 elements enter at
     // head, other types follow only the contiguous active-instance prefix.
     // activeInstance must reject non-type-2 and null instance references.
-    // Predicates and visitors must not mutate these links.
+    // Predicates and raw visitors must not mutate these links. visitDraw has
+    // a separate saved-successor contract for insertion during dispatch.
     template<class ActiveInstance> bool insert(unsigned layer,unsigned element,
         bool instanceElement,bool append,ActiveInstance activeInstance){
         if(layer>=Layers || element>=Elements || owner(element)!=NoLayer)return false;
@@ -59,6 +60,19 @@ public:
     template<class Visit> bool visitForward(unsigned layer,Visit visit)const{
         if(layer>=Layers)return false;
         for(unsigned i=layers_[layer].head;i!=End;i=links_[i].next)if(!visit(i))return false;
+        return true;
+    }
+    // Draw (0x4904c6): save the successor BEFORE dispatch. Insertions are
+    // observed only when a later visited element reads its own successor.
+    // The owner must keep the current layer and saved successor alive; this
+    // does not establish safe retirement/reuse semantics for Draw callbacks.
+    template<class Visit> bool visitDraw(unsigned layer,Visit visit)const{
+        if(layer>=Layers)return false;
+        for(unsigned i=layers_[layer].head;i!=End;){
+            const unsigned next=links_[i].next;
+            if(!visit(i))return false;
+            i=next;
+        }
         return true;
     }
     template<class Visit> bool visitBackward(unsigned layer,Visit visit)const{
