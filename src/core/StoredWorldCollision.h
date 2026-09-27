@@ -5,6 +5,7 @@
 #include "RunnerObjectFamilies.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
+#include "RunnerCollisionEventContext.h"
 namespace downwell {
 // Resource-backed owner for the stored world. Construct before the runtime,
 // bind its lifecycle before room births, then attach the runtime before Step.
@@ -76,6 +77,16 @@ public:
         if(!valid())return false;
         const auto* a=resolve(self);const auto* b=resolve(other);
         return a&&b&&adapter_.objects.collisionEvent(a->objectId,b->objectId,found,event);
+    }
+    template<class Execute>
+    bool dispatchCollisionEvent(RunnerCollisionEventContext& context,InstanceHandle self,InstanceHandle other,
+                                RunnerCollisionEventContext::RoomState room,Execute execute)const{
+        if(!valid())return false;
+        return context.dispatch(self,other,room,
+            [&](InstanceHandle a,InstanceHandle b,int& subtype,bool& found,PackedObjectEvent& event){
+                const auto* opposite=resolve(b);if(!opposite)return false;
+                subtype=opposite->objectId;return collisionEvent(a,b,found,event);
+            },execute);
     }
     bool collisionFlags(InstanceHandle h,std::uint32_t& flags)const{
         if(!valid()||!resolve(h))return false;

@@ -31,6 +31,20 @@ binary32 additions when applying motion (`0x5031e3..0x503248`). The portable
 protocol does not substitute fixed-point additions: concrete motion/path and
 event-context callbacks remain required before live scheduler admission.
 
+`RunnerCollisionEventContext` specializes dispatcher `0x4449e0` for event 4.
+No current room (`0x4449e6`) or a pending room change (`0x4449f8`) suppresses
+collision execution. The pending-change exception list permits event types
+0, 14, 1, 2 and 7, not collision type 4; persistence does not bypass that list.
+Lookup happens only after these guards. The defining owner from the handler
+entry becomes `event_object`, while the actual opposite object's ID becomes
+the subtype. The runner saves/restores those globals at `0x444ab1..0x444b05`.
+The portable context similarly restores the outer frame on success or checked
+failure, latches nested failures, and rejects recursion above 32 (the source
+reports a runtime error at `0x444a97`). The stored-world adapter supplies real
+handle and binding resolution, with execution explicitly delegated to its
+caller. The caller must supply actual room-transition state on every call;
+the legacy host room-change timing has not yet been adopted as source truth.
+
 `tools/verify-runner-collision-phase.py` pins these reviewed regions through
 the existing whole-executable hash guard. The scheduler's optional checked
 collision callback runs after Step reconciliation and before End Step,

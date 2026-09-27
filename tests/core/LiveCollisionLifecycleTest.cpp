@@ -239,6 +239,7 @@ int main(){
             "collect source-resource collision candidates from live room births");
         require(pairs->size()>0,"generated room exercises collision candidates");
         unsigned preciseHits=0;
+        RunnerCollisionEventContext eventContext;unsigned handlers=0;
         for(unsigned i=0;i<pairs->size();++i){
             const auto* pair=pairs->at(i);
             const auto* a=owner->resolve(pair->self);const auto* b=owner->resolve(pair->other);
@@ -253,6 +254,13 @@ int main(){
                 "live pair directions resolve handlers using actual lifetime identities");
             if(hasForward)require(forward.eventType==4&&forward.codeId>=0,"forward handler has source code binding");
             if(hasBackward)require(backward.eventType==4&&backward.codeId>=0,"reverse handler has source code binding");
+            const auto beforeHandlers=handlers;
+            require(owner->dispatchCollisionEvent(eventContext,pair->self,pair->other,{true,false},
+                [&](const RunnerCollisionEventContext::Frame& frame){
+                    ++handlers;return frame.subtype==b->objectId&&frame.owner==forward.ownerObjectId&&
+                        frame.code==forward.codeId&&owner->resolve(frame.self)==a&&owner->resolve(frame.other)==b;
+                })&&handlers==beforeHandlers+unsigned(hasForward)&&!eventContext.current(),
+                "live collision context separates actual subtype from inherited event owner");
             bool hit=false;std::uint32_t before=0,after=0;
             require(owner->collisionOverlap(pair->self,pair->other,hit)&&
                 owner->collisionFlags(pair->other,before)&&owner->queueCollision(pair->other)&&
