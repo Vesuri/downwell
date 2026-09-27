@@ -43,6 +43,18 @@ int main(){
     {
         GameMakerRandom random(42);World world(random);TimeShardEffects<2> effects;
         assert(effects.bindPhases(world));const auto a=effects.create({},{},false,random),b=effects.create({},{},false,random);
+        const auto untouched=*effects.get(b);AlarmBank alarms;alarms.set(0,10);alarms.set(1,9);alarms.set(2,4);
+        unsigned queries=0;
+        auto meeting=[&](auto local,const auto&,auto,auto,bool& hit){assert(local==a);++queries;hit=false;return true;};
+        auto outside=[](auto,const auto&,bool& retire){retire=false;return true;};
+        assert(effects.stepFor(a,effects.sourceId(a),alarms,true,random,meeting,outside));
+        assert(world.steps==1&&queries==3&&random.drawCount()==12&&effects.get(a)->alarm0==11&&
+            effects.get(a)->alarm1==10&&effects.get(a)->alarm2==4&&effects.get(b)->alarm0==untouched.alarm0);
+        assert(!effects.stepFor(a,999,alarms,true,random,meeting,outside)&&!effects.succeeded()&&world.steps==1&&queries==3);
+    }
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<2> effects;
+        assert(effects.bindPhases(world));const auto a=effects.create({},{},false,random),b=effects.create({},{},false,random);
         auto expected=*effects.get(a);const auto other=*effects.get(b);
         assert(expected.advanceImage()&&effects.advanceAnimationFor(a,effects.sourceId(a)));
         assert(world.animations==1&&effects.get(a)->timeline.bits==expected.timeline.bits&&

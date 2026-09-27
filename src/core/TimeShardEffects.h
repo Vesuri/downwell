@@ -164,23 +164,20 @@ public:
         if(!succeeded_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
-            bool eligible=true;
-            if(!eventEligible(slot,eligible))return false;
-            if(!eligible)continue;
-            if(!slot.effect.step(stopped,random,
-                [&](auto x,auto y,bool& hit){return meeting(slot.handle,static_cast<const TimeShardAnimation&>(slot.effect),x,y,hit);},
-                [&](){
-                    unsigned count=size();
-                    if(population_&&(!population_(context_,count)||count>0x7fffffffu))return -1;
-                    return static_cast<int>(count);
-                },
-                [&](const auto& effect,bool& retire){return outside(slot.handle,effect,retire);},
-                [&](){return !destroyed_||destroyed_(context_,slot.handle,slot.sourceId,slot.effect);})||
-               (step_&&!step_(context_,slot.handle,slot.sourceId,slot.effect))){
-                succeeded_=false;return false;
-            }
+            if(!stepOne(slot,nullptr,stopped,random,meeting,outside))return false;
         }
         return deferCleanup_||retireRequested();
+    }
+    template<class Random,class Meeting,class Outside>
+    bool stepFor(Handle handle,std::uint32_t id,const AlarmBank& alarms,bool stopped,Random& random,Meeting meeting,Outside outside){
+        if(!succeeded_)return false;
+        if(!deferCleanup_){succeeded_=false;return false;}
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+            if(slot.handle!=handle)continue;
+            if(slot.sourceId!=id||slot.effect.destroyRequested){succeeded_=false;return false;}
+            return stepOne(slot,&alarms,stopped,random,meeting,outside);
+        }
+        succeeded_=false;return false;
     }
     template<class Random> bool playerContact(Handle handle,MotionBinary64 xsp,MotionBinary64 ysp,Random& random){
         if(!succeeded_)return false;
@@ -234,6 +231,24 @@ public:
         }
     }
 private:
+    template<class Random,class Meeting,class Outside>
+    bool stepOne(Slot& slot,const AlarmBank* alarms,bool stopped,Random& random,Meeting meeting,Outside outside){
+        bool eligible=true;if(!eventEligible(slot,eligible))return false;
+        if(!eligible)return true;
+        if(alarms){
+            slot.effect.alarm0=alarms->get(0);slot.effect.alarm1=alarms->get(1);slot.effect.alarm2=alarms->get(2);
+        }
+        if(!slot.effect.step(stopped,random,
+            [&](auto x,auto y,bool& hit){return meeting(slot.handle,static_cast<const TimeShardAnimation&>(slot.effect),x,y,hit);},
+            [&](){
+                unsigned count=size();
+                if(population_&&(!population_(context_,count)||count>0x7fffffffu))return -1;
+                return static_cast<int>(count);
+            },[&](const auto& effect,bool& retire){return outside(slot.handle,effect,retire);},
+            [&](){return !destroyed_||destroyed_(context_,slot.handle,slot.sourceId,slot.effect);})||
+           (step_&&!step_(context_,slot.handle,slot.sourceId,slot.effect))){succeeded_=false;return false;}
+        return true;
+    }
     bool advanceImage(Slot& slot){
         bool eligible=true;
         if(animationEligible_&&!animationEligible_(context_,slot.handle,slot.sourceId,eligible)){

@@ -135,10 +135,11 @@ public:
     bool playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,InstancePlaceResult& result);
     bool playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit);
     bool playerOutsideTimeStopSides(MotionBinary64 x,bool& outside);
-    // Scoped animation/alarm ownership for one ordinary world tick. No borrowed
-    // callback survives the call. Shard Step/contact phases and player
-    // transitions are not supplied by this adapter yet.
-    enum class TimeEffectPhase {animation,alarm};
+    bool timeShardOutsideView(RunnerImageValue publishedY,bool& retire);
+    // Scoped animation/alarm/Step ownership for one ordinary world tick. No borrowed
+    // callback survives the call. Player contacts and player transitions
+    // are not supplied by this adapter yet.
+    enum class TimeEffectPhase {animation,alarm,step};
     template<unsigned Capacity,unsigned Registered,unsigned Changes> bool stepWithTimeStopEffects(
         StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
@@ -151,6 +152,8 @@ public:
         }
         auto dispatch=[&](InstanceRecord& record,TimeEffectPhase phase,unsigned index){
             if(phase==TimeEffectPhase::animation)return shards.dispatchAnimation(record,state.shards);
+            if(phase==TimeEffectPhase::step)return shards.dispatchStep(record,state.shards,state.player.stopped,random_,
+                [&](const auto& effect,bool& retire){return timeShardOutsideView(effect.y,retire);});
             return record.objectId==238?shards.dispatchAlarm(record,state.shards,index):
                 changes.dispatchAlarm(record,state.changes,index,state.roomSpeed);
         };

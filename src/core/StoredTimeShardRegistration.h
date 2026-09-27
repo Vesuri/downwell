@@ -123,6 +123,19 @@ public:
         }
         return fail();
     }
+    template<class Effects,class Random,class Outside>
+    bool dispatchStep(const InstanceRecord& record,Effects& effects,bool stopped,Random& random,Outside outside){
+        if(!succeeded_)return false;
+        if(!effects.phasesBoundTo(*this))return fail();
+        for(auto& e:entries_)if(e.local&&e.id==record.instanceId){
+            if(resolve(e)!=&record)return fail();
+            if(!effects.stepFor(e.local,e.id,record.alarms,stopped,random,
+                [&](auto,const auto&,auto x,auto y,bool& hit){return meeting(e.local,e.id,x,y,hit);},
+                [&](auto,const auto& effect,bool& retire){return outside(effect,retire);}))return fail();
+            return true;
+        }
+        return fail();
+    }
     bool meeting(std::uint32_t local,std::uint32_t id,MotionBinary64 x,MotionBinary64 y,bool& hit){
         if(!succeeded_)return false;
         auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;bool next=false;

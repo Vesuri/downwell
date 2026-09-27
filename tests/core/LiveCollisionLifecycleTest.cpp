@@ -358,8 +358,8 @@ int main(){
         require(world->emitTimeShards(state.burst,state.shards,{0x43700000u},{0x43300000u},{},{},false),"live routed shards");
         const auto changeId=state.changes.sourceId(1),shardId=state.shards.sourceId(1);
         const auto lifetime=world->instance(shardId)->alarms.get(0);
-        auto expectedAnimation=*state.shards.get(1);
         for(unsigned tick=1;tick<=14;++tick){
+            auto expectedAnimation=*state.shards.get(1);
             require(expectedAnimation.advanceImage(),"portable source shard animation oracle");
             require(world->stepWithTimeStopEffects(shards,changes,state,Input{}),"normal world tick dispatches registered effects");
             require(state.shards.get(1)->imageIndex.bits==expectedAnimation.imageIndex.bits&&
@@ -372,6 +372,19 @@ int main(){
         }
         require(world->cleanupDestroyed(shards,changes,state,[](auto,const auto&){return false;})&&!world->instance(changeId),
             "live routed expiry awaits normal explicit cleanup");
+        state.player.stopped=true;
+        const auto frozenLife=world->instance(shardId)->alarms.get(0),frozenFade=world->instance(shardId)->alarms.get(1);
+        const auto cooldown=world->instance(shardId)->alarms.get(2);
+        for(unsigned tick=1;tick<=5;++tick){
+            require(world->stepWithTimeStopEffects(shards,changes,state,Input{})&&state.shards.get(1)&&
+                world->instance(shardId)->alarms.get(0)==frozenLife&&world->instance(shardId)->alarms.get(1)==frozenFade&&
+                world->instance(shardId)->alarms.get(2)==cooldown-int(tick),
+                "live stopped Step compensates lifetime/fade decrements but not contact cooldown");
+            std::int32_t px,py;
+            require(state.shards.get(1)->xx.roundPixel(px)&&state.shards.get(1)->yy.roundPixel(py)&&
+                world->instance(shardId)->x==px&&world->instance(shardId)->y==py,
+                "registered stopped shard publishes rounded private motion coordinates");
+        }
         require(state.reset(),"retire live alarm test owners");
         world->step(false);
         require(world->effectsSucceeded(),"ordinary world step retains no scoped alarm callback");

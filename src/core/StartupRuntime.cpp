@@ -1129,6 +1129,21 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     syncMainBuilderState();
 }
 
+bool StartupRuntime::timeShardOutsideView(RunnerImageValue publishedY,bool& retire){
+    // fxTimeShard calls outOfView(0,320) before publishing rounded yy to y.
+    // The script only destroys in rmMain; other rooms have no retirement.
+    if(!run_.effectsSucceeded)return false;
+    if(roomId_!=mainRoomId){retire=false;return true;}
+    const auto view=MotionBinary64::fromInteger(mainCameraRenderViewY());int order;
+    if(!compareRunnerReal(publishedY.promoted(),view,order)){run_.effectsSucceeded=false;return false;}
+    if(order<0){retire=true;return true;}
+    auto bottom=view;
+    if(!bottom.add(MotionBinary64::fromInteger(320))||!compareRunnerReal(publishedY.promoted(),bottom,order)){
+        run_.effectsSucceeded=false;return false;
+    }
+    retire=order>0;return true;
+}
+
 bool StartupRuntime::playerOutsideTimeStopSides(MotionBinary64 x,bool& outside){
     if(!run_.effectsSucceeded)return false;
     PackedRoom room;
@@ -1359,6 +1374,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(eventType==3&&eventSubtype==0&&instance.objectId==238&&timeEffectDispatch_){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::step,0);
+        return run_.effectsSucceeded;
+    }
     if(eventType==2&&(instance.objectId==211||instance.objectId==238)&&timeEffectDispatch_){
         ++implementedCodeCalls_;
         run_.effectsSucceeded=timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::alarm,unsigned(eventSubtype));
