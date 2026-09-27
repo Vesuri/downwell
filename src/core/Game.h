@@ -19,7 +19,8 @@ public:
     explicit Game(const RoomPack* roomPack = nullptr,
                   const ObjectPack* objectPack = nullptr,
                   const BuilderPatternPack* builderPatternPack = nullptr,
-                  const EffectMaskAssets* effectAssets = nullptr);
+                  const EffectMaskAssets* effectAssets = nullptr,
+                  InstanceLifecycleBinding lifecycle = {});
 
     // Platform entropy for ResetPlayer/randomize; fixed default for replays.
     void update(const Input& input, std::uint32_t restartSeed = 2);

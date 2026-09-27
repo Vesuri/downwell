@@ -1,6 +1,7 @@
 #include "core/StartupRuntime.h"
 #include "core/RoomPack.h"
 #include "core/StoredCollisionLifecycle.h"
+#include "core/StoredWorldCollision.h"
 #include "core/RunnerObjectFamilies.h"
 #include "core/SmokeDirection.h"
 #include "core/SmokeTrig.h"
@@ -112,6 +113,21 @@ int main(){
         InstanceLifecycleBinding::bindQueries(lifecycle));
     lifecycle.runtime=runtime.get();lifecycle.masks=&masks;
     auto plain=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+    {
+        SpriteMaskPack missing(nullptr,0);
+        auto invalid=std::make_unique<StoredWorldCollision>(objects,sprites,missing);
+        bool hit=true;InstanceRecord record;
+        require(!invalid->valid()&&!invalid->attach(*plain)&&
+            !invalid->placeMeeting({},record,255,{},{},hit)&&hit,
+            "missing collision resources cannot attach or silently answer a successful miss");
+    }
+    auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+    require(productionOwner->valid(),"production owner validates resource packs");
+    auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+        productionOwner->binding());
+    require(productionOwner->attach(*production)&&!productionOwner->attach(*plain),
+        "production owner attaches exactly one runtime without sharing its identities");
+    production->skipToGameForTesting();
     runtime->skipToGameForTesting();plain->skipToGameForTesting();
     require(!runtime->instance(101097)&&!runtime->startTimeField()&&runtime->randomDrawCount()==331,
         "first-level start field consumes Create RNG then retires its placed lifetime");
@@ -121,6 +137,9 @@ int main(){
     for(unsigned tick=0;tick<1800;++tick){
         const auto input=gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY());
         runtime->step(input,false);plain->step(input,false);
+        production->step(input,false);
+        require(production->effectsSucceeded()&&production->roomLoadSucceeded()&&production->deferredCommandsSucceeded()&&
+            production->stateDigest()==runtime->stateDigest(),"production collision owner matches audited live query state and RNG");
         if(!runtime->effectsSucceeded()||!runtime->roomLoadSucceeded()||!runtime->deferredCommandsSucceeded()){
             std::fprintf(stderr,"live collision publication failed at tick %u\n",tick);return 1;
         }
@@ -143,6 +162,9 @@ int main(){
         }
     }
     require(lifecycle.meetingCalls>0,"natural player updates execute the maintained collision query");
+    production->reset(PlatformProfile::nonDesktop);production->skipToGameForTesting();
+    require(production->effectsSucceeded()&&production->roomLoadSucceeded()&&production->deferredCommandsSucceeded(),
+        "production collision owner survives room retirement and new generations");
     // Resolve through actual world ownership, not a copied InstanceStore or a
     // rebuilt tree. Generation validation precedes looking up its instance ID.
     struct View {

@@ -72,9 +72,10 @@ private:
 } // namespace
 
 Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
-           const BuilderPatternPack* builderPatternPack, const EffectMaskAssets* effectAssets)
+           const BuilderPatternPack* builderPatternPack, const EffectMaskAssets* effectAssets,
+           InstanceLifecycleBinding lifecycle)
     : startup_(PlatformProfile::desktop, roomPack, objectPack,
-               StartupRuntime::defaultRandomSeed, builderPatternPack),
+               StartupRuntime::defaultRandomSeed, builderPatternPack,lifecycle),
       objectPack_(objectPack), effectAssets_(effectAssets) {
 #ifdef DOWNWELL_SKIP_TO_GAME
     startup_.skipToGameForTesting();

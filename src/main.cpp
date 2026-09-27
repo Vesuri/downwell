@@ -4,11 +4,14 @@
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
 #include "core/SpritePack.h"
+#include "core/StoredWorldCollision.h"
 #include "platform/sdl/PlatformSDL.h"
 #include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <vector>
+#include <memory>
+#include <new>
 
 int main() {
     downwell::PlatformSDL platform;
@@ -63,9 +66,17 @@ int main() {
     const std::vector<std::uint8_t> effectBytes{std::istreambuf_iterator<char>(effectFile),{}};
     downwell::EffectMaskAssets effectAssets;
     if (!effectAssets.bind(effectBytes.data(),effectBytes.size())) return 20;
-    downwell::Game game(roomPack.valid() ? &roomPack : nullptr,
-                        objectPack.valid() ? &objectPack : nullptr,
-                        builderPatternPack.valid() ? &builderPatternPack : nullptr, &effectAssets);
+    std::ifstream collisionFile("generated/downwell-sprites.dwsc",std::ios::binary);
+    const std::vector<std::uint8_t> collisionBytes{std::istreambuf_iterator<char>(collisionFile),{}};
+    std::ifstream maskFile("generated/downwell-sprite-masks.dwsm",std::ios::binary);
+    const std::vector<std::uint8_t> maskBytes{std::istreambuf_iterator<char>(maskFile),{}};
+    const downwell::SpriteCollisionPack collisions(collisionBytes.data(),collisionBytes.size());
+    const downwell::SpriteMaskPack masks(maskBytes.data(),maskBytes.size());
+    std::unique_ptr<downwell::StoredWorldCollision> collisionOwner(
+        new(std::nothrow) downwell::StoredWorldCollision(objectPack,collisions,masks));
+    if(!roomPack.valid()||!builderPatternPack.valid()||!collisionOwner||!collisionOwner->valid())return 20;
+    downwell::Game game(&roomPack,&objectPack,&builderPatternPack,&effectAssets,collisionOwner->binding());
+    if(!collisionOwner->attach(game.startup()))return 20;
     while (!game.finished()) {
         game.update(platform.pollInput(), static_cast<std::uint32_t>(SDL_GetPerformanceCounter()));
         if (!game.simulationSucceeded()) return 20;

@@ -10,6 +10,7 @@
 #include "core/GameplayContactProfileInput.h"
 #include "core/SpritePack.h"
 #include "core/FontPack.h"
+#include "core/StoredWorldCollision.h"
 #include "platform/sdl/PlatformSDL.h"
 #include <chrono>
 #include <cstdio>
@@ -17,6 +18,7 @@
 #include <fstream>
 #include <iterator>
 #include <vector>
+#include <memory>
 
 static std::vector<std::uint8_t> read(const char* path) {
     std::ifstream file(path, std::ios::binary);
@@ -48,7 +50,13 @@ int main(int argc,char** argv) {
     downwell::PlatformSDL platform;
     if(!platform.ready() || !platform.loadSpriteAssets(sprites,"extracted/utmt-0.9.2.0/TexturePages") ||
        !platform.loadFontAssets(fonts)) return 20;
-    downwell::Game game(&rooms,&objects,&builders,&effects);
+    const auto cb=read("generated/downwell-sprites.dwsc"),mb=read("generated/downwell-sprite-masks.dwsm");
+    downwell::SpriteCollisionPack collisions(cb.data(),cb.size());
+    downwell::SpriteMaskPack masks(mb.data(),mb.size());
+    auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,collisions,masks);
+    if(!owner->valid())return 20;
+    downwell::Game game(&rooms,&objects,&builders,&effects,owner->binding());
+    if(!owner->attach(game.startup()))return 20;
     if(!game.startup().inMainRoom()) return 20;
     using Clock=std::chrono::steady_clock;
     const auto ms=[](auto a,auto b){return std::chrono::duration<double,std::milli>(b-a).count();};

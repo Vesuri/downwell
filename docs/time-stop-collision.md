@@ -37,10 +37,20 @@ room/reset/out-of-view retirement, activation requests and scheduler membership
 reconciliation pass through this binding. Rejected callbacks latch failure and
 stop later work; a rejected reset retirement must not create replacement births.
 The binding's owner must outlive the runtime, and a bound runtime must not be
-copied while sharing that owner. Default construction leaves the binding empty:
-it does not install a collision registry or change query selection. Position and
-resource writes, separate effect lifetimes and native-world registration still
-need explicit routing before installing the full collision owner in gameplay.
+copied while sharing that owner. Default core construction leaves the binding
+empty for unindexed fixtures. The SDL executable instead constructs a
+`StoredWorldCollision` before `Game`, passes its binding before room births, and
+attaches the runtime before the first update. It loads DWSC collision metadata
+and DWSM masks alongside the other generated resources; invalid ownership is a
+startup failure, not a silent fallback. `make run` generates those packs.
+
+The owner uses generation-validated slots to resolve current stored records,
+not borrowed record pointers that room compaction could invalidate. It cannot
+be copied or attached to a second runtime. Its lifecycle callbacks maintain
+the graph and spatial index across room/reset/activation/movement/resource
+writes; there is no per-frame reconstruction. The production SDL profiler uses
+the same owner. Native-world resource registration, separate effect lifetimes,
+remaining source writes and routing other collision decisions are still open.
 
 Object identity changes use `InstanceStore::bindObject` with the collision
 adapter's `rebind` callback. The callback validates the old handle/object pair
@@ -69,9 +79,9 @@ ownership, checks temporary player-position restoration, then resets the room.
 The query adapter accepts a read-only `resolve(handle)` view instead of requiring
 a copied or publicly exposed instance container. The clock tests also cover
 an overlapping exit, query failure, room retirement and a later-level entrance
-descendant. They are not an original traversal-order oracle. Production default
-construction still uses the unindexed adapter: full resource-owner installation,
-native-world registration and remaining collision-family scheduling are required.
+descendant. They are not an original traversal-order oracle. Native gameplay
+still uses the unindexed adapter until its heterogeneous world records have
+resource-backed registration; remaining collision-family scheduling is required.
 Motion remains a combined phase before this clock boundary; preserving old
 published query coordinates does not by itself prove full source event order.
 

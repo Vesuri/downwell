@@ -8,6 +8,7 @@
 #include "core/DeathResultsChoices.h"
 #include "core/RunSession.h"
 #include "core/StateDigest.h"
+#include "core/StoredWorldCollision.h"
 #include <cstring>
 #include <cmath>
 #include <cstdio>
@@ -391,6 +392,34 @@ int main() {
     const downwell::ObjectPack objects(objectBytes.data(), objectBytes.size());
     const downwell::BuilderPatternPack builders(builderBytes.data(), builderBytes.size());
     require(rooms.valid() && objects.valid() && builders.valid(), "damage-render test loads real room/object/builder data");
+    {
+        const auto collisionBytes=read("generated/downwell-sprites.dwsc"),maskBytes=read("generated/downwell-sprite-masks.dwsm");
+        const downwell::SpriteCollisionPack collisions(collisionBytes.data(),collisionBytes.size());
+        const downwell::SpriteMaskPack masks(maskBytes.data(),maskBytes.size());
+        auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,collisions,masks);
+        require(owner->valid(),"production boot loads collision resources");
+        auto bound=std::make_unique<downwell::Game>(&rooms,&objects,&builders,nullptr,owner->binding());
+        auto plain=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
+        require(owner->attach(bound->startup()),"production Game attaches before its first update");
+        unsigned gameplay=0,splashStages=0;bool garden=false,style=false;
+        for(unsigned frame=0;frame<4000&&gameplay<120;++frame){
+            const auto& state=bound->startup();
+            require(state.showSplash()>=0&&state.showSplash()<=6,"boot splash state is in source range");
+            splashStages|=1u<<state.showSplash();
+            downwell::Input control;
+            if(state.inMenu()){garden=true;control.right=true;}
+            else if(state.inPlayMenu()){style=true;control.fire=state.playMenuYOffset()==0;}
+            bound->update(control);plain->update(control);
+            require(bound->simulationSucceeded()&&plain->simulationSucceeded()&&
+                bound->startup().stateDigest()==plain->startup().stateDigest(),"production owner preserves boot-to-game state and RNG");
+            RecordingRenderer a,b;bound->render(a);plain->render(b);
+            require(bound->renderingSucceeded()&&plain->renderingSucceeded()&&a.spriteOrder==b.spriteOrder,
+                "production owner preserves boot-to-game sprite painter order");
+            gameplay+=state.inMainRoom();
+        }
+        require((splashStages&0x7eu)==0x7eu&&garden&&style&&gameplay==120,
+            "production boot traverses all six splash stages, garden and style selection into gameplay");
+    }
     {
         std::ifstream file("generated/amiga-game.dwap",std::ios::binary);
         const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
