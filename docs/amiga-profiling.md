@@ -6,6 +6,28 @@ commit that records them, not a rolling status document.
 
 ## Run a bounded comparison
 
+### SDL slowdown checks
+
+For interactive reports, run `DOWNWELL_PROFILE=1 make run`. Every 180 frames
+it reports depth, instance count, FPS, update/draw cost, presentation wait and
+tick-limiter wait. Keep the output from both the start and the slow section.
+
+For a repeatable descent with the production frame limiter:
+
+```sh
+make build/profile-sdl-game
+DOWNWELL_PROFILE=1 DOWNWELL_PROFILE_PACED=1 ./build/profile-sdl-game 2400
+```
+
+The profiler has a 45-second deadline and exits itself. Omit
+`DOWNWELL_PROFILE_PACED` to measure unpaced throughput; that is not the normal
+game's FPS. `DOWNWELL_PROFILE_DRAW_EVERY=10` allows deeper simulation coverage
+within the deadline, but must not be used to claim full-frame playability.
+Compare state digests at identical ticks to check that presentation optimizations
+have not changed the replay. Presentation time includes display synchronization.
+
+### Amiga checks
+
 For entrance-field lifecycle correctness (not timing), run
 `bash amiga/verify_field_reentry.sh`. It uses a 45-second emulator deadline
 (configurable up to 60), then restores the ordinary build. The same tape runs

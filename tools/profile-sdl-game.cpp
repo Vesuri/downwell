@@ -9,6 +9,7 @@
 // allowing a deeper replay within the deadline without changing its inputs.
 // DOWNWELL_PROFILE_FIRE_PHASE=0..9 selects a repeatable firing sequence;
 // different sequences reach different depths without altering game state.
+// DOWNWELL_PROFILE_PACED=1 uses the production tick limiter as well as vsync.
 #include "core/Game.h"
 #include "core/RoomPack.h"
 #include "core/GameplayContactProfileInput.h"
@@ -23,6 +24,7 @@
 #include <iterator>
 #include <vector>
 #include <memory>
+#include <string>
 
 static std::vector<std::uint8_t> read(const char* path) {
     std::ifstream file(path, std::ios::binary);
@@ -32,6 +34,8 @@ int main(int argc,char** argv) {
     unsigned frames=downwell::gameplayContactProfileFrames;
     unsigned drawEvery=1;
     unsigned firePhase=downwell::gameplayContactProfilePhase;
+    const bool paced=std::getenv("DOWNWELL_PROFILE_PACED") &&
+        std::string(std::getenv("DOWNWELL_PROFILE_PACED"))=="1";
     if(const char* value=std::getenv("DOWNWELL_PROFILE_FIRE_PHASE")){
         char* end=nullptr;const auto parsed=std::strtoul(value,&end,10);
         if(!*value || *end || parsed>9)return 2;
@@ -78,9 +82,10 @@ int main(int argc,char** argv) {
     using Clock=std::chrono::steady_clock;
     const auto ms=[](auto a,auto b){return std::chrono::duration<double,std::milli>(b-a).count();};
     const auto deadline=Clock::now()+std::chrono::seconds(45);
-    double update=0,draw=0,present=0,peak=0;
+    double update=0,draw=0,present=0,pacing=0,peak=0;
     unsigned rendered=0;
-    std::puts("tick,y,records,update_ms,draw_ms,present_ms,peak_work_ms,state_digest");
+    std::puts("tick,y,records,update_ms,draw_ms,present_ms,pacing_ms,ticks_per_second,peak_work_ms,state_digest");
+    auto sampleBegin=Clock::now();
     for(unsigned tick=0;tick<frames;++tick){
         if(Clock::now()>deadline) return 21;
         if(platform.pollInput().quit) return 0;
@@ -90,17 +95,21 @@ int main(int argc,char** argv) {
         const bool render=tick%drawEvery==0 || tick+1==frames;
         if(render)game.render(platform);const auto c=Clock::now();
         if(render){platform.present();++rendered;}const auto d=Clock::now();
+        if(paced)platform.waitForNextTick();const auto e=Clock::now();
         if(!game.simulationSucceeded() || !game.renderingSucceeded()) return 20;
         update+=ms(a,b);draw+=ms(b,c);present+=ms(c,d);
+        pacing+=ms(d,e);
         if(ms(a,c)>peak)peak=ms(a,c);
         if((tick+1)%180==0 || tick+1==frames){
             const unsigned updates=(tick%180)+1;
-            std::printf("%u,%.1f,%zu,%.3f,%.3f,%.3f,%.3f,%016llx\n",tick+1,state.mainPlayerY(),
+            std::printf("%u,%.1f,%zu,%.3f,%.3f,%.3f,%.3f,%.1f,%.3f,%016llx\n",tick+1,state.mainPlayerY(),
                         state.activeInstanceCount(),update/updates,draw/(rendered?rendered:1),
-                        present/(rendered?rendered:1),peak,
+                        present/(rendered?rendered:1),pacing/updates,
+                        1000.0*updates/ms(sampleBegin,e),peak,
                         static_cast<unsigned long long>(state.stateDigest()));
-            update=draw=present=peak=0;
+            update=draw=present=pacing=peak=0;
             rendered=0;
+            sampleBegin=e;
             std::fflush(stdout);
         }
     }

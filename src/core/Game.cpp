@@ -307,10 +307,17 @@ void Game::renderMain(Renderer& renderer) const {
         [&](int x,int y,int w,int h){renderer.fillRect(x,y,w,h,{0,0,0,255});return true;});
     if(!renderingSucceeded_)return;
     WallDrawLookup<StartupRuntime::instanceCapacity> walls;
-    walls.rebuild(startup_.activeInstanceCount(), [this](std::size_t i) -> const InstanceRecord& {
-        return startup_.instanceAt(i);
-    });
-    const auto hasWallAt = [&walls](std::int32_t x, std::int32_t y) {
+    bool wallsBuilt = false;
+    const auto hasWallAt = [this,&walls,&wallsBuilt](std::int32_t x, std::int32_t y) {
+        // Production walls retain their End Step-selected frames. Only the
+        // legacy fixture path needs adjacency; do not sort the entire growing
+        // level every frame when nobody will consult the lookup.
+        if (!wallsBuilt) {
+            walls.rebuild(startup_.activeInstanceCount(), [this](std::size_t i) -> const InstanceRecord& {
+                return startup_.instanceAt(i);
+            });
+            wallsBuilt = true;
+        }
         return walls.contains(x, y);
     };
 
