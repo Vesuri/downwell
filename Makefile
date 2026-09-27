@@ -2078,9 +2078,16 @@ build/capture-sdl-game: tools/capture-sdl-landing.cpp $(filter-out src/main.cpp,
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -DDOWNWELL_SKIP_TO_GAME -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
 
-build/profile-sdl-game: tools/profile-sdl-game.cpp $(filter-out src/main.cpp,$(SOURCES)) $(HOST_CHECK_HEADERS) src/platform/sdl/PlatformSDL.h
+build/profile-sdl-game: tools/profile-sdl-game.cpp $(filter-out src/main.cpp,$(SOURCES)) $(HOST_CHECK_HEADERS) src/platform/sdl/PlatformSDL.h src/platform/sdl/SpriteVisibility.h
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -DDOWNWELL_SKIP_TO_GAME -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
+
+.PHONY: verify-sdl-sprite-visibility
+test: verify-sdl-sprite-visibility
+verify-sdl-sprite-visibility:
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o build/sdl-sprite-visibility-test tests/platform/SDLSpriteVisibilityTest.cpp
+	./build/sdl-sprite-visibility-test
 
 build/live-collision-lifecycle-test: tests/core/LiveCollisionLifecycleTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) $(HOST_CHECK_HEADERS) generated/smoke-trig.inc
 	@mkdir -p build

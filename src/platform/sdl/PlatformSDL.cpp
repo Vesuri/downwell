@@ -1,4 +1,5 @@
 #include "PlatformSDL.h"
+#include "SpriteVisibility.h"
 #include "core/Game.h"
 #include "core/FontPack.h"
 #include "core/SpritePack.h"
@@ -251,6 +252,8 @@ void PlatformSDL::drawSpriteTransformed(std::int32_t spriteId,
                                 y + transformedTop,
                                 std::abs(scaleX) * item.targetWidth,
                                 std::abs(scaleY) * item.targetHeight};
+    if(sdlSpriteOutside(destination.x,destination.y,destination.w,destination.h,
+                        rotation,Game::logicalWidth,Game::logicalHeight))return;
     const SDL_FPoint origin{-transformedLeft, -transformedTop};
     SDL_RendererFlip flip = SDL_FLIP_NONE;
     if (scaleX < 0.0F)
