@@ -21,11 +21,28 @@ extends through 8; the existing angle/radian restrictions are unchanged.
 
 `MachineGunSourceMotion` preserves absolute-room binary32 x/y and binary64
 xsp/ysp. `endpoint()` returns promoted x+xsp and y+ysp without narrowing for the
-solid line query. `commitPosition()` models the later coordinate arithmetic,
-including a binary32 write on every update. It is an arithmetic operation, not
-a replacement for publishing the source's sequential X and Y mutations to the
-spatial owner. Translating to the native local origin before narrowing is not
+solid line query. `commitPosition(publish)` models the later coordinate arithmetic,
+including separate X-before-Y binary32 writes on every update. Its publisher
+receives each intermediate position before committing that axis to the motion
+owner. A failed second write retains the completed first write; the enclosing
+world must latch failure instead of retrying the event. Translating to the native local origin before narrowing is not
 equivalent. Backend offsets must be applied after original coordinate storage.
+
+`initialize(random,publishAngle,muzzle)` publishes angle before synchronous
+muzzle creation and sets `allSet` only after both callbacks succeed. The
+arithmetic-only overloads supply no-op publishers; they are for fixtures,
+not a substitute for live ownership.
+
+After wall-line selection and the enemy-line exclusion, `scrBulCheckSolid`
+stores `thatWall` and initializes `whileStop=0`. While its point query misses
+parent solid 59 it writes Y += ysp/10 followed by X += xsp/10, narrowing at each
+setter. It increments the counter and breaks only when it exceeds 100: up to
+101 iterations, with no further point query after that final iteration.
+`approachSolid` reproduces this sequence with explicit query/publication
+callbacks. Division by 10 must not be replaced by multiplication by rounded
+0.1. Wall damage/effects/destruction follow the loop; final X/Y movement still
+runs after a destruction request. Selector identity, those side effects and
+deferred retirement belong to the scheduler, not this arithmetic component.
 
 This component is not yet the live trajectory owner: the live Q20/Q32 adapter
 must be replaced together with its collision endpoints, angle consumers,

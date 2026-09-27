@@ -82,6 +82,14 @@ assert ("push.v self.y\npush.v self.ysp\nadd.v.v\n"
         "push.v self.y\npush.v self.x\ncall.i collision_line(argc=7)") in solid
 assert step.index("call.i gml_Script_scrEffectSpawn(argc=6)") < step.index("pop.v.i self.allSet")
 print("VM solid queries use unrounded upcoming endpoints, after synchronous muzzle Create")
+approach = solid.split(":[7]", 1)[1].split(":[10]", 1)[0]
+assert ("push.v self.y\npush.v self.ysp\npushi.e 10\nconv.i.d\ndiv.d.v\nadd.v.v\npop.v.v self.y\n"
+        "push.v self.x\npush.v self.xsp\npushi.e 10\nconv.i.d\ndiv.d.v\nadd.v.v\npop.v.v self.x") in approach
+assert "push.v self.whileStop\npushi.e 1\nadd.i.v\npop.v.v self.whileStop" in approach
+assert "push.v self.whileStop\npushi.e 100\ncmp.i.v GT\nbf [9]" in approach
+assert "pushi.e 0\npop.v.i self.whileStop" in solid
+assert step.index("pop.v.v self.x\n") < step.index("pop.v.v self.y\n")
+print("VM approach writes Y then X with division by ten and permits 101 iterations; final Step writes X then Y")
 impact = (export / "Assembly/gml_GlobalScript_scrTypicalBulletDamage.asm").read_text()
 bat = (export / "Assembly/gml_Object_enmBat_Step_0.asm").read_text()
 assert "push.v self.bDir\npop.v.v other.hitDir" in impact
