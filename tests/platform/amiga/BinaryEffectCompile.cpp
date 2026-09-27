@@ -10,6 +10,11 @@ bool compileLayerLifetimes(downwell::RunnerLayerLifetimes<4,16,8>& owner,downwel
     return owner.birth(h,id,{},false)&&owner.writeDepth(h,downwell::MotionBinary64::fromInteger(-60000))&&
         owner.serviceDepths()&&owner.retire(h);
 }
+bool compileLayerRoomLifetimes(downwell::RunnerLayerLifetimes<4,16,8>& owner,
+    const downwell::RunnerLayerLifetimes<4,16,8>::State& state){
+    return owner.adopt(state)&&owner.initializeRoom([&](auto visit){return visit(state.handle);},
+        [](unsigned){return false;});
+}
 #include "core/PackedRoomLayerLoader.h"
 #include "core/RunnerLayerBackground.h"
 #include "core/RunnerLayerBackgrounds.h"

@@ -264,4 +264,36 @@ void lifetimeDepthIntegration(){
     RunnerLayerLifetimes<4,8,0> full(fullLayers,fullRegistry,fullIds);
     require(!full.birth({0,1},1,{},false)&&!full.succeeded(),"lifetime capacity fails terminally");
 }
-int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
+void lifetimeRoomInitialization(){
+    using R=RunnerLayerInstances<4,8>;using Owner=RunnerLayerLifetimes<4,8,4>;
+    R registry;R::Layers layers;RunnerLayerIds catalog;
+    require(catalog.observeLoaded(131),"room lifetime catalog");
+    unsigned fixed=4;require(layers.insertAfterEquals(17,10,false,fixed)&&registry.reserve(layers,fixed,100),
+        "room lifetime placeholder");
+    Owner owner(layers,registry,catalog);
+    Owner::State survivor{{2,7},100,{{0x41280000u},99,true,false},true}; // 10.5
+    Owner::State fallback{{0,3},512,{{0x41a40000u},17,false,false},false}; // 20.5
+    require(owner.adopt(survivor)&&owner.adopt(fallback)&&registry.find(survivor.handle)==R::End,
+        "adoption preserves fields without attaching or running Create");
+    require(owner.initializeRoom([&](auto visit){
+        require(owner.resolve(survivor.handle)->depth.layerId==17&&
+            owner.resolve(survivor.handle)->depth.depth.bits==0x41280000u,
+            "serialized initialization preserves fractional depth before globals");
+        return visit(fallback.handle)&&visit(survivor.handle);
+    },[](unsigned){return false;}),"shared owner initializes surviving room lifetimes");
+    require(owner.resolve(fallback.handle)->depth.layerId==17&&
+        owner.resolve(fallback.handle)->depth.depth.bits==0x41200000u,
+        "fallback honors saved fixed layer then publishes its depth");
+    std::vector<unsigned> order;
+    require(layers.visitElements(fixed,[&](unsigned e){order.push_back(registry.get(e)->sourceId);return true;})&&
+        order==std::vector<unsigned>({512,100}),"inactive survivor follows active fallback");
+    require(owner.writeDepth(survivor.handle,MotionBinary64::fromInteger(-60000))&&owner.serviceDepths()&&
+        owner.resolve(survivor.handle)->depth.layerId==132,"adopted lifetime enters ordinary depth service");
+    require(owner.retire(survivor.handle)&&owner.birth({2,8},101,{},false),"adopted lifetime retires and slot is reusable");
+    require(!owner.initializeRoom([](auto visit){return visit(InstanceHandle{2,7});},[](unsigned){return false;})&&
+        !owner.succeeded()&&owner.resolve({2,8}),"stale global enumeration fails without losing replacement");
+    R duplicates;R::Layers duplicateLayers;RunnerLayerIds duplicateIds;Owner duplicate(duplicateLayers,duplicates,duplicateIds);
+    require(duplicate.adopt(survivor)&&!duplicate.birth({1,1},100,{},false)&&!duplicate.resolve({1,1}),
+        "birth cannot duplicate an adopted source identity before initialization");
+}
+int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}

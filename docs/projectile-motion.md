@@ -776,6 +776,20 @@ merged layer-ID publication, a -60000 migration and generation reuse. This is
 the shared adapter, not live installation: persistent-state transfer and room
 preparation must be connected before either backend changes Draw traversal.
 
+Its room-entry adapter adopts surviving lifetime fields without treating them
+as new births, assigning a depth, or resetting a saved layer ID. The room owner
+must supply the fields after source teardown; adoption does not transfer a
+pending depth queue or perform teardown itself. Duplicate source identities and
+occupied/stale handles fail terminally. `initializeRoom` uses those owned fields
+for serialized bindings, then a caller-provided original global-hash handle
+walk for fallback, followed by the separate inactive-tail normalization. Owned
+non-instance elements initialize through the supplied callback. Invoke this
+once at the source room-entry boundary, not once per frame: normalization is
+not idempotent. Tests retain fractional depth on serialized rebinding, honor a
+saved fixed layer during fallback, and carry adopted lifetimes through deferred
+depth service and retirement. Live room teardown/transfer and installation are
+still required; these tests do not establish persistent-room gameplay parity.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

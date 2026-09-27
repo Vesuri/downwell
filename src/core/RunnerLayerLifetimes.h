@@ -24,10 +24,45 @@ public:
     const State* resolve(InstanceHandle h)const{
         return h.slot<I&&h.generation&&states_[h.slot].handle.generation==h.generation?&states_[h.slot]:nullptr;
     }
-    bool birth(InstanceHandle h,std::uint32_t sourceId,RunnerImageValue depth,bool inactive){
+    // Adopt surviving instance fields before serialized room initialization.
+    // This is not Create: do not attach, truncate depth, or invent/reset the
+    // saved layer ID. The room owner supplies fields after source teardown.
+    // Pending depth requests belong to that owner too, not to this snapshot.
+    bool adopt(const State& state){
+        const auto h=state.handle;
         if(!succeeded()||h.slot>=I||!h.generation||states_[h.slot].handle.generation||
-            !RunnerSpatialSplit::valid(depth))return fail();
-        auto& state=states_[h.slot];state={h,sourceId,{depth,-1,false,false},inactive};
+            !RunnerSpatialSplit::valid(state.depth.depth))return fail();
+        for(unsigned i=0;i<I;++i)
+            if(states_[i].handle.generation&&states_[i].sourceId==state.sourceId)return fail();
+        states_[h.slot]=state;return true;
+    }
+    // Globals enumerates surviving handles in original global hash order.
+    // Serialized bindings precede fallback and the one inactive-tail pass.
+    // Other initializes owned non-instance elements (e.g. backgrounds).
+    template<class Globals,class Other> bool initializeRoom(Globals globals,Other other){
+        if(!succeeded())return false;
+        return registry_.initializeRoom(layers_,
+            [&](std::uint32_t id,InstanceHandle& h,RunnerDepthService::Instance*& out){
+                out=nullptr;
+                for(unsigned i=0;i<I;++i)if(states_[i].handle.generation&&states_[i].sourceId==id){
+                    h=states_[i].handle;out=&states_[i].depth;break;
+                }
+                return true;
+            },[&](auto visit){
+                return globals([&](InstanceHandle h){
+                    if(!resolve(h))return false;
+                    auto& state=states_[h.slot];
+                    return visit(state.sourceId,h,state.depth,state.inactive);
+                });
+            },[&](unsigned e){
+                const auto* entry=registry_.get(e);
+                const auto* state=entry?resolve(entry->instance):nullptr;
+                return state&&state->inactive;
+            },[&](int depth,unsigned& slot){return ids_.createDynamic(layers_,depth,slot);},other)||fail();
+    }
+    bool birth(InstanceHandle h,std::uint32_t sourceId,RunnerImageValue depth,bool inactive){
+        if(!adopt({h,sourceId,{depth,-1,false,false},inactive}))return false;
+        auto& state=states_[h.slot];
         const auto reserved=registry_.find(sourceId);
         const bool ok=reserved!=Registry::End?
             registry_.attach(layers_,layers_.elementOwner(reserved),sourceId,h,state.depth,inactive):
