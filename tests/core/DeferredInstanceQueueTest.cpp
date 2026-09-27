@@ -186,6 +186,40 @@ void testLifecycleFailureStopsCreate(){
         births==2&&creates==1&&next==102,"retry does not replay earlier publication or Create side effects");
 }
 
+void testCheckedCreateFailureStopsBatch(){
+    const auto bytes=makeObjectPack();downwell::ObjectPack objects(bytes.data(),bytes.size());
+    for(unsigned failAt:{1u,2u,3u,4u}){
+        downwell::InstanceStore<8> instances;downwell::DeferredInstanceQueue<4> queue;
+        for(int i=0;i<4;++i)require(queue.enqueueCreate(0,i,20),"queue checked Create fixture");
+        unsigned calls=0;std::uint32_t next=100;
+        auto create=[&](downwell::InstanceRecord& parent){
+            ++calls;
+            // A synchronous child and a write both precede the failure. They
+            // must remain observable rather than being rolled back/repeated.
+            parent.health=77;
+            require(instances.create(next++,0,20,false)==downwell::CreateInstanceResult::success,
+                "checked callback child birth");
+            return calls!=failAt;
+        };
+        require(queue.applyChecked(instances,objects,20,next,create)==
+            downwell::ApplyInstanceCommandsResult::createFailure,"Create failure propagates");
+        require(calls==failAt&&instances.size()==2*failAt&&next==100+2*failAt,
+            "failed Create prevents subsequent parent births but retains prior children");
+        for(unsigned i=0;i<failAt;++i)
+            require(instances.at(i*2).health==77,"completed Create writes remain visible");
+        require(queue.applyChecked(instances,objects,20,next,create)==
+            downwell::ApplyInstanceCommandsResult::createFailure&&calls==failAt,
+            "retry cannot replay failed Create or earlier births");
+        require(queue.apply(instances,objects,20,next,[](auto&){})==
+            downwell::ApplyInstanceCommandsResult::createFailure&&next==100+2*failAt,
+            "legacy apply cannot bypass a checked batch failure");
+        queue.clear();instances.clear();
+        require(queue.enqueueCreate(0,1,2),"fresh checked batch");
+        require(queue.applyChecked(instances,objects,20,next,[](auto&){return true;})==
+            downwell::ApplyInstanceCommandsResult::success,"explicit reset permits a new batch");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -193,6 +227,7 @@ int main() {
     testQueueOverflowIsSticky();
     testSynchronousChildBirthFailure();
     testLifecycleFailureStopsCreate();
+    testCheckedCreateFailureStopsBatch();
     std::cout << "deferred instance queue tests passed\n";
     return 0;
 }

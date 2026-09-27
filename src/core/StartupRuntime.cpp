@@ -1793,11 +1793,14 @@ void StartupRuntime::flushDeferredInstances(
     std::int32_t roomId) {
     if (objectPack_ == nullptr || deferredInstances_.size() == 0)
         return;
+    if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded)return;
     const auto createHandler = [this](InstanceRecord& instance) {
         dispatchInstancePhase(instance, RoomInstancePhase::preCreate);
+        if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded)return false;
         dispatchInstancePhase(instance, RoomInstancePhase::create);
+        return deferredCommandsSucceeded_ && run_.effectsSucceeded;
     };
-    const ApplyInstanceCommandsResult result = deferredInstances_.apply(
+    const ApplyInstanceCommandsResult result = deferredInstances_.applyChecked(
         instances, *objectPack_, roomId, nextRuntimeInstanceId_, createHandler);
     deferredCommandsSucceeded_ = deferredCommandsSucceeded_ &&
                                  result == ApplyInstanceCommandsResult::success;

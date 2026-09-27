@@ -17,7 +17,8 @@ enum class ApplyInstanceCommandsResult {
     unknownObject,
     duplicateInstanceId,
     allocatorExhausted,
-    lifecycleFailure
+    lifecycleFailure,
+    createFailure
 };
 
 struct DeferredCreateInstance {
@@ -90,6 +91,18 @@ public:
                                       std::int32_t roomId,
                                       std::uint32_t& nextInstanceId,
                                       CreateHandler createHandler,Lifecycle lifecycle = {}) {
+        return applyChecked(instances,objects,roomId,nextInstanceId,
+            [&](InstanceRecord& instance){createHandler(instance);return true;},lifecycle);
+    }
+
+    // Checked synchronous callbacks stop the batch after partial side effects.
+    // Completed births remain owned; retry must never replay their Create.
+    template <std::size_t InstanceCapacity, typename CreateHandler,typename Lifecycle = NoInstanceLifecycle>
+    ApplyInstanceCommandsResult applyChecked(InstanceStore<InstanceCapacity>& instances,
+                                      const ObjectPack& objects,
+                                      std::int32_t roomId,
+                                      std::uint32_t& nextInstanceId,
+                                      CreateHandler createHandler,Lifecycle lifecycle = {}) {
         if (applyFailure_ != ApplyInstanceCommandsResult::success)
             return applyFailure_;
         if (overflowed_)
@@ -152,7 +165,10 @@ public:
                 applyFailure_=ApplyInstanceCommandsResult::lifecycleFailure;
                 return applyFailure_;
             }
-            createHandler(instance);
+            if(!createHandler(instance)){
+                applyFailure_=ApplyInstanceCommandsResult::createFailure;
+                return applyFailure_;
+            }
         }
         clear();
         return ApplyInstanceCommandsResult::success;
