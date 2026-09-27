@@ -20,10 +20,42 @@ void require(bool condition, const char* message) {
     }
 }
 
-void stepMany(downwell::StartupRuntime& runtime, int count) {
+template<class Runtime> void stepMany(Runtime& runtime, int count) {
     for (int i = 0; i < count; ++i)
         runtime.step(false);
 }
+
+// Test branches reconstruct independent owners from identical resources and
+// inputs. Copying a runtime would alias borrowed lifecycle/registration state.
+class ReplayRuntime:public downwell::StartupRuntime {
+    struct Frame {downwell::Input input;bool advance=false,legacy=false;};
+    downwell::PlatformProfile profile_;
+    const downwell::RoomPack* rooms_;
+    const downwell::ObjectPack* objects_;
+    std::uint32_t seed_;
+    const downwell::BuilderPatternPack* patterns_;
+    std::vector<Frame> tape_;
+public:
+    ReplayRuntime(downwell::PlatformProfile profile,const downwell::RoomPack* rooms,
+        const downwell::ObjectPack* objects,std::uint32_t seed,const downwell::BuilderPatternPack* patterns)
+        :StartupRuntime(profile,rooms,objects,seed,patterns),profile_(profile),rooms_(rooms),
+         objects_(objects),seed_(seed),patterns_(patterns){}
+    void step(bool advance){tape_.push_back({{},advance,true});StartupRuntime::step(advance);}
+    void step(const downwell::Input& input,bool advance){
+        tape_.push_back({input,advance,false});StartupRuntime::step(input,advance);
+    }
+    std::unique_ptr<ReplayRuntime> replay()const{
+        auto result=std::make_unique<ReplayRuntime>(profile_,rooms_,objects_,seed_,patterns_);
+        for(const auto& frame:tape_){
+            if(frame.legacy)result->step(frame.advance);
+            else result->step(frame.input,frame.advance);
+        }
+        require(result->stateDigest()==stateDigest()&&result->randomDrawCount()==randomDrawCount()&&
+                result->nextRuntimeInstanceId()==nextRuntimeInstanceId(),
+                "independent fixture replay reproduces state, RNG and identity before mutation");
+        return result;
+    }
+};
 
 struct LifecycleAudit {
     bool markDestroyed(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
@@ -159,8 +191,12 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
               << " memberships=" << audit.memberships << " moves=" << audit.moves
               << " sprites=" << audit.sprites << " spriteChanges=" << audit.spriteChanges << " indices=" << audit.indices
               << " transforms=" << audit.transforms << '\n';
+    // Source sprite assignments and engine position publication are separate
+    // events (including projectile setters); they are not paired one-for-one.
+    // Verify each coverage category, while the callbacks above check lifetime
+    // validity and the paired run checks every frame's complete state/RNG.
     require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&
-            audit.terrainSprites>0&&audit.sprites==audit.moves+audit.terrainSprites&&audit.indices>audit.sprites,
+            audit.terrainSprites>0&&audit.sprites>audit.terrainSprites&&audit.spriteChanges>0&&audit.indices>audit.sprites,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     require(audit.playerMoves>=1800,"live player publishes each Begin Step position to its owner");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
@@ -535,9 +571,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
     }
 
-    downwell::StartupRuntime runtime(
+    auto runtimeStorage=std::make_unique<ReplayRuntime>(
         downwell::PlatformProfile::nonDesktop, &pack, objects,
         downwell::StartupRuntime::defaultRandomSeed, patterns);
+    auto& runtime=*runtimeStorage;
     require(runtime.roomLoadSucceeded(), "packed rmInit loads");
     require(runtime.activeInstanceCount() == 2,
             "packed rmInit creates two instances");
@@ -569,9 +606,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.implementedCodeCalls() == 191,
                 "room transition and recovered wall Create events route by code ID");
     if (objects != nullptr) {
-        downwell::StartupRuntime edgeEntry(
+        auto edgeEntryStorage=std::make_unique<downwell::StartupRuntime>(
             downwell::PlatformProfile::nonDesktop, &pack, objects,
             downwell::StartupRuntime::defaultRandomSeed, patterns);
+        auto& edgeEntry=*edgeEntryStorage;
         edgeEntry.step(false);
         stepMany(edgeEntry, 30);
         downwell::Input enterAtLeftEdge;
@@ -777,10 +815,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "a Begin Step birth misses the earlier animation traversal and retains Create frame zero");
         {
             // Isolate projectile/block coverage from later randomized layout.
-            // Use a copy and a real room instance; original resources stay untouched.
-            // O0 reserves all local snapshots in this function's stack frame.
-            // Keep independent runtime copies on the heap, not the host stack.
-            auto collisionStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            // Replay into an independent heap owner and use a real room instance;
+            // original resources and the main input trajectory stay untouched.
+            auto collisionStorage = runtime.replay();
             auto& collision = *collisionStorage;
             std::size_t target = collision.activeInstanceCount();
             for (std::size_t i = 0; i < collision.activeInstanceCount(); ++i)
@@ -811,7 +848,16 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         downwell::Input releasedMain;
         const std::uint32_t rowsBefore = runtime.mainBuilderRowsGenerated();
         const int builderYBefore = runtime.mainBuilderY();
-        const std::size_t instancesBefore = runtime.activeInstanceCount();
+        const auto firstNewInstance = runtime.nextRuntimeInstanceId();
+        auto newTerrainCount=[&](){
+            unsigned count=0;
+            for(std::size_t i=0;i<runtime.activeInstanceCount();++i){
+                const auto& record=runtime.instanceAt(i);
+                if(record.instanceId>=firstNewInstance&&
+                    (record.objectId==60||record.objectId==92||record.objectId==93))++count;
+            }
+            return count;
+        };
         for (int tick = 0;
              tick < 120 && runtime.mainBuilderRowsGenerated() == rowsBefore;
              ++tick)
@@ -821,18 +867,20 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainBuilderGenerationCount() ==
                         -30 + static_cast<int>(rowsBefore) + 1,
                 "the first-boot builder advances one shared pattern row");
-        require(runtime.activeInstanceCount() == instancesBefore + 2,
-                "one builder row creates exactly two shaft-wall instances");
+        // Registered projectiles/effects may retire during these ticks. Count
+        // new wall identities, not the net size of all instance families.
+        unsigned newWalls=0;
         bool foundLeftWall = false;
         bool foundRightWall = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);
+            if(instance.objectId==60&&instance.instanceId>=firstNewInstance)++newWalls;
             if (instance.objectId != 60 || instance.y != builderYBefore)
                 continue;
             foundLeftWall = foundLeftWall || instance.x == 160;
             foundRightWall = foundRightWall || instance.x == 320;
         }
-        require(foundLeftWall && foundRightWall,
+        require(newWalls==2&&foundLeftWall && foundRightWall,
                 "the generated row preserves the recovered shaft boundaries");
         for (int tick = 0;
              tick < 300 && runtime.mainBuilderRowsGenerated() < 29;
@@ -842,7 +890,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     runtime.mainBuilderY() == 1168 &&
                     runtime.mainBuilderGenerationCount() == -1,
                 "the deterministic first-boot prelude emits all 29 shared rows");
-        require(runtime.activeInstanceCount() == instancesBefore + 58,
+        require(newTerrainCount() == 58,
                 "the complete prelude retains its 58 generated boundary walls");
         const std::uint64_t drawsBeforeStart = runtime.randomDrawCount();
         for (int tick = 0;
@@ -852,7 +900,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         std::cerr << "Entrance after two spreading shots: pattern=" << runtime.mainBuilderStartPattern()
             << " reversed=" << runtime.mainBuilderStartReversed()
             << " rows=" << runtime.mainBuilderStartRowsGenerated() << ',' << runtime.mainBuilderRowsGenerated()
-            << " instances=" << runtime.activeInstanceCount() - instancesBefore
+            << " terrain=" << newTerrainCount()
             << " draws=" << runtime.randomDrawCount() - drawsBeforeStart << '\n';
         // startTimeField's Create now consumes its source draw before being
         // destroyed on level 1. This shifts the subsequent entrance choice.
@@ -863,7 +911,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(runtime.mainBuilderStartRowsGenerated() == 5 &&
                     runtime.mainBuilderRowsGenerated() == 34,
                 "the complete fragment advances its five shared row intervals");
-        require(runtime.activeInstanceCount() == instancesBefore + 73,
+        require(newTerrainCount() == 73,
                 "the fragment creates its exact walls and breakable blocks");
         require(runtime.randomDrawCount() == drawsBeforeStart + 62,
                 "box Create RNG ordering includes the reference gem-tile branch");
@@ -962,7 +1010,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         // Continue with real inputs until the next generated actor, keeping
         // the actor assertions instead of requiring this particular platform
         // to contain one or injecting an enemy into the generation stream.
-        auto encounterStorage=std::make_unique<downwell::StartupRuntime>(runtime);
+        auto encounterStorage=runtime.replay();
         auto& encounters=*encounterStorage;
         for(unsigned tick=0;!foundInitializedEnemy&&tick<480;++tick){
             downwell::Input walk;walk.left=true;
@@ -984,7 +1032,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         if (!foundMovingEnemy) {
             // This entrance can contain only resting/offscreen actors.
             // Exercise host movement explicitly without changing its RNG tape.
-            auto movementStorage = std::make_unique<downwell::StartupRuntime>(encounters);
+            auto movementStorage = encounters.replay();
             auto& movement = *movementStorage;
             std::size_t actorIndex = movement.activeInstanceCount();
             for (std::size_t i = 0; i < movement.activeInstanceCount(); ++i) {
@@ -1008,7 +1056,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(foundMovingEnemy,
                 "area-one enemies advance native fractional movement state");
         {
-            auto retirementStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto retirementStorage = runtime.replay();
             auto& retirement = *retirementStorage;
             std::size_t boxIndex = retirement.activeInstanceCount();
             std::vector<std::uint32_t> retiredIds;
@@ -1031,7 +1079,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     "compacting retirement preserves surviving identities");
         }
         {
-            auto snapStorage=std::make_unique<downwell::StartupRuntime>(runtime);
+            auto snapStorage=runtime.replay();
             auto& snap=*snapStorage;
             const int oldView=int(snap.mainCameraViewY());
             std::uint32_t boxId=0;
@@ -1082,9 +1130,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
         const float groundedY = runtime.mainPlayerY();
         {
-            // A controlled ceiling fixture on a copy of the live room; never
+            // A controlled ceiling fixture in a replayed live room; never
             // mutate exported resources or the original test trajectory.
-            auto headBoxStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto headBoxStorage = runtime.replay();
             auto& headBoxRuntime = *headBoxStorage;
             downwell::InstanceRecord* ceilingBox = nullptr;
             for (std::size_t i = 0; i < headBoxRuntime.activeInstanceCount(); ++i) {
@@ -1121,7 +1169,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         {
             // A controlled encounter, independent of the later side-room route.
             // Natural combat and collection remain mandatory in the paired scene tapes.
-            auto combatStorage = std::make_unique<downwell::StartupRuntime>(encounters);
+            auto combatStorage = encounters.replay();
             auto& combat = *combatStorage;
             for(unsigned frame=0;combat.mainBulletCount()==0&&frame<12;++frame){
                 downwell::Input shot;shot.fire=frame%3!=1;
@@ -1140,6 +1188,9 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             require(target != nullptr, "controlled encounter reuses a generated enemy instance");
             const auto targetId = target->instanceId;
             const auto bullet = combat.mainBulletAt(0);
+            // Branch before fixture edits, then copy only the explicit actor
+            // record setup below (not runtime owners or borrowed bindings).
+            auto batCombatStorage = combat.replay();
             target->objectId = 111; target->spriteId = 163; target->reward = 6;
             target->scaleX = target->scaleY = 1;
             target->imageSpeed = 0.25F; target->imageIndex = 0;
@@ -1155,9 +1206,10 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             target->grounded = false;
             target->walker.initialize(target->x, target->y, 0, 0, false);
             // Reuse the same isolated bullet path for a surviving-hit fixture.
-            auto batCombatStorage = std::make_unique<downwell::StartupRuntime>(combat);
             auto& batCombat = *batCombatStorage;
             auto& bat = const_cast<downwell::InstanceRecord&>(batCombat.instanceAt(targetIndex));
+            require(bat.instanceId==targetId,"replayed actor retains fixture identity");
+            bat=*target;
             const auto batId = bat.instanceId;
             bat.objectId = 116;
             bat.spriteId = 153;
