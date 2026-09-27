@@ -6,6 +6,15 @@ commit that records them, not a rolling status document.
 
 ## Run a bounded comparison
 
+For entrance-field lifecycle correctness (not timing), run
+`bash amiga/verify_field_reentry.sh`. It uses a 45-second emulator deadline
+(configurable up to 60), then restores the ordinary build. The same tape runs
+in `make verify-gameplay-collision-owner`: first-level field removal, the real
+exit/upgrade transition, level-two field survival, and Retry invalidation.
+The fixture injects an exit at the player before terrain binding; it does not
+prove natural descent, presentation parity, full cross-family creation order,
+or stock-A500 memory fit. The native gate checks the stack guard as well.
+
 From the repository root:
 
 ```sh

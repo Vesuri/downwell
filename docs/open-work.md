@@ -33,10 +33,6 @@ behavior, both backend integrations and relevant original-game verification.
   gameplay queries; register the remaining native field, effect and projectile
   lifetimes in the resource-backed owner before replacing its unindexed
   collision adapters. Complete original room creation order across families.
-- Extend bounded native re-entry verification to observe later-level entrance
-  field survival and Retry invalidation, in addition to host owner tests and
-  the first-level native creation path. Complete cross-family room ordering
-  before treating these registrations as an oracle for field selection.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding

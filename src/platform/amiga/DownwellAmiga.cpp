@@ -1,4 +1,12 @@
 #include <proto/exec.h>
+#ifdef DOWNWELL_FIELD_VERIFY
+#include "core/GameplayFieldReentryVerification.h"
+extern "C" {
+volatile unsigned gDownwellFieldChecks, gDownwellFieldStage, gDownwellFieldGameSteps,
+    gDownwellFieldClearSteps, gDownwellFieldFirst, gDownwellFieldLater, gDownwellFieldRetry;
+__attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile("" ::: "memory");}
+}
+#endif
 #include <proto/graphics.h>
 #include <exec/execbase.h>
 #include <exec/interrupts.h>
@@ -1257,6 +1265,19 @@ __attribute__((noinline)) static int runDownwell(void) {
         return 20;
     checkSceneStack(4);
 #endif
+#endif
+#ifdef DOWNWELL_FIELD_VERIFY
+    using FieldTape = downwell::GameplayFieldReentryVerification;
+    alignas(FieldTape) static UBYTE fieldTapeStorage[sizeof(FieldTape)];
+    auto& fieldTape = *new (fieldTapeStorage) FieldTape;
+    const bool fieldPassed = fieldTape.run(port,collisionOwner,objects,initialRingOrigin);
+    gDownwellFieldChecks=fieldTape.checks;gDownwellFieldStage=fieldTape.stage;
+    gDownwellFieldGameSteps=fieldTape.gameSteps;gDownwellFieldClearSteps=fieldTape.clearSteps;
+    gDownwellFieldFirst=fieldTape.firstGeneration;gDownwellFieldLater=fieldTape.laterGeneration;
+    gDownwellFieldRetry=fieldTape.retryGeneration;
+    checkSceneStack(40);
+    downwellFieldReentryReady();
+    if(!fieldPassed)return 20;
 #endif
 #ifndef DOWNWELL_REPLAY_VERIFY
     // Long-lived scene state must not consume the small AmigaDOS call stack.

@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "core/GameplayFieldReentryVerification.h"
 #include "core/WallPresentation.h"
 #include "platform/amiga/AmigaWallDamage.h"
 #include <fstream>
@@ -605,6 +606,18 @@ int main(){
         assert(fieldWorld->createRoomStartField()&&!fieldWorld->startTimeField()&&!fieldsOwner->state(startKey)&&
             fieldsOwner->population(371,population)&&population==0&&
             !fieldWorld->goalFieldInstances().find({0,firstIdentity})&&fieldsOwner->valid());
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1201-176,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        auto tape=std::make_unique<GameplayFieldReentryVerification>();
+        assert(tape->run(*world,*owner,objects,300)&&tape->checks==255&&tape->gameSteps==108&&
+            tape->clearSteps>0&&tape->clearSteps<400&&tape->firstGeneration<tape->laterGeneration&&
+            tape->laterGeneration<tape->retryGeneration);
+        std::printf("Field reentry tape: checks=%u gameplay=%u upgrade=%u generations=%u/%u/%u\n",
+            tape->checks,tape->gameSteps,tape->clearSteps,tape->firstGeneration,tape->laterGeneration,tape->retryGeneration);
     }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     {
