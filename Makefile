@@ -495,8 +495,14 @@ build/script-spawn-effects-test: tests/core/ScriptSpawnEffectsTest.cpp $(wildcar
 build/effect-spawn-script-test: tests/core/EffectSpawnScriptTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
-.PHONY: verify-machine-gun-source-motion verify-bullet-solid-script
-test: verify-bullet-solid-script
+.PHONY: verify-machine-gun-source-motion verify-bullet-solid-script verify-machine-gun-source-step
+test: verify-bullet-solid-script verify-machine-gun-source-step
+verify-machine-gun-source-step: build/machine-gun-source-step-test
+	python3 tools/verify-machine-gun.py
+	./build/machine-gun-source-step-test
+build/machine-gun-source-step-test: tests/core/MachineGunSourceStepTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 verify-bullet-solid-script: build/bullet-solid-script-test
 	python3 tools/verify-machine-gun.py
 	./build/bullet-solid-script-test

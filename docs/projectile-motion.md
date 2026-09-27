@@ -84,6 +84,18 @@ Native marked boxes remain accessible until room cleanup; retired/reused
 handles are rejected. These are target adapters for the pending source bullet
 integration, not a change to the current live gun's immediate removal path.
 
+`MachineGunSourceStep` composes the source motion initialization, synchronous
+`scrEffectSpawn` muzzle sequence, solid script and ordered final X/Y setters.
+It uses the shot's birth profile (ordinary or gem-high), the inherited
+`hitWallFx=101` default, and the raw spread direction for impact effects. The
+enclosing runtime supplies the same motion object to its query/approach
+callbacks and retains the executing bullet through destruction requests.
+`verify-machine-gun-source-step` checks both profiles through empty, box, wall,
+enemy-suppression and shootable routes, every callback failure prefix, and
+second-Step initialization. This shared event composition is not yet wired
+into the live schedulers: remaining target/effect/retirement adapters above
+still gate replacement of the approximate gun path.
+
 ## Collision lookup boundaries
 
 `verify-runner-line-point.py` pins the reviewed registrations, wrappers and

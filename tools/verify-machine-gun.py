@@ -64,6 +64,8 @@ assert "push.v self.bDir\npop.v.v self.image_angle" in step
 assert step.index("call.i random_range(argc=2)") < step.index("pop.v.v self.image_angle")
 print("VM projectile image angle follows firing direction plus first-Step spread")
 create = (export / "Assembly/gml_Object_bulletStandard_Create_0.asm").read_text()
+parent_create = (export / "Assembly/gml_Object_parentPBullet_Create_0.asm").read_text()
+assert "pushi.e 101\npop.v.i self.hitWallFx" in parent_create
 assert "push.d 0.3\npop.v.d self.image_speed" in create
 assert "pushi.e 0\npop.v.i self.image_index" in create
 assert all(len(manifest["resources"]["sprites"][i]["frames"]) == 6 for i in (458, 459))
