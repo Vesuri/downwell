@@ -54,9 +54,31 @@ int main(){
         ++cases;
     }
     for(int i=-8192;i<=8192;++i){N result;const double value=i/4.;check(P::snapShade(number(value),result));check(same(result,std::nearbyint(value/2)*2+0.));}
+    for(int i=-2097152;i<=2097152;++i){
+        N result;
+        check(P::snapShade(number(i),result));
+        check(same(result,std::nearbyint(double(i)/2)*2+0.));
+    }
+    unsigned relativeCases=0;
+    auto relative=[&](double a,double b){
+        N result;check(P::relative(number(a),number(b),result));
+        check(same(result,a-b));++relativeCases;
+    };
+    for(unsigned i=0;i<100000;++i)
+        relative(int(next()%4194303u)-2097151,int(next()%4194303u)-2097151);
+    for(double a:{-2097152.,-2097151.,-1048576.,-1.,-0.,0.,1.,1048576.,2097151.,2097152.,0.25,-0.25})
+    for(double b:{-2097152.,-2097151.,-1048576.,-1.,-0.,0.,1.,1048576.,2097151.,2097152.,0.25,-0.25})
+        relative(a,b);
+    for(N bad:{N{0x7ff00000u,0},N{0x7ff80000u,0},N{0,1}}){
+        N result=number(123);
+        check(!P::relative(bad,{},result)&&same(result,123));
+        check(!P::relative({},bad,result)&&same(result,123));
+        check(!P::snapShade(bad,result)&&same(result,123));
+    }
     P::Draw unchanged{P::direct,number(4),number(5)};
     check(!P::fx({0x7ff00000u,0},{},view,false,false,true,unchanged));
     check(unchanged.target==P::direct && same(unchanged.x,4)&&same(unchanged.y,5));
     std::printf("Effect placement: %u flag/edge cases and 16385 signed snapping cases passed\n",cases);
     std::printf("Effect visibility: %u scalar integer/fractional comparisons passed\n",visibilityCases);
+    std::printf("Effect coordinates: 4194305 integral shade cases and %u relative cases passed\n",relativeCases);
 }

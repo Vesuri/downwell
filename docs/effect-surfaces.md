@@ -26,6 +26,13 @@ binary64 additions. Signed zero is accepted. Fractional, larger and unsupported
 values continue through the checked real-arithmetic path; they are never rounded
 into this specialization. Placement and world-space shade snapping are unchanged.
 
+Camera subtraction also specializes this exact-integer domain, preserving the
+negative-zero result of `-0 - +0`. Shade snapping retains even world positions;
+odd positions choose the neighbouring multiple of four, equivalent to
+nearest-even rounding of `world/2` before multiplying by two. Zero is then
+published as positive zero, as in the general path. Both helpers retain checked
+binary64 fallbacks outside the domain; no fractional input is quantized early.
+
 `drawShade` is enabled only when not low-spec, in view, not `noControl`, and
 `surfaceShade` exists. It draws sprite 117, frame zero, at
 `round(world / 2) * 2 - viewOrigin` on each axis. Snap world coordinates before

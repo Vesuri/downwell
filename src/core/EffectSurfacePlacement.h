@@ -28,11 +28,28 @@ struct EffectSurfacePlacement {
         visible=l>0 && r<0 && t>0 && b<0;return true;
     }
     static bool relative(MotionBinary64 world,MotionBinary64 camera,MotionBinary64& out) {
+        std::int32_t a,b;
+        if(smallInteger(world,a) && smallInteger(camera,b)){
+            out=MotionBinary64::fromInteger(a-b);
+            // Exact cancellation yields +0, except -0 minus +0 yields -0.
+            if(!a && !b)out.high=(world.high&~camera.high)&0x80000000u;
+            return true;
+        }
         camera.high^=0x80000000u;
         if(!world.add(camera))return false;
         out=world;return true;
     }
     static bool snapShade(MotionBinary64 world,MotionBinary64& out) {
+        std::int32_t integer;
+        if(smallInteger(world,integer)){
+            unsigned magnitude=static_cast<unsigned>(integer<0?-integer:integer);
+            // Odd integers are exactly halfway between even pixels. Select
+            // the multiple of four (an even half), not always up or down.
+            if(magnitude&1u)magnitude=(magnitude+1u)&~3u;
+            out=MotionBinary64::fromInteger(integer<0?-static_cast<std::int32_t>(magnitude):
+                                                        static_cast<std::int32_t>(magnitude));
+            return true;
+        }
         MotionBinary64 half;std::int32_t rounded;
         if(!multiplyBinary64(world,{0x3fe00000u,0},half) || !half.roundPixel(rounded) ||
            rounded < -1073741824 || rounded > 1073741823)return false;
