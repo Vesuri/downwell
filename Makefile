@@ -117,7 +117,7 @@ all: $(TARGET)
 test: verify-amiga-wall-damage
 verify-amiga-wall-damage: build/amiga-wall-damage-test
 	./build/amiga-wall-damage-test
-build/amiga-wall-damage-test: tests/platform/amiga/AmigaWallDamageTest.cpp src/platform/amiga/AmigaWallDamage.h
+build/amiga-wall-damage-test: tests/platform/amiga/AmigaWallDamageTest.cpp src/platform/amiga/AmigaWallDamage.h src/core/WallFootprint.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 build/gameplay-collision-owner-test: src/platform/amiga/AmigaWallDamage.h

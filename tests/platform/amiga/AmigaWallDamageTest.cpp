@@ -1,7 +1,26 @@
 #include "platform/amiga/AmigaWallDamage.h"
 #include <cassert>
 #include <cstdio>
+#include <initializer_list>
 int main(){
+    // Compare strip rejection with independent wide-coordinate rectangles,
+    // including the outer eight rows of the 32-pixel Limbo artwork.
+    for(int sprite:{51,52,53,55,57,70,72,74,76}){
+        const long long radius=sprite==70?16:8;
+        for(int y=-40;y<=40;++y)for(int first=-50;first<=50;++first)
+            for(int height=0;height<=32;++height){
+                const bool expected=height>0&&y+radius>first&&y-radius<first+height;
+                assert(downwell::wallIntersectsRows(sprite,y,first,first+height)==expected);
+            }
+        for(int y:{(-2147483647-1),-2147483640,2147483640,2147483647})
+            for(int first:{(-2147483647-1),-2147483640,0,2147483630}){
+                const int end=first+16;
+                assert(downwell::wallIntersectsRows(sprite,y,first,end)==
+                    (static_cast<long long>(y)+radius>first&&static_cast<long long>(y)-radius<end));
+            }
+    }
+    assert(!downwell::wallIntersectsRows(-1,0,-1,1));
+    assert(downwell::wallIntersectsRows(999,0,100,101));
     AmigaWallDamage<64> damage;bool expected[512]{};
     unsigned random=123;
     for(unsigned i=0;i<4000;++i){

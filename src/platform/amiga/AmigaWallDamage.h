@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_AMIGA_WALL_DAMAGE_H
 #define DOWNWELL_AMIGA_WALL_DAMAGE_H
+#include "core/WallFootprint.h"
 // Sparse world-row debts, independent of camera position and ring origin.
 // Publish invalidation before camera/staging decisions; acknowledge a band only
 // after its visible repair succeeds. Callbacks must not mutate this queue.
@@ -7,20 +8,12 @@ template<unsigned Capacity=2048> class AmigaWallDamage {
     static_assert(Capacity>0,"Wall damage needs bounded storage");
     struct Band {int first,end;};
     Band bands_[Capacity]{};unsigned count_=0;bool good_=true;
-    static int radius(int sprite){
-        switch(sprite){
-            case -1:return 0;
-            case 70:return 16;
-            case 51:case 52:case 53:case 55:case 57:case 72:case 74:case 76:return 8;
-            default:return -1;
-        }
-    }
 public:
     bool valid()const{return good_;}
     unsigned size()const{return count_;}
     void clear(){count_=0;good_=true;}
     bool changed(int,int y,int before,int after){
-        const int a=radius(before),b=radius(after),r=a>b?a:b;
+        const int a=downwell::wallRadius(before),b=downwell::wallRadius(after),r=a>b?a:b;
         if(!good_||a<0||b<0||y<(-2147483647-1)+r||y>2147483647-r)return good_=false;
         return !r||mark(y-r,y+r);
     }
