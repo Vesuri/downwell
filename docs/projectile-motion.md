@@ -661,6 +661,21 @@ The caller must also preserve original global-instance hash iteration order
 and the subsequent per-layer inactive-tail normalization (`0x41363e`). Neither
 is implied by iterating storage slots. Live persistence integration remains open.
 
+The global instance table has 512 head/tail buckets, indexed by source instance
+ID masked with 511 (`0x401290`, mask at `0x8a5e54`). Creation appends to each
+bucket's tail (`0x488818` and `0x488c54`); the iterator walks buckets in ascending
+order (`0x422770`). The room fallback uses that traversal at `0x413549`, including
+inactive and destroy-marked instances which remain allocated.
+`InstanceStore::captureGlobalInstanceOrder` reproduces this ordering by sorting
+a caller-owned snapshot by bucket while preserving insertion order within each
+bucket. Stable record compaction preserves that insertion order after retirement
+and across persistent room entry; reusing a storage slot does not restore its
+old position. The snapshot is valid only for a structurally quiescent pass, not
+as a replacement for the original iterator when births or removals happen during
+iteration. Its constant-extra-workspace sorter is usable on 68000, but large
+snapshot storage must live outside the task stack. This ordering helper does
+not by itself connect live room fallback or inactive-tail normalization.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

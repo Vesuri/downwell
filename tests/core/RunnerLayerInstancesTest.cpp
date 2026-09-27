@@ -1,4 +1,6 @@
 #include "core/RunnerLayerInstances.h"
+#include "core/InstanceStore.h"
+#include "core/RunnerLayerIds.h"
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
@@ -102,6 +104,35 @@ void roomFallback(){
     require(registry.attachRoomFallback(layers,105,{5,1},invalid,false,create)&&invalid.depth.bits==0xc2480000u,
         "saved ID path never converts old depth");
 }
+void globalFallbackOrder(){
+    InstanceStore<4> store;RunnerStepSnapshot<4> snapshot;
+    using R=RunnerLayerInstances<2,4>;
+    R registry;R::Layers layers;RunnerLayerIds sourceIds;
+    require(sourceIds.observeLoaded(131),"catalog layer ID floor");
+    RunnerDepthService::Instance states[4];
+    for(unsigned id:{513u,512u,1025u,1024u}){
+        require(store.create(id,10,7,true)==CreateInstanceResult::success,"persistent fallback instance");
+    }
+    // Storage order starts in bucket 1, but bucket 0 must create its layer first.
+    states[0].depth.bits=states[2].depth.bits=0x41200000u; // 10
+    states[1].depth.bits=states[3].depth.bits=0x41a00000u; // 20
+    store.enterRoom(8);
+    require(store.captureGlobalInstanceOrder(snapshot),"capture persistent global order");
+    for(unsigned i=0;i<snapshot.size();++i){
+        const auto h=snapshot.handle(i);const auto* record=store.resolve(h);
+        require(record&&registry.attachRoomFallback(layers,record->instanceId,h,states[h.slot],false,
+            [&](int depth,unsigned& slot){return sourceIds.createDynamic(layers,depth,slot);}),
+            "global iteration drives fallback attachment");
+    }
+    require(states[1].layerId==132&&states[3].layerId==132&&
+        states[0].layerId==133&&states[2].layerId==133,"hash traversal determines dynamic source IDs");
+    std::vector<unsigned> order;
+    require(layers.visitElements(layers.find(132),[&](unsigned e){order.push_back(registry.get(e)->sourceId);return true;}),"bucket zero elements");
+    require(order==std::vector<unsigned>({1024,512}),"head attachment reverses same-bucket insertion order");
+    order.clear();
+    require(layers.visitElements(layers.find(133),[&](unsigned e){order.push_back(registry.get(e)->sourceId);return true;}),"bucket one elements");
+    require(order==std::vector<unsigned>({1025,513}),"second bucket keeps independent element order");
+}
 void serializedInitialization(){
     Registry registry;Layers layers;unsigned layer=2;
     require(layers.insertAfterEquals(17,-50,false,layer),"initialization layer");
@@ -176,4 +207,4 @@ void rebindRelease(){
     }
 }
 }
-int main(){permutations();lifecycle();bounds();roomFallback();serializedInitialization();rebindRelease();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
+int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}

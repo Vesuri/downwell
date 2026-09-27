@@ -237,6 +237,21 @@ public:
         if(result)snapshot.template sortDenseObjects<512>();
         return result;
     }
+    // Original global-ID table: 512 buckets, ID & 511, append within each
+    // bucket; room initialization walks buckets ascending (0x413549).
+    // Unlike Step, this includes inactive and destroy-marked allocated records.
+    // Stable record compaction preserves global insertion order. Use only at
+    // a boundary without structural instance mutation; this is not a general
+    // replacement for a live mutating hash-table iterator. Keep large caller
+    // workspaces off the Amiga stack; sort() uses constant extra workspace.
+    bool captureGlobalInstanceOrder(RunnerStepSnapshot<Capacity>& snapshot)const{
+        snapshot.clear();
+        for(std::size_t i=0;i<size_;++i){
+            const auto h=handleAt(i);
+            if(!snapshot.append(h.slot,h.generation,int(records_[i].instanceId&511u)))return false;
+        }
+        snapshot.sort();return true;
+    }
 
     const InstanceRecord* find(std::uint32_t instanceId) const {
         for (std::size_t index = 0; index < size_; ++index) {

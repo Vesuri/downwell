@@ -251,6 +251,31 @@ void testDenseStepOrder() {
 
 } // namespace
 
+void testGlobalInstanceOrder(){
+    downwell::InstanceStore<8> store;downwell::RunnerStepSnapshot<8> snapshot;
+    for(unsigned id:{1025u,512u,1u,1024u,511u})
+        require(store.create(id,10,7,id==1025||id==1)==downwell::CreateInstanceResult::success,"global order births");
+    auto order=[&](){
+        require(store.captureGlobalInstanceOrder(snapshot),"global order capture");
+        std::vector<unsigned> ids;
+        for(unsigned i=0;i<snapshot.size();++i){
+            const auto* record=store.resolve(snapshot.handle(i));require(record!=nullptr,"global snapshot lifetime resolves");
+            ids.push_back(record->instanceId);
+        }
+        return ids;
+    };
+    require(order()==std::vector<unsigned>({512,1024,1025,1,511}),"ascending buckets, insertion order within collisions");
+    store.find(1)->active=false;store.find(511)->destroyRequested=true;
+    require(order()==std::vector<unsigned>({512,1024,1025,1,511}),"inactive and marked instances remain globally registered");
+    const auto old=snapshot.handle(0);
+    require(store.erase(512)&&store.create(1536,10,7,false)==downwell::CreateInstanceResult::success,"compact and reuse slot");
+    require(!store.resolve(old)&&order()==std::vector<unsigned>({1024,1536,1025,1,511}),"reused storage slot appends within bucket");
+    store.enterRoom(8);
+    require(store.create(513,10,8,false)==downwell::CreateInstanceResult::success,"new room collision birth");
+    require(order()==std::vector<unsigned>({1025,1,513}),"persistent instances retain same-bucket order across rooms");
+    store.clear();require(order().empty(),"clear removes global records");
+}
+
 int main() {
     testCapacityIdentityAndOrder();
     testErasePreservesOrder();
@@ -261,6 +286,7 @@ int main() {
     testAnimationMembership();
     testAnimationTraversal();
     testDenseStepOrder();
+    testGlobalInstanceOrder();
     std::cout << "instance store tests passed\n";
     return 0;
 }

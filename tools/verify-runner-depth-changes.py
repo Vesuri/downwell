@@ -23,6 +23,7 @@ data = (root / "data/data.win").read_bytes()
 assert sha256(data).hexdigest() == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert data[8:12] == b"GEN8"
 assert struct.unpack_from("<I", data, 16 + 0x2c)[0] == 2
+assert struct.unpack("<I", region(0x8a5e54, 4))[0] == 511
 # All serialized room resources are loaded before room entry. Their version-3
 # sequence arrays are empty, so the extra sequence-layer allocator is skipped.
 offset = 8
@@ -48,6 +49,13 @@ assert len(loaded_ids) == 132 and max(loaded_ids) == 131
 assert region(0x7fe384, 6) == b"depth\0"
 assert struct.unpack("<d", region(0x7fcc90, 8))[0] == 20.0
 for start, end, digest in (
+    # Global instance-ID buckets: 512 head/tail pairs, tail insertion and
+    # ascending-bucket traversal used by room layer initialization.
+    (0x401290, 0x4012c6, "c9627d4fbfafea1880f69ed1f7c7c3870cb314cab4795ad383412e5e64abd9a3"),
+    (0x488818, 0x488889, "17eee26261072a69174cb1d5c1759b121c30694e32a1cd890221d3a36a796e61"),
+    (0x488c54, 0x488cc2, "1a5a916ce797d2a37f6b909e7a8a6fe3d5be771130c317202ceb3dd431e15a50"),
+    (0x422770, 0x4227bf, "ff5c5e79fb688379fc7ba39c66c15198712427b0b082f8c0bfc88bd12d914aac"),
+    (0x413549, 0x41363e, "941dc62c4376f9ea73d5bac93c9221c623e65169cb0a7217ff0976420b20873f"),
     # Resource catalog loop, serialized-layer and empty sequence-list branches.
     (0x496cd5, 0x496d52, "fa126e1b78f63516f014f6efd70b05c2fa8bb25fb719a4a8b49fd213b06e9cc2"),
     (0x496dc2, 0x496de5, "da43f5890ac19906acd9026004828bee259248d45836db66af69290c471952c8"),

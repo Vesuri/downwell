@@ -60,6 +60,9 @@ bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
     auto handle=store.handleAt(store.size()-1);store.enterRoom(2);
     return store.resolve(handle)==nullptr;
 }
+bool compileGlobalInstanceOrder(const downwell::InstanceStore<4>& store,downwell::RunnerStepSnapshot<4>& snapshot){
+    return store.captureGlobalInstanceOrder(snapshot);
+}
 #include "core/RunnerSpatialSplit.h"
 #include "core/RunnerSpatialNode.h"
 #include "core/RunnerSpatialIndex.h"
