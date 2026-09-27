@@ -483,6 +483,18 @@ verify-runner-step-order:
 	python3 tools/verify-runner-step-eligibility.py
 
 .PHONY: verify-smoke-direction
+test: verify-machine-gun-source-motion
+.PHONY: verify-machine-gun-source-motion
+verify-machine-gun-source-motion: build/machine-gun-source-motion-test
+	python3 tools/verify-machine-gun.py
+	python3 tools/verify-runner-smoke-geometry.py
+	python3 tools/verify-runner-effect-ranges.py
+	./build/machine-gun-source-motion-test
+
+build/machine-gun-source-motion-test: tests/core/MachineGunSourceMotionTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/MachineGunSourceMotionTest.cpp src/core/GameMakerRandom.cpp
+
 verify-smoke-direction: build/smoke-direction-test
 	./build/smoke-direction-test
 

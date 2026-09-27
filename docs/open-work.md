@@ -36,6 +36,9 @@ behavior, both backend integrations and relevant original-game verification.
 - Replace the usual-gun Q20/Q32 trajectory approximation with original setter
   and trigonometric semantics before enabling projectile selectors. Preserve muzzle-effect
   creation, collision-event ordering and destruction timing around movement.
+  Integrate the [source arithmetic contract](projectile-motion.md) with absolute
+  room coordinates and unrounded query endpoints; replace both live adapters,
+  not just their displayed positions.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding

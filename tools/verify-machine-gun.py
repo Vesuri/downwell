@@ -76,6 +76,12 @@ assert step.index("call.i gml_Script_scrBulCheckSolid(argc=0)") < step.index("po
 assert "push.v self.x\npush.v self.xsp\nadd.v.v\npop.v.v self.x" in step
 assert "push.v self.y\npush.v self.ysp\nadd.v.v\npop.v.v self.y" in step
 print("VM spread/velocity initialization precedes solid checks and retained vector movement")
+solid = (export / "Assembly/gml_GlobalScript_scrBulCheckSolid.asm").read_text()
+assert ("push.v self.y\npush.v self.ysp\nadd.v.v\n"
+        "push.v self.x\npush.v self.xsp\nadd.v.v\n"
+        "push.v self.y\npush.v self.x\ncall.i collision_line(argc=7)") in solid
+assert step.index("call.i gml_Script_scrEffectSpawn(argc=6)") < step.index("pop.v.i self.allSet")
+print("VM solid queries use unrounded upcoming endpoints, after synchronous muzzle Create")
 impact = (export / "Assembly/gml_GlobalScript_scrTypicalBulletDamage.asm").read_text()
 bat = (export / "Assembly/gml_Object_enmBat_Step_0.asm").read_text()
 assert "push.v self.bDir\npop.v.v other.hitDir" in impact

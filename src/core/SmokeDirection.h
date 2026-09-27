@@ -4,7 +4,7 @@
 #include "RunnerImageValue.h"
 namespace downwell {
 // The lengthdir wrappers' normal/zero arithmetic for smoke and shard bursts:
-// speed [0,6], angle [-585,585]. The original trig implementation is an input;
+// speed [0,8], angle [-585,585] (also usual-gun projectiles). The original trig implementation is an input;
 // using host sin/cos here does NOT establish original-runner trig identity.
 struct SmokeDirection {
     static bool radians(RunnerImageValue angle,RunnerImageValue& out) {
@@ -30,7 +30,7 @@ struct SmokeDirection {
         return true;
     }
     static bool component(RunnerImageValue speed,MotionBinary64 trig,bool negate,MotionBinary64& out) {
-        if(speed.bits>0x40c00000u || ((speed.bits&0x7f800000u)==0 && speed.bits))return false;
+        if(speed.bits>0x41000000u || ((speed.bits&0x7f800000u)==0 && speed.bits))return false;
         RunnerImageValue narrowed,value;
         MotionBinary64 product;
         if(!narrowed.assign(trig) || (narrowed.bits&0x7fffffffu)>0x3f800000u ||
@@ -53,7 +53,7 @@ struct SmokeDirection {
         MotionBinary64& x,MotionBinary64& y,Trig trig) {
         RunnerImageValue speed,angle,radian;
         if(!length.valid() || !degrees.valid() || !speed.assign(length) || !angle.assign(degrees) ||
-           (speed.bits&0x80000000u) || speed.bits>0x40c00000u || !radians(angle,radian))return false;
+           (speed.bits&0x80000000u) || speed.bits>0x41000000u || !radians(angle,radian))return false;
         MotionBinary64 cosine,sine,nx,ny;
         if(!trig(radian.promoted(),cosine,sine) || !component(speed,cosine,false,nx) ||
            !component(speed,sine,true,ny))return false;
