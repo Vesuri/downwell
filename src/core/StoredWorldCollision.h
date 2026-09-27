@@ -196,6 +196,13 @@ public:
         }
         result=next;return true;
     }
+    bool positionMeeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+        if(!valid()||!runtime_)return false;
+        return adapter_.pointVm(*this,object,x,y,masks_,
+            [](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
+                angle.bits^=0x80000000u;return Trig{}(angle,c,s);
+            },hit);
+    }
 };
 }
 #endif

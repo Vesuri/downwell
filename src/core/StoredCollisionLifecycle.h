@@ -148,6 +148,23 @@ struct StoredCollisionLifecycle {
                 return collide(records,a,b,publish,masks,dispatch,inverseTrig,hit);
             },result);
     }
+    // Object-selector position_meeting. This stored-world adapter uses the
+    // same compatibility mode as its resource-backed bounds refresh.
+    template<class Records,class InverseTrig>
+    bool pointVm(const Records& records,int object,MotionBinary64 x,MotionBinary64 y,
+                 const SpriteMaskPack& masks,InverseTrig inverseTrig,bool& hit){
+        RunnerImageValue px,py;
+        if(!px.assign(x)||!py.assign(y))return false;
+        auto refreshBounds=[&](InstanceHandle h,bool publish){
+            const auto* record=records.resolve(h);return record&&refresh(h,*record,publish);
+        };
+        return owner.point(object,px,py,true,allPrepared,graph,refreshBounds,
+            [&](InstanceHandle h,RunnerImageValue rawX,RunnerImageValue rawY,bool& found){
+                const auto* record=records.resolve(h);
+                return record&&matchingFlags(h,*record)&&owner.pointCandidate(h,properties[h.slot].sprite,
+                    rawX,rawY,true,true,sprites,masks,refreshBounds,inverseTrig,round,found);
+            },hit);
+    }
     // place_meeting (runner 0x4fee30) uses the same search with collect-all
     // disabled, then checks the returned instance pointer. Preserve query-time
     // index preparation and restoration even though only a boolean is exposed.

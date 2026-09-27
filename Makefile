@@ -2120,5 +2120,7 @@ verify-runner-mask-point:
 	./build/runner-mask-point-test
 	$(CXX) -Isrc $(CXXFLAGS) -o build/runner-point-candidate-test tests/core/RunnerPointCandidateTest.cpp
 	./build/runner-point-candidate-test
+	$(CXX) -Isrc $(CXXFLAGS) -o build/runner-point-query-test tests/core/RunnerPointQueryTest.cpp
+	./build/runner-point-query-test
 
 -include $(DEPS)

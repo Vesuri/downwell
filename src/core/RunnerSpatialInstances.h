@@ -470,6 +470,54 @@ public:
         if(!checked(nx.assign(x)&&ny.assign(y)))return false;
         return place(self,object,nx,ny,allPrepared,graph,refreshBounds,precise,result);
     }
+    // Object-resource selector path of position_meeting (0x52b780). Unlike
+    // instance_place, this query does not move or exclude a calling instance.
+    // candidate(h,rawX,rawY,hit) runs pointCandidate with the current resources.
+    template<class Graph,class Refresh,class Candidate>
+    bool point(int object,Real x,Real y,bool compatibility,bool allPrepared,
+        Graph& graph,Refresh refreshBounds,Candidate candidate,bool& hit){
+        if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        if(!Math::valid(x)||!Math::valid(y))return checked(false);
+        auto isA=[&](int child,int parent){return graph.isA(child,parent);};
+        using Prep=RunnerSpatialObjectPreparation;
+        const auto path=Prep::prepare(membership_.count(object,isA),index_.height(),
+            *graph.flags(unsigned(object)),allPrepared,
+            [&]{return graph.markSpatialFamily(unsigned(object));},
+            [&](auto emit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){
+                auto& state=entries_[slot].state;return emit(slot,state.flags,state.bounds);
+            });},
+            [&](unsigned slot,auto&,auto&){return refreshBounds(handle(slot),false);},
+            [&](Box box,unsigned slot){return index_.insert(box,slot);});
+        if(path==Prep::Path::failed)return checked(false);
+        if(path==Prep::Path::none){hit=false;return true;}
+        const bool indexed=path==Prep::Path::spatial;
+        if(indexed&&!checked(flush(refreshBounds)))return false;
+        bool good=true,result=false;
+        auto visit=[&](unsigned slot){
+            if(slot>=Capacity||entries_[slot].object<0){good=false;return false;}
+            const auto& entry=entries_[slot];
+            // 0x501e40 is an unconditional false stub in the pinned runner.
+            if((entry.state.flags&0x100003u)||
+               (indexed&&(entry.state.kind!=1||!isA(entry.object,object))))return true;
+            if(!candidate(handle(slot),x,y,result)){good=false;return false;}
+            return !result;
+        };
+        if(indexed){
+            // cvttss2si + cvtdq2ps affects only broad-phase coordinates;
+            // candidate tests still receive the original narrowed fractions.
+            const auto truncate=[](Real value){
+                const int exponent=int((value.bits>>23)&255)-127;
+                if(exponent<0)return Real{};
+                if(exponent>=31)return Real{0xcf000000u}; // SSE integer indefinite.
+                if(exponent<23)value.bits&=~((1u<<unsigned(23-exponent))-1u);
+                return value;
+            };
+            const Real bx=compatibility?truncate(x):x,by=compatibility?truncate(y):y;
+            if(!index_.query({bx,by,bx,by},visit))good=false;
+        }else membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});
+        if(!checked(good))return false;
+        hit=result;return true;
+    }
     // Object-resource branch of instance_number (0x4fe49b). This is NOT the
     // raw registration count used by collision preparation below. Filtering
     // flags does not unlink membership or alter the selected search strategy.

@@ -12,6 +12,7 @@ for start, end, digest in (
     (0x465520, 0x465837, "c122727f367baa4003e583062c82e26d933fcaf85ce7089b817238c977352ccb"),
     (0x4ba850, 0x4baa40, "b8392ec39f41e210976736832686d41d77191064e68c4dc3d29f60302dba160d"),
     (0x4bbbb0, 0x4bbd23, "5a2c64a5f93bb3335407bbb57892af85f1ebfb70c502e91dde7194dabfb226eb"),
+    (0x4ff240, 0x4ff368, "4afbf3eb99767fece832ca85d82ff5944bdcb1013ef5d5ba717ba37ac482a86d"),
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 for address, bits in ((0x795ab4, 0x3f000000), (0x801618, 0x38d1b717),
@@ -19,4 +20,5 @@ for address, bits in ((0x795ab4, 0x3f000000), (0x801618, 0x38d1b717),
                       (0x801d38, 0xb727c5ac), (0x795ab8, 0x3f800000)):
     assert struct.unpack("<I", region(address, 4))[0] == bits
 assert region(0x80ce14, 17) == b"position_meeting\0"
+assert region(0x501e40, 3) == bytes.fromhex("32c0c3")  # suppression stub: false
 print("Pinned Windows point-query wrapper, candidate gate, precise sampler and constants verified")

@@ -722,6 +722,34 @@ int main(){
         "production owner attaches exactly one runtime without sharing its identities");
     production->skipToGameForTesting();
     runtime->skipToGameForTesting();plain->skipToGameForTesting();
+    {
+        const auto digest=production->stateDigest();
+        const InstanceRecord* wall=nullptr;
+        for(unsigned i=0;i<production->activeInstanceCount();++i)
+            if(production->instanceAt(i).objectId==60){wall=&production->instanceAt(i);break;}
+        require(wall!=nullptr,"room supplies terrain for live point queries");
+        for(int dy=-16;dy<=16;dy+=4)for(int dx=-16;dx<=16;dx+=4){
+            const int x=wall->x+dx,y=wall->y+dy;bool expected=false;
+            for(unsigned i=0;i<production->activeInstanceCount();++i){
+                const auto& r=production->instanceAt(i);
+                if(!r.active||r.destroyRequested||!storage->families.isA(r.objectId,60))continue;
+                require(r.scaleX==1&&r.scaleY==1&&r.rotation==0,"point fixture uses authored unit terrain");
+                PackedSpriteCollision resource;
+                if(!sprites.collisionSprite(r.spriteId,r.maskId,resource)||!resource.frameCount)continue;
+                const int px=x-r.x+resource.originX,py=y-r.y+resource.originY;
+                if(px<resource.marginLeft||px>resource.marginRight||py<resource.marginTop||py>resource.marginBottom)continue;
+                if(!resource.collisionMode||!resource.collisionMaskCount){expected=true;break;}
+                SpriteMaskPack::Mask mask;int frame=int(r.imageIndex)%int(resource.collisionMaskCount);
+                if(frame<0)frame+=int(resource.collisionMaskCount);
+                require(masks.mask(unsigned(r.maskId<0?r.spriteId:r.maskId),unsigned(frame),mask),"point fixture resolves original mask");
+                if(mask.contains(px,py)){expected=true;break;}
+            }
+            bool hit=false;
+            require(productionOwner->positionMeeting(60,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),hit)&&hit==expected,
+                "live indexed point query matches authored unit terrain bounds and original masks");
+        }
+        require(production->stateDigest()==digest,"point queries do not move instances or consume game RNG");
+    }
     require(!runtime->instance(101097)&&!runtime->startTimeField()&&runtime->randomDrawCount()==331,
         "first-level start field consumes Create RNG then retires its placed lifetime");
     require(lifecycle.startWrites==2&&lifecycle.startRetires==1&&!lifecycle.handles.count(101097),

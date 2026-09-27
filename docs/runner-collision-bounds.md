@@ -358,7 +358,24 @@ positive mask-count modulo. Zero serialized mask count preserves the source's
 unexpanded-mask true fallback; missing required offline mask bytes are a port
 failure, not permission to invent that fallback. Candidate tests cover 1,680
 combinations plus lifetime rejection, frame selection and terminal failure.
-This candidate method is not yet connected to live point-query traversal.
+`RunnerSpatialInstances::point` supplies object-family traversal through the
+same preparation/index ownership used by `instance_place`. It filters flags
+`0x100003`, and indexed candidates additionally require kind 1 and matching
+ancestry. The pinned suppression predicate at `0x501e40` is an unconditional
+false stub. There is no calling-instance exclusion or temporary movement.
+Preparation chooses the source list/index branch from family population and
+index height; only the indexed route flushes pending bounds. Compatibility
+mode truncates the broad-query coordinates toward zero (including SSE's
+integer-indefinite conversion), while precise candidates retain raw binary32
+coordinates. Traversal stops at the first hit or terminal callback failure.
+
+The stored-world adapter exposes this as `positionMeeting` for object-resource
+selectors. Tests exercise the real indexed and list routes, dirty publication,
+first-hit order, inherited families and no self mutation; 81 queries against
+authored room terrain compare the resource-backed adapter with direct bounds
+and original-mask checks. These checks do not execute wall End Step or establish
+the full Windows runtime FP environment. All/instance-ID selectors and wall
+scheduler integration remain separate work.
 
 ## Cross-target mutation tape
 
