@@ -199,6 +199,7 @@ public:
         bool active;
         std::uint32_t lifetimeId;
         bool destroyRequested=false;
+        downwell::BreakableState state{};
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     struct PlayerInstance {
@@ -357,7 +358,8 @@ public:
     void configureBreakables(const int* x, const int* y, unsigned count);
     // Append a newly generated batch without reviving destroyed earlier blocks.
     // Reject capacity failure before changing any state.
-    bool appendBreakables(const int* x, const int* y, unsigned count);
+    bool appendBreakables(const int* x, const int* y, unsigned count,
+        const downwell::BreakableState* creation=nullptr);
     void configureSolidResolver(SolidResolver resolver, void* context, SegmentResolver segment = nullptr,
                                 SolidResolver mask = nullptr,WallContactResolver walls = nullptr) {
         solidResolver_ = resolver;
@@ -415,7 +417,8 @@ public:
         if (command.objectId == 92) {
             DW_GENERATION_SCOPE(profileGeneratedBreakable);
             const int x = command.x - 240, y = command.y - 176;
-            return appendBreakables(&x, &y, 1);
+            const auto state=command.boxCreate();
+            return appendBreakables(&x, &y, 1,&state);
         }
         const auto profile = downwell::enemyCreateProfile(command.objectId);
         if (!profile.health) return true;

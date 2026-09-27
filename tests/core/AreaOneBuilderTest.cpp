@@ -15,13 +15,17 @@ using Commands = std::vector<DeferredCreateInstance>;
 // Hash fields, not structure padding; pin ordered Create output plus RNG state.
 std::uint64_t emissionDigest = 14695981039346656037ULL;
 std::uint64_t legacyDigest = 14695981039346656037ULL;
-void mix(std::uint32_t value,bool newFieldPayload=false) {
-    auto legacy=newFieldPayload?0u:value;
+std::uint64_t preBoxDigest = 14695981039346656037ULL;
+void mix(std::uint32_t value,bool newFieldPayload=false,bool boxPayload=false) {
+    auto legacy=(newFieldPayload||boxPayload)?0u:value;
+    auto preBox=boxPayload?0u:value;
     for (unsigned byte = 0; byte < 4; ++byte) {
         emissionDigest = (emissionDigest ^ (value & 255u)) * 1099511628211ULL;
         legacyDigest = (legacyDigest ^ (legacy & 255u)) * 1099511628211ULL;
+        preBoxDigest = (preBoxDigest ^ (preBox & 255u)) * 1099511628211ULL;
         value >>= 8;
         legacy >>= 8;
+        preBox >>= 8;
     }
 }
 void capture(const Commands& commands, const GameMakerRandom& random) {
@@ -30,7 +34,7 @@ void capture(const Commands& commands, const GameMakerRandom& random) {
         for (std::int32_t value : {c.objectId, c.x, c.y, c.integerScaleX,
              c.integerImageIndex, c.integerVelocityX, c.integerVelocityY,
              c.integerDirection, c.integerMoveSpeed, c.motionState}) mix(value);
-        mix(c.auxiliaryState,c.objectId==82);
+        mix(c.auxiliaryState,c.objectId==82,c.objectId==92);
         for (float value : {c.scaleX, c.scaleY, c.imageSpeed, c.imageIndex,
              c.velocityX, c.velocityY, c.direction, c.moveSpeed}) {
             std::uint32_t bits;
@@ -237,8 +241,10 @@ int main(int argc, char** argv) {
     // fingerprint, not an independent Windows-runner capture.
     require(legacyDigest == 0x970b28efcbf63992ULL,
         "retaining field radius changes no other Create fields or RNG state");
-    require(emissionDigest == 0xddd99e417bca728fULL,
-        "64 seeded levels preserve ordered Create fields and complete RNG state");
+    require(preBoxDigest == 0xddd99e417bca728fULL,
+        "retaining box Create choices changes no prior emission fields or RNG state");
+    require(emissionDigest == 0x5c6663997c7bbf14ULL,
+        "64 seeded levels retain ordered box sound/gem choices and complete RNG state");
     GameMakerRandom random(2);
     AreaOneBuilder builder;
     builder.reset(240, 704, random);
@@ -308,6 +314,12 @@ int main(int argc, char** argv) {
                         command.integerImageIndex == 22,
                     "crate frame remains one of its source Create choices");
             expected.imageSpeed = 0.0F;
+            const auto box=command.boxCreate();
+            require(box.breakSound>=171&&box.breakSound<=174&&
+                box.haveGem==(command.integerImageIndex==22?2:0)&&box.wallHp.high==0x3ff00000u&&
+                !box.wallHp.low&&!box.hit&&!box.drilled&&!box.autoTile&&!box.checked,
+                "crate command retains its source Create fields without repeating RNG");
+            expected.setBoxCreate(box.breakSound,box.haveGem);
             expected.integerImageIndex = command.integerImageIndex;
 #ifdef DOWNWELL_FREESTANDING
             expected.imageIndex = command.integerImageIndex == 22 ? 22.0F : 0.0F;

@@ -64,6 +64,16 @@ the live gun Step: parent-90 adapters, target writes/effects and collision-event
 dispatch remain prerequisites. `verify-bullet-solid-script` checks 1024 branch
 combinations and every callback failure boundary against the pinned VM flow.
 
+The existing cavern builder's box choices are retained in
+`DeferredCreateInstance::boxCreate()` using object 92's otherwise-unused
+auxiliary payload. Sound 171..174, gem kind 0/2 and the associated frame are
+chosen once by the builder. Both backend records adopt `BreakableState`
+without consuming RNG again; raw resource-less fixtures use its defaults.
+It retains health 1, break sound, gem kind, drilled/autoTile/checked flags and
+hit-write storage. This is not the full box Create/Step implementation:
+non-cavern/glitch/ground-room variants, original damage/destruction timing,
+effects, audio, chain reactions and gem/debris emission still require wiring.
+
 ## Collision lookup boundaries
 
 `verify-runner-line-point.py` pins the reviewed registrations, wrappers and

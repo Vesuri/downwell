@@ -601,7 +601,8 @@ bool GameplayWorld::clearBreakableOwnership() {
     return true;
 }
 
-bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count)
+bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
+    const downwell::BreakableState* creation)
 {
     if(!run_.effectsSucceeded)return false;
     if (count > breakableCapacity - breakableCount_ || (count && (!x || !y)))
@@ -613,6 +614,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count)
         breakables_[index].y = y[source];
         breakables_[index].active = true;
         breakables_[index].destroyRequested = false;
+        breakables_[index].state=creation?creation[source]:downwell::BreakableState{};
         breakables_[index].lifetimeId = nextBreakableLifetimeId_++;
         if(!breakableLifecycle_.birth({index,breakables_[index].lifetimeId},breakables_[index])) {
             run_.effectsSucceeded=false;return false;

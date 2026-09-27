@@ -379,6 +379,28 @@ int main(){
     assert(masks.valid());
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        DeferredCreateInstance box{92,240,512};box.setBoxCreate(174,2);
+        box.imageSpeed=0;box.imageIndex=22;box.integerImageIndex=22;
+        const auto draws=world->randomDrawCount();
+        assert(world->createGeneratedInstance(box,objects,[](const auto&){return true;})&&world->randomDrawCount()==draws);
+        InstanceStore<1> stored;DeferredInstanceQueue<1> queue;std::uint32_t next=100000;
+        assert(queue.enqueueCreate(box)&&queue.applyChecked(stored,objects,11,next,[](auto&){return true;})==ApplyInstanceCommandsResult::success);
+        const auto* native=world->findBreakable({0,1});assert(native);
+        const auto& a=native->state;const auto& b=stored.at(0).box;
+        assert(a.wallHp.high==0x3ff00000u&&!a.wallHp.low&&a.wallHp.high==b.wallHp.high&&
+            a.breakSound==174&&a.breakSound==b.breakSound&&a.haveGem==2&&a.haveGem==b.haveGem&&
+            !a.hit&&!b.hit&&!a.drilled&&!b.drilled&&!a.autoTile&&!b.autoTile&&!a.checked&&!b.checked);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43,300)!=ResultsDestination::none);
+        const int x=0,y=336;assert(world->appendBreakables(&x,&y,1));
+        const auto* fresh=world->findBreakable({0,2});
+        assert(fresh&&fresh->state.breakSound==171&&!fresh->state.haveGem&&!fresh->state.hit&&
+            fresh->state.wallHp.high==0x3ff00000u);
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*scene));

@@ -47,6 +47,15 @@ struct DeferredCreateInstance {
     std::int32_t integerMoveSpeed = 0;
     std::int32_t motionState = 0;
     std::int32_t auxiliaryState = 0;
+    // Object 92 has no enemy motion auxiliary state. Carry selected Create
+    // values without enlarging every generated wall command.
+    void setBoxCreate(unsigned sound,unsigned gems){auxiliaryState=static_cast<std::int32_t>(sound|(gems<<16));}
+    BreakableState boxCreate()const{
+        BreakableState state;
+        if(auxiliaryState){state.breakSound=static_cast<unsigned short>(auxiliaryState&65535);
+            state.haveGem=static_cast<unsigned char>(static_cast<unsigned>(auxiliaryState)>>16);}
+        return state;
+    }
     // Object 82 owns no motion auxiliary state. Retain its exact Create RNG
     // word in that existing payload slot, avoiding a larger command for every
     // terrain cell. Explicit arithmetic keeps all uint32 values portable.
@@ -165,6 +174,7 @@ public:
             instance.moveSpeed = command.moveSpeed;
             instance.motionState = command.motionState;
             instance.auxiliaryState = command.auxiliaryState;
+            if(command.objectId==92)instance.box=command.boxCreate();
             instance.motionInitialized = command.motionInitialized;
             instance.grounded = command.grounded;
             instance.active = command.active;

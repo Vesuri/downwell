@@ -86,6 +86,15 @@ assert "pushi.e 90\nconv.i.v\npush.v self.y\npush.v self.x\ncall.i instance_plac
 assert solid.index("call.i instance_destroy(argc=0)", solid.index(":[16]")) < solid.index("pushi.e 272")
 assert "push.v self.bDir\npush.d 0.4\nconv.d.v\npushi.e 605" in solid
 print("Solid script branches pinned: repeated wall selection, direct parent 84, shootable 90 and post-destroy explosion")
+box_create = (export / "Assembly/gml_Object_objBox_n_Create_0.asm").read_text()
+assert "pushi.e 1\npop.v.i self.wallHp\npushi.e 0\npop.v.i self.drilled" in box_create
+assert "pushi.e 0\npop.v.i self.autoTile\npushi.e 0\npop.v.i self.checked" in box_create
+assert ("pushi.e 174\nconv.i.v\npushi.e 173\nconv.i.v\npushi.e 172\nconv.i.v\n"
+        "pushi.e 171\nconv.i.v\ncall.i choose(argc=4)\npop.v.v self.breakSound") in box_create
+assert "pushi.e 50\nconv.i.v\ncall.i irandom(argc=1)\npushi.e 1\ncmp.i.v LT\npop.v.b self.haveGem" in box_create
+assert "pushi.e 2\npop.v.i self.haveGem" in box_create
+assert "pushi.e 22\npop.v.i self.image_index" in box_create
+print("Box Create health, flags and cavern sound/gem choices are VM-pinned")
 assert ("push.v self.y\npush.v self.ysp\nadd.v.v\n"
         "push.v self.x\npush.v self.xsp\nadd.v.v\n"
         "push.v self.y\npush.v self.x\ncall.i collision_line(argc=7)") in solid

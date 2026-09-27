@@ -76,7 +76,8 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
     DW_GENERATION_PHASE(profileBuilderCommand);
     switch (objectId) {
     case 92: {
-        random.chooseIndexSmall(4);
+        const unsigned breakSound=171+random.chooseIndexSmall(4);
+        unsigned haveGem=0;
         command.imageSpeed = 0.0F;
         command.integerImageIndex = 16 + random.chooseIndexSmall(2);
 #ifndef DOWNWELL_FREESTANDING
@@ -84,9 +85,11 @@ bool AreaOneBuilder::emitObject(std::int32_t objectId, int x, int y,
 #endif
         if (random.irandomSmall(50) < 1) {
             random.chooseIndexSmall(2);
+            haveGem=2;
             command.integerImageIndex = 22;
             command.imageIndex = 22.0F;
         }
+        command.setBoxCreate(breakSound,haveGem);
     }
     break;
     case 111: {

@@ -17,6 +17,7 @@
 #include "RunnerRoomMembership.h"
 #include "InstanceHandle.h"
 #include "WallEndStep.h"
+#include "BreakableState.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -76,6 +77,7 @@ struct InstanceRecord {
     bool frogMotionInitialized = false;
     AlarmBank alarms;
     WallEndStepState wall{};
+    BreakableState box{};
 };
 
 enum class CreateInstanceResult {
