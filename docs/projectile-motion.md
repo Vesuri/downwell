@@ -846,6 +846,19 @@ installation adds bounded storage to `StartupRuntime`; it does not establish
 A500 memory fit. Neither live renderer has switched to layer Draw traversal,
 and the separate native gameplay lifetime owner still needs installation.
 
+`StoredRoomLayers::visitDraw` supplies mixed element traversal through
+`RunnerLayerDraw`: retained serialized visibility, reverse layer order, forward
+element order, checked instance/source identity and owned background payloads.
+The caller supplies current source flags and event/sprite availability, then
+receives separate instance/background callbacks at their layer depths. Hidden
+layers perform no instance lookup; unbound serialized reservations are skipped;
+inactive instances terminate their layer only. Dynamic layers start visible
+even when their depth matches a hidden fixed layer. The caller must not retire
+or reuse elements or move layers during this traversal. Renderer integration
+must use the background callback at its actual ordered position, not replace
+it with a frame-wide clear. Tests cover hidden/fixed/dynamic peers, failure
+propagation and background traversal in all 25 original rooms.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

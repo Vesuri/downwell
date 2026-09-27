@@ -32,7 +32,9 @@ behavior, both backend integrations and relevant original-game verification.
   Extend the SDL clock-query owner's coverage to identity-bearing and other
   gameplay queries; register the remaining native field, effect and projectile
   lifetimes in the resource-backed owner before replacing its unindexed
-  collision adapters. Complete original room creation order across families.
+  collision adapters. Complete original room creation order across families,
+  retaining source numeric instance IDs separately from native family-local
+  generation handles for serialized bindings and global lookup order.
 - Replace the usual-gun Q20/Q32 trajectory approximation with original setter
   and trigonometric semantics before enabling projectile selectors. Preserve muzzle-effect
   creation, collision-event ordering and destruction timing around movement.

@@ -7,6 +7,7 @@
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayerLifetimes.h"
 #include "core/StoredLayerLifecycle.h"
+#include "core/StoredRoomLayers.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -482,6 +483,16 @@ void testGeneratedPack(const char* path) {
         unsigned expectedBackgrounds=0;
         for(unsigned l=0;l<room.layerCount;++l){downwell::PackedRoomLayer p;require(pack.roomLayer(room,l,p),"count room backgrounds");expectedBackgrounds+=p.type==1;}
         require(backgroundDraws==expectedBackgrounds,"every original background appears in layer traversal");
+        downwell::InstanceStore<1> emptyStore;
+        downwell::RunnerLayerIds mixedIds;
+        downwell::StoredRoomLayers<1,16,1200,2> mixed(mixedIds);
+        require(mixed.prepare(pack,room.roomId,emptyStore),"prepare original room in production layer owner");
+        unsigned mixedBackgrounds=0;
+        require(mixed.visitDraw([](auto,unsigned,auto&){return false;},
+            [](auto,unsigned,int,auto){return false;},[&](const auto& background,int){
+                ++mixedBackgrounds;return background.initialized;
+            })&&mixedBackgrounds==expectedBackgrounds,
+            "production mixed Draw visits original backgrounds and skips unbound reservations");
         for(unsigned l=0;l<room.layerCount;++l){
             downwell::PackedRoomLayer packed;require(pack.roomLayer(room,l,packed),"generated layer");
             const auto slot=layers.find(int(packed.layerId));unsigned remaining=packed.membershipCount;
@@ -658,6 +669,44 @@ void testLayerLifecycleBinding(){
         "observer failure is returned after completed primary publication");
 }
 
+void testStoredLayerDraw(){
+    using namespace downwell;
+    for(bool visible:{false,true}){
+        auto bytes=makePack(false);
+        const unsigned layerStart=RoomPack::headerSize+RoomPack::roomRecordSize+2*RoomPack::instanceRecordSize;
+        bytes[layerStart+8]=visible?1:0;
+        RoomPack pack(bytes.data(),bytes.size());InstanceStore<3> store;RunnerLayerIds ids;
+        StoredRoomLayers<3,4,4,1> room(ids);
+        require(room.prepare(pack,7,store),"mixed Draw room preparation");
+        for(unsigned id:{100065u,100066u,100100u}){
+            require(store.create(id,35,7,false,-300000)==CreateInstanceResult::success,"mixed Draw instance storage");
+            require(room.observer().birth(store.handleAt(store.size()-1),store.at(store.size()-1)),"mixed Draw layer birth");
+        }
+        unsigned lookups=0;
+        auto lookup=[&](InstanceHandle h,unsigned id,RunnerLayerDraw::Element& out){
+            ++lookups;const auto* r=store.resolve(h);
+            if(!r||r->instanceId!=id)return false;
+            out.flags=0x10u|(r->active?0:2);out.object=true;out.sprite=true;
+            return true;
+        };
+        std::vector<unsigned> drawn;
+        auto draw=[&](InstanceHandle h,unsigned id,int depth,RunnerLayerDraw::Action action){
+            require(store.resolve(h)&&depth==-300000&&action==RunnerLayerDraw::Action::sprite,"mixed Draw identity/depth/action");
+            drawn.push_back(id);return true;
+        };
+        auto background=[](const auto&,int){return false;};
+        require(room.visitDraw(lookup,draw,background)&&drawn==(visible?
+            std::vector<unsigned>{100100,100066,100065}:std::vector<unsigned>{100100})&&lookups==drawn.size(),
+            "dynamic equal-depth layer draws first; hidden fixed layer does not even query instances");
+        store.at(1).active=false;drawn.clear();lookups=0;
+        require(room.visitDraw(lookup,draw,background)&&drawn==std::vector<unsigned>{100100}&&lookups==(visible?2u:1u),
+            "inactive entry terminates only its layer before later active entries");
+        unsigned calls=0;
+        require(!room.visitDraw(lookup,[&](auto,unsigned,int,auto){++calls;return false;},background)&&calls==1,
+            "renderer failure stops mixed Draw immediately");
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -671,6 +720,7 @@ int main(int argc, char** argv) {
     testLayerStartup();
     testLayerRoomReentry();
     testLayerLifecycleBinding();
+    testStoredLayerDraw();
     if (argc == 2)
         testGeneratedPack(argv[1]);
     std::cout << "room pack tests passed\n";
