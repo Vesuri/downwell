@@ -1050,6 +1050,26 @@ owner before normal native queries can use it. Tests exercise real records,
 inactive retained enemies, compaction, Retry and generation reuse, rather than
 only round-tripping key arithmetic.
 
+`GameplayCollisionOwner` connects those three typed lifecycle bindings to
+`RunnerSpatialInstances` and the recovered object/sprite packs. Birth maps local
+enemy/box coordinates through the native (240,176) origin, preserves player
+world coordinates and inactive flags, applies compatibility creation depth and
+the available native sprite/mask/transform fields, and publishes initial bounds.
+Installed move, sprite, image-index, transform, activation, membership and
+retirement callbacks subsequently mutate the same owner; no per-frame rebuilding
+or copied `InstanceRecord` registry is involved. Attach must identify the exact
+world whose player was registered during construction. Later callbacks validate
+the actual record address as well as its family and generation.
+
+The production executable does not install this owner yet. It intentionally
+exposes no gameplay query interface while terrain, fields and the remaining
+families are absent. Native birth hooks currently observe initialized actor
+state; full source PreCreate/Create interleaving and omitted resource writes
+still need migration. Tests bind real worlds and resources and cover dormant
+births, published movement/art, compaction, clear/Retry, unrelated-world rejection
+and copied-record failure. This establishes ownership at existing boundaries,
+not complete native collision fidelity or an A500 memory-fit claim.
+
 The shared immediate bullet/stomp response adapters provide a checked retirement
 callback after rewards and before clearing the active flag or publishing defeat
 and bounce effects. Failure retains earlier damage/reward mutations and stops
