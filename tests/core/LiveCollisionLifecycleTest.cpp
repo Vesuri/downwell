@@ -2,6 +2,7 @@
 #include "core/RoomPack.h"
 #include "core/StoredCollisionLifecycle.h"
 #include "core/StoredWorldCollision.h"
+#include "core/TimeChangeEffects.h"
 #include "core/RunnerObjectFamilies.h"
 #include "core/SmokeDirection.h"
 #include "core/SmokeTrig.h"
@@ -153,6 +154,48 @@ int main(){
         require(!invalid->valid()&&!invalid->attach(*plain)&&
             !invalid->placeMeeting({},record,255,{},{},hit)&&hit,
             "missing collision resources cannot attach or silently answer a successful miss");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach time-change world");world->skipToGameForTesting();
+        PackedObject definition;
+        require(objects.findObject(211,definition)&&definition.parentId==-1&&definition.spriteId==-1,
+            "time-change resource has no parent or visible sprite");
+        auto registration=world->timeChangeRegistration<1>();TimeChangeEffects<1> changes;
+        require(changes.bind(registration),"bind real time-change registration");
+        const auto first=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+        const auto count=world->activeInstanceCount();int speed=60;unsigned pauses=0;
+        require(world->createTimeChange(registration,changes,RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted(),
+            speed,[&](unsigned ms){
+                const auto* r=world->instance(first);
+                require(ms==30&&r&&r->objectId==211&&r->preciseX==240.25f&&r->preciseY==176.5f&&
+                    r->alarms.get(0)==2&&r->alarms.get(1)==2&&speed==30,
+                    "world record and initialized alarms exist before synchronous pause");
+                ++pauses;return true;
+            }),"registered time-change Create");
+        require(pauses==1&&changes.sourceId(1)==first&&world->nextRuntimeInstanceId()==first+1&&
+            world->randomDrawCount()==draws,"time-change consumes one shared ID but no RNG");
+        auto shardRegistration=world->timeShardRegistration<3>();TimeShardEffects<3> shards;TimeShardBurst burst;
+        require(shards.bindPhases(shardRegistration)&&world->emitTimeShards(burst,shards,
+            {0x43700000u},{0x43300000u},{},{},false),"following burst uses same world registry");
+        require(shards.sourceId(1)==first+1&&shards.sourceId(3)==first+3&&world->randomDrawCount()==draws+24,
+            "time-change ID precedes following shard IDs without perturbing RNG");
+        for(unsigned i=0;i<14;++i){const auto phase=changes.beginPhase();
+            require(world->advanceTimeChangeAlarm(registration,changes,phase,0,speed)&&
+                world->advanceTimeChangeAlarm(registration,changes,phase,1,speed),"world time-change alarm dispatch");}
+        require(changes.succeeded()&&changes.size()==0&&speed==60&&world->instance(first)&&
+            world->instance(first)->destroyRequested&&world->instance(first)->alarms.get(1)==0,
+            "final alarm value is published before marked time-change awaits cleanup");
+        require(changes.retireRequested()&&!world->instance(first)&&shards.clear()&&world->activeInstanceCount()==count,
+            "time-change and shard registrations retire without stale world records");
+        const auto failedId=world->nextRuntimeInstanceId();const auto failedDraws=world->randomDrawCount();
+        require(!world->createTimeChange(registration,changes,{},{},speed,[](unsigned){return false;})&&
+            !world->effectsSucceeded()&&speed==30&&world->instance(failedId)&&
+            world->instance(failedId)->alarms.get(1)==2&&world->randomDrawCount()==failedDraws,
+            "failed pause preserves registered Create prefix and stops the world");
+        require(!world->createTimeChange(registration,changes,{},{},speed,[](unsigned){return true;})&&
+            world->nextRuntimeInstanceId()==failedId+1,"failed world creation cannot consume another ID on retry");
     }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
     {

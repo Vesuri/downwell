@@ -10,7 +10,7 @@ struct Registration {
         ++births;id=105186;return failure!=1;
     }
     bool publish(unsigned,unsigned id,const TimeChangeEffect& effect){
-        assert(id==105186&&!effect.destroyRequested);++publishes;return failure!=2;
+        assert(id==105186&&effect.alarm1>=0);++publishes;return failure!=2;
     }
     bool eventEligible(unsigned,unsigned,bool& eligible){eligible=active;return failure!=3;}
     bool destroyed(unsigned,unsigned,const TimeChangeEffect& effect){assert(effect.destroyRequested);++destroys;return failure!=4;}

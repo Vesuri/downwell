@@ -25,6 +25,7 @@ public:
         return true;
     }
     bool succeeded()const{return succeeded_;}
+    template<class World> bool boundTo(const World& world)const{return context_==&world;}
     unsigned size()const{unsigned n=0;for(unsigned i=0;i<count_;++i)if(!slots_[i].effect.destroyRequested)++n;return n;}
     std::uint32_t sourceId(Handle h)const{for(unsigned i=0;i<count_;++i)if(slots_[i].handle==h)return slots_[i].sourceId;return 0;}
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
@@ -62,9 +63,10 @@ public:
             if(eligible_&&!eligible_(context_,slot.handle,slot.sourceId,eligible)){fail();return;}
             if(!eligible)continue;
             slot.effect.advanceAlarm(index,speed);
+            if(publish_&&!publish_(context_,slot.handle,slot.sourceId,slot.effect)){fail();return;}
             if(slot.effect.destroyRequested){
                 if(destroyed_&&!destroyed_(context_,slot.handle,slot.sourceId,slot.effect)){fail();return;}
-            }else if(publish_&&!publish_(context_,slot.handle,slot.sourceId,slot.effect)){fail();return;}
+            }
         }
         if(!context_)retireRequested();
     }

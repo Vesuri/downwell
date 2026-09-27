@@ -66,10 +66,15 @@ the synchronous pause. Registered callers cannot use the coordinate-less
 component `create` shortcut. Registered alarms consult world eligibility,
 publish changes and mark destruction separately from physical cleanup.
 Failures preserve the completed prefix and latch the owner; reset cannot hide
-a failed registration or retirement. This binding contract is not yet connected
-to the actual room registry or the transition helper's private coordinates.
-That integration must precede automatic player time-stop dispatch so object
-211 consumes its source ID before the following shard burst.
+a failed registration or retirement. `StoredTimeChangeRegistration` connects
+these operations to actual room records, source resource defaults, shared IDs
+and the maintained collision owner. `StartupRuntime` exposes checked Create and
+alarm boundaries which latch failures into the world. The live-owner fixture
+verifies the object-211 ID preceding a following shard burst, publication before
+pause, final alarm value before destruction and failed-pause preservation.
+The transition helper's private coordinates and automatic player dispatch still
+need wiring; normal frame scheduling must not advance both record alarms and
+effect-owner alarms for the same lifetime.
 
 ## Shard registration contract
 

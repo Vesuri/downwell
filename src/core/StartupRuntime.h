@@ -19,6 +19,8 @@
 #include "Input.h"
 #include "PlayerMotion.h"
 #include "StoredTimeShardRegistration.h"
+#include "StoredTimeChangeRegistration.h"
+#include "TimeChangeEffects.h"
 #include "TimeShardBurst.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
@@ -134,6 +136,25 @@ public:
     // before changing rooms. Phase dispatch is intentionally not supplied here.
     template<unsigned Capacity> StoredTimeShardRegistration<instanceCapacity,Capacity> timeShardRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredTimeChangeRegistration<instanceCapacity,Capacity> timeChangeRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,unsigned Registered,class Pause> bool createTimeChange(
+        StoredTimeChangeRegistration<instanceCapacity,Registered>& registration,TimeChangeEffects<Capacity>& changes,
+        MotionBinary64 x,MotionBinary64 y,int& speed,Pause pause){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=registration.belongsTo(instances_)&&changes.boundTo(registration)&&
+            changes.createAt(x,y,speed,pause);
+        return run_.effectsSucceeded;
+    }
+    template<unsigned Capacity,unsigned Registered> bool advanceTimeChangeAlarm(
+        StoredTimeChangeRegistration<instanceCapacity,Registered>& registration,TimeChangeEffects<Capacity>& changes,
+        typename TimeChangeEffects<Capacity>::Phase phase,unsigned index,int& speed){
+        if(!run_.effectsSucceeded)return false;
+        if(!registration.belongsTo(instances_)||!changes.boundTo(registration)){run_.effectsSucceeded=false;return false;}
+        changes.advanceAlarm(phase,index,speed);
+        run_.effectsSucceeded=changes.succeeded();return run_.effectsSucceeded;
     }
     template<unsigned Capacity> bool emitTimeShards(TimeShardBurst& burst,TimeShardEffects<Capacity>& shards,
         RunnerImageValue x,RunnerImageValue y,MotionBinary64 xsp,MotionBinary64 ysp,bool lowSpec){
