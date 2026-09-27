@@ -32,6 +32,7 @@
 #include "core/BatBehavior.h"
 #include "core/InstanceHandle.h"
 #include "core/InstanceLifecycle.h"
+#include "core/GameplayTerrainInstances.h"
 
 #include <cstdint>
 
@@ -191,7 +192,9 @@ public:
                               bool followCamera = false,
                               EnemyLifecycleBinding enemyLifecycle = {},
                               BreakableLifecycleBinding breakableLifecycle = {},
-                              PlayerLifecycleBinding playerLifecycle = {});
+                              PlayerLifecycleBinding playerLifecycle = {},
+                              downwell::GameplayTerrainInstances* terrainInstances = nullptr);
+    const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
     bool playerTimeFieldInstance(downwell::RunnerImageValue x,downwell::RunnerImageValue y,
                                  downwell::InstancePlaceResult& result){
@@ -266,6 +269,7 @@ public:
     template<class Terrain>
     bool createGeneratedInstance(const downwell::DeferredCreateInstance& command,
                                  const downwell::ObjectPack& objects, Terrain terrain) {
+        if(!run_.effectsSucceeded)return false;
         if (command.objectId == 277) {
             DW_GENERATION_SCOPE(profileGeneratedShop);
             return registerShop(command.x, command.y) != nullptr;
@@ -275,6 +279,10 @@ public:
             return run_.adoptTimeField(command.x,command.y,command.timeFieldRadiusWord());
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
         if (!terrain(command)) return false;
+        if(terrainInstances_&&(command.objectId==60||command.objectId==93)&&
+            !terrainInstances_->append(command.objectId,command.x,command.y,command.active)){
+            run_.effectsSucceeded=false;return false;
+        }
         if (command.objectId == 92) {
             DW_GENERATION_SCOPE(profileGeneratedBreakable);
             const int x = command.x - 240, y = command.y - 176;
@@ -473,6 +481,7 @@ private:
     EnemyLifecycleBinding enemyLifecycle_;
     BreakableLifecycleBinding breakableLifecycle_;
     PlayerLifecycleBinding playerLifecycle_;
+    downwell::GameplayTerrainInstances* terrainInstances_=nullptr;
     PlayerInstance playerInstance_;
     std::uint32_t nextPlayerLifetimeId_=1;
     bool birthPlayerOwnership();

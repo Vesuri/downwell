@@ -2134,7 +2134,8 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             for (unsigned i = 0; i < 16; ++i)
                 require(random.stateWord(i) == reference.randomState().stateWord(i), "native entry RNG matches decoded startup");
         }
-        AmigaPortRuntime game(300, false, 1201 - 176, true);
+        downwell::GameplayTerrainInstances terrainInstances;
+        AmigaPortRuntime game(300, false, 1201 - 176, true,{},{},{},&terrainInstances);
         game.initializeEntryInput(false);
         LiveSceneWorld live(patterns, objects);
         live.bind(game, rooms, room, false, &reference);
@@ -2231,8 +2232,13 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
         require(carriedKills == reference.mainEnemiesDefeated(), "natural run kill totals agree before reentry");
         std::cout << "Natural carried kills=" << carriedKills << std::endl;
         downwell::Input held; held.fire = true;
+        require(terrainInstances.valid()&&terrainInstances.size()>0,
+            "natural generation publishes individual terrain lifetimes");
+        const auto oldTerrain=terrainInstances.handle(0);
         require(game.prepareNextAreaOneLevel(held, 319) && reference.loadNextAreaOneLevel(held),
             "natural route enters second cavern");
+        require(terrainInstances.size()==0&&!terrainInstances.find(oldTerrain),
+            "natural level advance retires generated terrain before regeneration");
         require(game.runStage().level == 2 && reference.runStage().level == 2,
             "natural route advances exactly one level");
         require(game.enemiesDefeated() == carriedKills && reference.mainEnemiesDefeated() == carriedKills,
@@ -2247,6 +2253,8 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
             parityFrame = tick;
             compareInitialGameplay(game, reference);
         }
+        require(terrainInstances.size()>0&&terrainInstances.handle(0).generation>oldTerrain.generation,
+            "natural second-cavern generation cannot revive a first-cavern key");
         std::cout << "Natural exit seed=" << seed << " gameplay=" << updates
                   << " upgrade=" << clearUpdates << " reentry=120 passed\n";
         if (seed == 4) {

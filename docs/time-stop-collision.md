@@ -1034,8 +1034,8 @@ slot ownership without rewinding the lifetime counter. These handles remain
 world- and family-local; they neither establish original traversal order nor
 replace registration and synchronous retirement in the shared collision owner.
 
-`GameplayCollisionView` maps player, enemy and breakable local keys into
-disjoint collision slots (1 + 64 + 512). It borrows the actual `GameplayWorld`
+`GameplayCollisionView` maps player, enemy, breakable and terrain local keys into
+disjoint collision slots (1 + 64 + 512 + 2048). It borrows the actual `GameplayWorld`
 and resolves records on every call, so compaction cannot leave cached pointers.
 Generation validation still belongs to each store. `resolveEnemyLifetime`
 does not apply active/pending filters; an inactive retained lifetime must reach
@@ -1043,14 +1043,14 @@ the collision routine before that routine decides whether to exclude it.
 The legacy `findEnemy` gameplay eligibility behavior is unchanged.
 
 This view allocates no record copies and assigns no Windows instance IDs. Its
-slot ranges do not imply source traversal order. Terrain, fields, projectiles
+slot ranges do not imply source traversal order. Room-authored terrain, fields, projectiles
 and other effect stores still need their own lifetime registration, and typed
 resource/coordinate adapters must connect the view to the maintained spatial
 owner before normal native queries can use it. Tests exercise real records,
 inactive retained enemies, compaction, Retry and generation reuse, rather than
 only round-tripping key arithmetic.
 
-`GameplayCollisionOwner` connects those three typed lifecycle bindings to
+`GameplayCollisionOwner` connects those typed lifecycle bindings to
 `RunnerSpatialInstances` and the recovered object/sprite packs. Birth maps local
 enemy/box coordinates through the native (240,176) origin, preserves player
 world coordinates and inactive flags, applies compatibility creation depth and
@@ -1062,13 +1062,29 @@ world whose player was registered during construction. Later callbacks validate
 the actual record address as well as its family and generation.
 
 The production executable does not install this owner yet. It intentionally
-exposes no gameplay query interface while terrain, fields and the remaining
+exposes no gameplay query interface while room-authored terrain, fields and the remaining
 families are absent. Native birth hooks currently observe initialized actor
 state; full source PreCreate/Create interleaving and omitted resource writes
 still need migration. Tests bind real worlds and resources and cover dormant
 births, published movement/art, compaction, clear/Retry, unrelated-world rejection
 and copied-record failure. This establishes ownership at existing boundaries,
 not complete native collision fidelity or an A500 memory-fit claim.
+
+Generated walls (60) and platforms (93) can publish through an optional
+`GameplayTerrainInstances` store passed to `GameplayWorld` at construction.
+`createGeneratedInstance` appends after the backend terrain callback succeeds,
+before the next generated command. Records retain room coordinates and active
+state; coincident cells remain separate instances. Breakables still use their
+existing owner and are not duplicated here. Retry and level advance retire
+terrain before reusing slots, retaining the monotonic generation sequence.
+Callback/capacity failure is terminal and preserves the completed prefix.
+The store is separately allocated: normal unbound worlds gain only a pointer,
+not a terrain array. The optional collision owner includes the terrain array
+and expanded spatial capacity; its eventual A500 residency must be measured.
+This is registration at the current handoff, not original PreCreate execution:
+wall Create chooses `global.wallTile`, and End Step assigns adjacency frames.
+Those resource writes, room-authored births and per-instance activation/retirement
+still need their source boundaries before enabling live terrain queries.
 
 The enemy binding includes the explicit mask setter: flying bat Step copies
 `sprite_index` to `mask_index` after choosing 153 (flight) or 154 (hit), as shown

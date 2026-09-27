@@ -37,6 +37,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
+    if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    const auto terrainInstances=terrainInstances_;
     const auto playerLifecycle=playerLifecycle_;
     const auto nextPlayerIdentity=nextPlayerLifetimeId_;
     const auto enemyLifecycle=enemyLifecycle_;
@@ -54,7 +56,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto flashBirths=run_.flashEffects.birthSequence();
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
-    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle);
+    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances);
     nextBreakableLifetimeId_=nextBreakableIdentity;
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
@@ -81,6 +83,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
+    if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return false;}
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.
@@ -126,8 +129,9 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    int landingOffset,
                                    bool followCamera, EnemyLifecycleBinding enemyLifecycle,
                                    BreakableLifecycleBinding breakableLifecycle,
-                                   PlayerLifecycleBinding playerLifecycle)
-    : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), playerLifecycle_(playerLifecycle), player_(startsGrounded, landingOffset), tick_(0),
+                                   PlayerLifecycleBinding playerLifecycle,
+                                   downwell::GameplayTerrainInstances* terrainInstances)
+    : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), playerLifecycle_(playerLifecycle), terrainInstances_(terrainInstances), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
       cameraPixelX_(0), activationY_(0),

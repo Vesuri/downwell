@@ -7,12 +7,24 @@
 #include <cstdio>
 using namespace downwell;
 static std::vector<std::uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
+struct TerrainAudit {
+    GameplayTerrainInstances* store=nullptr;
+    unsigned births=0,retires=0,failBirth=0,failRetire=0;
+    bool birth(InstanceHandle h,const GameplayTerrainInstances::Record& r){
+        assert(store->find(h)==&r);return ++births!=failBirth;
+    }
+    bool retire(InstanceHandle h,const GameplayTerrainInstances::Record& r){
+        assert(store->find(h)==&r);return ++retires!=failRetire;
+    }
+    bool activation(InstanceHandle,const GameplayTerrainInstances::Record&,bool){return true;}
+    bool membership(InstanceHandle,const GameplayTerrainInstances::Record&,bool){return true;}
+};
 int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     assert(owner->valid());
-    auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding());
+    auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
     auto unrelated=std::make_unique<GameplayWorld>(300,true,0,false);
     assert(!owner->attach(*unrelated)&&owner->valid());
     assert(owner->attach(*world)&&world->effectsSucceeded());
@@ -29,6 +41,26 @@ int main(){
     assert(owner->properties(key)->sprite.spriteId==153&&owner->properties(key)->sprite.maskId==-1);
     unsigned count=0;
     assert(owner->population(35,count)&&count==1&&owner->population(92,count)&&count==1);
+    unsigned terrainCalls=0;
+    auto terrain=[&](const auto&){++terrainCalls;return true;};
+    assert(world->createGeneratedInstance({60,240,512},objects,terrain));
+    assert(world->createGeneratedInstance({60,240,512},objects,terrain)); // Coincident, distinct births.
+    DeferredCreateInstance platform(93,256,528);platform.active=false;
+    assert(world->createGeneratedInstance(platform,objects,terrain));
+    assert(terrainCalls==3&&owner->terrain().size()==3);
+    InstanceHandle wall,otherWall,ledge;
+    const auto wallLocal=owner->terrain().handle(0);
+    assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,wallLocal,wall)&&
+        GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,owner->terrain().handle(1),otherWall)&&
+        GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,owner->terrain().handle(2),ledge));
+    assert(wall.slot!=otherWall.slot&&owner->state(wall)&&owner->state(otherWall));
+    assert(owner->state(wall)->x.promoted().roundPixel(px)&&px==240&&
+        owner->state(wall)->y.promoted().roundPixel(py)&&py==512&&(owner->state(ledge)->flags&2));
+    assert(owner->population(60,count)&&count==2);
+    GameplayCollisionView::Record terrainRecord;
+    assert(GameplayCollisionView(*world).resolve(wall,terrainRecord)&&terrainRecord.terrain==owner->terrain().find(wallLocal));
+    // A backend rejection must not invent an identity for a cell it rejected.
+    assert(!world->createGeneratedInstance({60,1,2},objects,[](const auto&){return false;})&&owner->terrain().size()==3);
     world->step(0);
     assert(world->effectsSucceeded()&&owner->valid()&&world->enemyCount()==1&&owner->state(key));
     const auto* enemy=world->findEnemy(local);assert(enemy);
@@ -39,6 +71,10 @@ int main(){
     assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
     assert(owner->valid()&&!owner->state(key)&&!owner->state(player)&&owner->population(35,count)&&count==1);
     assert(owner->population(92,count)&&count==0&&owner->population(116,count)&&count==0);
+    assert(!owner->state(wall)&&!owner->state(otherWall)&&!owner->state(ledge)&&
+        !owner->terrain().find(wallLocal)&&owner->terrain().size()==0&&owner->population(60,count)&&count==0);
+    assert(world->createGeneratedInstance({60,240,512},objects,terrain));
+    assert(owner->terrain().handle(0).generation>wallLocal.generation&&!GameplayCollisionView(*world).resolve(wall,terrainRecord));
     // A copied record must not mutate the installed lifetime's properties.
     auto copy=*world->findPlayer(world->playerHandle());
     assert(!owner->playerBinding().integerPosition(world->playerHandle(),copy,1,2)&&!owner->valid());
@@ -68,5 +104,41 @@ int main(){
         assert(!masks->enemyBinding().mask(bat,copied,999)&&!masks->valid()&&batWorld->enemyAt(0).maskId==153);
         batWorld->step(0);assert(!batWorld->effectsSucceeded());
     }
-    std::puts("Native collision owner: real resource births, dormant flags, movement, compaction, retirement and Retry passed");
+    {
+        TerrainAudit audit;
+        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bind(audit));
+        audit.store=store.get();
+        assert(store->append(60,1,2,true)&&store->append(93,3,4,true));
+        const auto first=store->handle(0),second=store->handle(1);
+        audit.failRetire=2;
+        assert(!store->clear()&&!store->valid()&&audit.retires==2);
+        assert(!store->find(first)&&store->find(second)); // Successful prefix is not rolled back.
+        assert(!store->clear()&&audit.retires==2&&!store->append(60,5,6,true));
+    }
+    {
+        TerrainAudit audit;
+        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bind(audit));
+        audit.store=store.get();audit.failBirth=1;
+        auto failure=std::make_unique<GameplayWorld>(300,true,0,false,
+            GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+            GameplayWorld::PlayerLifecycleBinding{},store.get());
+        assert(!failure->createGeneratedInstance({60,1,2},objects,[](const auto&){return true;}));
+        assert(!failure->effectsSucceeded()&&!store->valid()&&store->find(store->handle(0))&&audit.births==1);
+        failure->step(0);assert(!failure->effectsSucceeded());
+    }
+    {
+        auto terrain=std::make_unique<GameplayTerrainInstances>();
+        auto full=std::make_unique<GameplayWorld>(300,true,0,false,
+            GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+            GameplayWorld::PlayerLifecycleBinding{},terrain.get());
+        unsigned calls=0;
+        const auto backend=[&](const auto&){++calls;return true;};
+        for(unsigned i=0;i<GameplayTerrainInstances::capacity;++i)
+            assert(full->createGeneratedInstance({60,240,512},objects,backend));
+        assert(!full->createGeneratedInstance({93,240,528},objects,backend)&&!full->effectsSucceeded());
+        assert(terrain->size()==GameplayTerrainInstances::capacity&&calls==GameplayTerrainInstances::capacity+1);
+        assert(!full->createGeneratedInstance({60,0,0},objects,backend)&&calls==GameplayTerrainInstances::capacity+1);
+        full->step(0);assert(!full->effectsSucceeded());
+    }
+    std::puts("Native collision owner: actor/terrain births, dormant flags, movement, compaction, retirement, Retry and terminal failure passed");
 }

@@ -8,14 +8,16 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable};
+    enum class Kind {player,enemy,breakable,terrain};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
-    static constexpr unsigned capacity=breakableBase+GameplayWorld::breakableCapacity;
+    static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
+    static constexpr unsigned capacity=terrainBase+GameplayTerrainInstances::capacity;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
         const GameplayWorld::Breakable* breakable=nullptr;
+        const GameplayTerrainInstances::Record* terrain=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -25,6 +27,7 @@ public:
             case Kind::player:count=1;break;
             case Kind::enemy:base=enemyBase;count=GameplayWorld::enemyCapacity;break;
             case Kind::breakable:base=breakableBase;count=GameplayWorld::breakableCapacity;break;
+            case Kind::terrain:base=terrainBase;count=GameplayTerrainInstances::capacity;break;
             default:return false;
         }
         if(local.slot>=count)return false;
@@ -32,8 +35,8 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
-        const unsigned base=key.slot<enemyBase?0:key.slot<breakableBase?enemyBase:breakableBase;
-        kind=base==0?Kind::player:base==enemyBase?Kind::enemy:Kind::breakable;
+        const unsigned base=key.slot<enemyBase?0:key.slot<breakableBase?enemyBase:key.slot<terrainBase?breakableBase:terrainBase;
+        kind=base==0?Kind::player:base==enemyBase?Kind::enemy:base==breakableBase?Kind::breakable:Kind::terrain;
         local={key.slot-base,key.generation};return true;
     }
     bool resolve(InstanceHandle key,Record& record)const{
@@ -44,6 +47,9 @@ public:
             case Kind::player:next.player=world_.findPlayer(local);if(!next.player)return false;break;
             case Kind::enemy:next.enemy=world_.resolveEnemyLifetime(local);if(!next.enemy)return false;break;
             case Kind::breakable:next.breakable=world_.findBreakable(local);if(!next.breakable)return false;break;
+            case Kind::terrain:
+                if(!world_.terrainInstances()||!(next.terrain=world_.terrainInstances()->find(local)))return false;
+                break;
         }
         record=next;return true;
     }

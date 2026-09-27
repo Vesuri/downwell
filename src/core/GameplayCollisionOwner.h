@@ -37,7 +37,7 @@ private:
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
-            if constexpr(Kind==View::Kind::enemy)return r.objectId;
+            if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
         bool key(InstanceHandle local,const Record& r,InstanceHandle& out,bool birth=false){
@@ -49,12 +49,14 @@ private:
             const void* pointer;
             if constexpr(Kind==View::Kind::player)pointer=actual.player;
             else if constexpr(Kind==View::Kind::enemy)pointer=actual.enemy;
+            else if constexpr(Kind==View::Kind::terrain)pointer=actual.terrain;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
         bool birth(InstanceHandle local,const Record& r){
             InstanceHandle h;if(!key(local,r,h,true))return false;
-            constexpr int ox=Kind==View::Kind::player?0:240,oy=Kind==View::Kind::player?0:176;
+            constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain;
+            constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
             if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
             Owner::State state;
             if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
@@ -106,13 +108,15 @@ private:
     Binding<GameplayWorld::PlayerInstance,View::Kind::player> player_{*this};
     Binding<GameplayWorld::EnemyState,View::Kind::enemy> enemies_{*this};
     Binding<GameplayWorld::Breakable,View::Kind::breakable> boxes_{*this};
+    Binding<GameplayTerrainInstances::Record,View::Kind::terrain> terrainBinding_{*this};
+    GameplayTerrainInstances terrain_{GameplayTerrainInstances::Binding::bind(terrainBinding_)};
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites):objects_(objects),sprites_(sprites){
         good_=sprites.valid()&&families_.bindInstanceFlags(objects);
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&terrain_.valid();}
     bool attach(const GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
@@ -121,6 +125,7 @@ public:
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
     auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMasks(enemies_);}
     auto breakableBinding(){return GameplayWorld::BreakableLifecycleBinding::bindMovement(boxes_);}
+    GameplayTerrainInstances& terrain(){return terrain_;}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
     bool population(int object,unsigned& count)const{return valid()&&owner_.instanceNumber(object,families_,count);}
