@@ -2112,7 +2112,7 @@ bool StartupRuntime::loadNextAreaOneLevel(const Input& input) {
     run_.bloodEffects.clear();
     run_.clearCorpseExpiry();
     run_.clearDamageNumbers();
-    run_.timeFields.clear();
+    if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return false;}
     run_.sideCameraLockers.clear();
     mainCameraInitialized_ = false;
     mainCameraMotion_ = {};

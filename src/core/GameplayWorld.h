@@ -453,6 +453,10 @@ public:
     const downwell::ShopWorld& shops() const { return run_.shops; }
     bool registerSideCameraLocker(int x, int y) { return run_.sideCameraLockers.create(x, y); }
     const downwell::OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
+    bool bindTimeFieldLifecycle(downwell::OrdinaryTimeFields<64>::Binding binding){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=run_.timeFields.bindLifecycle(binding);return run_.effectsSucceeded;
+    }
     bool cameraSideLocked() const { return cameraMotion_.sideLocked; }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(cameraMotion_); }
     // Read-only rendering hint: entering a camera column may collide with a

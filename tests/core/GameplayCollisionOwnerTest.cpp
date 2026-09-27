@@ -466,6 +466,32 @@ int main(){
         scene->step(0);
         assert(!scene->effectsSucceeded()&&scene->enemyAt(1).alarm1==before);
     }
+    {
+        auto fieldsOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto fieldWorld=std::make_unique<GameplayWorld>(300,true,0,false,fieldsOwner->enemyBinding(),
+            fieldsOwner->breakableBinding(),fieldsOwner->playerBinding(),&fieldsOwner->terrain());
+        assert(fieldsOwner->attach(*fieldWorld));
+        const auto draws=fieldWorld->randomDrawCount();
+        assert(fieldWorld->createGeneratedInstance({82,240,512},objects,[](const auto&){return false;}));
+        const auto identity=fieldWorld->timeFields().identityAt(0);
+        InstanceHandle fieldKey;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeField,{0,identity},fieldKey));
+        GameplayCollisionView::Record record;
+        assert(GameplayCollisionView(*fieldWorld).resolve(fieldKey,record)&&record.timeField==fieldWorld->timeFields().at(0));
+        const auto* state=fieldsOwner->state(fieldKey);std::int32_t x,y;
+        assert(state&&state->x.promoted().roundPixel(x)&&x==240&&state->y.promoted().roundPixel(y)&&y==512);
+        unsigned population=0;
+        assert(fieldsOwner->population(82,population)&&population==1&&
+            fieldsOwner->properties(fieldKey)->sprite.spriteId==597&&fieldWorld->randomDrawCount()==draws);
+        assert(fieldWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        assert(fieldsOwner->valid()&&!fieldsOwner->state(fieldKey)&&
+            !GameplayCollisionView(*fieldWorld).resolve(fieldKey,record)&&fieldsOwner->population(82,population)&&population==0);
+        assert(fieldWorld->createGeneratedInstance({82,256,600},objects,[](const auto&){return false;}));
+        const auto next=fieldWorld->timeFields().identityAt(0);
+        InstanceHandle nextKey;
+        assert(next>identity&&GameplayCollisionView::encode(GameplayCollisionView::Kind::timeField,{0,next},nextKey)&&
+            fieldsOwner->state(nextKey)&&!fieldsOwner->state(fieldKey));
+    }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     {
         auto terrain=std::make_unique<GameplayTerrainInstances>();GameMakerRandom random;

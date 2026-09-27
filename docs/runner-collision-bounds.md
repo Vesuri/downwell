@@ -383,13 +383,31 @@ scheduler integration remain separate work.
 
 The Amiga executable embeds the same generated `downwell-sprites.dwsc`
 metadata as the host and constructs `GameplayCollisionOwner` before its world.
-Player, enemy, breakable and terrain births/setters/retirements publish through
+Player, enemy, breakable, terrain and ordinary time-field births/retirements publish through
 that owner, including in-place Retry. Its storage is static, not on the task
-stack; the current 68000 layout consumes 1,360,392 bytes before the 26,700-byte
+stack; the current 68000 layout consumes 1,389,708 bytes before the 26,700-byte
 sprite metadata pack and the 511,580-byte original collision-mask pack. Mask
 bytes are borrowed directly from the executable's read-only data, not converted
 into Chip bitmaps or reconstructed from artwork alpha. This is an expanded-memory development configuration,
 not evidence of stock-A500 memory fit.
+
+Ordinary object-82 fields resolve directly from `OrdinaryTimeFields`, without
+a per-frame population pass or duplicated coordinates. The native view reserves
+64 disjoint slots after terrain; generation is the shared field birth identity.
+The registry binds the original sprite 597 and default properties before radius
+initialization. Runtime Create publishes birth before consuming its radius RNG;
+builder adoption preserves the already-consumed sample. Field Draw changes only
+radius, not the collision sprite or transform, so it does not rebuild bounds.
+
+Room teardown retires fields in their own creation order before invalidating
+keys. A failed callback preserves completed retirements, retains the failed
+record, and makes the owner terminal. Retry preserves the binding and monotonic
+birth sequence, so a reused field slot cannot resolve an old handle. Tests
+cover real generated-command adoption, native registry population/resources,
+Retry, and callback failure/RNG ordering. This adds 29,316 bytes to the native
+registry's static storage (measured from `collisionStorage` in the target ELF).
+It does not finish cross-family room creation/teardown order or admit field
+selection queries: start/goal fields and effect lifetimes still need registration.
 
 The task requires an 8 KiB stack. Launch scripts set it explicitly; the small
 entry wrapper returns 20 before entering the application if less is supplied.

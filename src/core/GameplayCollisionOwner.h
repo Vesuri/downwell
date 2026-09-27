@@ -59,10 +59,13 @@ private:
         GameplayCollisionOwner& parent;
         static int object(const Record& r){
             if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
+            if constexpr(Kind==View::Kind::timeField)return 82;
             return Kind==View::Kind::player?35:92;
         }
         bool key(InstanceHandle local,const Record& r,InstanceHandle& out,bool birth=false){
-            if(!parent.valid()||local.generation!=r.lifetimeId||!View::encode(Kind,local,out))return parent.check(false);
+            if(!parent.valid()||!View::encode(Kind,local,out))return parent.check(false);
+            if constexpr(Kind!=View::Kind::timeField)
+                if(local.generation!=r.lifetimeId)return parent.check(false);
             if(birth&&!parent.world_)return parent.check(Kind==View::Kind::player);
             View::Record actual;
             if(!parent.world_||!View(*parent.world_).resolve(out,actual)||
@@ -71,17 +74,18 @@ private:
             if constexpr(Kind==View::Kind::player)pointer=actual.player;
             else if constexpr(Kind==View::Kind::enemy)pointer=actual.enemy;
             else if constexpr(Kind==View::Kind::terrain)pointer=actual.terrain;
+            else if constexpr(Kind==View::Kind::timeField)pointer=actual.timeField;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
         bool birth(InstanceHandle local,const Record& r){
             InstanceHandle h;if(!key(local,r,h,true))return false;
-            constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain;
+            constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
             if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
             Owner::State state;
             if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
-            if(!r.active)state.flags|=2u;
+            if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
             if(!parent.check(parent.owner_.attach(h,object(r),state)))return false;
             auto& p=parent.properties_[h.slot];p={};
             if(!parent.check(parent.owner_.bindObjectFromPacks(h,object(r),true,p,
@@ -90,7 +94,7 @@ private:
             if(!parent.objects_.findObject(object(r),definition)||!real(definition.creationDepth,p.depth))return parent.check(false);
             if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
             parent.roomKeys_[h.slot]=h;
-            if(!r.active)parent.activationPending_=true;
+            if constexpr(Kind!=View::Kind::timeField)if(!r.active)parent.activationPending_=true;
             if constexpr(Kind==View::Kind::enemy){
                 p.sprite.spriteId=r.spriteId;p.sprite.maskId=r.maskId;
                 if(!real(r.objectId==117?r.motionState:r.facing,p.sprite.scaleX)||
@@ -142,6 +146,7 @@ private:
     Binding<GameplayWorld::EnemyState,View::Kind::enemy> enemies_{*this};
     Binding<GameplayWorld::Breakable,View::Kind::breakable> boxes_{*this};
     Binding<GameplayTerrainInstances::Record,View::Kind::terrain> terrainBinding_{*this};
+    Binding<OrdinaryTimeField,View::Kind::timeField> fields_{*this};
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
@@ -161,6 +166,7 @@ public:
     bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
+        if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
         world_=&world;
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary){
             return static_cast<GameplayCollisionOwner*>(context)->reconcileActivation();

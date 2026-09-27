@@ -37,6 +37,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
+    if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
     const auto phaseBoundary=phaseBoundary_;
@@ -53,6 +54,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto nextEnemyIdentity=nextEnemyLifetimeId_;
     const auto nextGemIdentity=nextGemLifetimeId_;
     const auto fieldBirths=run_.timeFields.birthSequence();
+    const auto fieldLifecycle=run_.timeFields.lifecycle();
     const auto numberBirths=run_.damageNumbers.birthSequence();
     const auto expiryBirths=run_.corpseExpiryEffects.birthSequence();
     const auto smokeBirths=run_.smokeEffects.birthSequence();
@@ -74,6 +76,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     nextPlayerLifetimeId_=nextPlayerIdentity;
     run_.restart(action, records);
     if(!run_.timeFields.restoreEmptyBirthSequence(fieldBirths))run_.effectsSucceeded=false;
+    if(!run_.timeFields.bindLifecycle(fieldLifecycle))run_.effectsSucceeded=false;
     if(!run_.smokeEffects.restoreEmptyBirthSequence(smokeBirths)||
        !run_.bloodEffects.restoreEmptyBirthSequence(bloodBirths)||
        !run_.flashEffects.restoreEmptyBirthSequence(flashBirths))run_.effectsSucceeded=false;
@@ -100,7 +103,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     run_.bloodEffects.clear();
     run_.clearCorpseExpiry();
     run_.clearDamageNumbers();
-    run_.timeFields.clear();
+    if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return false;}
     run_.sideCameraLockers.clear();
     player_.enterRoom(input.fire, 1201 - 176);
     emitter_.reset(run_.upgrades.levels[12] != 0);

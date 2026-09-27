@@ -11,6 +11,38 @@
 using namespace downwell;
 static double value(HudReal n){return std::ldexp(double(n.mantissa),n.exponent-52);}
 int main(){
+    struct Audit {
+        OrdinaryTimeFields<2>* fields=nullptr;GameMakerRandom* random=nullptr;
+        unsigned births=0,retires=0,failBirth=0,failRetire=0;
+        std::uint32_t drawsAtBirth=0;
+        bool birth(InstanceHandle h,const OrdinaryTimeField& r){
+            assert(fields->find(h.generation)==&r&&fields->identityAt(h.slot)==h.generation&&r.radius.mantissa==0);
+            drawsAtBirth=random->drawCount();return ++births!=failBirth;
+        }
+        bool retire(InstanceHandle h,const OrdinaryTimeField& r){
+            assert(fields->find(h.generation)==&r);return ++retires!=failRetire;
+        }
+        bool activation(InstanceHandle,const OrdinaryTimeField&,bool){return true;}
+        bool membership(InstanceHandle,const OrdinaryTimeField&,bool){return true;}
+    };
+    {
+        OrdinaryTimeFields<2> fields;GameMakerRandom random(42);Audit audit{&fields,&random};
+        assert(fields.bindLifecycle(OrdinaryTimeFields<2>::Binding::bind(audit)));
+        const auto draws=random.drawCount();
+        assert(fields.create(240,512,random)&&audit.births==1&&audit.drawsAtBirth==draws&&random.drawCount()==draws+1);
+        assert(fields.adoptCreate(256,600,123)&&audit.births==2&&random.drawCount()==draws+1);
+        const auto first=fields.identityAt(0),second=fields.identityAt(1);
+        audit.failRetire=2;
+        assert(!fields.clear()&&!fields.valid()&&!fields.find(first)&&fields.find(second)&&audit.retires==2);
+        assert(!fields.clear()&&!fields.create(1,2,random)&&random.drawCount()==draws+1);
+    }
+    {
+        OrdinaryTimeFields<2> fields;GameMakerRandom random(42);Audit audit{&fields,&random};audit.failBirth=1;
+        assert(fields.bindLifecycle(OrdinaryTimeFields<2>::Binding::bind(audit)));
+        const auto draws=random.drawCount();
+        assert(!fields.create(240,512,random)&&!fields.valid()&&fields.find(1)&&random.drawCount()==draws);
+        assert(!fields.create(256,600,random)&&!fields.restoreEmptyBirthSequence({1})&&audit.births==1);
+    }
     for(unsigned seed=0;seed<256;++seed){
         OrdinaryTimeFields<2> fields;
         GameMakerRandom actual(seed),expected(seed);

@@ -427,7 +427,7 @@ struct RunSession {
         bloodEffects.clear();
         clearCorpseExpiry();
         clearDamageNumbers();
-        timeFields.clear();
+        if(!timeFields.clear()){effectsSucceeded=false;return false;}
         // Room creation is followed by Draw before the next Step/Alarm phase.
         levelClearFrame = levelClear.presentation.advance(stage.area, stage.level,
             levelClear.selection.next, levelClear.selection.visible);
@@ -536,7 +536,7 @@ struct RunSession {
         bloodEffects.clear();
         clearCorpseExpiry();
         clearDamageNumbers();
-        timeFields.clear();
+        if(!timeFields.clear()){effectsSucceeded=false;return;}
         effectsSucceeded=true;
         sideCameraLockers.clear();
         gemHigh = false;
