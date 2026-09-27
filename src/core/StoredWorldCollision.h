@@ -186,6 +186,10 @@ public:
             [](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
                 angle.bits^=0x80000000u;return Trig{}(angle,c,s);
             },selected))return false;
+        return publishSelection(selected,result);
+    }
+private:
+    bool publishSelection(const Owner::Result& selected,InstancePlaceResult& result)const{
         InstancePlaceResult next;
         if(selected.found){
             const auto* record=resolve(selected.handle);
@@ -195,6 +199,25 @@ public:
             next.handle=selected.handle;next.x=state->x.promoted();next.y=state->y.promoted();
         }
         result=next;return true;
+    }
+public:
+    // Explicit capabilities, not yet wired into live bullets: their movement,
+    // muzzle births and collision-event ordering must be replaced together.
+    bool collisionPoint(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+                        bool precise,bool notMe,InstancePlaceResult& result){
+        if(!valid()||!runtime_)return false;
+        Owner::Result selected;
+        return adapter_.collisionPointVm(*this,self,object,x,y,precise,notMe,masks_,
+            [](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
+                angle.bits^=0x80000000u;return Trig{}(angle,c,s);
+            },selected)&&publishSelection(selected,result);
+    }
+    bool nonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
+                        MotionBinary64 x2,MotionBinary64 y2,bool notMe,InstancePlaceResult& result){
+        if(!valid()||!runtime_)return false;
+        Owner::Result selected;
+        return adapter_.nonPreciseLineVm(*this,self,object,x1,y1,x2,y2,notMe,selected)&&
+            publishSelection(selected,result);
     }
     bool positionMeeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
         if(!valid()||!runtime_)return false;

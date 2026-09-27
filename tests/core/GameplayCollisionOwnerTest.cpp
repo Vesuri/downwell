@@ -1,4 +1,15 @@
 #include "core/GameplayCollisionOwner.h"
+#ifdef DOWNWELL_NATIVE_QUERY_PROBE
+// Compile-only A500 gate: instantiate the public selectors without the host
+// fixture loader, filesystem, heap-backed assertions or C++ runtime headers.
+bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
+    const downwell::SpriteMaskPack& masks,downwell::InstanceHandle self,
+    downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+    downwell::GameplayCollisionOwner::Owner::Result& result){
+    return owner.terrainCollisionPoint(self,60,x,y,true,true,masks,result)&&
+        owner.terrainNonPreciseLine(self,60,x,y,x,y,true,result);
+}
+#else
 #include "core/GameplayFieldReentryVerification.h"
 #include "core/ProjectilePublication.h"
 #include "core/WallPresentation.h"
@@ -423,7 +434,7 @@ int main(){
         InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,self,shared));
         const auto before=*queries->state(shared);
         for(int y=492;y<=548;++y)for(int x=220;x<=276;++x){
-            bool expected=false;
+            bool expected=false,boxHit=false;
             for(unsigned i=0;i<3;++i){
                 const auto local=queries->terrain().handle(i);const auto* r=queries->terrain().find(local);
                 InstanceHandle key;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,key));
@@ -431,6 +442,7 @@ int main(){
                 assert(sprites.collisionSprite(p.spriteId,p.maskId,resource));
                 const int px=x-r->x+resource.originX,py=y-r->y+resource.originY;
                 if(px<resource.marginLeft||px>resource.marginRight||py<resource.marginTop||py>resource.marginBottom)continue;
+                boxHit=true;
                 if(!resource.collisionMode||!resource.collisionMaskCount){expected=true;break;}
                 SpriteMaskPack::Mask mask;assert(masks.mask(unsigned(p.maskId<0?p.spriteId:p.maskId),0,mask));
                 if(mask.contains(px,py)){expected=true;break;}
@@ -439,6 +451,19 @@ int main(){
             const bool ok=queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),masks,hit);
             if(!ok||hit!=expected)std::fprintf(stderr,"native point %d,%d: ok=%d hit=%d expected=%d\n",x,y,ok,hit,expected);
             assert(ok&&hit==expected);
+            const auto px=MotionBinary64::fromInteger(x),py=MotionBinary64::fromInteger(y);
+            GameplayCollisionOwner::Owner::Result selected;
+            assert(queries->terrainCollisionPoint({},60,px,py,true,false,masks,selected)&&selected.found==expected);
+            assert(queries->terrainCollisionPoint({},60,px,py,false,false,masks,selected)&&selected.found==boxHit);
+            assert(queries->terrainNonPreciseLine({},60,px,py,px,py,false,selected)&&selected.found==boxHit);
+            if(selected.found){
+                GameplayCollisionView::Kind kind;InstanceHandle local;
+                assert(GameplayCollisionView::decode(selected.handle,kind,local)&&
+                    kind==GameplayCollisionView::Kind::terrain&&queries->terrain().find(local));
+                const auto excluded=selected.handle;
+                assert(queries->terrainNonPreciseLine(excluded,60,px,py,px,py,true,selected));
+                assert(!selected.found||selected.handle.slot!=excluded.slot||selected.handle.generation!=excluded.generation);
+            }
         }
         for(auto p:{DeferredCreateInstance{0,256,512},DeferredCreateInstance{0,240,528},DeferredCreateInstance{1,240,512},DeferredCreateInstance{1,224,512}}){
             bool hit=false;
@@ -912,3 +937,4 @@ int main(){
     }
     std::puts("Native collision owner: actor/terrain births, dormant flags, movement, compaction, retirement, Retry and terminal failure passed");
 }
+#endif

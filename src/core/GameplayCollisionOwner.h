@@ -252,6 +252,30 @@ public:
             },result))return check(false);
         hit=result.found;return true;
     }
+    // self is a shared collision handle, not a terrain-local storage slot.
+    // Keep the completed-family gate: projectile parent families must not be
+    // queried until all of their lifetimes and setters are owned here.
+    bool terrainCollisionPoint(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        bool precise,bool notMe,const SpriteMaskPack& masks,Owner::Result& result){
+        if(!terrainQuery(object)||!masks.valid())return check(false);
+        auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
+        return check(owner_.collisionPointVm(self,object,x,y,notMe,families_,
+            [&](InstanceHandle h,RunnerImageValue px,RunnerImageValue py,bool& hit){
+                return resolves(h)&&owner_.pointCandidate(h,properties_[h.slot].sprite,px,py,
+                    true,precise,sprites_,masks,update,inverseTrig,roundPixel,hit);
+            },result));
+    }
+    bool terrainNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
+        MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
+        RunnerLineArguments args;
+        if(!terrainQuery(object)||!args.assign(x1,y1,x2,y2))return check(false);
+        auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
+        return check(owner_.collisionLine(self,object,args,notMe,false,families_,update,
+            [&](InstanceHandle h,const RunnerLineArguments& line,bool& hit){
+                return resolves(h)&&owner_.nonPreciseLineCandidate(h,properties_[h.slot].sprite,
+                    line,true,sprites_,update,hit);
+            },result));
+    }
     bool reconcileActivation(){
         if(!valid()||!world_)return check(false);
         if(!activationPending_)return true;

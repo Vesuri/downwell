@@ -935,6 +935,32 @@ int main(){
             bool hit=false;
             require(binding.positionMeeting(60,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),hit)&&hit==expected,
                 "live indexed point query matches authored unit terrain bounds and original masks");
+            const auto px=MotionBinary64::fromInteger(x),py=MotionBinary64::fromInteger(y);
+            InstancePlaceResult selected;
+            require(productionOwner->collisionPoint({},60,px,py,true,false,selected)&&
+                (selected.id!=-4)==expected,"resource-backed precise collision_point matches original mask pixels");
+            bool boxHit=false;
+            for(unsigned i=0;i<production->activeInstanceCount();++i){
+                const auto& r=production->instanceAt(i);PackedSpriteCollision resource;
+                if(!r.active||r.destroyRequested||!storage->families.isA(r.objectId,60)||
+                   !sprites.collisionSprite(r.spriteId,r.maskId,resource)||!resource.frameCount)continue;
+                const int lx=x-r.x+resource.originX,ly=y-r.y+resource.originY;
+                boxHit|=lx>=resource.marginLeft&&lx<=resource.marginRight&&
+                        ly>=resource.marginTop&&ly<=resource.marginBottom;
+            }
+            require(productionOwner->collisionPoint({},60,px,py,false,false,selected)&&
+                (selected.id!=-4)==boxHit,"non-precise point uses resource bounds rather than opaque pixels");
+            require(productionOwner->nonPreciseLine({},60,px,py,px,py,false,selected)&&
+                (selected.id!=-4)==boxHit,"resource-backed zero-length integer line selects terrain bounds");
+            if(boxHit){
+                const auto* r=productionOwner->resolve(selected.handle);
+                RunnerImageValue sx,sy;
+                require(r&&r->instanceId==unsigned(selected.id)&&
+                    productionOwner->collisionPosition(selected.handle,sx,sy)&&
+                    selected.x.high==sx.promoted().high&&selected.x.low==sx.promoted().low&&
+                    selected.y.high==sy.promoted().high&&selected.y.low==sy.promoted().low,
+                    "line result publishes generation-checked identity and exact source position");
+            }
         }
         require(production->stateDigest()==digest,"point queries do not move instances or consume game RNG");
     }

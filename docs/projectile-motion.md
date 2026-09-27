@@ -109,6 +109,23 @@ SSE exceptions; verifying the live Windows thread's FP environment remains
 open. Other nonfinite/subnormal/overflow inputs are still rejected explicitly.
 Narrow-phase candidate 0x4650b0 remains separate from the tree gate.
 
+Resource-backed query adapters preserve that distinction:
+`StoredWorldCollision::collisionPoint` uses direct object-list selection and
+`nonPreciseLine` uses the source list/tree dispatcher. Both return a
+generation-checked handle, source instance ID and published position snapshot;
+a failed query does not publish a miss. The native owner's corresponding
+`terrainCollisionPoint` and `terrainNonPreciseLine` return shared collision
+handles (not terrain-local slots). They retain the completed-family gate for
+60/93; these methods do not authorize queries against incomplete projectile
+parent families. Point queries accept the original precise flag. Line queries
+explicitly support only precise=false, not an approximation of bitmap lines.
+
+`LiveCollisionLifecycleTest` exercises the stored adapters against the loaded
+room and original terrain masks. `GameplayCollisionOwnerTest` exercises native
+identity, terrain bounds, masks and self exclusion. Define
+`DOWNWELL_NATIVE_QUERY_PROBE` when compiling the latter with the Amiga compiler
+to instantiate both public query paths without host fixture dependencies.
+
 This component is not yet the live trajectory owner: the live Q20/Q32 adapter
 must be replaced together with its collision endpoints, angle consumers,
 muzzle-effect creation and setter publication. Neither a common implementation

@@ -165,6 +165,39 @@ struct StoredCollisionLifecycle {
                     rawX,rawY,true,true,sprites,masks,refreshBounds,inverseTrig,round,found);
             },hit);
     }
+    // collision_point has direct object-list selection, unlike position_meeting.
+    template<class Records,class InverseTrig>
+    bool collisionPointVm(const Records& records,InstanceHandle self,int object,
+                         MotionBinary64 x,MotionBinary64 y,bool precise,bool notMe,
+                         const SpriteMaskPack& masks,InverseTrig inverseTrig,
+                         typename Owner::Result& result){
+        auto refreshBounds=[&](InstanceHandle h,bool publish){
+            const auto* r=records.resolve(h);return r&&refresh(h,*r,publish);
+        };
+        return owner.collisionPointVm(self,object,x,y,notMe,graph,
+            [&](InstanceHandle h,RunnerImageValue px,RunnerImageValue py,bool& hit){
+                const auto* r=records.resolve(h);
+                return r&&matchingFlags(h,*r)&&owner.pointCandidate(h,properties[h.slot].sprite,
+                    px,py,true,precise,sprites,masks,refreshBounds,inverseTrig,round,hit);
+            },result);
+    }
+    // Usual-gun collision_line uses precise=false. Do not silently approximate
+    // precise bitmap lines: that is a separate, not yet implemented query.
+    template<class Records>
+    bool nonPreciseLineVm(const Records& records,InstanceHandle self,int object,
+                         MotionBinary64 x1,MotionBinary64 y1,MotionBinary64 x2,MotionBinary64 y2,
+                         bool notMe,typename Owner::Result& result){
+        RunnerLineArguments args;if(!args.assign(x1,y1,x2,y2))return false;
+        auto refreshBounds=[&](InstanceHandle h,bool publish){
+            const auto* r=records.resolve(h);return r&&refresh(h,*r,publish);
+        };
+        return owner.collisionLine(self,object,args,notMe,allPrepared,graph,refreshBounds,
+            [&](InstanceHandle h,const RunnerLineArguments& line,bool& hit){
+                const auto* r=records.resolve(h);
+                return r&&matchingFlags(h,*r)&&owner.nonPreciseLineCandidate(h,properties[h.slot].sprite,
+                    line,true,sprites,refreshBounds,hit);
+            },result);
+    }
     // place_meeting (runner 0x4fee30) uses the same search with collect-all
     // disabled, then checks the returned instance pointer. Preserve query-time
     // index preparation and restoration even though only a boolean is exposed.
