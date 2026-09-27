@@ -110,6 +110,10 @@ public:
     const InstanceRecord* instance(std::uint32_t instanceId) const {
         return instances_.find(instanceId);
     }
+    // Stable slot/generation lookup follows compaction without an ID scan.
+    const InstanceRecord* resolveInstance(InstanceHandle handle) const {
+        return instances_.resolve(handle);
+    }
     const InstanceRecord& instanceAt(std::size_t index) const {
         return instances_.at(index);
     }

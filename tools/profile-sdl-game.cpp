@@ -5,6 +5,8 @@
 // Default: 1800 updates; every run also has a 45-second wall-clock deadline.
 // present_ms includes the renderer's vsync wait, not just GPU work. The normal
 // accelerated backend is representative; SDL's dummy/software backend is not.
+// DOWNWELL_PROFILE_DRAW_EVERY=N samples rendering every Nth simulation tick,
+// allowing a deeper replay within the deadline without changing its inputs.
 #include "core/Game.h"
 #include "core/RoomPack.h"
 #include "core/GameplayContactProfileInput.h"
@@ -26,6 +28,12 @@ static std::vector<std::uint8_t> read(const char* path) {
 }
 int main(int argc,char** argv) {
     unsigned frames=downwell::gameplayContactProfileFrames;
+    unsigned drawEvery=1;
+    if(const char* value=std::getenv("DOWNWELL_PROFILE_DRAW_EVERY")){
+        char* end=nullptr;const auto parsed=std::strtoul(value,&end,10);
+        if(!*value || *end || parsed<1 || parsed>6000)return 2;
+        drawEvery=static_cast<unsigned>(parsed);
+    }
     if(argc>3)return 2;
     if(argc>1){
         char* end=nullptr;
@@ -63,22 +71,28 @@ int main(int argc,char** argv) {
     const auto ms=[](auto a,auto b){return std::chrono::duration<double,std::milli>(b-a).count();};
     const auto deadline=Clock::now()+std::chrono::seconds(45);
     double update=0,draw=0,present=0,peak=0;
-    std::puts("tick,y,records,update_ms,draw_ms,present_ms,peak_work_ms");
+    unsigned rendered=0;
+    std::puts("tick,y,records,update_ms,draw_ms,present_ms,peak_work_ms,state_digest");
     for(unsigned tick=0;tick<frames;++tick){
         if(Clock::now()>deadline) return 21;
         if(platform.pollInput().quit) return 0;
         const auto& state=game.startup();
         const auto input=downwell::gameplayContactProfileInput(tick,state.mainPlayerX(),state.mainPlayerY());
         const auto a=Clock::now();game.update(input);const auto b=Clock::now();
-        game.render(platform);const auto c=Clock::now();
-        platform.present();const auto d=Clock::now();
+        const bool render=tick%drawEvery==0 || tick+1==frames;
+        if(render)game.render(platform);const auto c=Clock::now();
+        if(render){platform.present();++rendered;}const auto d=Clock::now();
         if(!game.simulationSucceeded() || !game.renderingSucceeded()) return 20;
         update+=ms(a,b);draw+=ms(b,c);present+=ms(c,d);
-        if(ms(a,d)>peak)peak=ms(a,d);
-        if((tick+1)%180==0){
-            std::printf("%u,%.1f,%zu,%.3f,%.3f,%.3f,%.3f\n",tick+1,state.mainPlayerY(),
-                        state.activeInstanceCount(),update/180,draw/180,present/180,peak);
+        if(ms(a,c)>peak)peak=ms(a,c);
+        if((tick+1)%180==0 || tick+1==frames){
+            const unsigned updates=(tick%180)+1;
+            std::printf("%u,%.1f,%zu,%.3f,%.3f,%.3f,%.3f,%016llx\n",tick+1,state.mainPlayerY(),
+                        state.activeInstanceCount(),update/updates,draw/(rendered?rendered:1),
+                        present/(rendered?rendered:1),peak,
+                        static_cast<unsigned long long>(state.stateDigest()));
             update=draw=present=peak=0;
+            rendered=0;
             std::fflush(stdout);
         }
     }

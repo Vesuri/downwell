@@ -738,9 +738,13 @@ int main(){
         }
         require(runtime->stateDigest()==plain->stateDigest(),"resource-backed lifecycle must preserve state/RNG");
         require(lifecycle.handles.size()==runtime->activeInstanceCount(),"all live stored identities registered");
+        require(!production->resolveInstance({})&&!productionOwner->resolve({}),
+            "direct lookup rejects invalid handles");
         for(unsigned i=0;i<runtime->activeInstanceCount();++i){
             const auto& record=runtime->instanceAt(i);const auto found=lifecycle.handles.find(record.instanceId);
             require(found!=lifecycle.handles.end(),"resolve live instance key");
+            require(runtime->resolveInstance(found->second)==&record,
+                "direct lookup follows live records through growth and compaction");
             const auto* state=storage->owner.resolve(found->second);
             require(state&&storage->owner.objectId(found->second)==record.objectId,"owner identity matches live object");
             if(record.objectId==60||record.objectId==93){

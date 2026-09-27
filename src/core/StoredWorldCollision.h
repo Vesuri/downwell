@@ -77,8 +77,9 @@ public:
     }
     const InstanceRecord* resolve(InstanceHandle h)const{
         if(!runtime_||!owner_.resolve(h))return nullptr;
-        const auto* record=runtime_->instance(ids_[h.slot]);
-        return record&&record->objectId==owner_.objectId(h)?record:nullptr;
+        const auto* record=runtime_->resolveInstance(h);
+        return record&&record->instanceId==ids_[h.slot]&&
+            record->objectId==owner_.objectId(h)?record:nullptr;
     }
     bool birth(InstanceHandle h,const InstanceRecord& r){
         if(!valid()||h.slot>=capacity||ids_[h.slot]||!r.instanceId||!adapter_.birth(h,r))return false;
