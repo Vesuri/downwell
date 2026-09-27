@@ -73,6 +73,7 @@ struct NativeEnemyLifecycleAudit {
     struct Entry { unsigned generation=0;bool live=false,active=false; } entries[GameplayWorld::enemyCapacity]{};
     unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,indices=0,zeroIndices=0,transforms=0,calls=0,fail=0;
     bool checkWalkingOrder=false;
+    bool checkFrogOrder=false;
     unsigned masks=0;
     bool mask(downwell::InstanceHandle h,const Enemy& e,int next){
         ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active&&
@@ -91,6 +92,9 @@ struct NativeEnemyLifecycleAudit {
         if(checkWalkingOrder)require(sprites==1&&moves==0&&field==downwell::RunnerTransformField::scaleX&&
                 e.spriteId==(e.objectId==111?164:187)&&e.walker.x==40*1280&&e.walker.y==0,
                 "walker scale follows its sprite setter but precedes motion integration");
+        if(checkFrogOrder)require(moves==0&&sprites==0&&!e.frogLanded&&e.alarm1==-1&&
+                e.frogHorizontal.position==40*65536&&field==downwell::RunnerTransformField::scaleX,
+                "frog scale precedes landing alarm and motion publication");
         if(fail==8||(fail==9&&field==downwell::RunnerTransformField::scaleY))return false;
         ++transforms;return true;
     }
@@ -255,6 +259,18 @@ void testNativeEnemyLifecycle(){
         require(runtime.tick()==tick&&checked.calls==calls&&
                 !runtime.configureEnemy(1,111,163,0,5,0,0,5,6),
                 "failed native owner permits neither further steps nor births");
+    }
+    for(unsigned fail:{0u,8u}){
+        NativeEnemyLifecycleAudit checked;checked.fail=fail;checked.checkFrogOrder=true;
+        GameplayWorld frog(300,true,0,false,Binding::bindTransforms(checked));
+        frog.configureSolidResolver(flatGround,nullptr);
+        require(frog.configureEnemy(0,113,166,40,1,128,0,5,6),"configure landing frog scale fixture");
+        // Controlled landing edge after an airborne phase; Create starts landed.
+        const_cast<GameplayWorld::EnemyState&>(frog.enemyAt(0)).frogLanded=false;
+        frog.step(0);
+        require(frog.effectsSucceeded()==(fail==0)&&frog.enemyAt(0).frogLanded==(fail==0)&&
+                frog.enemyAt(0).alarm1==(fail?-1:60)&&checked.moves==(fail?0u:1u)&&checked.sprites==(fail?0u:1u),
+                "rejected frog scale prevents landing alarm and later publication");
     }
 }
 

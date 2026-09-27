@@ -870,31 +870,31 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.frogMotionInitialized = true;
             }
             enemy.frogVertical.grounded = enemy.grounded;
-            const bool hit = stepFrogMotion(enemy.frogHorizontal, enemy.frogVertical,
+            const auto effects = stepFrogMotion(enemy.frogHorizontal, enemy.frogVertical,
                 enemy.frogHit, integrate, [this](int x, int y) {
                     return mainSolidAt(mainPlayerOriginX_ + x, mainPlayerOriginY_ + y);
-                });
-            if (hit) {
+                },[this,index,&enemy]{
                 enemy.auxiliaryState = 0;
                 enemy.alarms.set(0, 0);
                 enemy.alarms.set(1, 60);
                 enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
-                if(!publishMainEnemyImage(index,0))return;
+                if(!publishMainEnemyImage(index,0))return false;
                 enemy.imageIndex = 0;
                 enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
                 ++soundPlayRequests_;
-            }
+                return true;
+            },[this,index,&enemy](int scale){
+                if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
+                enemy.scaleX=static_cast<float>(scale);return true;
+            },[&enemy](bool grounded){
+                if(frogLandingEdge(grounded,enemy.frogLanded))enemy.alarms.set(1,60);
+            });
             enemy.preciseY = mainPlayerOriginY_ + enemy.frogVertical.position / 1280.0F;
             enemy.velocityY = enemy.frogVertical.velocity / 1280.0F;
             enemy.grounded = enemy.frogVertical.grounded;
-            if (!enemy.grounded) {
-                enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
-                enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
-            }
-            if (enemy.velocityX != 0.0F)
-                enemy.scaleX = enemy.velocityX < 0.0F ? -1.0F : 1.0F;
-            // enmFrog Step's landed latch is distinct from current support.
-            if (frogLandingEdge(enemy.grounded, enemy.frogLanded)) enemy.alarms.set(1, 60);
+            enemy.preciseX = mainPlayerOriginX_ + enemy.frogHorizontal.position / 65536.0F;
+            enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
+            if(!effects.succeeded)return;
         } else if (enemy.objectId == 116) {
             BatMotion bat{
                 static_cast<long>(std::round(enemy.preciseX * 256.0F)),

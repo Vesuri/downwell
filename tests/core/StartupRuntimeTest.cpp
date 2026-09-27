@@ -30,6 +30,7 @@ struct LifecycleAudit {
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
     unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,indices=0,transforms=0,calls=0,fail=0;
     unsigned walkingTransforms=0;
+    unsigned frogTransforms=0;
     unsigned batTransforms=0;
     bool rejectBatScale=false;
     bool rejectBatMask=false;
@@ -54,6 +55,10 @@ struct LifecycleAudit {
             require(field==downwell::RunnerTransformField::scaleX,"pursuit publishes only X scale");
             ++batTransforms;
             if(rejectBatScale)return false;
+        }
+        if(r.objectId==113){
+            require(field==downwell::RunnerTransformField::scaleX,"frog publishes horizontal scale");
+            ++frogTransforms;
         }
         if(fail==9)return false;
         ++transforms;return true;
@@ -177,7 +182,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         if(reject==1)require(bat->preciseX==startX&&bat->preciseY==startY&&bat->velocityX!=0&&bat->scaleX==-1,
                 "host scale failure retains calculated motion but skips integration and facing change");
     }
-    for(int object:{111,112})for(int velocity:{0,640}){
+    for(int object:{111,112,113})for(int velocity:{0,640}){
         LifecycleAudit walking;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
             downwell::InstanceLifecycleBinding::bindTransforms(walking));
@@ -192,16 +197,18 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                 // Controlled adapter fixture, not a naturally generated walker.
                 r.objectId=object;r.health=5;r.auxiliaryState=1;r.scaleX=-1;
                 r.alarms={};r.motionInitialized=true;
+                r.frogMotionInitialized=false;r.grounded=false;
                 r.preciseX=r.x;r.preciseY=r.y;r.velocityX=velocity/1280.0f;r.velocityY=0;
                 r.walker.initialize(r.x,r.y,velocity,0,false);r.walker.facing=-1;
                 id=r.instanceId;break;
             }
         }
         require(id!=0,"host walker fixture has a published enemy lifetime");
-        const auto before=walking.walkingTransforms;
+        const auto before=object==113?walking.frogTransforms:walking.walkingTransforms;
         runtime->step(false);
-        require(healthy(*runtime)&&walking.walkingTransforms==before+(velocity!=0?1u:0u),
-                "host walker publishes nonzero facing once and skips the zero-speed setter");
+        const auto after=object==113?walking.frogTransforms:walking.walkingTransforms;
+        require(healthy(*runtime)&&after==before+(velocity!=0?1u:0u),
+                "host walker/frog publishes nonzero facing once and skips the zero-speed setter");
         require(velocity!=0||runtime->instance(id)->scaleX==-1,
                 "host zero-speed walker preserves its existing mirrored artwork");
     }

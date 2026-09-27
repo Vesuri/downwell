@@ -903,30 +903,32 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             downwell::FrogVerticalMotion vertical{
                 enemy.preciseY * 5 + enemy.gravityPositionRemainder,
                 enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
-            const bool hit = downwell::stepFrogMotion(enemy.frogHorizontal, vertical,
+            const auto effects = downwell::stepFrogMotion(enemy.frogHorizontal, vertical,
                 enemy.frogHit, integrate, [this](int x, int y) {
                     return solidResolver_(solidResolverContext_, x, y);
-                });
-            if (hit) {
+                },[this,&enemy]{
                 enemy.auxiliaryState = 0;
                 enemy.alarm0 = 0;
                 enemy.alarm1 = 60;
                 enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
-                if(!publishEnemyImage(enemy,0))return {};
+                if(!publishEnemyImage(enemy,0))return false;
                 enemy.imagePhase = 0;
                 enemy.imageRemainder = 0;
-            }
+                return true;
+            },[this,&enemy](int scale){
+                if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+                enemy.facing=scale;return true;
+            },[&enemy](bool grounded){
+                if(downwell::frogLandingEdge(grounded,enemy.frogLanded))enemy.alarm1=60;
+            });
             enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(vertical.position, 5);
             enemy.gravityPositionRemainder = static_cast<unsigned char>(vertical.position - enemy.preciseY * 5);
             enemy.speedY = downwell::FrogVerticalMotion::floorDivide(vertical.velocity, 5);
             enemy.gravityRemainder = static_cast<unsigned char>(vertical.velocity - enemy.speedY * 5);
             enemy.grounded = vertical.grounded;
-            if (!enemy.grounded) {
-                enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
-                enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
-            }
-            // enmFrog Step: restart preparation only on a landing edge.
-            if (downwell::frogLandingEdge(enemy.grounded, enemy.frogLanded)) enemy.alarm1 = 60;
+            enemy.preciseX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.position);
+            enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
+            if(!effects.succeeded)return {};
         } else if (enemy.objectId == 117) {
             const int hitAlarm = enemy.snailHit.consume(enemyRandom_);
             if (hitAlarm >= 0) {
@@ -972,7 +974,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         enemy.x=publishedX;enemy.y=publishedY;
         if(enemy.objectId==119 &&
            !publishEnemyTransform(enemy,downwell::RunnerTransformField::angle,enemy.crawler.imageDirection*90))return {};
-        if (enemy.objectId!=116 && enemy.speedX != 0)
+        if (enemy.objectId!=116 && enemy.objectId!=113 && enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
         const auto nextSprite = downwell::finishEnemyPresentation(
             {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.speedY < 0,

@@ -18,16 +18,19 @@ struct FrogHorizontalMotion {
         return value < 0 ? -((-value + 128) / 256) : (value + 128) / 256;
     }
     template<class Meeting>
-    void step(Meeting meeting, bool integrate = true) {
+    void resolve(Meeting meeting) {
         const long next = position + velocity;
         const long pixel = next / 65536 - (next % 65536 < 0 ? 1 : 0);
         const auto mask = contactSpriteBounds(166);
         if (meeting(static_cast<int>(pixel) + (velocity < 0 ? mask.left : mask.right - 1))) {
             const long numerator = -velocity * 3;
             velocity = numerator < 0 ? -((-numerator + 5) / 10) : (numerator + 5) / 10;
-        } else if (integrate) {
-            position = next;
         }
+    }
+    template<class Meeting>
+    void step(Meeting meeting, bool integrate = true) {
+        resolve(meeting);
+        if(integrate)position+=velocity;
     }
 };
 

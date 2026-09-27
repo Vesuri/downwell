@@ -16,6 +16,39 @@ void require(bool value, const char* message) {
 }
 
 int main() {
+    for(long speed:{-65536L,-1L,0L,1L,65536L})for(bool visible:{false,true})for(bool accept:{false,true}){
+        downwell::FrogHorizontalMotion x{0,speed};
+        downwell::FrogVerticalMotion y;
+        downwell::FrogHitState hit;
+        unsigned scales=0,landings=0;
+        const auto effect=downwell::stepFrogMotion(x,y,hit,visible,[](int,int){return false;},
+            []{return true;},[&](int scale){
+                ++scales;require(scale==(speed<0?-1:1)&&x.position==0&&y.position==0&&landings==0,
+                        "frog scale precedes landing and both integrations, retaining Q16 sign");
+                return accept;
+            },[&](bool grounded){require(!grounded,"clear-space frog remains airborne");++landings;});
+        const bool ok=!speed||accept;
+        require(effect.succeeded==ok&&!effect.hit&&scales==unsigned(speed!=0)&&landings==unsigned(ok)&&
+                x.position==(ok&&visible?speed:0)&&y.position==(ok&&visible?192:0),
+                "offscreen and zero-speed scale guards do not bypass source callback order");
+    }
+    {
+        downwell::FrogHorizontalMotion x{0,65536};downwell::FrogVerticalMotion y;
+        downwell::FrogHitState hit;
+        const auto effect=downwell::stepFrogMotion(x,y,hit,true,[](int px,int){return px>=6;},
+            []{return true;},[&](int scale){return scale==-1&&x.position==0&&x.velocity==-19661;});
+        require(effect.succeeded&&x.position==-19661&&y.position==192,
+                "collision rebound is published before integrating the reversed velocity");
+    }
+    {
+        downwell::FrogHorizontalMotion x{0,2*65536};downwell::FrogVerticalMotion y{0,1280,false};
+        downwell::FrogHitState hit;hit.ready=true;unsigned queries=0,scales=0,landings=0;
+        const auto effect=downwell::stepFrogMotion(x,y,hit,true,[&](int,int){++queries;return false;},
+            []{return false;},[&](int){++scales;return true;},[&](bool){++landings;});
+        require(effect.hit&&!effect.succeeded&&queries==0&&scales==0&&landings==0&&
+                x.position==0&&y.position==0&&x.velocity==104858&&y.velocity==0,
+                "rejected hit publication stops terrain queries and later scale, landing and motion work");
+    }
     {
         // Integer rational oracle: no repeated floating-point additions. The
         // initial remainder and changing rates survive without quantization.
@@ -177,7 +210,7 @@ int main() {
     sharedHit.pending = true;
     sharedHit.advanceFrame();
     require(downwell::stepFrogMotion(sharedX, sharedY, sharedHit, true,
-                [](int, int) { return false; }) &&
+                [](int, int) { return false; }).hit &&
             sharedX.position == 104858 && sharedX.velocity == 104858 &&
             sharedY.position == 1000 && sharedY.velocity == 0,
             "shared step consumes hit, damps X and clears Y before movement");
@@ -221,11 +254,11 @@ int main() {
     downwell::FrogHorizontalMotion horizontal;
     horizontal.velocity = -2 * 65536L;
     horizontal.step([](int) { return true; });
-    require(horizontal.position == 0 && horizontal.velocity == 39322,
-            "source -0.3 rebound retains Q16 precision and does not advance blocked X");
+    require(horizontal.position == 39322 && horizontal.velocity == 39322,
+            "source -0.3 rebound integrates reversed speed in the same Step");
     for (unsigned i = 0; i < 100; ++i) horizontal.step([](int) { return false; });
-    require(std::fabs(horizontal.position / 65536.0 - 60.0) < 0.001,
-            "one hundred rebound steps retain fractional movement rather than rounded Q8 speed");
+    require(std::fabs(horizontal.position / 65536.0 - 60.6) < 0.001,
+            "initial rebound plus one hundred steps retain fractional movement rather than rounded Q8 speed");
     for (int sign : {-1, 1}) {
         horizontal = {};
         horizontal.velocity = sign * 2 * 65536L;

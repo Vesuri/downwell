@@ -806,8 +806,19 @@ only when `xsp` is nonzero. These setters run even when movement is offscreen;
 a zero velocity retains the previous scale. Rejection preserves earlier
 collision/gravity changes but stops integration and final position publication.
 The final shared animation normalization remains the existing approximation;
-the adapters do not issue a second sprite setter at that point. Frog scale
-assignments still require their own source-ordered integration.
+the adapters do not issue a second sprite setter at that point.
+
+Frog motion separates collision resolution from integration. The shared Step
+publishes nonzero horizontal scale from the Q16 velocity after collision response,
+then applies the landing latch/alarm, then performs visibility-gated integration.
+Grounded frogs still resolve horizontal collision and assign scale, but do not
+integrate X. Native facing must not be reconstructed from the rounded Q8 mirror:
+a nonzero Q16 velocity may round to zero there. Wall rebound integrates the
+reversed velocity in that same Step, as the VM's final `xx += xsp` requires.
+Checked hit publication precedes terrain queries; rejection of it or scale stops
+later work while retaining completed motion-state changes. Collision geometry,
+water behavior, binary64 arithmetic and exact individual hit-field mutation
+timing remain incomplete; this is not the original mask solver.
 
 Active bat pursuit calls the checked X-scale binding at `xscaleXsp`, after
 blocked velocity components are cleared and before motion integration. The
