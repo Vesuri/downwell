@@ -347,6 +347,52 @@ pending-depth ordering is implemented. The bridge must outlive its effect
 owner and retire registrations before room teardown. It does not install an
 automatic Step handler or replace the live gun adapter by itself.
 
+### Selected depth-update path
+
+The box destruction script requests depth -60000 for its sprite-603 impact.
+Admitting that write requires layer ownership, not an immediate sort of the
+room animation list. `make verify-runner-depth-changes` pins this audit against
+both original input hashes and checks GEN8 offset 0x2c: value 2 makes loader
+`0x4979e8` select the GMS2 branch (`0xb57f18 != 0`).
+
+The getter at `0x42d820` reads float field `instance+0x178`. The setter at
+`0x431ce0` narrows the incoming real to float and compares numerically with
+the old value. Equal writes, including signed zero, do not enqueue or replace
+it. Changed writes publish immediately, then append the instance to a unique
+pending array in first-request order. Subsequent writes change its value but
+not its queue position. Retirement removes queued pointers by stable
+compaction (`0x50f6c5`, `0x50d740`).
+
+At the maintenance boundary (`0x5108d0`), activation reconciliation precedes
+depth service. The selected `0x50d220` branch visits that queue in order and
+calls `0x414660` for each instance. It does **not** run the legacy branch's
+two-pass removal/reinsertion of the active room list. Therefore applying depth
+changes to `RunnerRoomMembership` would incorrectly change future animation
+order and would not model the selected presentation structure.
+
+The selected handler first requires a room, instance and flag 0x400 (attached
+layer element), then resolves the layer through instance field 0x140. It
+truncates the requested float depth to an integer and leaves the layer alone
+if that matches the existing layer depth. Otherwise:
+
+- A depth distance strictly below 20 (float subtraction, then promoted absolute
+  comparison against double 20), a dynamic layer (byte +0x1a), and exactly one
+  element (+0x64) permit a layer-depth update through `0x4147b0`, provided that
+  element is type 2 and points to this instance. A failed type/identity check
+  exits; it is not the migration fallback.
+- Other cases detach through `0x4258e0`, reset instance layer ID to -1, and
+  reattach through `0x412a30`. That searches for a dynamic layer with matching
+  integer depth or creates one. Attachment sets flag 0x400, publishes the layer
+  ID and rewrites the instance's depth to the layer's integer depth.
+
+The -60000 box-impact jump takes the migration case when born at depth zero.
+Layer list movement/merging, element order, empty-layer disposal and selected
+Draw traversal still require recovery and integration. The current renderer's
+room-list order is not proof of selected GMS2 layer order, including unchanged
+equal-depth births. Existing draw-order tests only validate the port's current
+adapter. Nonzero effect-depth admission remains intentionally disabled until
+the selected owner is connected; no legacy re-sorting fallback is enabled.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

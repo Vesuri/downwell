@@ -594,7 +594,14 @@ Read-only Windows disassembly gives this chain:
   next links. The tile-interleaved traversal at `0x48e9a0` uses the same head
   and next links, dispatching event type 8/subtype 0.
 
-Thus equal-depth dynamic fields whose depth is unchanged draw newest first.
+This establishes newest-first equal-depth order for the legacy room Draw
+traversal only. The pinned build selects GMS2 layers; the
+[depth-update audit](projectile-motion.md#selected-depth-update-path) shows that
+layer migration is separate from this room list. Selected layer Draw order
+must still be verified before treating these observations as the original
+game's complete painter order.
+
+The current port draws unchanged equal-depth dynamic fields newest first.
 An exit field must be interleaved at its creation boundary, not unconditionally
 drawn before or after all ordinary fields. `OrdinaryTimeFields::advanceDraw`
 accepts the ordinary-field count at exit-field birth for this merge. The

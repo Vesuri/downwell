@@ -339,6 +339,11 @@ build/dead-body-creation-test: tests/core/DeadBodyCreationTest.cpp $(wildcard sr
 	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/DeadBodyCreationTest.cpp
 
 .PHONY: verify-debris-draw
+.PHONY: verify-runner-depth-changes
+verify-runner-depth-changes:
+	python3 tools/verify-runner-depth-changes.py
+test: verify-runner-depth-changes
+
 verify-debris-draw: build/debris-draw-test
 	python3 tools/verify-debris-create.py
 	python3 tools/verify-dead-body-creation.py
