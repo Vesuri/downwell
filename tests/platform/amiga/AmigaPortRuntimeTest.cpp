@@ -344,6 +344,18 @@ struct NativePlayerAudit {
     downwell::InstanceHandle live{};
     unsigned births=0,retirements=0,moves=0,calls=0,fail=0;
     unsigned scales=0,rejectScaleAt=0;
+    unsigned queries=0;bool queryHit=false;
+    bool mask(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,int){return true;}
+    bool placeMeeting(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p,int object,
+                      downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
+        ++calls;++queries;
+        const auto px=downwell::MotionBinary64::fromInteger(p.x),py=downwell::MotionBinary64::fromInteger(p.y);
+        require(h.generation==live.generation&&p.lifetimeId==h.generation&&object==255&&
+            x.high==px.high&&x.low==px.low&&y.high==py.high&&y.low==py.low&&moves==0,
+            "native clock query resolves old published coordinates before position update");
+        if(fail==4)return false;
+        hit=queryHit;return true;
+    }
     bool sprite(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,int){return true;}
     bool imageIndex(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,downwell::RunnerImageValue){return true;}
     bool transform(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p,downwell::RunnerTransformField field,
@@ -384,6 +396,14 @@ struct NativePlayerAudit {
 
 void testNativePlayerLifecycle(){
     using Binding=GameplayWorld::PlayerLifecycleBinding;
+    for(bool reject:{false,true})for(bool hit:{false,true}){
+        NativePlayerAudit audit;audit.fail=reject?4:0;audit.queryHit=hit;
+        GameplayWorld world(0,true,0,false,{},{},Binding::bindQueries(audit));
+        world.step(2);
+        require(audit.queries==1&&audit.moves==unsigned(!reject)&&world.effectsSucceeded()==!reject&&
+                world.runTimeTicks()==unsigned(!reject&&!hit),"native checked query controls clock without fallback");
+        if(reject){const auto calls=audit.calls;world.step(2);require(audit.calls==calls,"query failure stays terminal");}
+    }
     {
         NativePlayerAudit audit;audit.rejectScaleAt=2;
         GameplayWorld world(0,true,0,false,{},{},Binding::bindTransforms(audit));

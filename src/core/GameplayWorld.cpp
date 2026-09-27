@@ -738,6 +738,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             if(!playerLifecycle_.integerTransform(playerHandle(),playerInstance_,downwell::RunnerTransformField::scaleX,
                     value,{0x3f800000u},0xffffffu))return false;
             playerInstance_.scaleX=value;return true;
+        },[this](downwell::RunSession& run,downwell::MotionBinary64 x,downwell::MotionBinary64 y,int facing,bool& hit){
+            if(!playerLifecycle_.hasPlaceMeeting())return run.playerGoalContact(x,y,facing,hit);
+            return playerInstance_.lifetimeId&&playerLifecycle_.placeMeeting(playerHandle(),playerInstance_,255,
+                downwell::MotionBinary64::fromInteger(playerInstance_.x),
+                downwell::MotionBinary64::fromInteger(playerInstance_.y),hit);
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};

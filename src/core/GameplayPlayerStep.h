@@ -12,17 +12,23 @@ struct NoPlayerPositionPublication {
     bool operator()(int,int) const { return true; }
 };
 struct NoPlayerScalePublication { bool operator()(int)const{return true;} };
+struct UnindexedPlayerGoalContact {
+    bool operator()(RunSession& run,MotionBinary64 x,MotionBinary64 y,int facing,bool& hit)const{
+        return run.playerGoalContact(x,y,facing,hit);
+    }
+};
 
 // Shared implemented objPlayer_n Begin Step phase. Owners bind terrain and
 // head-break callbacks first, then publish the returned motion and emit shots.
 // Activation remains before this phase; enemy alarms remain after it.
 // No renderer or instance-store representation is selected here.
-template<class PublishPosition=NoPlayerPositionPublication,class PublishScale=NoPlayerScalePublication>
+template<class PublishPosition=NoPlayerPositionPublication,class PublishScale=NoPlayerScalePublication,
+         class GoalContact=UnindexedPlayerGoalContact>
 inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     PlayerDeathSequence& death, RunSession& run, CurrencyAccount& currency,
     int& health, GameMakerRandom& random, const Input& input,
     int originX, int originY, int viewX, int viewY, bool controlsLocked = false,
-    PublishPosition publishPosition = {},PublishScale publishScale={}) {
+    PublishPosition publishPosition = {},PublishScale publishScale={},GoalContact goalContact={}) {
     death.beginStep(input.fire);
     run.combo.beginStep();
     struct Context {
@@ -63,10 +69,10 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     // goalStop/death suppress accounting, not only the eventual increment.
     // It queries the old published x/y before shop/interactable processing.
     bool inGoalField=false;
-    if(!run.goalStopped && !death.active && !run.playerGoalContact(
+    if(!run.goalStopped && !death.active && !goalContact(run,
         MotionBinary64::fromInteger(originX + roundGameMakerQ8(player.frameStartXFixed())),
         MotionBinary64::fromInteger(originY + roundGameMakerQ8(player.frameStartYFixed())),
-        player.facing(),inGoalField))return motion;
+        player.facing(),inGoalField)){run.effectsSucceeded=false;return motion;}
     // Boss completion is outside the implemented area-one scope.
     run.clock.advance(true, death.active, run.goalStopped, false, inGoalField);
     DW_PROFILE_PHASE(profilePlayerShops);

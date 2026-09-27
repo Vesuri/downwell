@@ -74,6 +74,20 @@ public:
         };
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindQueries(Owner& owner) {
+        auto b=bindMasks(owner);
+        b.placeMeeting_=[](void* p,InstanceHandle h,const Record& r,int object,
+                          MotionBinary64 x,MotionBinary64 y,bool& hit){
+            return static_cast<Owner*>(p)->placeMeeting(h,r,object,x,y,hit);
+        };
+        return b;
+    }
+    bool hasPlaceMeeting()const{return placeMeeting_!=nullptr;}
+    bool placeMeeting(InstanceHandle h,const Record& r,int object,MotionBinary64 x,MotionBinary64 y,bool& hit)const{
+        // Missing ownership is not a successful miss. Select the unindexed
+        // adapter explicitly before calling this checked operation.
+        return placeMeeting_&&placeMeeting_(context_,h,r,object,x,y,hit);
+    }
     bool mask(InstanceHandle h,const Record& r,int next)const{return !mask_||mask_(context_,h,r,next);}
     bool transform(InstanceHandle h,const Record& r,RunnerTransformField field,RunnerImageValue value,
                    RunnerImageValue alpha,std::uint32_t blend)const {
@@ -114,6 +128,7 @@ private:
     bool (*move_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
     bool (*sprite_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*mask_)(void*,InstanceHandle,const Record&,int)=nullptr;
+    bool (*placeMeeting_)(void*,InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,bool&)=nullptr;
     bool (*imageIndex_)(void*,InstanceHandle,const Record&,RunnerImageValue)=nullptr;
     bool (*transform_)(void*,InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t)=nullptr;
 };

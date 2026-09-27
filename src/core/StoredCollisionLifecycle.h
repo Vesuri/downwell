@@ -106,6 +106,17 @@ struct StoredCollisionLifecycle {
                     sprites,masks,dispatch,publish,refreshBounds,inverseTrig,round,hit);
             },result);
     }
+    // place_meeting (runner 0x4fee30) uses the same search with collect-all
+    // disabled, then checks the returned instance pointer. Preserve query-time
+    // index preparation and restoration even though only a boolean is exposed.
+    template<class Records,class InverseTrig>
+    bool meetingVm(const Records& records,InstanceHandle self,int object,
+                   MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,
+                   const RunnerMaskDispatch& dispatch,InverseTrig inverseTrig,bool& hit){
+        typename Owner::Result result;
+        if(!placeVm(records,self,object,x,y,masks,dispatch,inverseTrig,result))return false;
+        hit=result.found;return true;
+    }
 private:
     const std::uint32_t* matchingFlags(InstanceHandle h,const InstanceRecord& record)const{
         if(!owner.valid()||record.objectId<0||owner.objectId(h)!=record.objectId)return nullptr;

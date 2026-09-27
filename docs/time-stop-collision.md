@@ -28,7 +28,8 @@ false hits or silently skipped instances. Forward bounds trigonometry, inverse
 mask trigonometry and rounding remain explicit policies. This entry point does
 not populate or rebuild the index: births, writes, activation, rebinding and
 retirement must already have been routed through the owner in source order.
-Live scheduler wiring remains in the shared work queue.
+`meetingVm` exposes the boolean wrapper with the same query-time mutations;
+it does not replace that search with an independent overlap scan.
 
 `StartupRuntime` accepts a borrowed `InstanceLifecycleBinding` at construction,
 before the initial room births. Packed/fallback room loading, deferred creation,
@@ -55,15 +56,24 @@ not permission to continue with the old store identity and a changed owner.
 `make verify-live-collision-lifecycle` attaches the real object-family graph,
 sprite collision metadata and spatial owner to the stored runtime's natural
 seed-2 gameplay tape. It checks published player/terrain/enemy positions and
-activation flags against live records without rebuilding the index or issuing
-per-frame diagnostic queries. After the tape it runs precise `instance_place`
+activation flags against live records without rebuilding the index. Player
+updates call the maintained `place_meeting` owner through `bindQueries`, using
+selector 255 and the old published player position before position publication
+and shop processing. Goal-stop and death skip the query itself. A rejected
+query latches failure before clock accounting or later player work, rather than
+falling back to a miss. The native adapter exposes the same checked boundary;
+an empty binding explicitly selects the shared unindexed field adapter.
+After the tape the test runs precise `instance_place`
 queries over generated walls, resolves results through live generation-checked
 ownership, checks temporary player-position restoration, then resets the room.
 The query adapter accepts a read-only `resolve(handle)` view instead of requiring
-a copied or publicly exposed instance container. This test is not an original
-traversal-order oracle: queries occur after the tape, not at source event
-boundaries, and do not yet drive gameplay decisions. Native resource-backed
-world registration and all collision-family scheduling remain required.
+a copied or publicly exposed instance container. The clock tests also cover
+an overlapping exit, query failure, room retirement and a later-level entrance
+descendant. They are not an original traversal-order oracle. Production default
+construction still uses the unindexed adapter: full resource-owner installation,
+native-world registration and remaining collision-family scheduling are required.
+Motion remains a combined phase before this clock boundary; preserving old
+published query coordinates does not by itself prove full source event order.
 
 The source player object 35 uses sprite 31 as its explicit collision mask,
 independent of the visible animation sprite. Shard object 238 uses sprite 91

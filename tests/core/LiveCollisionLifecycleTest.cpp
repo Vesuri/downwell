@@ -36,7 +36,29 @@ struct RecordingLifecycle:Lifecycle {
     unsigned births=0,retires=0;
     unsigned goalWrites=0,rejectGoalStage=0;
     unsigned startWrites=0,rejectStartStage=0,startRetires=0;
+    const StartupRuntime* runtime=nullptr;
+    const SpriteMaskPack* masks=nullptr;
+    unsigned meetingCalls=0;
+    bool rejectMeeting=false;
     explicit RecordingLifecycle(Lifecycle base):Lifecycle(base){}
+    bool placeMeeting(InstanceHandle h,const InstanceRecord& r,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+        ++meetingCalls;
+        const auto px=MotionBinary64::fromInteger(r.x),py=MotionBinary64::fromInteger(r.y);
+        require(runtime&&masks&&r.objectId==35&&object==255&&
+            x.high==px.high&&x.low==px.low&&y.high==py.high&&y.low==py.low,
+            "clock query uses published player position and goal-family selector");
+        if(rejectMeeting)return false;
+        struct View {
+            const RecordingLifecycle& life;
+            const InstanceRecord* resolve(InstanceHandle key)const{
+                return life.owner.resolve(key)?life.runtime->instance(life.ids[key.slot]):nullptr;
+            }
+        } view{*this};
+        auto inverse=[](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
+            angle.bits^=0x80000000u;return Trig{}(angle,c,s);
+        };
+        return meetingVm(view,h,object,x,y,*masks,RunnerMaskDispatch{},inverse,hit);
+    }
     bool birth(InstanceHandle h,const InstanceRecord& r){
         if((rejectGoalStage==1&&r.objectId==74)||(rejectGoalStage==2&&r.objectId==255))return false;
         if(r.objectId==255||r.objectId==371)require(r.scaleX==1.0F&&r.scaleY==1.0F,"field birth precedes Create scales");
@@ -87,7 +109,8 @@ int main(){
     auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"bind full source families");
     RecordingLifecycle lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
     auto runtime=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        InstanceLifecycleBinding::bindMasks(lifecycle));
+        InstanceLifecycleBinding::bindQueries(lifecycle));
+    lifecycle.runtime=runtime.get();lifecycle.masks=&masks;
     auto plain=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     runtime->skipToGameForTesting();plain->skipToGameForTesting();
     require(!runtime->instance(101097)&&!runtime->startTimeField()&&runtime->randomDrawCount()==331,
@@ -119,6 +142,7 @@ int main(){
             ++checks;
         }
     }
+    require(lifecycle.meetingCalls>0,"natural player updates execute the maintained collision query");
     // Resolve through actual world ownership, not a copied InstanceStore or a
     // rebuilt tree. Generation validation precedes looking up its instance ID.
     struct View {
@@ -189,6 +213,49 @@ int main(){
     std::printf("Live resource owner: %u births, %u retirements, %u position/activation checks\n",
         lifecycle.births,lifecycle.retires,checks);
     std::printf("Live precise terrain queries: %u hits and one empty query\n",queries);
+    for(bool reject:{false,true}){
+        auto clockStorage=std::make_unique<Storage>();
+        require(clockStorage->families.bindInstanceFlags(objects),"clock query family fixture");
+        RecordingLifecycle clockLife({clockStorage->owner,clockStorage->properties,objects,sprites,clockStorage->families,{}, {}});
+        auto clock=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindQueries(clockLife));
+        clockLife.runtime=clock.get();clockLife.masks=&masks;
+        clock->skipToGameForTesting();
+        clock->registerLevelExit(int(clock->mainPlayerY()));
+        require(clock->effectsSucceeded()&&clock->levelExitPresent()&&!clock->goalStopped(),"live overlapping clock fixture");
+        const auto ticks=clock->runTimeTicks(),calls=clockLife.meetingCalls;
+        clockLife.rejectMeeting=reject;
+        clock->step(Input{},false);
+        require(clockLife.meetingCalls==calls+1&&clock->effectsSucceeded()==!reject&&clock->runTimeTicks()==ticks,
+                "live field hit suppresses clock; failed query stops rather than falling back to a miss");
+        if(reject){
+            clock->step(Input{},false);
+            require(clockLife.meetingCalls==calls+1&&clock->runTimeTicks()==ticks,"latched query failure prevents retry");
+        }else{
+            Input confirm;confirm.fire=true;bool heartGoal=false;
+            for(unsigned frame=0;frame<600&&clock->runStage().level==1;++frame){
+                if(clock->levelClearActive()){
+                    bool fire=true;
+                    clock->stepLevelClear(fire,false,false,heartGoal,[](LevelClearSelection::Effect,unsigned){});
+                    if(clock->nextLevelRequested())require(clock->loadNextAreaOneLevel(confirm),"load next collision-owned room");
+                }else{
+                    clock->step(confirm,false);
+                    if(clock->levelResultRequested())require(clock->enterLevelClear(0,heartGoal),"enter collision-owned level clear");
+                }
+            }
+            if(clock->runStage().level!=2||!clock->effectsSucceeded())std::fprintf(stderr,
+                "clock reentry: level=%u good=%d load=%d deferred=%d clear=%d next=%d exit=%d stopped=%d xy=%.1f,%.1f\n",
+                unsigned(clock->runStage().level),clock->effectsSucceeded(),clock->roomLoadSucceeded(),clock->deferredCommandsSucceeded(),
+                clock->levelClearActive(),clock->nextLevelRequested(),clock->levelResultRequested(),clock->goalStopped(),
+                double(clock->mainPlayerX()),double(clock->mainPlayerY()));
+            require(clock->effectsSucceeded()&&clock->runStage().level==2&&clock->startTimeField()&&
+                clock->instance(101097)&&clockLife.handles.count(101097),"next room publishes its live entrance descendant");
+            const auto entryTicks=clock->runTimeTicks(),entryCalls=clockLife.meetingCalls;
+            clock->step(Input{},false);
+            require(clock->effectsSucceeded()&&clockLife.meetingCalls==entryCalls+1&&clock->runTimeTicks()==entryTicks,
+                "maintained goal-family query finds the later-level entrance descendant");
+        }
+    }
     for(unsigned failure=1;failure<=3;++failure){
         auto failedStorage=std::make_unique<Storage>();
         require(failedStorage->families.bindInstanceFlags(objects),"start failure family fixture");

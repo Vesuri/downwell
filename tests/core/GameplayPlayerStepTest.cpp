@@ -25,6 +25,23 @@ struct Fixture {
 }
 
 int main() {
+    for(unsigned guard:{0u,1u,2u})for(bool accept:{false,true})for(bool hit:{false,true}){
+        Fixture f;f.run.goalStopped=guard==1;f.death.active=guard==2;
+        unsigned calls=0;
+        downwell::Input right;right.right=true;
+        downwell::stepGameplayPlayer(f.player,f.death,f.run,f.currency,f.health,f.random,right,
+            240,176,160,34,false,downwell::NoPlayerPositionPublication{},downwell::NoPlayerScalePublication{},
+            [&](downwell::RunSession&,downwell::MotionBinary64 x,downwell::MotionBinary64 y,int,bool& found){
+                ++calls;
+                const auto px=downwell::MotionBinary64::fromInteger(240),py=downwell::MotionBinary64::fromInteger(176);
+                require(x.high==px.high&&x.low==px.low&&y.high==py.high&&y.low==py.low,
+                    "bound goal query receives old published coordinates");
+                found=hit;return accept;
+            });
+        require(calls==(guard?0u:1u)&&f.run.effectsSucceeded==(guard||accept),"bound query preserves guards and checked failure");
+        require(f.run.clock.ticks==unsigned(!guard&&accept&&!hit),"bound collision result controls clock without fallback");
+        require(f.run.shops.previous.right==(guard||accept),"query failure stops before shop input");
+    }
     for(bool accept:{false,true}){
         Fixture f;downwell::Input right;right.right=true;
         bool called=false;

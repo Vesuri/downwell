@@ -1227,6 +1227,12 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
                 instance.scaleX=static_cast<float>(value);return true;
             }
             return false;
+        },[this,&instance](RunSession& run,MotionBinary64 x,MotionBinary64 y,int facing,bool& hit){
+            if(!lifecycle_.hasPlaceMeeting())return run.playerGoalContact(x,y,facing,hit);
+            for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==&instance)
+                return lifecycle_.placeMeeting(instances_.handleAt(i),instance,255,
+                    MotionBinary64::fromInteger(instance.x),MotionBinary64::fromInteger(instance.y),hit);
+            return false;
         });
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);
