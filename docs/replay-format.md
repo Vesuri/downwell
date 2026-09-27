@@ -41,12 +41,13 @@ padding, native booleans, or host-endian memory.
 
 Each state family starts with its own schema number and appends fields in a
 documented fixed order. Changing the field order or meaning requires a schema
-increment and a deliberate golden-digest update. Startup-state schema 47
+increment and a deliberate golden-digest update. Startup-state schema 48
 includes the room-load result, runtime instance state, gameplay/player/builder
 state, and the complete Windows-runner RNG state and draw count. The bounded
 startup replay seeded with `decafbad` has a pinned digest of
-`b087ad6a6c52e1ef` after 13 ticks and transition to `rmMenu`. Schema 47
-distinguishes offscreen destruction from retaining inactive instance records.
+`d0abc7698ecf86e9` after 13 ticks and transition to `rmMenu`. Schema 48 stores
+each projectile's binary32 sequence phase instead of a binary64 accumulator;
+existing bullets advance before Begin Step, while newborns retain frame zero.
 
 The current code provides memory encoding/decoding, seeded RNG initialization,
 state comparison, and a cross-target native-port runner. File recording and

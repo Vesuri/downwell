@@ -892,9 +892,8 @@ int main() {
             burst.bulletAt(1).lifetimeId>survivorIdentity && !burst.findBullet(oldestIdentity),
             "lifetime lookup follows compaction and new births cannot alias retired shots");
     downwell::ProjectileAnimation newborn;
-    newborn.advance();
-    require(burst.bulletAt(1).animation.index.equal(newborn.index) &&
-                !burst.bulletAt(0).animation.index.equal(newborn.index),
+    require(burst.bulletAt(1).animation.index.bits==newborn.index.bits &&
+                burst.bulletAt(0).animation.index.bits!=newborn.index.bits,
             "slot reuse resets new-shot animation without resetting surviving bullets");
     const auto lastBulletIdentity=burst.bulletAt(1).lifetimeId;
     burst.restartFromResults(downwell::DeathMenuSequence::Action::Retry,2,300);

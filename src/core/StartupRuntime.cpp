@@ -301,6 +301,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
     if(roomId_==mainRoomId)run_.advanceCorpseExpiryAnimation();
     if(!run_.effectsSucceeded)return;
+    if(roomId_==mainRoomId)for(std::size_t i=0;i<mainBulletCount_;++i)
+        if(!mainBullets_[i].animation.advance()){run_.effectsSucceeded=false;return;}
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
@@ -2209,7 +2211,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(47); // Offscreen destruction removes stored identities, not just activation.
+    digest.addU32(48); // Projectile sequence phase is binary32, advanced before Begin Step.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2319,8 +2321,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(mainBullets_[index].x);
         digest.addF32(mainBullets_[index].y);
         digest.addBool(mainBullets_[index].gemHigh);
-        digest.addU64(mainBullets_[index].animation.index.mantissa);
-        digest.addI32(mainBullets_[index].animation.index.exponent);
+        digest.addU32(mainBullets_[index].animation.index.bits);
         const auto& motion = mainBullets_[index].trajectory;
         digest.addI32(motion.x.pixel); digest.addU32(motion.x.fraction);
         digest.addI32(motion.y.pixel); digest.addU32(motion.y.fraction);

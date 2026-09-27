@@ -53,13 +53,13 @@ bool stepMachineGunBullet(MachineGunTrajectory& motion,Random& random,Enemy enem
 }
 
 // Complete implemented projectile update. Storage adapters supply collision
-// queries and their world origin, not a second animation/motion/expiry order.
+// queries and their world origin. Animation runs separately before Begin Step,
+// so a shot created during that phase retains its Create image on this Step.
 // Consumed shots still finish this update; owners retire/compact them afterward.
 template<class Bullet,class Random,class Enemy,class Wall,class Healthy>
 bool stepMachineGunProjectileChecked(Bullet& bullet,Random& random,Enemy enemy,Wall wall,
     bool& alive,Healthy healthy,int originY,long viewTopQ12,int viewHeight=284){
     if(!healthy())return false;
-    bullet.animation.advance();
     bool moving=false;
     if(!stepMachineGunBulletChecked(bullet.trajectory,random,enemy,wall,moving,healthy))return false;
     bullet.x = bullet.trajectory.x.pixel;

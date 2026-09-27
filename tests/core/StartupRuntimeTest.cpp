@@ -773,6 +773,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "default recoil arrests the fall and selects the shoot sprite");
         require(runtime.mainBulletCount() == 1,
                 "the first gunboot shot creates a visible bullet");
+        require(runtime.mainBulletAt(0).animation.index.bits==0,
+                "a Begin Step birth misses the earlier animation traversal and retains Create frame zero");
         {
             // Isolate projectile/block coverage from later randomized layout.
             // Use a copy and a real room instance; original resources stay untouched.

@@ -725,6 +725,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
     if(!run_.effectsSucceeded)return {};
+    for(unsigned i=0;i<bulletSlotEnd_;++i)if(bullets_[i].active&&!bullets_[i].animation.advance()){
+        run_.effectsSucceeded=false;return {};
+    }
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
     for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active) {

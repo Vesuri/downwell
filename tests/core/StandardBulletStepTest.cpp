@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <cstring>
 
 static void require(bool value, const char* message) {
     if (!value) { std::cerr << message << '\n'; std::exit(1); }
@@ -10,24 +11,24 @@ static void require(bool value, const char* message) {
 
 int main() {
     downwell::ProjectileAnimation animation;
-    double reference = 0;
+    float reference = 0;
     unsigned seen = 0;
     for (unsigned tick = 0; tick < 100000; ++tick) {
         require(animation.frame() == static_cast<unsigned>(reference),
-                "projectile clock matches binary64 accumulation across wraps");
+                "projectile clock matches the runner's binary32 sequence across wraps");
         seen |= 1u << animation.frame();
-        reference += 0.3;
-        if (reference >= 6) reference -= 6;
-        animation.advance();
-        require(std::ldexp(static_cast<double>(animation.index.mantissa),
-                           animation.index.exponent - 52) == reference,
+        reference = static_cast<float>(reference + 0.3F);
+        if (reference >= 6) reference=std::fmod(static_cast<float>(std::fmod(reference,6.0F)+6.0F),6.0F);
+        require(animation.advance(),"valid projectile sequence advances");
+        std::uint32_t bits;std::memcpy(&bits,&reference,sizeof(bits));
+        require(animation.index.bits == bits,
                 "projectile animation retains the entire fractional phase");
         if (tick == 9) require(animation.frame() == 2,
-                "binary64 ten-update boundary must not become exact-tenths frame three");
+                "binary32 ten-update boundary must not become exact-tenths frame three");
     }
     require(seen == 63, "projectile animation visits all six source frames");
     animation = {};
-    require(animation.frame() == 0 && animation.index.mantissa == 0,
+    require(animation.frame() == 0 && animation.index.bits == 0,
             "reused bullet slots restart at source Create frame zero");
     using downwell::standardBulletOutsideView;
     using downwell::fractionalBulletOutsideView;
@@ -48,11 +49,10 @@ int main() {
         Random rng;
         unsigned enemies = 0, walls = 0;
         downwell::ProjectileAnimation expected;
-        expected.advance();
         const auto enemy = [&](const downwell::ProjectileSegment&) {
             ++enemies;
-            require(bullet.animation.index.equal(expected.index) && rng.draws == 1,
-                    "projectile animation and first-Step RNG precede impact queries");
+            require(bullet.animation.index.bits==expected.index.bits && rng.draws == 1,
+                    "newborn keeps Create image while first-Step RNG precedes impact queries");
             require(bullet.trajectory.y.pixel == 342 - origin,
                     "collision queries observe pre-movement coordinates");
             return impact == 1;
@@ -67,15 +67,16 @@ int main() {
         require(alive == (impact == 0) && enemies == 1 && walls == (impact == 1 ? 0u : 1u),
                 "shared projectile lifecycle preserves non-piercing impact arbitration");
         require(bullet.x == 20 && bullet.y + origin == 350 &&
-                bullet.animation.index.equal(expected.index),
+                bullet.animation.index.bits==expected.index.bits,
                 "even consumed shots finish motion and publish position before retirement");
         if (alive) {
             expected.advance();
+            require(bullet.animation.advance(),"next frame's animation precedes Step");
             require(!downwell::stepMachineGunProjectile(bullet, rng,
                     [](const downwell::ProjectileSegment&) { return false; },
                     [](const downwell::ProjectileSegment&) { return false; }, origin, 34 * 4096L),
                     "next update expires after movement crosses the strict lower margin");
-            require(rng.draws == 1 && bullet.y + origin == 358 && bullet.animation.index.equal(expected.index),
+            require(rng.draws == 1 && bullet.y + origin == 358 && bullet.animation.index.bits==expected.index.bits,
                     "later updates preserve initialization RNG and advance animation through expiry");
         }
     }
@@ -96,12 +97,12 @@ int main() {
             "failed projectile does not publish alive state, position, movement or expiry");
         require(enemies==(failure?1u:0u)&&walls==(failure==2?1u:0u)&&rng.draws==(failure?1u:0u),
             "failure preserves completed initialization and forbids later queries");
-        downwell::ProjectileAnimation expected;if(failure)expected.advance();
-        require(bullet.animation.index.equal(expected.index),"completed animation is retained without rollback");
+        downwell::ProjectileAnimation expected;
+        require(bullet.animation.index.bits==expected.index.bits,"Step never advances animation");
         require(!downwell::stepMachineGunProjectileChecked(bullet,rng,
             [&](const auto&){require(false,"failed projectile retried enemy query");return false;},
             [&](const auto&){require(false,"failed projectile retried wall query");return false;},
-            alive,[&]{return healthy;},0,0)&&bullet.animation.index.equal(expected.index),
+            alive,[&]{return healthy;},0,0)&&bullet.animation.index.bits==expected.index.bits,
             "failed owner cannot retry projectile initialization or animation");
     }
     downwell::MachineGunTrajectory motion; motion.reset(20,10);

@@ -25,6 +25,7 @@ for index, name, frames in (
     (172,"sprFrogDead",1),
     (205,"sprEnmSkeletonHit",1), (206,"sprSkeletonDead",1),
     (207,"sprEnmSkeletonThrow",8), (208,"sprEnmSkeletonIdle",6),
+    (458,"sprBulScatter2",6), (459,"sprBulScatter1",6),
     (460,"sprSkeletonBone",4),
 ):
     s = sprites[index]

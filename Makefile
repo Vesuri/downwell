@@ -1129,7 +1129,7 @@ build/crawler-motion-test: tests/core/CrawlerMotionTest.cpp src/core/CrawlerMoti
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CrawlerMotionTest.cpp
 
-build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp src/core/StandardBulletStep.h src/core/ProjectileAnimation.h src/core/HudReal.h src/core/EnemyContact.h src/core/GameMakerRounding.h
+build/standard-bullet-test: tests/core/StandardBulletStepTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/StandardBulletStepTest.cpp
 

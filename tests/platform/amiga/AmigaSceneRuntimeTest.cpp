@@ -562,7 +562,7 @@ void compareGameplayShot(const AmigaPortRuntime& amiga,
                 a.x.fraction == b.x.fraction && a.y.fraction == b.y.fraction &&
                 a.velocityX == b.velocityX && a.velocityY == b.velocityY &&
                 a.direction == b.direction && a.zeroSpread == b.zeroSpread &&
-                bullet.gemHigh == host.gemHigh && bullet.animation.index.equal(host.animation.index),
+                bullet.gemHigh == host.gemHigh && bullet.animation.index.bits==host.animation.index.bits,
                 "all live gameplay shots match fractional motion, birth state and animation in creation order");
         require(240 + bullet.x == host.x && 176 + bullet.y == host.y,
                 "all live gameplay shots publish identical pixel positions");
@@ -1814,7 +1814,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                 const auto& hostBullet = reference.mainBulletAt(bulletOrdinal++);
                 require(bullet.gemHigh == hostBullet.gemHigh,
                         "live bullets retain matching birth-time weapon levels");
-                require(bullet.animation.index.equal(hostBullet.animation.index),
+                require(bullet.animation.index.bits==hostBullet.animation.index.bits,
                         "live bullets retain identical shared animation phase");
                 const auto& a = bullet.trajectory;
                 const auto& b = hostBullet.trajectory;

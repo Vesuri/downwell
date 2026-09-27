@@ -34,6 +34,21 @@ wrapping, Animation End events and sprite-type-specific getter behavior still
 require recovery. Existing live actor animation remains unchanged; its rational
 rate approximations must not be described as bit-exact runner animation.
 
+## Live usual-gun projectile contract
+
+`bulletStandard.Create` writes zero to `image_index` and double 0.3 to
+`image_speed`, which the builtin setter narrows to `0x3e99999a`.
+The selected machine-gun sprites 458/459 (`sprBulScatter2/1`) each contain six
+consecutive unit keys and playback speed one frame per game frame; the pinned
+metadata verifier checks these resources explicitly. `ProjectileAnimation`
+therefore uses the selected unit-sequence timeline, not binary64 accumulation
+or exact tenths. Its image and timeline coincide because this path has no
+subsequent image-index writes. Both live adapters advance existing shots before
+Begin Step; a shot born during Begin Step retains zero through its first Step
+and Draw. Step collision/movement must not advance its image a second time.
+This does not establish projectile collision-event ordering or registration
+in the heterogeneous room animation traversal.
+
 ## Legacy update path
 
 The branch at `0x50ec00` selects `0x50ef0c` when global byte `0xb57f18`
