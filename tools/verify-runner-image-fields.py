@@ -39,4 +39,5 @@ for start, end, digest in (
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest
 assert region(0x50DB9D, 6) == bytes.fromhex("8b b1 80 00 00 00")
+assert sha256(region(0x5107F4, 0x510825-0x5107F4)).hexdigest() == "743e96b6903a39deab31d92dc324a391cd83c2ad4f8d1c733e61b98ae55a7ad9"
 print("Pinned Windows image fields and active-room-list animation traversal verified")

@@ -68,7 +68,9 @@ struct LifecycleAudit {
         ++transforms;return true;
     }
     bool imageIndex(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerImageValue value){
-        ++calls;require(matches(h,r)&&r.active&&value.promoted().valid(),"animation publication resolves a live actor");
+        // Animation uses reconciled room membership, not a pending active flag.
+        // Lifetime identity and numeric validity are still mandatory.
+        ++calls;require(matches(h,r)&&value.promoted().valid(),"animation publication resolves an allocated actor");
         if(fail==8)return false;
         ++indices;return true;
     }

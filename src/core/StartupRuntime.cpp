@@ -307,22 +307,25 @@ void StartupRuntime::stepInternal(bool advancePressed,
     for (std::size_t i = 0; i < instances_.size(); ++i) {
         auto& instance = instances_.at(i);
         instance.enemyStepEligible=false;
+        if (instance.active && instance.objectId == 113) instance.frogHit.advanceFrame();
+        if (instance.active && instance.objectId == 117) instance.snailHit.advanceFrame();
+        if (instance.active && instance.objectId == 116) instance.batHit.advanceFrame();
+    }
+    if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         const bool enemyObject=instance.objectId==111 || instance.objectId==112 ||
             instance.objectId==113 || instance.objectId==116 || instance.objectId==117 || instance.objectId==119;
-        if (instance.active && enemyObject) {
+        if (enemyObject) {
             if (!instance.enemyImageInitialized) {
                 instance.enemyImagePhase=static_cast<unsigned>(std::lround(instance.imageIndex*256));
                 instance.enemyImageInitialized=true;
             }
             advanceEnemyImageQ8(instance.enemyImagePhase,instance.enemyImageRemainder,
                                static_cast<unsigned>(std::lround(instance.imageSpeed*20)));
-            if(!publishMainEnemyImage(i,instance.enemyImagePhase))return;
+            if(!lifecycle_.phaseIndex(key,instance,instance.enemyImagePhase))return false;
             instance.imageIndex=instance.enemyImagePhase/256.0F;
         }
-        if (instance.active && instance.objectId == 113) instance.frogHit.advanceFrame();
-        if (instance.active && instance.objectId == 117) instance.snailHit.advanceFrame();
-        if (instance.active && instance.objectId == 116) instance.batHit.advanceFrame();
-    }
+        return true;
+    })){run_.effectsSucceeded=false;return;}
 
     if (showSplash_ == 3 || showSplash_ == 4)
         splashDitherTenths_ = 110;
@@ -1122,6 +1125,11 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
         deferredCommandsSucceeded_ = false;
         return;
     }
+    // Materialize this Step's children before phase-end reconciliation. Leaving
+    // them queued until after End Step gives dormant births an extra animation
+    // tick in the next frame's still-active room list.
+    flushDeferredInstances(instances_,roomId_);
+    if(!deferredCommandsSucceeded_||!run_.effectsSucceeded)return;
     instance.y = areaOneBuilder_.y();
     syncMainBuilderState();
 }
@@ -2070,8 +2078,15 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
             instanceHandler, roomCreationHandler,
             deferredHandler,lifecycle_) == LoadRoomResult::success;
     }
-    if (roomLoadSucceeded_)
+    if (roomLoadSucceeded_) {
         roomId_ = roomId;
+        // Original room entry reconciles after Room Start (0x510813), before
+        // the next frame's active-list animation traversal.
+        roomLoadSucceeded_=instances_.reconcileObjectMembership(
+            [this](InstanceHandle key,const InstanceRecord& record,bool member){
+                return lifecycle_.membership(key,record,member);
+            });
+    }
 }
 
 InstanceRecord* StartupRuntime::initRoomInstance() {

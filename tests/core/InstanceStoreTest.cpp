@@ -175,6 +175,27 @@ void testAnimationMembership() {
     store.erase(1);store.create(2,238,7,false);member=false;
     require(!store.animationMember(key,member)&&!member,"stale generation cannot inherit animation membership");
 }
+void testAnimationTraversal() {
+    downwell::InstanceStore<4> store;
+    store.create(1,111,7,false,30);store.create(2,113,7,false,10);
+    store.create(3,117,7,false,20);store.create(4,116,7,false,10);
+    std::vector<unsigned> seen;
+    auto visit=[&](auto key,auto& record){
+        require(store.resolve(key)==&record,"animation callback retains generation identity");
+        seen.push_back(record.instanceId);record.imageIndex+=1;return true;
+    };
+    require(store.visitAnimationChecked(visit)&&seen==std::vector<unsigned>({2,4,3,1}),
+        "animation follows active depth list, with stable equal-depth order");
+    const auto key=store.handleAt(1);store.requestActivation(key,false);seen.clear();
+    require(store.visitAnimationChecked(visit)&&seen==std::vector<unsigned>({2,4,3,1}),
+        "pending deactivation remains in animation traversal");
+    store.reconcileObjectMembership();seen.clear();
+    require(store.visitAnimationChecked(visit)&&seen==std::vector<unsigned>({4,3,1}),
+        "inactive membership removed from animation traversal");
+    seen.clear();require(!store.visitAnimationChecked([&](auto,auto& record){
+        seen.push_back(record.instanceId);return record.instanceId!=3;
+    })&&seen==std::vector<unsigned>({4,3}),"failed animation stops before later records");
+}
 
 } // namespace
 
@@ -186,6 +207,7 @@ int main() {
     testOwnedObjectMembership();
     testMarkedRoomCleanup();
     testAnimationMembership();
+    testAnimationTraversal();
     std::cout << "instance store tests passed\n";
     return 0;
 }

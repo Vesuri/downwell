@@ -10,6 +10,13 @@ public:
     static constexpr unsigned End=Capacity;
     bool contains(unsigned slot)const{return slot<Capacity && entries_[slot].list>=0;}
     bool active(unsigned slot)const{return slot<Capacity && entries_[slot].list==0;}
+    // Animation's active-room traversal. Visitor may update instance fields,
+    // but must not create/remove/rebind memberships while visiting this list.
+    template<class Visit> bool visitAnimationChecked(Visit visit)const{
+        for(unsigned slot=head_[0];slot!=End;slot=entries_[slot].next)
+            if(!visit(slot))return false;
+        return true;
+    }
     bool bind(unsigned slot,RunnerImageValue key){
         if(slot>=Capacity || !RunnerSpatialSplit::valid(key))return false;
         remove(slot);entries_[slot].key=key;insertActive(slot);return true;

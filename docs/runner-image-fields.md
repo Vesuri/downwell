@@ -94,6 +94,25 @@ membership, and pending reactivation does not add it. Tests cover both requests,
 their reconciliation, stale slot reuse and failed eligibility publication.
 This is eligibility evidence, not proof of complete cross-family scheduling.
 
+The stored-world live enemy animation pass now uses
+`InstanceStore::visitAnimationChecked`, following the active room list's depth
+order and stable equal-depth insertion order rather than compact storage order.
+It publishes each image change using that lifetime's handle and stops at the
+first failed publication. The visitor currently permits field updates only;
+animation callbacks which create, remove or rebind memberships require separate
+source-equivalent traversal handling. External effect families and the native
+heterogeneous actor scheduler are not yet merged into this pass.
+
+Membership must be reconciled before this pass begins. Original room entry
+dispatches Room Start (event 7/4) at `0x5107f8`, then calls reconciliation at
+`0x510813` and cleanup at `0x510820`; that range is pinned by the verifier.
+The stored runtime publishes membership after its room-start sequence too.
+Builder children are materialized before the builder Step returns, so its
+phase-end reconciliation can demote dormant births. Deferring these births
+until after End Step incorrectly leaves them on the next active animation list.
+This phase-boundary correction does not yet make every builder child Create
+synchronous at its original cell's individual call site.
+
 ## Sequence loop recovery (supersedes the tentative legacy binding)
 
 The export now includes full sequence metadata for sprites 205–208 and 460.

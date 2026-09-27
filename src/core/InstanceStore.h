@@ -127,6 +127,13 @@ public:
         if(!resolve(handle))return false;
         member=roomMembership_.active(handle.slot);return true;
     }
+    template<class Visit> bool visitAnimationChecked(Visit visit){
+        return roomMembership_.visitAnimationChecked([&](unsigned slot){
+            const InstanceHandle key{slot,slots_[slot].generation};
+            auto* record=resolve(key);
+            return record&&visit(key,*record);
+        });
+    }
 
     // Explicit activation requests are not destruction. Notify collision state
     // while the old flags are still observable; defer object-list changes until
