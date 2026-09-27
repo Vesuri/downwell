@@ -34,8 +34,15 @@ strictly below cached YView + height. At equality it must stay still, even if
 camMain is already moving to a lower view. These two VM entries are pinned too.
 
 The current adapters snapshot that normal published view at update entry for
-builder, ordinary/End Step lifetime checks, shop retirement and exit-dither
-movement. Rendering still follows the
+builder, ordinary/End Step lifetime checks, shop retirement, exit-dither
+movement, ordinary projectile out-of-view checks and frog/walker/crawler
+visibility. `scrBulletOov` uses cached YView - 100 and YView + height + 32;
+`scrInView` uses cached X/Y/width/height with the caller's margins. Native
+relative coordinates subtract the fixed (240,176) world origin, not a new
+camera position. Crawler alarms retain their earlier phase's view too.
+A horizontal crossing regression places a frog outside the old shaft view
+and inside the upcoming side view: integration starts only next update.
+Rendering still follows the
 final camera position, preserving immediate visual collision snaps and native
 ring-scroll deltas. This is not a complete camera manager: explicit camera
 setters, dirty-mode transitions, initial room publication and remaining

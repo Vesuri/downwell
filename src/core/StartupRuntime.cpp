@@ -295,6 +295,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     // Previous Draw's follow publication remains visible throughout ordinary
     // Step, even after camMain's own Step changes the followed instance.
     ordinaryStepViewTopQ12_ = mainCameraMotion_.viewTopQ12();
+    ordinaryStepViewLeftQ12_ = mainCameraMotion_.viewLeftQ12();
     if(roomId_==mainRoomId)
         run_.advanceFlashAnimation();
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
@@ -749,7 +750,7 @@ void StartupRuntime::updateMainBullets() {
                 return true;
             }
             return false;
-          },alive,[this]{return run_.effectsSucceeded;},0,mainCameraMotion_.viewTopQ12(),surfaceHeight);
+          },alive,[this]{return run_.effectsSucceeded;},0,ordinaryStepViewTopQ12_,surfaceHeight);
         if(!succeeded){
             // Keep the failed shot's completed initialization and all untouched
             // later shots, while retaining earlier successful retirements.
@@ -815,8 +816,8 @@ void StartupRuntime::updateMainCurrency() {
 void StartupRuntime::updateCrawler(InstanceRecord& enemy, bool alarm) {
     if (!enemy.crawler.initialized) enemy.crawler.initialize(enemy.x, enemy.y);
     const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
-        mainCameraMotion_.viewLeftQ12(), mainCameraMotion_.viewTopQ12(),
-        mainCameraMotion_.viewRightQ12(), mainCameraMotion_.viewBottomQ12(),
+        ordinaryStepViewLeftQ12_, ordinaryStepViewTopQ12_,
+        ordinaryStepViewLeftQ12_ + surfaceWidth * 4096L, ordinaryStepViewTopQ12_ + surfaceHeight * 4096L,
         alarm ? 0 : 64);
     const auto meeting = [this](long x, long y) {
         return CrawlerMotion::meetsTiles(x, y, [this](int px, int py) {
@@ -860,8 +861,8 @@ void StartupRuntime::updateMainEnemies() {
             }
             const bool turtle = enemy.objectId == 112;
             const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
-                mainCameraMotion_.viewLeftQ12(), mainCameraMotion_.viewTopQ12(),
-                mainCameraMotion_.viewRightQ12(), mainCameraMotion_.viewBottomQ12(),
+                ordinaryStepViewLeftQ12_, ordinaryStepViewTopQ12_,
+                ordinaryStepViewLeftQ12_ + surfaceWidth * 4096L, ordinaryStepViewTopQ12_ + surfaceHeight * 4096L,
                 turtle ? 64 : 32);
             if(!enemy.walker.step(turtle, groundTurtleWalking(enemy.auxiliaryState), visible,
                 [this, &enemy, turtle](long x, long y) {
@@ -886,10 +887,9 @@ void StartupRuntime::updateMainEnemies() {
             enemy.grounded = enemy.walker.grounded;
         } else if (enemy.objectId == 113) {
             const bool integrate = frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
-                static_cast<long>(std::round(mainCameraViewX() * 256.0F)),
-                static_cast<long>(std::round(mainCameraViewY() * 256.0F)),
-                static_cast<long>(std::round((mainCameraViewX() + surfaceWidth) * 256.0F)),
-                static_cast<long>(std::round((mainCameraViewY() + surfaceHeight) * 256.0F)));
+                ordinaryStepViewLeftQ12_ / 16, ordinaryStepViewTopQ12_ / 16,
+                ordinaryStepViewLeftQ12_ / 16 + surfaceWidth * 256L,
+                ordinaryStepViewTopQ12_ / 16 + surfaceHeight * 256L);
             if (!enemy.frogMotionInitialized) {
                 enemy.frogHorizontal.position = static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 65536.0F));
                 enemy.frogHorizontal.velocity = static_cast<long>(std::round(enemy.velocityX * 65536.0F));

@@ -552,7 +552,7 @@ private:
     long viewCameraYQ8() const { return followCamera_ ? cameraPixelY_ * 256L : cameraY_; }
     void applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect);
     void advanceEnemyAlarms();
-    void updateCrawler(EnemyState& enemy, bool alarm);
+    void updateCrawler(EnemyState& enemy, bool alarm, int cameraX, long cameraYQ8);
     GenerationStep generationStep_ = nullptr;
     void* generationContext_ = nullptr;
     bool generationSucceeded_ = true;

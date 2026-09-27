@@ -16,6 +16,12 @@ for name, digest in (
     ("gml_Object_camMain_Step_0.asm", "7bbb7ff179d72e3e1ebd3e7695ea8acd7723e4002bb89bc0c476978710368450"),
     ("gml_Object_Shop_Step_2.asm", "e124d7e7d595c81e9e222a01e8570eb9f95ad58bdc37b111cc7e5909a861ea6b"),
     ("gml_Object_objTransDither_Step_0.asm", "2a201cbf2233b297030ec00109b90de2e916a53d4ad505de870337226564b9eb"),
+    ("gml_GlobalScript_scrBulletOov.asm", "1b393802ddd4cc84545f3571f4a244d0baf692d7ddc1ae49a3b8c9aefeb1f022"),
+    ("gml_GlobalScript_scrInView.asm", "cf66675bc8ea809f5bd42270ceee29d3e50eb9c3aa9d916205006db32e0e3432"),
+    ("gml_Object_enmFrog_Step_0.asm", "92cfa42170603c8ac63c358fffb17bfa669185edea32cb8d3920370b9e173756"),
+    ("gml_Object_enmSnake_Step_0.asm", "690662b8e7584558e39c3f785ae875fb00ed16be334c2f8d1116d8b08e5b37d0"),
+    ("gml_Object_enmGroundTurtle_Step_0.asm", "0fd08eea84b434ed58aa0dee3bc2ae4157e95493d41bd27699f0371cdabc5161"),
+    ("gml_Object_enmCrawler_Step_0.asm", "0d566dfa4ce1ad04c0fbfe85ffd6afb96b24040406d9746b73a60acbdcf901e0"),
 ):
     assert sha256((assembly / name).read_bytes()).hexdigest() == digest, name
 for start, end, digest in (

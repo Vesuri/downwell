@@ -1691,6 +1691,29 @@ int main() {
     for (unsigned i = 0; i < AmigaPortRuntime::gemCapacity; ++i)
         require(!contact.gemAt(i).active, "restart removes old gems");
 
+    {
+        AmigaPortRuntime visibility(300,true,0,true);
+        visibility.configureSolidResolver(noSolid,0);
+        downwell::Input right;right.right=true;
+        bool crossed=false;
+        for(unsigned tick=0;tick<120&&!crossed;++tick){
+            // Place a frog inside the prospective side view, but outside the
+            // published shaft view. Reset only the isolated test actor.
+            const int frogY=visibility.cameraOffsetY();
+            require(visibility.configureEnemy(0,113,166,120,frogY,0,256,35,20),
+                "configure frog at the horizontal publication boundary");
+            visibility.step(downwell::packReplayInput(right));
+            if(visibility.cameraOffsetX()==160){
+                crossed=true;
+                require(visibility.enemyAt(0).preciseY==frogY*256L,
+                    "frog does not integrate using the new camera during the crossing Step");
+                visibility.step(0);
+                require(visibility.enemyAt(0).preciseY>frogY*256L,
+                    "frog integrates on the following Step after side-view publication");
+            }
+        }
+        require(crossed,"frog publication test reaches a natural horizontal camera crossing");
+    }
     AmigaPortRuntime sideCamera(300, true, 0, true);
     sideCamera.configureSolidResolver(noSolid, 0);
     downwell::Input walkRight;

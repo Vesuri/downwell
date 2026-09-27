@@ -676,17 +676,17 @@ void GameplayWorld::advanceEnemyAlarms()
         } else if (enemy.objectId == 116 && alarm0Fired) {
             enemy.batHit.alarm();
         } else if (enemy.objectId == 119 && alarm0Fired) {
-            updateCrawler(enemy, true);
+            updateCrawler(enemy, true, cameraPixelX_, viewCameraYQ8());
             enemy.alarm0 = 2;
         }
       }
     }
 }
 
-void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm)
+void GameplayWorld::updateCrawler(EnemyState& enemy, bool alarm, int cameraX, long cameraYQ8)
 {
-    const long cx = cameraPixelX_ * 4096L;
-    const long cy = viewCameraYQ8() * 16;
+    const long cx = cameraX * 4096L;
+    const long cy = cameraYQ8 * 16;
     const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
         cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
         alarm ? 0 : 64);
@@ -726,6 +726,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // camera_get_view_y reads the runner's published cache, not camMain.y.
     // Normal following refreshes before Draw; post-Step refresh is dirty-only.
     const long generationCameraY = viewCameraYQ8();
+    const int publishedCameraX = cameraPixelX_;
     const int oldAmmo = player_.ammo();
     const int oldAmmoCapacity = player_.ammoCapacity();
     const int oldHealth = health_;
@@ -895,7 +896,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             if (!bullet.active)
                 continue;
             bulletChanged = true;
-            const long cameraCentreQ12 = 176L * 4096 + viewCameraYQ8() * 16;
+            const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
             bool alive=false;
             if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
                 [this, &bullet](const downwell::ProjectileSegment& path) {
@@ -989,8 +990,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             continue;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const bool turtle = enemy.objectId == 112;
-            const long cx = cameraPixelX_ * 4096L;
-            const long cy = viewCameraYQ8() * 16;
+            const long cx = publishedCameraX * 4096L;
+            const long cy = generationCameraY * 16;
             const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
                 cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
                 turtle ? 64 : 32);
@@ -1049,8 +1050,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             }
         } else if (enemy.objectId == 113) {
             const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
-                (cameraPixelX_ - 80) * 256L, viewCameraYQ8() - 142 * 256L,
-                (cameraPixelX_ + 80) * 256L, viewCameraYQ8() + 142 * 256L);
+                (publishedCameraX - 80) * 256L, generationCameraY - 142 * 256L,
+                (publishedCameraX + 80) * 256L, generationCameraY + 142 * 256L);
             downwell::FrogVerticalMotion vertical{
                 enemy.preciseY * 5 + enemy.gravityPositionRemainder,
                 enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
@@ -1100,7 +1101,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.speedY = enemy.snail.vy / 5;
             enemy.motionState = enemy.facing = enemy.snail.facing;
         } else if (enemy.objectId == 119) {
-            updateCrawler(enemy, false);
+            updateCrawler(enemy, false, publishedCameraX, generationCameraY);
         }
         // World origins (240,176) are even integers, so ties-to-even is
         // unchanged by storing these positions relative to the origin.

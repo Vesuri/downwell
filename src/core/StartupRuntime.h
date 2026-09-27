@@ -770,6 +770,7 @@ private:
     float mainCameraX_ = 240.0F;
     MainCameraMotion mainCameraMotion_;
     long ordinaryStepViewTopQ12_ = 34L * 4096;
+    long ordinaryStepViewLeftQ12_ = 160L * 4096;
     float mainCameraY_ = 176.0F;
     float mainCameraTargetY_ = 176.0F;
 };
