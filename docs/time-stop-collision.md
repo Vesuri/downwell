@@ -1041,8 +1041,22 @@ the effect owners' opaque handles. `findBullet` resolves only live shots and
 follows creation-order compaction. New births cannot reuse a retired ID; the
 sequence survives level changes and Retry, and exhaustion fails explicitly.
 These keys are not reconstructed Windows instance IDs and must not be used as
-source ordering evidence. Mapping them into a shared spatial registry, including
-synchronous membership retirement, remains necessary before live queries use it.
+source ordering evidence. A separate identity slot survives compaction;
+`resolveBulletLifetime` also resolves marked shots until Draw cleanup. Native
+object-261 births are resource-backed, then receive the selected sprite. Existing
+shots publish their pre-Begin-Step image phase; first Step publishes the sampled
+angle before impact queries, and movement publishes fractional positions.
+Impact/expiry excludes the record from queries immediately, retains its lifetime
+until `prepareDraw`, and retires it before slot reuse. Room exits and Retry clear
+ownership, with terminal failure propagation at each publication boundary.
+
+`ProjectilePublication` narrows the current Q20 position and Q32-turn direction
+without discarding fractions at the drawing-pixel boundary. This is an adapter
+for the existing approximation, **not** evidence that projectile motion matches
+the Windows setters/trigonometry. Projectile selectors remain unavailable: source
+motion precision, collision-event/mark timing, muzzle-effect creation order and
+the stored-world projectile owner's registration still need integration. The
+existing enemy-first impact adapter is not replaced by this ownership work.
 
 Native exit creation also registers the object-306 trigger and object-74
 camera-limit child in `GameplayExitControllers`, before the object-255 goal

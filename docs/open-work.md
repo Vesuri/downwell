@@ -33,6 +33,10 @@ behavior, both backend integrations and relevant original-game verification.
   gameplay queries; register the remaining native field, effect and projectile
   lifetimes in the resource-backed owner before replacing its unindexed
   collision adapters. Complete original room creation order across families.
+- Finish projectile ownership on the stored-world SDL path and replace the
+  usual-gun Q20/Q32 trajectory approximation with original setter/trigonometric
+  semantics before enabling projectile selectors. Preserve muzzle-effect
+  creation, collision-event ordering and destruction timing around movement.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding

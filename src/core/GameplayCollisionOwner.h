@@ -60,6 +60,7 @@ private:
         static int object(const Record& r){
             if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
             if constexpr(Kind==View::Kind::timeField)return 82;
+            if constexpr(Kind==View::Kind::bullet)return 261;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -78,6 +79,7 @@ private:
             else if constexpr(Kind==View::Kind::timeField)pointer=actual.timeField;
             else if constexpr(Kind==View::Kind::goalField)pointer=actual.goalField;
             else if constexpr(Kind==View::Kind::exitController)pointer=actual.exitController;
+            else if constexpr(Kind==View::Kind::bullet)pointer=actual.bullet;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
@@ -152,6 +154,7 @@ private:
     Binding<OrdinaryTimeField,View::Kind::timeField> fields_{*this};
     Binding<GameplayGoalFields::Record,View::Kind::goalField> goals_{*this};
     Binding<GameplayExitControllers::Record,View::Kind::exitController> exits_{*this};
+    Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
@@ -174,6 +177,7 @@ public:
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
         if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(goals_)))return check(false);
         if(!world_&&!world.bindExitControllerLifecycle(GameplayExitControllers::Binding::bind(exits_)))return check(false);
+        if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
         world_=&world;
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary phase){
             auto& owner=*static_cast<GameplayCollisionOwner*>(context);
@@ -321,6 +325,7 @@ public:
                 case View::Kind::enemy:return record.enemy==world_->resolveEnemyLifetime(local)&&world_->retireMarkedEnemy(local);
                 case View::Kind::breakable:return record.breakable==world_->findBreakable(local)&&world_->retireMarkedBreakable(local);
                 case View::Kind::goalField:return record.goalField==world_->goalFieldInstances().find(local)&&world_->retireMarkedGoalField(local);
+                case View::Kind::bullet:return record.bullet==world_->resolveBulletLifetime(local)&&world_->retireMarkedBullet(local);
                 default:return false;
             }
         });

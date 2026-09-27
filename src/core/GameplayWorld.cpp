@@ -31,11 +31,13 @@ inline void* operator new(__SIZE_TYPE__, void* address) noexcept { return addres
 #else
 #include <new>
 #endif
+#include "core/ProjectilePublication.h"
 
 downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
+    if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
     if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!goalFieldInstances_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -53,6 +55,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto nextBreakableIdentity=nextBreakableLifetimeId_;
     const auto records = run_.records();
     const auto nextBulletIdentity=nextBulletLifetimeId_;
+    const auto bulletLifecycle=bulletLifecycle_;
     const auto nextEnemyIdentity=nextEnemyLifetimeId_;
     const auto nextGemIdentity=nextGemLifetimeId_;
     const auto fieldBirths=run_.timeFields.birthSequence();
@@ -73,6 +76,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;
+    bulletLifecycle_=bulletLifecycle;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
     // Construction above has no bound player owner. Recreate its lifetime
@@ -100,6 +104,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
+    if(!clearBulletOwnership())return false;
     if(!goalFieldInstances_.clear()){run_.effectsSucceeded=false;return false;}
     if(!exitControllers_.clear()){run_.effectsSucceeded=false;return false;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return false;}
@@ -333,6 +338,22 @@ bool GameplayWorld::clearEnemyOwnership() {
     for(unsigned i=0;i<enemyCount_;++i)
         if(!retireEnemyOwnership(enemies_[i])) return false;
     return true;
+}
+
+bool GameplayWorld::retireBulletOwnership(BulletState& bullet){
+    if(bullet.identitySlot>=bulletCapacity)return true;
+    if(!bulletLifecycle_.retire({bullet.identitySlot,bullet.lifetimeId},bullet))return run_.effectsSucceeded=false;
+    bulletIdentitySlots_[bullet.identitySlot]=false;
+    bullet.identitySlot=0xffffu;bullet.active=false;return true;
+}
+bool GameplayWorld::clearBulletOwnership(){
+    for(unsigned i=0;i<bulletSlotEnd_;++i)if(!retireBulletOwnership(bullets_[i]))return false;
+    return true;
+}
+bool GameplayWorld::retireMarkedBullet(downwell::InstanceHandle h){
+    auto* bullet=const_cast<BulletState*>(resolveBulletLifetime(h));
+    if(!run_.effectsSucceeded||!bullet||!bullet->destroyRequested)return run_.effectsSucceeded=false;
+    return retireBulletOwnership(*bullet);
 }
 
 bool GameplayWorld::configureEnemy(unsigned index, int objectId,
@@ -725,8 +746,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
     if(!run_.effectsSucceeded)return {};
-    for(unsigned i=0;i<bulletSlotEnd_;++i)if(bullets_[i].active&&!bullets_[i].animation.advance()){
-        run_.effectsSucceeded=false;return {};
+    for(unsigned i=0;i<bulletSlotEnd_;++i)if(bullets_[i].active){
+        auto& bullet=bullets_[i];
+        if(!bullet.animation.advance()||!bulletLifecycle_.imageIndex({bullet.identitySlot,bullet.lifetimeId},bullet,bullet.animation.index)){
+            run_.effectsSucceeded=false;return {};
+        }
     }
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
@@ -833,13 +857,21 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
     if (player_.shots() != oldShots) {
         const int muzzleOffset = emitter_.nextOffset();
-        const unsigned index = downwell::compactInstanceSlots(bullets_, bulletSlotEnd_);
+        // Marked records remain resolvable until Draw cleanup; never compact
+        // them away merely because gameplay/rendering has stopped using them.
+        unsigned index=0;
+        for(unsigned read=0;read<bulletSlotEnd_;++read)if(bullets_[read].identitySlot<bulletCapacity){
+            if(index!=read)bullets_[index]=bullets_[read];++index;
+        }
         bulletSlotEnd_ = index;
         if (index >= bulletCapacity || !nextBulletLifetimeId_) {
             run_.effectsSucceeded = false;
             return {};
         }
         BulletState& bullet = bullets_[index];
+        unsigned identity=0;while(identity<bulletCapacity&&bulletIdentitySlots_[identity])++identity;
+        if(identity==bulletCapacity){run_.effectsSucceeded=false;return {};}
+        bullet={};bullet.identitySlot=identity;bulletIdentitySlots_[identity]=true;
         bullet.lifetimeId=nextBulletLifetimeId_++;
         bullet.active = true;
         bulletSlotEnd_ = index + 1;
@@ -848,6 +880,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         bullet.gemHigh = run_.gemHigh;
         bullet.animation = {};
         bullet.trajectory.reset(bullet.x, bullet.y, run_.upgrades.levels[12] != 0);
+        const downwell::InstanceHandle handle{identity,bullet.lifetimeId};
+        if(!bulletLifecycle_.birth(handle,bullet)||
+            !bulletLifecycle_.sprite(handle,bullet,downwell::machineGunProfile(bullet.gemHigh).sprite)){
+            run_.effectsSucceeded=false;return {};
+        }
         bulletChanged = true;
     }
 
@@ -914,6 +951,16 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             bulletChanged = true;
             const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
             bool alive=false;
+            const bool firstStep=!bullet.trajectory.initialized;
+            if(firstStep&&bulletLifecycle_.hasOwner()){
+                bullet.trajectory.initialize(enemyRandom_);
+                downwell::RunnerImageValue angle;
+                if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
+                    !bulletLifecycle_.transform({bullet.identitySlot,bullet.lifetimeId},bullet,
+                        downwell::RunnerTransformField::angle,angle,{0x3f800000u},0xffffffu)){
+                    run_.effectsSucceeded=false;return {};
+                }
+            }
             if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
                 [this, &bullet](const downwell::ProjectileSegment& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
@@ -986,7 +1033,22 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                     }
                     return false;
                 },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096))return {};
-            bullet.active=alive;
+            if(bulletLifecycle_.hasOwner()){
+                const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
+                downwell::RunnerImageValue x,y;
+                if(!downwell::ProjectilePublication::coordinate(bullet.trajectory.x,240,x)||
+                    !downwell::ProjectilePublication::coordinate(bullet.trajectory.y,176,y)||
+                    !bulletLifecycle_.publishedPosition(h,bullet,x,y)){
+                    run_.effectsSucceeded=false;return {};
+                }
+            }
+            if(!alive){
+                const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
+                if(bulletLifecycle_.hasOwner()){
+                    if(!bulletLifecycle_.markDestroyed(h,bullet)){run_.effectsSucceeded=false;return {};}
+                    bullet.destroyRequested=true;bullet.active=false;
+                }else if(!retireBulletOwnership(bullet))return {};
+            }
         }
     }
 
@@ -1220,7 +1282,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     DW_PROFILE_PHASE(profileLifecycle);
     // Only discard inactive tails; holes stay in creation order until the
     // existing stable compaction at the next birth. Never reorder live slots.
-    while (bulletSlotEnd_ && !bullets_[bulletSlotEnd_-1].active) --bulletSlotEnd_;
+    while (bulletSlotEnd_ && bullets_[bulletSlotEnd_-1].identitySlot>=bulletCapacity) --bulletSlotEnd_;
     while (gemSlotEnd_ && !gems_[gemSlotEnd_-1].active) --gemSlotEnd_;
     run_.exitDither.step(34 + downwell::floorQ8Coordinate(generationCameraY), 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),

@@ -97,6 +97,8 @@ public:
     struct BulletState {
         // Internal lifetime key, not a Windows instance/resource ID or slot.
         std::uint32_t lifetimeId = 0;
+        unsigned short identitySlot = 0xffffu;
+        bool destroyRequested = false;
         int x;
         int y;
         bool active;
@@ -104,6 +106,7 @@ public:
         downwell::ProjectileAnimation animation;
         downwell::MachineGunTrajectory trajectory;
     };
+    using BulletLifecycleBinding=downwell::RecordLifecycleBinding<BulletState>;
     struct EnemyState {
         // Family-local lifetime key; never a recovered Windows instance ID.
         std::uint32_t lifetimeId = 0;
@@ -363,6 +366,16 @@ public:
     unsigned bulletSlotEnd() const { return bulletSlotEnd_; }
     unsigned gemSlotEnd() const { return gemSlotEnd_; }
     const BulletState& bulletAt(unsigned index) const;
+    const BulletState* resolveBulletLifetime(downwell::InstanceHandle h)const{
+        if(h.generation&&h.slot<bulletCapacity&&bulletIdentitySlots_[h.slot])
+            for(unsigned i=0;i<bulletSlotEnd_;++i)
+                if(bullets_[i].identitySlot==h.slot&&bullets_[i].lifetimeId==h.generation)return &bullets_[i];
+        return nullptr;
+    }
+    bool bindBulletLifecycle(BulletLifecycleBinding binding){
+        if(bulletSlotEnd_||!run_.effectsSucceeded)return false;bulletLifecycle_=binding;return true;
+    }
+    bool retireMarkedBullet(downwell::InstanceHandle h);
     const BulletState* findBullet(std::uint32_t lifetimeId) const {
         if(lifetimeId)for(unsigned i=0;i<bulletSlotEnd_;++i)
             if(bullets_[i].active && bullets_[i].lifetimeId==lifetimeId)return &bullets_[i];
@@ -513,7 +526,7 @@ public:
     // instead of gameplay step until the next-room request is consumed.
     bool enterLevelClear(unsigned style, bool heartGoal) {
         if(!run_.levelResultRequested||run_.levelClearActive)return false;
-        if(!run_.effectsSucceeded||!goalFieldInstances_.clear()||!exitControllers_.clear())return run_.effectsSucceeded=false;
+        if(!run_.effectsSucceeded||!clearBulletOwnership()||!goalFieldInstances_.clear()||!exitControllers_.clear())return run_.effectsSucceeded=false;
         return run_.enterLevelClear(style, heartGoal, health_, player_, enemyRandom_);
     }
     template<class Emit>
@@ -585,6 +598,8 @@ private:
     bool publishEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value);
     bool retireEnemyOwnership(EnemyState& enemy);
     bool clearEnemyOwnership();
+    bool retireBulletOwnership(BulletState& bullet);
+    bool clearBulletOwnership();
     // Normal gameplay reads camMain's published pixel position. Preserve the
     // synthetic replay fixture's explicit camera track when following is off.
     long viewCameraYQ8() const { return followCamera_ ? cameraPixelY_ * 256L : cameraY_; }
@@ -605,6 +620,8 @@ private:
     int cameraPixelX_;
     int activationY_;
     BulletState bullets_[bulletCapacity];
+    bool bulletIdentitySlots_[bulletCapacity]{};
+    BulletLifecycleBinding bulletLifecycle_{};
     std::uint32_t nextBulletLifetimeId_ = 1;
     std::uint32_t nextEnemyLifetimeId_ = 1, nextGemLifetimeId_ = 1;
     unsigned bulletSlotEnd_ = 0, gemSlotEnd_ = 0;

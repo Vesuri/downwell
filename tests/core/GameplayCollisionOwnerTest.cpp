@@ -1,5 +1,6 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/GameplayFieldReentryVerification.h"
+#include "core/ProjectilePublication.h"
 #include "core/WallPresentation.h"
 #include "platform/amiga/AmigaWallDamage.h"
 #include <fstream>
@@ -8,6 +9,7 @@
 #include <vector>
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 using namespace downwell;
 static std::vector<std::uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 struct TerrainAudit {
@@ -88,7 +90,52 @@ struct ExitAudit {
     bool activation(InstanceHandle,const GameplayExitControllers::Record&,bool){return true;}
     bool membership(InstanceHandle,const GameplayExitControllers::Record&,bool){return true;}
 };
+struct BulletAudit {
+    GameplayWorld* world;unsigned reject=0,last=0;
+    using Record=GameplayWorld::BulletState;
+    bool check(InstanceHandle h,const Record& r,unsigned event){
+        assert(world->resolveBulletLifetime(h)==&r);last=event;return event!=reject;
+    }
+    bool birth(InstanceHandle h,const Record& r){assert(!r.trajectory.initialized);return check(h,r,1);}
+    bool sprite(InstanceHandle h,const Record& r,int sprite){assert(sprite==459);return check(h,r,2);}
+    bool transform(InstanceHandle h,const Record& r,RunnerTransformField,RunnerImageValue,RunnerImageValue,unsigned){
+        assert(r.trajectory.initialized);return check(h,r,3);
+    }
+    bool move(InstanceHandle h,const Record& r,RunnerImageValue,RunnerImageValue){return check(h,r,4);}
+    bool imageIndex(InstanceHandle h,const Record& r,RunnerImageValue){return check(h,r,5);}
+    bool markDestroyed(InstanceHandle h,const Record& r){assert(!r.destroyRequested);return check(h,r,6);}
+    bool retire(InstanceHandle h,const Record& r){return check(h,r,7);}
+    bool activation(InstanceHandle,const Record&,bool){return true;}
+    bool membership(InstanceHandle,const Record&,bool){return true;}
+    bool mask(InstanceHandle,const Record&,int){return true;}
+};
 int main(){
+    for(unsigned failure=1;failure<=7;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+        BulletAudit audit{world.get(),failure};
+        assert(world->bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(audit)));
+        if(failure>=6)world->configureSolidResolver([](void*,int,int y){return y==8;},nullptr);
+        world->step(4);
+        if(failure==5)world->step(0);
+        if(failure==7){
+            const auto& bullet=world->bulletAt(0);
+            assert(bullet.destroyRequested&&!world->retireMarkedBullet({bullet.identitySlot,bullet.lifetimeId}));
+        }
+        assert(!world->effectsSucceeded()&&audit.last==failure);
+        const auto draws=world->randomDrawCount();world->step(4);
+        assert(audit.last==failure&&world->randomDrawCount()==draws);
+    }
+    for(unsigned i=0;i<10000;++i){
+        const std::uint32_t turns=i*2654435761u;
+        RunnerImageValue actual;
+        assert(ProjectilePublication::angle(turns,actual));
+        float expected=static_cast<float>(double(turns)*360.0/4294967296.0);
+        std::uint32_t bits;std::memcpy(&bits,&expected,4);assert(actual.bits==bits);
+        const MachineGunTrajectory::Coordinate position{int(i)-5000,turns&1048575u};
+        assert(ProjectilePublication::coordinate(position,176,actual));
+        expected=static_cast<float>(position.pixel+176+double(position.fraction)/1048576.0);
+        std::memcpy(&bits,&expected,4);assert(actual.bits==bits);
+    }
     for(unsigned failure=0;failure<4;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);
         ExitAudit audit{world.get(),failure,0,0,world->randomDrawCount()};
@@ -669,6 +716,49 @@ int main(){
             tape->laterGeneration<tape->retryGeneration);
         std::printf("Field reentry tape: checks=%u gameplay=%u upgrade=%u generations=%u/%u/%u\n",
             tape->checks,tape->gameSteps,tape->clearSteps,tape->firstGeneration,tape->laterGeneration,tape->retryGeneration);
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        for(unsigned i=0;i<8;++i){world->step(4);assert(world->effectsSucceeded()&&owner->prepareDraw());}
+        assert(world->bulletCount()==2);
+        const auto local=[](const auto& b){return InstanceHandle{b.identitySlot,b.lifetimeId};};
+        const auto first=local(world->bulletAt(0)),second=local(world->bulletAt(1));
+        InstanceHandle firstKey,secondKey;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,first,firstKey)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,second,secondKey));
+        for(unsigned i=0;i<2;++i){
+            const auto& bullet=world->bulletAt(i);InstanceHandle key;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,local(bullet),key));
+            const auto* state=owner->state(key);const auto* properties=owner->properties(key);
+            RunnerImageValue x,y,angle;
+            assert(ProjectilePublication::coordinate(bullet.trajectory.x,240,x)&&
+                ProjectilePublication::coordinate(bullet.trajectory.y,176,y)&&
+                ProjectilePublication::angle(bullet.trajectory.direction,angle));
+            assert(state&&properties&&state->x.bits==x.bits&&state->y.bits==y.bits&&
+                properties->sprite.imageIndex.bits==bullet.animation.index.bits&&
+                properties->sprite.spriteId==machineGunProfile(bullet.gemHigh).sprite&&properties->sprite.angle.bits==angle.bits);
+        }
+        world->configureSolidResolver([](void*,int,int y){return y==70;},nullptr);
+        world->step(4);
+        unsigned population;
+        assert(world->effectsSucceeded()&&world->resolveBulletLifetime(first)&&
+            world->resolveBulletLifetime(first)->destroyRequested&&!world->findBullet(first.generation)&&
+            owner->state(firstKey)&&(owner->state(firstKey)->flags&1u)&&
+            owner->population(261,population)&&population==1);
+        assert(owner->prepareDraw()&&!world->resolveBulletLifetime(first)&&!owner->state(firstKey));
+        world->configureSolidResolver(nullptr,nullptr);
+        for(unsigned i=9;i<=14;++i){world->step(4);assert(world->effectsSucceeded()&&owner->prepareDraw());}
+        assert(world->bulletCount()==2&&world->resolveBulletLifetime(second)==&world->bulletAt(0)&&
+            owner->state(secondKey)&&!owner->state(firstKey));
+        const auto newest=local(world->bulletAt(1));
+        assert(newest.generation>second.generation&&newest.slot==first.slot);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)==ResultsDestination::gameplay&&
+            !owner->state(secondKey)&&!world->resolveBulletLifetime(newest)&&owner->population(261,population)&&population==0);
+        world->step(4);
+        assert(world->effectsSucceeded()&&world->bulletCount()==1&&world->bulletAt(0).lifetimeId>newest.generation);
     }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     {
