@@ -2,6 +2,13 @@
 #include "AmigaPortRuntime.h"
 #include "AmigaProfile.h"
 
+bool AmigaGameplayGeneration::loadRoom(AmigaPortRuntime& runtime,
+    const downwell::RoomPack& rooms,const downwell::PackedRoom& room){
+    return runtime.loadRoomTerrain(rooms,room,[this](const downwell::PackedRoomInstance& instance){
+        return amigaAddTerrainObject(index_,instance.objectId,instance.x,instance.y,true);
+    });
+}
+
 void AmigaGameplayGeneration::bind(AmigaPortRuntime& runtime) {
     runtime_ = &runtime;
     dirtyFirst = worldRows; dirtyEnd = 0;

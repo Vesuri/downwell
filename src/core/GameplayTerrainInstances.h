@@ -1,10 +1,13 @@
 #ifndef DOWNWELL_CORE_GAMEPLAY_TERRAIN_INSTANCES_H
 #define DOWNWELL_CORE_GAMEPLAY_TERRAIN_INSTANCES_H
 #include "InstanceLifecycle.h"
+#include "RoomPack.h"
+#include <cstring>
 namespace downwell {
 // Optional identity store, separate from backend occupancy/drawing caches.
-// One record per generated wall/platform, including coincident instances.
-// Coordinates are room coordinates. No source instance ID is synthesized.
+// One record per wall/platform, including coincident instances. Room births
+// retain authored IDs; generated births do not synthesize source instance IDs.
+// Coordinates are room coordinates.
 class GameplayTerrainInstances {
 public:
     static constexpr unsigned capacity=2048;
@@ -12,6 +15,8 @@ public:
         int objectId=0,x=0,y=0;
         bool active=true;
         std::uint32_t lifetimeId=0;
+        std::uint32_t sourceInstanceId=0; // Authored ID only; zero for generated records.
+        int creationCodeId=-1;
     };
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayTerrainInstances(Binding binding={}):binding_(binding){}
@@ -25,14 +30,24 @@ public:
     InstanceHandle handle(unsigned index)const{
         return index<count_?InstanceHandle{index,records_[index].lifetimeId}:InstanceHandle{};
     }
-    bool append(int object,int x,int y,bool active){
+    bool append(int object,int x,int y,bool active,std::uint32_t sourceId=0,int creationCode=-1){
         if(!good_)return false;
         if((object!=60&&object!=93)||count_==capacity||!next_)return good_=false;
         const unsigned slot=count_++;
-        auto& r=records_[slot];r={object,x,y,active,next_++};
+        auto& r=records_[slot];r={object,x,y,active,next_++,sourceId,creationCode};
         // Expose the actual record to synchronous birth callbacks.
         if(!binding_.birth(handle(slot),r))return good_=false;
         return true;
+    }
+    bool appendRoom(const PackedRoomInstance& r){
+        // These are the supported rmMain terrain birth properties. Reject
+        // new transformed/pre-create variants rather than silently lose
+        // their source shape. The retained creation code is not executed here.
+        if(!r.instanceId||bits(r.scaleX)!=0x3f800000u||bits(r.scaleY)!=0x3f800000u||
+            (bits(r.rotation)&0x7fffffffu)||bits(r.imageSpeed)!=0x3f800000u||
+            (bits(r.imageIndex)&0x7fffffffu)||r.preCreateCodeId!=-1||r.flags)
+            return good_=false;
+        return append(r.objectId,r.x,r.y,true,r.instanceId,r.creationCodeId);
     }
     bool clear(){
         if(!good_)return false;
@@ -44,6 +59,12 @@ public:
         count_=0;return true; // Never reset the generation sequence on Retry.
     }
 private:
+    // Metadata comparison only: do not pull floating-point helpers into the
+    // freestanding 68000 backend to test known binary32 defaults.
+    static std::uint32_t bits(float value){
+        std::uint32_t result;static_assert(sizeof(value)==sizeof(result),"binary32 required");
+        std::memcpy(&result,&value,sizeof(result));return result;
+    }
     Binding binding_;
     Record records_[capacity]{};
     unsigned count_=0;

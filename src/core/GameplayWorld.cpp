@@ -84,6 +84,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return false;}
+    roomTerrainLoaded_=false;
     if (!run_.advanceAfterLevelClear()) return false;
     // Do not reconstruct this large runtime or copy RunSession onto the task
     // stack: its run globals remain in place while old world ownership retires.

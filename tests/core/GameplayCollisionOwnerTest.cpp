@@ -22,6 +22,51 @@ struct TerrainAudit {
 int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
+    PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
+    {
+        auto roomOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto roomWorld=std::make_unique<GameplayWorld>(300,true,0,false,roomOwner->enemyBinding(),
+            roomOwner->breakableBinding(),roomOwner->playerBinding(),&roomOwner->terrain());
+        assert(roomOwner->attach(*roomWorld));
+        unsigned calls=0,codes=0;
+        assert(roomWorld->loadRoomTerrain(rooms,room,[&](const PackedRoomInstance& r){++calls;codes+=r.creationCodeId!=-1;return true;}));
+        assert(calls==240&&codes==3&&roomOwner->terrain().size()==240);
+        unsigned ordinal=0;
+        for(unsigned i=0;i<room.instanceCount;++i){
+            PackedRoomInstance r;assert(rooms.roomInstance(room,i,r));
+            if(r.objectId!=60&&r.objectId!=93)continue;
+            const auto local=roomOwner->terrain().handle(ordinal++);
+            const auto* stored=roomOwner->terrain().find(local);InstanceHandle shared;
+            assert(stored&&stored->sourceInstanceId==r.instanceId&&stored->creationCodeId==r.creationCodeId&&
+                stored->x==r.x&&stored->y==r.y&&stored->objectId==r.objectId&&
+                GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
+            const auto* state=roomOwner->state(shared);std::int32_t x,y;
+            assert(state&&state->x.promoted().roundPixel(x)&&state->y.promoted().roundPixel(y)&&x==r.x&&y==r.y);
+        }
+        const auto old=roomOwner->terrain().handle(0);
+        assert(roomWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        assert(roomOwner->terrain().size()==0&&!roomOwner->terrain().find(old));
+        assert(roomWorld->loadRoomTerrain(rooms,room,[](const auto&){return true;}));
+        assert(roomOwner->terrain().size()==240&&roomOwner->terrain().handle(0).generation>old.generation);
+        assert(!roomWorld->loadRoomTerrain(rooms,room,[&](const auto&){++calls;return true;})&&calls==240);
+        assert(!roomWorld->effectsSucceeded()&&roomOwner->terrain().size()==240);
+    }
+    {
+        auto terrain=std::make_unique<GameplayTerrainInstances>();
+        auto partial=std::make_unique<GameplayWorld>(300,true,0,false,
+            GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+            GameplayWorld::PlayerLifecycleBinding{},terrain.get());
+        unsigned calls=0;
+        assert(!partial->loadRoomTerrain(rooms,room,[&](const auto&){return ++calls<3;}));
+        assert(calls==3&&terrain->size()==2&&!partial->effectsSucceeded());
+        assert(!partial->loadRoomTerrain(rooms,room,[&](const auto&){++calls;return true;})&&calls==3);
+    }
+    {
+        auto terrain=std::make_unique<GameplayTerrainInstances>();PackedRoomInstance r;
+        assert(rooms.roomInstance(room,0,r));r.scaleX=2;
+        assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
+    }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     assert(owner->valid());
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),&owner->terrain());

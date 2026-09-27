@@ -72,13 +72,7 @@ struct LiveSceneWorld {
         tiles.clear();
         collision.index = nullptr; collision.runtime = nullptr; collision.fragmentCount = 0;
         require(amigaBuildTerrainIndex(collision, index), "live scene index initializes empty");
-        for (unsigned i = 0; i < room.instanceCount; ++i) {
-            downwell::PackedRoomInstance instance;
-            require(rooms.roomInstance(room, i, instance), "live room instance decodes");
-            if (instance.objectId == 60)
-                require(amigaAddTerrainObject(index, 60, instance.x, instance.y, true),
-                        "initial room walls enter the live index");
-        }
+        require(generation.loadRoom(port,rooms,room),"ordered room terrain enters live index and optional identity owner");
         collision.index = &index;
         collision.runtime = &port;
         const int emptyBlock = 0;

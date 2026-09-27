@@ -1043,7 +1043,7 @@ the collision routine before that routine decides whether to exclude it.
 The legacy `findEnemy` gameplay eligibility behavior is unchanged.
 
 This view allocates no record copies and assigns no Windows instance IDs. Its
-slot ranges do not imply source traversal order. Room-authored terrain, fields, projectiles
+slot ranges do not imply source traversal order. Fields, projectiles
 and other effect stores still need their own lifetime registration, and typed
 resource/coordinate adapters must connect the view to the maintained spatial
 owner before normal native queries can use it. Tests exercise real records,
@@ -1062,7 +1062,7 @@ world whose player was registered during construction. Later callbacks validate
 the actual record address as well as its family and generation.
 
 The production executable does not install this owner yet. It intentionally
-exposes no gameplay query interface while room-authored terrain, fields and the remaining
+exposes no gameplay query interface while terrain property updates, fields and the remaining
 families are absent. Native birth hooks currently observe initialized actor
 state; full source PreCreate/Create interleaving and omitted resource writes
 still need migration. Tests bind real worlds and resources and cover dormant
@@ -1078,13 +1078,28 @@ state; coincident cells remain separate instances. Breakables still use their
 existing owner and are not duplicated here. Retry and level advance retire
 terrain before reusing slots, retaining the monotonic generation sequence.
 Callback/capacity failure is terminal and preserves the completed prefix.
-The store is separately allocated: normal unbound worlds gain only a pointer,
-not a terrain array. The optional collision owner includes the terrain array
+The store is separately allocated: normal unbound worlds gain a pointer and
+room-load guard, not a terrain array. The optional collision owner includes the terrain array
 and expanded spatial capacity; its eventual A500 residency must be measured.
 This is registration at the current handoff, not original PreCreate execution:
 wall Create chooses `global.wallTile`, and End Step assigns adjacency frames.
-Those resource writes, room-authored births and per-instance activation/retirement
+Those resource writes and per-instance activation/retirement
 still need their source boundaries before enabling live terrain queries.
+
+Room terrain enters through `GameplayWorld::loadRoomTerrain`, shared by native
+startup/re-entry and scene tests via `AmigaGameplayGeneration::loadRoom`.
+The room pack is serialized from `instanceCreationOrder`; filtering that stream
+preserves terrain-relative order, without claiming original cross-family order
+(the native player still exists before this terrain-only handoff). `rmMain` has
+240 authored walls, all unit scale/zero rotation/default image properties.
+Records retain the original instance ID and creation-code reference. The three
+wall instance-creation scripts (`gml_RoomCC_rmMain_1/2/3_Create.asm`, codes
+676–678) set `isPillar` to -1/+1/-1; registration does not execute those scripts.
+Generated records have no authored ID. Their local lifetime keys remain separate
+from source IDs. Unsupported room transforms/pre-create properties are rejected
+when identity tracking is installed, not silently flattened. A room-load guard
+rejects duplicate or partially failed loading; Retry/next-level reset it only
+after the previous terrain ownership is retired.
 
 The enemy binding includes the explicit mask setter: flying bat Step copies
 `sprite_index` to `mask_index` after choosing 153 (flight) or 154 (hit), as shown

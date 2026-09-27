@@ -195,6 +195,23 @@ public:
                               PlayerLifecycleBinding playerLifecycle = {},
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
+    // RoomPack serializes instanceCreationOrder, not object/position order.
+    // This terrain-only handoff does not execute the complete room lifecycle.
+    template<class Terrain>
+    bool loadRoomTerrain(const downwell::RoomPack& rooms,const downwell::PackedRoom& room,Terrain terrain){
+        if(!run_.effectsSucceeded)return false;
+        if(roomTerrainLoaded_||!rooms.valid()){run_.effectsSucceeded=false;return false;}
+        roomTerrainLoaded_=true; // A partial load cannot be retried.
+        for(unsigned i=0;i<room.instanceCount;++i){
+            downwell::PackedRoomInstance instance;
+            if(!rooms.roomInstance(room,i,instance)){run_.effectsSucceeded=false;return false;}
+            if(instance.objectId!=60&&instance.objectId!=93)continue;
+            if(!terrain(instance)||(terrainInstances_&&!terrainInstances_->appendRoom(instance))){
+                run_.effectsSucceeded=false;return false;
+            }
+        }
+        return true;
+    }
     downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
     bool playerTimeFieldInstance(downwell::RunnerImageValue x,downwell::RunnerImageValue y,
                                  downwell::InstancePlaceResult& result){
@@ -482,6 +499,7 @@ private:
     BreakableLifecycleBinding breakableLifecycle_;
     PlayerLifecycleBinding playerLifecycle_;
     downwell::GameplayTerrainInstances* terrainInstances_=nullptr;
+    bool roomTerrainLoaded_=false;
     PlayerInstance playerInstance_;
     std::uint32_t nextPlayerLifetimeId_=1;
     bool birthPlayerOwnership();

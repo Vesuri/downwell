@@ -1342,17 +1342,12 @@ int main(void) {
         terrainCollision.fragments = fragments;
         terrainCollision.fragmentCount = 0;
         terrainCollision.runtime = &port;
-        for (unsigned i = 0; i < mainRoom.instanceCount; ++i) {
-            downwell::PackedRoomInstance instance;
-            if (!rooms.roomInstance(mainRoom, i, instance) ||
-                (instance.objectId == 60 && !amigaAddTerrainObject(
-                    terrainIndex, 60, instance.x, instance.y, true))) {
-                platform.restore();
-                FreeMem(startupCopperWords, 4 * sizeof(UWORD));
-                gDownwellStartupFailure = 6;
-                downwellStartupFailed();
-                return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
-            }
+        if (!liveGeneration.loadRoom(port,rooms,mainRoom)) {
+            platform.restore();
+            FreeMem(startupCopperWords, 4 * sizeof(UWORD));
+            gDownwellStartupFailure = 6;
+            downwellStartupFailed();
+            return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
         }
         terrainCollision.index = &terrainIndex;
         port.configureLandingResolver(amigaResolveTerrainLanding,
@@ -1860,17 +1855,7 @@ int main(void) {
                         amigaBuildTerrainIndex(emptyTerrain, terrainIndex);
                         terrainTiles.clear();
                         terrainCollision.fragmentCount = 0;
-                        bool roomReady = true;
-                        for (unsigned i = 0; i < mainRoom.instanceCount; ++i) {
-                            downwell::PackedRoomInstance instance;
-                            if (!rooms.roomInstance(mainRoom, i, instance) ||
-                                (instance.objectId == 60 && !amigaAddTerrainObject(
-                                    terrainIndex, 60, instance.x, instance.y, true))) {
-                                roomReady = false;
-                                break;
-                            }
-                        }
-                        if (!roomReady) break;
+                        if (!liveGeneration.loadRoom(port,rooms,mainRoom)) break;
                         port.confirmFirstStage();
                         if (!port.initializeAreaOneBuilder(liveBuilder, -16, 704, scenes.styleCursor())) break;
                         liveGeneration.bind(port);
