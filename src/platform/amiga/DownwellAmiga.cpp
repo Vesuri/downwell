@@ -2437,6 +2437,9 @@ __attribute__((noinline)) static int runDownwell(void) {
             }
 #endif
             DW_PROFILE_PHASE(profileTitle);
+            // The runner sweeps marked instances at Draw entry. Inter-phase
+            // reconciliation deliberately keeps those identities alive.
+            if (!collisionOwner.prepareDraw()) { exitCode=20; break; }
             scrollDelta = result.scrollDelta;
             cameraXChanged = result.cameraXChanged;
 #ifdef DOWNWELL_CAMERA_VERIFY

@@ -387,7 +387,9 @@ int main(){
         (owner->state(wall)->flags&3u)==3u&&owner->terrain().find(wallLocal)==dying);
     const auto* survivor=owner->terrain().find(owner->terrain().handle(1));
     const auto survivorHandle=owner->terrain().handle(1);
-    assert(owner->terrain().retireMarked(wallLocal)&&!owner->terrain().find(wallLocal)&&!owner->state(wall));
+    assert(owner->reconcileActivation()&&owner->terrain().find(wallLocal)==dying);
+    assert(owner->prepareDraw()&&!owner->terrain().find(wallLocal)&&!owner->state(wall));
+    assert(owner->prepareDraw()); // An unchanged frame does not sweep again.
     assert(owner->terrain().size()==2&&owner->terrain().handle(0).slot==survivorHandle.slot&&
         owner->terrain().find(survivorHandle)==survivor&&owner->state(otherWall));
     assert(world->createGeneratedInstance({60,240,512},objects,terrain));

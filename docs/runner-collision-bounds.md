@@ -385,7 +385,7 @@ The Amiga executable embeds the same generated `downwell-sprites.dwsc`
 metadata as the host and constructs `GameplayCollisionOwner` before its world.
 Player, enemy, breakable and terrain births/setters/retirements publish through
 that owner, including in-place Retry. Its storage is static, not on the task
-stack; the current 68000 layout consumes 1,360,382 bytes before the 26,700-byte
+stack; the current 68000 layout consumes 1,360,392 bytes before the 26,700-byte
 sprite metadata pack. This is an expanded-memory development configuration,
 not evidence of stock-A500 memory fit.
 
@@ -401,6 +401,14 @@ mask payloads are not yet resident in the native executable, and wall End Step
 is not dispatched by its production scheduler. The registered terrain supplies
 the retained painter, with changed-wall notifications routed to sparse row
 damage. No broad collision-parity or frame-budget claim follows from this.
+
+Wall activation and destruction marks publish occupancy changes immediately,
+separately from coalesced presentation damage. The native gameplay Draw entry
+calls the owner's checked cleanup: marked terrain identities survive all phase
+reconciliation, then retire in active-room order followed by inactive-room
+order. A pending-mark flag avoids scanning unchanged rooms. An unsupported
+marked family fails rather than silently bypassing typed retirement. This
+cleanup wiring does not establish the missing source event-list dispatch order.
 
 Spatial insertion uses a bounded descent path and reverse unwind rather than
 recursive split frames. Child selection, bounds propagation and sibling order

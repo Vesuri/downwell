@@ -28,6 +28,7 @@ private:
     InstanceHandle initialPlayerKey_{};
     bool good_=false;
     bool activationPending_=false;
+    bool destructionPending_=false;
     bool terrainFamilies_[2]={false,false};
     bool check(bool ok){if(!ok)good_=false;return ok;}
     bool terrainQuery(int object)const{
@@ -114,7 +115,8 @@ private:
         bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h))return false;
             const auto* state=parent.owner_.resolve(h);
-            return state&&parent.check(parent.owner_.setExclusions(h,(state->flags&0x100003u)|1u));}
+            if(!state||!parent.check(parent.owner_.setExclusions(h,(state->flags&0x100003u)|1u)))return false;
+            parent.destructionPending_=true;return true;}
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.registerObject(h,member));}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
@@ -244,7 +246,8 @@ public:
     // must dispatch to the corresponding typed store before this call returns.
     template<class Retire> bool cleanupDestroyed(Retire retire){
         if(!valid()||!world_)return check(false);
-        return check(room_.visitCleanupChecked([&](unsigned slot){
+        if(!destructionPending_)return true;
+        const bool cleaned=room_.visitCleanupChecked([&](unsigned slot){
             const auto h=roomKeys_[slot];const auto* state=owner_.resolve(h);
             View::Record record;
             if(!state||!View(*world_).resolve(h,record))return false;
@@ -252,7 +255,19 @@ public:
             if(!retire(h,record)||!valid()||owner_.resolve(h))return false;
             View::Record remaining;
             return !View(*world_).resolve(h,remaining);
-        }));
+        });
+        if(!check(cleaned))return false;
+        destructionPending_=false;return true;
+    }
+    // Invoke at Draw entry, not at an inter-Step reconciliation boundary.
+    // Terrain is the currently registered deferred-destruction family. Reject
+    // any other marked family until its typed retirement is integrated.
+    bool prepareDraw(){
+        return cleanupDestroyed([&](InstanceHandle shared,const View::Record& record){
+            View::Kind kind;InstanceHandle local;
+            return View::decode(shared,kind,local)&&kind==View::Kind::terrain&&
+                record.terrain==terrain_.find(local)&&terrain_.retireMarked(local);
+        });
     }
 };
 }
