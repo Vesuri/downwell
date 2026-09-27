@@ -9,6 +9,7 @@
 #include "core/MainRoomLifetime.h"
 #include "core/CurrencyReward.h"
 #include "core/StandardBulletStep.h"
+#include "core/GameplayCollisionView.h"
 
 #include <cstdlib>
 #include <cmath>
@@ -468,7 +469,52 @@ void testNativePlayerLifecycle(){
     }
 }
 
+void testGameplayCollisionView(){
+    using View=downwell::GameplayCollisionView;using Key=downwell::InstanceHandle;
+    for(unsigned slot=0;slot<View::capacity;++slot){
+        View::Kind kind;Key local,encoded;
+        require(View::decode({slot,42},kind,local)&&View::encode(kind,local,encoded)&&
+            encoded.slot==slot&&encoded.generation==42,"native collision namespace round trip");
+    }
+    Key invalid{77,88};View::Kind kind=View::Kind::enemy;
+    require(!View::encode(View::Kind::player,{1,1},invalid)&&invalid.slot==77&&
+        !View::encode(View::Kind::enemy,{0,0},invalid)&&
+        !View::decode({View::capacity,1},kind,invalid)&&kind==View::Kind::enemy,
+        "invalid native collision keys leave outputs untouched");
+    NativeBoxAudit boxes;
+    GameplayWorld world(300,true,0,false,{},GameplayWorld::BreakableLifecycleBinding::bind(boxes));
+    world.configureSolidResolver(noSolid,nullptr);
+    int x=80,y=40;world.configureBreakables(&x,&y,1);
+    require(world.configureEnemy(0,111,163,100,-2000,0,0,5,6)&&
+        world.configureEnemy(1,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false),
+        "native mixed-family collision view fixture");
+    View view(world);Key player,box,enemy;
+    const auto survivor=world.enemyHandle(world.enemyAt(1).lifetimeId);
+    require(View::encode(View::Kind::player,world.playerHandle(),player)&&
+        View::encode(View::Kind::breakable,boxes.last,box)&&View::encode(View::Kind::enemy,survivor,enemy)&&
+        player.slot!=box.slot&&player.slot!=enemy.slot&&box.slot!=enemy.slot,
+        "family-local identities never alias in the shared collision namespace");
+    View::Record record;
+    require(view.resolve(player,record)&&record.player==world.findPlayer(world.playerHandle())&&!record.enemy&&
+        view.resolve(box,record)&&record.breakable==world.findBreakable(boxes.last)&&!record.player&&
+        view.resolve(enemy,record)&&record.enemy==&world.enemyAt(1),"view resolves original records without copying");
+    auto& inactive=const_cast<GameplayWorld::EnemyState&>(world.enemyAt(1));
+    inactive.active=false;inactive.activationPending=false;
+    require(!world.findEnemy(survivor)&&view.resolve(enemy,record)&&record.enemy==&inactive,
+        "collision lifetime resolution does not prematurely apply activation guards");
+    inactive.active=true;
+    world.step(0);
+    require(world.effectsSucceeded()&&world.enemyCount()==1&&view.resolve(enemy,record)&&record.enemy==&world.enemyAt(0),
+        "collision key follows survivor through enemy compaction");
+    require(world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300)!=downwell::ResultsDestination::none&&
+        !view.resolve(player,record)&&!view.resolve(box,record)&&!view.resolve(enemy,record),
+        "retry retires all typed collision lifetimes before slot reuse");
+    Key reborn;require(View::encode(View::Kind::player,world.playerHandle(),reborn)&&reborn.slot==player.slot&&
+        reborn.generation!=player.generation&&view.resolve(reborn,record),"new player cannot revive stale collision key");
+}
+
 int main() {
+    testGameplayCollisionView();
     testNativePlayerLifecycle();
     testNativeBoxLifecycle();
     testNativeEnemyLifecycle();

@@ -68,6 +68,7 @@ public:
     static constexpr unsigned destroyedCapacity = gameplayWorldDestroyedCapacity;
     static constexpr unsigned enemyCapacity = gameplayWorldEnemyCapacity;
     static constexpr unsigned gemCapacity = gameplayWorldGemCapacity;
+    static constexpr unsigned breakableCapacity = 512;
     typedef bool (*SolidResolver)(void* context, int x, int y);
     typedef bool (*SegmentResolver)(void* context, const downwell::ProjectileSegment& path);
     using WallContactResolver = bool (*)(void*,const downwell::ContactBounds&,unsigned&);
@@ -334,6 +335,14 @@ public:
         const auto* enemy=findEnemy(handle.generation);
         return enemy&&enemy->identitySlot==handle.slot?enemy:nullptr;
     }
+    // Lifetime resolution must not discard inactive records before collision
+    // dispatch applies its own source-specific exclusion checks.
+    const EnemyState* resolveEnemyLifetime(downwell::InstanceHandle handle) const {
+        if(handle.slot>=enemyCapacity||!handle.generation||!enemyIdentitySlots_[handle.slot])return nullptr;
+        for(unsigned i=0;i<enemyCount_;++i)
+            if(enemies_[i].identitySlot==handle.slot&&enemies_[i].lifetimeId==handle.generation)return &enemies_[i];
+        return nullptr;
+    }
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const downwell::CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
     const downwell::PlayerDamageNumbers<8>& damageNumbers()const{return run_.damageNumbers;}
@@ -487,7 +496,6 @@ private:
     GenerationStep generationStep_ = nullptr;
     void* generationContext_ = nullptr;
     bool generationSucceeded_ = true;
-    static constexpr unsigned breakableCapacity = 512;
 
     PlayerMotion player_;
     unsigned tick_;

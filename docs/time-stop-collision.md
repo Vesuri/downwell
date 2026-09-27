@@ -1034,6 +1034,22 @@ slot ownership without rewinding the lifetime counter. These handles remain
 world- and family-local; they neither establish original traversal order nor
 replace registration and synchronous retirement in the shared collision owner.
 
+`GameplayCollisionView` maps player, enemy and breakable local keys into
+disjoint collision slots (1 + 64 + 512). It borrows the actual `GameplayWorld`
+and resolves records on every call, so compaction cannot leave cached pointers.
+Generation validation still belongs to each store. `resolveEnemyLifetime`
+does not apply active/pending filters; an inactive retained lifetime must reach
+the collision routine before that routine decides whether to exclude it.
+The legacy `findEnemy` gameplay eligibility behavior is unchanged.
+
+This view allocates no record copies and assigns no Windows instance IDs. Its
+slot ranges do not imply source traversal order. Terrain, fields, projectiles
+and other effect stores still need their own lifetime registration, and typed
+resource/coordinate adapters must connect the view to the maintained spatial
+owner before normal native queries can use it. Tests exercise real records,
+inactive retained enemies, compaction, Retry and generation reuse, rather than
+only round-tripping key arithmetic.
+
 The shared immediate bullet/stomp response adapters provide a checked retirement
 callback after rewards and before clearing the active flag or publishing defeat
 and bounce effects. Failure retains earlier damage/reward mutations and stops
