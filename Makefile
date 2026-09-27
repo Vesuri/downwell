@@ -496,6 +496,11 @@ build/effect-spawn-script-test: tests/core/EffectSpawnScriptTest.cpp $(wildcard 
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 .PHONY: verify-machine-gun-source-motion verify-bullet-solid-script verify-machine-gun-source-step
+test: verify-runner-sprite-vertices
+.PHONY: verify-runner-sprite-vertices
+verify-runner-sprite-vertices:
+	python3 tools/verify-runner-sprite-vertices.py
+	python3 tests/impact-angle-art-test.py
 test: verify-bullet-solid-script verify-machine-gun-source-step
 verify-machine-gun-source-step: build/machine-gun-source-step-test
 	python3 tools/verify-machine-gun.py

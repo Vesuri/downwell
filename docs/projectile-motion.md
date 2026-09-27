@@ -221,6 +221,34 @@ anchors still need a verified raster policy. Shootable-hit resource 605 is
 asymmetric and uses the raw bullet angle, so it must not reuse the muzzle's
 quarter-turn proof; its offline angle-dependent rendering remains unimplemented.
 
+### Original CPU vertex path and fractional anchors
+
+`verify-runner-sprite-vertices` pins a static review of the Steam runner's
+ordinary bitmap path. `draw_self` is registered at `0x537e6a`, calling wrapper
+`0x531350`: instance X/Y at `+0xb0/+0xb4` are loaded with `movss`, forwarded to
+`0x4af6f0`, then to the bitmap renderer. The default no-Draw-event path at
+`0x490f65` calls `0x4afb40`, which likewise loads those float fields. Its
+ordinary bitmap branch and the explicit Draw branch pass float X/Y unchanged
+to texture/atlas builders `0x45c3f0` and `0x45c780`.
+
+Both builders form local bounds from origin, trim and scale, then add float
+X/Y directly to the vertex buffer. At near-zero rotation, atlas instructions
+`0x45c8ff..0x45c931` perform those `addss`/`movss` operations without an integer
+coordinate conversion. The rotated branch uses float radians (degrees times
+float pi, divided by float 180), promoted CRT trigonometry and narrowed float
+products/sums before vertex stores. The near-zero branch threshold is float
+0.001 radians. Integer conversions elsewhere in these routines handle frame
+indices, texture metadata or alpha, not an anchor-snapping policy.
+
+This rules out assuming that the CPU renderer first rounds every sprite anchor.
+It does **not** prove final Windows pixels: projection/view transforms, shader
+offsets, GPU sample centres, edge/tie rules and filtering still need verification.
+`tests/impact-angle-art-test.py` also exhibits angle and fractional-anchor
+counterexamples for resource 605 under the existing offline nearest-pixel
+model. That is a rejection test for generalizing the muzzle shortcut, not an
+original-runner capture or a replacement raster oracle. Keep fractional
+positions intact until a verified raster policy selects offline variants.
+
 `NonLoopSpriteAnimation` supplies the common sprite-change and Animation End
 state machine, also used by the live corpse-expiry child. Its admitted advance
 path requires verified nonempty unit-key sprite metadata. After the muzzle
