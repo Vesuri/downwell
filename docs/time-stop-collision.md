@@ -734,6 +734,14 @@ routes fatal bullet/stomp responses and snail expiry to its checked activation
 binding with `false` before clearing the record's active flag. This removes
 collision visibility while retaining the stored lifetime until ordinary erasure;
 it does not set `activationPending` as a dormant deactivation request would.
+The host's projectile and player-box contact paths also publish this checked
+inactivation before clearing object 92's active flag. A rejected publication
+leaves the box active, does not increment the destroyed-block or sound counters,
+and stops subsequent simulation. This closes stale collision visibility at the
+existing removal boundary; it does not implement the original box's delayed
+`wallHp <= 0` Step, synchronous smoke/flash/debris creation, or chain reactions
+(`gml_Object_objBox_n_Step_0.asm`). Native breakable ownership still needs the
+corresponding registration and lifetime hooks before using the spatial owner.
 The native compact enemy store uses the same borrowed binding specialized for
 its own record type. It publishes fully initialized births, checked replacement
 and out-of-view retirement, frontier activation, fatal-contact/snail inactivation,

@@ -671,13 +671,13 @@ bool StartupRuntime::publishMainEnemyImage(std::size_t index,unsigned phase) {
     run_.effectsSucceeded=false;return false;
 }
 
-bool StartupRuntime::publishMainEnemyInactivation(const InstanceRecord& enemy) {
+bool StartupRuntime::publishMainInactivation(const InstanceRecord& record) {
     // Keep the stored lifetime until its normal erase boundary, but remove
     // collision visibility before the response clears active. Do not use a
     // dormant activation request: dead actors must not become activationPending.
     for (std::size_t i=0;i<instances_.size();++i) {
-        if (&instances_.at(i)!=&enemy) continue;
-        if (lifecycle_.activation(instances_.handleAt(i),enemy,false)) return true;
+        if (&instances_.at(i)!=&record) continue;
+        if (lifecycle_.activation(instances_.handleAt(i),record,false)) return true;
         break;
     }
     run_.effectsSucceeded=false;
@@ -701,7 +701,7 @@ void StartupRuntime::updateMainBullets() {
                                           enemy->reward);
                         return run_.effectsSucceeded;
                     }, bullet.gemHigh, bullet.trajectory.direction,
-                    [this](const InstanceRecord& record){return publishMainEnemyInactivation(record);});
+                    [this](const InstanceRecord& record){return publishMainInactivation(record);});
                 if (impact.kind == BulletImpactKind::ignored) return false;
                 if (impact.kind == BulletImpactKind::failed) return true;
                 ++soundPlayRequests_;
@@ -714,6 +714,7 @@ void StartupRuntime::updateMainBullets() {
                 if (wall->objectId == 92) {
                     // objBox_n starts with wallHp = 1. The usual gun's bdmg
                     // exhausts it on contact; its Step event destroys it.
+                    if (!publishMainInactivation(*wall)) return true;
                     wall->active = false;
                     ++mainBlocksDestroyed_;
                     ++soundPlayRequests_;
@@ -949,7 +950,7 @@ void StartupRuntime::updateMainEnemies() {
             const bool alive = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); },false,
                 [this,index](RunnerTransformField field,int value){return publishMainEnemyTransform(index,field,value);});
             if(!run_.effectsSucceeded)return;
-            if (!alive && !publishMainEnemyInactivation(enemy)) return;
+            if (!alive && !publishMainInactivation(enemy)) return;
             enemy.active = alive;
             if (!alive) continue;
             if (enemy.active) {
@@ -1032,7 +1033,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
         [this](int x,int y) {
             return run_.contactDamageNumber(mainPlayerMotion_.frameStartXFixed(),
                 mainPlayerMotion_.frameStartYFixed(),x,y,mainPlayerOriginX_,mainPlayerOriginY_);
-        },[this](const InstanceRecord& enemy){return publishMainEnemyInactivation(enemy);}))return;
+        },[this](const InstanceRecord& enemy){return publishMainInactivation(enemy);}))return;
 }
 
 void StartupRuntime::updateMainLifecycle() {
@@ -1197,6 +1198,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
             bool hit=false;
             if(!PlayerBoxContact::testPrepared(bounds,box.x,box.y,hit))return false;
             if (hit) {
+                if (!runtime.publishMainInactivation(box)) return false;
                 box.active = false;
                 ++runtime.mainBlocksDestroyed_;
                 ++runtime.soundPlayRequests_;

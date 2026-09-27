@@ -32,6 +32,8 @@ struct LifecycleAudit {
     unsigned walkingTransforms=0;
     unsigned frogTransforms=0;
     unsigned batTransforms=0;
+    unsigned boxRemovals=0;
+    bool rejectBoxRemoval=false;
     bool rejectBatScale=false;
     bool rejectBatMask=false;
     unsigned masks=0;
@@ -97,6 +99,10 @@ struct LifecycleAudit {
     }
     bool activation(downwell::InstanceHandle h,const downwell::InstanceRecord& r,bool active){
         ++calls;require(matches(h,r)&&active!=r.active,"activation publication sees the old live flag");
+        if(!active&&r.objectId==92){
+            ++boxRemovals;
+            if(rejectBoxRemoval)return false;
+        }
         if(fail==(active?3u:5u))return false;
         if(active)++activations;else {
             require(!r.activationPending,"dead actor removal must not queue dormant reactivation");
@@ -143,6 +149,22 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
+    for(bool reject:{false,true}){
+        LifecycleAudit boxes;boxes.rejectBoxRemoval=reject;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bind(boxes));
+        runtime->skipToGameForTesting();
+        for(unsigned tick=0;tick<1800&&healthy(*runtime);++tick)
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+        require(boxes.boxRemovals>0,"natural contact tape reaches checked box removal");
+        require(healthy(*runtime)!=reject,"box publication rejection is terminal");
+        if(reject){
+            require(runtime->mainBlocksDestroyed()==0,"rejected first box removal does not count a destroyed block");
+            const auto calls=boxes.calls;const auto tick=runtime->tick();
+            runtime->step(false);
+            require(boxes.calls==calls&&runtime->tick()==tick,"box failure remains latched");
+        }
+    }
     for(unsigned reject:{0u,1u,2u}){
         LifecycleAudit checked;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

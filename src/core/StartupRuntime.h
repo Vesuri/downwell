@@ -337,7 +337,7 @@ private:
     bool mainSolidAt(float x, float y) const;
     void emitMainBullet(const InstanceRecord& instance);
     void updateMainBullets();
-    bool publishMainEnemyInactivation(const InstanceRecord& enemy);
+    bool publishMainInactivation(const InstanceRecord& record);
     bool publishMainEnemyImage(std::size_t index,unsigned phase);
     bool publishMainEnemyTransform(std::size_t index,RunnerTransformField field,int value);
     void spawnMainCurrency(float x, float y, std::int32_t amount,
