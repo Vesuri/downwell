@@ -379,6 +379,18 @@ reuse, old-phase exclusion, and terminal image/mark/retirement failures. These
 APIs do not themselves install native or stored-world collision records; that
 mapping and the world's phase traversal remain live-integration requirements.
 
+`GameplayDebrisInstances` supplies the borrowed-record adapter for that mapping.
+It is non-copyable, retains marked records until cleanup, publishes each
+coordinate candidate through `RecordLifecycleBinding::publishedPosition`, and
+publishes animation and destruction through the corresponding binding hooks.
+Birth's binding must publish the completed Create state (position, sprite and
+image index); this adapter does not claim pre-Create registration. Selected
+animation/cleanup dispatch verifies both registry-record identity and the
+effect owner's retained address, not just coincident local IDs. Teardown can
+release records after failure, but a failed registry cannot admit new work.
+The adapter tests cover fractional movement and failure cleanup; neither live
+world's collision-key mapping or global scheduler installs it yet.
+
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed
 publication/query handling and repeated slot reuse. This local owner is not
