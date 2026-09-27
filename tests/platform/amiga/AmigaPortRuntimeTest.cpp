@@ -72,6 +72,7 @@ struct NativeEnemyLifecycleAudit {
     using Enemy=GameplayWorld::EnemyState;
     struct Entry { unsigned generation=0;bool live=false,active=false; } entries[GameplayWorld::enemyCapacity]{};
     unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,indices=0,zeroIndices=0,transforms=0,calls=0,fail=0;
+    bool checkWalkingOrder=false;
     bool transform(downwell::InstanceHandle h,const Enemy& e,downwell::RunnerTransformField field,
                    downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
         ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active&&
@@ -79,6 +80,9 @@ struct NativeEnemyLifecycleAudit {
                         "native transform resolves current opaque-white actor");
         if(e.objectId==119)require(moves>0&&lastX==e.x+240&&lastY==e.y+176&&e.alarm0==2,
                 "crawler angle follows Step position publication, not Alarm 0");
+        if(checkWalkingOrder)require(sprites==1&&moves==0&&field==downwell::RunnerTransformField::scaleX&&
+                e.spriteId==(e.objectId==111?164:187)&&e.walker.x==40*1280&&e.walker.y==0,
+                "walker scale follows its sprite setter but precedes motion integration");
         if(fail==8||(fail==9&&field==downwell::RunnerTransformField::scaleY))return false;
         ++transforms;return true;
     }
@@ -100,7 +104,7 @@ struct NativeEnemyLifecycleAudit {
         ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active,
                         "native position assignment resolves live identity");
         if(fail==5)return false;
-        std::int32_t px,py;
+        std::int32_t px=0,py=0;
         require(x.promoted().roundPixel(px)&&y.promoted().roundPixel(py),"native position uses runner world coordinates");
         lastX=px;lastY=py;++moves;return true;
     }
@@ -168,6 +172,20 @@ void testNativeEnemyLifecycle(){
             const auto calls=checked.calls,tick=snail.tick();snail.step(0);
             require(checked.calls==calls&&snail.tick()==tick,"transform rejection remains terminal");
         }else require(checked.transforms==2,"snail publishes attachment and vertical orientation");
+    }
+    for(int object:{111,112})for(unsigned fail:{0u,6u,8u}){
+        NativeEnemyLifecycleAudit checked;checked.fail=fail;checked.checkWalkingOrder=true;
+        GameplayWorld walking(300,true,0,false,Binding::bindTransforms(checked));
+        walking.configureSolidResolver(noSolid,nullptr);
+        require(walking.configureEnemy(0,object,object==111?163:186,40,0,128,0,5,6,0,1),
+                "configure walker presentation ordering fixture");
+        walking.step(0);
+        require(walking.effectsSucceeded()==(fail==0)&&checked.sprites==(fail==6?0u:1u)&&
+                checked.transforms==(fail?0u:1u)&&checked.moves==(fail?0u:1u),
+                "walker callbacks run once in sprite-scale-position order and stop on rejection");
+        if(fail)require(walking.enemyAt(0).walker.x==40*1280&&walking.enemyAt(0).walker.y==0&&
+                       walking.enemyAt(0).walker.vy==256,
+                "failed walker presentation retains earlier gravity without integrating motion");
     }
     {
         NativeEnemyLifecycleAudit checked;checked.fail=8;

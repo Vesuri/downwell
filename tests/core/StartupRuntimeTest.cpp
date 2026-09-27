@@ -4,6 +4,7 @@
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
 #include "core/GameplayContactProfileInput.h"
+#include "core/EnemyPresentation.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -28,10 +29,17 @@ struct LifecycleAudit {
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
     unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,indices=0,transforms=0,calls=0,fail=0;
-    bool transform(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerTransformField,
+    unsigned walkingTransforms=0;
+    bool transform(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerTransformField field,
                    downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
         ++calls;require(matches(h,r)&&r.active&&value.promoted().valid()&&alpha.bits==0x3f800000u&&blend==0xffffffu,
                         "host transform resolves current opaque-white actor");
+        if(r.objectId==111||r.objectId==112){
+            require(field==downwell::RunnerTransformField::scaleX&&r.spriteId==downwell::enemyPresentationSprite(
+                        r.objectId,r.walker.grounded,r.auxiliaryState)&&r.x==r.walker.publishedX&&r.y==r.walker.publishedY,
+                    "host walker scale sees selected sprite before final position publication");
+            ++walkingTransforms;
+        }
         if(fail==9)return false;
         ++transforms;return true;
     }
@@ -115,6 +123,34 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
+    for(int object:{111,112})for(int velocity:{0,640}){
+        LifecycleAudit walking;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindTransforms(walking));
+        runtime->skipToGameForTesting();
+        std::uint32_t id=0;
+        for(unsigned tick=0;tick<600&&!id;++tick){
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                auto& r=const_cast<downwell::InstanceRecord&>(runtime->instanceAt(i));
+                if(!r.active||r.health<=0||
+                   (r.objectId!=111&&r.objectId!=112&&r.objectId!=113&&r.objectId!=116&&r.objectId!=117&&r.objectId!=119))continue;
+                // Controlled adapter fixture, not a naturally generated walker.
+                r.objectId=object;r.health=5;r.auxiliaryState=1;r.scaleX=-1;
+                r.alarms={};r.motionInitialized=true;
+                r.preciseX=r.x;r.preciseY=r.y;r.velocityX=velocity/1280.0f;r.velocityY=0;
+                r.walker.initialize(r.x,r.y,velocity,0,false);r.walker.facing=-1;
+                id=r.instanceId;break;
+            }
+        }
+        require(id!=0,"host walker fixture has a published enemy lifetime");
+        const auto before=walking.walkingTransforms;
+        runtime->step(false);
+        require(healthy(*runtime)&&walking.walkingTransforms==before+(velocity!=0?1u:0u),
+                "host walker publishes nonzero facing once and skips the zero-speed setter");
+        require(velocity!=0||runtime->instance(id)->scaleX==-1,
+                "host zero-speed walker preserves its existing mirrored artwork");
+    }
     {
         LifecycleAudit changed;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

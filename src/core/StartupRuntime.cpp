@@ -824,26 +824,38 @@ void StartupRuntime::updateMainEnemies() {
         if (enemy.objectId == 113)
             enemy.imageSpeed = enemy.frogPresentation.beginStepRate() / 20.0F;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
-            if (!enemy.walker.initialized)
+            if (!enemy.walker.initialized) {
                 enemy.walker.initialize(enemy.x, enemy.y,
                     static_cast<long>(std::round(enemy.velocityX * 1280)),
                     static_cast<long>(std::round(enemy.velocityY * 1280)), enemy.grounded);
+                enemy.walker.facing=enemy.scaleX<0?-1:1;
+            }
             const bool turtle = enemy.objectId == 112;
             const bool visible = CrawlerMotion::inView(enemy.x, enemy.y,
                 mainCameraMotion_.viewLeftQ12(), mainCameraMotion_.viewTopQ12(),
                 mainCameraMotion_.viewRightQ12(), mainCameraMotion_.viewBottomQ12(),
                 turtle ? 64 : 32);
-            enemy.walker.step(turtle, groundTurtleWalking(enemy.auxiliaryState), visible,
+            if(!enemy.walker.step(turtle, groundTurtleWalking(enemy.auxiliaryState), visible,
                 [this, &enemy, turtle](long x, long y) {
                     return enemy.walker.meetsTiles(x, y, turtle,
                         [this](int px, int py) { return mainSolidAt(px, py); });
-                });
+                },[this,index,&enemy](int sprite,int scale){
+                    enemy.grounded=enemy.walker.grounded;
+                    if(!lifecycle_.sprite(instances_.handleAt(index),enemy,sprite)){
+                        run_.effectsSucceeded=false;return false;
+                    }
+                    enemy.spriteId=sprite;
+                    if(scale){
+                        if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
+                        enemy.scaleX=static_cast<float>(scale);
+                    }
+                    return true;
+                }))return;
             enemy.preciseX = enemy.walker.x / 1280.0F;
             enemy.preciseY = enemy.walker.y / 1280.0F;
             enemy.velocityX = enemy.walker.vx / 1280.0F;
             enemy.velocityY = enemy.walker.vy / 1280.0F;
             enemy.grounded = enemy.walker.grounded;
-            enemy.scaleX = static_cast<float>(enemy.walker.facing);
         } else if (enemy.objectId == 113) {
             const bool integrate = frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
                 static_cast<long>(std::round(mainCameraViewX() * 256.0F)),
@@ -967,7 +979,8 @@ void StartupRuntime::updateMainEnemies() {
              enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
             enemy.frogPresentation, enemy.batActivity, enemy.batHit,
             enemy.enemyImagePhase, enemy.enemyImageRemainder);
-        if(!lifecycle_.sprite(instances_.handleAt(index),enemy,nextSprite)) {
+        if(enemy.objectId!=111 && enemy.objectId!=112 &&
+           !lifecycle_.sprite(instances_.handleAt(index),enemy,nextSprite)) {
             run_.effectsSucceeded=false;return;
         }
         enemy.spriteId=nextSprite;

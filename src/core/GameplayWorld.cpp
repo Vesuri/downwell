@@ -842,12 +842,23 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
                 cx - 80L * 4096, cy - 142L * 4096, cx + 80L * 4096, cy + 142L * 4096,
                 turtle ? 64 : 32);
-            enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
+            if(!enemy.walker.step(turtle, downwell::groundTurtleWalking(enemy.auxiliaryState), visible,
                 [this, &enemy, turtle](long x, long y) {
                     return enemy.walker.meetsTiles(x, y, turtle, [this](int px, int py) {
                         return solidResolver_(solidResolverContext_, px, py);
                     });
-                });
+                },[this,&enemy](int sprite,int scale){
+                    enemy.grounded=enemy.walker.grounded;
+                    if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,sprite)){
+                        run_.effectsSucceeded=false;return false;
+                    }
+                    enemy.spriteId=sprite;
+                    if(scale){
+                        if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+                        enemy.facing=scale;
+                    }
+                    return true;
+                }))return {};
             enemy.preciseX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.x, 5);
             enemy.preciseY = downwell::FrogVerticalMotion::floorDivide(enemy.walker.y, 5);
             enemy.speedX = downwell::FrogVerticalMotion::floorDivide(enemy.walker.vx, 5);
@@ -962,7 +973,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
              enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
             enemy.frogPresentation, enemy.batActivity, enemy.batHit,
             enemy.imagePhase, enemy.imageRemainder);
-        if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,nextSprite)) {
+        if(enemy.objectId!=111 && enemy.objectId!=112 &&
+           !enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,nextSprite)) {
             run_.effectsSucceeded=false;return {};
         }
         enemy.spriteId=nextSprite;

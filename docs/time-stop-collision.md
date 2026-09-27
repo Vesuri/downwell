@@ -799,6 +799,16 @@ scale setters, mask mutations, precise source scheduling and installation of the
 full live collision registry remain necessary; these callbacks alone do not
 establish original collision selection.
 
+Snake and ground-turtle movement expose a checked presentation boundary after
+collision/gravity resolution and before visibility-gated integration. At this
+boundary both adapters publish the source sprite selection, then `image_xscale`
+only when `xsp` is nonzero. These setters run even when movement is offscreen;
+a zero velocity retains the previous scale. Rejection preserves earlier
+collision/gravity changes but stops integration and final position publication.
+The final shared animation normalization remains the existing approximation;
+the adapters do not issue a second sprite setter at that point. Frog and bat
+scale/mask assignments still require their own source-ordered integration.
+
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty
 owners, just as it does for damage numbers and corpse-expiry effects. A restore

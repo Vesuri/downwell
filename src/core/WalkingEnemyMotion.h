@@ -3,6 +3,9 @@
 #include "SolidCollision.h"
 #include "EnemyContact.h"
 namespace downwell {
+struct NoWalkingPresentation {
+    bool operator()(int,int)const{return true;}
+};
 // Shared dry-world enmSnake/enmGroundTurtle Step movement, in fifths of Q8.
 struct WalkingEnemyMotion {
     long x = 0, y = 0, vx = 0, vy = 0;
@@ -22,8 +25,8 @@ struct WalkingEnemyMotion {
         return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
                solid(b.left, b.bottom - 1) || solid(b.right - 1, b.bottom - 1);
     }
-    template<class Meeting>
-    void step(bool turtle, bool walking, bool visible, Meeting meeting) {
+    template<class Meeting,class Presentation=NoWalkingPresentation>
+    bool step(bool turtle, bool walking, bool visible, Meeting meeting,Presentation presentation={}) {
         vy += 256;
         if (vy >= 7 * 1280L) vy = 7 * 1280L;
         // Source clears active whenever grounded, then checks !active && grounded.
@@ -44,13 +47,19 @@ struct WalkingEnemyMotion {
                 }
             }
         } else grounded = meeting(x, y + 1280);
-        if (vx != 0) facing = vx < 0 ? -1 : 1;
+        // VM Step selects sprite, then writes scale only for nonzero xsp,
+        // before the visibility-gated xx/yy integration and x/y setters.
+        const int sprite=turtle ? (!grounded ? 187 : walking ? 188 : 186) : grounded ? 163 : 164;
+        const int scale=(vx>0)-(vx<0);
+        if(!presentation(sprite,scale))return false;
+        if (scale != 0) facing = scale;
         if (visible) {
             if (!turtle || walking) x += vx;
             y += vy;
             publishedX = static_cast<int>(FixedCollisionMath::round(x) / 1280);
             publishedY = static_cast<int>(FixedCollisionMath::round(y) / 1280);
         }
+        return true;
     }
 };
 }

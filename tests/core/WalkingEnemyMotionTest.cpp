@@ -7,6 +7,26 @@ static void require(bool ok, const char* message) {
 int main() {
     using downwell::WalkingEnemyMotion;
     const auto empty = [](long, long) { return false; };
+    for(bool turtle:{false,true})for(bool visible:{false,true})for(bool accept:{false,true}){
+        WalkingEnemyMotion checked;checked.initialize(10,20,-640,0,false);
+        unsigned calls=0;
+        const bool ok=checked.step(turtle,true,visible,empty,[&](int sprite,int scale){
+            ++calls;
+            require(sprite==(turtle?187:164)&&scale==-1&&checked.x==10*1280&&checked.y==20*1280&&
+                    checked.vy==256&&checked.publishedX==10&&checked.publishedY==20,
+                    "walking sprite and scale follow collision/gravity but precede integration and publication");
+            return accept;
+        });
+        require(ok==accept&&calls==1&&checked.x==10*1280-(accept&&visible?640:0)&&
+                checked.y==20*1280+(accept&&visible?256:0),
+                "rejected presentation stops at its boundary and offscreen presentation still runs");
+    }
+    {
+        WalkingEnemyMotion still;still.initialize(0,0,0,0,true);still.facing=-1;
+        require(still.step(true,false,true,[](long,long y){return y>=1280;},[](int sprite,int scale){
+            return sprite==186&&scale==0;
+        })&&still.facing==-1,"grounded idle turtle with zero xsp retains scale without a setter");
+    }
     WalkingEnemyMotion falling;
     falling.initialize(0, 0, 0, 0, false);
     for (long n = 1; n <= 30; ++n) {
