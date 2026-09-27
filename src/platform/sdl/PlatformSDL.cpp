@@ -39,6 +39,14 @@ PlatformSDL::PlatformSDL() {
         std::fprintf(stderr, "SDL_CreateRenderer: %s\n", SDL_GetError());
         return;
     }
+    const char* profile = std::getenv("DOWNWELL_PROFILE");
+    if (profile && std::string(profile) == "1") {
+        SDL_RendererInfo info{};
+        if (SDL_GetRendererInfo(renderer_, &info) == 0)
+            std::fprintf(stderr, "SDL profile: renderer=%s accelerated=%d vsync=%d\n",
+                info.name, !!(info.flags & SDL_RENDERER_ACCELERATED),
+                !!(info.flags & SDL_RENDERER_PRESENTVSYNC));
+    }
 
     SDL_RenderSetLogicalSize(renderer_, Game::logicalWidth, Game::logicalHeight);
     // The runner rasterizes the application surface before display scaling.

@@ -12,6 +12,8 @@
 #include <vector>
 #include <memory>
 #include <new>
+#include <cstdlib>
+#include <algorithm>
 
 int main() {
     downwell::PlatformSDL platform;
@@ -78,13 +80,40 @@ int main() {
     downwell::Game game(&roomPack,&objectPack,&builderPatternPack,&effectAssets,collisionOwner->binding(),true);
     if(!collisionOwner->attach(game.startup()))return 20;
     game.applyStartupShortcut();
+    const char* profileOption = std::getenv("DOWNWELL_PROFILE");
+    const bool profile = profileOption && std::string(profileOption) == "1";
+    const double counterMilliseconds = 1000.0 / SDL_GetPerformanceFrequency();
+    unsigned profileFrames = 0;
+    double updateMs = 0, drawMs = 0, presentMs = 0, pacingMs = 0, peakWorkMs = 0;
     while (!game.finished()) {
-        game.update(platform.pollInput(), static_cast<std::uint32_t>(SDL_GetPerformanceCounter()));
+        const auto input = platform.pollInput();
+        const auto begin = SDL_GetPerformanceCounter();
+        game.update(input, static_cast<std::uint32_t>(begin));
         if (!game.simulationSucceeded()) return 20;
+        const auto updated = profile ? SDL_GetPerformanceCounter() : 0;
         game.render(platform);
         if (!game.renderingSucceeded()) return 20;
+        const auto drawn = profile ? SDL_GetPerformanceCounter() : 0;
         platform.present();
+        const auto presented = profile ? SDL_GetPerformanceCounter() : 0;
         platform.waitForNextTick();
+        if (profile) {
+            updateMs += (updated - begin) * counterMilliseconds;
+            drawMs += (drawn - updated) * counterMilliseconds;
+            presentMs += (presented - drawn) * counterMilliseconds;
+            pacingMs += (SDL_GetPerformanceCounter() - presented) * counterMilliseconds;
+            peakWorkMs = std::max(peakWorkMs, (drawn - begin) * counterMilliseconds);
+            if (++profileFrames == 180) {
+                std::fprintf(stderr,
+                    "SDL profile: y=%.1f records=%zu fps=%.1f update=%.3f draw=%.3f "
+                    "present=%.3f pacing=%.3f peak_work=%.3f ms\n",
+                    double(game.startup().mainPlayerY()), game.startup().activeInstanceCount(),
+                    180000.0 / (updateMs + drawMs + presentMs + pacingMs),
+                    updateMs / 180, drawMs / 180, presentMs / 180, pacingMs / 180, peakWorkMs);
+                profileFrames = 0;
+                updateMs = drawMs = presentMs = pacingMs = peakWorkMs = 0;
+            }
+        }
     }
     return 0;
 }

@@ -97,6 +97,13 @@ The host build uses `-O2` with debug symbols and floating-point contraction
 disabled (no fast-math). For instruction-by-instruction debugging, use
 `make HOST_OPT=-O0`. Changing this option automatically rebuilds the SDL objects.
 
+To diagnose slowdown during interactive play, run
+`DOWNWELL_PROFILE=1 make run SKIP_TO_GAME=1`. Every 180 frames it reports player
+Y, resident record count, frame rate, simulation/drawing time, presentation
+(including vsync wait), pacing, and peak simulation-plus-drawing time in ms.
+The selected SDL rendering backend is printed at startup. This does not skip
+simulation or rendering work; retain the output from before and during a slowdown.
+
 The native player/scroll slice also has a real host-versus-emulated-A500 replay
 gate. With the Amiga toolchain and FS-UAE installed, run
 `make verify-cross-replay`; both targets must produce the pinned 64-frame
