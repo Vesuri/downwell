@@ -165,10 +165,11 @@ int main(int argc, char** argv) {
                     reference.points[ring][i]={x+component(cosine[i]),y+component(cosine[(i+18)%24])};
             }
             require(actual.same(reference),"symmetric outline preserves every original rounded vertex");
-            for(unsigned clip=0;clip<3;++clip){
-                const int left=clip==0?downwellPlayfieldX:clip==1?x:x+200;
-                const int top=clip==0?0:y;
-                const int right=left+(clip==0?160:clip==1?1:0),bottom=top+(clip==0?284:1);
+            for(unsigned clip=0;clip<4;++clip){
+                const int left=clip==0?downwellPlayfieldX:clip==1?x:clip==3?x-132:x+200;
+                const int top=clip==0?0:clip==3?y-132:y;
+                const int right=left+(clip==0?160:clip==1?1:clip==3?265:0);
+                const int bottom=top+(clip==0?284:clip==3?265:1);
                 std::vector<int> expected,got;
                 reference.draw([&](int px,int py,int pen){
                     if(px>=left&&px<right&&py>=top&&py<bottom){expected.push_back(px);expected.push_back(py);expected.push_back(pen);}
@@ -186,9 +187,19 @@ int main(int argc, char** argv) {
                     for(int px=first;px<end;++px)spans[(row-top)*(right-left)+px-left]=pen;
                 });
                 require(spans==pixels,"coalesced spans preserve final coverage and pen priority");
+                std::fill(spans.begin(),spans.end(),0);
+                downwell::TimeFieldOutlines cached;
+                cached.visible=true;cached.count=1;
+                cached.circles[0]={x,y,minimum*256+fraction};
+                amigaFieldSpans(cached,left,top,right,bottom,[&](int first,int end,int row,int pen){
+                    require(first>=left&&first<end&&end<=right&&row>=top&&row<bottom,
+                        "cached field runs are nonempty and clipped");
+                    for(int px=first;px<end;++px)spans[(row-top)*(right-left)+px-left]=pen;
+                });
+                require(spans==pixels,"offline field rows preserve final coverage and pen priority");
             }
         }
-        std::cout << "1024 outline radii and 3072 ordered clipping comparisons passed\n";
+        std::cout << "1024 outline radii and 4096 clipping/cache comparisons passed\n";
     }
     {
         std::vector<UBYTE> base(downwellGameRingBytes), actual(base.size()), expected(base.size());

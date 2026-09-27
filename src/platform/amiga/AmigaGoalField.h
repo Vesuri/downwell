@@ -3,6 +3,7 @@
 #include "AmigaRenderer.h"
 #include "core/GoalFieldOutline.h"
 #include "core/TimeFieldOutlines.h"
+#include "AmigaFieldSpans.h"
 
 // Per-display sparse word overlay. Restore only departing coverage; publish
 // final colours directly, never clearing continuing pixels. Drain DMA first.
@@ -46,7 +47,7 @@ public:
         for (unsigned i = 0; i < next.count; ++i) next.index[next.words[i].offset / 2] = 0;
         next.count = 0;
         bool overflow = false;
-        shape.drawClippedSpans(downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,
+        amigaFieldSpans(shape,downwellPlayfieldX,0,downwellPlayfieldX+downwellPlayfieldWidth,
                           downwellDisplayHeight,[&](int first,int end,int y,int pen) {
             unsigned row = origin + static_cast<unsigned>(y);
             if (row >= downwellGameRingHeight) row -= downwellGameRingHeight;

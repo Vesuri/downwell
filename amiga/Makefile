@@ -163,6 +163,9 @@ obj/startup-options: FORCE_STARTUP_OPTIONS
 	@cmp -s $@.tmp $@ || cp $@.tmp $@
 
 $(OBJECTS): obj/startup-options
+$(OBJECTS): $(REPO)/generated/downwell-field-spans.h
+$(REPO)/generated/downwell-field-spans.h: $(REPO)/tools/generate-field-spans.cpp $(wildcard $(REPO)/src/core/*.h)
+	$(MAKE) -C $(REPO) generated/downwell-field-spans.h
 $(OBJECTS): $(REPO)/generated/downwell-goal-mask.h
 $(OBJECTS): $(REPO)/generated/downwell-time-field-mask.h
 $(REPO)/generated/downwell-time-field-mask.h: $(REPO)/tools/export-time-stop-masks.csx $(REPO)/tools/verify-time-stop-masks.py $(REPO)/data/data.win

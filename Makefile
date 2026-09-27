@@ -1275,6 +1275,16 @@ build/startup-options: FORCE_STARTUP_OPTIONS
 
 $(OBJECTS): build/startup-options
 
+build/generate-field-spans: tools/generate-field-spans.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Isrc -Wall -Wextra -Wpedantic $< -o $@
+
+generated/downwell-field-spans.h: build/generate-field-spans
+	@mkdir -p generated
+	./build/generate-field-spans $@
+
+$(AMIGA_RENDERER_TEST_TARGET): generated/downwell-field-spans.h src/platform/amiga/AmigaFieldSpans.h
+
 $(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
