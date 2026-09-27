@@ -1114,6 +1114,23 @@ two-event traces, checking complete modeled state and external-call order.
 Query answers, out-of-view and engine side effects are fixtures in that test;
 it proves control flow, not their implementation or end-to-end wall fidelity.
 
+The compatibility `tile_add` script finds the first existing layer with the
+requested depth, or creates one, then calls `layer_tile_create` with the source
+patch and world coordinates. The wall does not retain the returned tile ID.
+`tileCavern` (sprite 739), source `(48,48,16,16)`, is 256 opaque-black pixels.
+`verify-wall-background.py` checks the pinned input, export/tool identity,
+reviewed helper assembly, atlas hash and each pixel. This exact patch may use
+a black fill; other tiles must not inherit that specialization.
+
+`WallBackgroundTiles` retains these patches independently of instances, with
+unrounded binary64 positions and depth 100. Its region painter accepts an
+explicit raster policy and emits only clipped rectangles, allowing retained
+cache repair/newly exposed strips rather than mandatory full-frame repainting.
+It preserves duplicate additions and fails capacity/arithmetic errors without
+discarding the accepted prefix. This is not a general layer/tile-ID engine.
+The store and its depth pass still need connection to both live schedulers and
+renderers; the background-tile primitive alone does not authorize retiring walls.
+
 Room terrain enters through `GameplayWorld::loadRoomTerrain`, shared by native
 startup/re-entry and scene tests via `AmigaGameplayGeneration::loadRoom`.
 The room pack is serialized from `instanceCreationOrder`; filtering that stream

@@ -2123,4 +2123,12 @@ verify-runner-mask-point:
 	$(CXX) -Isrc $(CXXFLAGS) -o build/runner-point-query-test tests/core/RunnerPointQueryTest.cpp
 	./build/runner-point-query-test
 
+.PHONY: verify-wall-background
+test: verify-wall-background
+verify-wall-background:
+	@mkdir -p build
+	python3 tools/verify-wall-background.py
+	$(CXX) -Isrc $(CXXFLAGS) -o build/wall-background-test tests/core/WallBackgroundTilesTest.cpp
+	./build/wall-background-test
+
 -include $(DEPS)
