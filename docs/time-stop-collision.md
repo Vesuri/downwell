@@ -87,6 +87,32 @@ must agree with [the runner collision rules](runner-collision-bounds.md).
 
 ## Exit children and Create order
 
+### Room-entry descendant
+
+`startTimeField` (371) is a child of `goalTimeField` (255), not an ordinary
+object-82 field or an exit trigger. The main room places instance 101097 at
+(240,192), using sprite 616. Its own Create (code 2731) does not call inherited
+Create: it writes X scale 2, Y scale 2, samples `128+random(2)`, then destroys
+itself only when both `global.area==1` and `global.level==1`. The random draw
+therefore occurs even on the first level, before destruction. Discarding the
+instance during room decoding would change the source RNG stream.
+
+On later levels its inherited family membership makes it eligible for the
+player's goal-field clock query as well as parent-time-field queries. Its own
+Draw (2732) resamples the radius unless `pTimeStop`, and draws the same three
+outline circles as the exit field, with all three circles outlined. It inherits
+the goal-field player Collision event, including the guarded wind-sound choice.
+An exit-only contact adapter cannot represent this room-entry descendant.
+
+Implementing the field requires room-load Create/destruction handling, shared
+field state and later-level drawing, not a special exclusion inside collision
+queries. The native entry RNG checkpoint must account for the same ordered
+Create draw. A live resource-owner query against the unhandled placed record
+finds a unit-scale phantom on the first player update; this is evidence of
+missing Create semantics, not evidence that the original pauses its clock there.
+
+### Exit-trigger children
+
 `objLineToResult` (306) calls inherited `objLineToMain` Create: set the custom
 trigger variable `active=0`, center X at half the room width, and synchronously
 create `roomEndSetter` (74). That child's Create finds camera 63 and sets its

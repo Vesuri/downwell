@@ -36,6 +36,12 @@ behavior, both backend integrations and relevant original-game verification.
 
 ### B. Connect time-stop state and effects
 
+- Implement room-entry `startTimeField` (371) Create, scale publication and
+  first-level destruction after its RNG draw. Preserve its later-level lifetime,
+  inherited clock/parent-field contacts, Draw and wind-audio behavior on both
+  platforms. Update the native entry RNG checkpoint from the source-ordered
+  sequence before enabling live clock queries; an unhandled placed record is a
+  phantom collider, not an eligible first-level field.
 - Connect player Begin Step `checkStop`/`pTimeStop` and parent-time-field queries
   to both world schedulers before blood dispatch. Goal-stop and shop control-lock
   are not substitutes. Preserve transition effects, RNG and audio order.

@@ -34,6 +34,12 @@ machine code, not runtime results. Work priorities remain in [open-work.md](open
   index `0x84`. A missing resource collapses bounds to the instance position.
 - `place_meeting` wrapper `0x52b1f0` converts supplied coordinates to binary32
   and calls `0x4fee30`; this is distinct from reading bbox getter values.
+- `0x4fee30..0x4fee79` checks that the caller is an ordinary instance (kind 1),
+  calls the same `0x4fe560` search used by `instance_place`, with the final
+  collect-all argument zero, then returns whether the resulting pointer is
+  non-null. Thus a boolean meeting query retains the search's preparation and
+  restoration mutations; it is not permission to replace it with an arbitrary
+  resource scan. The verifier pins this reviewed helper too.
 
 ## Cache refresh and spatial publication
 
