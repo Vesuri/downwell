@@ -1025,6 +1025,24 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     retirement.instance(controller.instanceId)->objectId == controller.objectId,
                     "compacting retirement preserves surviving identities");
         }
+        {
+            auto snapStorage=std::make_unique<downwell::StartupRuntime>(runtime);
+            auto& snap=*snapStorage;
+            const int oldView=int(snap.mainCameraViewY());
+            std::uint32_t boxId=0;
+            for(std::size_t i=0;i<snap.activeInstanceCount();++i){
+                auto& box=const_cast<downwell::InstanceRecord&>(snap.instanceAt(i));
+                if(box.objectId!=92)continue;
+                box.active=true;box.y=oldView-120;boxId=box.instanceId;break;
+            }
+            require(boxId&&snap.registerSideCameraLocker(int(snap.mainCameraViewX())+80,oldView+222),
+                "host camera retirement fixture has a box and overlapping locker");
+            snap.step(releasedMain,false);
+            require(snap.effectsSucceeded()&&snap.mainCameraViewY()==oldView+80,
+                "host camera collision publishes the new view in this frame");
+            require(!snap.hasInstance(boxId),
+                "host box End Step lifetime sees the post-collision view");
+        }
         bool retainedOldStone = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
             const downwell::InstanceRecord& instance = runtime.instanceAt(index);

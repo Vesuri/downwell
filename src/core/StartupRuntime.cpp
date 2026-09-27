@@ -437,10 +437,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
         updateMainCurrency();
         if(!run_.effectsSucceeded)return;
-        updateMainLifecycle();
+        updateMainLifecycle(false);
         if(!run_.effectsSucceeded)return;
-        // Camera Collision follows ordinary Step/retirement, before shop End
-        // Step and Draw. Earlier actors/generation keep their Step-time view.
+        // Scattered16's Step lifetime check sees the pre-collision view.
+        // Actor End Step lifetime checks see the camera's collision snap.
         run_.sideCameraLockers.collide(mainCameraMotion_);
         mainCameraX_ = mainCameraMotion_.x / 4096.0F;
         mainCameraY_ = mainCameraMotion_.y / 4096.0F;
@@ -452,6 +452,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
                 camera.y = mainCameraMotion_.pixelY();
             }
         }
+        updateMainLifecycle(true);
+        if(!run_.effectsSucceeded)return;
         run_.shops.endStep(mainCameraRenderViewY());
         run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
@@ -1058,7 +1060,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
         },[this](const InstanceRecord& enemy){return publishMainInactivation(enemy);}))return;
 }
 
-void StartupRuntime::updateMainLifecycle() {
+void StartupRuntime::updateMainLifecycle(bool endStep) {
     // scrOutofview destroys, rather than deactivates, the instance. Erasure
     // compacts records but preserves survivor handles/order. Translate the
     // original traversal index after each removal so adjacent deaths are not
@@ -1076,7 +1078,7 @@ void StartupRuntime::updateMainLifecycle() {
             ++removed;
             ++mainInstancesRetired_;
             return true;
-        });
+        },endStep?MainRoomLifetimePhase::endStep:MainRoomLifetimePhase::step);
     if(!succeeded)run_.effectsSucceeded=false;
 }
 

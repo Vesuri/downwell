@@ -294,6 +294,7 @@ build/corpse-creation-integration-test: tests/core/CorpseCreationIntegrationTest
 .PHONY: verify-out-of-view-lifetime
 verify-out-of-view-lifetime: build/out-of-view-lifetime-test
 	python3 tools/verify-dead-body-creation.py
+	python3 tools/verify-main-room-lifetime.py
 	./build/out-of-view-lifetime-test
 
 build/out-of-view-lifetime-test: tests/core/OutOfViewLifetimeTest.cpp $(wildcard src/core/*.h)

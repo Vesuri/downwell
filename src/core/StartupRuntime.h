@@ -600,7 +600,7 @@ private:
     void spawnMainCurrency(float x, float y, std::int32_t amount,
                            bool attracted = false);
     void updateMainCurrency();
-    void updateMainLifecycle();
+    void updateMainLifecycle(bool endStep);
     void updateMainEnemies();
     void updateCrawler(InstanceRecord& enemy, bool alarm);
     void updateMainEnemyInteractions();

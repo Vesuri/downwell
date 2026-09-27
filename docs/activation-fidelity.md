@@ -155,13 +155,20 @@ Y against view Y minus 160 / plus 3000, checks room 11, then calls
 `instance_destroy`. `StartupRuntime::updateMainLifecycle` erases the supported
 records and invalidates their handles rather than leaving them searchable and
 occupying capacity. Its compacting traversal retains survivor order and visits
-adjacent retired records. `GameplayWorld` likewise removes offscreen enemy
+adjacent retired records. Both live adapters test End Step families after the
+side-camera collision snap; Scattered16 (289) tests its ordinary-Step view
+before that snap. The resource-ID/event audit is pinned by
+`verify-main-room-lifetime.py`. Ground turtle 112 uses the generic helper;
+do not substitute the differently named, later-area turtle 129's margins.
+Host and native regression fixtures place a box between the pre/post-snap
+lifetime edges to distinguish these timings. `GameplayWorld` likewise removes offscreen enemy
 entries while retaining surviving lifetime keys and order; dormant future
 enemies remain present because they do not receive End Step. Static terrain
 storage is separate from this actor pool. The pinned resource manifest contains no Destroy or
 Clean Up events; this sweep therefore has no such game callbacks to dispatch.
-This does not establish generic destruction timing or wire external collision
-retirement; those remain separate scheduler-integration requirements.
+This still uses legacy lifetime sweeps rather than the complete original event
+dispatch. Migrating them to ordered handlers and deferred Draw-entry cleanup
+remains required; corrected camera timing alone does not prove that migration.
 
 `tools/verify-runner-field-lookup.py` pins the reviewed wrapper, predicate,
 activation/deactivation and unique-enqueue bytes against the immutable Windows

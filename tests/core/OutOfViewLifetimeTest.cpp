@@ -1,5 +1,6 @@
 #include "core/OutOfViewLifetime.h"
 #include "core/CorpseLifecycle.h"
+#include "core/MainRoomLifetime.h"
 #include <cassert>
 #include <cstring>
 #include <cstdio>
@@ -24,6 +25,14 @@ int main(){
         assert(corpse.endStep(main,real(camera),events)&&events.count==unsigned(expected));++cases;
     }
     bool retire=true;
+    for(auto phase:{MainRoomLifetimePhase::step,MainRoomLifetimePhase::endStep}){
+        unsigned retired=0;
+        const LifetimeInstance records[]={{289,-161,true},{112,-161,true},{92,3001,true},
+            {289,-161,false},{112,-160,true},{129,-161,true}};
+        assert(retireMainRoomObjectsChecked(6,11,1,0,[&](unsigned i){return records[i];},
+            [&](unsigned i){retired|=1u<<i;return true;},phase));
+        assert(retired==(phase==MainRoomLifetimePhase::step?1u:6u));
+    }
     assert(!outOfViewRetirement({}, {0x7ff00000u,0},true,retire)&&retire);
     CorpseLifecycle corpse;Retire events;
     assert(!corpse.endStep(true,{0x7ff00000u,0},events)&&!corpse.valid&&!events.count);

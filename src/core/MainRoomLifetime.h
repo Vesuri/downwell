@@ -8,8 +8,9 @@ struct LifetimeInstance {
     bool active;
 };
 
-// Implemented object families whose End Step calls scrOutofview. objWall_n
-// has an additional area-five guard; this is not a universal object policy.
+enum class MainRoomLifetimePhase { step, endStep };
+// Implemented families calling scrOutofview. Scattered16 does so in Step;
+// the others in End Step. objWall_n additionally guards on area five.
 inline bool usesMainRoomOutOfView(int objectId, int area) {
     switch (objectId) {
     case 60: return area == 5;
@@ -26,11 +27,13 @@ inline bool usesMainRoomOutOfView(int objectId, int area) {
 // Storage adapters only expose records and apply the resulting retirement.
 template<class Read, class Retire>
 bool retireMainRoomObjectsChecked(unsigned count, int roomId, int area, long viewTopQ12,
-                          Read read, Retire retire) {
+                          Read read, Retire retire,
+                          MainRoomLifetimePhase phase=MainRoomLifetimePhase::endStep) {
     if (roomId != 11) return true;
     for (unsigned i = 0; i < count; ++i) {
         const LifetimeInstance instance = read(i);
         if (!instance.active || !usesMainRoomOutOfView(instance.objectId, area)) continue;
+        if((instance.objectId==289)!=(phase==MainRoomLifetimePhase::step))continue;
         const long y = instance.y * 4096L;
         if (y < viewTopQ12 - 160L * 4096 || y > viewTopQ12 + 3000L * 4096)
             if (!retire(i)) return false;

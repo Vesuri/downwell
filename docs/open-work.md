@@ -35,6 +35,10 @@ behavior, both backend integrations and relevant original-game verification.
   collision adapters. Complete original room creation order across families.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
+- Resolve the room-entry RNG divergence reported by `amiga-scene-runtime-test`
+  at parity frame 55. It reproduces on baseline `ee558f1` as well as the
+  camera/lifetime phase correction. Trace the original event/RNG order; do not
+  weaken the paired check or treat the separate runtime suites as parity proof.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding
   assumptions, including rotated masks required by blood time-field contacts.
 

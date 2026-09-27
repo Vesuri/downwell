@@ -1710,10 +1710,16 @@ int main() {
         sideCamera.sideCameraDigest() == beforePreview && sideCamera.randomDrawCount() == beforePreviewRng,
         "side-column prefetch predicts collision snap without mutating camera or RNG");
     const int beforeLockY = sideCamera.cameraOffsetY();
+    const int offscreenBoxX=0,offscreenBoxY=-240; // world y=-64
+    sideCamera.configureBreakables(&offscreenBoxX,&offscreenBoxY,1);
+    require(sideCamera.findBreakable({0,1})&&beforeLockY<62,
+        "box is above the new view's lifetime edge but inside the pre-snap view");
     sideFrame = sideCamera.step(downwell::packReplayInput(walkRight));
     require(sideCamera.cameraSideLocked() && sideCamera.cameraOffsetY() == 80 &&
         sideFrame.scrollDelta == 80 - beforeLockY && sideCamera.ringOrigin() == 60,
         "collision-phase camera snap reaches the same frame's circular-buffer delta");
+    require(!sideCamera.findBreakable({0,1}),
+        "box End Step retirement observes this frame's camera collision snap");
     downwell::Input leaveSide; leaveSide.left = true;
     for (unsigned frame = 0; frame < 180 &&
             (sideCamera.cameraOffsetX() != 0 || sideCamera.cameraSideLocked()); ++frame)

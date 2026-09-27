@@ -1210,6 +1210,22 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.exitDither.step(cameraMotion_.pixelY() - 142, 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
+    // Collision camera snaps must precede End Step lifetime decisions.
+    if(!reconcilePhase(PhaseBoundary::step))return {};
+    if (followCamera_ && run_.sideCameraLockers.count) {
+        run_.sideCameraLockers.collide(cameraMotion_);
+        const int collisionScroll = cameraMotion_.pixelY() - 176 - cameraPixelY_;
+        cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
+        cameraPixelY_ += collisionScroll;
+        scrollDelta += collisionScroll;
+        motion.deltaY -= collisionScroll;
+        if (collisionScroll) {
+            int origin = (int(ringOrigin_) + collisionScroll) % int(ringHeight);
+            if (origin < 0) origin += int(ringHeight);
+            ringOrigin_ = unsigned(origin);
+        }
+    }
+    if(!reconcilePhase(PhaseBoundary::collision))return {};
     const long viewTop = 34L * 4096 + viewCameraYQ8() * 16;
     unsigned retiredEnemies = 0;
     const bool enemiesRetired=downwell::retireMainRoomObjectsChecked(enemyCount_, 11, 1, viewTop,
@@ -1236,24 +1252,6 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         [this](unsigned i) { return retireBreakable(i); });
     if(!boxesRetired){run_.effectsSucceeded=false;return {};}
 
-    // Collision phase follows ordinary actor/generation/retirement work.
-    if(!reconcilePhase(PhaseBoundary::step))return {};
-    // Its snap contributes to this frame's final display delta, not the view
-    // those earlier Step events observed.
-    if (followCamera_ && run_.sideCameraLockers.count) {
-        run_.sideCameraLockers.collide(cameraMotion_);
-        const int collisionScroll = cameraMotion_.pixelY() - 176 - cameraPixelY_;
-        cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
-        cameraPixelY_ += collisionScroll;
-        scrollDelta += collisionScroll;
-        motion.deltaY -= collisionScroll;
-        if (collisionScroll) {
-            int origin = (int(ringOrigin_) + collisionScroll) % int(ringHeight);
-            if (origin < 0) origin += int(ringHeight);
-            ringOrigin_ = unsigned(origin);
-        }
-    }
-    if(!reconcilePhase(PhaseBoundary::collision))return {};
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
     checkpoint_ = downwell::portCheckpointDigest(
