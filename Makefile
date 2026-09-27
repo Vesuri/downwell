@@ -115,6 +115,15 @@ all: $(TARGET)
 
 .PHONY: verify-wall-draw-lookup
 .PHONY: verify-terrain-create
+test: verify-wall-end-step
+.PHONY: verify-wall-end-step
+verify-wall-end-step: build/wall-end-step-test
+	./build/wall-end-step-test
+	python3 tools/verify-wall-end-step.py build/wall-end-step-test
+build/wall-end-step-test: tests/core/WallEndStepTest.cpp src/core/GameMakerRandom.cpp src/core/WallEndStep.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
 test: verify-terrain-create
 verify-terrain-create: build/terrain-create-test
 	python3 tools/verify-terrain-create.py

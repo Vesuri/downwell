@@ -1095,6 +1095,25 @@ per-instance activation/retirement still need their source boundaries before
 enabling live terrain queries. Drawing a neighbor-derived tile does not publish
 that frame or retire the corresponding collision instance.
 
+`WallEndStep.h` implements code 986's control flow with explicit external-call
+adapters. Its first event issues four shape queries, applies pillar remapping,
+and conditionally issues four distinct point queries for corner lighting. A
+surrounded wall is marked during that event; only the following event adds
+background 739 (source 48,48; size 16,16; position x-8,y-8; depth 100), requests
+destruction and then, when requested, deactivation. Destruction must remain an
+engine request during the callback: the VM continues executing the event.
+Area-five out-of-view runs before either branch. Area-four flower choice and
+area-zero repeated frame writes preserve the VM's order and RNG calls.
+
+The handler is not installed in either live scheduler yet. It requires
+source-equivalent shape/point queries, retained background-tile ownership and
+destruction/reconciliation adapters; boolean terrain occupancy is not a generic
+replacement for these operations. `verify-wall-end-step.py` interprets the
+pinned assembly's integer/control-flow subset against the portable handler's
+two-event traces, checking complete modeled state and external-call order.
+Query answers, out-of-view and engine side effects are fixtures in that test;
+it proves control flow, not their implementation or end-to-end wall fidelity.
+
 Room terrain enters through `GameplayWorld::loadRoomTerrain`, shared by native
 startup/re-entry and scene tests via `AmigaGameplayGeneration::loadRoom`.
 The room pack is serialized from `instanceCreationOrder`; filtering that stream
