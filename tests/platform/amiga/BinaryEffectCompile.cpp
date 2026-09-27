@@ -7,8 +7,11 @@
 #include "core/RunnerLayerInstances.h"
 #include "core/PackedRoomLayerLoader.h"
 bool compilePackedLayers(const downwell::RoomPack& pack,int room,downwell::RunnerLayers<4,16>& layers,
-    downwell::RunnerLayerInstances<4,16>& registry){
-    return downwell::PackedRoomLayerLoader::load(pack,room,layers,registry,[](unsigned,const auto&){return true;});
+    downwell::RunnerLayerInstances<4,16>& registry,downwell::RunnerLayerIds& ids){
+    return downwell::PackedRoomLayerLoader::load(pack,room,layers,registry,[](unsigned,const auto&){return true;},&ids);
+}
+bool compileLayerIds(downwell::RunnerLayerIds& ids,downwell::RunnerLayers<4,16>& layers,int depth,unsigned& slot){
+    return ids.createDynamic(layers,depth,slot);
 }
 bool compileLayerInstances(downwell::RunnerLayerInstances<4,16>& registry,downwell::RunnerLayers<4,16>& layers,
     unsigned layer,unsigned id,downwell::InstanceHandle handle,downwell::RunnerDepthService::Instance& state){

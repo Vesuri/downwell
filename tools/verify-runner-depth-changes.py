@@ -8,6 +8,17 @@ import struct
 root = Path(__file__).resolve().parents[1]
 audit = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = audit["region"]
+# Layer ID globals are in the PE's zero-filled virtual data tail, not raw
+# on-disk initializer bytes. Pin that initial state without reading past raw data.
+binary = audit["binary"]
+for address in (0x925f84, 0x925f88):
+    zero_filled = False
+    for index in range(struct.unpack_from("<H", binary, audit["pe"] + 6)[0]):
+        virtual_size, rva, raw_size = struct.unpack_from("<III", binary, audit["section_start"] + index * 40 + 8)
+        base = audit["image_base"] + rva
+        if base + raw_size <= address and address + 4 <= base + virtual_size:
+            zero_filled = True
+    assert zero_filled, hex(address)
 data = (root / "data/data.win").read_bytes()
 assert sha256(data).hexdigest() == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert data[8:12] == b"GEN8"

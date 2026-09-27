@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_PACKED_ROOM_LAYER_LOADER_H
 #include "RoomPack.h"
 #include "RunnerLayerInstances.h"
+#include "RunnerLayerIds.h"
 namespace downwell {
 // Prepare fixed layers and their empty instance elements BEFORE room instance
 // creation. This loads the instance-membership projection in DWRM, not omitted
@@ -10,7 +11,7 @@ namespace downwell {
 struct PackedRoomLayerLoader {
     template<unsigned L,unsigned E,class Publish>
     static bool load(const RoomPack& pack,int roomId,RunnerLayers<L,E>& layers,
-        RunnerLayerInstances<L,E>& instances,Publish publish){
+        RunnerLayerInstances<L,E>& instances,Publish publish,RunnerLayerIds* ids=nullptr){
         if(!pack.valid()||!layers.succeeded())return false;
         bool empty=true;layers.visitLayers([&](unsigned,const auto&){empty=false;return false;});
         if(!empty)return false;
@@ -27,6 +28,9 @@ struct PackedRoomLayerLoader {
                 if(!pack.membership(layer.firstMembership+j,id)||!instances.reserve(layers,slot,id))return false;
                 ++members;
             }
+            // Original reader raises the process maximum after completing
+            // each serialized layer, not by pre-scanning this room's IDs.
+            if(ids&&!ids->observeLoaded(std::int32_t(layer.layerId)))return false;
         }
         if(members!=room.instanceCount)return false;
         // Every packed birth must have one reservation; reserve already rejects

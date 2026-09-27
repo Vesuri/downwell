@@ -1,4 +1,5 @@
 #include "core/RunnerLayers.h"
+#include "core/RunnerLayerIds.h"
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -112,4 +113,22 @@ void activation(){
     elements(o,layer,{3,2,1,0});
 }
 }
-int main(){movement();merging();failure();exhaustiveMoves();activation();std::cout<<"Layer depth movement, ownership and merge publication verified (3840 movement cases)\n";}
+void sourceIds(){
+    downwell::RunnerLayerIds ids;std::int32_t id=-1;
+    require(ids.allocate(id)&&id==1,"zero-filled source counter starts at one");
+    require(ids.observeLoaded(90)&&ids.observeLoaded(20)&&ids.allocate(id)&&id==91,"loaded maximum raises allocation floor");
+    require(ids.observeLoaded(3)&&ids.allocate(id)&&id==92,"lower room IDs do not reset dynamic high-water mark");
+    Owner first;unsigned slot=Owner::End;
+    require(ids.createDynamic(first,0,slot)&&first.get(slot)->id==93,"dynamic layer uses source ID");
+    require(first.attach(slot,0,true,false,inactive)&&first.detach(0)&&!first.get(slot),"dispose first dynamic layer");
+    require(ids.createDynamic(first,10,slot)&&first.get(slot)->id==94,"reused slot never reuses source ID");
+    Owner nextRoom;unsigned next=Owner::End;
+    require(ids.createDynamic(nextRoom,-60000,next)&&nextRoom.get(next)->id==95,"new room retains process identity counter");
+    downwell::RunnerLayers<0,0> full;unsigned none=0;
+    require(!ids.createDynamic(full,0,none)&&ids.dynamicMaximum==96,"failed insertion retains consumed ID");
+    require(!ids.observeLoaded(-1)&&ids.loadedMaximum==90,"invalid loaded identity rejected");
+    ids.loadedMaximum=0x7ffffffe;
+    require(ids.allocate(id)&&id==0x7fffffff,"last supported positive identity");
+    id=123;require(!ids.allocate(id)&&id==123,"exhaustion cannot wrap into negative ID");
+}
+int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases)\n";}

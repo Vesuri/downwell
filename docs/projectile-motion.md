@@ -593,6 +593,22 @@ The live startup/native adapters still need to own these structures, retain
 visibility/state publication, coordinate persistence and retire queued depth
 identities before reuse; the connected test does not enable a live Draw switch.
 
+Layer IDs are process state, not room-local slot numbers. Globals `0x925f84`
+(loaded maximum) and `0x925f88` (last allocated dynamic ID) start in the PE's
+zero-filled virtual data tail. The serialized reader raises the loaded maximum
+after each completed layer (`0x4144c0..0x4144d4`). Dynamic creation takes the
+signed maximum of these two counters, increments it, and publishes the result
+before room insertion (`0x41282c..0x41284c`). `RunnerLayerIds` owns this state;
+retain it across room changes and layer disposal. The packed layer loader can
+publish into this owner as it loads fixed layers. Tests cover all original
+packed rooms' maximum publication, dynamic allocation across different room
+owners, slot reuse, insertion failure and explicit exhaustion. Negative and
+wrapped IDs are outside the admitted domain and fail rather than silently
+emulating signed wraparound. Source element IDs use a separate counter and
+are not supplied by this layer-ID owner. Live startup must reproduce original
+resource-loading order before depending on these IDs; loading only the current
+room is not proof that the process high-water mark matches the runner.
+
 Room initialization's later global-instance pass (`0x413590..0x413610`) skips
 already-attached instances. For an unattached instance it first resolves its
 saved layer ID, accepting fixed as well as dynamic layers without comparing

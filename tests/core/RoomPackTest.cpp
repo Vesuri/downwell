@@ -284,14 +284,20 @@ void testGeneratedPack(const char* path) {
     require(pack.roomInstance(room, 0, player) &&
                 player.instanceId == 104218 && player.objectId == 35,
             "rmMenu begins with recovered player instance");
+    downwell::RunnerLayerIds sourceIds;unsigned expectedMaximum=0;
     for(unsigned roomIndex=0;roomIndex<pack.roomCount();++roomIndex){
         require(pack.room(roomIndex,room),"generated layer room");
         downwell::RunnerLayers<16,1200> layers;
         downwell::RunnerLayerInstances<16,1200> registry;
         unsigned published=0;
         require(downwell::PackedRoomLayerLoader::load(pack,room.roomId,layers,registry,
-            [&](unsigned,const auto&){++published;return true;}),"all original room memberships load");
+            [&](unsigned,const auto& layer){
+                require(sourceIds.loadedMaximum==int(expectedMaximum),"ID floor updates after serialized layer completion");
+                if(layer.layerId>expectedMaximum)expectedMaximum=layer.layerId;
+                ++published;return true;
+            },&sourceIds),"all original room memberships load");
         require(published==room.layerCount,"all layer metadata published");
+        require(sourceIds.loadedMaximum==int(expectedMaximum),"process maximum preserved across loaded rooms");
         for(unsigned l=0;l<room.layerCount;++l){
             downwell::PackedRoomLayer packed;require(pack.roomLayer(room,l,packed),"generated layer");
             const auto slot=layers.find(int(packed.layerId));unsigned remaining=packed.membershipCount;
