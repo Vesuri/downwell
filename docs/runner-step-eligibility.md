@@ -30,6 +30,14 @@ Each phase snapshot costs eight bytes per capacity slot; this is not the
 Amiga `GameplayWorld` actor scheduler and does not establish source object-list
 event traversal.
 
+Destruction bit 1 is part of the Step filter `0x100003` at `0x50b8ab`
+and the alarm filter at `0x509dfb`, before alarm decrement. `EventScheduler`
+therefore excludes `destroyRequested` records both at capture and at each
+dispatch, including subsequent alarm indices. The current handler continues;
+the record is not physically removed by the dispatcher. Tests cover destruction
+in every Step/alarm phase, a later already-snapshotted sibling, unchanged alarms,
+and exclusion on the following frame while storage remains allocated.
+
 The decoded host publishes deferred object membership after each complete Begin
 Step, alarm, ordinary Step and End Step phase, before the next phase snapshot.
 The Windows frame loop calls reconciliation after those phases at `0x50dc89`,

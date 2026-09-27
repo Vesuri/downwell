@@ -16,4 +16,5 @@ for start, end, digest in (
     (0x509D97, 0x509E84, "62c667a3ee7dc779d0b6220cef0d47ec7d084a81389bd62be19df20f7a29732e"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest
-print("Pinned Windows alarm registration, storage and ordered dispatch verified")
+assert region(0x509DFB, 7) == bytes.fromhex("f7 47 78 03 00 10 00")
+print("Pinned Windows alarm registration, storage, ordered dispatch and destruction exclusion verified")

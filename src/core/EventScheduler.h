@@ -82,7 +82,7 @@ private:
         std::size_t count = 0;
         for (std::size_t index = 0; index < instances.size(); ++index) {
             const InstanceRecord& instance = instances.at(index);
-            if (instance.active)
+            if (instance.active && !instance.destroyRequested)
                 handles[count++] = instances.handleAt(index);
         }
         return count;
@@ -96,7 +96,7 @@ private:
         const std::size_t count = captureActive(instances, handles);
         for (std::size_t index = 0; index < count; ++index) {
             InstanceRecord* instance = instances.resolve(handles[index]);
-            if (instance != nullptr && instance->active) {
+            if (instance != nullptr && instance->active && !instance->destroyRequested) {
                 handler(*instance, StepEvent{phase, 0});
                 if(!healthy())return false;
             }
@@ -115,7 +115,7 @@ private:
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm) {
             for (std::size_t index = 0; index < count; ++index) {
                 InstanceRecord* instance = instances.resolve(handles[index]);
-                if (instance == nullptr || !instance->active)
+                if (instance == nullptr || !instance->active || instance->destroyRequested)
                     continue;
                 const bool hasEvent = (alarmEvents(*instance) & (1u << alarm)) != 0;
                 if(!healthy())return false;

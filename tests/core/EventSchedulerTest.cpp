@@ -346,6 +346,40 @@ void testCheckedDispatch() {
     require(publications==1,"no second publication after latched failure");
 }
 
+void testDeferredDestroyEligibility() {
+    using namespace downwell;
+    for(const auto destructionPhase:{StepEventPhase::beginStep,StepEventPhase::alarm,
+            StepEventPhase::step,StepEventPhase::endStep}){
+        InstanceStore<3> instances;
+        instances.create(1,10,7,false);instances.create(2,20,7,false);instances.create(3,30,7,false);
+        for(unsigned i=0;i<3;++i){instances.at(i).alarms.set(0,1);instances.at(i).alarms.set(1,1);}
+        instances.find(3)->destroyRequested=true; // Marked before capture, still allocated.
+        bool destroyed=false,continued=false;
+        unsigned forbidden=0;
+        EventScheduler<3>::runStep(instances,[](const auto&){return AlarmBank::allEvents;},
+            [&](auto& record,StepEvent event){
+                if(record.instanceId==3||destroyed)++forbidden;
+                if(record.instanceId==1&&event.phase==destructionPhase){
+                    record.destroyRequested=true;
+                    instances.find(2)->destroyRequested=true; // Was already snapshotted.
+                    destroyed=true;
+                    record.x=42;continued=true; // Destroy must not abort this handler.
+                }
+            });
+        require(destroyed&&continued&&forbidden==0,"Destroy skips later dispatch without aborting its handler");
+        require(instances.size()==3&&instances.find(1)->x==42,"all marked lifetimes remain allocated until cleanup");
+        require(instances.find(3)->alarms.get(0)==1&&instances.find(3)->alarms.get(1)==1,
+            "already marked records do not advance alarms");
+        if(destructionPhase==StepEventPhase::beginStep||destructionPhase==StepEventPhase::alarm)
+            require(instances.find(2)->alarms.get(0)==1&&instances.find(1)->alarms.get(1)==1,
+                "destruction excludes later instance and later alarm indices immediately");
+        unsigned nextEvents=0;
+        EventScheduler<3>::runStep(instances,[](const auto&){return AlarmBank::allEvents;},
+            [&](auto&,auto){++nextEvents;});
+        require(nextEvents==0,"deferred storage does not reenter dispatch next frame");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -359,6 +393,7 @@ int main() {
     testRoomMembershipCycles();
     testExternalMembershipPublication();
     testCheckedDispatch();
+    testDeferredDestroyEligibility();
     std::cout << "event scheduler tests passed\n";
     return 0;
 }
