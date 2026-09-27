@@ -608,6 +608,20 @@ no-ops and failure paths. The saved-ID branch does not convert the old depth.
 This is only the fallback pass, not the whole room transition. The earlier
 serialized-element initialization at `0x412e60` has different rebinding and
 depth-publication behavior; it must not be replaced by ordinary attachment.
+Its type-2 branch (`0x412ea5..0x412fe6`) skips initialized elements and negative
+source IDs, then looks up the source instance ID in the global instance hash.
+An absent instance leaves the placeholder uninitialized. If the instance has
+an attachment and a layer ID other than -1, the runner searches this room's layer
+chain for that ID and a type-2 element pointing at this instance. A match is
+unlinked and returned to the element pool, without disposing the emptied layer.
+The destination element receives the instance pointer; the instance receives
+the attachment flag and destination layer ID. No depth write or inactive-tail
+move occurs. `RunnerLayerInstances::initializeReserved` supplies this checked
+publication policy with borrowed global lookup and old-attachment release
+callbacks. The release adapter must implement the same-room search, preserve
+the instance lifetime and destination placeholder, and not substitute normal
+destruction/empty-dynamic-layer retirement. Tests cover preserved fractional
+depth and position, absent/already-initialized entries and callback failures.
 The caller must also preserve original global-instance hash iteration order
 and the subsequent per-layer inactive-tail normalization (`0x41363e`). Neither
 is implied by iterating storage slots. Live persistence integration remains open.

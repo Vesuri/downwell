@@ -52,6 +52,33 @@ public:
         if(element==End||entries_[element].sourceId!=sourceId||!layers.detach(element))return false;
         entries_[element]=Entry{};return true;
     }
+    // Serialized type-2 initialization (0x412ea5..0x412fe6), not ordinary
+    // birth attachment. Missing global instances leave placeholders unbound.
+    // Lookup returns a borrowed state pointer plus generation-checked handle;
+    // a null pointer means absent. Release implements the source's search of
+    // THIS room for the old attachment, not global destruction. It must leave
+    // the destination placeholder/layer and borrowed instance state alive.
+    // In particular no depth write or inactive tail move occurs here.
+    template<class Lookup,class Release>
+    bool initializeReserved(Layers& layers,unsigned element,Lookup lookup,Release release){
+        if(!layers.succeeded()||!get(element))return false;
+        auto& entry=entries_[element];
+        if(entry.instance.generation||entry.sourceId>0x7fffffffu)return true;
+        const unsigned layer=layers.elementOwner(element);
+        const auto* destination=layers.get(layer);if(!destination)return false;
+        InstanceHandle h;RunnerDepthService::Instance* state=nullptr;
+        if(!lookup(entry.sourceId,h,state))return false;
+        if(!state)return true;
+        if(!h.generation||h.slot==0xffffffffu)return false;
+        const auto id=destination->id;
+        if(state->attached&&state->layerId!=-1&&!release(h,*state))return false;
+        // A surviving same-room attachment would alias the lifetime. Release
+        // must retire it before publication, without retiring the instance.
+        if(find(h)!=End||!get(element)||layers.elementOwner(element)!=layer||
+            !layers.get(layer)||layers.get(layer)->id!=id)return false;
+        entry.instance=h;state->attached=true;state->layerId=id;
+        return true;
+    }
     // Room initialization's fallback (0x413590..0x413610), after serialized
     // element initialization. Caller supplies original global-instance hash
     // iteration order, then performs the separate inactive-tail normalization.

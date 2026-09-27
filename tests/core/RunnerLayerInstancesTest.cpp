@@ -102,5 +102,47 @@ void roomFallback(){
     require(registry.attachRoomFallback(layers,105,{5,1},invalid,false,create)&&invalid.depth.bits==0xc2480000u,
         "saved ID path never converts old depth");
 }
+void serializedInitialization(){
+    Registry registry;Layers layers;unsigned layer=2;
+    require(layers.insertAfterEquals(17,-50,false,layer),"initialization layer");
+    for(unsigned id:{100u,101u,102u})require(registry.reserve(layers,layer,id),"initialization placeholders");
+    RunnerDepthService::Instance state;state.depth.bits=0x40f00000u;
+    state.layerId=900;state.attached=true;state.append=true;
+    unsigned lookups=0,releases=0;
+    auto lookup=[&](unsigned id,InstanceHandle& h,RunnerDepthService::Instance*& out){
+        ++lookups;require(id==101,"lookup uses source ID");h={50,3};out=&state;return true;
+    };
+    auto release=[&](InstanceHandle h,const auto& old){
+        ++releases;require(h.slot==50&&h.generation==3&&old.layerId==900&&old.attached,
+            "release sees prior attachment before publication");return true;
+    };
+    const unsigned element=registry.find(101);
+    require(registry.initializeReserved(layers,element,lookup,release),"initialize existing global instance");
+    require(lookups==1&&releases==1&&state.attached&&state.layerId==17&&state.depth.bits==0x40f00000u&&state.append,
+        "initialization preserves fractional depth and registration state");
+    require(ids(layers,registry,layer)==std::vector<unsigned>({102,101,100}),"initialization preserves placeholder position");
+    require(registry.initializeReserved(layers,element,lookup,release)&&lookups==1&&releases==1,
+        "initialized element never rebinds");
+    require(registry.initializeReserved(layers,registry.find(100),
+        [](unsigned,InstanceHandle&,RunnerDepthService::Instance*&){return true;},release)&&releases==1,
+        "missing global instance is a successful no-op");
+    require(!registry.get(registry.find(100))->instance.generation,"missing instance leaves placeholder unbound");
+    RunnerDepthService::Instance fresh;fresh.depth.bits=0xc0200000u; // -2.5
+    auto freshLookup=[&](unsigned,InstanceHandle& h,RunnerDepthService::Instance*& out){h={51,1};out=&fresh;return true;};
+    require(registry.initializeReserved(layers,registry.find(100),freshLookup,release)&&releases==1&&fresh.depth.bits==0xc0200000u,
+        "unattached initialization skips release and preserves depth");
+    RunnerDepthService::Instance failed;failed.attached=true;failed.layerId=123;failed.depth.bits=0x3f800000u;
+    require(!registry.initializeReserved(layers,registry.find(102),
+        [&](unsigned,InstanceHandle& h,RunnerDepthService::Instance*& out){h={52,1};out=&failed;return true;},
+        [](InstanceHandle,const auto&){return false;}),"release failure stops publication");
+    require(failed.layerId==123&&failed.depth.bits==0x3f800000u&&!registry.get(registry.find(102))->instance.generation,
+        "release failure leaves target unbound");
+    require(!registry.initializeReserved(layers,registry.find(102),
+        [](unsigned,InstanceHandle&,RunnerDepthService::Instance*&){return false;},release),"lookup failure propagated");
+    require(!registry.initializeReserved(layers,registry.find(102),
+        [&](unsigned,InstanceHandle&,RunnerDepthService::Instance*& out){out=&failed;return true;},release),"invalid lifetime rejected");
+    require(registry.reserve(layers,layer,0xffffffffu)&&registry.initializeReserved(layers,registry.find(0xffffffffu),
+        [](unsigned,InstanceHandle&,RunnerDepthService::Instance*&){return false;},release),"negative source ID is skipped before lookup");
 }
-int main(){permutations();lifecycle();bounds();roomFallback();std::cout<<"Serialized layer placeholders, room fallback and lifetime-checked attachment verified\n";}
+}
+int main(){permutations();lifecycle();bounds();roomFallback();serializedInitialization();std::cout<<"Serialized layer initialization, room fallback and lifetime-checked attachment verified\n";}

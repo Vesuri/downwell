@@ -26,6 +26,14 @@ bool compileRoomLayerFallback(downwell::RunnerLayerInstances<4,16>& registry,
         return layers.insertAfterEquals(nextLayerId,depth,true,slot);
     });
 }
+bool compileReservedLayerInitialization(downwell::RunnerLayerInstances<4,16>& registry,
+    downwell::RunnerLayers<4,16>& layers,unsigned element,downwell::InstanceHandle handle,
+    downwell::RunnerDepthService::Instance& state){
+    return registry.initializeReserved(layers,element,
+        [&](unsigned,downwell::InstanceHandle& h,downwell::RunnerDepthService::Instance*& out){
+            h=handle;out=&state;return true;
+        },[](downwell::InstanceHandle,const auto&){return true;});
+}
 bool compileDepthChanges(downwell::RunnerDepthChanges<16>& queue,downwell::RunnerLayers<4,16>& layers,
     downwell::RunnerDepthService::Instance& instance,unsigned element,downwell::MotionBinary64 value){
     return queue.request(element,instance.depth,value)&&queue.service([&](unsigned e){

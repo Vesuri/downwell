@@ -32,6 +32,9 @@ for start, end, digest in (
     # Room-entry fallback prefers the stored layer ID (including fixed), then
     # searches/creates a dynamic depth match before ordinary attachment.
     (0x413590, 0x413613, "c55dde2205b4c4d035dd44698216b4746fd49974cb1ece01ad4eee5659c20ae0"),
+    # Serialized type-2 initialization binds an existing instance without
+    # overwriting its depth or moving inactive placeholders to the tail.
+    (0x412e60, 0x412fe7, "3de1827d6b974ffadfed1b4d6507b8ae0eb499634a49ed621a7331563f0cedd5"),
     # Element insertion, layer movement/merge, and reverse inactive tail moves.
     (0x4128d0, 0x4129cd, "be01d3600e3a984f13b2927abc893d7cb279e2449dcfc4c2f68ac3910b4d1f8b"),
     (0x4147b0, 0x414949, "0b5d221b348ec2f8d5ed5edee3b106279214ac4a81c5c2541f17ee49f07db835"),
