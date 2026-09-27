@@ -23,6 +23,7 @@
 #include "StoredTimeChangeRegistration.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
+#include "EventScheduler.h"
 #include "ScriptSpawnOperations.h"
 #include "EffectSpawnScript.h"
 #include "TimeChangeEffects.h"
@@ -224,6 +225,27 @@ public:
         return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;
     }
     struct NoCollisionPass {bool operator()()const{return true;}};
+    template<unsigned Capacity,unsigned Registered,class Stopped,class Collisions=NoCollisionPass>
+    bool stepWithDebris(StoredDebrisRegistration<instanceCapacity,Registered>& registration,DebrisEffects<Capacity>& effects,
+        const Input& input,Stopped stopped,bool advancePressed=false,Collisions collisions={}){
+        if(!run_.effectsSucceeded)return false;
+        if(debrisEventDispatch_||!registration.belongsTo(instances_)||!effects.valid())return run_.effectsSucceeded=false;
+        if(debrisBinding_.effects!=&effects||debrisBinding_.registry!=&registration){
+            if(hasDebrisRecords())return run_.effectsSucceeded=false;
+            debrisBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registration);
+        }
+        auto dispatch=[&](const InstanceRecord& record,StepEvent event){
+            if(event.phase==StepEventPhase::alarm)return registration.dispatchAlarmEvent(record,effects,event.subtype);
+            if(event.phase==StepEventPhase::step)return registration.dispatchScheduledStep(record,effects,random_,stopped);
+            return true; // Object 370 has no Begin/End Step body.
+        };
+        debrisEventContext_=&dispatch;
+        debrisEventDispatch_=[](void* context,const InstanceRecord& record,StepEvent event){
+            return (*static_cast<decltype(dispatch)*>(context))(record,event);
+        };
+        const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
+        debrisEventDispatch_=nullptr;debrisEventContext_=nullptr;return ok;
+    }
     // Script effects join the real active-room animation traversal, not a
     // separate family-wide pass. The callback is scoped to this ordinary tick.
     template<unsigned Capacity,unsigned Registered,class Collisions=NoCollisionPass>
@@ -319,6 +341,10 @@ public:
         MotionBinary64 x,MotionBinary64 y,int area,std::uint32_t& id){
         if(!run_.effectsSucceeded)return false;
         if(!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
+        if(debrisBinding_.effects!=&effects||debrisBinding_.registry!=&registration){
+            if(hasDebrisRecords())return run_.effectsSucceeded=false;
+            debrisBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registration);
+        }
         const auto local=effects.createRegistered(x,y,area,random_,registration);
         if(!local)return run_.effectsSucceeded=false;
         id=registration.sourceId(local);return run_.effectsSucceeded=id!=0;
@@ -755,6 +781,17 @@ private:
     InstanceStore<instanceCapacity> instances_;
     InstanceLifecycleBinding lifecycle_;
     ScriptEffectRuntimeBinding scriptEffectsBinding_;
+    ScriptEffectRuntimeBinding debrisBinding_;
+    bool hasDebrisRecords()const{
+        for(std::size_t i=0;i<instances_.size();++i)if(instances_.at(i).objectId==370)return true;
+        return false;
+    }
+    bool clearRoomDebris(){
+        if(hasDebrisRecords()&&!debrisBinding_.clearRoom())return run_.effectsSucceeded=false;
+        debrisBinding_={};return true;
+    }
+    void* debrisEventContext_=nullptr;
+    bool (*debrisEventDispatch_)(void*,const InstanceRecord&,StepEvent)=nullptr;
     bool hasScriptEffectRecords()const{
         for(std::size_t i=0;i<instances_.size();++i)if(instances_.at(i).objectId==219)return true;
         return false;

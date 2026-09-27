@@ -928,6 +928,35 @@ int main(){
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
         require(collision->attach(*world),"attach script-effect registration fixture");
         world->skipToGameForTesting();
+        {
+            auto registration=world->debrisRegistration<1>();DebrisEffects<1> effects;unsigned id=0;
+            require(world->spawnDebris(registration,effects,MotionBinary64::fromInteger(20000),
+                MotionBinary64::fromInteger(20000),1,id),"spawn scheduled debris in empty terrain");
+            DebrisAnimation expected=*effects.get(1);auto random=world->randomState();unsigned stops=0;
+            for(unsigned tick=0;tick<40;++tick){
+                const bool frozen=tick<5;
+                require(expected.advanceImage(),"scheduled reference animation");
+                for(unsigned a=0;a<3;++a)expected.advanceAlarm(a);
+                require(expected.step(frozen,random,[](auto,auto,bool& hit){hit=false;return true;}),"scheduled reference Step");
+                require(world->stepWithDebris(registration,effects,{},
+                    [&](InstanceHandle,const auto&,bool& stop){++stops;stop=frozen;return true;}),"SDL scheduler dispatches debris events");
+                const auto* record=world->instance(id);const auto* actual=effects.retained(1);
+                if(expected.destroyRequested){require(!record&&!actual,"scheduled Alarm 0 retires at room cleanup");continue;}
+                require(record&&actual,"scheduled debris stays alive until source expiration");
+                require(actual->x.bits==expected.x.bits&&actual->y.bits==expected.y.bits&&
+                    actual->imageIndex.bits==expected.imageIndex.bits&&actual->imageSpeed.bits==expected.imageSpeed.bits&&
+                    actual->noTouch==expected.noTouch&&actual->disappearing==expected.disappearing&&actual->flash==expected.flash,
+                    "scheduled debris state matches animation, alarms, freeze and motion");
+                for(unsigned a=0;a<3;++a)require(record->alarms.get(a)==expected.alarms.get(a)&&
+                    actual->alarms.get(a)==expected.alarms.get(a),"scheduler does not double-decrement debris alarms");
+            }
+            require(stops==34,"five frozen frames extend the thirty-frame lifetime without dispatch after death");
+            require(world->spawnDebris(registration,effects,{},{},1,id),"spawn debris before Retry");
+            require(world->restartFromResults(DeathMenuSequence::Action::Retry,42)&&!effects.size()&&!world->instance(id),
+                "Retry clears borrowed debris before room transition");
+            require(world->spawnDebris(registration,effects,{},{},1,id)&&effects.retained(3),"reuse monotonic debris owner after Retry");
+            require(effects.clear(registration),"clear scheduled debris fixture");
+        }
         for(int area=1;area<=5;++area){
             auto debrisRegistration=world->debrisRegistration<1>();DebrisEffects<1> debris;
             const auto cutoff=debris.beginPhase();auto expectedRandom=world->randomState();

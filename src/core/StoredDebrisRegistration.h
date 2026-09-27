@@ -16,6 +16,10 @@ template<unsigned WorldCapacity,unsigned Capacity> class StoredDebrisRegistratio
     InstanceStore<WorldCapacity>& records_;const ObjectPack* objects_;
     InstanceLifecycleBinding lifecycle_;std::uint32_t& nextId_;const int& room_;bool& succeeded_;
     bool fail(){succeeded_=false;return false;}
+    Entry* forRecord(const InstanceRecord& r){
+        for(auto& e:entries_)if(e.local&&e.id==r.instanceId)return record(e)==&r?&e:nullptr;
+        return nullptr;
+    }
     Entry* entry(unsigned local){for(auto& e:entries_)if(local&&e.local==local)return &e;return nullptr;}
     InstanceRecord* record(const Entry& e){
         auto* r=records_.resolve(e.key);return r&&r->instanceId==e.id&&r->objectId==370?r:nullptr;
@@ -92,6 +96,21 @@ public:
         auto* e=selected(key,r,effects);
         if(!e||!effects.advanceRegisteredAlarmOne(e->local,phase,index,*this))return fail();
         record(*e)->alarms=e->effect->alarms;return true;
+    }
+    template<unsigned N> bool dispatchAlarmEvent(const InstanceRecord& r,DebrisEffects<N>& effects,unsigned index){
+        auto* e=forRecord(r);
+        if(!e||!selected(e->key,r,effects))return fail();
+        return effects.dispatchRegisteredAlarmEventOne(e->local,r.alarms,index,*this)||fail();
+    }
+    template<unsigned N,class Random,class Stopped>
+    bool dispatchScheduledStep(const InstanceRecord& r,DebrisEffects<N>& effects,Random& random,Stopped stopped){
+        auto* e=forRecord(r);
+        if(!e||!selected(e->key,r,effects))return fail();
+        auto* effect=effects.get(e->local);if(!effect)return fail();
+        // Include countdowns that did not fire an event, and the following
+        // tick's zero-to-inactive changes, before TimeStopBound refunds them.
+        effect->alarms=r.alarms;
+        return dispatchStep(e->key,r,effects,effects.beginPhase(),random,stopped);
     }
     template<unsigned N,class Random,class Stopped>
     bool dispatchStep(InstanceHandle key,const InstanceRecord& r,DebrisEffects<N>& effects,

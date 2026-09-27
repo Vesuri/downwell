@@ -13,6 +13,11 @@ struct DebrisMotion : DebrisBirth {
     }
     void advanceAlarm(unsigned index){
         if(destroyRequested||index>2||!alarms.advanceOne(index))return;
+        alarmEvent(index);
+    }
+    // Event body only. Stored-world schedulers have already advanced the bank.
+    void alarmEvent(unsigned index){
+        if(destroyRequested||index>2)return;
         if(index==0)destroyRequested=true;
         else if(index==1)disappearing=true;
         else noTouch=false;

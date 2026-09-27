@@ -430,7 +430,7 @@ Step snapshot for 16 seeds and 40 frames, comparing full state/RNG with the
 source-motion component using independent rectangular terrain overlaps. It also
 checks newborn exclusion and terminal decision failure. This is not yet normal
 gameplay scheduling: cross-family alarm dispatch, live time-field decisions,
-automatic SDL dispatch and rendering remain required before natural birth admission.
+production scheduler admission and rendering remain required before natural birth admission.
 
 `StoredDebrisRegistration` provides the SDL stored-world counterpart, retaining
 both the effect address and generation-checked `InstanceRecord` identity. It
@@ -441,10 +441,24 @@ and selected `stepDebris` consume the world's RNG, not a separate effect stream.
 Room cleanup retires through the particle owner before erasing the real record.
 The resource-backed fixture covers all five area variants, mirrored alarm
 refunds, collision exclusion and slot reuse. Keep the registration and effect
-owner alive until explicitly cleared; automatic room transition ownership is
-not installed yet. Do not run its `advanceAlarm` after the generic SDL scheduler
-has already decremented the record bank: the eventual event adapter must
-distinguish decrementing a timer from handling an already-fired alarm.
+owner alive until cleared. Spawn installs room-owned animation and cleanup
+bindings; reset, room changes and Retry clear the particle owner before removing
+stored records.
+
+`StartupRuntime::stepWithDebris` scopes the checked freeze decision and event
+adapter to one real scheduler tick. Animation follows room traversal; alarm
+bodies run only after the generic scheduler decrements the record bank. Shared
+`DebrisMotion::alarmEvent` is distinct from `advanceAlarm`, so firing does not
+decrement twice. At ordinary Step, the adapter copies the scheduler's whole
+bank, including countdowns which did not fire and zero-to-inactive changes,
+before the shared motion code can refund positive alarms. Explicit manual
+`advanceAlarm` remains for callers that own the countdown themselves and must
+not be combined with scheduler advancement. A normal tick with registered
+debris but no scoped event adapter fails rather than silently omitting Step.
+The full scheduler fixture covers 40 ticks, five frozen frames, single alarm
+dispatch, post-destruction exclusion, cleanup and Retry. It supplies freeze
+decisions explicitly; wiring original live time-stop state, both renderers and
+natural combat births remains unfinished.
 
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed

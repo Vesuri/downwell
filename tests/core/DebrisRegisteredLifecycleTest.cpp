@@ -9,6 +9,10 @@ struct Lifecycle {
     bool destroyed(unsigned,const downwell::DebrisAnimation&);
     bool retire(unsigned,const downwell::DebrisAnimation&);
 };
+bool nativeDebrisAlarmEvent(downwell::DebrisEffects<2>& owner,unsigned h,
+    const downwell::AlarmBank& bank,unsigned index,Lifecycle& life){
+    return owner.dispatchRegisteredAlarmEventOne(h,bank,index,life);
+}
 bool nativeRegisteredDebris(downwell::DebrisEffects<2>& owner,downwell::GameMakerRandom& random,Lifecycle& life){
     const auto h=owner.createRegistered({}, {},1,random,life);const auto phase=owner.beginPhase();
     return h&&owner.advanceRegisteredAnimationOne(h,phase,life)&&

@@ -63,6 +63,7 @@ StartupRuntime::StartupRuntime(PlatformProfile profile,
 }
 
 void StartupRuntime::reset(PlatformProfile profile) {
+    if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}
     if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
     if(!instances_.clear([this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);})){
         roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;
@@ -205,6 +206,7 @@ void StartupRuntime::resetSceneState() {
 
 bool StartupRuntime::restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed) {
     if (resultsDestination(action) == ResultsDestination::none) return false;
+    if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
     const auto records = run_.records();
     resetSceneState();
@@ -300,6 +302,12 @@ void StartupRuntime::stepInternal(bool advancePressed,
     // Step, even after camMain's own Step changes the followed instance.
     ordinaryStepViewTopQ12_ = mainCameraMotion_.viewTopQ12();
     ordinaryStepViewLeftQ12_ = mainCameraMotion_.viewLeftQ12();
+    if(debrisBinding_.effects){
+        if(hasDebrisRecords()){
+            if(!debrisEventDispatch_){run_.effectsSucceeded=false;return;}
+            debrisBinding_.beginAnimation();
+        }else debrisBinding_={};
+    }
     if(scriptEffectsBinding_.effects){
         if(hasScriptEffectRecords())scriptEffectsBinding_.beginAnimation();
         else scriptEffectsBinding_={};
@@ -351,6 +359,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
+        if(instance.objectId==370&&!debrisBinding_.advance(key,&instance))return false;
         if(instance.objectId==219){
             if(scriptAnimationDispatch_){if(!scriptAnimationDispatch_(scriptAnimationContext_,key,instance))return false;}
             else if(!scriptEffectsBinding_.advance(key,&instance))return false;
@@ -404,6 +413,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
         // Projectiles still use the shared supported Step adapter below.
         // Registration does not authorize a second dispatch of their events.
         if(instance.objectId==261)return;
+        if(instance.objectId==370){
+            if(!debrisEventDispatch_||!debrisEventDispatch_(debrisEventContext_,instance,event))run_.effectsSucceeded=false;
+            return;
+        }
         if (event.phase==StepEventPhase::step) instance.enemyStepEligible=true;
         if (objectPack_ != nullptr) {
             if (event.phase == StepEventPhase::alarm) {
@@ -840,9 +853,10 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
 
 bool StartupRuntime::cleanupMainBullets(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
-        [this](const InstanceRecord& r){return r.objectId==261||(r.objectId==219&&!scriptAnimationDispatch_);},
+        [this](const InstanceRecord& r){return r.objectId==261||r.objectId==370||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
+            if(r.objectId==370)return debrisBinding_.retire(key,&r);
             return instances_.erase(r.instanceId,
             [this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);});});
 }
@@ -2230,6 +2244,7 @@ void StartupRuntime::gotoRoom(int roomId) {
 
 void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
     if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
+    if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}
     if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
     const auto instanceHandler = [this](InstanceRecord& instance,
                                         RoomInstancePhase phase) {

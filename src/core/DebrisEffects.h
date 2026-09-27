@@ -92,6 +92,15 @@ public:
            }))return good_=false;
         return publishMark(*slot,lifecycle);
     }
+    template<class Lifecycle>
+    bool dispatchRegisteredAlarmEventOne(Handle h,const AlarmBank& bank,unsigned index,Lifecycle& lifecycle){
+        auto* slot=find(h);
+        if(!slot||index>2||bank.get(index)!=0)return good_=false;
+        if(slot->effect.destroyRequested)return true;
+        slot->effect.alarms=bank;
+        slot->effect.alarmEvent(index);
+        return publishMark(*slot,lifecycle);
+    }
     template<class Lifecycle> bool retireMarked(Handle h,Lifecycle& lifecycle){
         auto* slot=find(h);
         if(!slot||!slot->effect.destroyRequested||!slot->markPublished||
