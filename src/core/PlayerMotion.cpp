@@ -472,9 +472,5 @@ unsigned PlayerMotion::spriteFrame(bool dead, int deathAnimation) const
     if (spinJumping_) return spinPhaseTwentieths_ / 20;
     if (airborneShot_)
         return shotPhaseQuarters_ / 4 < 3 ? shotPhaseQuarters_ / 4 : 3;
-    if (speedY_ < -2 * fixedOne) return 0;
-    if (speedY_ < 0) return 1;
-    if (speedY_ < fixedOne) return 2;
-    if (speedY_ < 2 * fixedOne) return 3;
-    return 4;
+    return downwell::playerAirFrame(speedYFifths());
 }

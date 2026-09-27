@@ -73,6 +73,20 @@ template<class Math> void checkControls() {
 }
 
 int main() {
+    for(long velocity=-16*1280;velocity<=16*1280;++velocity){
+        const double ysp=double(velocity)/1280;
+        const int magnitude=int(std::floor(std::fabs(ysp)));
+        unsigned expected;
+        if(ysp<0){
+            expected=0;
+            switch(magnitude){case 0:case 1:expected=1;break;case 2:case 3:expected=0;break;}
+        }else{
+            expected=4;
+            switch(magnitude){case 0:expected=2;break;case 1:expected=3;break;case 2:expected=4;break;}
+        }
+        require(downwell::playerAirFrame(velocity)==expected,
+                "air pose follows source sign/floor switch at every fifth-Q8 boundary");
+    }
     for(unsigned reject:{0u,1u,2u}){
         long speed=256;int facing=1;unsigned calls=0;
         const bool ok=downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(

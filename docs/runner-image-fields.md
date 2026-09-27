@@ -227,3 +227,14 @@ symbols. This does not establish live skeleton behavior: throw/activation/hit
 presentation decisions, damage/death effects, owner lifecycle and rendering
 still need connection. Native execution and timing of this component remain
 unmeasured.
+
+## Airborne player pose boundaries
+
+`gml_GlobalScript_playerSpriteControl.asm` blocks 35–51 set the ordinary air
+sprite's index from the sign of `ysp` and `floor(abs(ysp))`. Negative speeds
+strictly above -2 select frame 1; exactly -2 and faster upward speeds select
+frame 0. Nonnegative speeds select frames 2, 3, or 4 at the 1 and 2 boundaries.
+The current shared fixed-point player applies this rule to its full signed
+fifths-of-Q8 velocity, including the gravity remainder, not the truncated Q8
+component. This corrects frame selection within that representation; original
+binary64 motion and the exact sprite-control event phase remain separate work.

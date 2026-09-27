@@ -35,6 +35,22 @@ bool resolveLedge(void* opaque, int x, int y) {
 } // namespace
 
 int main() {
+    unsigned airFrames=0;
+    for(unsigned release=1;release<=24;++release){
+        PlayerMotion flight;
+        for(unsigned tick=0;tick<80;++tick){
+            downwell::Input input;input.fire=tick<release;
+            flight.step(input);
+            if(flight.spriteId()!=37)continue;
+            const double velocity=double(flight.speedYFifths())/1280;
+            const int magnitude=int(std::floor(std::fabs(velocity)));
+            const unsigned expected=velocity<0 ? (magnitude<2?1u:0u) :
+                magnitude==0?2u:magnitude==1?3u:4u;
+            require(flight.spriteFrame()==expected,"live jump/release air pose uses the complete signed velocity");
+            ++airFrames;
+        }
+    }
+    require(airFrames>300,"air-pose integration covers varied jump-release timings");
     for (bool high : {false, true}) {
         PlayerMotion firing(false, 10000);
         downwell::Input fire; fire.fire = true;
@@ -323,8 +339,8 @@ int main() {
 
     input.fire = false;
     player.step(input);
-    require(player.spriteFrame() == 1,
-            "variable-height release selects the slow upward frame");
+    require(player.speedYFifths()==-2*1280&&player.spriteFrame() == 0,
+            "release at exactly -2 selects source floor(abs(ysp))==2 frame zero");
     input.fire = true;
     player.step(input);
     require(player.shots() == 1 && player.ammo() == 7,

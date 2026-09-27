@@ -3,6 +3,15 @@
 
 namespace downwell {
 
+// playerSpriteControl [35..51], expressed in the motion owner's signed
+// fifths-of-Q8 storage. Source tests ysp's sign then floor(abs(ysp)).
+inline unsigned playerAirFrame(long velocityFifths) {
+    if(velocityFifths<0)return velocityFifths<=-2L*1280 ? 0u : 1u;
+    if(velocityFifths<1280)return 2;
+    if(velocityFifths<2L*1280)return 3;
+    return 4;
+}
+
 // Transitional arithmetic adapters. Rules below are shared; neither adapter
 // establishes the original VM's binary64 storage/rounding semantics.
 struct FixedPlayerMath {

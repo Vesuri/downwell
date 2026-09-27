@@ -81,6 +81,7 @@ public:
     long frameStartYFixed() const { return frameStartY_; }
     long speedXFixed() const { return speedX_; }
     long speedYFixed() const { return speedY_; }
+    long speedYFifths() const { return speedY_*5+gravityRemainder_; }
     bool jumpShootLocked() const { return jumpShootLocked_; }
     bool shotDelayed() const { return shotDelay_ != 0; }
     bool airborneShot() const { return airborneShot_; }
