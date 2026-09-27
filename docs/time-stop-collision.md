@@ -1114,6 +1114,16 @@ two-event traces, checking complete modeled state and external-call order.
 Query answers, out-of-view and engine side effects are fixtures in that test;
 it proves control flow, not their implementation or end-to-end wall fidelity.
 
+The stored collision owner's production lifecycle binding exposes both shape
+queries and a separate `positionMeeting` point query. The latter has no caller
+handle, forwards binary64 VM coordinate words unchanged to the resource-backed
+owner, and publishes its boolean result only on success. An absent binding is
+an error, not a successful miss. Older partial owners must explicitly opt in;
+they do not acquire a terrain-grid fallback. Live authored-wall tests exercise
+the binding against the original collision resources without moving instances
+or consuming RNG. This query connection does not enable wall event scheduling
+or establish the native world's still-incomplete heterogeneous ownership.
+
 The compatibility `tile_add` script finds the first existing layer with the
 requested depth, or creates one, then calls `layer_tile_create` with the source
 patch and world coordinates. The wall does not retain the returned tile ID.

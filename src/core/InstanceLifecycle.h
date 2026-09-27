@@ -84,6 +84,21 @@ public:
         return b;
     }
     bool hasPlaceMeeting()const{return placeMeeting_!=nullptr;}
+    template<class Owner> static RecordLifecycleBinding bindPointQueries(Owner& owner){
+        auto b=bindFrameSnapshots(owner);
+        b.positionMeeting_=[](void* p,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+            return static_cast<Owner*>(p)->positionMeeting(object,x,y,hit);
+        };
+        return b;
+    }
+    bool hasPositionMeeting()const{return positionMeeting_!=nullptr;}
+    bool positionMeeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit)const{
+        // Point queries have no moving caller and must not fall back to a
+        // shape query or treat an unavailable owner as an empty scene.
+        bool next=false;
+        if(!positionMeeting_||!positionMeeting_(context_,object,x,y,next))return false;
+        hit=next;return true;
+    }
     template<class Owner> static RecordLifecycleBinding bindFrameSnapshots(Owner& owner){
         auto b=bindPositionedBirths(owner);
         b.previous_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->capturePrevious(h,r);};
@@ -183,6 +198,7 @@ private:
     bool (*sprite_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*mask_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*placeMeeting_)(void*,InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,bool&)=nullptr;
+    bool (*positionMeeting_)(void*,int,MotionBinary64,MotionBinary64,bool&)=nullptr;
     bool (*instancePlace_)(void*,InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,InstancePlaceResult&)=nullptr;
     bool (*imageIndex_)(void*,InstanceHandle,const Record&,RunnerImageValue)=nullptr;
     bool (*transform_)(void*,InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t)=nullptr;

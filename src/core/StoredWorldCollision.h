@@ -45,7 +45,7 @@ public:
         if(!valid()||(runtime_&&runtime_!=&runtime))return false;
         runtime_=&runtime;return true;
     }
-    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindFrameSnapshots(*this);}
+    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindPointQueries(*this);}
     bool capturePrevious(InstanceHandle h,const InstanceRecord& r){
         return resolve(h)==&r&&adapter_.capturePrevious(h,r);
     }

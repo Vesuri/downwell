@@ -112,6 +112,29 @@ int main(){
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
     {
+        struct PointOwner:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            bool succeed=false,answer=false;int selector=-1;
+            MotionBinary64 receivedX{},receivedY{};
+            bool positionMeeting(int object,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                selector=object;receivedX=x;receivedY=y;hit=answer;return succeed;
+            }
+        };
+        auto owner=std::make_unique<PointOwner>(objects,sprites,masks);
+        const auto binding=InstanceLifecycleBinding::bindPointQueries(*owner);
+        const MotionBinary64 x{0x3ff80000u,1u},y{0xbff40000u,3u};
+        bool hit=true;
+        require(!binding.positionMeeting(60,x,y,hit)&&hit,
+            "failed point callback cannot overwrite the caller's previous result");
+        require(owner->selector==60&&owner->receivedX.high==x.high&&owner->receivedX.low==x.low&&
+            owner->receivedY.high==y.high&&owner->receivedY.low==y.low,
+            "point binding preserves fractional VM coordinate words and selector");
+        owner->succeed=true;
+        require(binding.positionMeeting(60,x,y,hit)&&!hit,"successful point miss is published");
+        owner->answer=true;
+        require(binding.positionMeeting(60,x,y,hit)&&hit,"successful point hit is published");
+    }
+    {
         auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"scheduled-change families");
         // This scheduler fixture owns its records directly, not through a
         // StartupRuntime. Collision queries are deliberately unavailable.
@@ -740,6 +763,12 @@ int main(){
         for(unsigned i=0;i<production->activeInstanceCount();++i)
             if(production->instanceAt(i).objectId==60){wall=&production->instanceAt(i);break;}
         require(wall!=nullptr,"room supplies terrain for live point queries");
+        const auto binding=productionOwner->binding();
+        require(binding.hasPositionMeeting(),"production lifecycle publishes point queries");
+        bool unchanged=true;
+        require(!InstanceLifecycleBinding{}.hasPositionMeeting()&&
+            !InstanceLifecycleBinding{}.positionMeeting(60,{},{},unchanged)&&unchanged,
+            "missing point ownership fails without publishing a miss");
         for(int dy=-16;dy<=16;dy+=4)for(int dx=-16;dx<=16;dx+=4){
             const int x=wall->x+dx,y=wall->y+dy;bool expected=false;
             for(unsigned i=0;i<production->activeInstanceCount();++i){
@@ -757,7 +786,7 @@ int main(){
                 if(mask.contains(px,py)){expected=true;break;}
             }
             bool hit=false;
-            require(productionOwner->positionMeeting(60,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),hit)&&hit==expected,
+            require(binding.positionMeeting(60,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),hit)&&hit==expected,
                 "live indexed point query matches authored unit terrain bounds and original masks");
         }
         require(production->stateDigest()==digest,"point queries do not move instances or consume game RNG");
