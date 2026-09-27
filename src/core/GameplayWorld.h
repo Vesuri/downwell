@@ -195,6 +195,9 @@ public:
                               const PlayerLifecycleBinding& playerLifecycle = {},
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
+    void configureBeginStepBoundary(bool (*callback)(void*),void* context){
+        beginStepBoundary_=callback;beginStepBoundaryContext_=context;
+    }
     // RoomPack serializes instanceCreationOrder, not object/position order.
     // This terrain-only handoff does not execute the complete room lifecycle.
     template<class Terrain>
@@ -503,6 +506,8 @@ public:
 
 private:
     EnemyLifecycleBinding enemyLifecycle_;
+    bool (*beginStepBoundary_)(void*)=nullptr;
+    void* beginStepBoundaryContext_=nullptr;
     BreakableLifecycleBinding breakableLifecycle_;
     PlayerLifecycleBinding playerLifecycle_;
     downwell::GameplayTerrainInstances* terrainInstances_=nullptr;

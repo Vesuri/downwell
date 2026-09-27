@@ -188,6 +188,41 @@ int main(){
         assert(queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(400),MotionBinary64::fromInteger(800),masks,hit)&&hit);
         hit=true;assert(!queries->terrainPositionMeeting(82,{},{},masks,hit)&&hit&&!queries->valid());
     }
+    {
+        auto phaseOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto phaseWorld=std::make_unique<GameplayWorld>(300,true,0,false,phaseOwner->enemyBinding(),
+            phaseOwner->breakableBinding(),phaseOwner->playerBinding(),&phaseOwner->terrain());
+        assert(phaseOwner->attach(*phaseWorld));
+        assert(phaseWorld->createGeneratedInstance({60,240,512},objects,[](const auto&){return true;}));
+        auto local=phaseOwner->terrain().handle(0);InstanceHandle shared;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
+        assert(phaseOwner->terrain().activation(local,false));
+        assert(!(phaseOwner->state(shared)->flags&0x80000u)); // Deferred until phase boundary.
+        phaseWorld->step(0);assert(phaseWorld->effectsSucceeded());
+        assert(phaseOwner->state(shared)->flags&0x80000u);
+        assert(phaseOwner->terrain().activation(local,true));
+        assert(phaseOwner->state(shared)->flags&0x80000u);
+        phaseWorld->step(0);assert(phaseWorld->effectsSucceeded());
+        assert(!(phaseOwner->state(shared)->flags&0x80000u));
+        assert(phaseWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        assert(phaseWorld->createGeneratedInstance({60,240,512},objects,[](const auto&){return true;}));
+        local=phaseOwner->terrain().handle(0);
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
+        assert(phaseOwner->terrain().activation(local,false));
+        phaseWorld->step(0);assert(phaseWorld->effectsSucceeded());
+        assert(phaseOwner->state(shared)->flags&0x80000u); // Callback survives Retry.
+    }
+    {
+        auto phaseWorld=std::make_unique<GameplayWorld>(300);
+        struct Audit{unsigned boundaries=0,generations=0;} audit;
+        phaseWorld->configureBeginStepBoundary([](void* p){++static_cast<Audit*>(p)->boundaries;return false;},&audit);
+        phaseWorld->configureGenerationStep([](void* p,GameplayWorld&,GameMakerRandom&,int){
+            ++static_cast<Audit*>(p)->generations;return true;
+        },&audit);
+        phaseWorld->step(0);
+        assert(!phaseWorld->effectsSucceeded()&&audit.boundaries==1&&!audit.generations);
+        phaseWorld->step(0);assert(audit.boundaries==1&&!audit.generations);
+    }
     for(bool reject:{false,true}){
         auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),

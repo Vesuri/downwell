@@ -39,6 +39,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
+    const auto beginStepBoundary=beginStepBoundary_;
+    void* const beginStepBoundaryContext=beginStepBoundaryContext_;
     const auto playerLifecycle=playerLifecycle_;
     const auto nextPlayerIdentity=nextPlayerLifetimeId_;
     const auto enemyLifecycle=enemyLifecycle_;
@@ -58,6 +60,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances);
     nextBreakableLifetimeId_=nextBreakableIdentity;
+    configureBeginStepBoundary(beginStepBoundary,beginStepBoundaryContext);
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
@@ -777,6 +780,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     // Alarms follow Begin Step movement, before builder Step/Create events.
+    // Runner 0x50dc89 reconciles pending room membership after the complete
+    // Begin Step dispatcher, not after each individual activation request.
+    if(beginStepBoundary_&&!beginStepBoundary_(beginStepBoundaryContext_)){
+        run_.effectsSucceeded=false;return {};
+    }
     const auto damageNumberAlarmPhase=run_.damageNumbers.beginPhase();
     // Object 221 Alarm 0 only destroys itself: no RNG or cross-family effects.
     run_.advanceDamageNumberAlarm(damageNumberAlarmPhase,0);

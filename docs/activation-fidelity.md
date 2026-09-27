@@ -121,6 +121,15 @@ calls the reconciliation wrapper at `0x50dc89`, after the dispatcher returns.
 Do not flush object memberships after each individual Begin Step handler.
 This establishes that boundary, not every frame/room-transition call site.
 
+The native `GameplayWorld` calls its borrowed Begin Step boundary hook after
+player movement/shooting and before alarms. Attaching `GameplayCollisionOwner`
+installs reconciliation there. Immediate activation requests and dormant births
+set a pending bit; the owner does not rescan room membership on quiet frames.
+The callback survives in-place Retry, and failure latches the world before
+alarms/generation can proceed. Other source phase boundaries, remaining object
+families, and full original room ordering are still required; this hook is not
+a substitute for the complete event scheduler.
+
 `InstanceStore::reconcileObjectMembership` can publish these transitions to an
 external owner using a live handle, record and registration state. Its checked
 room traversal retains the two-pass ordering and does not republish unchanged

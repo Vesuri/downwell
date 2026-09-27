@@ -27,6 +27,7 @@ private:
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
     bool good_=false;
+    bool activationPending_=false;
     bool terrainFamilies_[2]={false,false};
     bool check(bool ok){if(!ok)good_=false;return ok;}
     bool terrainQuery(int object)const{
@@ -88,6 +89,7 @@ private:
             if(!parent.objects_.findObject(object(r),definition)||!real(definition.creationDepth,p.depth))return parent.check(false);
             if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
             parent.roomKeys_[h.slot]=h;
+            if(!r.active)parent.activationPending_=true;
             if constexpr(Kind==View::Kind::enemy){
                 p.sprite.spriteId=r.spriteId;p.sprite.maskId=r.maskId;
                 if(!real(r.objectId==117?r.motionState:r.facing,p.sprite.scaleX)||
@@ -116,7 +118,8 @@ private:
         bool membership(InstanceHandle local,const Record& r,bool member){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.registerObject(h,member));}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
-            return key(local,r,h)&&parent.check(parent.owner_.setActive(h,active,*parent.families_.flags(object(r))));}
+            if(!key(local,r,h)||!parent.check(parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
+            parent.activationPending_=true;return true;}
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.move(h,x,y,*parent.families_.flags(object(r))));}
         bool sprite(InstanceHandle local,const Record& r,int sprite){InstanceHandle h;
@@ -153,10 +156,14 @@ public:
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
     bool valid()const{return good_&&owner_.valid()&&terrain_.valid();}
-    bool attach(const GameplayWorld& world){
+    bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
-        world_=&world;return true;
+        world_=&world;
+        world.configureBeginStepBoundary([](void* context){
+            return static_cast<GameplayCollisionOwner*>(context)->reconcileActivation();
+        },this);
+        return true;
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
     auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMasks(enemies_);}
@@ -192,6 +199,7 @@ public:
     }
     bool reconcileActivation(){
         if(!valid()||!world_)return check(false);
+        if(!activationPending_)return true;
         const bool result=room_.reconcileChecked([&](unsigned slot){
             const auto* state=owner_.resolve(roomKeys_[slot]);
             if(!state){good_=false;return true;}
@@ -199,7 +207,8 @@ public:
         },[&](unsigned slot,bool registered){
             return good_&&owner_.registerObject(roomKeys_[slot],registered);
         });
-        return check(result&&good_);
+        if(!check(result&&good_))return false;
+        activationPending_=false;return true;
     }
     // Dispatch a scheduler-selected wall, not a terrain-only phase. Effects
     // owns tile publication, synchronous flower Create and area-five lifetime
