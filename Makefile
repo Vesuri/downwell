@@ -1921,6 +1921,7 @@ generated/default-shader.json: tools/export-default-shader.sh tools/export-defau
 .PHONY: verify-default-shader
 verify-default-shader: generated/default-shader.json
 	python3 tools/verify-default-shader.py
+	python3 tools/verify-runner-vertex-shader.py
 
 verify-amiga-game: generate-amiga-game verify-default-shader
 	python3 tools/verify-runner-effect-blend.py

@@ -249,6 +249,33 @@ model. That is a rejection test for generalizing the muzzle shortcut, not an
 original-runner capture or a replacement raster oracle. Keep fractional
 positions intact until a verified raster policy selects offline variants.
 
+`make verify-default-shader` also decodes the embedded Windows `vs_4_0`
+program, rather than treating the alternate GLSL source as Windows evidence.
+The HLSL11 payload contains a 1564-byte DXBC container at byte 420. Its input
+signature maps position to v0 and texture coordinates to v2; its output
+signature maps texture coordinates to o0 and system position to o1. The entire
+executable body forwards texture coordinates, copies position XYZ into a
+temporary with W=1, then computes four dot products against cb0[43..46].
+Reflection identifies these slots as the fifth matrix in `_gm_Matrices`.
+There is no explicit round, floor, integer conversion or extra position offset
+in this program. The verifier checks the decoded operands as well as input
+identity and the complete embedded container hash. Token interpretation follows
+[Microsoft's tokenized-program definitions](https://raw.githubusercontent.com/microsoft/DirectXShaderCompiler/main/include/dxc/Support/d3d12TokenizedProgramFormat.hpp).
+
+The camera builder at `0x453a70` supplies width/height from +0x18c/+0x190 and
+near/far 0/32000 to `0x6f75c0`, then publishes the result through `0x457680`.
+For nondegenerate inputs the matrix builder writes diagonal values
+2/width, 2/height, 1/(far-near), 1 and Z translation near/(near-far);
+other entries are zero. These are single-precision SSE operations, with no
+half-pixel X/Y translation in this builder. The verifier pins these routines
+and their 1.0/2.0 constants, not a whole-pipeline mapping.
+
+This does not establish the selected device feature level (the container also
+has a downlevel program), constant-buffer upload, composed view/world matrices,
+viewport, render-target orientation, sampler state or final pixel coverage.
+Do not infer a final rounding rule from these two stages alone. In particular,
+the offline resource-605 counterexamples remain model evidence, not GPU captures.
+
 `NonLoopSpriteAnimation` supplies the common sprite-change and Animation End
 state machine, also used by the live corpse-expiry child. Its admitted advance
 path requires verified nonempty unit-key sprite metadata. After the muzzle
