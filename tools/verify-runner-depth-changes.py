@@ -29,6 +29,9 @@ for start, end, digest in (
     (0x412820, 0x4128ce, "844ff5dceb7f1212b0926d58e5c05830284953ef899ab8fdfa9d7ae0bf27e22a"),
     (0x412a30, 0x412ab0, "6cda25459cdff969edb5900e9fae6122b469b20b55eac581a44d01bc29e67819"),
     (0x412ab0, 0x412bdc, "d6430edf874ff3b161026a9741e2f0f9772fc6476d05c9f08d5f7db9d00acc89"),
+    # Room-entry fallback prefers the stored layer ID (including fixed), then
+    # searches/creates a dynamic depth match before ordinary attachment.
+    (0x413590, 0x413613, "c55dde2205b4c4d035dd44698216b4746fd49974cb1ece01ad4eee5659c20ae0"),
     # Element insertion, layer movement/merge, and reverse inactive tail moves.
     (0x4128d0, 0x4129cd, "be01d3600e3a984f13b2927abc893d7cb279e2449dcfc4c2f68ac3910b4d1f8b"),
     (0x4147b0, 0x414949, "0b5d221b348ec2f8d5ed5edee3b106279214ac4a81c5c2541f17ee49f07db835"),

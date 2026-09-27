@@ -52,6 +52,29 @@ public:
         if(element==End||entries_[element].sourceId!=sourceId||!layers.detach(element))return false;
         entries_[element]=Entry{};return true;
     }
+    // Room initialization's fallback (0x413590..0x413610), after serialized
+    // element initialization. Caller supplies original global-instance hash
+    // iteration order, then performs the separate inactive-tail normalization.
+    // This is NOT depth migration: a surviving saved ID may name a FIXED layer
+    // and takes priority over depth, even if the instance depth differs.
+    template<class CreateLayer>
+    bool attachRoomFallback(Layers& layers,std::uint32_t sourceId,InstanceHandle h,
+        RunnerDepthService::Instance& state,bool inactive,CreateLayer create){
+        if(!layers.succeeded())return false;
+        if(state.attached)return true;
+        unsigned layer=state.layerId==-1?Layers::End:layers.find(state.layerId);
+        if(layer==Layers::End){
+            std::int32_t depth;
+            if(!RunnerDepthService::integerDepth(state.depth,depth))return false;
+            layer=layers.findDynamic(depth);
+            if(layer==Layers::End){
+                if(!create(depth,layer))return false;
+                const auto* created=layers.get(layer);
+                if(!created||!created->dynamic||created->depth!=depth)return false;
+            }
+        }
+        return attach(layers,layer,sourceId,h,state,inactive);
+    }
 private:
     unsigned free(const Layers& layers)const{
         for(unsigned i=0;i<ElementCapacity;++i)

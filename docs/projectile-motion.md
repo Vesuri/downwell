@@ -593,6 +593,25 @@ The live startup/native adapters still need to own these structures, retain
 visibility/state publication, coordinate persistence and retire queued depth
 identities before reuse; the connected test does not enable a live Draw switch.
 
+Room initialization's later global-instance pass (`0x413590..0x413610`) skips
+already-attached instances. For an unattached instance it first resolves its
+saved layer ID, accepting fixed as well as dynamic layers without comparing
+depth. Only a missing ID (including -1) triggers truncation of instance depth,
+lookup of a dynamic layer at that integer depth, or dynamic-layer creation.
+It then invokes ordinary attachment (`0x412ab0`), which publishes the selected
+layer's depth. `RunnerLayerInstances::attachRoomFallback` implements this
+selection with caller-owned source IDs and checked layer allocation. Tests
+distinguish saved fixed-layer identity from same-depth dynamic fallback,
+fractional truncation, fixed-only depth matches, append state, already-attached
+no-ops and failure paths. The saved-ID branch does not convert the old depth.
+
+This is only the fallback pass, not the whole room transition. The earlier
+serialized-element initialization at `0x412e60` has different rebinding and
+depth-publication behavior; it must not be replaced by ordinary attachment.
+The caller must also preserve original global-instance hash iteration order
+and the subsequent per-layer inactive-tail normalization (`0x41363e`). Neither
+is implied by iterating storage slots. Live persistence integration remains open.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

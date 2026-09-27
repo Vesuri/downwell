@@ -63,5 +63,44 @@ void bounds(){
     require(!registry.attach(layers,layer,11,{1,1},state,false)&&!state.attached,"capacity leaves instance unchanged");
     require(!registry.attach(layers,layer,10,{},state,false),"invalid handle rejected");
 }
+void roomFallback(){
+    using RoomRegistry=RunnerLayerInstances<4,8>;
+    RoomRegistry registry;RoomRegistry::Layers layers;
+    unsigned fixed=4,dynamic=4;unsigned creations=0;
+    require(layers.insertAfterEquals(17,-50,false,fixed)&&
+        layers.insertAfterEquals(18,7,true,dynamic),"room fallback layers");
+    auto create=[&](int depth,unsigned& slot){
+        ++creations;return layers.insertAfterEquals(100+creations,depth,true,slot);
+    };
+    RunnerDepthService::Instance saved;saved.layerId=17;saved.depth.bits=0x40f00000u; // 7.5
+    require(registry.attachRoomFallback(layers,100,{0,1},saved,false,create),"saved fixed ID takes priority");
+    require(saved.layerId==17&&saved.depth.bits==0xc2480000u&&creations==0,"saved layer depth published");
+    RunnerDepthService::Instance missing;missing.layerId=999;missing.depth.bits=0x40f00000u;
+    require(registry.attachRoomFallback(layers,101,{1,1},missing,false,create),"missing saved ID uses truncated depth");
+    require(missing.layerId==18&&missing.depth.bits==0x40e00000u&&creations==0,"reuse matching dynamic layer");
+    RunnerDepthService::Instance fresh;fresh.depth.bits=0xc2480000u; // fixed layer exists at -50
+    require(registry.attachRoomFallback(layers,102,{2,1},fresh,false,create),"fixed depth match cannot be reused");
+    require(fresh.layerId==101&&creations==1,"new dynamic layer created at fixed peer depth");
+    RunnerDepthService::Instance dormant;dormant.depth=fresh.depth;dormant.append=true;
+    require(registry.attachRoomFallback(layers,103,{3,1},dormant,true,create)&&creations==1,"reuse created dynamic layer");
+    std::vector<unsigned> order;
+    require(layers.visitElements(layers.find(101),[&](unsigned e){order.push_back(registry.get(e)->sourceId);return true;}),"fallback order");
+    require(order==std::vector<unsigned>({102,103}),"fallback preserves append registration flag");
+    // Already attached is a true no-op, not a second birth or reordering.
+    require(registry.attachRoomFallback(layers,103,{3,1},dormant,true,
+        [](int,unsigned&){return false;})&&creations==1,"attached instance skipped");
+    RunnerDepthService::Instance failure;failure.depth.bits=0x42c80000u; // 100
+    require(!registry.attachRoomFallback(layers,104,{4,1},failure,false,
+        [](int,unsigned&){return false;})&&!failure.attached&&registry.find(104)==RoomRegistry::End,
+        "failed layer allocation does not attach instance");
+    require(!registry.attachRoomFallback(layers,104,{4,1},failure,false,
+        [&](int,unsigned& slot){slot=fixed;return true;})&&!failure.attached,
+        "allocator cannot substitute a fixed layer");
+    RunnerDepthService::Instance invalid;invalid.depth.bits=0x7fc00000u;
+    require(!registry.attachRoomFallback(layers,105,{5,1},invalid,false,create),"invalid fallback conversion fails");
+    invalid.layerId=17;
+    require(registry.attachRoomFallback(layers,105,{5,1},invalid,false,create)&&invalid.depth.bits==0xc2480000u,
+        "saved ID path never converts old depth");
 }
-int main(){permutations();lifecycle();bounds();std::cout<<"Serialized layer placeholders and lifetime-checked attachment verified\n";}
+}
+int main(){permutations();lifecycle();bounds();roomFallback();std::cout<<"Serialized layer placeholders, room fallback and lifetime-checked attachment verified\n";}
