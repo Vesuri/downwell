@@ -4,15 +4,24 @@
 #include "PlayerLifeRules.h"
 
 namespace downwell {
+struct NoContactRetirement {
+    template<class... Args> bool operator()(Args&&...) const { return true; }
+};
+// External owners remove membership after reward creation and before the
+// current immediate-retirement writes. False is terminal; the caller must
+// latch failure, not retry a partially rewarded contact. This boundary does
+// not change the still-approximate source death-event scheduling below.
 // Shared response for the currently implemented default-style area-one
 // contact pass. Storage/FX adapters supply reward/damage emission; player movement,
 // health, immunity and defeat accounting are decided here, not by a backend.
 // Immediate enemy retirement/reward is still an approximation of the original
 // collision -> later enemy Step/death effects, and must be migrated together.
-template<class Player, class Immunity, class Count, class Reward, class Damage>
+template<class Player, class Immunity, class Count, class Reward, class Damage,
+         class Retire = NoContactRetirement>
 EnemyContact applyEnemyContact(int object, const ContactActor& enemy,
     int publishedX, int publishedY, bool& active, int& enemyHealth, Player& player, int& playerHealth,
-    Immunity& invulnerability, Count& defeated, Reward reward, bool candle, Damage damage) {
+    Immunity& invulnerability, Count& defeated, Reward reward, bool candle, Damage damage,
+    Retire retire = {}) {
     if (!active || enemyHealth <= 0 || !playerCanAct(playerHealth)) return EnemyContact::none;
     const ContactActor playerContact{player.offsetXFixed(), player.offsetYFixed(),
                                     player.facing(), 1, 31};
@@ -20,6 +29,7 @@ EnemyContact applyEnemyContact(int object, const ContactActor& enemy,
                                              player.frameStartYFixed());
     if (contact == EnemyContact::stomp) {
         if (!reward()) return EnemyContact::none;
+        if (!retire()) return EnemyContact::none;
         enemyHealth = 0;
         active = false;
         ++defeated;
@@ -49,10 +59,11 @@ struct EnemyContactLocation {
 // Failed reward/damage callbacks stop traversal without rolling back earlier
 // combo, child-creation or health changes. They must latch world failure.
 template<class Player, class Immunity, class Count, class Combo,
-         class Get, class Locate, class Reward, class Publish, class Damage>
+         class Get, class Locate, class Reward, class Publish, class Damage,
+         class Retire = NoContactRetirement>
 bool stepEnemyContacts(unsigned count, Player& player, int& health,
     Immunity& immunity, Count& defeated, Combo& combo, bool candle,
-    Get get, Locate locate, Reward reward, Publish publish, Damage damage) {
+    Get get, Locate locate, Reward reward, Publish publish, Damage damage, Retire retire = {}) {
     if (immunity > 0) --immunity;
     for (unsigned i = 0; i < count; ++i) {
         auto& enemy = get(i);
@@ -69,6 +80,8 @@ bool stepEnemyContacts(unsigned count, Player& player, int& health,
                 return succeeded = reward(enemy);
             }, candle, [&](int x, int y) {
                 return succeeded = damage(x, y);
+            }, [&] {
+                return succeeded = retire(enemy);
             });
         if (!succeeded) return false;
         if (contact != EnemyContact::none) publish(contact);

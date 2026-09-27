@@ -3,6 +3,9 @@
 #include "MachineGunProfile.h"
 #include <cstdint>
 namespace downwell {
+struct NoBulletRetirement {
+    template<class Enemy> bool operator()(const Enemy&) const { return true; }
+};
 enum class BulletImpactKind { ignored, immune, damaged, defeated, failed };
 struct BulletImpact { BulletImpactKind kind; int sound; };
 
@@ -12,10 +15,11 @@ struct BulletImpact { BulletImpactKind kind; int sound; };
 // Enemy storage exposes the same hit-state fields on both platforms. Queued
 // hit delivery and immediate fatal retirement remain phase approximations;
 // original hitAngle/hitDmg, damageStun, momentDelay and effects are not modeled.
-template<class Enemy, class Count, class Random, class Reward>
+template<class Enemy, class Count, class Random, class Reward, class Retire = NoBulletRetirement>
 BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
                                       Random& random, Reward reward, bool gemHigh = false,
-                                      std::uint32_t directionTurns = 0xc0000000u) {
+                                      std::uint32_t directionTurns = 0xc0000000u,
+                                      Retire retire = {}) {
     if (!enemy.active || enemy.health <= 0) return {BulletImpactKind::ignored, -1};
     if (enemy.objectId == 112) {
         // scrTypicalBulletDamage's immune branch: choose(30,31) before
@@ -28,6 +32,9 @@ BulletImpact applyStandardBulletImpact(Enemy& enemy, Count& defeated,
     enemy.health -= machineGunProfile(gemHigh).damage;
     if (enemy.health > 0) return {BulletImpactKind::damaged, 29};
     if(!reward())return {BulletImpactKind::failed,-1};
+    // Retain damage/reward writes if owner removal fails, but do not publish
+    // retirement, defeat accounting or sound. Caller must latch failure.
+    if(!retire(enemy))return {BulletImpactKind::failed,-1};
     enemy.active = false;
     ++defeated;
     return {BulletImpactKind::defeated, 29};

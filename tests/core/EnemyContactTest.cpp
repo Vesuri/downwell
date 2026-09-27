@@ -98,6 +98,21 @@ int main() {
         require(failed.kind==BulletImpactKind::failed&&failed.sound==-1&&enemy.active&&
             enemy.health==-8&&defeated==oldDefeated,
             "failed bullet reward retains damage but does not retire, count defeat or publish sound");
+        for(bool accepts : {false,true}) {
+            enemy=Enemy{};enemy.health=1;
+            unsigned order=0;
+            const auto before=defeated;
+            const auto impact=applyStandardBulletImpact(enemy,defeated,random,[&]{
+                require(order++==0,"bullet reward precedes owner retirement");return true;
+            },false,0xc0000000u,[&](const Enemy& live){
+                require(order++==1&&live.active&&live.health==-8&&defeated==before,
+                        "owner retires damaged actor before active flag and defeat publication");
+                return accepts;
+            });
+            require(order==2&&enemy.active==!accepts&&defeated==before+unsigned(accepts)&&
+                    impact.kind==(accepts?BulletImpactKind::defeated:BulletImpactKind::failed),
+                    "checked bullet retirement preserves earlier writes and gates later publication");
+        }
     }
     {
         struct PlayerProbe {
@@ -184,7 +199,8 @@ int main() {
         struct Combo { unsigned kills = 0; void enemyDefeated() { ++kills; } } combo;
         int health = 4;
         unsigned immunity = 1, defeated = 0, rewards = 0, published = 0, located = 0;
-        bool rewardWorks=true;
+        bool rewardWorks=true,retirementWorks=true;
+        unsigned retirements=0;
         auto step = [&] {
             return stepEnemyContacts(5, motion, health, immunity, defeated, combo, false,
                 [&](unsigned i) -> Enemy& { return enemies[i]; },
@@ -201,7 +217,10 @@ int main() {
                 [&](EnemyContact contact) {
                     require(contact != EnemyContact::none, "only applied contacts publish effects");
                     ++published;
-                }, [](int,int) { return true; });
+                }, [](int,int) { return true; },[&](const Enemy& e){
+                    require(e.active&&e.health==15,"stomp owner retires before health and active writes");
+                    ++retirements;return retirementWorks;
+                });
         };
         step();
         require(health == 3 && immunity == 90 && motion.knocks == 1 &&
@@ -227,6 +246,15 @@ int main() {
                 "failed reward cannot retire, bounce, publish or reach a later contact");
         require(rewards==oldRewards+1&&combo.kills==oldCombo+1,
                 "already executed reward callback and combo changes are not rolled back");
+        // Use a fresh count baseline after the deliberately failed reward.
+        rewards=defeated;combo.kills=defeated;
+        rewardWorks=true;retirementWorks=false;
+        const auto beforeRetirement=retirements,beforeLocated=located;
+        const auto beforeBounce=motion.bounces,beforePublished=published;
+        require(!step()&&retirements==beforeRetirement+1&&located==beforeLocated+1&&
+                enemies[1].active&&enemies[1].health==15&&motion.bounces==beforeBounce&&
+                published==beforePublished&&defeated==oldDefeated,
+                "failed owner retirement stops before bounce, defeat, publication or later contacts");
     }
     ContactActor player{0, 0, 1, 1, 31};
     ContactActor bat{0, -11 * 256, 1, 1, 153};

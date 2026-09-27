@@ -726,6 +726,14 @@ slot ownership without rewinding the lifetime counter. These handles remain
 world- and family-local; they neither establish original traversal order nor
 replace registration and synchronous retirement in the shared collision owner.
 
+The shared immediate bullet/stomp response adapters provide a checked retirement
+callback after rewards and before clearing the active flag or publishing defeat
+and bounce effects. Failure retains earlier damage/reward mutations and stops
+contact traversal; callers must latch it rather than retry. Default callbacks
+are empty until collision ownership is installed. This boundary is not evidence
+that the current immediate death response matches the runner's deferred enemy
+death events, nor does it cover snail expiry or room-clear retirement.
+
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty
 owners, just as it does for damage numbers and corpse-expiry effects. A restore
