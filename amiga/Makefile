@@ -416,7 +416,10 @@ $(AMIGA_SHOP): $(REPO)/tools/generate-amiga-hud.py $(REPO)/data/language.ini
 $(AMIGA_CLEAR): $(REPO)/tools/generate-amiga-hud.py $(REPO)/data/language.ini
 	$(MAKE) -C $(REPO) generate-amiga-clear
 
-$(ROOM_PACK):
+$(ROOM_PACK): $(REPO)/tools/generate-room-pack.py \
+	$(REPO)/tools/export-room-layer-metadata.csx $(REPO)/tools/export-room-layer-metadata.sh \
+	$(REPO)/tools/verify-room-layer-metadata.py $(REPO)/src/core/RoomPack.h \
+	$(REPO)/extracted/utmt-0.9.2.0/manifest.json $(REPO)/data/data.win
 	$(MAKE) -C $(REPO) generate-room-pack
 
 $(OBJECT_PACK):
