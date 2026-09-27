@@ -14,7 +14,8 @@ struct World {
     unsigned animations=0,steps=0;
     bool publishAnimation(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++animations;return fail!=4;}
     bool publishStep(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++steps;return fail!=5;}
-    bool publishAlarm(std::uint32_t,std::uint32_t,const TimeShardAnimation&){return fail!=6;}
+    unsigned alarmPublications=0;
+    bool publishAlarm(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++alarmPublications;return fail!=6;}
     unsigned destroys=0;
     bool active=true;
     bool animationMember=true;
@@ -39,6 +40,17 @@ struct World {
     }
 };
 int main(){
+    for(unsigned fault=0;fault<7;++fault){
+        GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
+        assert(effects.bindPhases(world));const auto h=effects.create({},{},false,random);
+        AlarmBank alarms;alarms.set(0,0);alarms.set(2,fault==0?1:0);
+        if(fault>=4)world.fail=fault==4?9:fault==5?6:7;
+        assert(!effects.dispatchAlarm(fault==1?h+1:h,fault==2?999:effects.sourceId(h),alarms,
+            fault==3?3:fault==6?0:2));
+        assert(!effects.succeeded()&&random.drawCount()==6&&world.alarmPublications==unsigned(fault>=5)&&
+            world.destroys==unsigned(fault==6));
+        assert(!effects.dispatchAlarm(h,effects.sourceId(h),alarms,0)&&world.alarmPublications==unsigned(fault>=5));
+    }
     for(unsigned failure=0;failure<4;++failure){
         GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
         assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);

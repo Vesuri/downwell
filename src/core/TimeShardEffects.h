@@ -112,15 +112,33 @@ public:
                 if(!eventEligible(slot,eligible))return;
                 if(!eligible)continue;
                 slot.effect.advanceAlarm(index);
-                if(slot.effect.destroyRequested&&destroyed_&&!destroyed_(context_,slot.handle,slot.sourceId,slot.effect)){
+                if(alarm_&&!alarm_(context_,slot.handle,slot.sourceId,slot.effect)){
                     succeeded_=false;return;
                 }
-                if(!slot.effect.destroyRequested&&alarm_&&!alarm_(context_,slot.handle,slot.sourceId,slot.effect)){
+                if(slot.effect.destroyRequested&&destroyed_&&!destroyed_(context_,slot.handle,slot.sourceId,slot.effect)){
                     succeeded_=false;return;
                 }
             }
         }
         if(!deferCleanup_)retireRequested();
+    }
+    bool dispatchAlarm(Handle handle,std::uint32_t id,const AlarmBank& alarms,unsigned index){
+        if(!succeeded_)return false;
+        if(!deferCleanup_||index>2||alarms.get(index)!=0){succeeded_=false;return false;}
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+            if(slot.handle!=handle)continue;
+            if(slot.sourceId!=id||slot.effect.destroyRequested){succeeded_=false;return false;}
+            bool eligible=true;if(!eventEligible(slot,eligible))return false;
+            if(!eligible)return true;
+            // Import all counters: publishing a fired event must not restore
+            // sibling countdowns already advanced by the global scheduler.
+            slot.effect.alarm0=alarms.get(0);slot.effect.alarm1=alarms.get(1);slot.effect.alarm2=alarms.get(2);
+            slot.effect.fireAlarm(index);
+            if(!alarm_(context_,handle,id,slot.effect)||
+                (slot.effect.destroyRequested&&!destroyed_(context_,handle,id,slot.effect))){succeeded_=false;return false;}
+            return true;
+        }
+        succeeded_=false;return false;
     }
     bool advanceAnimation(Phase phase){
         if(!succeeded_)return false;

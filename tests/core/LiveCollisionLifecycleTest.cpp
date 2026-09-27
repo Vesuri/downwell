@@ -158,6 +158,34 @@ int main(){
             return true;
         })&&retired==2&&records.size()==1,"scheduled changes retire through global cleanup");
         require(effects.createAt({},{},speed,[](unsigned){return true;}),"new lifetime after scheduled retirement");
+        const auto changeId=nextId-1;
+        StoredTimeShardRegistration<4,2> shardRegistration(records,&objects,InstanceLifecycleBinding::bindPositionedBirths(lifecycle),nextId,room,healthy);
+        TimeShardEffects<2> shards;GameMakerRandom random(123);
+        require(shards.bindPhases(shardRegistration)&&shards.create({},{},false,random)&&
+            shards.create({},{},false,random),"register shards in mixed alarm fixture");
+        const auto a=shards.sourceId(1),b=shards.sourceId(2);const auto draws=random.drawCount();
+        for(auto id:{a,b}){auto& alarms=records.find(id)->alarms;alarms.set(0,-1);alarms.set(1,1);alarms.set(2,5);}
+        records.find(99)->alarms.set(1,1);records.find(changeId)->alarms.set(1,1);
+        auto mixedTick=[&]{return EventScheduler<4>::runStepChecked(records,
+            [](const auto& r){return r.objectId==238?7u:r.objectId==211?3u:2u;},
+            [&](auto& r,StepEvent event){
+                if(event.phase!=StepEventPhase::alarm)return;
+                if(r.objectId==238)healthy=shardRegistration.dispatchAlarm(r,shards,event.subtype);
+                else if(r.objectId==211)healthy=registration.dispatchAlarm(r,effects,event.subtype,speed);
+                else records.find(a)->alarms.set(2,1);
+            },[](auto){},[](auto,const auto&,bool){return true;},[&]{return healthy;});};
+        require(mixedTick()&&speed==35&&shards.get(1)->disappearing&&shards.get(2)->disappearing&&
+            !shards.get(1)->noTouch&&shards.get(2)->noTouch&&records.find(a)->alarms.get(2)==0&&
+            records.find(b)->alarms.get(2)==4&&records.find(a)->alarms.get(0)==-1,
+            "mixed alarm phase observes another actor's later-alarm write without stale counter publication");
+        for(auto id:{a,b}){auto& alarms=records.find(id)->alarms;alarms.set(0,1);alarms.set(1,1);alarms.set(2,1);}
+        require(mixedTick()&&shards.size()==0&&records.find(a)->destroyRequested&&records.find(b)->destroyRequested&&
+            records.find(a)->alarms.get(0)==0&&records.find(a)->alarms.get(1)==1&&records.find(a)->alarms.get(2)==1&&
+            random.drawCount()==draws,"shard expiry publishes zero then excludes later alarms without RNG");
+        require(records.cleanupDestroyed([&](InstanceHandle key,const InstanceRecord& r){
+            return r.objectId==238?shardRegistration.retireMarked(key,r,shards):registration.retireMarked(key,r,effects);
+        })&&records.size()==2,"mixed scheduler shard cleanup");
+        require(effects.clear()&&effects.createAt({},{},speed,[](unsigned){return true;}),"replace remaining change for identity test");
         const InstanceRecord copied=*records.find(nextId-1);
         require(!registration.dispatchAlarm(copied,effects,1,speed)&&!healthy&&speed==30,
             "world-selected dispatch rejects a copied record rather than trusting its numeric ID");

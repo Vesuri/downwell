@@ -15,11 +15,18 @@ struct TimeShardLifecycle : TimeShardBirth {
     void advanceAlarm(unsigned index){
         if(destroyRequested)return;
         switch(index){
-        case 0: if(AlarmBank::advanceValue(alarm0))destroyRequested=true;break;
-        case 1: if(AlarmBank::advanceValue(alarm1))disappearing=true;break;
-        case 2: if(AlarmBank::advanceValue(alarm2))noTouch=false;break;
+        case 0: if(AlarmBank::advanceValue(alarm0))fireAlarm(index);break;
+        case 1: if(AlarmBank::advanceValue(alarm1))fireAlarm(index);break;
+        case 2: if(AlarmBank::advanceValue(alarm2))fireAlarm(index);break;
         default: break;
         }
+    }
+    // Dispatch only: the world scheduler has already decremented this alarm.
+    void fireAlarm(unsigned index){
+        if(destroyRequested)return;
+        if(index==0)destroyRequested=true;
+        if(index==1)disappearing=true;
+        if(index==2)noTouch=false;
     }
     template<class Random> bool playerContact(MotionBinary64 playerXsp,MotionBinary64 playerYsp,Random& random){
         if(destroyRequested || noTouch)return true;
