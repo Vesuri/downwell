@@ -11,6 +11,32 @@ static N number(double d){std::uint64_t u;std::memcpy(&u,&d,8);return {std::uint
 static bool same(N n,double d){auto r=number(d);return n.high==r.high && n.low==r.low;}
 int main(){
     unsigned cases=0;
+    // Independent scalar oracle across the integer fast-path range and its
+    // boundaries. Fractional/epsilon neighbours must retain the real path.
+    unsigned visibilityCases=0;
+    std::uint32_t random=0x19c0ffeeu;
+    auto next=[&](){random=random*1664525u+1013904223u;return random;};
+    auto verify=[&](double x,double y,double vx,double vy,double w,double h){
+        bool visible=false;
+        check(P::inView(number(x),number(y),{number(vx),number(vy),number(w),number(h)},visible));
+        check(visible==(x-vx>1e-5 && x-(vx+w)<-1e-5 && y-vy>1e-5 && y-(vy+h)<-1e-5));
+        ++visibilityCases;
+    };
+    for(unsigned i=0;i<20000;++i){
+        const int vx=int(next()%4194303u)-2097151,vy=int(next()%4194303u)-2097151;
+        const int w=int(next()%1024u)-128,h=int(next()%1024u)-128;
+        verify(vx+int(next()%1200u)-200,vy+int(next()%1200u)-200,vx,vy,w,h);
+    }
+    for(double origin:{-2097152.,-2097151.,-1048576.,-1.,-0.,0.,1.,1048576.,2097151.,2097152.})
+    for(double offset:{-1.,0.,0.000001,0.00002,159.,160.-0.00002,160.-0.000001,160.,161.}){
+        verify(origin+offset,origin+1,origin,origin,160,284);
+        verify(origin+1,origin+offset,origin,origin,284,160);
+    }
+    for(N bad:{N{0x7ff00000u,0},N{0x7ff80000u,0},N{0,1}}){
+        bool untouched=true;
+        check(!P::inView(bad,{},{{},{},number(160),number(284)},untouched)&&untouched);
+        check(!P::inView({},{},{{},{},bad,number(284)},untouched)&&untouched);
+    }
     const P::View view{number(-12.25),number(40.5),number(160),number(284)};
     for(double x:{-13.,-12.25,-12.25+0.000001,-12.25+0.00002,1.,3.,147.75-0.00002,147.75,148.})
     for(double y:{40.,40.5,40.5+0.000001,40.5+0.00002,99.,101.,324.5,325.})
@@ -32,4 +58,5 @@ int main(){
     check(!P::fx({0x7ff00000u,0},{},view,false,false,true,unchanged));
     check(unchanged.target==P::direct && same(unchanged.x,4)&&same(unchanged.y,5));
     std::printf("Effect placement: %u flag/edge cases and 16385 signed snapping cases passed\n",cases);
+    std::printf("Effect visibility: %u scalar integer/fractional comparisons passed\n",visibilityCases);
 }

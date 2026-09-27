@@ -17,6 +17,15 @@ The visibility test uses the instance origin, not its sprite bounds. All four
 comparisons are strict runner real comparisons; edge equality and its epsilon
 band are excluded. Fractional camera coordinates are retained.
 
+Visibility has an exact-integer specialization when both coordinates and all
+four view fields are integral binary64 values with magnitude below 2^21.
+Within that domain the edge sums and comparison differences are exact and fit
+signed 32 bits; every nonzero difference is outside the runner's epsilon band.
+Strict integer inequalities therefore give the same result without six software
+binary64 additions. Signed zero is accepted. Fractional, larger and unsupported
+values continue through the checked real-arithmetic path; they are never rounded
+into this specialization. Placement and world-space shade snapping are unchanged.
+
 `drawShade` is enabled only when not low-spec, in view, not `noControl`, and
 `surfaceShade` exists. It draws sprite 117, frame zero, at
 `round(world / 2) * 2 - viewOrigin` on each axis. Snap world coordinates before

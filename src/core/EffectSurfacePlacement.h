@@ -10,6 +10,17 @@ struct EffectSurfacePlacement {
     struct View { MotionBinary64 x,y,width,height; };
     struct Draw { Target target=hidden; MotionBinary64 x{},y{}; };
     static bool inView(MotionBinary64 x,MotionBinary64 y,const View& view,bool& visible) {
+        std::int32_t ix,iy,vx,vy,w,h;
+        if(smallInteger(x,ix) && smallInteger(y,iy) &&
+           smallInteger(view.x,vx) && smallInteger(view.y,vy) &&
+           smallInteger(view.width,w) && smallInteger(view.height,h)){
+            // Each input is an exact integer with magnitude below 2^21.
+            // Sums/differences are exact in binary64 and fit signed 32 bits.
+            // A nonzero integer is outside the runner's 1e-5 equality band;
+            // strict integer comparisons therefore preserve all four tests.
+            visible=ix>vx && ix<vx+w && iy>vy && iy<vy+h;
+            return true;
+        }
         auto right=view.x,bottom=view.y;int l,r,t,b;
         if(!right.add(view.width) || !bottom.add(view.height) ||
            !compareRunnerReal(x,view.x,l) || !compareRunnerReal(x,right,r) ||
@@ -55,6 +66,20 @@ struct EffectSurfacePlacement {
             }
         }
         out=next;return true;
+    }
+private:
+    static bool smallInteger(MotionBinary64 value,std::int32_t& out){
+        if(value.low)return false;
+        const unsigned magnitude=value.high&0x7fffffffu;
+        if(!magnitude){out=0;return true;}
+        const unsigned exponent=magnitude>>20;
+        if(exponent<1023 || exponent>1043)return false;
+        const unsigned shift=1043-exponent;
+        const unsigned significand=(magnitude&0xfffffu)|0x100000u;
+        if(significand&((1u<<shift)-1u))return false;
+        out=static_cast<std::int32_t>(significand>>shift);
+        if(value.high&0x80000000u)out=-out;
+        return true;
     }
 };
 }
