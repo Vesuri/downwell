@@ -129,6 +129,8 @@ SELECTIONS = {
         550: None,   # sprScattered (generated plants)
         568: None,   # sprDungTorch
         569: None,   # sprGemChunk
+        602: None,   # sprFxBoingRed (gem-high muzzle)
+        603: None,   # sprFxBoingball (usual gunboot muzzle)
         631: None,   # sprTree
         635: None,   # sprGrass
         636: None,   # sprGrass2
@@ -520,15 +522,15 @@ def build_pack(manifest, extracted, profile, language_path=None):
                 canvas = flash_palette_canvas(canvas)
             if profile == "game" and sprite_id in (84, 96, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278,
-                    458, 459, 460, 485, 486, 487, 496, 497):
+                    458, 459, 460, 485, 486, 487, 496, 497, 602, 603):
                 # Prepare snail Y flips and crawler quarter turns on the host.
                 # Crop transparent padding to keep variants Chip-RAM cheap.
                 snail = sprite_id in (177, 178)
-                bullet = sprite_id in (458, 459)
-                if bullet:
+                gun_spread = sprite_id in (458, 459, 602, 603)
+                if gun_spread:
                     require(not sprite["smooth"], "spread proof requires nearest-sampled source artwork")
                     verify_projectile_spread_pixels(canvas, sprite["originX"], sprite["originY"])
-                turns = (0, 3) if bullet else range(2 if snail else 4 if sprite_id == 278 else 1)
+                turns = (0, 3) if gun_spread else range(2 if snail else 4 if sprite_id == 278 else 1)
                 for turn in turns:
                     if turn == 0:
                         variant = canvas
@@ -545,7 +547,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
                     require(bounds is not None, "empty oriented actor frame")
-                    if bullet or sprite_id == 84:
+                    if gun_spread or sprite_id == 84:
                         # Projectile art and smoke's final single-pixel frame
                         # can sit beyond their origin. Keep that anchor inside
                         # the DMA frame when cropping, without moving pixels.
@@ -570,7 +572,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
                     # used planar facing; DMA variants remain independently
                     # generated below and checked against the pixel oracle.
                     # fxSmoke also leaves image_xscale at its default +1.
-                    facings = (False,) if bullet or sprite_id in (84, 485, 486, 487, 496, 497) else (False, True)
+                    facings = (False,) if gun_spread or sprite_id in (84, 485, 486, 487, 496, 497) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]
@@ -797,7 +799,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
         hardware = []
         actors = (0, 1, 3, 12, 15, 27, 31, 37, 84, 96, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460,
-                  485, 486, 487, 496, 497, 707)
+                  485, 486, 487, 496, 497, 602, 603, 707)
         for sprite, frame_index, dma_width, planar in encoded:
             if sprite["id"] not in actors:
                 continue

@@ -147,6 +147,18 @@ speed 0.5. The operation adapter deliberately does not allocate or draw:
 runtime ownership, global animation scheduling and depth-zero painter order
 must accompany live integration. `make verify-effect-spawn` checks the VM
 contract and initialization's publication/failure boundaries.
+
+The gameplay asset pack includes offline planar and DMA variants of muzzle
+resources 602/603 at 0 and 270 degrees. The generator's conservative inverse-map
+test covers the entire 267–273 degree spread interval, including stationary
+points and transparent pixels outside the canvas: both resources match the
+quarter turn under pixel-centre nearest sampling at integer anchors. This is
+not a proof for fractional anchors or Windows GPU edge rules. Cropping keeps
+the source-relative anchor intact. `tests/muzzle-art-test.py`, included in
+`make verify-amiga-game`, compares both planar orientations and mirrored DMA
+streams against source pixels. Assets alone do not enable muzzle emission or
+establish its cross-family Draw order.
+
 `NonLoopSpriteAnimation` supplies the common sprite-change and Animation End
 state machine, also used by the live corpse-expiry child. Its admitted advance
 path requires verified nonempty unit-key sprite metadata. After the muzzle

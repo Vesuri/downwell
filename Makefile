@@ -1910,6 +1910,7 @@ verify-amiga-game: generate-amiga-game verify-default-shader
 	tools/generate-amiga-hud.py --profile game --check
 	python3 tests/exit-mask-test.py
 	python3 tests/skeleton-art-test.py
+	python3 tests/muzzle-art-test.py
 	python3 tests/planar-packing-test.py
 
 verify-native-data: generate-room-pack generate-object-pack generate-sprite-pack generate-font-pack generate-builder-pattern-pack $(STARTUP_TEST_TARGET)
