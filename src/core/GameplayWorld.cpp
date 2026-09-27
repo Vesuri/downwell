@@ -40,6 +40,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
     const auto phaseBoundary=phaseBoundary_;
+    const auto enemyOrderCapture=enemyOrderCapture_;
+    void* const enemyOrderContext=enemyOrderContext_;
     void* const phaseBoundaryContext=phaseBoundaryContext_;
     const auto playerLifecycle=playerLifecycle_;
     const auto nextPlayerIdentity=nextPlayerLifetimeId_;
@@ -61,6 +63,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances);
     nextBreakableLifetimeId_=nextBreakableIdentity;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
+    configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
@@ -582,9 +585,23 @@ void GameplayWorld::applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmE
     // Audio output is not yet implemented by this backend.
 }
 
+bool GameplayWorld::captureEnemyStepOrder(){
+    enemyStepOrder_.clear();
+    if(enemyOrderCapture_){
+        if(!enemyOrderCapture_(enemyOrderContext_,enemyStepOrder_))return run_.effectsSucceeded=false;
+    }else{
+        // Unbound component worlds have no external registration owner.
+        for(unsigned i=0;i<enemyCount_;++i){const auto& e=enemies_[i];
+            if(e.active&&!enemyStepOrder_.append(e.identitySlot,e.lifetimeId,e.objectId))return run_.effectsSucceeded=false;
+        }
+    }
+    enemyStepOrder_.sort();return true;
+}
+
 void GameplayWorld::advanceEnemyAlarms()
 {
     DW_PROFILE_PHASE(profileEnemyAlarms);
+    if(!captureEnemyStepOrder())return;
     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
         EnemyState& enemy = enemies_[enemyIndex];
         if (!enemy.active)
@@ -596,8 +613,10 @@ void GameplayWorld::advanceEnemyAlarms()
     // Match the runner's global alarm-index order. Dispatch each event before
     // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
     for (unsigned alarm = 0; alarm < 2; ++alarm) {
-      for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
-        EnemyState& enemy = enemies_[enemyIndex];
+      for (unsigned i=0;i<enemyStepOrder_.size();++i) {
+        auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(enemyStepOrder_.handle(i)));
+        if(!live)continue;
+        EnemyState& enemy = *live;
         if (!enemy.active) continue;
         const unsigned events = downwell::enemyAlarmEvents(enemy.objectId);
         const bool alarm0Fired = alarm == 0 && downwell::AlarmBank::advanceValue(enemy.alarm0, (events & 1) != 0);
@@ -816,7 +835,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         ringOrigin_ = (unsigned)origin;
     }
 
-    const unsigned ordinaryStepEnemyCount=enemyCount_;
+    if(!captureEnemyStepOrder())return {};
     if (generationStep_ && generationSucceeded_) {
         DW_PROFILE_SCOPE(profileGeneration);
         // Camera centre is 176 + cameraY_/256; view bottom is 142 below it.
@@ -921,8 +940,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 
 
     DW_PROFILE_PHASE(profileEnemyMotion);
-    for (unsigned enemyIndex = 0; enemyIndex < ordinaryStepEnemyCount; ++enemyIndex) {
-        EnemyState& enemy = enemies_[enemyIndex];
+    for (unsigned i=0;i<enemyStepOrder_.size();++i) {
+        auto* live=const_cast<EnemyState*>(resolveEnemyLifetime(enemyStepOrder_.handle(i)));
+        if(!live)continue;
+        EnemyState& enemy = *live;
         if (!enemy.active)
             continue;
         if (enemy.objectId == 113)

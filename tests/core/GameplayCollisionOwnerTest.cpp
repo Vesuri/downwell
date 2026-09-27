@@ -329,6 +329,33 @@ int main(){
         assert(rooms.roomInstance(room,0,r));r.scaleX=2;
         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
     }
+    {
+        auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),
+            ordered->breakableBinding(),ordered->playerBinding(),&ordered->terrain());
+        assert(ordered->attach(*scene));
+        for(unsigned i=0;i<3;++i)
+            assert(scene->configureEnemy(i,112,163,int(i)*32,128,0,0,5,14,0,1,-1,1));
+        const auto first=scene->enemyHandle(scene->enemyAt(0).lifetimeId);
+        auto& record=const_cast<GameplayWorld::EnemyState&>(*scene->findEnemy(first));
+        auto binding=ordered->enemyBinding();
+        assert(binding.activation(first,record,false));record.active=false;
+        assert(ordered->reconcileActivation());
+        assert(binding.activation(first,record,true));record.active=true;
+        assert(ordered->reconcileActivation());
+        GameMakerRandom expected=scene->randomState();
+        const int second=120+int(expected.irandomSmall(180));
+        const int third=120+int(expected.irandomSmall(180));
+        const int reactivated=120+int(expected.irandomSmall(180));
+        scene->step(0);
+        assert(scene->effectsSucceeded()&&scene->enemyAt(1).alarm1==second&&
+            scene->enemyAt(2).alarm1==third&&scene->findEnemy(first)->alarm1==reactivated);
+        // A failed external capture is terminal before any actor alarm runs.
+        scene->configureEnemyStepOrder([](void*,GameplayWorld::EnemyStepOrder&){return false;},nullptr);
+        const int before=scene->enemyAt(1).alarm1;
+        scene->step(0);
+        assert(!scene->effectsSucceeded()&&scene->enemyAt(1).alarm1==before);
+    }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     {
         auto terrain=std::make_unique<GameplayTerrainInstances>();GameMakerRandom random;

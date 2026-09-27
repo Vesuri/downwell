@@ -165,6 +165,16 @@ public:
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary){
             return static_cast<GameplayCollisionOwner*>(context)->reconcileActivation();
         },this);
+        world.configureEnemyStepOrder([](void* context,GameplayWorld::EnemyStepOrder& snapshot){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid())return false;
+            return self.check(self.owner_.visitRegistrations([&](InstanceHandle shared,int object,const Owner::State& state){
+                View::Kind kind;InstanceHandle local;
+                if(!View::decode(shared,kind,local))return false;
+                if(kind!=View::Kind::enemy||(state.flags&0x100003u))return true;
+                return self.world_->resolveEnemyLifetime(local)&&snapshot.append(local.slot,local.generation,object);
+            }));
+        },this);
         return true;
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}

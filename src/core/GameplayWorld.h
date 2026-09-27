@@ -33,6 +33,7 @@
 #include "core/InstanceHandle.h"
 #include "core/InstanceLifecycle.h"
 #include "core/GameplayTerrainInstances.h"
+#include "core/RunnerStepSnapshot.h"
 
 #include <cstdint>
 
@@ -196,6 +197,10 @@ public:
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep };
+    using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
+    void configureEnemyStepOrder(bool (*capture)(void*,EnemyStepOrder&),void* context){
+        enemyOrderCapture_=capture;enemyOrderContext_=context;
+    }
     void configurePhaseBoundary(bool (*callback)(void*,PhaseBoundary),void* context){
         phaseBoundary_=callback;phaseBoundaryContext_=context;
     }
@@ -558,6 +563,10 @@ private:
     std::uint32_t nextEnemyLifetimeId_ = 1, nextGemLifetimeId_ = 1;
     unsigned bulletSlotEnd_ = 0, gemSlotEnd_ = 0;
     EnemyState enemies_[enemyCapacity];
+    EnemyStepOrder enemyStepOrder_; // Owner-resident: never a 68000 stack snapshot.
+    bool (*enemyOrderCapture_)(void*,EnemyStepOrder&)=nullptr;
+    void* enemyOrderContext_=nullptr;
+    bool captureEnemyStepOrder();
     bool enemyIdentitySlots_[enemyCapacity]{};
     GemState gems_[gemCapacity];
     unsigned enemyCount_;

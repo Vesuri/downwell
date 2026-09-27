@@ -211,7 +211,10 @@ completed activation reconciliation can change it as described in
 registration and traversal ranges to the original executable. This establishes
 the ordering contract. The host phase snapshot now consumes exact-object
 registration order and sorts by resource ID with registration ordinal as its
-tie-breaker. Native typed-family scheduling still needs to consume this order.
+tie-breaker. Native enemy alarms and ordinary Step use the same snapshot,
+captured from the resource-backed owner's registrations. This orders enemies
+within their current scheduling block; it does not yet interleave all native
+families according to the complete event table.
 Keep the phase cutoff and immediate flag rechecks below when integrating it;
 sorting by resource ID alone does not handle reactivation or new lifetimes.
 
@@ -243,9 +246,14 @@ must not transfer phase eligibility to the replacement. Handle resolution also
 follows surviving records through compaction without linear ID searches.
 Each ordered phase snapshot costs sixteen bytes per capacity slot. The bounded
 heap sort allocates no heap storage and is shared portable code; native users
-must place a large snapshot outside the task stack. This is not yet the Amiga
-`GameplayWorld` actor scheduler. Runtime object rebinding during an executing
-phase and separate effect-family scheduling still require integration checks.
+must place a large snapshot outside the task stack. `GameplayWorld` keeps its
+64-enemy workspace in the world object, captures ordinary Step eligibility
+before generation, and resolves each lifetime again before dispatch. Its
+unbound component fixtures use birth order for same-object ties; production
+installs the collision owner's registration-order capture before stepping and
+preserves that binding through Retry. Runtime object rebinding during an
+executing phase and separate effect-family scheduling still require integration
+checks.
 
 Destruction bit 1 is part of the Step filter `0x100003` at `0x50b8ab`
 and the alarm filter at `0x509dfb`, before alarm decrement. `EventScheduler`

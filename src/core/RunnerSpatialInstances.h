@@ -518,6 +518,14 @@ public:
         if(!checked(good))return false;
         hit=result;return true;
     }
+    // Borrow exact registrations for phase snapshots; callbacks cannot mutate
+    // membership. The scheduler supplies phase-specific exclusion flags.
+    template<class Visit> bool visitRegistrations(Visit visit)const{
+        return valid()&&membership_.visitRegistrations([&](unsigned slot,std::uint32_t generation,int object){
+            const InstanceHandle h{slot,generation};const auto* state=resolve(h);
+            return state&&visit(h,object,*state);
+        });
+    }
     // Object-resource branch of instance_number (0x4fe49b). This is NOT the
     // raw registration count used by collision preparation below. Filtering
     // flags does not unlink membership or alter the selected search strategy.
