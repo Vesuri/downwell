@@ -43,7 +43,7 @@ public:
         if(!valid()||(runtime_&&runtime_!=&runtime))return false;
         runtime_=&runtime;return true;
     }
-    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindQueries(*this);}
+    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindInstanceQueries(*this);}
     const InstanceRecord* resolve(InstanceHandle h)const{
         if(!runtime_||!owner_.resolve(h))return nullptr;
         const auto* record=runtime_->instance(ids_[h.slot]);
@@ -73,6 +73,24 @@ public:
             [](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
                 angle.bits^=0x80000000u;return Trig{}(angle,c,s);
             },hit);
+    }
+    bool instancePlace(InstanceHandle h,const InstanceRecord& r,int object,MotionBinary64 x,MotionBinary64 y,
+                       InstancePlaceResult& result){
+        if(!valid()||resolve(h)!=&r)return false;
+        Owner::Result selected;
+        if(!adapter_.placeVm(*this,h,object,x,y,masks_,RunnerMaskDispatch{},
+            [](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
+                angle.bits^=0x80000000u;return Trig{}(angle,c,s);
+            },selected))return false;
+        InstancePlaceResult next;
+        if(selected.found){
+            const auto* record=resolve(selected.handle);
+            const auto* state=owner_.resolve(selected.handle);
+            if(!record||!state||!record->instanceId||record->instanceId>0x7fffffffu)return false;
+            next.id=static_cast<std::int32_t>(record->instanceId);
+            next.handle=selected.handle;next.x=state->x.promoted();next.y=state->y.promoted();
+        }
+        result=next;return true;
     }
 };
 }

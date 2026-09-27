@@ -1126,6 +1126,18 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     syncMainBuilderState();
 }
 
+bool StartupRuntime::playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,InstancePlaceResult& result){
+    if(!run_.effectsSucceeded)return false;
+    for(std::size_t i=0;i<instances_.size();++i){
+        const auto& player=instances_.at(i);
+        if(player.objectId==35&&player.active){
+            run_.effectsSucceeded=lifecycle_.instancePlace(instances_.handleAt(i),player,82,x.promoted(),y.promoted(),result);
+            return run_.effectsSucceeded;
+        }
+    }
+    run_.effectsSucceeded=false;return false;
+}
+
 void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     if (!mainPlayerInitialized_)
         return;

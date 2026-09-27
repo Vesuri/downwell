@@ -123,6 +123,9 @@ public:
     bool inMenu() const { return roomId_ == menuRoomId; }
     bool inPlayMenu() const { return roomId_ == playMenuRoomId; }
     bool inMainRoom() const { return roomId_ == mainRoomId; }
+    // scrTimeShard's identity-bearing query at published x/y. Each call runs
+    // the maintained search again; missing ownership is a terminal failure.
+    bool playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,InstancePlaceResult& result);
     bool menuPlayerNapping() const { return menuPlayerNapping_; }
     int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }

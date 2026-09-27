@@ -6,6 +6,7 @@
 #include "core/SmokeDirection.h"
 #include "core/SmokeTrig.h"
 #include "core/GameplayContactProfileInput.h"
+#include "core/TimeShardBurst.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -165,6 +166,73 @@ int main(){
     production->reset(PlatformProfile::nonDesktop);production->skipToGameForTesting();
     require(production->effectsSucceeded()&&production->roomLoadSucceeded()&&production->deferredCommandsSucceeded(),
         "production collision owner survives room retirement and new generations");
+    {
+        const RunnerImageValue x{0x43700000u},y{0x43300000u}; // 240,176
+        InstancePlaceResult selected;selected.id=17;
+        require(production->playerTimeFieldInstance(x,y,selected)&&selected.id==-4,
+            "first-level identity lookup sees no phantom entrance field");
+        production->registerLevelExit(176);
+        require(production->playerTimeFieldInstance(x,y,selected)&&selected.id>0,
+            "parent-field identity lookup returns a live source instance ID");
+        const auto* record=productionOwner->resolve(selected.handle);
+        require(record&&record==production->instance(selected.id)&&record->objectId==255&&
+            selected.x.high==MotionBinary64::fromInteger(record->x).high&&
+            selected.x.low==MotionBinary64::fromInteger(record->x).low&&
+            selected.y.high==MotionBinary64::fromInteger(record->y).high&&
+            selected.y.low==MotionBinary64::fromInteger(record->y).low,
+            "selected field identity and published position refer to the same lifetime");
+        // Explicit setter fixture: query results must use the collision owner's
+        // published binary32 position, not the legacy integer record snapshot.
+        const RunnerImageValue fractionalX{0x43704000u},fractionalY{0x43508000u}; // 240.25,208.5
+        const auto originalId=selected.id;
+        require(productionOwner->move(selected.handle,*record,fractionalX,fractionalY)&&
+            production->playerTimeFieldInstance(x,y,selected)&&selected.id==originalId&&
+            selected.x.high==fractionalX.promoted().high&&selected.x.low==fractionalX.promoted().low&&
+            selected.y.high==fractionalY.promoted().high&&selected.y.low==fractionalY.promoted().low,
+            "field lookup preserves fractional published coordinates");
+        RunnerImageValue restoredX,restoredY;
+        require(restoredX.assign(MotionBinary64::fromInteger(record->x))&&restoredY.assign(MotionBinary64::fromInteger(record->y))&&
+            productionOwner->move(selected.handle,*record,restoredX,restoredY),"restore explicit field setter fixture");
+        production->registerLevelExit(186); // Deliberate overlapping-field fixture.
+        const auto digest=production->stateDigest();
+        TimeShardEffects<3> effects;TimeShardBurst burst;GameMakerRandom random(42);
+        unsigned lookups=0;InstancePlaceResult last;
+        require(burst.emit(x,y,{}, {},false,random,effects,
+            [&](auto px,auto py,auto& id,auto& fx,auto& fy){
+                ++lookups;
+                if(!production->playerTimeFieldInstance(px,py,last))return false;
+                id=last.id;fx=last.x;fy=last.y;return true;
+            },[&](auto ax,auto ay,auto bx,auto by,auto& angle){
+                require(lookups==2&&ax.high==last.x.high&&ax.low==last.x.low&&ay.high==last.y.high&&ay.low==last.y.low&&
+                    bx.high==x.promoted().high&&by.high==y.promoted().high,
+                    "shard direction uses the second maintained query's selected field");
+                angle=MotionBinary64::fromInteger(30);return true;
+            },[](auto,auto,bool,auto& out){out={};return true;}),"source shard script consumes live field identities");
+        require(lookups==2&&burst.field==last.id&&effects.size()==3&&random.drawCount()==24&&
+            production->stateDigest()==digest,"identity queries preserve world/RNG while shard Create consumes its ordered draws");
+        const auto old=selected.handle;
+        production->reset(PlatformProfile::nonDesktop);production->skipToGameForTesting();
+        require(!productionOwner->resolve(old)&&production->playerTimeFieldInstance(x,y,selected)&&selected.id==-4&&
+            !selected.handle.generation&&!selected.x.high&&!selected.x.low&&!selected.y.high&&!selected.y.low,
+            "retired field result cannot alias a new room or persist through a miss");
+        production->registerLevelExit(int(production->mainPlayerY()));
+        Input confirm;confirm.fire=true;bool heartGoal=false;
+        for(unsigned frame=0;frame<600&&production->runStage().level==1;++frame){
+            if(production->levelClearActive()){
+                bool fire=true;
+                production->stepLevelClear(fire,false,false,heartGoal,[](LevelClearSelection::Effect,unsigned){});
+                if(production->nextLevelRequested())require(production->loadNextAreaOneLevel(confirm),"identity-owned next room");
+            }else{
+                production->step(confirm,false);
+                if(production->levelResultRequested())require(production->enterLevelClear(0,heartGoal),"identity-owned clear");
+            }
+        }
+        require(production->effectsSucceeded()&&production->runStage().level==2&&
+            production->playerTimeFieldInstance(x,y,selected)&&selected.id==101097&&
+            productionOwner->resolve(selected.handle)&&
+            productionOwner->resolve(selected.handle)->objectId==371,
+            "identity lookup resolves the later-level entrance descendant through parent family 82");
+    }
     // Resolve through actual world ownership, not a copied InstanceStore or a
     // rebuilt tree. Generation validation precedes looking up its instance ID.
     struct View {

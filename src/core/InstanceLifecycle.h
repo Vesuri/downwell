@@ -4,6 +4,7 @@
 #include "InstanceHandle.h"
 #include "RunnerImageValue.h"
 #include "RunnerTransformField.h"
+#include "InstancePlaceResult.h"
 
 namespace downwell {
 
@@ -83,6 +84,22 @@ public:
         return b;
     }
     bool hasPlaceMeeting()const{return placeMeeting_!=nullptr;}
+    template<class Owner> static RecordLifecycleBinding bindInstanceQueries(Owner& owner){
+        auto b=bindQueries(owner);
+        b.instancePlace_=[](void* p,InstanceHandle h,const Record& r,int object,
+                           MotionBinary64 x,MotionBinary64 y,InstancePlaceResult& result){
+            return static_cast<Owner*>(p)->instancePlace(h,r,object,x,y,result);
+        };
+        return b;
+    }
+    bool instancePlace(InstanceHandle h,const Record& r,int object,MotionBinary64 x,MotionBinary64 y,
+                       InstancePlaceResult& result)const{
+        InstancePlaceResult next;
+        if(!instancePlace_||!instancePlace_(context_,h,r,object,x,y,next))return false;
+        if(next.id==-4){result={};return true;}
+        if(next.id<=0||!next.handle.generation||next.handle.slot==0xffffffffu||!next.x.valid()||!next.y.valid())return false;
+        result=next;return true;
+    }
     bool placeMeeting(InstanceHandle h,const Record& r,int object,MotionBinary64 x,MotionBinary64 y,bool& hit)const{
         // Missing ownership is not a successful miss. Select the unindexed
         // adapter explicitly before calling this checked operation.
@@ -129,6 +146,7 @@ private:
     bool (*sprite_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*mask_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*placeMeeting_)(void*,InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,bool&)=nullptr;
+    bool (*instancePlace_)(void*,InstanceHandle,const Record&,int,MotionBinary64,MotionBinary64,InstancePlaceResult&)=nullptr;
     bool (*imageIndex_)(void*,InstanceHandle,const Record&,RunnerImageValue)=nullptr;
     bool (*transform_)(void*,InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t)=nullptr;
 };

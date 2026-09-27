@@ -345,6 +345,16 @@ struct NativePlayerAudit {
     unsigned births=0,retirements=0,moves=0,calls=0,fail=0;
     unsigned scales=0,rejectScaleAt=0;
     unsigned queries=0;bool queryHit=false;
+    bool instancePlace(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p,int object,
+                       downwell::MotionBinary64 x,downwell::MotionBinary64 y,downwell::InstancePlaceResult& result){
+        ++calls;++queries;
+        require(h.generation==live.generation&&p.lifetimeId==h.generation&&object==82&&
+            x.valid()&&y.valid(),"native shard lookup forwards its caller lifetime and parent-field selector");
+        result.id=123000;result.x=downwell::MotionBinary64::fromInteger(241);
+        result.y=downwell::MotionBinary64::fromInteger(192);
+        if(fail!=6)result.handle={1,live.generation};
+        return fail!=5;
+    }
     bool mask(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,int){return true;}
     bool placeMeeting(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p,int object,
                       downwell::MotionBinary64 x,downwell::MotionBinary64 y,bool& hit){
@@ -396,6 +406,22 @@ struct NativePlayerAudit {
 
 void testNativePlayerLifecycle(){
     using Binding=GameplayWorld::PlayerLifecycleBinding;
+    for(unsigned failure:{0u,5u,6u}){
+        const bool reject=failure!=0;
+        NativePlayerAudit audit;audit.fail=failure;
+        GameplayWorld world(0,true,0,false,{},{},Binding::bindInstanceQueries(audit));
+        downwell::InstancePlaceResult result;result.id=17;
+        require(world.playerTimeFieldInstance({0x43700000u},{0x43300000u},result)==!reject&&
+            result.id==(reject?17:123000)&&world.effectsSucceeded()==!reject&&audit.queries==1,
+            "native field identity query publishes only successful results");
+        if(reject){const auto calls=audit.calls;world.step(0);require(audit.calls==calls,"identity query failure remains terminal");}
+    }
+    {
+        GameplayWorld world(0,true,0,false);
+        downwell::InstancePlaceResult result;result.id=17;
+        require(!world.playerTimeFieldInstance({},{},result)&&!world.effectsSucceeded()&&result.id==17,
+            "native identity query cannot substitute an unindexed boolean overlap");
+    }
     for(bool reject:{false,true})for(bool hit:{false,true}){
         NativePlayerAudit audit;audit.fail=reject?4:0;audit.queryHit=hit;
         GameplayWorld world(0,true,0,false,{},{},Binding::bindQueries(audit));

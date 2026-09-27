@@ -85,6 +85,23 @@ resource-backed registration; remaining collision-family scheduling is required.
 Motion remains a combined phase before this clock boundary; preserving old
 published query coordinates does not by itself prove full source event order.
 
+`bindInstanceQueries` adds the identity-bearing `instance_place` operation.
+`InstancePlaceResult` carries the source numeric instance ID, a generation key
+and promoted published binary32 coordinates, not a pointer into compacting
+storage. A miss is canonical `noone` (-4); failure leaves the caller's result
+unchanged and the world adapter latches failure. Missing ownership or a
+malformed successful result is not an approximate overlap fallback. The stored
+owner runs the maintained search, resolves its selected lifetime, and reads its
+published position; it does not select the nearest or newest field independently.
+
+Both worlds expose `playerTimeFieldInstance` for the source parent selector 82.
+The shard script must call it again for its second lookup, even when the first
+query hit. Integration tests feed those real lookups into `TimeShardBurst`,
+including overlapping fields, fractional published positions, room replacement
+and the start-field descendant. This connects the lookup contract, not the
+whole shard scheduler: global shard birth identities, time-stop transition
+dispatch and full original traversal-order verification remain required.
+
 The source player object 35 uses sprite 31 as its explicit collision mask,
 independent of the visible animation sprite. Shard object 238 uses sprite 91
 and has no explicit replacement mask. Both sprites have origin (12,12), a

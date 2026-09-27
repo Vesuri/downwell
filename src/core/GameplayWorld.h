@@ -192,6 +192,13 @@ public:
                               BreakableLifecycleBinding breakableLifecycle = {},
                               PlayerLifecycleBinding playerLifecycle = {});
     downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
+    bool playerTimeFieldInstance(downwell::RunnerImageValue x,downwell::RunnerImageValue y,
+                                 downwell::InstancePlaceResult& result){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=playerInstance_.lifetimeId&&playerLifecycle_.instancePlace(
+            playerHandle(),playerInstance_,82,x.promoted(),y.promoted(),result);
+        return run_.effectsSucceeded;
+    }
     const PlayerInstance* findPlayer(downwell::InstanceHandle handle) const {
         return handle.slot==0&&handle.generation&&handle.generation==playerInstance_.lifetimeId
             ? &playerInstance_ : nullptr;
