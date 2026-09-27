@@ -9,6 +9,7 @@ template<unsigned Capacity> class RunnerRoomMembership {
 public:
     static constexpr unsigned End=Capacity;
     bool contains(unsigned slot)const{return slot<Capacity && entries_[slot].list>=0;}
+    bool active(unsigned slot)const{return slot<Capacity && entries_[slot].list==0;}
     bool bind(unsigned slot,RunnerImageValue key){
         if(slot>=Capacity || !RunnerSpatialSplit::valid(key))return false;
         remove(slot);entries_[slot].key=key;insertActive(slot);return true;

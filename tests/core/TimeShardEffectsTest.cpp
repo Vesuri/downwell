@@ -17,6 +17,8 @@ struct World {
     bool publishAlarm(std::uint32_t,std::uint32_t,const TimeShardAnimation&){return fail!=6;}
     unsigned destroys=0;
     bool active=true;
+    bool animationMember=true;
+    bool animationEligible(unsigned,unsigned,bool& eligible){eligible=animationMember;return fail!=10;}
     bool eventEligible(unsigned,unsigned,bool& eligible){eligible=active;return fail!=9;}
     bool population(unsigned& count){count=creates-destroys;return fail!=8;}
     bool destroyed(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++destroys;return fail!=7;}
@@ -43,6 +45,9 @@ int main(){
         auto* shard=effects.get(h);shard->alarm0=2;
         const auto before=shard->xx;const auto draws=random.drawCount();
         world.active=false;effects.advanceAlarm(effects.beginPhase(),0);
+        assert(effects.advanceAnimation(effects.beginPhase())&&world.animations==1);
+        world.animationMember=false;
+        assert(effects.advanceAnimation(effects.beginPhase())&&world.animations==1);
         assert(effects.step(effects.beginPhase(),false,random,
             [](auto,const auto&,auto,auto,bool&){assert(false);return false;},
             [](auto,const auto&,bool&){assert(false);return false;}));
@@ -109,13 +114,13 @@ int main(){
         const auto fresh=effects.create({}, {},false,random);assert(fresh>h&&effects.sourceId(fresh)==105187);
         assert(effects.clear());
     }
-    for(unsigned failure:{4u,5u,6u,8u,9u}){
+    for(unsigned failure:{4u,5u,6u,8u,9u,10u}){
         GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
         assert(effects.bindPhases(world)&&effects.phasesBoundTo(world));
         auto old=effects.beginPhase();assert(effects.create({}, {},false,random));
         assert(effects.advanceAnimation(old)&&world.animations==0);
         world.fail=failure;
-        if(failure==4)assert(!effects.advanceAnimation(effects.beginPhase()));
+        if(failure==4||failure==10)assert(!effects.advanceAnimation(effects.beginPhase()));
         else if(failure==5||failure==8||failure==9)assert(!effects.step(effects.beginPhase(),true,random,
             [](auto,const auto&,auto,auto,bool& hit){hit=false;return true;},
             [](auto,const auto&,bool& retire){retire=false;return true;}));

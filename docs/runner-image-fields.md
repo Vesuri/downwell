@@ -84,6 +84,16 @@ call at `0x50dce6`. The component test now advances before applying ordinary
 Step's speed/time-stop writes, using the previous stored speed. This phase
 finding is independent of which animation branch each sprite selects.
 
+The traversal head is loaded from the room's active-list offset `0x80` at
+`0x50db9d`, now checked explicitly by the verifier. It follows instance link
+`0x14c` before calling animation, without testing the pending activation flag.
+Registered shards consult `InstanceStore::animationMember`, which resolves the
+lifetime generation and the maintained room list. This differs from the Step
+and alarm active-flag check: pending deactivation does not remove animation
+membership, and pending reactivation does not add it. Tests cover both requests,
+their reconciliation, stale slot reuse and failed eligibility publication.
+This is eligibility evidence, not proof of complete cross-family scheduling.
+
 ## Sequence loop recovery (supersedes the tentative legacy binding)
 
 The export now includes full sequence metadata for sprites 205–208 and 460.

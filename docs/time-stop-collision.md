@@ -66,8 +66,9 @@ is terminal, not a successful inactive result. This implements the supported
 active/destruction parts of the runner's `0x100003` event filter. Animation
 eligibility is deliberately separate: the original pre-Begin-Step animation
 loop traverses room membership, which can differ from pending activation flags.
-That animation traversal still needs integration rather than applying the Step
-flag predicate blindly.
+Registered shard animation therefore resolves active room-list membership via
+its generation-checked record, separately from event eligibility. The global
+animation traversal and cross-family ordering still need integration.
 
 Phase-bound shard Step obtains `instance_number(fxTimeShard)` from the world
 collision owner, not its private effect pool size. The object-resource query

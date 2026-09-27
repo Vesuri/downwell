@@ -38,4 +38,5 @@ for start, end, digest in (
     (0x50F9E0, 0x50FA95, "beb50e65c526540b5c7082a3526bc611ce09e8f7fee8b6ff96006f1978197a4c"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest
-print("Pinned Windows image field registration, narrowing setters and speed getter verified")
+assert region(0x50DB9D, 6) == bytes.fromhex("8b b1 80 00 00 00")
+print("Pinned Windows image fields and active-room-list animation traversal verified")

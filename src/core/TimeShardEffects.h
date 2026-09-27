@@ -37,6 +37,9 @@ public:
         eligible_=[](void* p,Handle h,std::uint32_t id,bool& eligible){
             return static_cast<World*>(p)->eventEligible(h,id,eligible);
         };
+        animationEligible_=[](void* p,Handle h,std::uint32_t id,bool& eligible){
+            return static_cast<World*>(p)->animationEligible(h,id,eligible);
+        };
         animation_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
             return static_cast<World*>(p)->publishAnimation(h,id,effect);
         };
@@ -123,6 +126,11 @@ public:
         if(!succeeded_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle<=phase.newest&&!slot.effect.destroyRequested){
+                bool eligible=true;
+                if(animationEligible_&&!animationEligible_(context_,slot.handle,slot.sourceId,eligible)){
+                    succeeded_=false;return false;
+                }
+                if(!eligible)continue;
                 if(!slot.effect.advanceImage()||
                    (animation_&&!animation_(context_,slot.handle,slot.sourceId,slot.effect))){
                     succeeded_=false;return false;
@@ -213,6 +221,7 @@ private:
     void* context_=nullptr;
     bool (*population_)(void*,unsigned&)=nullptr;
     bool (*eligible_)(void*,Handle,std::uint32_t,bool&)=nullptr;
+    bool (*animationEligible_)(void*,Handle,std::uint32_t,bool&)=nullptr;
     bool (*birth_)(void*,Handle,const TimeShardAnimation&,std::uint32_t&)=nullptr;
     bool (*created_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
     bool (*retire_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;

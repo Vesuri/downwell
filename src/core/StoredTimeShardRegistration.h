@@ -35,6 +35,12 @@ public:
     StoredTimeShardRegistration(const StoredTimeShardRegistration&)=delete;
     StoredTimeShardRegistration& operator=(const StoredTimeShardRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    bool animationEligible(std::uint32_t local,std::uint32_t id,bool& eligible){
+        if(!succeeded_)return false;
+        auto* e=entry(local,id);
+        if(!e||!resolve(*e)||!records_.animationMember(e->key,eligible))return fail();
+        return true;
+    }
     bool eventEligible(std::uint32_t local,std::uint32_t id,bool& eligible){
         if(!succeeded_)return false;
         auto* e=entry(local,id);auto* record=e?resolve(*e):nullptr;

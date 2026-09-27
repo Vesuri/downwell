@@ -122,6 +122,11 @@ public:
     InstanceRecord* resolve(InstanceHandle handle) {
         return const_cast<InstanceRecord*>(static_cast<const InstanceStore&>(*this).resolve(handle));
     }
+    // Animation traverses the room's active list, not a pending active flag.
+    bool animationMember(InstanceHandle handle,bool& member)const{
+        if(!resolve(handle))return false;
+        member=roomMembership_.active(handle.slot);return true;
+    }
 
     // Explicit activation requests are not destruction. Notify collision state
     // while the old flags are still observable; defer object-list changes until

@@ -160,6 +160,21 @@ void testMarkedRoomCleanup() {
         }
     }
 }
+void testAnimationMembership() {
+    downwell::InstanceStore<1> store;store.create(1,238,7,false);
+    const auto key=store.handleAt(0);bool member=false;
+    require(store.animationMember(key,member)&&member,"new lifetime belongs to active animation list");
+    require(store.requestActivation(key,false),"request deactivation");
+    require(store.animationMember(key,member)&&member,"pending deactivation does not change animation list");
+    store.reconcileObjectMembership();
+    require(store.animationMember(key,member)&&!member,"reconciled inactive lifetime skips animation");
+    require(store.requestActivation(key,true),"request reactivation");
+    require(store.animationMember(key,member)&&!member,"pending reactivation does not join animation list early");
+    store.reconcileObjectMembership();
+    require(store.animationMember(key,member)&&member,"reconciled reactivation resumes animation");
+    store.erase(1);store.create(2,238,7,false);member=false;
+    require(!store.animationMember(key,member)&&!member,"stale generation cannot inherit animation membership");
+}
 
 } // namespace
 
@@ -170,6 +185,7 @@ int main() {
     testStableHandles();
     testOwnedObjectMembership();
     testMarkedRoomCleanup();
+    testAnimationMembership();
     std::cout << "instance store tests passed\n";
     return 0;
 }
