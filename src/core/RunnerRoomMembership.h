@@ -17,9 +17,11 @@ public:
             if(!visit(slot))return false;
         return true;
     }
-    // Ordinary Draw walks the SAME active list in the opposite direction:
+    // Legacy room-list Draw walks the SAME active list in the opposite direction:
     // room+0x84, next+0x150 (0x490f11), versus animation's room+0x80,
     // next+0x14c. Higher depths and newly inserted equal-depth peers go first.
+    // This is NOT the layer path used when room+0xdc is positive (0x490db8).
+    // Current adapters still use this pending layer-owner integration.
     // The visitor owns visibility/destruction filtering. No list mutation.
     template<class Visit> bool visitDrawChecked(Visit visit)const{
         for(unsigned slot=tail_[0];slot!=End;slot=entries_[slot].previous)

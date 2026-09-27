@@ -3,6 +3,12 @@
 #include "core/RunnerLayerElements.h"
 #include "core/RunnerLayers.h"
 #include "core/RunnerDepthChanges.h"
+#include "core/RunnerLayerDraw.h"
+bool compileLayerDraw(const downwell::RunnerLayers<4,16>& layers,unsigned flags){
+    return downwell::RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},
+        [](unsigned,const auto&){return true;},[&](unsigned,auto& e){e={2,flags,true,true,true,true};return true;},
+        [](unsigned,unsigned,auto){return true;},[](unsigned,const auto&){return true;});
+}
 bool compileDepthChanges(downwell::RunnerDepthChanges<16>& queue,downwell::RunnerLayers<4,16>& layers,
     downwell::RunnerDepthService::Instance& instance,unsigned element,downwell::MotionBinary64 value){
     return queue.request(element,instance.depth,value)&&queue.service([&](unsigned e){

@@ -386,7 +386,7 @@ if that matches the existing layer depth. Otherwise:
   ID and rewrites the instance's depth to the layer's integer depth.
 
 The -60000 box-impact jump takes the migration case when born at depth zero.
-Selected Draw traversal still requires recovery; layer ownership and migration
+Selected Draw traversal is described below; layer ownership and migration
 still require live integration. The current renderer's
 room-list order is not proof of selected GMS2 layer order, including unchanged
 equal-depth births. Existing draw-order tests only validate the port's current
@@ -483,6 +483,42 @@ These components are not yet invoked by the live world schedulers. Adapters
 still need source identity allocation, instance-field/lookup synchronization,
 current-element bookkeeping and the original phase boundaries; component
 agreement is not proof of a naturally spawned or correctly drawn box effect.
+
+#### Selected ordinary Draw traversal
+
+`0x490dac..0x490dcc` chooses `0x490370` when the current room exists and its
+layer count at +0xdc is positive. Unlike depth service, this branch tests the
+room count, not the global GMS2 flag directly. The recovered room manifest has
+132 layers across 25 rooms, with no zero-layer room (rmMain has six). The
+room-list loop at `0x490f11` is the fallback, not evidence for layer traversal.
+
+`0x490370` starts at room layer tail +0xd8 and follows previous +0x70. Invisible
+layers (byte +0x18 zero) are skipped, including their begin/end hooks. Visible
+layers perform their setup/begin operations, then start at element head +0x5c
+and follow next +0x14, saved before element dispatch. The switch at `0x490a64`
+maps element type 2 to `0x4904f4`. That branch:
+
+- Skips null instance pointers.
+- **Ends the entire current layer's element loop** on instance flag bit 0x2;
+  it proceeds to layer-end operations, not to the next element.
+- Otherwise requires `(flags & 0x110013) == 0x10` and a non-null object.
+- Dispatches ordinary Draw (event 8, subtype 0) when present. Otherwise it
+  resolves the sprite and calls `0x4afb40`, or `0x4b4c00` when flag 0x4000 is
+  set. A missing sprite emits nothing. The event branch needs no sprite.
+
+After layer-end operations it reads the previous layer link (`0x49081e`).
+This explains why inactive-instance tail normalization affects more than
+cosmetic order: an inactive entry ahead of drawable entries suppresses them.
+
+`RunnerLayerDraw` implements this traversal and dispatch policy over the shared
+layer owner, with checked callbacks for layer visibility, begin/end operations,
+element lookup and presentation. Tests cover reverse layer/forward element
+order, equal-depth peers, layer termination, hidden layers, callback failures
+and 1,024 instance flag/lookup combinations. Non-instance element types remain
+backend dispatch responsibilities. The helper currently prohibits structural
+mutation during callbacks; original Draw-time removal, insertion, layer scripts,
+shader setup and non-instance rendering still require adapter integration/audit.
+It is not yet a replacement for either live renderer's room-list adapter.
 
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing

@@ -43,11 +43,13 @@ behavior, both backend integrations and relevant original-game verification.
   enabling the source-ordered spatial line path for live bullets.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
-- Recover and integrate the selected GMS2 layer/element ordering and deferred
+- Integrate the recovered selected GMS2 layer/element ordering and deferred
   depth migration before admitting the box impact's -60000 depth override.
   Keep layer Draw order separate from room animation order; audit existing
   room-list-based Draw adapters against the selected runner branch. See the
   [depth-update audit](projectile-motion.md#selected-depth-update-path).
+  Complete fixed-layer loading, activation ordering and Draw-time structural
+  mutation handling; preserve inactive-instance termination of each layer walk.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding
   assumptions, including rotated masks required by blood time-field contacts.
 

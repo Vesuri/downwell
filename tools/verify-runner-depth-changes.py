@@ -37,6 +37,14 @@ for start, end, digest in (
     (0x4258e0, 0x42595d, "617c2bfaf8772dee654e8b1809276df86290e756396612c9090202ffa81747ca"),
     (0x425a40, 0x425b5a, "b20cd62a9d8c6490c080e1e04578b96668ec8d7cf174e7857b867d55e56513a7"),
     (0x425b60, 0x425c1b, "686844692cb51f131db70e17575d63c0a92b6a134ee41848e78c9efb1892591d"),
+    # Ordinary Draw selects layers by positive room layer count; tail-to-head
+    # layers, head-to-tail elements, inactive instance ends the element loop.
+    (0x490dac, 0x490dcc, "554b33c5873f4a484c6d043c5297b0102ad377481225e86862c58a23ce5dd309"),
+    (0x49037c, 0x4903aa, "42075b233d40d2b22d29fbaef10c46ea61cfbf9c284ff4f33a46d25ecbe5c010"),
+    (0x4904b8, 0x49059b, "a115423ce85817e4e1075ff3fee15904e26034e5098c8e906af25c92183044a8"),
+    (0x49074d, 0x490767, "8211696ebdffabaa68d2d4d7569be09e9f533e6c8356a661e1ac021ed6b7d8b6"),
+    (0x49081e, 0x490835, "1b2d77b572d1a762154ae9bb95552c8db2f2b92ff5de9e4fbe3adb909a214147"),
+    (0x490a64, 0x490a84, "626112d83e906f2a98d62865b5b7b392f8cbd5ccea5fc5a0b7a2acbbe69a3a1e"),
     # Retirement removes an instance from the pending queue by stable compaction.
     (0x50f6c5, 0x50f6d9, "f00979b8847f3a5a9dd9913d8dbaae6267fc1618afbe618eb9a31f490d0fc389"),
     (0x50d740, 0x50d793, "6ee03835d9451e9681567d9b5cccda322bdf74663a62c36896bbff3127a9d541"),
@@ -45,5 +53,7 @@ for start, end, digest in (
 assert region(0x50d223, 7) == bytes.fromhex("80 3d 18 7f b5 00 00")
 assert region(0x50d22a, 2) == bytes.fromhex("74 4a")
 assert 0x50d255 + struct.unpack("<i", region(0x50d251, 4))[0] == 0x414660
+assert struct.unpack_from("<I", region(0x490a64, 32), 4)[0] == 0x4904f4
 print("Pinned depth setter, unique pending queue, and selected GMS2 layer migration")
 print("Legacy active-room re-sorting is not the selected depth-update path")
+print("Pinned positive-layer-count Draw selection and inactive-instance layer termination")

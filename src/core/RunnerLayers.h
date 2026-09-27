@@ -87,6 +87,10 @@ public:
         for(unsigned i=head_;i!=End;i=layers_[i].next)if(!visit(i,layers_[i]))return false;
         return true;
     }
+    template<class Visit> bool visitLayersReverse(Visit visit)const{
+        for(unsigned i=tail_;i!=End;i=layers_[i].previous)if(!visit(i,layers_[i]))return false;
+        return true;
+    }
     template<class Visit> bool visitElements(unsigned layer,Visit visit)const{
         return get(layer)&&elements_.visitForward(layer,visit);
     }
