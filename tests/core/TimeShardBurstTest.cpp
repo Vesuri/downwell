@@ -12,6 +12,12 @@
 using namespace downwell;
 static MotionBinary64 number(double d){unsigned long long n;std::memcpy(&n,&d,8);return {unsigned(n>>32),unsigned(n)};}
 static void same(MotionBinary64 a,double d){auto b=number(d);assert(a.high==b.high && a.low==b.low);}
+struct Registration {
+    unsigned next=105186,births=0,creates=0,retires=0;
+    bool birth(std::uint32_t,RunnerImageValue,RunnerImageValue,std::uint32_t& id){id=next++;++births;return true;}
+    bool created(unsigned,unsigned,const TimeShardAnimation&){++creates;return true;}
+    bool retire(unsigned,unsigned,const TimeShardAnimation&){++retires;return true;}
+};
 int main(){
     for(unsigned seed=0;seed<1024;++seed)for(bool field:{false,true}){
         GameMakerRandom rng(seed),oracle(seed);TimeShardEffects<4> effects;TimeShardBurst burst;
@@ -46,6 +52,17 @@ int main(){
     TimeShardEffects<1> effects;TimeShardBurst burst;GameMakerRandom rng(3);
     auto lookup=[](auto,auto,auto& id,auto&,auto&){id=-4;return true;};
     auto direction=[](auto,auto,auto,auto,auto& out){out={};return true;};
+    {
+        Registration registration;TimeShardEffects<3> registered;TimeShardBurst b;GameMakerRandom random(42);
+        assert(registered.bind(registration));
+        assert(b.emit({}, {},{}, {},false,random,registered,lookup,direction,
+            [](auto,auto,bool vertical,auto& out){out=number(vertical?-7:9);return true;}));
+        assert(b.shard==105188 && registered.sourceId(3)==105188);
+        assert(registration.births==3 && registration.creates==3 && random.drawCount()==24);
+        assert(!registered.get(b.shard)); // Never mistake source ID for a private lifetime key.
+        same(registered.get(3)->xsp,9);same(registered.get(3)->ysp,-7);
+        assert(registered.clear() && registration.retires==3);
+    }
     unsigned components=0;
     assert(!burst.emit({}, {},{}, {},false,rng,effects,lookup,direction,
         [&](auto,auto,bool,auto& out){++components;out={};return true;}));

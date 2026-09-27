@@ -30,8 +30,9 @@ struct TimeShardBurst {
                !randomBinary64(random.nextU32(),MotionBinary64::fromInteger(5),speed) ||
                !speed.add(MotionBinary64::fromInteger(1)))return false;
             // Complete all six child Create draws before evaluating lengthdir.
-            shard=effects.create(x.promoted(),y.promoted(),lowSpec,random);
-            auto* child=effects.get(shard);
+            const auto handle=effects.create(x.promoted(),y.promoted(),lowSpec,random);
+            shard=effects.sourceId(handle);
+            auto* child=effects.get(handle);
             if(!child)return false;
             if(!component(speed,scatteredDirection,false,child->xsp) ||
                !component(speed,scatteredDirection,true,child->ysp))return false;

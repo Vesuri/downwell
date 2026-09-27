@@ -4,7 +4,72 @@
 #include <cstdio>
 #include <vector>
 using namespace downwell;
+struct World {
+    GameMakerRandom& rng;
+    explicit World(GameMakerRandom& random):rng(random){}
+    unsigned births=0,creates=0,retires=0,fail=0,failRetireAt=0;
+    std::uint32_t nextId=105186;
+    std::vector<unsigned> events;
+    bool birth(std::uint32_t h,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
+        assert(h && x.promoted().valid() && y.promoted().valid());++births;events.push_back(1);
+        assert(rng.drawCount()==6*creates);
+        id=nextId++;
+        return fail!=1;
+    }
+    bool created(unsigned h,unsigned id,const TimeShardAnimation& s){
+        assert(h && id>=105186 && s.alarm0>=90);++creates;events.push_back(2);
+        assert(rng.drawCount()==6*creates);return fail!=2;
+    }
+    bool retire(unsigned h,unsigned id,const TimeShardAnimation& s){
+        assert(h && id>=105186 && s.destroyRequested);++retires;events.push_back(3);
+        return fail!=3 && retires!=failRetireAt;
+    }
+};
 int main(){
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<3> owned;
+        assert(owned.bind(world));
+        const auto a=owned.create({}, {},false,random),b=owned.create({}, {},false,random),
+                   c=owned.create({}, {},false,random);
+        world.failRetireAt=2;
+        assert(!owned.clear());
+        assert(owned.sourceId(c)==0 && owned.sourceId(b)==105187 && owned.sourceId(a)==105186);
+        assert(world.retires==2 && !owned.clear() && world.retires==2);
+        assert(!owned.advanceAnimation(owned.beginPhase()));
+    }
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<3> owned;
+        assert(owned.bind(world));assert(owned.create({}, {},false,random));
+        world.nextId=105186; // Registration may not alias another live source ID.
+        assert(!owned.create({}, {},false,random) && !owned.succeeded());
+        assert(random.drawCount()==6 && world.births==2 && world.creates==1);
+    }
+    // World numeric IDs are independent from private phase handles. Register
+    // before RNG, publish completed Create, retire before slot reuse/reset.
+    for(unsigned fail=0;fail<=3;++fail){
+        GameMakerRandom random(42);World world{random};TimeShardEffects<2> owned;
+        assert(owned.bind(world));assert(!owned.bind(world));world.fail=fail;
+        const auto h=owned.create(MotionBinary64::fromInteger(12),{},true,random);
+        if(fail==1||fail==2){
+            assert(!h&&!owned.succeeded());
+            assert(random.drawCount()==(fail==1?0:6));
+            assert(!owned.create({}, {},true,random));assert(!owned.clear());
+            assert(world.births==1 && world.retires==0);continue;
+        }
+        assert(h==1 && owned.sourceId(h)==105186 && owned.get(h));
+        owned.get(h)->alarm0=1;owned.advanceAlarm(owned.beginPhase(),0);
+        assert(world.retires==1);
+        if(fail==3){
+            assert(!owned.succeeded() && owned.sourceId(h)==105186);
+            assert(!owned.clear() && !owned.create({}, {},true,random));
+            assert(world.retires==1);continue;
+        }
+        assert(owned.sourceId(h)==0);
+        const auto replacement=owned.create({}, {},true,random);
+        assert(replacement==2 && owned.sourceId(replacement)==105187);
+        assert(owned.clear() && owned.sourceId(replacement)==0);
+        assert((world.events==std::vector<unsigned>{1,2,3,1,2,3}));
+    }
     TimeShardEffects<6> owner;GameMakerRandom rng(42);
     const auto empty=owner.beginPhase();
     const auto first=owner.create({}, {},true,rng);assert(first);

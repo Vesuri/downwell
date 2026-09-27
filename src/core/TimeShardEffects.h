@@ -9,7 +9,33 @@ template<unsigned Capacity> class TimeShardEffects {
 public:
     using Handle=std::uint32_t;
     struct Phase{Handle newest;};
-    struct Slot{Handle handle=0;TimeShardAnimation effect;};
+    struct Slot{Handle handle=0;std::uint32_t sourceId=0;TimeShardAnimation effect;};
+    // Borrowed world registration. The world owns the numeric instance ID;
+    // our monotonic handle only identifies an effect lifetime/phase cutoff.
+    // Registration precedes synchronous Create and therefore its six RNG words.
+    // Callbacks must not mutate this store. Failed callbacks are terminal: do
+    // not replay a partial Create or recycle a still-registered lifetime.
+    template<class World> bool bind(World& world){
+        if(count_||context_||!succeeded_)return false;
+        context_=&world;
+        birth_=[](void* p,Handle h,const TimeShardAnimation& effect,std::uint32_t& id){
+            return static_cast<World*>(p)->birth(h,effect.x,effect.y,id);
+        };
+        created_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+            return static_cast<World*>(p)->created(h,id,effect);
+        };
+        retire_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+            return static_cast<World*>(p)->retire(h,id,effect);
+        };
+        return true;
+    }
+    bool succeeded()const{return succeeded_;}
+    std::uint32_t sourceId(Handle handle)const{
+        for(unsigned i=0;i<count_;++i){const auto& slot=slots_[order_[i]];
+            if(slot.handle==handle)return slot.sourceId;
+        }
+        return 0;
+    }
     Phase beginPhase()const{return {next_?next_-1:0xffffffffu};}
     unsigned size()const{
         unsigned alive=0;
@@ -22,25 +48,46 @@ public:
         }
         return nullptr;
     }
-    void clear(){for(unsigned i=0;i<count_;++i)slots_[order_[i]].handle=0;count_=0;}
+    bool clear(){
+        if(!succeeded_)return false;
+        for(unsigned i=0;i<count_;++i)slots_[order_[i]].effect.destroyRequested=true;
+        return retireRequested();
+    }
     template<class Random> Handle create(MotionBinary64 x,MotionBinary64 y,bool lowSpec,Random& random){
-        retireRequested();
+        if(!retireRequested())return 0;
         if(!next_ || count_==Capacity)return 0;
         for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
-            if(!slots_[index].effect.create(x,y,lowSpec,random))return 0;
+            TimeShardAnimation initial;
+            if(!initial.x.assign(x)||!initial.y.assign(y))return 0;
+            auto& slot=slots_[index];slot.effect=initial;
+            slot.handle=next_++;slot.sourceId=slot.handle;
             for(unsigned i=count_;i>0;--i)order_[i]=order_[i-1];
-            order_[0]=index;++count_;return slots_[index].handle=next_++;
+            order_[0]=index;++count_;
+            if(birth_&&!birth_(context_,slot.handle,slot.effect,slot.sourceId)){
+                succeeded_=false;return 0;
+            }
+            if(!slot.sourceId||slot.sourceId>0x7fffffffu){succeeded_=false;return 0;}
+            for(unsigned i=1;i<count_;++i)if(slots_[order_[i]].sourceId==slot.sourceId){
+                succeeded_=false;return 0;
+            }
+            if(!slot.effect.create(x,y,lowSpec,random)||
+               (created_&&!created_(context_,slot.handle,slot.sourceId,slot.effect))){
+                succeeded_=false;return 0;
+            }
+            return slot.handle;
         }
         return 0;
     }
     // Global scheduler owns the outer alarm-index loop, including other types.
     void advanceAlarm(Phase phase,unsigned index){
+        if(!succeeded_)return;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle<=phase.newest)slot.effect.advanceAlarm(index);
         }
         retireRequested();
     }
     bool advanceAnimation(Phase phase){
+        if(!succeeded_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle<=phase.newest && !slot.effect.advanceImage())return false;
         }
@@ -48,6 +95,7 @@ public:
     }
     template<class Random,class Meeting,class Outside>
     bool step(Phase phase,bool stopped,Random& random,Meeting meeting,Outside outside){
+        if(!succeeded_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
             if(!slot.effect.step(stopped,random,
@@ -55,19 +103,29 @@ public:
                 [&](){return int(size());},
                 [&](const auto& effect,bool& retire){return outside(slot.handle,effect,retire);}))return false;
         }
-        retireRequested();return true;
+        return retireRequested();
     }
     template<class Random> bool playerContact(Handle handle,MotionBinary64 xsp,MotionBinary64 ysp,Random& random){
+        if(!succeeded_)return false;
         auto* effect=get(handle);
         return !effect || effect->playerContact(xsp,ysp,random);
     }
-    void retireRequested(){
+    bool retireRequested(){
+        if(!succeeded_)return false;
         unsigned kept=0;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
-            if(slot.effect.destroyRequested)slot.handle=0;
+            if(slot.effect.destroyRequested){
+                if(retire_&&!retire_(context_,slot.handle,slot.sourceId,slot.effect)){
+                    // Keep the failed and unvisited registrations intact;
+                    // successful earlier retirements must not be retried.
+                    for(unsigned j=i;j<count_;++j)order_[kept++]=order_[j];
+                    count_=kept;succeeded_=false;return false;
+                }
+                slot.handle=slot.sourceId=0;
+            }
             else order_[kept++]=order_[i];
         }
-        count_=kept;
+        count_=kept;return true;
     }
     // Unfiltered visitation supports state hashing and both drawFx modes.
     // Draw eligibility is dflash<=0 (GameMaker truth), NOT C++ !dflash.
@@ -78,6 +136,11 @@ public:
     }
 private:
     Slot slots_[Capacity];unsigned order_[Capacity]{},count_=0;Handle next_=1;
+    bool succeeded_=true;
+    void* context_=nullptr;
+    bool (*birth_)(void*,Handle,const TimeShardAnimation&,std::uint32_t&)=nullptr;
+    bool (*created_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
+    bool (*retire_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
 };
 }
 #endif

@@ -23,7 +23,10 @@ template<unsigned Capacity> struct TimeStopEffects {
         RunnerImageValue x,y; // published builtins, not private xx/yy
         MotionBinary64 xsp,ysp;
     };
-    void reset(){player={};burst={};shards.clear();changes.clear();roomSpeed=60;succeeded=true;}
+    bool reset(){
+        if(!shards.clear()){succeeded=false;return false;}
+        player={};burst={};changes.clear();roomSpeed=60;succeeded=true;return true;
+    }
     template<class Random,class Field,class Lookup,class Audio,class Emit>
     bool beginStep(bool mainRoom,bool outsideSides,const PlayerPose& pose,bool lowSpec,
                    Random& random,Field field,Lookup lookup,Audio audio,Emit emit){

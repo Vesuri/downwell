@@ -1,5 +1,26 @@
 # Time-stop collision inputs
 
+## Shard registration contract
+
+`TimeShardEffects` distinguishes its monotonic phase/lifetime handle from a
+world-assigned numeric instance ID. A borrowed registration adapter receives
+the narrowed birth coordinates before object-238 Create consumes RNG, then the
+completed Create state before `scrTimeShard` overwrites velocity. Resource
+defaults and global ID allocation belong to that adapter, not to the effect
+store. The burst caller retains the source ID; effect access uses the private
+handle. Adapters must outlive the bound store and must not mutate it recursively.
+
+Removal and room cleanup call the adapter before recycling storage. Partial
+registration, post-Create publication or retirement failure latches the store:
+completed callbacks and RNG draws are never replayed, and failed registrations
+are not silently recycled. Reset cannot clear this failure. Numeric IDs must be
+positive signed-32-bit values and unique among this store's live registrations.
+
+These hooks are not yet bound by either production world. Global birth ordering,
+registration of all effect families, publication during movement/animation and
+exact synchronous Destroy boundaries still need scheduler integration; the
+standalone owner tests do not prove those properties.
+
 ## Query mutation contract
 
 The object-selector `instance_place` wrapper (`0x4fe560..0x4fe8b1`) is not a
