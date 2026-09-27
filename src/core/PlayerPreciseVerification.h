@@ -3,6 +3,7 @@
 #include "PlayerGravityBinary64.h"
 #include "PlayerWallResponseBinary64.h"
 #include "PlayerBoxContact.h"
+#include "ForcedPlayerJump.h"
 namespace downwell {
 struct PlayerPreciseVerification {
     unsigned checks=0,failures=0;std::uint32_t digest=2166136261u;
@@ -53,6 +54,42 @@ struct PlayerPreciseVerification {
             result.word(state.grounded);result.word(state.hardLand);result.word(state.wallColliding);
             result.word(unsigned(state.collision.x));result.word(unsigned(state.collision.y));result.word(unsigned(facing));
         }
+    }
+    // scrFjump -> binary64 motion -> builtin position publication. Constant
+    // velocity and empty geometry isolate storage precision from gravity and
+    // collision selection. Expected final sums are independent binary64
+    // repeated-addition results, not rounded Q8 trajectories.
+    const N finalX[]={{0x405f3333u,0},{0x407b0000u,0},{0x40480000u,0},{0x406f0000u,0}};
+    const N finalY[]={{0x40480000u,0},{0x40480000u,0},{0x40480000u,0},{0x40099999u,0x99999a74u}};
+    for(unsigned scenario=0;scenario<4;++scenario){
+        PlayerWallResponseBinary64 state;state.x=N::fromInteger(240);state.y=N::fromInteger(176);
+        state.vx={0x3fc00000u,0};state.grounded=true; // Zero horizontal argument retains +1/8.
+        ForcedPlayerJump jump;
+        struct JumpEvents {
+            PlayerWallResponseBinary64& state;PlayerPreciseVerification& result;unsigned order=0;
+            void setSpinJumping(){result.check(order++==0);}
+            bool recharge(){result.check(order++==1 && state.grounded);return true;}
+            bool setGrounded(bool grounded){result.check(order++==2);state.grounded=grounded;return true;}
+            bool setHorizontal(N x){result.check(order++==3 && !state.grounded);state.vx=x;return true;}
+            bool setVertical(N y){state.vy=y;return true;}
+        } events{state,result};
+        const N impulse=scenario==0?RunnerImageValue{0xbfe66668u}.promoted():
+            scenario==1?N::fromInteger(3):scenario==2?N::fromInteger(-3):N{};
+        result.check(jump.execute(impulse,scenario==3?N{}:N::fromInteger(2),events));
+        result.check(events.order==(scenario==3?3u:4u) && !state.grounded);
+        const auto velocity=state.vx;
+        for(unsigned tick=0;tick<64;++tick){
+            unsigned writes=0;
+            result.check(state.integrateAndPublish(false,false,[&](N published){
+                result.check(writes++==0);result.real(published);return true;
+            },[&](N published){
+                result.check(writes++==1);result.real(published);return true;
+            }));
+            result.check(state.vx.high==velocity.high&&state.vx.low==velocity.low);
+            result.real(state.x);result.real(state.y);result.real(state.vx);result.real(state.vy);
+        }
+        result.check(state.x.high==finalX[scenario].high&&state.x.low==finalX[scenario].low);
+        result.check(state.y.high==finalY[scenario].high&&state.y.low==finalY[scenario].low);
     }
     // Live ceiling-box adapter, including half ties at odd/even room origins.
     auto rounded=[](long value){
