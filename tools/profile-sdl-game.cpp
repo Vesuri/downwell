@@ -55,8 +55,9 @@ int main(int argc,char** argv) {
     downwell::SpriteMaskPack masks(mb.data(),mb.size());
     auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,collisions,masks);
     if(!owner->valid())return 20;
-    downwell::Game game(&rooms,&objects,&builders,&effects,owner->binding());
+    downwell::Game game(&rooms,&objects,&builders,&effects,owner->binding(),true);
     if(!owner->attach(game.startup()))return 20;
+    game.applyStartupShortcut();
     if(!game.startup().inMainRoom()) return 20;
     using Clock=std::chrono::steady_clock;
     const auto ms=[](auto a,auto b){return std::chrono::duration<double,std::milli>(b-a).count();};

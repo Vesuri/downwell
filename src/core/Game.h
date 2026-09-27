@@ -20,7 +20,12 @@ public:
                   const ObjectPack* objectPack = nullptr,
                   const BuilderPatternPack* builderPatternPack = nullptr,
                   const EffectMaskAssets* effectAssets = nullptr,
-                  InstanceLifecycleBinding lifecycle = {});
+                  InstanceLifecycleBinding lifecycle = {},
+                  bool deferStartupShortcut = false);
+
+    // Resource-backed owners must attach before a shortcut executes Steps.
+    // Idempotent so an explicit initialization cannot replay room creation.
+    void applyStartupShortcut();
 
     // Platform entropy for ResetPlayer/randomize; fixed default for replays.
     void update(const Input& input, std::uint32_t restartSeed = 2);
@@ -48,6 +53,7 @@ private:
     bool left_ = false, right_ = false, heartGoal_ = false;
     bool finished_ = false;
     bool simulationSucceeded_ = true;
+    bool startupShortcutApplied_ = false;
 };
 
 } // namespace downwell

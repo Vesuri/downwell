@@ -73,10 +73,16 @@ private:
 
 Game::Game(const RoomPack* roomPack, const ObjectPack* objectPack,
            const BuilderPatternPack* builderPatternPack, const EffectMaskAssets* effectAssets,
-           InstanceLifecycleBinding lifecycle)
+           InstanceLifecycleBinding lifecycle, bool deferStartupShortcut)
     : startup_(PlatformProfile::desktop, roomPack, objectPack,
                StartupRuntime::defaultRandomSeed, builderPatternPack,lifecycle),
       objectPack_(objectPack), effectAssets_(effectAssets) {
+    if (!deferStartupShortcut) applyStartupShortcut();
+}
+
+void Game::applyStartupShortcut() {
+    if (startupShortcutApplied_) return;
+    startupShortcutApplied_ = true;
 #ifdef DOWNWELL_SKIP_TO_GAME
     startup_.skipToGameForTesting();
 #ifdef DOWNWELL_SKIP_LEVEL

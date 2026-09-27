@@ -75,8 +75,9 @@ int main() {
     std::unique_ptr<downwell::StoredWorldCollision> collisionOwner(
         new(std::nothrow) downwell::StoredWorldCollision(objectPack,collisions,masks));
     if(!roomPack.valid()||!builderPatternPack.valid()||!collisionOwner||!collisionOwner->valid())return 20;
-    downwell::Game game(&roomPack,&objectPack,&builderPatternPack,&effectAssets,collisionOwner->binding());
+    downwell::Game game(&roomPack,&objectPack,&builderPatternPack,&effectAssets,collisionOwner->binding(),true);
     if(!collisionOwner->attach(game.startup()))return 20;
+    game.applyStartupShortcut();
     while (!game.finished()) {
         game.update(platform.pollInput(), static_cast<std::uint32_t>(SDL_GetPerformanceCounter()));
         if (!game.simulationSucceeded()) return 20;
