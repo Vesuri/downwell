@@ -165,7 +165,14 @@ public:
     template<class Random> bool playerContact(Handle handle,MotionBinary64 xsp,MotionBinary64 ysp,Random& random){
         if(!succeeded_)return false;
         auto* effect=get(handle);
-        return !effect || effect->playerContact(xsp,ysp,random);
+        if(!effect)return true;
+        bool eligible=true;
+        const auto id=sourceId(handle);
+        if(eligible_&&!eligible_(context_,handle,id,eligible)){succeeded_=false;return false;}
+        if(!eligible||effect->noTouch)return true;
+        if(!effect->playerContact(xsp,ysp,random)||
+           (alarm_&&!alarm_(context_,handle,id,*effect))){succeeded_=false;return false;}
+        return true;
     }
     // A global room-list sweep selects one lifetime, not an entire family.
     // Both keys must match: numeric IDs are external and slots may be reused.

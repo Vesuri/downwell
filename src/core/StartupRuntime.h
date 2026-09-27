@@ -162,6 +162,14 @@ public:
             },outside);
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity,unsigned Registered> bool contactTimeShard(
+        StoredTimeShardRegistration<instanceCapacity,Registered>& registration,TimeShardEffects<Capacity>& shards,
+        typename TimeShardEffects<Capacity>::Handle handle,MotionBinary64 xsp,MotionBinary64 ysp){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=registration.belongsTo(instances_)&&shards.phasesBoundTo(registration)&&
+            shards.playerContact(handle,xsp,ysp,random_);
+        return run_.effectsSucceeded;
+    }
     template<unsigned Capacity,unsigned Registered> bool retireTimeShard(
         StoredTimeShardRegistration<instanceCapacity,Registered>& registration,TimeShardEffects<Capacity>& shards,
         std::uint32_t id){

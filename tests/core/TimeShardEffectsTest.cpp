@@ -39,6 +39,30 @@ struct World {
     }
 };
 int main(){
+    for(unsigned failure=0;failure<4;++failure){
+        GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
+        assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);
+        effects.get(h)->noTouch=false;const auto draws=random.drawCount();
+        const MotionBinary64 invalid{0x7ff00000u,0};
+        if(failure==2)world.fail=6; // Publication fails after both velocity draws.
+        if(failure==3)world.fail=9; // Eligibility fails before any mutation.
+        assert(!effects.playerContact(h,failure==0?invalid:MotionBinary64{},
+            failure==1?invalid:MotionBinary64{},random));
+        const unsigned consumed=failure==0||failure==3?0:failure==1?1:2;
+        assert(!effects.succeeded()&&random.drawCount()==draws+consumed);
+        assert(!effects.playerContact(h,{},{},random)&&random.drawCount()==draws+consumed);
+        assert(!effects.clear());
+    }
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
+        assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);
+        effects.get(h)->noTouch=false;world.active=false;const auto draws=random.drawCount();
+        assert(effects.playerContact(h,{},{},random)&&random.drawCount()==draws&&!effects.get(h)->noTouch);
+        world.active=true;
+        assert(effects.playerContact(h,{},{},random)&&random.drawCount()==draws+2&&effects.get(h)->alarm2==5);
+        world.fail=6; // Cooldown guard must not attempt redundant alarm publication.
+        assert(effects.playerContact(h,{},{},random)&&effects.succeeded()&&random.drawCount()==draws+2);
+    }
     {
         GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
         assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);

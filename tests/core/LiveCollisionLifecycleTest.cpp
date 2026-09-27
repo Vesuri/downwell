@@ -194,6 +194,10 @@ int main(){
         shards.advanceAlarm(phase,2);
         require(shards.succeeded()&&world->instance(first)->alarms.get(2)==29,"publish alarm phase before Step");
         require(shards.advanceAnimation(phase),"publish shard animation phase");
+        const auto contactDraws=world->randomDrawCount();shards.get(1)->noTouch=false;
+        require(world->contactTimeShard(registration,shards,1,{},{})&&world->randomDrawCount()==contactDraws+2&&
+                world->instance(first)->alarms.get(2)==5,
+                "registered contact publishes cooldown before any subsequent world phase");
         require(world->stepTimeShards(registration,shards,phase,true,
             [](auto,const auto&,bool& retire){retire=false;return true;}),"registered shard motion with source queries");
         for(unsigned i=0;i<3;++i){

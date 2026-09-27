@@ -59,6 +59,13 @@ and the remaining family dispatchers are not yet wired to it.
 
 ## Shard registration contract
 
+The explicit registered-player-contact boundary uses the world's RNG and
+publishes the changed alarm-2 cooldown immediately. It checks event eligibility
+before consuming random words; inactive or `noTouch`-guarded contacts do no work.
+A failed velocity calculation or cooldown publication is terminal, preserving
+any already-consumed RNG and velocity assignments rather than retrying them.
+The ordinary collision traversal still needs to invoke this boundary.
+
 Registered shard alarm and Step dispatch check the generation-resolved world's
 active/destruction state before mutating timers, querying contacts or consuming
 RNG. An inactive lifetime stays allocated and can resume later; a failed lookup
