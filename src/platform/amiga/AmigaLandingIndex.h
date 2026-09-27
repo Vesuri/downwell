@@ -11,6 +11,9 @@ public:
     void insert(unsigned column, unsigned row) {
         if (column<128 && row<512) words_[column][row>>4] |= 0x8000u>>(row&15);
     }
+    void remove(unsigned column, unsigned row) {
+        if (column<128 && row<512) words_[column][row>>4] &= ~(0x8000u>>(row&15));
+    }
     unsigned next(unsigned column, unsigned row) const {
         if (column>=128 || row>=512) return 0;
         unsigned word=row>>4;

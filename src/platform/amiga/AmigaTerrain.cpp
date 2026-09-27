@@ -265,7 +265,8 @@ unsigned amigaCollectTerrainBreakables(
 }
 
 namespace {
-enum { solidCell = 1, landingCell = 2, breakableCell = 4, roomWallCell = 8, wallCell = 16 };
+enum { solidCell = 1, landingCell = 2, breakableCell = 4, roomWallCell = 8, wallCell = 16,
+       platformCell = 32 };
 bool indexAdd(AmigaTerrainIndex& index, int x, int y, unsigned flags,
               unsigned* addedCell = nullptr) {
     if ((x & 15) || (y & 15) || x < AmigaTerrainIndex::minX ||
@@ -298,6 +299,7 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
     index.wallContacts.clear();
     // Reconstructed pattern occupancy is not evidence of actual Create events.
     index.wallContactsComplete = context.fragmentCount==0;
+    index.mutableWallOccupancy = context.fragmentCount==0 && !(context.rooms && context.room);
     for (unsigned i = 0; i < sizeof(index.cells); ++i) index.cells[i] = 0;
     if (context.rooms && context.room) {
         for (unsigned i = 0; i < context.room->instanceCount; ++i) {
@@ -370,7 +372,7 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
     if (!index.wallContacts.append(objectId,x,y))return false;
     const unsigned flags = objectId == 60
         ? solidCell | landingCell | wallCell | (initialRoomWall ? roomWallCell : 0)
-        : objectId == 92 ? breakableCell : objectId == 93 ? landingCell : 0;
+        : objectId == 92 ? breakableCell : objectId == 93 ? landingCell | platformCell : 0;
     if (!flags) return true;
     unsigned cell;
     {
@@ -379,6 +381,20 @@ bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
     }
     DW_GENERATION_SCOPE(profileGeneratedLanding);
     index.nextLanding.insert(cell%AmigaTerrainIndex::columns,cell/AmigaTerrainIndex::columns);
+    return true;
+}
+
+bool amigaRemoveTerrainWall(AmigaTerrainIndex& index, int x, int y) {
+    if (!index.mutableWallOccupancy || !index.wallContactsComplete ||
+        !index.wallContacts.removeOne(60,x,y)) return false;
+    if (index.wallContacts.contains(60,x,y)) return true;
+    const unsigned cell = (unsigned(y)>>4)*AmigaTerrainIndex::columns +
+        (unsigned(x-AmigaTerrainIndex::minX)>>4);
+    auto& flags=index.cells[cell];
+    flags &= ~(solidCell | wallCell | roomWallCell);
+    if (!(flags & platformCell)) flags &= ~landingCell;
+    if (!(flags & (landingCell | breakableCell)))
+        index.nextLanding.remove(cell%AmigaTerrainIndex::columns,cell/AmigaTerrainIndex::columns);
     return true;
 }
 

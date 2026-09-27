@@ -12,6 +12,12 @@ public:
     struct Record {std::int16_t x;std::uint16_t y,object,next;};
     void clear(){for(auto& head:heads_)head=0;count_=used_=free_=0;}
     unsigned size()const{return count_;}
+    bool contains(int object,int x,int y)const{
+        if(x<-512||x>=1536||y<0||y>=8192||(x&15)||(y&15))return false;
+        for(unsigned id=heads_[unsigned(y)/16];id;id=records_[id-1].next)
+            if(records_[id-1].object==object&&records_[id-1].x==x)return true;
+        return false;
+    }
     bool append(int object,int x,int y){
         if(object!=60 && object!=92 && object!=293)return true;
         if(count_==Capacity || x<-512 || x>=1536 || y<0 || y>=8192 || (x&15) || (y&15))return false;

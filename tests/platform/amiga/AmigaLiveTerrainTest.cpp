@@ -15,6 +15,37 @@ void require(bool value, const char* message) {
     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
 }
 using Commands = std::vector<downwell::DeferredCreateInstance>;
+void verifyWallRemoval() {
+    static AmigaTerrainIndex index;
+    AmigaTerrainCollisionContext context{nullptr,nullptr,nullptr,nullptr,0,nullptr};
+    context.index=&index;
+    for(unsigned overlap=0;overlap<4;++overlap){
+        require(amigaBuildTerrainIndex(context,index),"removal index initializes");
+        require(amigaAddTerrainObject(index,60,240,176,true) &&
+                amigaAddTerrainObject(index,60,240,176),"coincident wall births");
+        if(overlap&1)require(amigaAddTerrainObject(index,93,240,176),"overlapping platform");
+        if(overlap&2)require(amigaAddTerrainObject(index,92,240,176),"overlapping box");
+        require(amigaAddTerrainObject(index,60,240,192),"next landing candidate");
+        const unsigned column=(240-AmigaTerrainIndex::minX)/16;
+        index.mutableWallOccupancy=false;
+        require(!amigaRemoveTerrainWall(index,240,176) && index.wallContacts.contains(60,240,176),
+                "reconstructed occupancy cannot be subtracted");
+        index.mutableWallOccupancy=true;
+        require(!amigaRemoveTerrainWall(index,241,176) && !amigaRemoveTerrainWall(index,240,-16),
+                "invalid removal is rejected");
+        require(amigaRemoveTerrainWall(index,240,176) && amigaIndexedWall(index,240,176) &&
+                index.nextLanding.next(column,11)==12,"first removal preserves duplicate occupancy");
+        require(amigaRemoveTerrainWall(index,240,176) && !amigaIndexedWall(index,240,176) &&
+                !amigaIndexedRoomWall(index,240,176),"last wall removes wall occupancy");
+        require(index.nextLanding.next(column,11)==(overlap?12u:13u),
+                "landing removal preserves overlapping platforms and boxes");
+        require(amigaResolveTerrainSolid(&context,0,0)==bool(overlap&2),
+                "only overlapping box remains solid after walls disappear");
+        require(!amigaRemoveTerrainWall(index,240,176),"absent wall does not consume another object");
+        require(amigaAddTerrainObject(index,60,240,176) && amigaIndexedWall(index,240,176) &&
+                index.nextLanding.next(column,11)==12,"reactivation restores contact and landing");
+    }
+}
 void verifyTerrainSegments() {
     static AmigaTerrainIndex index;
     AmigaTerrainCollisionContext context{nullptr, nullptr, nullptr, nullptr, 0, nullptr};
@@ -339,6 +370,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
 }
 
 int main(int argc, char** argv) {
+    verifyWallRemoval();
     verifyTerrainSegments();
     require(argc == 2, "builder pack path required");
     std::ifstream input(argv[1], std::ios::binary);

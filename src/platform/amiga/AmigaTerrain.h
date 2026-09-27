@@ -139,6 +139,8 @@ struct AmigaTerrainIndex {
     AmigaLandingIndex nextLanding; // candidate bits; row+1/zero query encoding
     downwell::TerrainWallContacts<> wallContacts;
     bool wallContactsComplete = false;
+    // Subtraction is safe only when occupancy came from actual Create events.
+    bool mutableWallOccupancy = false;
 };
 bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
                            AmigaTerrainIndex& index);
@@ -147,6 +149,8 @@ bool amigaBuildTerrainIndex(const AmigaTerrainCollisionContext& context,
 bool amigaAddTerrainObject(AmigaTerrainIndex& index, int objectId, int x, int y,
                            bool initialRoomWall = false);
 bool amigaIndexedRoomWall(const AmigaTerrainIndex& index, int x, int y);
+// Remove one collision contribution, not the authoritative instance lifetime.
+bool amigaRemoveTerrainWall(AmigaTerrainIndex& index, int x, int y);
 bool amigaIndexedWall(const AmigaTerrainIndex& index, int x, int y);
 
 bool amigaBuildInitialAreaOneTerrain(
