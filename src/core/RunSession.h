@@ -375,10 +375,11 @@ struct RunSession {
     // One logical Draw phase per gameplay update, not per renderer repaint.
     // The source consumes field RNG even outside its camera drawing bounds.
     void gameplayPresentationStep(GameMakerRandom& random, bool timeStopped = false) {
-        if (effectsSucceeded)
-            effectsSucceeded = timeFields.advanceDraw(timeStopped, random,
-                levelExitPresent, goalFieldBirthBoundary,
-                [&] { goalField.advanceDraw(timeStopped, random); });
+        if (!effectsSucceeded) return;
+        effectsSucceeded = timeFields.advanceDraw(timeStopped, random,
+            levelExitPresent, goalFieldBirthBoundary,
+            [&] { goalField.advanceDraw(timeStopped, random); });
+        if (!effectsSucceeded) return;
         results.presentationStep();
     }
 

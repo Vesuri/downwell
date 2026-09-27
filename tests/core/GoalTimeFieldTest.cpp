@@ -1,5 +1,6 @@
 #include "core/GoalTimeField.h"
 #include "core/RunSession.h"
+#include "core/StateDigest.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -28,6 +29,26 @@ int main() {
     session.levelExitPresent = false;
     session.gameplayPresentationStep(sessionRandom);
     require(sessionRandom.drawCount() == 1, "retired field consumes no Draw RNG");
+    session.results.open(true,100,100);
+    session.results.menu.visible[5]=session.results.menu.visible[6]=true;
+    const auto resultsDigest=[&] {
+        downwell::StateDigest digest;session.results.appendState(digest);return digest.value();
+    };
+    session.gameplayPresentationStep(sessionRandom);
+    require(session.results.progress.animatedTotal>0,"healthy presentation advances results progress");
+    const auto beforeFailure=resultsDigest();
+    const auto rngBefore=sessionRandom.drawCount();
+    session.levelExitPresent=true;
+    session.goalFieldBirthBoundary=1; // Invalid: no ordinary fields were born.
+    session.gameplayPresentationStep(sessionRandom);
+    require(!session.effectsSucceeded && resultsDigest()==beforeFailure &&
+            sessionRandom.drawCount()==rngBefore,
+            "failed field Draw stops results progression and later RNG consumption");
+    session.goalFieldBirthBoundary=0; // Repairing input must not clear a terminal failure.
+    session.gameplayPresentationStep(sessionRandom);
+    require(!session.effectsSucceeded && resultsDigest()==beforeFailure &&
+            sessionRandom.drawCount()==rngBefore,
+            "latched failure blocks subsequent presentation even with valid fields");
     downwell::GameMakerRandom random(42), oracle(42);
     downwell::GoalTimeField field;
     field.create(240, 4032, random);
