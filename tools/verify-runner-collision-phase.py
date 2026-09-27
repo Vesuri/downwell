@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pin reviewed collision-pass placement and paired dispatch, not pair ordering."""
+"""Pin reviewed collision collection, phase placement and paired dispatch."""
 from hashlib import sha256
 from pathlib import Path
 import runpy
@@ -7,6 +7,7 @@ import runpy
 review = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = review["region"]
 for start, size, digest in (
+    (0x5022F5, 0x2C1, "858ae24f21aa85da46936ec6c95289d1e8374d32e508bf0bc8f97973c85e78d0"),
     (0x50DD76, 15, "ff6e0054f27c2990155a0e75c553c375bb3b2aacd83f6bee67b8c1400a6de0cb"),
     (0x50DEC8, 58, "d75c0f48915733e6dd39e56a7bc490ef55c29f9ba43bb32a3bc779b2745d0d3d"),
     (0x5030D0, 55, "4f1b418205dc219c0e0925395bc3ae13570e5936a81ffd46e5366b5ff170fab0"),

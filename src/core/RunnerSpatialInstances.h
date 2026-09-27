@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_INSTANCES_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_INSTANCES_H
 #include "InstanceHandle.h"
+#include "RunnerCollisionPairs.h"
 #include "RunnerTransformField.h"
 #include "RunnerObjectMembership.h"
 #include "RunnerSpatialIndex.h"
@@ -344,6 +345,56 @@ public:
         if(!valid())return false;
         return checked(spatial_.flush([&](unsigned slot){return entries_[slot].state.flags;},
             [&](unsigned slot){return refreshBounds(handle(slot),true);}));
+    }
+    // 0x5022c0: flush bounds, query collision-dirty instances in intrusive-list
+    // order, then retain animated masks for the next pass. indexAvailable is
+    // the runner's global index-pointer state, NOT whether the tree is empty.
+    // hasEvent resolves inherited collision events; maskFrames resolves mask
+    // or fallback sprite (zero for missing). Neither may mutate the world.
+    // This collects only: precise tests and paired handlers run after sealing.
+    template<unsigned Pairs,class Refresh,class HasEvent,class MaskFrames>
+    bool collectCollisionPairs(RunnerCollisionPairs<Capacity,Pairs>& pairs,
+        bool indexAvailable,Refresh refreshBounds,HasEvent hasEvent,MaskFrames maskFrames){
+        if(!valid()||!checked(pairs.beginPass()))return false;
+        unsigned retained[Capacity],count=0;
+        if(indexAvailable){
+            if(!flush(refreshBounds))return false;
+            unsigned slot=collision_.first();
+            while(slot!=Queue::End){
+                const auto self=handle(slot);
+                if(!checked(live(self)))return false;
+                const bool eligible=Queue::shouldRefreshQueued(entries_[slot].state.flags);
+                if(eligible){
+                    Box box=entries_[slot].state.bounds;
+                    if(!checked(normalize(box)))return false;
+                    bool callbacks=true;
+                    const bool queried=index_.query(box,[&](unsigned candidate){
+                        if(candidate>=Capacity||entries_[candidate].object<0){callbacks=false;return false;}
+                        callbacks=pairs.candidate(self,handle(candidate),hasEvent);
+                        return callbacks;
+                    });
+                    // query's early callback stop is not itself an index error.
+                    if(!checked(queried&&callbacks))return false;
+                }
+                if(!checked(collision_.contains(slot)))return false;
+                const unsigned successor=collision_.next(slot);
+                collision_.remove(slot);
+                if(eligible){
+                    if(entries_[slot].state.flags&0x200u){
+                        unsigned frames=0;
+                        if(!checked(maskFrames(self,frames)))return false;
+                        if(frames>1)retained[count++]=slot;
+                    }
+                    if(!checked(pairs.finishInstance(self)))return false;
+                }
+                slot=successor;
+            }
+        }
+        collision_.clear();
+        // Source prepends to a temporary list, then prepends back: preserve
+        // query order, rather than reversing animated instances each frame.
+        while(count)collision_.mark(retained[--count]);
+        return checked(pairs.seal());
     }
     // VM instance_place wrapper 0x529e50 narrows absolute room coordinates
     // to binary32 before 0x4fe560. Do not round to pixels or narrow a relative

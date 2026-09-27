@@ -35,8 +35,24 @@ Thus reverse-pair suppression depends on outer traversal order, not sorted IDs.
 
 `RunnerCollisionPairs` models this collection for externally supplied ordered
 candidates, with checked capacity and generation-tagged deferred handles.
-It does not supply the dirty-list traversal, spatial queries, inherited event
-lookup, precise overlap, or solid response. Its completed-instance set models
+`RunnerSpatialInstances::collectCollisionPairs` supplies the maintained dirty
+queue and spatial-index traversal. It flushes spatial updates first, normalizes
+cached bounds, skips excluded current instances without stamping them, and
+does not filter candidate exclusions prematurely. The pair-processing routine
+owns those later tests. A missing global index skips the flush/query and clears
+the collision queue, distinct from querying an empty tree.
+
+After each eligible query, the runner unlinks the current instance, tests flag
+`0x200`, resolves the mask (or sprite if the mask ID is negative), and retains
+it only for resources with more than one frame. Two prepend passes preserve
+the retained query order for the next frame (`0x50242a..0x5025b4`). The shared
+owner uses a temporary slot array (four bytes per capacity slot) and reverse
+prepend to produce the same order. Resource resolution and inherited event
+lookup remain checked callbacks; callbacks cannot mutate lifetimes. Failures
+latch the owner and preserve completed mutations rather than retrying.
+
+This does not yet supply live scheduler wiring, precise overlap dispatch or
+solid response. The pair buffer's completed-instance set models
 one pass; source counter overflow and concurrent mutation during collection
 are outside its contract. The runner evidence verifier pins these regions.
 

@@ -25,6 +25,61 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    // Actual index traversal and collision queue, not a supplied slot order.
+    for(unsigned mode=0;mode<5;++mode){
+        Owner owner;Graph graph;graph.values[1]=0x18;
+        RunnerCollisionPairs<64,16> pairs;
+        unsigned refreshed=0,lookups=0,framesRead=0;
+        auto refresh=[&](InstanceHandle h,bool publish){
+            ++refreshed;
+            // Reversed cached endpoints must still query the normalized box.
+            Owner::Box box{{0x3f800000},{0x3f800000},{},{}};
+            return owner.refresh(h,0x18,false,&box,true,publish);
+        };
+        for(unsigned i=0;i<3;++i){
+            assert(owner.attach({i,1},1,{}));
+            assert(owner.publishBirth({i,1},graph,refresh));
+        }
+        // Queue is 2,1,0; insertion order within the leaf is 0,1,2.
+        if(mode==1)assert(owner.setExclusions({2,1},2));
+        if(mode==2)assert(owner.move({0,1},{0x3f800000},{},0x18));
+        refreshed=0;
+        auto event=[&](InstanceHandle,InstanceHandle,bool& found){
+            ++lookups;found=true;return mode!=3;
+        };
+        auto frames=[&](InstanceHandle,unsigned& n){++framesRead;n=2;return mode!=4;};
+        const bool ok=owner.collectCollisionPairs(pairs,mode!=2,refresh,event,frames);
+        if(mode==3||mode==4){
+            assert(!ok&&!owner.valid());
+            const unsigned before=lookups;
+            assert(!owner.collectCollisionPairs(pairs,true,refresh,event,frames));
+            assert(lookups==before);
+            continue;
+        }
+        assert(ok&&refreshed==0);
+        if(mode==2){
+            assert(pairs.size()==0&&lookups==0&&framesRead==0);
+            assert(owner.pendingCollision()==0&&owner.pendingSpatial()==1);
+            continue; // Absent global index skips even the bounds flush.
+        }
+        assert(pairs.size()==3&&owner.pendingCollision()==(mode==1?2u:3u));
+        const unsigned expected[2][6]={{2,0,2,1,1,0},{1,0,1,2,0,2}};
+        for(unsigned i=0;i<3;++i){
+            const auto* p=pairs.at(i);
+            assert(p->self.slot==expected[mode][2*i]&&p->other.slot==expected[mode][2*i+1]);
+        }
+        // An excluded current instance remains a broad-phase candidate; it is
+        // neither stamped nor requeued. Precise/destruction checks come later.
+        assert(framesRead==(mode==1?2u:3u));
+        assert(owner.collectCollisionPairs(pairs,true,refresh,event,frames));
+        for(unsigned i=0;i<3;++i){
+            const auto* p=pairs.at(i);
+            assert(p->self.slot==expected[mode][2*i]&&p->other.slot==expected[mode][2*i+1]);
+        }
+        assert(owner.retire({0,1}));
+        assert(owner.collectCollisionPairs(pairs,true,refresh,event,frames));
+        assert(pairs.size()==1); // No stale pair/queue membership after retirement.
+    }
     {
         Owner owner;Graph graph;unsigned count=999;
         assert(owner.instanceNumber(0,graph,count)&&count==0);
@@ -43,6 +98,30 @@ int main(){
         assert(owner.registerObject({1,2},false)&&owner.instanceNumber(0,graph,count)&&count==1);
         count=999;assert(!owner.instanceNumber(-3,graph,count)&&count==999);
         assert(!owner.instanceNumber(4,graph,count)&&count==999);
+    }
+    for(unsigned framesCount:{0u,1u,2u}){
+        Owner owner;Graph graph;graph.values[1]=0x18;
+        RunnerCollisionPairs<64,1> pairs;
+        unsigned refreshes=0;
+        auto refresh=[&](InstanceHandle h,bool publish){
+            ++refreshes;const auto* s=owner.resolve(h);assert(s);
+            Owner::Box box{s->x,s->y,s->x,s->y};
+            return owner.refresh(h,0x18,false,&box,true,publish);
+        };
+        for(unsigned i=0;i<2;++i){
+            assert(owner.attach({i,1},1,{}));
+            assert(owner.publishBirth({i,1},graph,refresh));
+            assert(owner.move({i,1},{0x40000000},{},0x18));
+        }
+        refreshes=0;
+        auto event=[](InstanceHandle,InstanceHandle,bool& found){found=true;return true;};
+        auto frames=[&](InstanceHandle,unsigned& n){n=framesCount;return true;};
+        assert(owner.collectCollisionPairs(pairs,true,refresh,event,frames));
+        assert(refreshes==2&&owner.pendingSpatial()==0&&pairs.size()==1);
+        assert(pairs.at(0)->self.slot==1&&pairs.at(0)->other.slot==0);
+        assert(owner.pendingCollision()==(framesCount>1?2u:0u));
+        assert(owner.collectCollisionPairs(pairs,true,refresh,event,frames));
+        assert(pairs.size()==(framesCount>1?1u:0u));
     }
     // VM coordinates retain fractions and narrow only once, in absolute room
     // space. Compare the boundary with a scalar double -> float conversion,
