@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <memory>
 using Split=downwell::RunnerSpatialSplit;
 using Box=std::array<float,4>;
 static Box merge(Box a,Box b){return {std::min(a[0],b[0]),std::min(a[1],b[1]),std::max(a[2],b[2]),std::max(a[3],b[3])};}
@@ -221,6 +222,22 @@ int main(){
         for(unsigned id=0;id<200;++id)assert(tree.insert(packed(live[id]),id));
         tree.clear();assert(tree.valid() && tree.height()==0 && tree.nodeCount()==1);
         assert(tree.query(packed(all),[](unsigned){assert(false);return true;}));
+    }
+    // Native production ownership has thousands of slots; exercise a deeper
+    // descent/unwind than the small randomized mutation tapes above.
+    auto deep=std::make_unique<downwell::RunnerSpatialIndex<4096>>();
+    ReferenceTree deepReference;
+    for(unsigned id=0;id<2400;++id){
+        const float x=float(id%32)*16,y=float(id/32)*16;
+        const Box b={x,y,x+16,y+16};
+        assert(deep->insert(packed(b),id));deepReference.insert(b,id);
+    }
+    assert(deep->height()>=4&&deep->height()==deepReference.nodes[deepReference.root].level);
+    for(unsigned row=0;row<75;++row){
+        const Box b={0,float(row)*16,512,float(row)*16+16};
+        std::vector<unsigned> actual,expected;
+        assert(deep->query(packed(b),[&](unsigned id){actual.push_back(id);return true;}));
+        deepReference.visit(deepReference.root,b,expected);assert(actual==expected);
     }
     downwell::RunnerSpatialIndex<3> equalTree;
     for(unsigned i=0;i<7;++i)assert(equalTree.insert({},i));

@@ -83,20 +83,34 @@ private:
         return nodes_[node].split(entry,nodes_[sibling]);
     }
     bool insertAt(unsigned node,const Node::Entry& entry,int level,unsigned& sibling){
-        Node& n=nodes_[node];
-        if(n.level==level)return add(node,entry,sibling);
-        if(n.level<level)return false;
-        Box choices[6];for(unsigned i=0;i<n.count;++i)choices[i]=n.entries[i].bounds;
-        unsigned selected;
-        if(!Math::chooseChild(choices,n.count,entry.bounds,selected))return false;
-        unsigned child=n.entries[selected].child,newChild=Capacity;
-        if(!insertAt(child,entry,level,newChild))return false;
-        if(newChild==Capacity){
-            n.entries[selected].bounds=Math::unite(n.entries[selected].bounds,entry.bounds);
-            return true;
+        // Every internal node has at least two children: the bit width of
+        // Capacity bounds tree height. Keep only the descent path, rather than
+        // a complete split/child-selection call frame at every tree level.
+        constexpr unsigned depthLimit=[](){unsigned n=Capacity,bits=0;
+            do{++bits;n>>=1;}while(n);return bits;}();
+        unsigned parents[depthLimit],selections[depthLimit],depth=0;
+        while(nodes_[node].level!=level){
+            const Node& n=nodes_[node];
+            if(n.level<level||depth==depthLimit)return false;
+            Box choices[6];for(unsigned i=0;i<n.count;++i)choices[i]=n.entries[i].bounds;
+            unsigned selected;
+            if(!Math::chooseChild(choices,n.count,entry.bounds,selected))return false;
+            parents[depth]=node;selections[depth++]=selected;
+            node=n.entries[selected].child;
         }
-        n.entries[selected].bounds=bounds(child);
-        return add(node,{bounds(newChild),newChild,0},sibling);
+        unsigned split=Capacity;
+        if(!add(node,entry,split))return false;
+        while(depth){
+            const unsigned child=node;node=parents[--depth];
+            auto& selected=nodes_[node].entries[selections[depth]];
+            if(split==Capacity)selected.bounds=Math::unite(selected.bounds,entry.bounds);
+            else {
+                selected.bounds=bounds(child);
+                const unsigned newChild=split;split=Capacity;
+                if(!add(node,{bounds(newChild),newChild,0},split))return false;
+            }
+        }
+        sibling=split;return true;
     }
     bool eraseAt(unsigned node,Box box,std::uint32_t instance,unsigned& detached){
         Node& n=nodes_[node];
