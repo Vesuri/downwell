@@ -501,7 +501,14 @@ test: verify-runner-sprite-vertices
 verify-runner-sprite-vertices:
 	python3 tools/verify-runner-sprite-vertices.py
 	python3 tests/impact-angle-art-test.py
-test: verify-bullet-solid-script verify-machine-gun-source-step
+test: verify-bullet-solid-script verify-machine-gun-source-step verify-box-destruction
+.PHONY: verify-box-destruction
+verify-box-destruction: build/box-destruction-test
+	python3 tools/verify-box-destruction.py
+	./build/box-destruction-test
+build/box-destruction-test: tests/core/BoxDestructionScriptTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 verify-machine-gun-source-step: build/machine-gun-source-step-test
 	python3 tools/verify-machine-gun.py
 	./build/machine-gun-source-step-test

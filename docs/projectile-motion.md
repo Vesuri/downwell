@@ -74,6 +74,25 @@ hit-write storage. This is not the full box Create/Step implementation:
 non-cavern/glitch/ground-room variants, original damage/destruction timing,
 effects, audio, chain reactions and gem/debris emission still require wiring.
 
+`BoxDestructionScript` transcribes object 92's Step body, separately from a
+bullet's damage write. Health <= 0 causes overlap-limited sound, smoke at Y+4,
+flash at Y, and sprite 603 at Y+12 (speed 0.5, angle 270, depth -60000), in that
+order. Chain reaction creates object 266 synchronously, publishes `myBullet`,
+then direction 90 and damage 20 before sound 342. It queries adjacent boxes
+up/right/down/left, publishes `target` even on a miss, sets alarm 0 to 5 on
+hits, and clears `checked` when auto-tiling is enabled. Global chain-reaction
+reads are retained across callbacks rather than cached before child creation.
+
+The destruction request precedes object-370 debris Create: one child in
+low-spec mode, two otherwise. Area 4 suppresses gems; other areas spawn 3 or 10
+for gem kinds 1 or 2. `alarmStop(0)` runs last, including for intact boxes.
+Callbacks must execute the complete child scripts synchronously and retain
+the destroyed parent until the event finishes. The helper stops at the first
+failed callback without rollback or retry; it does not implement child
+lifecycles or attach itself to the live scheduler. In particular, the existing
+immediate box-inactivation path still needs replacement. Run
+`make verify-box-destruction` for the pinned assembly and branch/failure tests.
+
 The stored and native collision owners expose `projectileWallParent` and
 `projectileBoxHealth`/`projectileBoxHealthWrite`/`projectileBoxHit` for the
 selected lifetime. Parent lookup uses the direct serialized parent, not an
