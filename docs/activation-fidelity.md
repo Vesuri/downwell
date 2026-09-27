@@ -119,14 +119,21 @@ collision-index remove/insert merely because this hook is called.
 The frame loop calls Begin Step dispatcher `0x50b7e0(1)` at `0x50dc81`, then
 calls the reconciliation wrapper at `0x50dc89`, after the dispatcher returns.
 Do not flush object memberships after each individual Begin Step handler.
-This establishes that boundary, not every frame/room-transition call site.
+The same normal frame path calls wrapper `0x5108d0` after Alarm dispatch
+(`0x50dce6` / `0x50dceb`), ordinary Step (`0x50dd78` / `0x50dd80`), collision
+dispatch (`0x50decc` / `0x50ded1`), and End Step (`0x50def5` / `0x50defd`).
+The wrapper's pending-membership branch at `0x510900` calls `0x48d630`.
+The call targets and Step subtype arguments are asserted directly by the
+field-lookup verifier. This does not establish every alternate frame or
+room-transition path, nor the wrapper's other maintenance operations.
 
-The native `GameplayWorld` calls its borrowed Begin Step boundary hook after
-player movement/shooting and before alarms. Attaching `GameplayCollisionOwner`
-installs reconciliation there. Immediate activation requests and dormant births
+The native `GameplayWorld` calls its borrowed phase-boundary hook after Begin
+Step, alarms, ordinary Step, collisions, and the implemented End Step work.
+Attaching `GameplayCollisionOwner` installs reconciliation at these boundaries.
+Immediate activation requests and dormant births
 set a pending bit; the owner does not rescan room membership on quiet frames.
 The callback survives in-place Retry, and failure latches the world before
-alarms/generation can proceed. Other source phase boundaries, remaining object
+later phases can proceed. Other source maintenance operations, remaining object
 families, and full original room ordering are still required; this hook is not
 a substitute for the complete event scheduler.
 

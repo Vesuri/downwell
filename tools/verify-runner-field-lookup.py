@@ -82,3 +82,23 @@ assert region(0x80cee0,25) == b"instance_activate_region\0"
 assert region(0x7fe7e0,4) == bytes.fromhex("000080bf") # preference sentinel -1
 assert region(0x795ab8,4) == bytes.fromhex("0000803f") # seed sentinel adjustment +1
 print("Pinned Windows ancestor-list registration/removal, instance_place dispatch and first-hit traversal")
+
+# Normal frame path: dispatch returns before the common maintenance wrapper.
+# Rel32 call decoding pins the targets, not merely a hash of reviewed bytes.
+import struct
+def call_target(address):
+    instruction = region(address, 5)
+    assert instruction[0] == 0xe8
+    return address + 5 + struct.unpack("<i", instruction[1:])[0]
+for dispatch, target, boundary in (
+    (0x50dc81, 0x50b7e0, 0x50dc89),  # Begin Step, subtype 1
+    (0x50dce6, 0x509d40, 0x50dceb),  # Alarm dispatcher
+    (0x50dd78, 0x50b7e0, 0x50dd80),  # Step, subtype 0
+    (0x50decc, 0x5022c0, 0x50ded1),  # normal collision path
+    (0x50def5, 0x50b7e0, 0x50defd),  # End Step, subtype 2
+):
+    assert call_target(dispatch) == target
+    assert call_target(boundary) == 0x5108d0
+for address, subtype in ((0x50dc7f, 1), (0x50dd76, 0), (0x50def3, 2)):
+    assert region(address, 2) == bytes((0x6a, subtype))
+print("Pinned normal frame phase calls and deferred membership boundaries")

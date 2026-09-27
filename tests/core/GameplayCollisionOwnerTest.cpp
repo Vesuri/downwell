@@ -204,6 +204,12 @@ int main(){
         assert(phaseOwner->state(shared)->flags&0x80000u);
         phaseWorld->step(0);assert(phaseWorld->effectsSucceeded());
         assert(!(phaseOwner->state(shared)->flags&0x80000u));
+        phaseWorld->configureGenerationStep([](void* p,GameplayWorld&,GameMakerRandom&,int){
+            auto& terrain=static_cast<GameplayCollisionOwner*>(p)->terrain();
+            return terrain.activation(terrain.handle(0),false);
+        },phaseOwner.get());
+        phaseWorld->step(0);assert(phaseWorld->effectsSucceeded());
+        assert(phaseOwner->state(shared)->flags&0x80000u); // Step request is not delayed to next frame.
         assert(phaseWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
         assert(phaseWorld->createGeneratedInstance({60,240,512},objects,[](const auto&){return true;}));
         local=phaseOwner->terrain().handle(0);
@@ -215,13 +221,33 @@ int main(){
     {
         auto phaseWorld=std::make_unique<GameplayWorld>(300);
         struct Audit{unsigned boundaries=0,generations=0;} audit;
-        phaseWorld->configureBeginStepBoundary([](void* p){++static_cast<Audit*>(p)->boundaries;return false;},&audit);
+        phaseWorld->configurePhaseBoundary([](void* p,GameplayWorld::PhaseBoundary phase){
+            assert(phase==GameplayWorld::PhaseBoundary::beginStep);
+            ++static_cast<Audit*>(p)->boundaries;return false;
+        },&audit);
         phaseWorld->configureGenerationStep([](void* p,GameplayWorld&,GameMakerRandom&,int){
             ++static_cast<Audit*>(p)->generations;return true;
         },&audit);
         phaseWorld->step(0);
         assert(!phaseWorld->effectsSucceeded()&&audit.boundaries==1&&!audit.generations);
         phaseWorld->step(0);assert(audit.boundaries==1&&!audit.generations);
+    }
+    for(unsigned reject=0;reject<=5;++reject){
+        auto phaseWorld=std::make_unique<GameplayWorld>(300);
+        struct Audit{unsigned reject,calls=0,generations=0;} audit{reject};
+        phaseWorld->configurePhaseBoundary([](void* p,GameplayWorld::PhaseBoundary phase){
+            auto& a=*static_cast<Audit*>(p);
+            assert(unsigned(phase)==a.calls);
+            assert(a.generations==(a.calls<2?0u:1u));
+            return a.calls++!=a.reject;
+        },&audit);
+        phaseWorld->configureGenerationStep([](void* p,GameplayWorld&,GameMakerRandom&,int){
+            auto& a=*static_cast<Audit*>(p);assert(a.calls==2);++a.generations;return true;
+        },&audit);
+        phaseWorld->step(0);
+        assert(phaseWorld->effectsSucceeded()==(reject==5));
+        assert(audit.calls==(reject<5?reject+1:5));
+        if(reject<5){phaseWorld->step(0);assert(audit.calls==reject+1);}
     }
     for(bool reject:{false,true}){
         auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);

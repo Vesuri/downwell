@@ -39,8 +39,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
-    const auto beginStepBoundary=beginStepBoundary_;
-    void* const beginStepBoundaryContext=beginStepBoundaryContext_;
+    const auto phaseBoundary=phaseBoundary_;
+    void* const phaseBoundaryContext=phaseBoundaryContext_;
     const auto playerLifecycle=playerLifecycle_;
     const auto nextPlayerIdentity=nextPlayerLifetimeId_;
     const auto enemyLifecycle=enemyLifecycle_;
@@ -60,7 +60,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances);
     nextBreakableLifetimeId_=nextBreakableIdentity;
-    configureBeginStepBoundary(beginStepBoundary,beginStepBoundaryContext);
+    configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     nextBulletLifetimeId_=nextBulletIdentity;
     nextEnemyLifetimeId_=nextEnemyIdentity;
     nextGemLifetimeId_=nextGemIdentity;
@@ -782,13 +782,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Alarms follow Begin Step movement, before builder Step/Create events.
     // Runner 0x50dc89 reconciles pending room membership after the complete
     // Begin Step dispatcher, not after each individual activation request.
-    if(beginStepBoundary_&&!beginStepBoundary_(beginStepBoundaryContext_)){
-        run_.effectsSucceeded=false;return {};
-    }
+    if(!reconcilePhase(PhaseBoundary::beginStep))return {};
     const auto damageNumberAlarmPhase=run_.damageNumbers.beginPhase();
     // Object 221 Alarm 0 only destroys itself: no RNG or cross-family effects.
     run_.advanceDamageNumberAlarm(damageNumberAlarmPhase,0);
     advanceEnemyAlarms();
+    if(!reconcilePhase(PhaseBoundary::alarm))return {};
     const auto smokeStepPhase=run_.smokeEffects.beginPhase();
     const auto damageNumberStepPhase=run_.damageNumbers.beginPhase();
     DW_PROFILE_PHASE(profilePlayer);
@@ -1180,6 +1179,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(!boxesRetired){run_.effectsSucceeded=false;return {};}
 
     // Collision phase follows ordinary actor/generation/retirement work.
+    if(!reconcilePhase(PhaseBoundary::step))return {};
     // Its snap contributes to this frame's final display delta, not the view
     // those earlier Step events observed.
     if (followCamera_ && run_.sideCameraLockers.count) {
@@ -1195,6 +1195,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             ringOrigin_ = unsigned(origin);
         }
     }
+    if(!reconcilePhase(PhaseBoundary::collision))return {};
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();
     checkpoint_ = downwell::portCheckpointDigest(
@@ -1213,6 +1214,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.shops.endStep(34 + downwell::floorQ8Coordinate(viewCameraYQ8()));
     GameplayFrame frame = {};
     run_.gameplayPresentationStep(enemyRandom_);
+    if(!reconcilePhase(PhaseBoundary::endStep))return {};
     frame.playerMotion = motion;
     DW_PROFILE_PHASE(profileHudState);
     const bool ammoMotionChanged = run_.ammoHud.step(player_.shots(), player_.recharges());

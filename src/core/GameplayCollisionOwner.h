@@ -160,7 +160,7 @@ public:
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
         world_=&world;
-        world.configureBeginStepBoundary([](void* context){
+        world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary){
             return static_cast<GameplayCollisionOwner*>(context)->reconcileActivation();
         },this);
         return true;
