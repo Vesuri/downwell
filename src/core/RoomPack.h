@@ -18,7 +18,8 @@ enum class RoomPackError {
     wrongSize,
     badRoomRange,
     badLayerRange,
-    badInstanceIdBoundary
+    badInstanceIdBoundary,
+    badLayerType
 };
 
 struct PackedRoom {
@@ -59,19 +60,26 @@ struct PackedRoomLayer {
     std::uint32_t flags;
     std::uint32_t firstMembership;
     std::uint32_t membershipCount;
+    std::uint32_t type; // Serialized layer type: 1 background, 2 instances.
+    std::int32_t backgroundSpriteId;
+    std::uint32_t backgroundColor;
+    std::uint32_t backgroundFlags; // visible, foreground, tile X/Y, stretch.
+    float backgroundFirstFrame;
+    float backgroundAnimationSpeed;
+    std::uint32_t backgroundAnimationSpeedType;
 
     bool visible() const { return (flags & 1U) != 0; }
 };
 
 class RoomPack {
 public:
-    static constexpr std::uint16_t formatVersion = 2;
+    static constexpr std::uint16_t formatVersion = 3;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 40;
     static constexpr std::size_t roomRecordSize = 40;
     static constexpr std::size_t instanceRecordSize = 48;
-    static constexpr std::size_t layerRecordSize = 20;
+    static constexpr std::size_t layerRecordSize = 48;
     static constexpr std::size_t membershipRecordSize = 4;
 
     RoomPack(const std::uint8_t* bytes, std::size_t size);

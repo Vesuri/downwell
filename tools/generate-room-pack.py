@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 MAGIC = b"DWRM"
-VERSION = 2
+VERSION = 3
 MANIFEST_SCHEMA = 3
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 EXPECTED_ROOMS = 25
@@ -21,7 +21,7 @@ EXPECTED_LAYERS = 132
 HEADER = struct.Struct("<4sHHIIIIIQI")
 ROOM = struct.Struct("<iiiiiIIIII")
 INSTANCE = struct.Struct("<Iiii5fiiI")
-LAYER = struct.Struct("<IiIII")
+LAYER = struct.Struct("<IiIIIIiIIffI")
 MEMBERSHIP = struct.Struct("<I")
 
 ROOM_PERSISTENT = 1 << 0
@@ -34,11 +34,18 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def build_pack(manifest):
+def build_pack(manifest, layer_metadata):
     require(manifest.get("schemaVersion") == MANIFEST_SCHEMA,
             f"expected manifest schema {MANIFEST_SCHEMA}")
     require(manifest.get("source", {}).get("sha256") == SOURCE_SHA256,
             "manifest source hash does not match the pinned Steam build")
+    require(layer_metadata.get("schemaVersion") == 1 and
+            layer_metadata.get("sourceSha256") == SOURCE_SHA256 and
+            layer_metadata.get("extractor") == "UndertaleModTool" and
+            layer_metadata.get("version") == "0.9.2.0" and
+            layer_metadata.get("commit") == "03c7048438347799e0717b6e57a9358d000472e0",
+            "layer metadata provenance mismatch")
+    metadata_rooms = {room["id"]: room for room in layer_metadata["rooms"]}
 
     resources = manifest["resources"]
     rooms_by_id = {room["id"]: room for room in resources["rooms"]}
@@ -87,7 +94,20 @@ def build_pack(manifest):
             ))
 
         first_layer = len(layer_records)
-        for layer in room["layers"]:
+        metadata_layers = metadata_rooms[room["id"]]["layers"]
+        require(len(metadata_layers) == len(room["layers"]), "layer metadata count mismatch")
+        for layer, metadata in zip(room["layers"], metadata_layers):
+            values = metadata["values"]
+            require(metadata["id"] == layer["id"] and metadata["type"] == layer["type"] and
+                    values["LayerDepth"] == layer["depth"] and values["IsVisible"] == layer["visible"] and
+                    metadata["instanceIds"] == layer["instanceIds"], "layer metadata identity mismatch")
+            require(all(values[field] == 0 for field in ("XOffset", "YOffset", "HSpeed", "VSpeed")),
+                    "nonzero layer motion requires a pack extension")
+            kind = {"Background": 1, "Instances": 2}[layer["type"]]
+            background = metadata["background"]
+            background_flags = sum((1 << bit) for bit, field in enumerate(
+                ("Visible", "Foreground", "TiledHorizontally", "TiledVertically", "Stretch"))
+                if background.get(field, False))
             first_membership = len(memberships)
             for instance_id in layer["instanceIds"]:
                 require(instance_id in instances_by_id,
@@ -99,6 +119,13 @@ def build_pack(manifest):
                 LAYER_VISIBLE if layer["visible"] else 0,
                 first_membership,
                 len(layer["instanceIds"]),
+                kind,
+                metadata["backgroundSpriteId"],
+                background.get("Color", 0),
+                background_flags,
+                background.get("FirstFrame", 0),
+                background.get("AnimationSpeed", 0),
+                background.get("AnimationSpeedType", 0),
             ))
 
         room_records.append(ROOM.pack(
@@ -165,11 +192,14 @@ def main():
                         default=root / "extracted/utmt-0.9.2.0/manifest.json")
     parser.add_argument("--output", type=Path,
                         default=root / "generated/downwell-rooms.dwrm")
+    parser.add_argument("--layer-metadata", type=Path,
+                        default=root / "generated/room-layer-metadata.json")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-    payload = build_pack(manifest)
+    layer_metadata = json.loads(args.layer_metadata.read_text(encoding="utf-8"))
+    payload = build_pack(manifest, layer_metadata)
     digest = hashlib.sha256(payload).hexdigest()
 
     if args.check:

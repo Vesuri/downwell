@@ -720,8 +720,13 @@ in Steam-service rooms 0, 1, 2, 3, 5 and 6. The other 18 have sprite ID -1 and
 serialized black color. These are resource facts, not permission to omit their
 runtime elements: sprite-less background initialization/Draw and source element
 ID allocation still need integration. The ignored output is
-`generated/room-layer-metadata.json`; DWRM v2 remains an instance-membership
-projection and does not yet carry these background fields. No original asset
+`generated/room-layer-metadata.json`. DWRM v3 carries the layer type, background
+sprite ID, color, five background flags, first frame, animation speed and speed
+type in its 48-byte layer record. Layer offsets/speeds remain omitted only under
+the pinned zero-value check. The decoder rejects old pack versions, unknown
+layer types and background layers with instance memberships. The layer loader
+publishes this metadata but still reserves only instance elements; background
+element construction and Draw remain integration work. No original asset
 payloads are included in the committed extraction tools.
 
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world

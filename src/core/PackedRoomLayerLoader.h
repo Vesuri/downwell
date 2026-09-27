@@ -5,8 +5,9 @@
 #include "RunnerLayerIds.h"
 namespace downwell {
 // Prepare fixed layers and their empty instance elements BEFORE room instance
-// creation. This loads the instance-membership projection in DWRM, not omitted
-// background/tile/shader payloads. Use fresh owners; a failed load is terminal
+// creation. This reserves instance elements; background metadata is passed to
+// publish but its element construction still belongs to the caller. Use fresh
+// owners; a failed load is terminal
 // for those owners and may leave a published prefix (never retry it in place).
 struct PackedRoomLayerLoader {
     // The original loads the entire room resource catalog before gameplay.

@@ -1715,7 +1715,11 @@ extract:
 verify-extraction:
 	tools/verify-extraction.sh
 
-generate-room-pack:
+generated/room-layer-metadata.json: data/data.win tools/export-room-layer-metadata.csx tools/export-room-layer-metadata.sh
+	bash tools/export-room-layer-metadata.sh
+
+generate-room-pack: generated/room-layer-metadata.json
+	python3 tools/verify-room-layer-metadata.py
 	tools/generate-room-pack.py
 
 verify-room-pack: $(ROOM_PACK_TEST_TARGET)

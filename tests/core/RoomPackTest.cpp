@@ -93,6 +93,13 @@ std::vector<std::uint8_t> makePack() {
     appendU32(bytes, 0);
     appendU32(bytes, 2);
 
+    appendU32(bytes, 2); // instance layer
+    appendI32(bytes, -1); // no background sprite
+    appendU32(bytes, 0);
+    appendU32(bytes, 0);
+    appendF32(bytes, 0);
+    appendF32(bytes, 0);
+    appendU32(bytes, 0);
     appendU32(bytes, 100065);
     appendU32(bytes, 100066);
     return bytes;
@@ -122,11 +129,33 @@ void testDecode() {
 
     downwell::PackedRoomLayer layer;
     require(pack.roomLayer(room, 0, layer), "room layer is decoded");
-    require(layer.layerId == 13 && layer.depth == -300000 && layer.visible(),
+    require(layer.layerId == 13 && layer.depth == -300000 && layer.visible()&&
+                layer.type==2&&layer.backgroundSpriteId==-1,
             "layer fields are decoded");
     std::uint32_t member = 0;
     require(pack.membership(1, member) && member == 100066,
             "layer membership is decoded");
+}
+
+void testBackgroundDecode(){
+    auto bytes=makePack();
+    const auto layerOffset=downwell::RoomPack::headerSize+downwell::RoomPack::roomRecordSize+
+        2*downwell::RoomPack::instanceRecordSize;
+    auto word=[&](unsigned at,unsigned value){for(unsigned i=0;i<4;++i)bytes[layerOffset+at+i]=std::uint8_t(value>>(i*8));};
+    word(16,0);word(20,1);word(24,740);word(28,0xff123456u);word(32,31);
+    word(36,0x3fc00000u);word(40,0x41700000u);word(44,1);
+    const downwell::RoomPack pack(bytes.data(),bytes.size());downwell::PackedRoomLayer layer;
+    require(pack.valid()&&pack.layer(0,layer)&&layer.type==1&&layer.backgroundSpriteId==740&&
+        layer.backgroundColor==0xff123456u&&layer.backgroundFlags==31&&layer.backgroundFirstFrame==1.5f&&
+        layer.backgroundAnimationSpeed==15.f&&layer.backgroundAnimationSpeedType==1,"background payload round trip");
+    word(24,0xffffffffu);
+    require(downwell::RoomPack(bytes.data(),bytes.size()).layer(0,layer)&&layer.backgroundSpriteId==-1,"sprite-less background sentinel");
+    word(16,1);
+    require(downwell::RoomPack(bytes.data(),bytes.size()).error()==downwell::RoomPackError::badLayerType,"background cannot own instance membership");
+    word(16,0);word(20,99);
+    require(downwell::RoomPack(bytes.data(),bytes.size()).error()==downwell::RoomPackError::badLayerType,"unknown serialized layer type fails");
+    bytes=makePack();bytes[4]=2;
+    require(downwell::RoomPack(bytes.data(),bytes.size()).error()==downwell::RoomPackError::unsupportedVersion,"old layer payload format is rejected");
 }
 
 void testValidation() {
@@ -273,6 +302,20 @@ void testGeneratedPack(const char* path) {
             "generated room pack has audited totals");
     require(pack.nextRuntimeInstanceId() == 105186,
             "generated pack carries authoritative GEN8.LastObj");
+    unsigned instanceLayers=0,backgroundLayers=0,spriteBackgrounds=0;
+    for(unsigned i=0;i<pack.layerCount();++i){
+        downwell::PackedRoomLayer layer;require(pack.layer(i,layer),"generated layer decode");
+        if(layer.type==2){++instanceLayers;continue;}
+        ++backgroundLayers;
+        require(layer.backgroundFlags==1&&layer.backgroundFirstFrame==0&&layer.backgroundAnimationSpeedType==0,
+            "original background flags and animation start");
+        if(layer.backgroundSpriteId==740){
+            ++spriteBackgrounds;
+            require(layer.backgroundColor==0xffffffffu&&layer.backgroundAnimationSpeed==30,"Steam sprite background metadata");
+        }else require(layer.backgroundSpriteId==-1&&layer.backgroundColor==0xff000000u&&
+            layer.backgroundAnimationSpeed==15,"sprite-less black background metadata");
+    }
+    require(instanceLayers==108&&backgroundLayers==24&&spriteBackgrounds==6,"all original layer payloads retained");
 
     downwell::PackedRoom room;
     require(pack.room(0, room) && room.roomId == 7 && room.instanceCount == 2,
@@ -387,6 +430,7 @@ void testLayerStartup(){
 
 int main(int argc, char** argv) {
     testDecode();
+    testBackgroundDecode();
     testValidation();
     testPackedRoomLoader();
     testLayerStartup();

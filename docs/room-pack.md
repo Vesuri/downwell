@@ -1,7 +1,7 @@
 # Native room pack (`DWRM`)
 
 The room pack is a deterministic, endian-explicit lowering of manifest schema 3
-for native SDL and Amiga loaders. The generated payload is copyrighted derived
+and pinned room-layer metadata for native SDL and Amiga loaders. The generated payload is copyrighted derived
 game data and remains ignored under `generated/`; the generator and this format
 specification are committed.
 
@@ -21,7 +21,7 @@ No compiler padding is present.
 | Offset | Type | Meaning |
 | ---: | --- | --- |
 | 0 | char[4] | `DWRM` magic |
-| 4 | u16 | Format version, currently 2 |
+| 4 | u16 | Format version, currently 3 |
 | 6 | u16 | Header size, 40 |
 | 8 | u32 | Source manifest schema, currently 3 |
 | 12 | u32 | Room count |
@@ -50,12 +50,27 @@ imageSpeed, imageIndex; i32 creationCodeId, preCreateCodeId; u32 flags`
 Instance flag bit 0 is resolved object persistence. Records are in serialized
 instance-creation order within each room.
 
-## Layer record — 20 bytes
+## Layer record — 48 bytes
 
-`u32 layerId; i32 depth; u32 flags, firstMembership, membershipCount`
+`u32 layerId; i32 depth; u32 flags, firstMembership, membershipCount, type;
+i32 backgroundSpriteId; u32 backgroundColor, backgroundFlags;
+f32 backgroundFirstFrame, backgroundAnimationSpeed; u32 backgroundAnimationSpeedType`
 
-Layer flag bit 0 is visibility. Membership entries are u32 instance IDs. Version
-1 asserts that every room instance belongs to exactly one layer.
+Layer flag bit 0 is visibility. Type 1 is background; type 2 is instances.
+Membership entries are u32 instance IDs; every room instance belongs to exactly
+one instance layer. Background flag bits 0–4 are visible, foreground,
+horizontal tiling, vertical tiling and stretch. Color retains its serialized
+32-bit value, including alpha; sprite ID -1 means no sprite. Animation speed
+type retains the original numeric value. Instance layers have sprite ID -1
+and zero background fields.
+
+`make generate-room-pack` exports scalar layer metadata when needed and checks
+it against the raw ROOM records before packing. The metadata records the full
+source hash and pinned extractor version/commit. All layer offsets and speeds
+are zero in this build, with no effect name or properties; verification rejects
+changes to those omitted fields. DWRM v3 is not backward compatible with v2.
+The shared reader exposes background fields, but construction and drawing of
+background runtime elements remain separate from instance reservations.
 
 Names stay in the auditable JSON manifest and are not duplicated in the runtime
 pack. Numeric IDs provide the traceability seam back to GameMaker resources.
@@ -70,6 +85,7 @@ not affect decoding.
 Construction validates magic, format/schema versions, source-hash prefix,
 overflow-safe total size, every room/layer slice, and that every serialized
 instance ID is below the runtime allocator boundary before any view is exposed.
+Unknown layer types and backgrounds with instance memberships are rejected.
 Tests cover malformed synthetic packs and also open the complete locally
 generated payload, confirming the audited totals and the `rmInit`/`rmMenu`
 creation-order anchors.

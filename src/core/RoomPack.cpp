@@ -132,6 +132,11 @@ bool RoomPack::validateRanges() {
     for (std::uint32_t index = 0; index < layerCount_; ++index) {
         PackedRoomLayer value;
         layer(index, value);
+        if ((value.type != 1 && value.type != 2) ||
+            (value.type == 1 && value.membershipCount != 0)) {
+            error_ = RoomPackError::badLayerType;
+            return false;
+        }
         if (!validRange(value.firstMembership,
                         value.membershipCount,
                         membershipCount_)) {
@@ -210,6 +215,13 @@ bool RoomPack::layer(std::uint32_t index, PackedRoomLayer& output) const {
     output.flags = readU32(data + 8);
     output.firstMembership = readU32(data + 12);
     output.membershipCount = readU32(data + 16);
+    output.type = readU32(data + 20);
+    output.backgroundSpriteId = readI32(data + 24);
+    output.backgroundColor = readU32(data + 28);
+    output.backgroundFlags = readU32(data + 32);
+    output.backgroundFirstFrame = readF32(data + 36);
+    output.backgroundAnimationSpeed = readF32(data + 40);
+    output.backgroundAnimationSpeedType = readU32(data + 44);
     return true;
 }
 
