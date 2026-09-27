@@ -367,7 +367,7 @@ public:
     // ordinary inter-Step reconciliation boundary.
     // Retire through the typed stores, retaining identity across compaction.
     // Player destruction remains unsupported rather than silently discarded.
-    bool prepareDraw(){return prepareDrawWithEffects([](InstanceHandle,const View::Record&){return false;});}
+    bool prepareDraw(){return prepareDrawWithEffects([&](InstanceHandle key,const View::Record&){return world_->retireScriptRoomEffect(key);});}
     template<unsigned Capacity> bool prepareDraw(ScriptSpawnEffects<Capacity>& effects){
         if(!effects.boundTo(scriptEffects_))return check(false);
         return prepareDrawWithEffects([&](InstanceHandle local,const View::Record& record){

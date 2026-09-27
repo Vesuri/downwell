@@ -197,15 +197,25 @@ collision births use the effect's absolute binary32 coordinates, without native
 origin translation. Setter hooks update the same resource-backed collision
 properties used by other actors. Registry keys are monotonic owner-local
 lifetimes, not Windows numeric IDs. Retire effects before destroying their
-owner or changing rooms. The plain native Retry entry point preserves an empty
-registry and rejects a populated one. Both runtimes provide a typed
+owner or changing rooms. Successful runtime spawn wiring retains a checked,
+non-allocating binding to that owner/registry pair while records exist. Ordinary
+main-room ticks capture its birth cutoff and dispatch animation in room order;
+ordinary pre-Draw cleanup retires marked effects. No borrowed stack lambda is
+retained. Owners and registries must stay at fixed addresses until their records
+are retired. Attempts to mix live owners in one runtime fail before another birth.
+
+Ordinary Retry and room loading clear registered effects through the bound
+owner before replacing world records, including unfinished animation. Both
+runtimes also retain an explicit typed
 `restartFromResultsWithScriptEffects` entry point that clears owned effects
 before rebuilding the world, including effects still awaiting Animation End.
 It neither fabricates Animation End nor clears the caller's saved identity;
 new births cannot revive old handles. No results action performs no cleanup,
 and terminal effect failures cannot be reset through this entry point.
-Automatic scene-owner use, other room transitions, cross-family teardown order,
-gun emission and drawing remain separate integration requirements.
+Cross-family teardown order, production ownership of the effect store, gun
+emission and drawing remain separate integration requirements. Direct low-level
+registry births without a runtime binding must still use the explicit scoped
+interfaces; they are not automatically adopted into another owner.
 
 Both runtime `spawnScriptEffect` entry points use `ScriptSpawnOperations` for
 the same creation and setter sequence. They supply resource frame lookup and

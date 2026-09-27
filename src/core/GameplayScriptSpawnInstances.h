@@ -59,6 +59,11 @@ public:
         if(!good_||!effects.boundTo(*this)||find(key)!=&record||!record.destroyRequested)return good_=false;
         return good_=effects.retireMarked(key.generation,*this);
     }
+    template<class Effects> bool dispatchAnimation(InstanceHandle key,const Record& record,Effects& effects,
+        typename Effects::Phase phase){
+        if(!good_||!effects.boundTo(*this)||find(key)!=&record)return good_=false;
+        return good_=effects.advanceRegisteredOne(key.generation,phase,*this);
+    }
 private:
     bool check(unsigned local,const ScriptSpawnEffect& effect){
         const auto* r=find(handle(local));return good_=good_&&r&&r->effect==&effect;

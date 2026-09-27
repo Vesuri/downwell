@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_WORLD_H
 
 #include "PlayerMotion.h"
+#include "ScriptEffectRuntimeBinding.h"
 #include "Profile.h"
 #include "core/GameMakerRandom.h"
 #include "core/StateDigest.h"
@@ -228,6 +229,10 @@ public:
         if(!run_.effectsSucceeded)return false;
         if(!scriptSpawnInstances_){run_.effectsSucceeded=false;return false;}
         auto& registration=*scriptSpawnInstances_;
+        if(scriptEffectsBinding_.effects!=&effects){
+            if(registration.size())return run_.effectsSucceeded=false;
+            scriptEffectsBinding_=downwell::ScriptEffectRuntimeBinding::bind<downwell::GameplayScriptSpawnInstances::Record>(effects,registration);
+        }
         auto ops=downwell::scriptSpawnOperations(effects,registration,frames,[&](unsigned local){
             const auto key=registration.handle(local);if(!key.generation)return false;myFx=key;return true;
         },run_.effectsSucceeded);
@@ -245,7 +250,12 @@ public:
     bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
     bool advanceScriptRoomAnimation(downwell::InstanceHandle key){
         if(!run_.effectsSucceeded)return false;
-        return run_.effectsSucceeded=scriptAnimation_&&scriptAnimation_(scriptAnimationContext_,key);
+        const auto* record=scriptSpawnInstances_?scriptSpawnInstances_->find(key):nullptr;
+        return run_.effectsSucceeded=record&&(scriptAnimation_?scriptAnimation_(scriptAnimationContext_,key):scriptEffectsBinding_.advance(key,record));
+    }
+    bool retireScriptRoomEffect(downwell::InstanceHandle key){
+        const auto* record=scriptSpawnInstances_?scriptSpawnInstances_->find(key):nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&record&&scriptEffectsBinding_.retire(key,record);
     }
     template<unsigned Capacity> bool stepWithScriptEffects(downwell::ScriptSpawnEffects<Capacity>& effects,std::uint8_t input){
         if(!run_.effectsSucceeded)return false;
@@ -629,6 +639,12 @@ public:
 
 private:
     EnemyLifecycleBinding enemyLifecycle_;
+    downwell::ScriptEffectRuntimeBinding scriptEffectsBinding_;
+    bool clearRoomScriptEffects(){
+        if(scriptSpawnInstances_&&scriptSpawnInstances_->size()&&
+            (!run_.effectsSucceeded||!scriptEffectsBinding_.clearRoom()))return run_.effectsSucceeded=false;
+        scriptEffectsBinding_={};return true;
+    }
     bool (*roomAnimation_)(void*)=nullptr;
     void* roomAnimationContext_=nullptr;
     bool (*scriptAnimation_)(void*,downwell::InstanceHandle)=nullptr;

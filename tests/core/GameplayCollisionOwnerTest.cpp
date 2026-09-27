@@ -319,6 +319,17 @@ int main(){
             effects.size()==0&&registration.size()==0&&!registration.find(oldHandle)&&collision->valid());
         const auto renewed=effects.create({}, {},registration);
         assert(renewed>next&&!registration.find(oldHandle)&&effects.clear(registration));
+        assert(scene->spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},frames,caller));
+        const auto automatic=caller;
+        scene->step(0);
+        assert(scene->effectsSucceeded()&&effects.get(automatic.generation)->imageIndex.bits==0x3f000000u);
+        assert(collision->prepareDraw());
+        scene->step(0);
+        assert(scene->effectsSucceeded()&&collision->prepareDraw()&&effects.size()==0&&!registration.find(automatic));
+        assert(scene->spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},frames,caller));
+        const auto beforeRetry=caller;
+        assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,44,300)!=ResultsDestination::none&&
+            effects.size()==0&&!registration.find(beforeRetry)&&collision->valid());
         // Failure after Create must poison the actual runtime, retain its
         // completed birth/caller publication and never repeat the event.
         const auto draws=scene->randomDrawCount();unsigned lookups=0;

@@ -63,6 +63,7 @@ StartupRuntime::StartupRuntime(PlatformProfile profile,
 }
 
 void StartupRuntime::reset(PlatformProfile profile) {
+    if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
     if(!instances_.clear([this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);})){
         roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;
     }
@@ -204,6 +205,7 @@ void StartupRuntime::resetSceneState() {
 
 bool StartupRuntime::restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed) {
     if (resultsDestination(action) == ResultsDestination::none) return false;
+    if(!clearRoomScriptEffects())return false;
     const auto records = run_.records();
     resetSceneState();
     const auto destination = run_.restart(action, records);
@@ -298,6 +300,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
     // Step, even after camMain's own Step changes the followed instance.
     ordinaryStepViewTopQ12_ = mainCameraMotion_.viewTopQ12();
     ordinaryStepViewLeftQ12_ = mainCameraMotion_.viewLeftQ12();
+    if(scriptEffectsBinding_.effects){
+        if(hasScriptEffectRecords())scriptEffectsBinding_.beginAnimation();
+        else scriptEffectsBinding_={};
+    }
     if(roomId_==mainRoomId)
         run_.advanceFlashAnimation();
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
@@ -345,8 +351,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
-        if(instance.objectId==219&&scriptAnimationDispatch_&&
-            !scriptAnimationDispatch_(scriptAnimationContext_,key,instance))return false;
+        if(instance.objectId==219){
+            if(scriptAnimationDispatch_){if(!scriptAnimationDispatch_(scriptAnimationContext_,key,instance))return false;}
+            else if(!scriptEffectsBinding_.advance(key,&instance))return false;
+        }
         if(instance.objectId==238&&timeEffectDispatch_&&
             !timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::animation,0))return false;
         const bool enemyObject=instance.objectId==111 || instance.objectId==112 ||
@@ -832,8 +840,10 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
 
 bool StartupRuntime::cleanupMainBullets(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
-        [](const InstanceRecord& r){return r.objectId==261;},
-        [this](InstanceHandle,const InstanceRecord& r){return instances_.erase(r.instanceId,
+        [this](const InstanceRecord& r){return r.objectId==261||(r.objectId==219&&!scriptAnimationDispatch_);},
+        [this](InstanceHandle key,const InstanceRecord& r){
+            if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
+            return instances_.erase(r.instanceId,
             [this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);});});
 }
 bool StartupRuntime::clearMainBullets(){
@@ -2220,6 +2230,7 @@ void StartupRuntime::gotoRoom(int roomId) {
 
 void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
     if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
+    if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
     const auto instanceHandler = [this](InstanceRecord& instance,
                                         RoomInstancePhase phase) {
         dispatchInstancePhase(instance, phase);

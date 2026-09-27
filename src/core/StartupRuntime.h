@@ -3,6 +3,7 @@
 
 #include "AreaOneBuilder.h"
 #include "InstanceStore.h"
+#include "ScriptEffectRuntimeBinding.h"
 #include "DeferredInstanceQueue.h"
 #include "GameMakerRandom.h"
 #include "GameplayLimits.h"
@@ -298,6 +299,10 @@ public:
         MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
         if(!run_.effectsSucceeded)return false;
         if(!registration.belongsTo(instances_)){run_.effectsSucceeded=false;return false;}
+        if(scriptEffectsBinding_.effects!=&effects||scriptEffectsBinding_.registry!=&registration){
+            if(hasScriptEffectRecords())return run_.effectsSucceeded=false;
+            scriptEffectsBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registration);
+        }
         auto ops=scriptSpawnOperations(effects,registration,frames,[&](unsigned local){
             const auto id=registration.sourceId(local);if(!id)return false;myFx=id;return true;
         },run_.effectsSucceeded);
@@ -698,6 +703,15 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     InstanceLifecycleBinding lifecycle_;
+    ScriptEffectRuntimeBinding scriptEffectsBinding_;
+    bool hasScriptEffectRecords()const{
+        for(std::size_t i=0;i<instances_.size();++i)if(instances_.at(i).objectId==219)return true;
+        return false;
+    }
+    bool clearRoomScriptEffects(){
+        if(hasScriptEffectRecords()&&(!run_.effectsSucceeded||!scriptEffectsBinding_.clearRoom()))return run_.effectsSucceeded=false;
+        scriptEffectsBinding_={};return true;
+    }
     void* collisionContext_=nullptr;
     bool (*collisionDispatch_)(void*)=nullptr;
     void* scriptAnimationContext_=nullptr;

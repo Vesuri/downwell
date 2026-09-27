@@ -37,9 +37,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
-    if(scriptSpawnInstances_&&scriptSpawnInstances_->size()){
-        run_.effectsSucceeded=false;return downwell::ResultsDestination::none;
-    }
+    if(!clearRoomScriptEffects())return downwell::ResultsDestination::none;
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
     if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -111,6 +109,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
+    if(!clearRoomScriptEffects())return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
     if(!clearBulletOwnership())return false;
     if(!goalFieldInstances_.clear()){run_.effectsSucceeded=false;return false;}
@@ -761,6 +760,8 @@ bool GameplayWorld::advanceBulletRoomAnimation(downwell::InstanceHandle key){
 GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
 {
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
+    if(scriptSpawnInstances_&&scriptSpawnInstances_->size())scriptEffectsBinding_.beginAnimation();
+    else scriptEffectsBinding_={};
     // Only valid unit-sequence state is admitted through the effect owner.
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();

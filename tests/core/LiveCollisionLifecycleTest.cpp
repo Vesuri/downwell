@@ -975,7 +975,14 @@ int main(){
             "Retry retires unmarked effects through typed ownership before replacing the room");
         require(spawn(second)&&second!=first&&effects.birthSequence().next>birthSequence&&!collision->resolve(old.handle),
             "new room cannot revive old script-effect identity");
-        require(effects.clear(registration),"retire renewed effect before fixture teardown");
+        world->step({},false);
+        require(world->effectsSucceeded()&&world->instance(second)->imageIndex==0.5F,
+            "ordinary Step automatically animates runtime-created script effects");
+        world->step({},false);
+        require(world->effectsSucceeded()&&!world->instance(second)&&effects.size()==0,
+            "ordinary pre-Draw cleanup retires finished script effects");
+        require(spawn(first)&&world->restartFromResults(DeathMenuSequence::Action::Retry,44)&&
+            effects.size()==0&&!world->instance(first),"ordinary Retry clears bound still-live script effects");
     }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
