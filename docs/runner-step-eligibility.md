@@ -209,8 +209,9 @@ completed activation reconciliation can change it as described in
 
 `tools/verify-runner-step-order.py` pins the reviewed builder, inheritance,
 registration and traversal ranges to the original executable. This establishes
-the ordering contract, not live-scheduler fidelity: the host's current phase
-snapshot and native typed-family scheduling still need to consume this order.
+the ordering contract. The host phase snapshot now consumes exact-object
+registration order and sorts by resource ID with registration ordinal as its
+tie-breaker. Native typed-family scheduling still needs to consume this order.
 Keep the phase cutoff and immediate flag rechecks below when integrating it;
 sorting by resource ID alone does not handle reactivation or new lifetimes.
 
@@ -240,9 +241,11 @@ The decoded host's `EventScheduler` snapshots `InstanceHandle` lifetimes rather
 than numeric instance IDs. Deleting a not-yet-visited record and reusing its ID
 must not transfer phase eligibility to the replacement. Handle resolution also
 follows surviving records through compaction without linear ID searches.
-Each phase snapshot costs eight bytes per capacity slot; this is not the
-Amiga `GameplayWorld` actor scheduler and does not establish source object-list
-event traversal.
+Each ordered phase snapshot costs sixteen bytes per capacity slot. The bounded
+heap sort allocates no heap storage and is shared portable code; native users
+must place a large snapshot outside the task stack. This is not yet the Amiga
+`GameplayWorld` actor scheduler. Runtime object rebinding during an executing
+phase and separate effect-family scheduling still require integration checks.
 
 Destruction bit 1 is part of the Step filter `0x100003` at `0x50b8ab`
 and the alarm filter at `0x509dfb`, before alarm decrement. `EventScheduler`

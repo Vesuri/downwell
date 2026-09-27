@@ -13,6 +13,16 @@ public:
     static constexpr unsigned End = Capacity;
     bool contains(unsigned slot) const {return slot<Capacity && entries_[slot].object>=0;}
     unsigned size() const {return count_;}
+    // Borrow the current registration sequence without permitting mutation.
+    // Exact-object Step ordering is applied after capture, not by traversing
+    // ancestor-inclusive collision lists.
+    template<class Visit> bool visitRegistrations(Visit visit)const{
+        for(unsigned slot=head_;slot!=End;slot=entries_[slot].next){
+            const auto& e=entries_[slot];
+            if(!visit(slot,e.identity,e.object))return false;
+        }
+        return true;
+    }
     void clear() {while(head_!=End)unbind(head_);}
     bool bind(unsigned slot,int object,std::uint32_t identity) {
         if(slot>=Capacity || object<0)return false;

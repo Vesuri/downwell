@@ -24,7 +24,7 @@ struct StepEvent {
 // supplies which alarm events each object implements and dispatches handlers.
 // Lifetimes are snapshotted per phase so deletion is safe and newly created instances
 // can participate in later phases of the same tick.
-// Each snapshot uses 8 bytes per capacity slot; lookup is O(1). Keep the
+// Each ordered snapshot uses 16 bytes per capacity slot; lookup is O(1). Keep the
 // snapshot's stack cost explicit when selecting a target capacity.
 template <std::size_t Capacity>
 class EventScheduler {
@@ -88,25 +88,15 @@ public:
     }
 
 private:
-    static std::size_t captureActive(const InstanceStore<Capacity>& instances,
-                                     std::array<InstanceHandle, Capacity>& handles) {
-        std::size_t count = 0;
-        for (std::size_t index = 0; index < instances.size(); ++index) {
-            const InstanceRecord& instance = instances.at(index);
-            if (instance.active && !instance.destroyRequested)
-                handles[count++] = instances.handleAt(index);
-        }
-        return count;
-    }
-
     template <typename Handler,typename Healthy>
     static bool dispatchPhase(InstanceStore<Capacity>& instances,
                               StepEventPhase phase,
                               Handler& handler,Healthy& healthy) {
-        std::array<InstanceHandle, Capacity> handles{};
-        const std::size_t count = captureActive(instances, handles);
+        RunnerStepSnapshot<Capacity> handles;
+        if(!instances.captureStepOrder(handles))return false;
+        const std::size_t count = handles.size();
         for (std::size_t index = 0; index < count; ++index) {
-            InstanceRecord* instance = instances.resolve(handles[index]);
+            InstanceRecord* instance = instances.resolve(handles.handle(index));
             if (instance != nullptr && instance->active && !instance->destroyRequested) {
                 handler(*instance, StepEvent{phase, 0});
                 if(!healthy())return false;
@@ -119,13 +109,14 @@ private:
     static bool dispatchAlarms(InstanceStore<Capacity>& instances,
                                AlarmEvents& alarmEvents,
                                Handler& handler,Healthy& healthy) {
-        std::array<InstanceHandle, Capacity> handles{};
-        const std::size_t count = captureActive(instances, handles);
+        RunnerStepSnapshot<Capacity> handles;
+        if(!instances.captureStepOrder(handles))return false;
+        const std::size_t count = handles.size();
         // Original runner 0x509d97: alarm index is the outer loop and each
         // zero is dispatched immediately. Later alarms observe handler writes.
         for (std::size_t alarm = 0; alarm < AlarmBank::count; ++alarm) {
             for (std::size_t index = 0; index < count; ++index) {
-                InstanceRecord* instance = instances.resolve(handles[index]);
+                InstanceRecord* instance = instances.resolve(handles.handle(index));
                 if (instance == nullptr || !instance->active || instance->destroyRequested)
                     continue;
                 const bool hasEvent = (alarmEvents(*instance) & (1u << alarm)) != 0;

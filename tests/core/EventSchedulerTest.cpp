@@ -54,6 +54,68 @@ void testPhaseAndAlarmOrder() {
             "End Step is last");
 }
 
+void testObjectRegistrationOrder() {
+    using namespace downwell;
+    InstanceStore<8> instances;
+    instances.create(1,60,7,false);
+    instances.create(2,40,7,false);
+    instances.create(3,60,7,false);
+    instances.create(4,99,7,false);
+    const auto first=instances.handleAt(0);
+    // Same-object rebinding moves to the registration tail, not the storage tail.
+    require(instances.bindObject(instances.handleAt(0),60),"same-object rebind");
+    std::vector<unsigned> begin,step,end;
+    EventScheduler<8>::runStep(instances,[](const auto&){return AlarmBank::allEvents;},
+        [&](auto& r,StepEvent event){
+            if(event.phase==StepEventPhase::beginStep){
+                begin.push_back(r.instanceId);
+                if(r.instanceId==2)instances.create(5,10,7,false);
+            }
+            if(event.phase==StepEventPhase::step){
+                step.push_back(r.instanceId);
+                if(r.instanceId==5){
+                    instances.erase(3);instances.create(3,60,7,false);
+                }
+            }
+            if(event.phase==StepEventPhase::endStep)end.push_back(r.instanceId);
+        });
+    require(begin==std::vector<unsigned>({2,3,1,4}),"object IDs ascending, exact-object registration order stable");
+    require(step==std::vector<unsigned>({5,2,1,4}),"earlier-phase birth participates; replaced lifetime does not inherit eligibility");
+    require(end==std::vector<unsigned>({5,2,1,3,4}),"replacement enters next phase at exact-object registration tail");
+    require(instances.requestActivation(first,false,[](auto,const auto&,bool){return true;}) &&
+            instances.reconcileObjectMembership([](auto,const auto&,bool){return true;}) &&
+            instances.requestActivation(first,true,[](auto,const auto&,bool){return true;}) &&
+            instances.reconcileObjectMembership([](auto,const auto&,bool){return true;}),"reactivation reconciles");
+    RunnerStepSnapshot<8> snapshot;
+    require(instances.captureStepOrder(snapshot),"ordered capture");
+    std::vector<unsigned> ids;
+    for(unsigned i=0;i<snapshot.size();++i)ids.push_back(instances.resolve(snapshot.handle(i))->instanceId);
+    require(ids==std::vector<unsigned>({5,2,3,1,4}),"reactivation appends within exact object, not global dispatch order");
+}
+
+void testOrderedSnapshotSort() {
+    downwell::RunnerStepSnapshot<257> snapshot;
+    unsigned random=19;
+    for(unsigned count=0;count<=257;++count){
+        snapshot.clear();
+        std::vector<std::pair<int,unsigned>> reference;
+        for(unsigned i=0;i<count;++i){
+            random=random*1664525u+1013904223u;
+            const int object=int((random>>16)%43);
+            require(snapshot.append(i,i+1,object),"snapshot append");
+            reference.push_back({object,i});
+        }
+        std::stable_sort(reference.begin(),reference.end(),[](auto a,auto b){return a.first<b.first;});
+        snapshot.sort();
+        for(unsigned i=0;i<count;++i)
+            require(snapshot.handle(i).slot==reference[i].second &&
+                    snapshot.handle(i).generation==reference[i].second+1,"bounded heap order matches independent stable sort");
+    }
+    require(!snapshot.append(0,1,0)&&snapshot.size()==257,"capacity rejection preserves snapshot");
+    snapshot.clear();
+    require(!snapshot.append(0,0,1)&&!snapshot.append(0,1,-1)&&snapshot.size()==0,"invalid capture entries reject");
+}
+
 void testActiveStateAndMissingAlarmEvent() {
     downwell::InstanceStore<2> instances;
     instances.create(1, 10, 7, false);
@@ -261,7 +323,7 @@ void testDeferredMembershipPhaseBoundary() {
                 "post-phase promotion follows inactive room-list order, not request or storage order");
             ++publications;
         });
-    require(beginCalls==3 && publications==3,"publication precedes every later phase snapshot");
+    require(beginCalls==0 && publications==3,"unregistered promotions wait for reconciliation before dispatch");
     store.find(3)->active=false; // Retirement, not pending activation.
     store.reconcileObjectMembership();
     require(store.registeredObjectCount(10,exact)==2,"retired diagnostic record loses membership");
@@ -405,6 +467,8 @@ void testCollisionBoundary(){
 } // namespace
 
 int main() {
+    testObjectRegistrationOrder();
+    testOrderedSnapshotSort();
     testPhaseAndAlarmOrder();
     testCrossAlarmWrites();
     testDeletionDuringAlarm();

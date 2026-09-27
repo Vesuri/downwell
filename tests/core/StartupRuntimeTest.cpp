@@ -1098,8 +1098,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             std::size_t targetIndex = 0;
             for (std::size_t i = 0; i < combat.activeInstanceCount(); ++i) {
                 auto& candidate = const_cast<downwell::InstanceRecord&>(combat.instanceAt(i));
-                if (candidate.objectId == 111 || candidate.objectId == 112 || candidate.objectId == 113 ||
-                    candidate.objectId == 116 || candidate.objectId == 117 || candidate.objectId == 119) {
+                if (candidate.active && (candidate.objectId == 111 || candidate.objectId == 112 || candidate.objectId == 113 ||
+                    candidate.objectId == 116 || candidate.objectId == 117 || candidate.objectId == 119)) {
                     target = &candidate; targetIndex = i; break;
                 }
             }
@@ -1123,6 +1123,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             auto batCombatStorage = std::make_unique<downwell::StartupRuntime>(combat);
             auto& batCombat = *batCombatStorage;
             auto& bat = const_cast<downwell::InstanceRecord&>(batCombat.instanceAt(targetIndex));
+            const auto batId = bat.instanceId;
             bat.objectId = 116;
             bat.spriteId = 153;
             bat.health = 15;
@@ -1132,21 +1133,22 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             bat.imageSpeed = 0.2F;
             bat.alarms.reset();
             batCombat.step(releasedMain, false);
-            require(batCombat.instanceAt(targetIndex).health == 6 &&
-                        batCombat.instanceAt(targetIndex).batHit.pending,
+            require(batCombat.instance(batId)->health == 6 &&
+                        batCombat.instance(batId)->batHit.pending,
                     "SDL usual bullet queues a surviving bat hit");
-            const float batX = batCombat.instanceAt(targetIndex).preciseX;
-            const float batY = batCombat.instanceAt(targetIndex).preciseY;
+            const float batX = batCombat.instance(batId)->preciseX;
+            const float batY = batCombat.instance(batId)->preciseY;
             for (int frame = 0; frame < 3; ++frame) {
                 batCombat.step(releasedMain, false);
-                const auto& state = batCombat.instanceAt(targetIndex);
+                require(batCombat.instance(batId)!=nullptr,"bat lifetime survives stun");
+                const auto& state = *batCombat.instance(batId);
                 require(state.spriteId == 154 && state.alarms.get(0) == 3 - frame &&
                             state.preciseX == batX && state.preciseY == batY,
                         "SDL bat hit pauses movement with damage art for three ticks");
             }
             batCombat.step(releasedMain, false);
-            require(!batCombat.instanceAt(targetIndex).batHit.stunned &&
-                        batCombat.instanceAt(targetIndex).spriteId == 153,
+            require(!batCombat.instance(batId)->batHit.stunned &&
+                        batCombat.instance(batId)->spriteId == 153,
                     "decoded bat Alarm 0 restores normal SDL presentation");
             const auto kills = combat.mainEnemiesDefeated();
             combat.step(releasedMain, false);

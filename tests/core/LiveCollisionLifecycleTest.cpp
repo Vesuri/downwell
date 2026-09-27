@@ -197,9 +197,12 @@ int main(){
             },[](auto){},[](auto,const auto&,bool){return true;},[&]{return healthy;});};
         require(tick()&&speed==55&&order.empty()&&records.find(100)->alarms.get(1)==1,
             "global scheduler decrements each registered alarm exactly once");
-        require(tick()&&speed==63&&order==std::vector<unsigned>({100,99,101})&&
-            records.find(100)->alarms.get(0)==0&&records.find(101)->alarms.get(1)==2,
-            "selected effects interleave with other actors and preserve source unclamped speed");
+        // Object 36 runs before both object-211 instances. Its 58 becomes 63
+        // in the first change; the second observes >=60, restores 60 and dies.
+        require(tick()&&speed==60&&order==std::vector<unsigned>({99,100,101})&&
+            records.find(100)->alarms.get(0)==0&&records.find(100)->alarms.get(1)==2&&
+            records.find(101)->alarms.get(1)==0&&records.find(101)->destroyRequested,
+            "selected effects follow ascending object order and observe prior handler speed writes");
         const bool third=tick();const auto thirdAlarm=records.find(100)->alarms.get(0);const bool fourth=tick();
         require(third&&thirdAlarm==-1&&fourth&&speed==60&&effects.size()==0&&
             records.find(100)->destroyRequested&&records.find(101)->destroyRequested&&

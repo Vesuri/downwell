@@ -13,6 +13,7 @@
 #include "BatHitState.h"
 #include "BatBehavior.h"
 #include "RunnerObjectMembership.h"
+#include "RunnerStepSnapshot.h"
 #include "RunnerRoomMembership.h"
 #include "InstanceHandle.h"
 #include "WallEndStep.h"
@@ -217,6 +218,15 @@ public:
             const auto* instance=resolve(handle);
             return !instance || visit(handle,*instance);
         });
+    }
+    bool captureStepOrder(RunnerStepSnapshot<Capacity>& snapshot)const{
+        snapshot.clear();
+        const bool result=objectMembership_.visitRegistrations([&](unsigned slot,std::uint32_t generation,int object){
+            const auto* r=resolve({slot,generation});
+            return r&&(!r->active||r->destroyRequested||snapshot.append(slot,generation,object));
+        });
+        if(result)snapshot.sort();
+        return result;
     }
 
     const InstanceRecord* find(std::uint32_t instanceId) const {
