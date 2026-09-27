@@ -49,6 +49,10 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
     const downwell::SpriteCollisionPack compact(compactBytes.data(),compactBytes.size());
     require(compact.valid()&&compact.spriteCount()==pack.spriteCount(),"compact collision table validates");
     require(compactBytes.size()==26700,"collision-only table excludes atlas payload and frame mappings");
+    std::ifstream maskInput(maskPath,std::ios::binary);
+    const std::vector<std::uint8_t> maskBytes((std::istreambuf_iterator<char>(maskInput)),{});
+    const downwell::SpriteMaskPack masks(maskBytes.data(),maskBytes.size());
+    require(masks.valid(),"all-partner mask pack resolves");
     {
         std::ifstream objectInput(objectPath,std::ios::binary);
         const std::vector<std::uint8_t> objectBytes((std::istreambuf_iterator<char>(objectInput)),{});
@@ -192,10 +196,67 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         require(!owner.changeSpriteFromPack({0,1},sprite,timeline,cached,208,invalid,0x38)&&!owner.valid()&&sprite.spriteId==before,
             "unavailable pack fails before sprite mutation");
     }
-    std::ifstream maskInput(maskPath,std::ios::binary);
-    const std::vector<std::uint8_t> maskBytes((std::istreambuf_iterator<char>(maskInput)),{});
-    const downwell::SpriteMaskPack masks(maskBytes.data(),maskBytes.size());
-    require(masks.valid(),"all-partner mask pack resolves");
+    {
+        std::ifstream objectInput(objectPath,std::ios::binary);
+        const std::vector<std::uint8_t> objectBytes((std::istreambuf_iterator<char>(objectInput)),{});
+        const downwell::ObjectPack objects(objectBytes.data(),objectBytes.size());
+        using Owner=downwell::RunnerSpatialInstances<4,16>;
+        Owner owner;Owner::Properties properties[4];downwell::InstanceStore<4> records;
+        downwell::RunnerObjectFamilies<386> families;
+        require(families.bindInstanceFlags(objects),"query fixture source families");
+        require(families.isA(255,82),"exit field belongs to the recovered parentTimeField family");
+        auto trig=[](auto,auto&,auto&){return false;};
+        auto round=[](auto value,int& out){return value.promoted().roundPixel(out);};
+        downwell::StoredCollisionLifecycle<4,16,decltype(families),decltype(trig),decltype(round)>
+            lifecycle{owner,properties,objects,compact,families,trig,round};
+        downwell::RoomInstanceDefinition placed[]={{100,35,false},{101,82,false},{102,255,false}};
+        for(auto& item:placed){
+            downwell::PackedObject object;require(objects.findObject(item.objectId,object),"query object metadata");
+            item.spriteId=object.spriteId;item.maskId=item.objectId==35?31:object.textureMaskId;
+            if(item.objectId!=35){item.x=240;item.y=100;}
+            if(item.objectId==255)item.scaleX=item.scaleY=2.0f;
+        }
+        require(downwell::RoomLoader<4>::enterChecked(records,7,placed,3,false,
+            [](auto&,auto){return true;},[](int){return true;},[](auto&){return true;},lifecycle)==
+            downwell::LoadRoomResult::success,"query fixture publishes all resource-backed births");
+        const auto player=records.handleAt(0);downwell::RunnerMaskDispatch dispatch;
+        const auto x=downwell::RunnerImageValue{0x43704000u}.promoted(); // 240.25
+        const auto y=downwell::RunnerImageValue{0x42c84000u}.promoted(); // 100.125
+        Owner::Result hit;
+        auto query=[&](){return lifecycle.placeVm(records,player,82,x,y,masks,dispatch,trig,hit);};
+        require(query()&&hit.found&&hit.handle.slot!=player.slot,"fractional player query resolves a precise field");
+        const auto selected=hit.handle;
+        require(records.resolve(selected)&&families.isA(records.resolve(selected)->objectId,82),
+            "selected collision handle resolves the correct live family");
+        require(owner.resolve(player)->x.bits==0&&owner.resolve(player)->y.bits==0&&records.at(0).x==0,
+            "temporary query movement restores published position without editing stored coordinates");
+        require(records.erase(records.resolve(selected)->instanceId,
+            [&](auto h,const auto& record){return lifecycle.retire(h,record);}),"retire selected field before store invalidation");
+        require(!records.resolve(selected)&&!owner.resolve(selected)&&query()&&hit.found&&
+            !(hit.handle.slot==selected.slot&&hit.handle.generation==selected.generation),
+            "next query resolves surviving field after compaction, never a stale handle");
+        auto surviving=hit.handle;
+        require(records.requestActivation(surviving,false,[&](auto h,const auto& record,bool active){
+            return lifecycle.activation(h,record,active);}),"deactivate selected field");
+        require(query()&&!hit.found,"inactive precise field is excluded before membership reconciliation");
+        require(records.requestActivation(surviving,true,[&](auto h,const auto& record,bool active){
+            return lifecycle.activation(h,record,active);})&&query()&&hit.found,"reactivated field rejoins query eligibility");
+        downwell::DeferredInstanceQueue<1> replacement;
+        require(replacement.enqueueCreate(35,1000,1000),"queue unrelated slot replacement");
+        std::uint32_t nextId=200;
+        require(replacement.applyChecked(records,objects,7,nextId,[](auto&){return true;},lifecycle)==
+            downwell::ApplyInstanceCommandsResult::success,"replacement publishes through checked lifecycle");
+        const auto reused=records.handleAt(records.size()-1);
+        require(reused.slot==selected.slot&&reused.generation!=selected.generation&&
+            !records.resolve(selected)&&!owner.resolve(selected)&&query()&&hit.found&&hit.handle.slot==surviving.slot,
+            "slot reuse cannot resurrect a selected field or change its object family");
+        // Deliberately violate the adapter contract; never quietly skip this
+        // live store/owner mismatch or publish a false-negative result.
+        records.resolve(surviving)->objectId=35;
+        hit={true,{3,99}};
+        require(!query()&&!owner.valid()&&hit.found&&hit.handle.generation==99,
+            "candidate identity mismatch is terminal and leaves result unpublished");
+    }
     {
         using Collisions=downwell::RunnerSpatialInstances<4,8>;
         Collisions collisions;Collisions::Sprite visuals[2];

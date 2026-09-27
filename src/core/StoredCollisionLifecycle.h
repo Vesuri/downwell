@@ -70,6 +70,29 @@ struct StoredCollisionLifecycle {
         const auto* flags=matchingFlags(h,record);
         return flags&&owner.setActive(h,active,*flags);
     }
+    // Query only an already-maintained owner. Do not rebuild membership from
+    // store order here: the runner's preparation/index history selects hits.
+    // Bounds and mask callbacks resolve generation-checked handles each time;
+    // an orphaned/mismatched candidate is a failure, not a skipped collision.
+    template<class InverseTrig>
+    bool placeVm(const InstanceStore<Capacity>& records,InstanceHandle self,int object,
+                 MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,
+                 const RunnerMaskDispatch& dispatch,InverseTrig inverseTrig,
+                 typename Owner::Result& result){
+        const auto* record=records.resolve(self);
+        if(!record || !matchingFlags(self,*record))return false;
+        auto refreshBounds=[&](InstanceHandle h,bool publish){
+            const auto* live=records.resolve(h);
+            return live&&refresh(h,*live,publish);
+        };
+        return owner.placeVm(self,object,x,y,allPrepared,graph,refreshBounds,
+            [&](InstanceHandle a,InstanceHandle b,bool publish,bool& hit){
+                const auto* first=records.resolve(a);const auto* second=records.resolve(b);
+                if(!first||!second||!matchingFlags(a,*first)||!matchingFlags(b,*second))return false;
+                return owner.collideCompatibility(a,b,properties[a.slot].sprite,properties[b.slot].sprite,
+                    sprites,masks,dispatch,publish,refreshBounds,inverseTrig,round,hit);
+            },result);
+    }
 private:
     const std::uint32_t* matchingFlags(InstanceHandle h,const InstanceRecord& record)const{
         if(!owner.valid()||record.objectId<0||owner.objectId(h)!=record.objectId)return nullptr;

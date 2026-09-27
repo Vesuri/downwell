@@ -29,6 +29,19 @@ bool compileMaskPair(const downwell::RunnerMaskPair::Shape& a,
 #include "core/RunnerObjectFamilies.h"
 #include "core/RoomLoader.h"
 #include "core/StoredCollisionLifecycle.h"
+bool compileStoredCollisionQuery(downwell::RunnerSpatialInstances<4,8>& owner,
+    downwell::RunnerSpatialInstances<4,8>::Properties (&properties)[4],
+    const downwell::InstanceStore<4>& records,const downwell::ObjectPack& objects,
+    const downwell::SpriteCollisionPack& sprites,const downwell::SpriteMaskPack& masks,
+    downwell::RunnerObjectFamilies<386>& graph,downwell::InstanceHandle self,
+    downwell::MotionBinary64 x,downwell::MotionBinary64 y,
+    downwell::RunnerSpatialInstances<4,8>::Result& result){
+    auto trig=[](auto,auto&,auto&){return false;};
+    auto round=[](auto value,std::int32_t& out){return value.promoted().roundPixel(out);};
+    downwell::StoredCollisionLifecycle<4,8,decltype(graph),decltype(trig),decltype(round)>
+        lifecycle{owner,properties,objects,sprites,graph,trig,round};
+    return lifecycle.placeVm(records,self,82,x,y,masks,{},trig,result);
+}
 bool compileStoredCollisionBirth(downwell::RunnerSpatialInstances<4,8>& owner,
     downwell::RunnerSpatialInstances<4,8>::Properties (&properties)[4],
     const downwell::ObjectPack& objects,const downwell::SpriteCollisionPack& sprites,

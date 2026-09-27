@@ -19,6 +19,17 @@ it is not yet the live registry, nor the all/instance selector or collect-all
 variant. Port-side callback failures attempt position restoration and require
 the owner to latch failure rather than use partially changed index state.
 
+`StoredCollisionLifecycle::placeVm` connects that traversal to an already
+maintained instance store, object graph and resource-backed collision owner.
+It resolves generation-checked handles for bounds refresh and precise mask
+tests, using the owner's temporary query coordinates rather than rereading the
+store's rounded position. Missing or mismatched candidates are failures, not
+false hits or silently skipped instances. Forward bounds trigonometry, inverse
+mask trigonometry and rounding remain explicit policies. This entry point does
+not populate or rebuild the index: births, writes, activation, rebinding and
+retirement must already have been routed through the owner in source order.
+Live scheduler wiring remains in the shared work queue.
+
 ## Player and shard inputs
 
 The source player object 35 uses sprite 31 as its explicit collision mask,
