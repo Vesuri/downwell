@@ -90,6 +90,11 @@ public:
             return object==224 && create(px,py,random)!=0;
         });
     }
+    template<class Random> bool boxBurst(MotionBinary64 x,MotionBinary64 y,Random& random) {
+        return boxFlashBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+            return object==224 && create(px,py,random)!=0;
+        });
+    }
 private:
     Slot slots_[Capacity];
     unsigned order_[Capacity]{};

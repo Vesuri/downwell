@@ -48,6 +48,11 @@ public:
             return object==225 && create(px,py,random)!=0;
         });
     }
+    template<class Random> bool boxBurst(MotionBinary64 x,MotionBinary64 y,Random& random){
+        return boxSmokeBurst(x,y,random,[&](int object,MotionBinary64 px,MotionBinary64 py){
+            return object==225 && create(px,py,random)!=0;
+        });
+    }
     bool advanceAnimation(Phase phase){
         for(unsigned i=0;i<count_;++i){
             auto& slot=slots_[order_[i]];

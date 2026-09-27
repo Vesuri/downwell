@@ -93,6 +93,17 @@ lifecycles or attach itself to the live scheduler. In particular, the existing
 immediate box-inactivation path still needs replacement. Run
 `make verify-box-destruction` for the pinned assembly and branch/failure tests.
 
+The smoke and flash owners expose `boxBurst` for the box script's fixed
+arguments, sharing their burst implementation with skeletons. Count variation
+zero still calls `irandom_range(0,0)` and consumes two RNG words. Smoke samples
+Y then X via five-way choices before object-225 Create; flash samples Y then X
+over [-2,2) before object-224 Create's own integer jitter. The caller supplies
+the already-offset Y+4 for smoke; these owners do not add it a second time.
+Both finish each child Create synchronously and retain their normal phase
+cutoffs and animation/motion lifecycles. Burst tests compare full RNG state,
+including failed capacity cases; owner tests exercise these actual box births.
+These entry points still require wiring to the box event's live callbacks.
+
 The stored and native collision owners expose `projectileWallParent` and
 `projectileBoxHealth`/`projectileBoxHealthWrite`/`projectileBoxHit` for the
 selected lifetime. Parent lookup uses the direct serialized parent, not an

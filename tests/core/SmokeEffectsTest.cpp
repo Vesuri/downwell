@@ -1,5 +1,11 @@
 #include "core/SmokeEffects.h"
 #include "core/GameMakerRandom.h"
+#ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeBoxSmoke(downwell::SmokeEffects<32>& effects,downwell::MotionBinary64 x,
+                    downwell::MotionBinary64 y,downwell::GameMakerRandom& random){
+    return effects.boxBurst(x,y,random);
+}
+#else
 #include <vector>
 #include <cstdlib>
 #include <cstdio>
@@ -7,12 +13,12 @@ static void check(bool ok){if(!ok)std::abort();}
 static bool same(downwell::MotionBinary64 a,downwell::MotionBinary64 b){return a.high==b.high && a.low==b.low;}
 int main(){
     unsigned births=0;
-    for(unsigned seed=0;seed<128;++seed){
+    for(unsigned seed=0;seed<128;++seed)for(bool box:{false,true}){
         downwell::SmokeEffects<16> store;
         downwell::GameMakerRandom rng(seed),reference(seed);
         const auto prior=store.beginPhase();
-        check(store.skeletonBurst({}, {},rng));
-        const unsigned count=4+reference.irandom(2);
+        check(box?store.boxBurst({}, {},rng):store.skeletonBurst({}, {},rng));
+        const unsigned count=(box?1:4)+reference.irandom(box?0:2);
         std::vector<downwell::SmokeEffect> expected(count);
         for(auto& effect:expected){
             const int y=int(reference.nextU32()%5)-2,x=int(reference.nextU32()%5)-2;
@@ -88,3 +94,4 @@ int main(){
     check(collisions.collideWalls(phase,[](auto,auto){check(false);return true;}));
     std::printf("Smoke owner: %u births, phase exclusion, retirement, capacity and stable reuse passed\n",births);
 }
+#endif

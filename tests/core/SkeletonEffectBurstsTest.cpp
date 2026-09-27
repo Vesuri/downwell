@@ -15,7 +15,7 @@ static double real(downwell::MotionBinary64 x){
 struct Birth {int object;double x,y;};
 int main(){
     unsigned births=0;
-    for(unsigned seed=0;seed<1024;++seed) for(bool flash:{false,true})
+    for(unsigned seed=0;seed<1024;++seed) for(bool flash:{false,true}) for(bool box:{false,true})
     for(int capacity:{0,2,32}) {
         downwell::GameMakerRandom random(seed),oracle(seed);
         std::vector<Birth> actual,expected;
@@ -31,14 +31,16 @@ int main(){
             childDraws(random,flash);return true;
         };
         const double x=seed%2?96.125:-32.375,y=seed%3?192.75:-256.25;
-        bool result=flash?downwell::skeletonFlashBurst(number(x),number(y),random,create):
-                          downwell::skeletonSmokeBurst(number(x),number(y),random,create);
+        bool result=box?(flash?downwell::boxFlashBurst(number(x),number(y),random,create):
+                              downwell::boxSmokeBurst(number(x),number(y),random,create)):
+                         (flash?downwell::skeletonFlashBurst(number(x),number(y),random,create):
+                                downwell::skeletonSmokeBurst(number(x),number(y),random,create));
         // Independent 64-bit modulus and ordinary host-double arithmetic.
-        const unsigned count=4+unsigned(oracle.irandom(flash?4:2));
+        const unsigned count=(box?1:4)+unsigned(oracle.irandom(box?0:flash?4:2));
         bool success=true;
         for(unsigned i=0;i<count;++i){
             double py,px;
-            if(flash){py=y+(oracle.random(20)-10);px=x+(oracle.random(20)-10);}
+            if(flash){const int radius=box?2:10;py=y+(oracle.random(radius*2)-radius);px=x+(oracle.random(radius*2)-radius);}
             else {py=y+(int(oracle.nextU32()%5)-2);px=x+(int(oracle.nextU32()%5)-2);}
             if(int(expected.size())==capacity){success=false;break;}
             expected.push_back({flash?224:225,px,py});
@@ -53,5 +55,5 @@ int main(){
         check(random.drawCount()==oracle.drawCount() && random.stateIndex()==oracle.stateIndex());
         for(unsigned i=0;i<16;++i)check(random.stateWord(i)==oracle.stateWord(i));
     }
-    std::printf("Skeleton effect bursts: 6144 sequences, %u ordered child births passed\n",births);
+    std::printf("Skeleton/box effect bursts: 12288 sequences, %u ordered child births passed\n",births);
 }

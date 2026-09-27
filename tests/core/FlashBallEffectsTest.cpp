@@ -1,5 +1,11 @@
 #include "core/FlashBallEffects.h"
 #include "core/GameMakerRandom.h"
+#ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeBoxFlash(downwell::FlashBallEffects<32>& effects,downwell::MotionBinary64 x,
+                    downwell::MotionBinary64 y,downwell::GameMakerRandom& random){
+    return effects.boxBurst(x,y,random);
+}
+#else
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -13,16 +19,17 @@ static float scalar(downwell::RunnerImageValue x){float value;std::memcpy(&value
 struct Reference {float x,y,index=1;};
 int main(){
     unsigned births=0;
-    for(unsigned seed=0;seed<1024;++seed){
+    for(unsigned seed=0;seed<1024;++seed)for(bool box:{false,true}){
         downwell::GameMakerRandom random(seed),oracle(seed);
         downwell::FlashBallEffects<16> effects;
         const auto before=effects.beginAnimation();
         const double x=seed%2?16777217.25:-64.125,y=seed%3?192.375:-16777217.25;
-        check(effects.skeletonBurst(number(x),number(y),random));
+        check(box?effects.boxBurst(number(x),number(y),random):effects.skeletonBurst(number(x),number(y),random));
         std::vector<Reference> expected;
-        const unsigned count=4+unsigned(oracle.irandom(4));
+        const unsigned count=(box?1:4)+unsigned(oracle.irandom(box?0:4));
         for(unsigned i=0;i<count;++i){
-            const double py=y+(oracle.random(20)-10),px=x+(oracle.random(20)-10);
+            const int radius=box?2:10;
+            const double py=y+(oracle.random(radius*2)-radius),px=x+(oracle.random(radius*2)-radius);
             const float finalX=float(double(float(px))+int(oracle.irandom(4))-2);
             const float finalY=float(double(float(py))+int(oracle.irandom(4))-2);
             expected.push_back({finalX,finalY,1});
@@ -68,5 +75,6 @@ int main(){
     std::vector<int> order;
     ordered.visitNewest([&](const downwell::FlashBallEffect& effect){order.push_back(effect.pixelX());});
     check(order.size()==2 && order[0]>=198 && order[1]<=102);
-    std::printf("Flash effects: %u owned births across 1024 seeds, seven-update retirement and slot reuse passed\n",births);
+    std::printf("Flash effects: %u skeleton/box births across 1024 seeds, seven-update retirement and slot reuse passed\n",births);
 }
+#endif
