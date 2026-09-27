@@ -1,4 +1,5 @@
 #include "core/RunSession.h"
+#include "core/TimeFieldOutlines.h"
 #include <cstdio>
 #include <cstdlib>
 static void require(bool ok, const char* why) {
@@ -6,6 +7,31 @@ static void require(bool ok, const char* why) {
 }
 int main() {
     using namespace downwell;
+    for(int area:{1,2})for(int level:{1,2,3}){
+        RunSession run;run.stage.area=area;run.stage.level=level;
+        GameMakerRandom random(42),expected(42);
+        const auto radius=GoalTimeField::nextRadius(expected);
+        require(run.createStartField(240,192,random),"source start-field Create");
+        const bool present=area!=1||level!=1;
+        require(run.startFieldPresent==present&&run.startField.radius.equal(radius)&&random.drawCount()==1,
+                "start field samples radius before first-level destruction");
+        bool hit=false;
+        require(run.playerGoalContact(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),1,hit)&&hit==present,
+                "start descendant participates in goal-family clock contacts without an exit");
+        RunnerImageValue unit{0x3f800000u};
+        require(run.parentTimeFieldContact(TimeStopGoalContact::Mask::Player,MotionBinary64::fromInteger(240),
+            MotionBinary64::fromInteger(176),unit,unit,hit)&&hit==present,"start descendant participates in parent contacts");
+        run.gameplayPresentationStep(random,true);
+        require(random.drawCount()==1,"pTimeStop suppresses start-field Draw RNG");
+        run.gameplayPresentationStep(random);
+        if(present)require(run.startField.radius.equal(GoalTimeField::nextRadius(expected)),"live start field resamples in Draw");
+        require(random.drawCount()==expected.drawCount(),"destroyed start field consumes no Draw RNG");
+        for(unsigned i=0;i<16;++i)require(random.stateWord(i)==expected.stateWord(i),"start field complete RNG state");
+        TimeFieldOutlines snapshot;
+        snapshot.set(run.timeFields,run.goalField,false,0,160,34,0,present?&run.startField:nullptr);
+        require(snapshot.count==unsigned(present),"start-field presentation shares immutable field outlines");
+        run.reset();require(!run.startFieldPresent,"run reset retires the start field");
+    }
     for(unsigned failAt:{1u,2u}){
         RunSession run;GameMakerRandom random(42);
         struct Camera {int end=0;void setLevelExit(int y){end=y;}} camera;

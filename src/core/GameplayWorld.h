@@ -403,6 +403,7 @@ public:
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const downwell::LevelExit& levelExit() const { return run_.levelExit; }
     const downwell::GoalTimeField& goalField() const { return run_.goalField; }
+    const downwell::GoalTimeField* startTimeField() const { return run_.startFieldPresent?&run_.startField:nullptr; }
     unsigned goalFieldBirthBoundary() const { return run_.goalFieldBirthBoundary; }
     bool goalStopped() const { return run_.goalStopped; }
     bool exitDitherRequested() const { return run_.exitDitherRequested; }
@@ -433,7 +434,7 @@ public:
         setup.style = style;
         setup.member = run_.upgrades.levels[14] != 0;
         builder.resetRoom(x, y, enemyRandom_, setup);
-        return true;
+        return run_.createStartField(240,192,enemyRandom_);
     }
     const downwell::LevelClearController& levelClear() const { return run_.levelClear; }
     const downwell::LevelClearPresentation::Frame& levelClearFrame() const { return run_.levelClearFrame; }

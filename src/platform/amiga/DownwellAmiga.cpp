@@ -1131,7 +1131,7 @@ static void exposeGameplayFrame(const AmigaMemory& memory, const Bitmap& display
     static downwell::TimeFieldOutlines fieldOracle;
     fieldOracle.set(port.timeFields(), port.goalField(), port.levelExitPresent(),
                     port.goalFieldBirthBoundary(), 160 + port.cameraOffsetX(),
-                    34 + port.cameraOffsetY(), downwellPlayfieldX);
+                    34 + port.cameraOffsetY(), downwellPlayfieldX,port.startTimeField());
     if (fieldOracle.visible) {
         AmigaRenderer oracle;
         amigaRendererInit(&oracle, expected, nullptr);
@@ -2695,7 +2695,7 @@ int main(void) {
             DW_PROFILE_PHASE(profileSprite);
             static downwell::TimeFieldOutlines fieldShape;
             fieldShape.set(port.timeFields(), port.goalField(), port.levelExitPresent(),
-                port.goalFieldBirthBoundary(), worldViewX, worldViewY, downwellPlayfieldX);
+                port.goalFieldBirthBoundary(), worldViewX, worldViewY, downwellPlayfieldX,port.startTimeField());
             bool fieldChanged = !gameplayFields[back].matches(
                 (UBYTE*)gameDisplay[back].data, port.ringOrigin(), fieldShape);
             if (!fieldChanged && fieldShape.visible)

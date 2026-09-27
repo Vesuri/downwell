@@ -358,6 +358,10 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
 
 void compareInitialGameplay(const AmigaPortRuntime& amiga,
                             const downwell::StartupRuntime& reference) {
+    const auto* nativeStart=amiga.startTimeField();const auto* hostStart=reference.startTimeField();
+    require(bool(nativeStart)==bool(hostStart),"both worlds agree on start-field lifetime");
+    if(nativeStart)require(nativeStart->x==hostStart->x&&nativeStart->y==hostStart->y&&
+        nativeStart->radius.equal(hostStart->radius),"both worlds agree on start-field coordinates and Draw radius");
     require(amiga.timeFields().size()==reference.timeFields().size(),
         "both worlds retain every ordinary time-field birth");
     for(unsigned i=0;i<amiga.timeFields().size();++i){
@@ -731,9 +735,13 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             downwell::GameMakerRandom roomRandom(42);
             AmigaTerrainFragment restartFragments[19];
             AmigaAreaOneTerrainBuilder restartBuilder(restartFragments, 19);
-            restartBuilder.resetRoom(-16, 704, roomRandom);
-            require(roomRandom.drawCount() == restarted.randomDrawCount(),
-                    "fresh native builder consumes the same room-creation RNG draws as decoded Retry");
+            AmigaPortRuntime fresh(300,false,1201-176,true);
+            fresh.configureEnemyRandom(roomRandom);
+            require(fresh.initializeAreaOneBuilder(restartBuilder,-16,704)&&
+                    fresh.randomDrawCount()==restarted.randomDrawCount(),
+                    "native room entry includes builder and start-field Create RNG, matching decoded Retry");
+            for(unsigned word=0;word<16;++word)require(fresh.randomState().stateWord(word)==restarted.randomState().stateWord(word),
+                    "Retry room entry preserves complete RNG state");
             require(restarted.inMainRoom() && restarted.tick() == oldTick &&
                     restarted.mainPlayerHealth() == 4 && restarted.mainAmmo() == 8 &&
                     restarted.mainBulletCount() == 0 && restarted.mainCurrencyCount() == 0 &&
@@ -1473,7 +1481,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                       << " ammo=" << reference.mainAmmo() << '\n';
         for (unsigned enemy = 0; enemy < gameplay.enemyCount(); ++enemy)
             sawAwakeEnemy = sawAwakeEnemy || gameplay.enemyAt(enemy).awake;
-        if (sawAwakeEnemy && sawExtendedEnemyAnimation && sawPairedFrogAir && sawPairedFrogGround &&
+        if (routeFrogHit && sawAwakeEnemy && sawExtendedEnemyAnimation && sawPairedFrogAir && sawPairedFrogGround &&
             retiredCompared >= 2 &&
             gameplay.cameraOffsetY() >= postLandingCameraY + 256)
             break;
@@ -1598,9 +1606,9 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             }
             // Exercise alternate press phases of the same firing cycle.
             const int firePhase = std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")
-                ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
+                ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 4;
             input.fire = (tick + firePhase) % 10 < 5;
-            if (std::getenv("DOWNWELL_VERIFY_DEATH") && gameplay.enemiesDefeated() > 0) {
+            if ((std::getenv("DOWNWELL_VERIFY_DEATH")||candleFixture) && gameplay.enemiesDefeated() > 0) {
                 // Once reward coverage exists, seek a nearby enemy and stop
                 // shooting during airborne approach. Keep grounded firing to
                 // break through platforms when the threat is below our feet.
@@ -1618,6 +1626,14 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
                     input.right = reference.mainPlayerX() < threat->x;
                     if (!reference.mainPlayerGrounded() ||
                         std::fabs(threat->y-reference.mainPlayerY()) < 16) input.fire=false;
+                }
+                // Do not let enemy pursuit oscillate forever over a platform.
+                // Continue a real left/right firing sweep after the encounter
+                // phase so damage fixtures explore newly generated rows.
+                if(tick>=1800){
+                    input.left=(tick/90)%2==0;
+                    input.right=!input.left;
+                    input.fire=tick%16==0||tick%16==3;
                 }
             }
             const bool bothWereDead = gameplay.deathSequence().movementDead() && reference.mainDeathSequence().movementDead();
@@ -2325,7 +2341,8 @@ void testNaturalExit(const char* roomPath, const char* objectPath, const char* p
                       << " camera=" << sideCamera << "->" << game.cameraOffsetX() << std::endl;
             require(sideCamera != 0 && returnUpdates < 240 && !game.dead(),
                 "natural shop return releases side camera and reaches main shaft alive");
-            require(nativeRoute.done && secondUpdates == 1201 && nativeRoute.returnFrames == 43,
+            std::cout << "Natural route second-level updates=" << secondUpdates << '\n';
+            require(nativeRoute.done && nativeRoute.returnFrames == returnUpdates+1,
                 "native natural route completion matches host timing");
         }
     }

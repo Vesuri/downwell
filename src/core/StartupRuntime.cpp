@@ -1341,6 +1341,27 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                                  std::int32_t codeId,
                                  bool advancePressed) {
     switch (codeId) {
+    case 2731: // startTimeField Create: scales, radius, then first-level destruction
+        ++implementedCodeCalls_;
+        if(instance!=nullptr){
+            for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==instance){
+                const auto handle=instances_.handleAt(i);
+                if(!lifecycle_.integerTransform(handle,*instance,RunnerTransformField::scaleX,2,{0x3f800000u},0xffffffu)){
+                    run_.effectsSucceeded=false;return;
+                }
+                instance->scaleX=2.0F;
+                if(!lifecycle_.integerTransform(handle,*instance,RunnerTransformField::scaleY,2,{0x3f800000u},0xffffffu)){
+                    run_.effectsSucceeded=false;return;
+                }
+                instance->scaleY=2.0F;
+                if(!run_.createStartField(instance->x,instance->y,random_))return;
+                if(!run_.startFieldPresent&&!instances_.erase(instance->instanceId,
+                    [this](InstanceHandle h,const InstanceRecord& r){return lifecycle_.retire(h,r);}))run_.effectsSucceeded=false;
+                return;
+            }
+            run_.effectsSucceeded=false;
+        }
+        return;
     case 2461: // objLineToResult Create -> inherited objLineToMain Create
         ++implementedCodeCalls_;
         if(instance!=nullptr){

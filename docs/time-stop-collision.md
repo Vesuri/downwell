@@ -104,12 +104,16 @@ outline circles as the exit field, with all three circles outlined. It inherits
 the goal-field player Collision event, including the guarded wind-sound choice.
 An exit-only contact adapter cannot represent this room-entry descendant.
 
-Implementing the field requires room-load Create/destruction handling, shared
-field state and later-level drawing, not a special exclusion inside collision
-queries. The native entry RNG checkpoint must account for the same ordered
-Create draw. A live resource-owner query against the unhandled placed record
-finds a unit-scale phantom on the first player update; this is evidence of
-missing Create semantics, not evidence that the original pauses its clock there.
+Room-load Create publishes each scale before updating the stored record and
+retires the first-level collision identity only after sampling the radius.
+Rejected publication stops the sequence and preserves earlier writes. Shared
+`RunSession` state supplies later-level goal/parent contacts and immutable
+outline snapshots to both renderers; room teardown retires the field. Native
+entry checkpoints include the same ordered Create draw (331 words for seed 2,
+325 for seed 4). This is not a special exclusion inside collision queries:
+leaving the placed record unhandled would produce a unit-scale phantom on the
+first player update. Wind-audio collision dispatch remains a separate integration
+requirement; shared contact/outline tests do not prove its RNG or sound ordering.
 
 ### Exit-trigger children
 

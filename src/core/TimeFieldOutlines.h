@@ -6,12 +6,12 @@ namespace downwell {
 // Compact immutable presentation snapshot. Store only visible circle inputs,
 // not 72 vertices for every world field. No Draw RNG is consumed here.
 struct TimeFieldOutlines {
-    struct Circle { int x, y, radius; } circles[65] = {};
+    struct Circle { int x, y, radius; } circles[66] = {};
     unsigned count = 0;
     bool visible = false;
     void set(const OrdinaryTimeFields<64>& fields, const GoalTimeField& goal,
              bool goalPresent, unsigned goalBoundary, int viewX, int viewY,
-             int screenX = 0) {
+             int screenX = 0,const GoalTimeField* start=nullptr) {
         count = 0; visible = false;
         if (viewX + 80 <= 160 || viewX + 80 >= 320) return;
         auto append = [&](int x, int y, HudReal radius, int minimum) {
@@ -29,6 +29,7 @@ struct TimeFieldOutlines {
             append(field.x, field.y, field.radius, 24);
         }
         if (goalPresent && goalBoundary == 0) append(goal.x, goal.y, goal.radius, 128);
+        if(start)append(start->x,start->y,start->radius,128);
         visible = count != 0;
     }
     bool same(const TimeFieldOutlines& other) const {

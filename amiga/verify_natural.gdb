@@ -12,11 +12,11 @@ continue
 end
 break downwellNaturalReady
 continue
-if gDownwellNaturalExitTick != 1634 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 1201
+if gDownwellNaturalExitTick != 2156 || gDownwellClearReentries != 1 || gDownwellClearGameplayUpdates != 914
     printf "Natural route timing/reentry mismatch: exit=%lu entries=%lu updates=%lu\n", gDownwellNaturalExitTick, gDownwellClearReentries, gDownwellClearGameplayUpdates
     quit 1
 end
-if gDownwellNaturalFailures != 0 || gDownwellNaturalReturnFrames != 43 || gDownwellShopLiveFailures != 0 || gDownwellShopLivePixelFailures != 0 || gDownwellShopLiveFrames < 7
+if gDownwellNaturalFailures != 0 || gDownwellNaturalReturnFrames != 45 || gDownwellShopLiveFailures != 0 || gDownwellShopLivePixelFailures != 0 || gDownwellShopLiveFrames < 7
     printf "Natural shop/return failed: logic=%lu return=%lu frames=%lu raster=%lu\n", gDownwellNaturalFailures, gDownwellNaturalReturnFrames, gDownwellShopLiveFrames, gDownwellShopLivePixelFailures
     quit 1
 end

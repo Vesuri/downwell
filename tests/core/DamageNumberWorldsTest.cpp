@@ -2,6 +2,7 @@
 #include "core/StartupRuntime.h"
 #include "core/RoomPack.h"
 #include "core/BuilderPatternPack.h"
+#include "core/GameplayContactProfileInput.h"
 #include <cassert>
 #include <fstream>
 #include <iterator>
@@ -150,16 +151,15 @@ int main(){
         assert(encounter.tick()==stoppedTick);
     }
     {
-        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
+        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,2,&builderPack);
         encounter.skipToGameForTesting();Input fire{};fire.fire=true;
         InstanceRecord* victim=nullptr;
         for(unsigned tick=0;tick<6000&&(!victim||!encounter.mainBulletCount());++tick){
-            fire.right=(tick/90)%2==0;fire.left=!fire.right;fire.fire=tick%10<5;
-            if(encounter.mainPlayerY()<1264){fire.left=encounter.mainPlayerX()>242;fire.right=encounter.mainPlayerX()<238;}
+            fire=gameplayContactProfileInput(tick,encounter.mainPlayerX(),encounter.mainPlayerY());
             encounter.step(fire,false);victim=nullptr;
             for(unsigned i=0;i<encounter.activeInstanceCount();++i){
                 const int object=encounter.instanceAt(i).objectId;
-                if(object==111||object==113||object==116||object==117||object==119){
+                if(object==111){
                     victim=&const_cast<InstanceRecord&>(encounter.instanceAt(i));break;
                 }
             }
@@ -167,13 +167,22 @@ int main(){
         assert(victim&&encounter.mainBulletCount());
         // Capacity fault injection at the next real projectile segment, not
         // an original-game encounter fixture or a replacement actor definition.
-        const auto before=encounter.mainBulletAt(0);
+        // Isolate the injected reward fault from generated terrain: the next
+        // projectile segment must reach the victim rather than a wall first.
+        auto& projectile=const_cast<StartupRuntime::MainBulletState&>(encounter.mainBulletAt(0));
+        projectile.x=1000;projectile.y=encounter.mainCameraRenderViewY()+50;
+        projectile.trajectory.reset(1000,int(projectile.y),false);
+        const auto before=projectile;
         victim->x=int(before.x);victim->y=int(before.y)+4;
         victim->preciseX=float(victim->x);victim->preciseY=float(victim->y);
         victim->active=true;victim->activationPending=false;victim->health=1;
+        victim->walker.initialize(victim->x,victim->y,0,0,false);
         victim->reward=int(StartupRuntime::mainCurrencyCapacity+1)*10;
         const auto defeats=encounter.mainEnemiesDefeated();
         encounter.step(fire,false);
+        if(encounter.effectsSucceeded()||encounter.mainCurrencyCount()!=StartupRuntime::mainCurrencyCapacity)
+            std::fprintf(stderr,"reward fault missed: object=%d position=%d,%d health=%d bullets=%zu before=%g,%g gems=%zu\n",
+                victim->objectId,victim->x,victim->y,victim->health,encounter.mainBulletCount(),double(before.x),double(before.y),encounter.mainCurrencyCount());
         assert(!encounter.effectsSucceeded()&&encounter.mainCurrencyCount()==StartupRuntime::mainCurrencyCapacity);
         assert(victim->active&&victim->health==-8&&encounter.mainEnemiesDefeated()==defeats);
         assert(encounter.mainBulletCount()&&encounter.mainBulletAt(0).y==before.y);
@@ -181,15 +190,11 @@ int main(){
     StartupRuntime host(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
     host.skipToGameForTesting();assert(host.inMainRoom()&&host.roomLoadSucceeded());
     {
-        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,84,&builderPack);
+        StartupRuntime encounter(PlatformProfile::desktop,&roomPack,&objectPack,2,&builderPack);
         encounter.skipToGameForTesting();
         bool hit=false;
         for(unsigned tick=0;tick<6000&&!hit;++tick){
-            Input input{};
-            input.right=(tick/90)%2==0;input.left=!input.right;input.fire=tick%10<5;
-            if(encounter.mainPlayerY()<1264){
-                input.left=encounter.mainPlayerX()>242;input.right=encounter.mainPlayerX()<238;
-            }
+            const Input input=gameplayContactProfileInput(tick,encounter.mainPlayerX(),encounter.mainPlayerY());
             const int health=encounter.mainPlayerHealth();
             encounter.step(input,false);
             assert(encounter.effectsSucceeded());

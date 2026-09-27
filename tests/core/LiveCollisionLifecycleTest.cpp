@@ -35,10 +35,11 @@ struct RecordingLifecycle:Lifecycle {
     std::uint32_t ids[capacity]{};
     unsigned births=0,retires=0;
     unsigned goalWrites=0,rejectGoalStage=0;
+    unsigned startWrites=0,rejectStartStage=0,startRetires=0;
     explicit RecordingLifecycle(Lifecycle base):Lifecycle(base){}
     bool birth(InstanceHandle h,const InstanceRecord& r){
         if((rejectGoalStage==1&&r.objectId==74)||(rejectGoalStage==2&&r.objectId==255))return false;
-        if(r.objectId==255)require(r.scaleX==1.0F&&r.scaleY==1.0F,"goal birth precedes Create scales");
+        if(r.objectId==255||r.objectId==371)require(r.scaleX==1.0F&&r.scaleY==1.0F,"field birth precedes Create scales");
         if(!Lifecycle::birth(h,r)){std::fprintf(stderr,"birth failed: object=%d id=%u\n",r.objectId,r.instanceId);return false;}
         require(handles.emplace(r.instanceId,h).second,"duplicate live instance ID");ids[h.slot]=r.instanceId;++births;return true;
     }
@@ -52,9 +53,22 @@ struct RecordingLifecycle:Lifecycle {
             if((rejectGoalStage==3&&field==RunnerTransformField::scaleX)||
                (rejectGoalStage==4&&field==RunnerTransformField::scaleY))return false;
         }
+        if(r.objectId==371){
+            ++startWrites;
+            require(value.bits==0x40000000u&&r.scaleY==1.0F&&
+                ((field==RunnerTransformField::scaleX&&r.scaleX==1.0F)||
+                 (field==RunnerTransformField::scaleY&&r.scaleX==2.0F)),"start scales publish X then Y before record writes");
+            if((rejectStartStage==1&&field==RunnerTransformField::scaleX)||
+               (rejectStartStage==2&&field==RunnerTransformField::scaleY))return false;
+        }
         return Lifecycle::transform(h,r,field,value,alpha,blend);
     }
     bool retire(InstanceHandle h,const InstanceRecord& r){
+        if(r.objectId==371){
+            require(r.scaleX==2.0F&&r.scaleY==2.0F,"start retirement follows both scale writes");
+            ++startRetires;
+            if(rejectStartStage==3)return false;
+        }
         if(!Lifecycle::retire(h,r))return false;
         require(handles.erase(r.instanceId)==1,"retire unknown instance ID");ids[h.slot]=0;++retires;return true;
     }
@@ -76,6 +90,10 @@ int main(){
         InstanceLifecycleBinding::bindMasks(lifecycle));
     auto plain=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     runtime->skipToGameForTesting();plain->skipToGameForTesting();
+    require(!runtime->instance(101097)&&!runtime->startTimeField()&&runtime->randomDrawCount()==331,
+        "first-level start field consumes Create RNG then retires its placed lifetime");
+    require(lifecycle.startWrites==2&&lifecycle.startRetires==1&&!lifecycle.handles.count(101097),
+        "first-level start field retires its registered collision identity");
     unsigned checks=0;
     for(unsigned tick=0;tick<1800;++tick){
         const auto input=gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY());
@@ -171,6 +189,24 @@ int main(){
     std::printf("Live resource owner: %u births, %u retirements, %u position/activation checks\n",
         lifecycle.births,lifecycle.retires,checks);
     std::printf("Live precise terrain queries: %u hits and one empty query\n",queries);
+    for(unsigned failure=1;failure<=3;++failure){
+        auto failedStorage=std::make_unique<Storage>();
+        require(failedStorage->families.bindInstanceFlags(objects),"start failure family fixture");
+        RecordingLifecycle failedLifecycle({failedStorage->owner,failedStorage->properties,objects,sprites,failedStorage->families,{}, {}});
+        failedLifecycle.rejectStartStage=failure;
+        auto failed=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindMasks(failedLifecycle));
+        failed->skipToGameForTesting();
+        const auto* partial=failed->instance(101097);
+        require(!failed->effectsSucceeded()&&partial&&partial->scaleX==(failure==1?1.0F:2.0F)&&
+            partial->scaleY==(failure==3?2.0F:1.0F)&&failed->randomDrawCount()==(failure==3?331u:330u),
+            "start failure preserves accepted scales and samples radius only before retirement");
+        require(failedLifecycle.startWrites==(failure==1?1u:2u)&&failedLifecycle.startRetires==(failure==3?1u:0u),
+            "start failure stops subsequent publication");
+        const auto digest=failed->stateDigest();
+        failed->step({},false);
+        require(failed->stateDigest()==digest,"failed start Create remains terminal");
+    }
     for(unsigned failure=1;failure<=4;++failure){
         auto failedStorage=std::make_unique<Storage>();
         require(failedStorage->families.bindInstanceFlags(objects),"failed-birth family fixture");

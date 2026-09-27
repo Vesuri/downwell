@@ -566,8 +566,8 @@ int main() {
         else if (state.inPlayMenu() && state.playMenuYOffset() == 0) input.fire = true;
         else if (state.inMainRoom()) {
             // Use the same natural-contact tape as the host/native profile
-            // gate. Phase zero no longer reaches an enemy after the corrected
-            // ceiling collision response; do not inject damage to hide that.
+            // gate, revalidated after source entry RNG changes. Do not inject
+            // damage when a former tape stops reaching an enemy.
             input = downwell::gameplayContactProfileInput(mainTicks,
                 int(state.mainPlayerX()), int(state.mainPlayerY()));
         }
@@ -640,7 +640,7 @@ int main() {
     }
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
-    require(firstDamage == 550 && mainTicks == 640 && hidden == 45 && flashingVisible == 45 &&
+    require(firstDamage == 647 && mainTicks == 737 && hidden == 45 && flashingVisible == 45 &&
             damagedGame.startup().mainPlayerHealth() == 3,
             "render route reaches the verified natural contact and complete immunity interval");
     require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");
@@ -895,9 +895,14 @@ int main() {
         clearRuntime.upgrades().count == 1 && clearRuntime.runTimeTicks() == clockBeforeClear,
         "room loading preserves grants, health, currency and run clock while refilling charge");
     const auto beforePlay = clearRuntime.mainPlayerY();
+    const auto beforePlayTick = clearRuntime.tick();
     clearGame.update({});
-    require(clearRuntime.runTimeTicks() > clockBeforeClear && clearRuntime.mainPlayerY() >= beforePlay,
-        "new stage resumes gameplay updates instead of remaining in result ownership");
+    require(clearRuntime.startTimeField()&&clearRuntime.runTimeTicks()==clockBeforeClear&&
+        clearRuntime.tick()==beforePlayTick+1&&clearRuntime.mainPlayerY()>=beforePlay,
+        "new stage updates gameplay while its entrance field pauses the clock");
+    for(unsigned tick=0;tick<120&&clearRuntime.runTimeTicks()==clockBeforeClear;++tick)clearGame.update({});
+    require(clearRuntime.runTimeTicks()>clockBeforeClear,
+        "leaving the entrance field resumes the run clock");
     clearRuntime.registerLevelExit(int(clearRuntime.mainPlayerY()));
     for (unsigned tick = 0; tick < 330 && clearRuntime.runStage().level == 2; ++tick)
         clearGame.update(confirm);

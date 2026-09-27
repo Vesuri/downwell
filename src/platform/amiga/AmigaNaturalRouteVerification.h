@@ -14,7 +14,7 @@ struct AmigaNaturalRouteVerification {
     bool done = false;
     static void entry(AmigaAreaOneTerrainBuilder& builder, downwell::GameMakerRandom& random) {
         random.setSeed(4);
-        for (unsigned i = 0; i < 324; ++i) random.nextU32();
+        for (unsigned i = 0; i < 325; ++i) random.nextU32();
         downwell::AreaOneBuilder initial;
         initial.restoreInitialCheckpoint(240, 704, -30, 8, 4);
         builder.resetFromRoomEntry(initial);

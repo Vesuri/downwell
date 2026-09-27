@@ -213,57 +213,23 @@ Decoded `StartupRuntime::skipToGameForTesting` now yields:
 
 | Seed | Words consumed | Side-room rows |
 | --- | ---: | --- |
-| 2 (ordinary native entry) | 330 | 8, 3 |
-| 4 (native natural-route fixture) | 324 | 8, 4 |
+| 2 (ordinary native entry) | 331 | 8, 3 |
+| 4 (native natural-route fixture) | 325 | 8, 4 |
 
-Both shortcuts are checked against decoded startup for draw count, state index,
-all sixteen state words and the pre-builder entry state. The ordinary native
-entry replaces its obsolete 470-word / rows 3,7 capture; the test entry replaces
-437 words / rows 8,13. These are cached startup snapshots, not compensating
-draws added to gameplay. The live terrain comparison passes with the new seed-2
-checkpoint (`/tmp/downwell-corrected-entry-terrain.log`).
+The counts include the placed start-field radius draw before first-level
+self-destruction. Compare both shortcuts against decoded startup for draw
+count, state index, all sixteen state words and the pre-builder entry state.
+These are cached startup snapshots, not compensating draws added to gameplay.
 
-The corrected host natural routes pass: seed 99 takes 1,339 gameplay updates
-and seed 4 takes 1,646, each followed by 211 upgrade updates and 120 second-level
-updates. Seed 4 then reaches the generated shop after 259 more updates,
-has 16 gems against a 300-gem price, retains money/stock on a rejected purchase,
-leaves, and returns to the shaft in 45 updates. Total second-level updates are
-431. The native controller reproduces those host inputs and completes without
-state injection. Its insufficient-funds check now asserts `money < price` and
-unchanged money/stock, not incidental amounts from the former random stream.
-The native debugger's expected counts are updated to these host observations.
+`verify-natural-exit` compares real-input routes through generated exits,
+upgrade selection and next-level entry. The seed-4 controller also visits a
+generated shop, tests insufficient funds without changing money or stock, and
+returns to the shaft. `amiga/verify_natural.gdb` pins the corresponding target
+timings, presentation counters and stack guard; regenerate its expected counts
+from the paired host route whenever source-backed RNG changes affect terrain.
+Do not weaken the underlying encounter or result checks to retain old tapes.
 
-`make verify-amiga-natural-route` now passes with the corrected checkpoints:
-1,646 updates to exit, 211 upgrade comparisons, 168 exit-field comparisons,
-431 second-level updates, 51 shop-HUD comparisons and 45 return updates.
-Logic/raster failure counters are zero and the 256-byte task-stack guard is
-intact. This is a bounded A500/68000 emulator run with 512 KiB Chip plus 8 MiB
-Fast RAM, not proof of stock-memory fit or complete original-game fidelity.
-The runner stopped its emulator and restored ordinary build options. Logs:
-`/tmp/downwell-corrected-native-route.log` and
-`/tmp/downwell-corrected-native-gdb.log`.
-
-The broader startup test's geometry-specific expectations and the eight-seed
-sweep remain to be revalidated; this gate does not silently supersede them.
-
-## Startup fixture and sweep restored
-
-Follow-up revalidation now passes both outstanding checks. The full startup
-fixture retains its input tape and all behavior assertions; its pinned geometry
-now reflects entrance pattern 2 and right-room pattern 0. The player lands at
-y=1200 on generated terrain at y=1216 with zero vertical speed and full ammo;
-the shot destroys one block and retires. The checked right-room markers remain
-`v,O,_,@,{,}` with no invented torch. These are corrected-implementation
-regression observations, not independently captured Windows trajectories.
-Log: `/tmp/downwell-startup-rebaseline.log`.
-Address/undefined-behavior sanitizer validation also passes with a 65,520 KiB
-host stack limit (`/tmp/downwell-startup-rebaseline-sanitized.log`). The initial
-default-stack sanitizer run overflowed this test function's multiple copied
-runtime snapshots; no target stack setting was changed. The preceding native
-route's guard check remains separate evidence about the Amiga stack.
-
-The unchanged eight-seed input controller reaches every exit alive within the
-existing 2,500-update budget. It compares 15,118 gameplay updates and all RNG
-words, with 95 generated enemies and no adapter mismatch. Per-seed counts are
-in `natural-route-verification.md`; log `/tmp/downwell-corrected-sweep.log`.
-No production code or emulator build options changed during this revalidation.
+The startup fixture's geometry and route counts are implementation regressions,
+not independently captured Windows trajectories. Host sanitizer checks do not
+prove target stack safety. Emulator checks with expanded Fast RAM do not prove
+stock-A500 memory fit; those requirements remain in `open-work.md`.

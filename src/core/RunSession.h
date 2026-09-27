@@ -257,6 +257,10 @@ struct RunSession {
                         if(!BloodGoalContact::query(effect,goalField,inField))return false;
                         if(inField)return true;
                     }
+                    if(startFieldPresent){
+                        if(!BloodGoalContact::query(effect,startField,inField))return false;
+                        if(inField)return true;
+                    }
                     return otherFields(effect,inField);
                 },allowed);
         });
@@ -308,6 +312,16 @@ struct RunSession {
     }
     LevelExit levelExit;
     GoalTimeField goalField;
+    GoalTimeField startField;
+    bool startFieldPresent=false;
+    // startTimeField Create does not call inherited Create. Its radius draw
+    // precedes first-level destruction, so even an absent field advances RNG.
+    bool createStartField(int x,int y,GameMakerRandom& random){
+        if(!effectsSucceeded)return false;
+        startField.create(x,y,random);
+        startFieldPresent=!(stage.area==1&&stage.level==1);
+        return true;
+    }
     unsigned goalFieldBirthBoundary = 0;
     bool levelExitPresent = false;
     // Boolean parentTimeField contact, distinct from instance_place identity.
@@ -318,7 +332,7 @@ struct RunSession {
         MotionBinary64 x, MotionBinary64 y, RunnerImageValue xs,
         RunnerImageValue ys, bool& hit) {
         if (!effectsSucceeded) return false;
-        if (!levelExitPresent && !timeFields.size()) { hit = false; return true; }
+        if (!levelExitPresent && !startFieldPresent && !timeFields.size()) { hit = false; return true; }
         RunnerImageValue px, py;
         effectsSucceeded = px.assign(x) && py.assign(y);
         if (!effectsSucceeded) return false;
@@ -333,6 +347,10 @@ struct RunSession {
             effectsSucceeded = TimeStopGoalContact::query(mask, px, py, xs, ys, goalField, found);
             if (!effectsSucceeded) return false;
         }
+        if(!found&&startFieldPresent){
+            effectsSucceeded=TimeStopGoalContact::query(mask,px,py,xs,ys,startField,found);
+            if(!effectsSucceeded)return false;
+        }
         hit = found;
         return true;
     }
@@ -341,7 +359,7 @@ struct RunSession {
     // those queries or infer their answer from goalStopped.
     bool playerGoalContact(MotionBinary64 x,MotionBinary64 y,int facing,bool& hit) {
         if(!effectsSucceeded)return false;
-        if(!levelExitPresent){hit=false;return true;}
+        if(!levelExitPresent&&!startFieldPresent){hit=false;return true;}
         RunnerImageValue px,py,sx,sy;
         effectsSucceeded=px.assign(x) && py.assign(y) &&
             sx.assign(MotionBinary64::fromInteger(facing<0?-1:1)) &&
@@ -353,17 +371,22 @@ struct RunSession {
         // original transformed sampling path below.
         std::int32_t ix,iy;
         RunnerImageValue rx,ry;
-        if(px.promoted().roundPixel(ix) && py.promoted().roundPixel(iy) &&
+        const bool integral=px.promoted().roundPixel(ix) && py.promoted().roundPixel(iy) &&
            rx.assign(MotionBinary64::fromInteger(ix)) && ry.assign(MotionBinary64::fromInteger(iy)) &&
            rx.bits==px.bits && ry.bits==py.bits &&
-           ix>=-1048576 && ix<=1048576 && iy>=-1048576 && iy<=1048576 &&
-           goalField.x>=-1048576 && goalField.x<=1048576 &&
-           goalField.y>=-1048576 && goalField.y<=1048576){
-            hit=goalField.meetsPlayer(ix,iy);return true;
-        }
-        effectsSucceeded=TimeStopGoalContact::query(TimeStopGoalContact::Mask::Player,
-            px,py,sx,sy,goalField,hit);
-        return effectsSucceeded;
+           ix>=-1048576 && ix<=1048576 && iy>=-1048576 && iy<=1048576;
+        bool found=false;
+        const auto query=[&](const GoalTimeField& field){
+            if(integral&&field.x>=-1048576&&field.x<=1048576&&field.y>=-1048576&&field.y<=1048576){
+                found=field.meetsPlayer(ix,iy);return true;
+            }
+            effectsSucceeded=TimeStopGoalContact::query(TimeStopGoalContact::Mask::Player,px,py,sx,sy,field,found);
+            return effectsSucceeded;
+        };
+        if(levelExitPresent&&!query(goalField))return false;
+        if(!found&&startFieldPresent&&!query(startField))return false;
+        hit=found;
+        return true;
     }
     bool goalStopped = false, exitControlsLocked = false;
     bool exitDitherRequested = false, levelResultRequested = false;
@@ -380,6 +403,8 @@ struct RunSession {
             levelExitPresent, goalFieldBirthBoundary,
             [&] { goalField.advanceDraw(timeStopped, random); });
         if (!effectsSucceeded) return;
+        // The placed start field predates generated ordinary/exit fields.
+        if(startFieldPresent)startField.advanceDraw(timeStopped,random);
         results.presentationStep();
     }
 
@@ -401,6 +426,7 @@ struct RunSession {
             levelClear.selection.next, levelClear.selection.visible);
         levelResultRequested = exitDitherRequested = false;
         levelExitPresent = false;
+        startFieldPresent = false;
         exitDither = {};
         nextLevelRequested = false;
         return true;
@@ -508,6 +534,7 @@ struct RunSession {
         gemHigh = false;
         levelExit = {};
         goalField = {};
+        startField = {};startFieldPresent=false;
         goalFieldBirthBoundary = 0;
         levelExitPresent = false;
         goalStopped = exitControlsLocked = false;

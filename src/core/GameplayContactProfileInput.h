@@ -5,7 +5,7 @@ namespace downwell {
 // Profiling inputs only: no instance/state injection and no random draws.
 // Shared by the host gate and native autorun so contact coverage is testable
 // before spending an emulator run on a tape that no longer reaches damage.
-constexpr unsigned gameplayContactProfilePhase=5;
+constexpr unsigned gameplayContactProfilePhase=7;
 constexpr unsigned gameplayContactProfileFrames=1800;
 inline Input gameplayContactProfileInput(unsigned tick,int x,int y,unsigned phase=gameplayContactProfilePhase){
     Input input;

@@ -64,7 +64,7 @@ struct LifecycleAudit {
             ++frogTransforms;
         }
         const bool enemy=r.objectId==111||r.objectId==112||r.objectId==113||r.objectId==116||r.objectId==117||r.objectId==119;
-        if((fail==9&&enemy)||(fail==11&&!enemy))return false;
+        if((fail==9&&enemy)||(fail==11&&r.objectId==35))return false;
         ++transforms;return true;
     }
     bool imageIndex(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerImageValue value){
@@ -845,16 +845,18 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             << " rows=" << runtime.mainBuilderStartRowsGenerated() << ',' << runtime.mainBuilderRowsGenerated()
             << " instances=" << runtime.activeInstanceCount() - instancesBefore
             << " draws=" << runtime.randomDrawCount() - drawsBeforeStart << '\n';
-        require(runtime.mainBuilderStartPattern() == 2 &&
+        // startTimeField's Create now consumes its source draw before being
+        // destroyed on level 1. This shifts the subsequent entrance choice.
+        require(runtime.mainBuilderStartPattern() == 1 &&
                     !runtime.mainBuilderStartReversed() &&
                     runtime.mainBuilderGenerationCount() == 0,
-                "corrected choice stream selects unmirrored entrance fragment two");
-        require(runtime.mainBuilderStartRowsGenerated() == 6 &&
-                    runtime.mainBuilderRowsGenerated() == 35,
-                "the complete fragment advances its six shared row intervals");
-        require(runtime.activeInstanceCount() == instancesBefore + 92,
+                "start-field Create stream selects unmirrored entrance fragment one");
+        require(runtime.mainBuilderStartRowsGenerated() == 5 &&
+                    runtime.mainBuilderRowsGenerated() == 34,
+                "the complete fragment advances its five shared row intervals");
+        require(runtime.activeInstanceCount() == instancesBefore + 73,
                 "the fragment creates its exact walls and breakable blocks");
-        require(runtime.randomDrawCount() == drawsBeforeStart + 89,
+        require(runtime.randomDrawCount() == drawsBeforeStart + 62,
                 "box Create RNG ordering includes the reference gem-tile branch");
 
         downwell::Input steerToPlatform;
@@ -886,8 +888,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             << " last=" << runtime.mainBuilderLastMainPattern()
             << " rows=" << runtime.mainBuilderRowsGenerated() << " blocks=" << runtime.mainBlocksDestroyed()
             << " sprite=" << runtime.mainPlayerSpriteId() << " vy=" << runtime.mainPlayerSpeedY() << '\n';
-        require(runtime.mainPlayerY() >= 1199.0F &&
-                    runtime.mainPlayerY() <= 1201.0F &&
+        require(runtime.mainPlayerY() >= 1327.0F &&
+                    runtime.mainPlayerY() <= 1329.0F &&
                     runtime.mainPlayerSpeedY() == 0.0F &&
                     runtime.mainPlayerSpriteId() == 31,
                 "landing settles on corrected entrance geometry after the shot");
@@ -935,19 +937,45 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     instance.velocityX != 0.0F || instance.velocityY != 0.0F;
             }
             if (instance.active && (instance.objectId == 60 || instance.objectId == 92 || instance.objectId == 93) &&
-                instance.y == 1216 &&
+                instance.y == 1344 &&
                 runtime.mainPlayerX() + 3.0F >= instance.x - 8.0F &&
                 runtime.mainPlayerX() - 4.0F <= instance.x + 7.0F)
                 standingOnGeneratedTerrain = true;
         }
         require(foundInitializedBlock && standingOnGeneratedTerrain,
                 "grounded state remains backed by generated solid terrain, with initialized breakables in the room");
+        require(runtime.mainBuilderMainPatternsGenerated()==2&&runtime.mainBuilderLastMainPattern()==2&&
+                runtime.mainBuilderGenerationCount()==2&&runtime.mainBuilderRowsGenerated()==58,
+                "start-field RNG stream generates two regular fragments with the decoded row overlap");
+        require(runtime.mainShotsFired()==shotsBeforeBlock+1&&runtime.mainBlocksDestroyed()==0&&runtime.mainBulletCount()==0,
+                "this corrected layout's shot retires without hitting a breakable block");
+        // The corrected entry RNG can select a terrain-only landing slice.
+        // Continue with real inputs until the next generated actor, keeping
+        // the actor assertions instead of requiring this particular platform
+        // to contain one or injecting an enemy into the generation stream.
+        auto encounterStorage=std::make_unique<downwell::StartupRuntime>(runtime);
+        auto& encounters=*encounterStorage;
+        for(unsigned tick=0;!foundInitializedEnemy&&tick<480;++tick){
+            downwell::Input walk;walk.left=true;
+            encounters.step(walk,false);
+            for(unsigned i=0;i<encounters.activeInstanceCount();++i){
+                const auto& actor=encounters.instanceAt(i);
+                const int ids[]={111,112,113,116,117,119};
+                const int health[]={5,5,35,15,20,3},reward[]={6,14,20,12,24,6};
+                for(unsigned kind=0;kind<6;++kind)if(actor.objectId==ids[kind]){
+                    require(actor.health==health[kind]&&actor.reward==reward[kind]&&actor.motionInitialized,
+                        "first naturally generated actor retains recovered Create combat state");
+                    foundInitializedEnemy=true;
+                    foundMovingEnemy=foundMovingEnemy||actor.x%16!=0||actor.y%16!=0||actor.velocityX!=0.0F||actor.velocityY!=0.0F;
+                }
+            }
+        }
         require(foundInitializedEnemy,
                 "the deterministic area-one slice contains a native enemy");
         if (!foundMovingEnemy) {
             // This entrance can contain only resting/offscreen actors.
             // Exercise host movement explicitly without changing its RNG tape.
-            auto movementStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto movementStorage = std::make_unique<downwell::StartupRuntime>(encounters);
             auto& movement = *movementStorage;
             std::size_t actorIndex = movement.activeInstanceCount();
             for (std::size_t i = 0; i < movement.activeInstanceCount(); ++i) {
@@ -970,16 +998,6 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         require(foundMovingEnemy,
                 "area-one enemies advance native fractional movement state");
-        require(runtime.mainBuilderMainPatternsGenerated() == 1 &&
-                    runtime.mainBuilderLastMainPattern() == 18 &&
-                    runtime.mainBuilderGenerationCount() == 1,
-                "the corrected stream generates regular fragment eighteen below the entrance");
-        require(runtime.mainBuilderRowsGenerated() == 51,
-                "regular fragments preserve row overlap and append pillar rows");
-        require(runtime.mainShotsFired() == shotsBeforeBlock + 1 &&
-                    runtime.mainBlocksDestroyed() == 1 &&
-                    runtime.mainBulletCount() == 0,
-                "the corrected layout's shot destroys one block and retires its projectile");
         {
             auto retirementStorage = std::make_unique<downwell::StartupRuntime>(runtime);
             auto& retirement = *retirementStorage;
@@ -1065,8 +1083,13 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         {
             // A controlled encounter, independent of the later side-room route.
             // Natural combat and collection remain mandatory in the paired scene tapes.
-            auto combatStorage = std::make_unique<downwell::StartupRuntime>(runtime);
+            auto combatStorage = std::make_unique<downwell::StartupRuntime>(encounters);
             auto& combat = *combatStorage;
+            for(unsigned frame=0;combat.mainBulletCount()==0&&frame<12;++frame){
+                downwell::Input shot;shot.fire=frame%3!=1;
+                combat.step(shot,false);
+            }
+            require(combat.mainBulletCount()>0,"controlled encounter emits a real projectile before positioning its target");
             downwell::InstanceRecord* target = nullptr;
             std::size_t targetIndex = 0;
             for (std::size_t i = 0; i < combat.activeInstanceCount(); ++i) {
@@ -1147,16 +1170,15 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                   << " rows=" << runtime.mainBuilderRowsGenerated()
                   << " specials=" << runtime.mainBuilderSpecialObjectsGenerated() << '\n';
         // This is a tape-specific regression, not a Windows trajectory oracle.
-        // Rounded player-mask X in upward terrain probes changes this route's
-        // trajectory and later selection. The pre-correction movement reproduces
-        // pattern 0/row 89; the corrected tape selects pattern 4/row 94.
-        // Both recovered patterns contain v,O,_,@,{,} and no J torch marker.
+        // The source startTimeField Create consumes a radius draw even when it
+        // destroys itself on level 1. With that entry draw this tape selects
+        // pattern 7/row 86. VM string 1022 contains v,O,_,@,{,} and no J marker.
         require(runtime.mainBuilderSideRoomsGenerated() == 1 &&
                     runtime.mainBuilderShopsGenerated() == 0 &&
                     runtime.mainBuilderShopSuppressed() &&
-                    runtime.mainBuilderLastRightPattern() == 4 &&
+                    runtime.mainBuilderLastRightPattern() == 7 &&
                     runtime.mainBuilderGenerationCount() == 4 &&
-                    runtime.mainBuilderRowsGenerated() == 94,
+                    runtime.mainBuilderRowsGenerated() == 86,
                 "the first scheduled side room preserves deterministic selection and rows");
         require(runtime.mainBuilderSpecialObjectsGenerated() == 6,
                 "every special marker in deterministic right-room pattern is interpreted");
@@ -1176,7 +1198,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         }
         require(!foundTorch && foundAmbience && foundTimeField &&
                     foundSideCamera && foundRoomReward,
-                "pattern 4 emits its utility/reward IDs without inventing a J torch marker");
+                "pattern 7 emits its utility/reward IDs without inventing a J torch marker");
     }
 }
 

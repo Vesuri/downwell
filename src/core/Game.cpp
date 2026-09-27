@@ -314,7 +314,7 @@ void Game::renderMain(Renderer& renderer) const {
     TimeFieldOutlines field;
     field.set(startup_.timeFields(), startup_.goalField(), startup_.levelExitPresent(),
               startup_.goalFieldBirthBoundary(),
-              static_cast<int>(viewX), static_cast<int>(viewY));
+              static_cast<int>(viewX), static_cast<int>(viewY),0,startup_.startTimeField());
 
     // Enemy Step has already selected its presentation, including hit/wake
     // overrides. Drawing must not reconstruct a default pose from object ID.
