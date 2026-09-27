@@ -212,6 +212,15 @@ the source-relative anchor intact. `tests/muzzle-art-test.py`, included in
 streams against source pixels. Assets alone do not enable muzzle emission or
 establish its cross-family Draw order.
 
+Wall-hit resource 101 has all eight unrotated frames in the same offline
+planar/DMA pack. `tests/wall-impact-art-test.py` compares their anchored pixels
+and both DMA facings with the source texture pages. The native draw list
+accepts these frames at integer anchors and zero angle; its scheduler test
+checks the 16 updates at speed 0.5 and Animation End retirement. Fractional
+anchors still need a verified raster policy. Shootable-hit resource 605 is
+asymmetric and uses the raw bullet angle, so it must not reuse the muzzle's
+quarter-turn proof; its offline angle-dependent rendering remains unimplemented.
+
 `NonLoopSpriteAnimation` supplies the common sprite-change and Animation End
 state machine, also used by the live corpse-expiry child. Its admitted advance
 path requires verified nonempty unit-key sprite metadata. After the muzzle

@@ -78,6 +78,7 @@ SELECTIONS = {
         84: None,    # sprSmoke: all nine source animation frames
         91: None,    # sprDebris: six frames, default/area-four debris
         96: None,    # sprFlashBall: source shader light/dark classes
+        101: None,   # sprFxBulletHitWall: eight source impact frames
         102: None,   # sprFxExplosionS: corpse expiry, twelve planar frames
         115: None,   # sprDebrisRock: four frames, areas one/three/five
         116: None,   # sprDebrisWood: four frames, area two
@@ -520,7 +521,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
             canvas = frame_canvas(sprite, frame, items, pages)
             if profile == "game" and sprite_id == 96:
                 canvas = flash_palette_canvas(canvas)
-            if profile == "game" and sprite_id in (84, 96, 153, 154, 157, 162, 163, 164,
+            if profile == "game" and sprite_id in (84, 96, 101, 153, 154, 157, 162, 163, 164,
                     166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278,
                     458, 459, 460, 485, 486, 487, 496, 497, 602, 603):
                 # Prepare snail Y flips and crawler quarter turns on the host.
@@ -547,7 +548,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
                             ox, oy = oy, canvas.width - ox
                     bounds = variant.getbbox()
                     require(bounds is not None, "empty oriented actor frame")
-                    if gun_spread or sprite_id == 84:
+                    if gun_spread or sprite_id in (84, 101):
                         # Projectile art and smoke's final single-pixel frame
                         # can sit beyond their origin. Keep that anchor inside
                         # the DMA frame when cropping, without moving pixels.
@@ -572,7 +573,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
                     # used planar facing; DMA variants remain independently
                     # generated below and checked against the pixel oracle.
                     # fxSmoke also leaves image_xscale at its default +1.
-                    facings = (False,) if gun_spread or sprite_id in (84, 485, 486, 487, 496, 497) else (False, True)
+                    facings = (False,) if gun_spread or sprite_id in (84, 101, 485, 486, 487, 496, 497) else (False, True)
                     for flip_x in facings:
                         image = variant.transpose(Image.Transpose.FLIP_LEFT_RIGHT) if flip_x else variant
                         pixels = [pixel_to_pen(pixel) for pixel in image.get_flattened_data()]
@@ -797,7 +798,7 @@ def build_pack(manifest, extracted, profile, language_path=None):
     # Gameplay DMA words, including mirrored multi-channel actors, are host work.
     if profile == "game":
         hardware = []
-        actors = (0, 1, 3, 12, 15, 27, 31, 37, 84, 96, 133, 134, 153, 154, 157, 162, 163, 164,
+        actors = (0, 1, 3, 12, 15, 27, 31, 37, 84, 96, 101, 133, 134, 153, 154, 157, 162, 163, 164,
                   166, 168, 170, 173, 177, 178, 186, 187, 188, 205, 207, 208, 278, 458, 459, 460,
                   485, 486, 487, 496, 497, 602, 603, 707)
         for sprite, frame_index, dma_width, planar in encoded:

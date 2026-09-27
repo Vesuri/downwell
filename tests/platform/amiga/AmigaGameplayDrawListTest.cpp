@@ -49,6 +49,19 @@ int main() {
 #endif
         unsigned visited=0;
         assert(!scene->visitRoomActors([&](auto,auto,auto){++visited;return false;})&&visited==1);
+        downwell::InstanceHandle impact;
+        assert(scene->spawnScriptEffect(n(248),n(128),101,{0x3fe00000u,0},{},{},frames,impact));
+        for(unsigned tick=0;tick<16;++tick){
+            assert(list.collect(*scene,pack,pack+8,160,34));unsigned seen=0;
+            for(unsigned i=0;i<list.count;++i)if(list.actors[i].sprite==101){
+                assert(list.actors[i].frame==tick/2&&list.actors[i].x==198&&list.actors[i].y==94);++seen;
+            }
+            assert(seen==1);scene->step(0);assert(scene->effectsSucceeded());
+        }
+        assert(owner->prepareDraw()&&list.collect(*scene,pack,pack+8,160,34));
+        for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=101);
+        assert(scene->spawnScriptEffect(n(248),n(128),101,{0x3fe00000u,0},n(1),{},frames,impact));
+        assert(!list.collect(*scene,pack,pack+8,160,34)&&list.failedSprite==101);
         // Unknown fractional anchors must not be rounded into a proven variant.
         assert(scene->spawnScriptEffect({0x406e1000u,0},n(124),603,{0x3fe00000u,0},n(270),{},frames,b));
         assert(!list.collect(*scene,pack,pack+8,160,34)&&list.failedSprite==603);

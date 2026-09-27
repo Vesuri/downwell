@@ -404,7 +404,8 @@ int main() {
         require(owner->attach(scene->startup()),"muzzle drawing fixture attaches production collision owner");
         auto& world=const_cast<downwell::StartupRuntime&>(scene->startup());world.skipToGameForTesting();
         auto n=[](int v){return downwell::MotionBinary64::fromInteger(v);};
-        auto frames=[](int id,unsigned& count){count=1;return id==602||id==603;};
+        auto frames=[&](int id,unsigned& count){downwell::PackedSpriteCollision sprite;
+            if(!sprites.sprite(id,sprite))return false;count=sprite.frameCount;return true;};
         std::uint32_t a=0,b=0;
         require(world.spawnScriptEffect(n(240),n(120),603,{0x3fe00000u,0},n(270),{},frames,a)&&
             world.spawnScriptEffect(n(244),n(124),602,{0x3fe00000u,0},{},{},frames,b)&&b>a,
@@ -422,6 +423,21 @@ int main() {
             std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),602)==retired.spriteOrder.end()&&
             std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),603)==retired.spriteOrder.end(),
             "ordinary Animation End and cleanup remove muzzles from SDL drawing");
+        require(world.spawnScriptEffect(n(248),n(128),101,{0x3fe00000u,0},{},{},frames,a),
+            "wall impact uses the shared script effect owner");
+        for(unsigned tick=0;tick<16;++tick){
+            RecordingRenderer frame;frame.recordTransforms=true;scene->render(frame);unsigned seen=0;
+            for(const auto& item:frame.transforms)if(item.sprite==101){
+                require(item.frame==tick/2&&item.angle==0&&
+                    item.x==110+248-world.mainCameraRenderViewX()&&item.y==128-world.mainCameraRenderViewY(),
+                    "SDL wall impact retains source frame, angle and room anchor");++seen;
+            }
+            require(seen==1&&scene->renderingSucceeded(),"one wall impact is drawn before Animation End");
+            scene->update({});require(scene->simulationSucceeded(),"wall impact ordinary animation update succeeds");
+        }
+        RecordingRenderer ended;scene->render(ended);
+        require(std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),101)==ended.spriteOrder.end(),
+            "wall impact retires after sixteen source animation updates");
     }
     {
         auto game=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
