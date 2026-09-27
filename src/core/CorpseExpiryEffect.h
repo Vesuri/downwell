@@ -1,16 +1,13 @@
 #ifndef DOWNWELL_CORE_CORPSE_EXPIRY_EFFECT_H
 #define DOWNWELL_CORE_CORPSE_EXPIRY_EFFECT_H
-#include "RunnerSpriteChange.h"
-#include "UnitSequenceFrames.h"
+#include "NonLoopSpriteAnimation.h"
 namespace downwell {
 // Object 242 (fxJobutsu), parent 219 (parentNoloopFx). No Step event,
 // TimeStopBound, movement or Create RNG. Ordinary sprite drawing, not drawFx.
-struct CorpseExpiryEffect {
+struct CorpseExpiryEffect:NonLoopSpriteAnimation {
     std::uint32_t drawBirth=0; // Shared depth -1000 insertion order, assigned by world owner.
-    RunnerImageValue x{},y{},timeline{},imageIndex{},imageSpeed{0x3e99999au};
-    int spriteId=102;
-    unsigned frames=12;
-    bool valid=true,destroyRequested=false;
+    RunnerImageValue x{},y{};
+    CorpseExpiryEffect(){imageSpeed={0x3e99999au};spriteId=102;frames=12;}
     bool create(MotionBinary64 px,MotionBinary64 py){
         CorpseExpiryEffect next;
         next.valid=next.x.assign(px)&&next.y.assign(py);
@@ -19,30 +16,7 @@ struct CorpseExpiryEffect {
     // Caller supplies verified normal, consecutive unit-key sprite metadata.
     // Preserve source setter semantics and publish changed collision bounds.
     template<class Publish> bool setSprite(int id,unsigned count,Publish publish){
-        if(!valid)return false;
-        RunnerSpriteChange::Result change;
-        if(!count || !RunnerSpriteChange::plan(spriteId,id,imageIndex,count,change)){
-            valid=false;return false;
-        }
-        if(!change.changed)return true;
-        spriteId=id;frames=count;
-        if(change.resetIndex)imageIndex={};
-        if(change.resetTimeline)timeline={};
-        valid=publish(*this);return valid;
-    }
-    // Animation is scheduled before Begin Step. Parent Other 7 kills the
-    // instance on the first wrap; no separate age counter or freeze branch.
-    bool advanceImage(){
-        if(!valid)return false;
-        if(destroyRequested)return true;
-        bool crossed=false;
-        valid=UnitSequenceFrames::advance(timeline,imageSpeed,frames,imageIndex,crossed);
-        if(valid&&crossed)destroyRequested=true;
-        return valid;
-    }
-    unsigned drawFrame()const{
-        const unsigned exponent=(imageIndex.bits>>23)&255u;
-        return exponent<127?0:((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);
+        return NonLoopSpriteAnimation::setSprite(id,count,[&](const auto&){return publish(*this);});
     }
 };
 }

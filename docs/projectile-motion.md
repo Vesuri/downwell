@@ -147,6 +147,14 @@ speed 0.5. The operation adapter deliberately does not allocate or draw:
 runtime ownership, global animation scheduling and depth-zero painter order
 must accompany live integration. `make verify-effect-spawn` checks the VM
 contract and initialization's publication/failure boundaries.
+`NonLoopSpriteAnimation` supplies the common sprite-change and Animation End
+state machine, also used by the live corpse-expiry child. Its admitted advance
+path requires verified nonempty unit-key sprite metadata. After the muzzle
+script installs its one-frame sprite and speed, the first animation update
+reaches index 0.5 without retirement; the second wraps to zero and requests
+destruction. Owners must exclude Step-born effects from the already-started
+animation phase; a two-tick state machine alone does not establish that global
+ordering or the effect's Draw order.
 
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
