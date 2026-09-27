@@ -6,6 +6,11 @@
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayerInstances.h"
 #include "core/PackedRoomLayerLoader.h"
+#include "core/RunnerLayerBackground.h"
+bool compileLayerBackground(const downwell::PackedRoomLayer& source,downwell::RunnerLayerBackground& out){
+    if(!downwell::RunnerLayerBackground::create(source,out))return false;
+    out.initialize();return out.initialized;
+}
 #include "core/RoomLoader.h"
 bool compileRoomPreparation(downwell::InstanceStore<4>& store){
     return downwell::RoomLoader<4>::enterChecked(store,1,nullptr,0,false,

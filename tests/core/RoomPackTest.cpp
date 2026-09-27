@@ -1,6 +1,7 @@
 #include "core/RoomPack.h"
 #include "core/PackedRoomLoader.h"
 #include "core/PackedRoomLayerLoader.h"
+#include "core/RunnerLayerBackground.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -158,6 +159,31 @@ void testBackgroundDecode(){
     require(downwell::RoomPack(bytes.data(),bytes.size()).error()==downwell::RoomPackError::unsupportedVersion,"old layer payload format is rejected");
 }
 
+void testBackgroundConstruction(){
+    for(unsigned alpha=0;alpha<256;++alpha)for(unsigned flags=0;flags<32;++flags){
+        downwell::PackedRoomLayer source{};source.type=1;
+        source.backgroundSpriteId=alpha&1?740:-1;
+        source.backgroundFlags=flags;source.backgroundColor=(alpha<<24)|0x123456u;
+        source.backgroundFirstFrame=1.5f;source.backgroundAnimationSpeed=15.f;
+        source.backgroundAnimationSpeedType=1;
+        downwell::RunnerLayerBackground background;
+        require(downwell::RunnerLayerBackground::create(source,background),"background construction");
+        const float expected=float(alpha)/255.f;unsigned bits;std::memcpy(&bits,&expected,4);
+        require(background.alpha.bits==bits&&background.color==0x123456u&&background.flags==flags&&
+            background.spriteId==source.backgroundSpriteId&&background.firstFrame.bits==0x3fc00000u&&
+            background.speed.bits==0x41700000u&&background.speedType==1&&
+            background.scaleX.bits==0x3f800000u&&background.scaleY.bits==0x3f800000u&&!background.initialized,
+            "source color split, float alpha, flags, animation and unit scale");
+        background.initialize();background.initialize();
+        require(background.initialized&&background.spriteId==source.backgroundSpriteId&&background.alpha.bits==bits,
+            "background initialization is idempotent and retains sprite-less payload");
+        source.type=2;
+        require(!downwell::RunnerLayerBackground::create(source,background)&&background.initialized,"wrong type leaves output unchanged");
+        source.type=1;source.backgroundFlags=32;
+        require(!downwell::RunnerLayerBackground::create(source,background)&&background.initialized,"unknown flags leave output unchanged");
+    }
+}
+
 void testValidation() {
     std::vector<std::uint8_t> bytes = makePack();
     bytes[0] = 'X';
@@ -307,6 +333,9 @@ void testGeneratedPack(const char* path) {
         downwell::PackedRoomLayer layer;require(pack.layer(i,layer),"generated layer decode");
         if(layer.type==2){++instanceLayers;continue;}
         ++backgroundLayers;
+        downwell::RunnerLayerBackground background;
+        require(downwell::RunnerLayerBackground::create(layer,background)&&background.alpha.bits==0x3f800000u,
+            "every recovered background constructs with original opaque alpha");
         require(layer.backgroundFlags==1&&layer.backgroundFirstFrame==0&&layer.backgroundAnimationSpeedType==0,
             "original background flags and animation start");
         if(layer.backgroundSpriteId==740){
@@ -431,6 +460,7 @@ void testLayerStartup(){
 int main(int argc, char** argv) {
     testDecode();
     testBackgroundDecode();
+    testBackgroundConstruction();
     testValidation();
     testPackedRoomLoader();
     testLayerStartup();

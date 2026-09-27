@@ -729,6 +729,16 @@ publishes this metadata but still reserves only instance elements; background
 element construction and Draw remain integration work. No original asset
 payloads are included in the committed extraction tools.
 
+`RunnerLayerBackground` models payload construction at `0x413bc9..0x413cb7`:
+unit binary32 scales, separate low-24-bit color and binary32 alpha (high byte
+divided by 255), original flags, sprite ID and unconverted animation fields.
+It retains sprite-less backgrounds; a missing sprite does not skip creation.
+The type-1 initialization jump at `0x412e9e` targets `0x41306b`, which only sets
+the initialized byte. All 256 alpha values and 32 flag combinations are tested,
+and all 24 recovered backgrounds construct through this shared representation.
+This does not yet allocate/link background elements, consume their source IDs,
+advance animation or implement Draw; those remain owner integration work.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

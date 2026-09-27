@@ -48,7 +48,13 @@ for room in room_offsets:
 assert len(loaded_ids) == 132 and max(loaded_ids) == 131
 assert region(0x7fe384, 6) == b"depth\0"
 assert struct.unpack("<d", region(0x7fcc90, 8))[0] == 20.0
+assert struct.unpack("<f", region(0x7fcc98, 4))[0] == 255.0
 for start, end, digest in (
+    # Background payload: unit scales, raw animation copies, RGB/alpha split;
+    # type-1 initialization jumps directly to the initialized-flag write.
+    (0x413bc9, 0x413cb7, "fa67f36f83e09cdde02dc70cf91e79b181401c26aff8b396bd6e3f32a05a7075"),
+    (0x412e87, 0x412ea5, "564d689d3aeb5eb9c7ca8a807e233508db07d9e430f750fb4622c875460b0fb1"),
+    (0x41306b, 0x413094, "736ffe601f01900f0099b8d051282087c2f097432977eea3941422de1b2a397d"),
     # Global instance-ID buckets: 512 head/tail pairs, tail insertion and
     # ascending-bucket traversal used by room layer initialization.
     (0x401290, 0x4012c6, "c9627d4fbfafea1880f69ed1f7c7c3870cb314cab4795ad383412e5e64abd9a3"),
