@@ -107,11 +107,13 @@ Membership must be reconciled before this pass begins. Original room entry
 dispatches Room Start (event 7/4) at `0x5107f8`, then calls reconciliation at
 `0x510813` and cleanup at `0x510820`; that range is pinned by the verifier.
 The stored runtime publishes membership after its room-start sequence too.
-Builder children are materialized before the builder Step returns, so its
-phase-end reconciliation can demote dormant births. Deferring these births
+Builder children are materialized at each emission callback before the builder
+continues to the next cell, so phase-end reconciliation can demote dormant births
+and a failed publication stops generation immediately. Deferring these births
 until after End Step incorrectly leaves them on the next active animation list.
-This phase-boundary correction does not yet make every builder child Create
-synchronous at its original cell's individual call site.
+The shared builder still prepares supported scalar Create fields/RNG before
+the publication callback; this does not establish original registration-before-
+Create ordering for every field, child dependency or future object family.
 
 ## Sequence loop recovery (supersedes the tentative legacy binding)
 

@@ -1111,25 +1111,18 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
                 return runtime->registerShop(command.x, command.y) != nullptr;
             if (command.objectId == 82 && !runtime->run_.adoptTimeField(
                 command.x,command.y,command.timeFieldRadiusWord()))return false;
-            if (command.objectId == 62 || command.objectId == 306) {
-                // Materialize Create before the later camera Step, retaining
-                // prior queued instances' creation order and the real record.
-                if (!runtime->deferredInstances_.enqueueCreate(command)) return false;
-                runtime->flushDeferredInstances(runtime->instances_, runtime->roomId_);
-                return runtime->deferredCommandsSucceeded_;
-            }
-            return runtime->deferredInstances_.enqueueCreate(command);
+            // Publish each child before the builder continues to the next
+            // cell. Even ordinary terrain/actor births can fail or affect
+            // instance queries; a pattern-end batch changes that ordering.
+            if (!runtime->deferredInstances_.enqueueCreate(command)) return false;
+            runtime->flushDeferredInstances(runtime->instances_, runtime->roomId_);
+            return runtime->deferredCommandsSucceeded_&&runtime->run_.effectsSucceeded;
         },
         this, result);
     if (!generated) {
         deferredCommandsSucceeded_ = false;
         return;
     }
-    // Materialize this Step's children before phase-end reconciliation. Leaving
-    // them queued until after End Step gives dormant births an extra animation
-    // tick in the next frame's still-active room list.
-    flushDeferredInstances(instances_,roomId_);
-    if(!deferredCommandsSucceeded_||!run_.effectsSucceeded)return;
     instance.y = areaOneBuilder_.y();
     syncMainBuilderState();
 }
