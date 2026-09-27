@@ -1048,7 +1048,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         return;
 
     // The first operation in recovered objPlayer_n Begin Step, before motion.
-    mainEnemiesActivated_ += advanceMainRoomActivation(mainActivationY_,
+    const auto activation = advanceMainRoomActivationChecked(mainActivationY_,
         mainCameraMotion_.viewBottomQ12() / 16, instances_.size(),
         [this](unsigned index) {
             const auto& enemy = instances_.at(index);
@@ -1068,8 +1068,10 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         [this](unsigned index) {
             // The frontier enumerates live slots without structural mutation.
             // Use the request boundary; membership is reconciled after Begin Step.
-            instances_.requestActivation(instances_.handleAt(index),true);
+            return instances_.requestActivation(instances_.handleAt(index),true);
         });
+    mainEnemiesActivated_ += activation.activated;
+    if(!activation.succeeded){run_.effectsSucceeded=false;return;}
 
     const bool wasGrounded = mainPlayerMotion_.grounded();
     const unsigned priorShots = mainPlayerMotion_.shots();

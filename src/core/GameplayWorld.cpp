@@ -555,7 +555,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.results.beginStep(input);
     // objPlayer_n Begin Step advances activatey once, before gravity/motion.
     // Native camera offsets map to world view bottom 318 + cameraY.
-    downwell::advanceMainRoomActivation(activationY_,
+    const auto activation = downwell::advanceMainRoomActivationChecked(activationY_,
         318L * 256L + viewCameraYQ8(), enemyCount_,
         [this](unsigned i) {
             const auto& enemy = enemies_[i];
@@ -570,7 +570,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         [this](unsigned i) {
             enemies_[i].active = true;
             enemies_[i].activationPending = false;
+            return true;
         });
+    if(!activation.succeeded){run_.effectsSucceeded=false;return {};}
     // scrPlayerShootN captures instance x/y before this Begin Step moves xx/yy.
     const int muzzleX = (int)downwell::roundGameMakerQ8(player_.offsetXFixed());
     const int muzzleY = (int)downwell::roundGameMakerQ8(player_.offsetYFixed()) + 4;

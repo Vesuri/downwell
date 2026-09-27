@@ -18,10 +18,13 @@ struct ActivationInstance {
 // Windows 0x52d040 includes equality at region right/bottom. In this build's
 // compatibility mode the runner's mask upper edges are inclusive; ContactBounds
 // stores them plus one, hence >0 on those edges but <= on left/top below.
+struct MainRoomActivationResult { bool succeeded; unsigned activated; };
+// Failure retains the advanced frontier and completed activations. The caller
+// must latch it and stop the frame, not retry a partially published region.
 template<class Read, class Activate>
-unsigned advanceMainRoomActivation(int& activationY, long viewBottomQ8,
+MainRoomActivationResult advanceMainRoomActivationChecked(int& activationY, long viewBottomQ8,
                                    unsigned count, Read read, Activate activate) {
-    if (viewBottomQ8 <= (activationY - 112L) * 256L) return 0;
+    if (viewBottomQ8 <= (activationY - 112L) * 256L) return {true,0};
     activationY += 16;
     unsigned activated = 0;
     for (unsigned i = 0; i < count; ++i) {
@@ -33,11 +36,17 @@ unsigned advanceMainRoomActivation(int& activationY, long viewBottomQ8,
             instance.bounds.left < instance.bounds.right && instance.bounds.top < instance.bounds.bottom &&
             instance.bounds.left <= 480 && instance.bounds.right > 0 &&
             instance.bounds.top <= activationY && instance.bounds.bottom > 0) {
-            activate(i);
+            if (!activate(i)) return {false,activated};
             ++activated;
         }
     }
-    return activated;
+    return {true,activated};
+}
+template<class Read, class Activate>
+unsigned advanceMainRoomActivation(int& activationY, long viewBottomQ8,
+                                   unsigned count, Read read, Activate activate) {
+    return advanceMainRoomActivationChecked(activationY,viewBottomQ8,count,read,
+        [&](unsigned i){activate(i);return true;}).activated;
 }
 } // namespace downwell
 #endif

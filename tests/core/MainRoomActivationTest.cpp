@@ -59,5 +59,26 @@ int main() {
     require(downwell::advanceMainRoomActivation(frontier, 300000L * 256, 0,
                 read, activate) == 0 && frontier == 300000,
             "empty stores still advance and serialized room coordinates fit 32 bits");
+    for(unsigned failure=0;failure<5;++failure) {
+        frontier=0;unsigned visited=0,attempts=0,committed=0;
+        const unsigned candidates[]={1,4,5,8,9};
+        const auto result=downwell::advanceMainRoomActivationChecked(frontier,318L*256,10,
+            [&](unsigned i){++visited;return edges[i];},[&](unsigned i){
+                require(i==candidates[attempts],"checked activation retains candidate order");
+                if(attempts++==failure)return false;
+                committed|=1u<<i;return true;
+            });
+        unsigned expected=0;
+        for(unsigned i=0;i<failure;++i)expected|=1u<<candidates[i];
+        require(!result.succeeded && result.activated==failure && attempts==failure+1 &&
+                visited==candidates[failure]+1 && frontier==16 && committed==expected,
+                "failed activation stops traversal and retains only completed writes plus frontier");
+    }
+    frontier=0;
+    const auto noCross=downwell::advanceMainRoomActivationChecked(frontier,-112L*256,10,
+        [&](unsigned){require(false,"no-crossing must not read");return edges[0];},
+        [&](unsigned){require(false,"no-crossing must not publish");return false;});
+    require(noCross.succeeded && !noCross.activated && !frontier,
+            "checked view equality remains a successful no-op");
     std::cout << "shared main room activation tests passed\n";
 }
