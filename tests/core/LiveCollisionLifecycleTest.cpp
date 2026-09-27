@@ -592,6 +592,32 @@ int main(){
         require(!step()&&world->randomDrawCount()==failedDraws+24&&world->nextRuntimeInstanceId()==failedId+4,
             "failed transition cannot restart through a later Begin Step");
     }
+    for(int beyond:{0,1}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach shard cached-view world");world->skipToGameForTesting();
+        for(unsigned tick=0;tick<60;++tick)world->step(Input{},false);
+        require(world->effectsSucceeded(),"reach a naturally descending camera for shard boundary test");
+        TimeStopEffects<16> state;auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
+        require(state.shards.bindPhases(shards)&&state.changes.bind(changes),"bind cached-view shard families");
+        const int oldView=world->mainCameraRenderViewY();
+        auto edge=MotionBinary64::fromInteger(oldView);
+        if(beyond)require(edge.add(RunnerImageValue{0xbe800000u}.promoted()),"quarter-pixel outside edge");
+        RunnerImageValue y;
+        require(y.assign(edge)&&
+            world->emitTimeShards(state.burst,state.shards,{0x43700000u},y,{},{},false),
+            "create real registered shards at the strict outOfView upper edge");
+        const auto id=state.shards.sourceId(1);
+        require(world->stepWithTimeStopEffects(shards,changes,state,Input{})&&
+            world->mainCameraRenderViewY()>oldView,"camera moves before the shard Step boundary check");
+        require(world->instance(id)&&world->instance(id)->destroyRequested==(beyond!=0)&&
+            state.shards.size()==(beyond?0u:3u),
+            "shard Step preserves cached-view equality and destroys only strictly beyond it");
+        require(world->cleanupDestroyed(shards,changes,state,[](auto,const auto&){return false;}),
+            "cached-view shard cleanup preserves ordinary deferred destruction");
+        require(bool(world->instance(id))==(beyond==0)&&state.reset(),
+            "cached-view shard ownership remains valid through cleanup and teardown");
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

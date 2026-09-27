@@ -42,6 +42,13 @@ relative coordinates subtract the fixed (240,176) world origin, not a new
 camera position. Crawler alarms retain their earlier phase's view too.
 A horizontal crossing regression places a frog outside the old shaft view
 and inside the upcoming side view: integration starts only next update.
+The stored world's scoped time-shard scheduler also reads this snapshot.
+`fxTimeShard` calls `outOfView(0,320)` against its published binary32 y before
+writing rounded private yy back to y; unlike `scrBulletOov`, this helper does
+not add view height. Equality at either edge survives. The live registration
+test compares equality with a quarter-pixel outside during natural descent,
+including the destroy mark and subsequent cleanup. This validates the existing
+host scheduler, not production time-stop ownership on both platforms.
 Rendering still follows the
 final camera position, preserving immediate visual collision snaps and native
 ring-scroll deltas. This is not a complete camera manager: explicit camera

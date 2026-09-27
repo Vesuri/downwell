@@ -1156,7 +1156,9 @@ bool StartupRuntime::timeShardOutsideView(RunnerImageValue publishedY,bool& reti
     // The script only destroys in rmMain; other rooms have no retirement.
     if(!run_.effectsSucceeded)return false;
     if(roomId_!=mainRoomId){retire=false;return true;}
-    const auto view=MotionBinary64::fromInteger(mainCameraRenderViewY());int order;
+    // Called by the scoped shard Step dispatcher after camMain's Step. The
+    // getter still sees the previously published view, not camMain's new y.
+    const auto view=MotionBinary64::fromInteger(ordinaryStepViewTopQ12_ / 4096);int order;
     if(!compareRunnerReal(publishedY.promoted(),view,order)){run_.effectsSucceeded=false;return false;}
     if(order<0){retire=true;return true;}
     auto bottom=view;

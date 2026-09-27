@@ -22,6 +22,8 @@ for name, digest in (
     ("gml_Object_enmSnake_Step_0.asm", "690662b8e7584558e39c3f785ae875fb00ed16be334c2f8d1116d8b08e5b37d0"),
     ("gml_Object_enmGroundTurtle_Step_0.asm", "0fd08eea84b434ed58aa0dee3bc2ae4157e95493d41bd27699f0371cdabc5161"),
     ("gml_Object_enmCrawler_Step_0.asm", "0d566dfa4ce1ad04c0fbfe85ffd6afb96b24040406d9746b73a60acbdcf901e0"),
+    ("gml_GlobalScript_outOfView.asm", "3e5f05e4af17e1ad76e707bc326648595c927dfdc3fe3f2832cf8da4ad1444fd"),
+    ("gml_Object_fxTimeShard_Step_0.asm", "ffc9df3254393892f836845f420fb92b601704d5419987fb2ce4a795fddd6e3b"),
 ):
     assert sha256((assembly / name).read_bytes()).hexdigest() == digest, name
 for start, end, digest in (

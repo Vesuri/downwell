@@ -111,7 +111,7 @@ Reference: [area-two recovery](area-two-recovery.md).
 - Audit remaining event ordering, fractional collisions, activation boundaries,
   time-stop/feedback, special camera modes and overlapping camera lockers.
   Finish remaining phase-aware published-view reads, including camera dirty
-  setters, initial room publication and time-shard queries; see
+  setters, initial room publication and native time-effect queries; see
   [runner camera view](runner-camera-view.md).
 - Replace approximate live animation where original float/sequence behavior
   changes observable frames or event timing. Cover relevant sprite/index writes;
