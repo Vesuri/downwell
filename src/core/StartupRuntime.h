@@ -135,6 +135,31 @@ public:
     bool playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,InstancePlaceResult& result);
     bool playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit);
     bool playerOutsideTimeStopSides(MotionBinary64 x,bool& outside);
+    // Scoped alarm ownership for one ordinary world tick. No borrowed callback
+    // survives the call (or a later copy/reset of this runtime). Other shard
+    // phases and player transitions are not supplied by this alarm adapter.
+    template<unsigned Capacity,unsigned Registered,unsigned Changes> bool stepWithTimeStopAlarms(
+        StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
+        StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
+        const Input& input,bool advancePressed=false){
+        if(!run_.effectsSucceeded)return false;
+        if(timeStopAlarmDispatch_||!state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
+            !shards.belongsTo(instances_)||!changes.belongsTo(instances_)||
+            !state.shards.phasesBoundTo(shards)||!state.changes.boundTo(changes)){
+            run_.effectsSucceeded=false;return false;
+        }
+        auto dispatch=[&](InstanceRecord& record,unsigned index){
+            return record.objectId==238?shards.dispatchAlarm(record,state.shards,index):
+                changes.dispatchAlarm(record,state.changes,index,state.roomSpeed);
+        };
+        timeStopAlarmContext_=&dispatch;
+        timeStopAlarmDispatch_=[](void* context,InstanceRecord& record,unsigned index){
+            return (*static_cast<decltype(dispatch)*>(context))(record,index);
+        };
+        step(input,advancePressed);
+        timeStopAlarmDispatch_=nullptr;timeStopAlarmContext_=nullptr;
+        return run_.effectsSucceeded;
+    }
     // Explicit Begin Step boundary; the scheduler supplies synchronous audio,
     // shake, pause and oxygen effects. Registrations must
     // outlive the effect owner and be retired before room teardown.
@@ -505,6 +530,8 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     InstanceLifecycleBinding lifecycle_;
+    void* timeStopAlarmContext_=nullptr;
+    bool (*timeStopAlarmDispatch_)(void*,InstanceRecord&,unsigned)=nullptr;
     const RoomPack* roomPack_ = nullptr;
     const ObjectPack* objectPack_ = nullptr;
     // Object event bindings are immutable. Cache inherited alarm masks, not

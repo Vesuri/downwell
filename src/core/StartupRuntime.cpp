@@ -1357,6 +1357,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(eventType==2&&(instance.objectId==211||instance.objectId==238)&&timeStopAlarmDispatch_){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=timeStopAlarmDispatch_(timeStopAlarmContext_,instance,unsigned(eventSubtype));
+        return run_.effectsSucceeded;
+    }
     executeCode(&instance, event.codeId, advancePressed);
     return true;
 }

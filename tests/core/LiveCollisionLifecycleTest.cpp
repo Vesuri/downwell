@@ -347,6 +347,40 @@ int main(){
         require(!step()&&world->randomDrawCount()==failedDraws+24&&world->nextRuntimeInstanceId()==failedId+4,
             "failed transition cannot restart through a later Begin Step");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach live alarm-routing world");world->skipToGameForTesting();
+        TimeStopEffects<16> state;auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
+        require(state.shards.bindPhases(shards)&&state.changes.bind(changes),"bind live alarm families");
+        require(world->createTimeChange(changes,state.changes,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),
+            state.roomSpeed,[](unsigned){return true;}),"live routed time change");
+        require(world->emitTimeShards(state.burst,state.shards,{0x43700000u},{0x43300000u},{},{},false),"live routed shards");
+        const auto changeId=state.changes.sourceId(1),shardId=state.shards.sourceId(1);
+        const auto lifetime=world->instance(shardId)->alarms.get(0);
+        for(unsigned tick=1;tick<=14;++tick){
+            require(world->stepWithTimeStopAlarms(shards,changes,state,Input{}),"normal world tick dispatches registered alarms");
+            require(state.roomSpeed==int(tick<12?30+5*(tick/2):60)&&
+                world->instance(shardId)->alarms.get(0)==lifetime-int(tick)&&
+                world->instance(changeId)->destroyRequested==(tick==14),
+                "live world alarm counters advance once and execute recovered time-change ramp");
+        }
+        require(world->cleanupDestroyed(shards,changes,state,[](auto,const auto&){return false;})&&!world->instance(changeId),
+            "live routed expiry awaits normal explicit cleanup");
+        require(state.reset(),"retire live alarm test owners");
+        world->step(false);
+        require(world->effectsSucceeded(),"ordinary world step retains no scoped alarm callback");
+        auto foreignRegistration=world->timeChangeRegistration<1>();TimeChangeEffects<1> foreignChanges;int foreignSpeed=60;
+        require(foreignChanges.bind(foreignRegistration)&&world->createTimeChange(foreignRegistration,foreignChanges,{},{},
+            foreignSpeed,[](unsigned){return true;}),"unrouted family lifetime fixture");
+        const auto foreignId=foreignChanges.sourceId(1);
+        require(world->stepWithTimeStopAlarms(shards,changes,state,Input{}),"unrouted lifetime has not fired yet");
+        require(!world->stepWithTimeStopAlarms(shards,changes,state,Input{})&&!world->effectsSucceeded()&&
+            world->instance(foreignId)->alarms.get(0)==0&&world->instance(foreignId)->alarms.get(1)==1,
+            "missing registered alarm owner stops phase before later counter changes");
+        require(!world->stepWithTimeStopAlarms(shards,changes,state,Input{})&&
+            world->instance(foreignId)->alarms.get(1)==1,"failed live alarm dispatch cannot be retried");
+    }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
     {
         auto shardOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
