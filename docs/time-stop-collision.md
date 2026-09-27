@@ -1055,7 +1055,7 @@ only round-tripping key arithmetic.
 enemy/box coordinates through the native (240,176) origin, preserves player
 world coordinates and inactive flags, applies compatibility creation depth and
 the available native sprite/mask/transform fields, and publishes initial bounds.
-Installed move, sprite, image-index, transform, activation, membership and
+Installed move, sprite, mask, image-index, transform, activation, membership and
 retirement callbacks subsequently mutate the same owner; no per-frame rebuilding
 or copied `InstanceRecord` registry is involved. Attach must identify the exact
 world whose player was registered during construction. Later callbacks validate
@@ -1069,6 +1069,13 @@ still need migration. Tests bind real worlds and resources and cover dormant
 births, published movement/art, compaction, clear/Retry, unrelated-world rejection
 and copied-record failure. This establishes ownership at existing boundaries,
 not complete native collision fidelity or an A500 memory-fit claim.
+
+The enemy binding includes the explicit mask setter: flying bat Step copies
+`sprite_index` to `mask_index` after choosing 153 (flight) or 154 (hit), as shown
+in `gml_Object_enmBat_Step_0.asm` blocks 59–63. A live bullet-hit test exercises
+all three stun ticks and recovery, checking the maintained mask independently
+of artwork. Falling back to the current sprite while leaving mask ID -1 would
+miss this state change even when a single-frame collision looked equivalent.
 
 The shared immediate bullet/stomp response adapters provide a checked retirement
 callback after rewards and before clearing the active flag or publishing defeat

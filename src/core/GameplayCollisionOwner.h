@@ -95,6 +95,9 @@ private:
                 sprite,parent.sprites_,*parent.families_.flags(object(r))));}
         bool imageIndex(InstanceHandle local,const Record& r,RunnerImageValue value){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.writeImageIndex(h,parent.properties_[h.slot].sprite,value));}
+        bool mask(InstanceHandle local,const Record& r,int value){InstanceHandle h;
+            return key(local,r,h)&&parent.check(parent.owner_.changeMask(h,parent.properties_[h.slot].sprite,
+                value,*parent.families_.flags(object(r))));}
         bool transform(InstanceHandle local,const Record& r,RunnerTransformField field,RunnerImageValue value,
             RunnerImageValue alpha,std::uint32_t blend){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.changeTransform(h,parent.properties_[h.slot].sprite,
@@ -116,7 +119,7 @@ public:
         world_=&world;return true;
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
-    auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindTransforms(enemies_);}
+    auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMasks(enemies_);}
     auto breakableBinding(){return GameplayWorld::BreakableLifecycleBinding::bindMovement(boxes_);}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}

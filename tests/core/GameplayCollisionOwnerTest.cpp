@@ -43,5 +43,30 @@ int main(){
     auto copy=*world->findPlayer(world->playerHandle());
     assert(!owner->playerBinding().integerPosition(world->playerHandle(),copy,1,2)&&!owner->valid());
     world->step(0);assert(!world->effectsSucceeded());
+    {
+        auto masks=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto batWorld=std::make_unique<GameplayWorld>(300,false,1000,false,
+            masks->enemyBinding(),masks->breakableBinding(),masks->playerBinding());
+        assert(masks->attach(*batWorld));
+        batWorld->configureSolidResolver([](void*,int,int){return false;},nullptr);
+        assert(batWorld->configureEnemy(0,116,153,0,12,0,0,15,12,0,0,-1,-1,270,256,true,false,true));
+        const auto bat=batWorld->enemyHandle(batWorld->enemyAt(0).lifetimeId);
+        InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::enemy,bat,shared));
+        assert(masks->properties(shared)->sprite.maskId==-1);
+        batWorld->step(4); // Real surviving bullet hit, not a forced sprite write.
+        assert(batWorld->effectsSucceeded()&&batWorld->enemyAt(0).health==6&&batWorld->enemyAt(0).batHit.pending);
+        for(unsigned frame=0;frame<3;++frame){
+            batWorld->step(0);
+            const auto* p=masks->properties(shared);
+            assert(batWorld->effectsSucceeded()&&p&&p->sprite.spriteId==154&&p->sprite.maskId==154&&
+                batWorld->enemyAt(0).maskId==154);
+        }
+        batWorld->step(0);
+        assert(batWorld->effectsSucceeded()&&masks->properties(shared)->sprite.spriteId==153&&
+            masks->properties(shared)->sprite.maskId==153&&batWorld->enemyAt(0).maskId==153);
+        auto copied=batWorld->enemyAt(0);
+        assert(!masks->enemyBinding().mask(bat,copied,999)&&!masks->valid()&&batWorld->enemyAt(0).maskId==153);
+        batWorld->step(0);assert(!batWorld->effectsSucceeded());
+    }
     std::puts("Native collision owner: real resource births, dormant flags, movement, compaction, retirement and Retry passed");
 }
