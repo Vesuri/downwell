@@ -137,9 +137,11 @@ private:
     Binding<GameplayWorld::EnemyState,View::Kind::enemy> enemies_{*this};
     Binding<GameplayWorld::Breakable,View::Kind::breakable> boxes_{*this};
     Binding<GameplayTerrainInstances::Record,View::Kind::terrain> terrainBinding_{*this};
-    GameplayTerrainInstances terrain_{GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_)};
+    GameplayTerrainInstances terrain_;
 public:
-    GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites):objects_(objects),sprites_(sprites){
+    GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
+        GameplayTerrainInstances::Presentation presentation={}):objects_(objects),sprites_(sprites),
+        terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation){
         good_=sprites.valid()&&families_.bindInstanceFlags(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;

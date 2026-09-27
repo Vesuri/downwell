@@ -1162,6 +1162,18 @@ does not yet make the production collision cache reflect wall retirement.
 Native record-backed composition scans the bounded store for each requested
 strip; production installation still needs measured row indexing and cache
 invalidation for selected-frame changes, not a full-frame repaint workaround.
+The terrain store offers a borrowed checked presentation observer for that
+invalidation. It reports room-coordinate wall centers after accepted first
+frame selection, changed published frames, visibility changes and destruction.
+It includes old/new sprite IDs (-1 for hidden), so the backend can invalidate
+both footprints: most tile/glitch sprites are 16-by-16 at origin 8,8, but
+resource 70 is 32-by-32 at origin 16,16. The source verifier checks that exception.
+Unchanged frame writes and events, hidden walls, post-destruction deactivation
+and physical cleanup do not report redundant damage. A rejected notification
+is terminal but preserves already-published simulation/collision changes.
+Birth drawing and whole-room teardown remain owned by generation/scene reset;
+the observer does not replace them. Native cache repair still needs to consume
+these notifications before production wall dispatch is enabled.
 
 The stored collision owner's production lifecycle binding exposes both shape
 queries and a separate `positionMeeting` point query. The latter has no caller

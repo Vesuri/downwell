@@ -24,7 +24,16 @@ public:
         bool destroyRequested=false;
     };
     using Binding=RecordLifecycleBinding<Record>;
-    explicit GameplayTerrainInstances(Binding binding={}):binding_(binding){}
+    struct Presentation {
+        void* context;
+        bool (*changed)(void*,int,int,int,int); // Center, old/new sprite (-1 means hidden).
+        Presentation(void* p=nullptr,bool (*fn)(void*,int,int,int,int)=nullptr):context(p),changed(fn){}
+        template<class Observer> static Presentation bind(Observer& observer){
+            return {&observer,[](void* p,int x,int y,int before,int after){return static_cast<Observer*>(p)->changed(x,y,before,after);}};
+        }
+        bool notify(int x,int y,int before,int after)const{return !changed||changed(context,x,y,before,after);}
+    };
+    explicit GameplayTerrainInstances(Binding binding={},Presentation presentation={}):binding_(binding),presentation_(presentation){}
     GameplayTerrainInstances(const GameplayTerrainInstances&)=delete;
     GameplayTerrainInstances& operator=(const GameplayTerrainInstances&)=delete;
     bool valid()const{return good_;}
@@ -87,28 +96,37 @@ public:
         // Publish collision exclusion before marking the local record. Keep
         // its address and identity alive through the remainder of the event.
         if(!binding_.markDestroyed(h,r))return good_=false;
-        r.destroyRequested=true;return true;
+        const int before=drawSprite(r);r.destroyRequested=true;
+        return note(r,before,-1,before>=0);
     }
     bool imageIndex(InstanceHandle h,int frame){
         if(!good_||!find(h)||frame<0||frame>15)return good_=false;
         auto& r=records_[h.slot];
+        const bool changed=r.imageIndex!=frame;
         if(!binding_.phaseIndex(h,r,unsigned(frame)*256u))return good_=false;
-        r.imageIndex=frame;return true;
+        r.imageIndex=frame;return note(r,drawSprite(r),drawSprite(r),changed&&r.wall.checked&&visible(r));
     }
     template<class Ops> bool wallEvent(InstanceHandle h,int area,GameMakerRandom& random,Ops& ops){
-        if(!good_||!find(h))return good_=false;
+        if(!good_||dispatching_||!find(h))return good_=false;
         auto& r=records_[h.slot];
         if(!r.active||r.destroyRequested)return true;
         if(r.objectId==99)return true; // Explicit empty End Step override.
         if(r.objectId!=60)return good_=false;
-        if(!wallEndStep(r.wall,area,random,ops))return good_=false;
-        return true;
+        const bool selected=r.wall.checked!=0;
+        const bool wasVisible=visible(r);const int sprite=r.spriteId,frame=r.imageIndex,before=drawSprite(r);
+        dispatching_=true;
+        const bool succeeded=wallEndStep(r.wall,area,random,ops);
+        dispatching_=false;
+        if(!succeeded||!good_)return good_=false;
+        return note(r,before,drawSprite(r),wasVisible!=visible(r)||(visible(r)&&
+            (selected!=(r.wall.checked!=0)||sprite!=r.spriteId||frame!=r.imageIndex)));
     }
     bool activation(InstanceHandle h,bool active){
         if(!good_||!find(h))return good_=false;
         auto& r=records_[h.slot];
+        const int before=drawSprite(r);
         if(!binding_.activation(h,r,active))return good_=false;
-        r.active=active;return true;
+        r.active=active;return note(r,before,drawSprite(r),before!=drawSprite(r));
     }
     // The world scheduler supplies the runner's cross-family cleanup order.
     // Do not invent a terrain-only sweep or retire during the game callback.
@@ -136,6 +154,13 @@ public:
         return good_; // Never reset the generation sequence on Retry.
     }
 private:
+    static bool visible(const Record& r){return r.objectId==60&&r.active&&!r.destroyRequested;}
+    static int drawSprite(const Record& r){return visible(r)?(r.wall.checked?r.spriteId:51):-1;}
+    bool note(const Record& r,int before,int after,bool changed){
+        if(dispatching_)return true; // Coalesce the complete event's visual change.
+        if(changed&&!presentation_.notify(r.x,r.y,before,after))return good_=false;
+        return true;
+    }
     // Metadata comparison only: do not pull floating-point helpers into the
     // freestanding 68000 backend to test known binary32 defaults.
     static std::uint32_t bits(float value){
@@ -143,12 +168,14 @@ private:
         std::memcpy(&result,&value,sizeof(result));return result;
     }
     Binding binding_;
+    Presentation presentation_;
     Record records_[capacity]{};
     unsigned order_[capacity]{}; // Birth order, independent of reusable identity slots.
     unsigned count_=0;
     unsigned freeHint_=0;
     std::uint32_t next_=1;
     bool good_=true;
+    bool dispatching_=false;
 };
 }
 #endif

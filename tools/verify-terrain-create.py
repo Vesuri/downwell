@@ -54,6 +54,10 @@ for i, op in enumerate(init):
         assert init[i-3:i-1] == ["conv.i.v", "pushi.e -5"]
         table.append((int(init[i-1].split()[-1]), int(init[i-4].split()[-1])))
 assert table == list(enumerate((76, 51, 74, 72, 70, 55)))
+for sprite in {76, 51, 74, 72, 70, 55, 52, 53, 57}:
+    art = manifest["resources"]["sprites"][sprite]
+    expected = (32, 32, 16, 16) if sprite == 70 else (16, 16, 8, 8)
+    assert (art["width"], art["height"], art["originX"], art["originY"]) == expected
 header = (root / "src/core/TerrainCreate.h").read_text()
 assert re.search(r"tiles\[\]=\{76,51,74,72,70,55\}", header)
 assert re.search(r"choices\[\]=\{51,52,53,55,57\}", header)

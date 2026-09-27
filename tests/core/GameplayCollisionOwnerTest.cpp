@@ -33,6 +33,15 @@ struct TerrainDestructionAudit:TerrainAudit {
     }
 };
 int main(){
+    {
+        TerrainDestructionAudit lifecycle;
+        struct RejectDamage {unsigned calls=0;bool changed(int x,int y,int before,int after){assert(x==32&&y==48&&before==51&&after==-1);++calls;return false;}} damage;
+        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(lifecycle),
+            GameplayTerrainInstances::Presentation::bind(damage));lifecycle.store=store.get();
+        assert(store->append(60,32,48,true));const auto h=store->handle(0);
+        assert(!store->requestDestroy(h)&&store->find(h)->destroyRequested&&!store->valid()&&damage.calls==1&&lifecycle.destroys==1);
+        assert(!store->activation(h,false)&&!store->retireMarked(h)&&lifecycle.activations==0&&lifecycle.retires==0);
+    }
     for(unsigned failure=0;failure<3;++failure){
         TerrainDestructionAudit audit;audit.rejectDestroy=failure==1;audit.rejectActivation=failure==2;
         auto terrain=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(audit));
@@ -79,7 +88,11 @@ int main(){
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     assert(masks.valid());
     for(bool rejectTile:{false,true}){
-        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        struct Damage {std::vector<std::pair<int,int>> cells;
+            bool changed(int x,int y,int before,int after){assert(before==51&&(after==51||after==-1));cells.push_back({x,y});return true;}
+        } damage;
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation::bind(damage));
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*scene));
@@ -93,6 +106,7 @@ int main(){
         } effects{*scene,rejectTile};
         GameMakerRandom random(123);const auto draws=random.drawCount();
         for(unsigned i=0;i<9;++i)assert(owner->wallEndStepEvent(owner->terrain().handle(i),1,random,masks,effects));
+        assert(damage.cells.size()==9);damage.cells.clear();
         const auto middle=owner->terrain().handle(4);const auto* record=owner->terrain().find(middle);
         assert(record->wall.surrounded&&record->wall.checked==1&&record->wall.lights==0&&record->imageIndex==15&&
             !record->destroyRequested&&effects.tiles==0&&scene->wallBackgroundTiles().size()==0);
@@ -101,6 +115,8 @@ int main(){
             assert(sprite==record->spriteId&&frame==15);++drawn;
         })&&drawn==1);
         assert(owner->wallEndStepEvent(middle,1,random,masks,effects)==!rejectTile&&effects.tiles==1);
+        assert(damage.cells.size()==(rejectTile?0u:1u));
+        if(!rejectTile)assert(damage.cells[0].first==256&&damage.cells[0].second==528);
         assert(random.drawCount()==draws&&record->destroyRequested==!rejectTile&&owner->terrain().find(middle)==record);
         if(!rejectTile)assert(drawWallPresentation(*record,[]{assert(false);return 0u;},
             [](int,unsigned){assert(false);}));
@@ -112,12 +128,14 @@ int main(){
             std::int32_t x,y;const auto* tile=scene->wallBackgroundTiles().at(0);
             assert(tile->x.roundPixel(x)&&tile->y.roundPixel(y)&&x==248&&y==520);
             assert(owner->wallEndStepEvent(middle,1,random,masks,effects)&&effects.tiles==1);
+            assert(owner->terrain().activation(middle,false)&&damage.cells.size()==1);
             assert(owner->cleanupDestroyed([&](InstanceHandle shared,const auto&){
                 GameplayCollisionView::Kind kind;InstanceHandle local;
                 return GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::terrain&&
                     owner->terrain().retireMarked(local);
             }));
             assert(!owner->terrain().find(middle)&&owner->terrain().size()==8&&scene->wallBackgroundTiles().size()==1);
+            assert(damage.cells.size()==1); // Hiding, deactivating, cleanup do not repaint the same wall three times.
         }
     }
     {
