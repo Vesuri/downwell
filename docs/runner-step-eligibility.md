@@ -255,6 +255,23 @@ preserves that binding through Retry. Runtime object rebinding during an
 executing phase and separate effect-family scheduling still require integration
 checks.
 
+`GameplayCollisionOwner::dispatchStepPhase` provides the heterogeneous native
+counterpart using a caller-owned snapshot. It captures registered player,
+terrain, breakable and enemy lifetimes together, sorts by actual object ID and
+registration order, and resolves flags/lifetimes again before each callback.
+Resource lookup retains explicit empty own events (for example object 99's
+End Step 1112 instead of inherited wall code 986). Callbacks execute the selected
+binding; neither unknown handlers nor callback failures are implicit success.
+Capacity failure happens before dispatch, and checked failures latch the owner.
+Do not reuse the supplied snapshot recursively during a callback.
+
+The native scene gate exercises this traversal with a resource-probe callback
+and static workspace. Component tests compose it with actual precise wall
+events and cover reactivation order, same-phase destruction/slot reuse and
+failure cutoff. This is not yet the production End Step scheduler: all live
+handlers and remaining families must be admitted in source order, replacing
+their existing paths rather than adding a second terrain-only pass.
+
 Destruction bit 1 is part of the Step filter `0x100003` at `0x50b8ab`
 and the alarm filter at `0x509dfb`, before alarm decrement. `EventScheduler`
 therefore excludes `destroyRequested` records both at capture and at each
@@ -299,7 +316,7 @@ the gameplay world has not yet adopted the store.
 
 The integration audit found that both existing enemy adapters manually ran
 new builder children immediately after the builder, outside the dispatcher.
-`GameplayWorld` now captures its ordinary-Step enemy count before generation;
+`GameplayWorld` now captures ordinary-Step enemy lifetimes before generation;
 `StartupRuntime` marks records only when visited by ordinary-Step dispatch.
 Their manual enemy Step passes exclude newly created records. Later collision
 processing is not excluded by this flag.

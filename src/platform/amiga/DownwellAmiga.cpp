@@ -1404,17 +1404,26 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_SCENE_VERIFY
         // Exercise the target's actual precise-mask route, not an occupancy
         // answer. This does not replace the legacy live collision adapters.
-        bool testedWall=false,maskChecksSucceeded=true;
-        for(unsigned i=0;i<collisionOwner.terrain().size()&&!testedWall;++i){
-            const auto* wall=collisionOwner.terrain().find(collisionOwner.terrain().handle(i));
-            if(!wall||wall->objectId!=60||!wall->active)continue;
+        // The verification callback probes resources only, not game events.
+        // Keep this full heterogeneous phase workspace off the task stack.
+        using MaskPhase=downwell::RunnerStepSnapshot<downwell::GameplayCollisionView::capacity>;
+        alignas(MaskPhase) static UBYTE maskPhaseStorage[sizeof(MaskPhase)];
+        auto& maskPhase=*new(maskPhaseStorage) MaskPhase;
+        bool testedWall=false;
+        const bool maskChecksSucceeded=collisionOwner.dispatchStepPhase(2,maskPhase,
+            [&](downwell::InstanceHandle shared,const downwell::PackedObjectEvent& event){
+            if(testedWall||event.codeId!=986)return true;
+            downwell::GameplayCollisionView::Kind kind;downwell::InstanceHandle local;
+            if(!downwell::GameplayCollisionView::decode(shared,kind,local)||
+                kind!=downwell::GameplayCollisionView::Kind::terrain)return false;
+            const auto* wall=collisionOwner.terrain().find(local);
+            if(!wall||wall->objectId!=60||!wall->active)return false;
             bool hit=false;
             if(!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(wall->x),
-                downwell::MotionBinary64::fromInteger(wall->y),collisionMasks,hit)||!hit){
-                maskChecksSucceeded=false;break;
-            }
+                downwell::MotionBinary64::fromInteger(wall->y),collisionMasks,hit)||!hit)return false;
             ++gDownwellPreciseMaskChecks;testedWall=true;
-        }
+            return true;
+        });
         bool outside=true;
         if(!maskChecksSucceeded||!testedWall||!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(-10000),
             downwell::MotionBinary64::fromInteger(-10000),collisionMasks,outside)||outside){

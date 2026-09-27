@@ -88,6 +88,66 @@ int main(){
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     assert(masks.valid());
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        // Deliberately interleave registration/storage order across families.
+        for(int object:{99,60,112,93,60})
+            assert(world->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}));
+        const auto first=owner->terrain().handle(1),second=owner->terrain().handle(3);
+        assert(owner->terrain().activation(first,false)&&owner->reconcileActivation());
+        assert(owner->terrain().activation(first,true)&&owner->reconcileActivation());
+        RunnerStepSnapshot<16> snapshot;
+        std::vector<int> codes;std::vector<InstanceHandle> walls;
+        assert(owner->dispatchStepPhase(2,snapshot,[&](InstanceHandle h,const PackedObjectEvent& event){
+            assert(event.eventType==3&&event.eventSubtype==2);
+            codes.push_back(event.codeId);
+            if(event.codeId==986){
+                GameplayCollisionView::Kind kind;InstanceHandle local;
+                assert(GameplayCollisionView::decode(h,kind,local)&&kind==GameplayCollisionView::Kind::terrain);
+                walls.push_back(local);
+            }
+            return true;
+        }));
+        assert((codes==std::vector<int>{848,986,986,1091,1112,1200}));
+        assert(walls.size()==2&&walls[0].slot==second.slot&&walls[1].slot==first.slot);
+        // Object 99's empty own End Step (1112) must NOT inherit wall 986.
+        codes.clear();bool changed=false;InstanceHandle newborn;
+        assert(owner->dispatchStepPhase(2,snapshot,[&](InstanceHandle,const PackedObjectEvent& event){
+            codes.push_back(event.codeId);
+            if(event.codeId==986&&!changed){
+                changed=true;
+                assert(owner->terrain().requestDestroy(first));
+                assert(owner->prepareDraw()); // Exercise physical slot reuse too.
+                assert(world->createGeneratedInstance({60,272,512},objects,[](const auto&){return true;}));
+                newborn=owner->terrain().handle(owner->terrain().size()-1);
+                assert(newborn.slot==first.slot&&newborn.generation!=first.generation);
+            }
+            return true;
+        }));
+        assert(changed&&(codes==std::vector<int>{848,986,1091,1112,1200}));
+        codes.clear();
+        assert(owner->dispatchStepPhase(2,snapshot,[&](InstanceHandle,const PackedObjectEvent& event){
+            codes.push_back(event.codeId);return true;
+        }));
+        assert((codes==std::vector<int>{848,986,986,1091,1112,1200}));
+        unsigned calls=0;
+        assert(!owner->dispatchStepPhase(2,snapshot,[&](InstanceHandle,const PackedObjectEvent&){return ++calls<2;}));
+        assert(calls==2&&!owner->valid());
+        assert(!owner->dispatchStepPhase(2,snapshot,[&](InstanceHandle,const PackedObjectEvent&){++calls;return true;})&&calls==2);
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        assert(world->createGeneratedInstance({60,240,512},objects,[](const auto&){return true;}));
+        RunnerStepSnapshot<1> tooSmall;unsigned calls=0;
+        assert(!owner->dispatchStepPhase(2,tooSmall,[&](InstanceHandle,const PackedObjectEvent&){++calls;return true;}));
+        assert(calls==0&&!owner->valid());
+    }
     for(bool rejectTile:{false,true}){
         struct Damage:AmigaWallDamage<64> {std::vector<std::pair<int,int>> cells;
             bool changed(int x,int y,int before,int after){assert(before==51&&(after==51||after==-1));cells.push_back({x,y});return AmigaWallDamage<64>::changed(x,y,before,after);}
@@ -106,7 +166,14 @@ int main(){
             bool create(int,MotionBinary64,MotionBinary64){assert(false);return false;}
         } effects{*scene,rejectTile};
         GameMakerRandom random(123);const auto draws=random.drawCount();
-        for(unsigned i=0;i<9;++i)assert(owner->wallEndStepEvent(owner->terrain().handle(i),1,random,masks,effects));
+        RunnerStepSnapshot<16> phase;unsigned wallEvents=0;
+        assert(owner->dispatchStepPhase(2,phase,[&](InstanceHandle shared,const PackedObjectEvent& event){
+            if(event.codeId!=986){assert(event.codeId==848);return true;}
+            GameplayCollisionView::Kind kind;InstanceHandle local;
+            assert(GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::terrain);
+            ++wallEvents;return owner->wallEndStepEvent(local,1,random,masks,effects);
+        }));
+        assert(wallEvents==9);
         assert(damage.cells.size()==9&&damage.size()==1);damage.cells.clear();damage.clear();
         const auto middle=owner->terrain().handle(4);const auto* record=owner->terrain().find(middle);
         assert(record->wall.surrounded&&record->wall.checked==1&&record->wall.lights==0&&record->imageIndex==15&&

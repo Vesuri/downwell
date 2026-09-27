@@ -180,6 +180,31 @@ public:
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
     auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMasks(enemies_);}
     auto breakableBinding(){return GameplayWorld::BreakableLifecycleBinding::bindMovement(boxes_);}
+    // Caller owns the phase workspace; a full native snapshot must not live on
+    // the 8 KiB task stack. Capture all registered families, then resolve again
+    // immediately before each event. An empty own event is still dispatched.
+    template<unsigned Capacity,class Execute>
+    bool dispatchStepPhase(unsigned subtype,RunnerStepSnapshot<Capacity>& snapshot,Execute execute){
+        if(!valid()||!world_||subtype>2)return check(false);
+        snapshot.clear();
+        if(!check(owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
+            return resolves(h)&&((state.flags&0x100003u)||snapshot.append(h.slot,h.generation,object));
+        })))return false;
+        snapshot.sort();
+        const unsigned count=snapshot.size();
+        for(unsigned i=0;i<count;++i){
+            const auto h=snapshot.handle(i);
+            const auto* current=owner_.resolve(h);
+            // Destruction/retirement by a preceding callback suppresses this
+            // lifetime; a new occupant of the slot cannot inherit its turn.
+            if(!current||(current->flags&0x100003u))continue;
+            if(!check(resolves(h)))return false;
+            PackedObjectEvent event;
+            if(!objects_.findEvent(owner_.objectId(h),3,int(subtype),event))continue;
+            if(!check(execute(h,event))||!valid())return false;
+        }
+        return true;
+    }
     GameplayTerrainInstances& terrain(){return terrain_;}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
