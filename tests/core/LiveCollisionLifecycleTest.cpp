@@ -269,6 +269,28 @@ int main(){
             preciseHits+=hit;
         }
         require(preciseHits>0,"live shard/player pairs exercise precise-mask overlap");
+        const auto phase=shards.beginPhase();
+        for(unsigned tick=0;tick<30;++tick)shards.advanceAlarm(phase,2);
+        require(shards.succeeded()&&!shards.get(1)->noTouch,"expire fixture shard contact cooldown");
+        struct NoSolidMotion {
+            bool restorePath(InstanceHandle){return false;}
+            bool preparePath(InstanceHandle){return false;}
+            bool engineVelocity(InstanceHandle,RunnerCollisionMotion::Velocity&){return false;}
+        } motion;
+        const auto beforeContactDraws=world->randomDrawCount();unsigned contacts=0;
+        require(owner->executeCollisionPairs(*world,*pairs,eventContext,motion,
+            []{return RunnerCollisionEventContext::RoomState{true,false};},
+            [&](const RunnerCollisionEventContext::Frame& frame){
+                const auto* self=owner->resolve(frame.self);const auto* other=owner->resolve(frame.other);
+                if(!self||!other||frame.code!=2081||self->objectId!=238||other->objectId!=35)return false;
+                for(unsigned h=1;h<=3;++h)if(shards.sourceId(h)==self->instanceId){
+                    ++contacts;
+                    return world->contactTimeShard(registration,shards,h,{},{})&&
+                        shards.get(h)->noTouch&&world->instance(self->instanceId)->alarms.get(2)==5;
+                }
+                return false;
+            })&&contacts==preciseHits&&contacts>0&&world->randomDrawCount()==beforeContactDraws+2*contacts,
+            "source-ordered live pair execution dispatches real shard contacts and exact RNG/cooldown effects");
         const auto tracked=pairs->at(0)->self;
         const auto* beforeFrame=owner->resolve(tracked);
         require(beforeFrame,"snapshot fixture lifetime resolves");

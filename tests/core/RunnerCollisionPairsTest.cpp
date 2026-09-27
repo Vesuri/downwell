@@ -46,6 +46,24 @@ int main(){
     assert(pairs.beginPass());lookups.clear();
     assert(pairs.candidate(c,b,event)&&pairs.finishInstance(c)&&pairs.candidate(b,a,event)&&pairs.seal());
     assert(pairs.at(0)->self.slot==2&&pairs.at(0)->other.slot==1&&pairs.at(1)->other.slot==0);
+    std::vector<unsigned> dispatched;
+    assert(pairs.dispatch([&](auto self,auto other){dispatched.push_back(self.slot*10+other.slot);return true;}));
+    assert((dispatched==std::vector<unsigned>{21,10}));
+    assert(!pairs.dispatch([](auto,auto){assert(false);return true;}));
+    for(unsigned failure=0;failure<3;++failure){
+        RunnerCollisionPairs<3,4> pass;assert(pass.beginPass());
+        auto yes=[](auto,auto,bool& found){found=true;return true;};
+        assert(pass.candidate(a,b,yes)&&pass.candidate(a,c,yes)&&pass.seal());
+        unsigned calls=0;
+        assert(!pass.dispatch([&](auto,auto){
+            ++calls;
+            if(failure==2){assert(!pass.beginPass());return true;}
+            return calls!=failure+1;
+        }));
+        assert(calls==(failure==2?1u:failure+1)&&!pass.succeeded());
+    }
+    RunnerCollisionPairs<3,4> empty;assert(empty.beginPass()&&empty.seal());
+    assert(empty.dispatch([](auto,auto){assert(false);return true;}));
     // Capacity failure preserves the collected prefix, and cannot be reset.
     RunnerCollisionPairs<3,1> full;assert(full.beginPass()&&full.candidate(a,b,event));
     assert(!full.candidate(b,c,event)&&!full.succeeded()&&full.size()==1&&!full.beginPass());

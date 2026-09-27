@@ -6,6 +6,7 @@
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include "RunnerCollisionEventContext.h"
+#include "RunnerCollisionDispatch.h"
 namespace downwell {
 // Resource-backed owner for the stored world. Construct before the runtime,
 // bind its lifecycle before room births, then attach the runtime before Step.
@@ -133,6 +134,31 @@ public:
             [](RunnerImageValue angle,RunnerImageValue& c,RunnerImageValue& s){
                 angle.bits^=0x80000000u;return Trig{}(angle,c,s);
             },hit);
+    }
+    // Execute a sealed source-ordered pass against live lifetime identities.
+    // Motion supplies checked path restoration/preparation and engine velocity;
+    // roomState is reread for EACH event direction. Neither execution callback
+    // may physically retire instances until this captured pass finishes.
+    template<unsigned Pairs,class Motion,class RoomState,class Execute>
+    bool executeCollisionPairs(StartupRuntime& world,RunnerCollisionPairs<capacity,Pairs>& pairs,
+        RunnerCollisionEventContext& context,Motion& motion,RoomState roomState,Execute execute){
+        if(!valid()||runtime_!=&world||!world.effectsSucceeded()||!context.succeeded())return false;
+        struct Ops {
+            StoredWorldCollision& owner;StartupRuntime& world;RunnerCollisionEventContext& context;
+            Motion& motion;RoomState& roomState;Execute& execute;
+            bool overlap(InstanceHandle a,InstanceHandle b,bool& hit){return owner.collisionOverlap(a,b,hit);}
+            bool flags(InstanceHandle h,std::uint32_t& flags){return owner.collisionFlags(h,flags);}
+            bool queueCollision(InstanceHandle h){return owner.queueCollision(h);}
+            bool rollback(InstanceHandle h){return owner.rollbackCollisionPosition(world,h)&&motion.restorePath(h);}
+            bool dispatch(InstanceHandle a,InstanceHandle b){
+                return owner.dispatchCollisionEvent(context,a,b,roomState(),execute)&&world.effectsSucceeded();
+            }
+            bool prepareMotion(InstanceHandle h){return motion.preparePath(h);}
+            bool advanceMotion(InstanceHandle h){RunnerCollisionMotion::Velocity speed;
+                return motion.engineVelocity(h,speed)&&owner.advanceCollisionPosition(world,h,speed);}
+        } ops{*this,world,context,motion,roomState,execute};
+        RunnerCollisionDispatch dispatch;
+        return pairs.dispatch([&](InstanceHandle a,InstanceHandle b){return dispatch.pair(a,b,ops);});
     }
     bool activation(InstanceHandle h,const InstanceRecord& r,bool active){return adapter_.activation(h,r,active);}
     bool membership(InstanceHandle h,const InstanceRecord& r,bool registered){return adapter_.membership(h,r,registered);}

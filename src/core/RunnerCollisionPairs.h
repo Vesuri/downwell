@@ -14,9 +14,9 @@ public:
     unsigned size()const{return count_;}
     const Pair* at(unsigned index)const{return index<count_?&pairs_[index]:nullptr;}
     bool beginPass(){
-        if(!good_||collecting_)return fail();
+        if(!good_||collecting_||executing_)return fail();
         count_=0;for(auto& generation:processed_)generation=0;
-        collecting_=true;return true;
+        collecting_=true;ready_=false;return true;
     }
     template<class HasEvent> bool candidate(InstanceHandle self,InstanceHandle other,HasEvent hasEvent){
         if(!good_)return false;
@@ -38,13 +38,26 @@ public:
     bool seal(){
         if(!good_)return false;
         if(!collecting_)return fail();
-        collecting_=false;return true;
+        collecting_=false;ready_=true;return true;
+    }
+    // 0x5025b6 captures the count and processes append order. Keep the sealed
+    // buffer stable while handlers run; recursive collection is unsupported.
+    // Successful consumption is once-only, and any failure retains its prefix.
+    template<class Dispatch> bool dispatch(Dispatch invoke){
+        if(!good_||!ready_||executing_)return fail();
+        ready_=false;executing_=true;
+        const unsigned limit=count_;
+        for(unsigned i=0;i<limit;++i){
+            const Pair pair=pairs_[i];
+            if(!invoke(pair.self,pair.other)||!good_){executing_=false;return fail();}
+        }
+        executing_=false;return true;
     }
 private:
     bool valid(InstanceHandle h)const{return h.slot<Instances&&h.generation!=0;}
     bool fail(){good_=false;return false;}
     Pair pairs_[Capacity]{};std::uint32_t processed_[Instances]{};
-    unsigned count_=0;bool collecting_=false,good_=true;
+    unsigned count_=0;bool collecting_=false,ready_=false,executing_=false,good_=true;
 };
 }
 #endif

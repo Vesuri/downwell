@@ -147,8 +147,22 @@ The ordinary
 `findEvent` lookup of an exact subtype is not sufficient for collision presence.
 The original routines are pinned by `verify-runner-field-lookup.py`.
 
-This does not yet supply live scheduler wiring, precise overlap dispatch or
-solid response. The pair buffer's completed-instance set models
+`StoredWorldCollision::executeCollisionPairs` consumes a sealed buffer once in
+append order, composing live precise overlap, collision requeueing, authoritative
+position rollback/reapplication and the event context above. The caller supplies
+checked engine-velocity/path operations and fresh room-transition state for each
+event direction. It must defer physical retirement until the captured pass ends.
+Recursive collection or execution fails terminally rather than invalidating the
+buffer; a failed callback preserves completed effects and prevents later pairs.
+
+The live integration fixture collects real shard/player candidates, expires the
+shards' contact cooldown, then executes recovered handler 2081 through this pass.
+It checks precise-hit count, two RNG draws per contact, `noTouch` and alarm 2.
+The fixture rejects any unexpected solid-motion callback rather than supplying
+invented zero velocities. This is explicit pass execution, not automatic normal
+scheduler admission or complete collision-handler coverage on either backend.
+
+The pair buffer's completed-instance set models
 one pass; source counter overflow and concurrent mutation during collection
 are outside its contract. The runner evidence verifier pins these regions.
 
