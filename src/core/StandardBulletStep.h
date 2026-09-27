@@ -33,17 +33,27 @@ inline bool fractionalBulletOutsideView(MachineGunTrajectory::Coordinate y,
 // retained fractional movement; it is not a full VM collision-event scheduler.
 // Healthy observes terminal callback failure, separately from a consumed shot.
 // On failure leave alive untouched and retain only work already completed.
-template<class Random,class Enemy,class Wall,class Healthy>
+template<class Random,class Enemy,class Wall,class Healthy,class PublishInitialization>
 bool stepMachineGunBulletChecked(MachineGunTrajectory& motion,Random& random,
-    Enemy enemy,Wall wall,bool& alive,Healthy healthy) {
+    Enemy enemy,Wall wall,bool& alive,Healthy healthy,PublishInitialization publishInitialization) {
     if(!healthy())return false;
-    motion.initialize(random);
+    if(!motion.initialized){
+        motion.initialize(random);
+        // Both live worlds publish the first-Step angle here, before any
+        // query. Keep this boundary shared when replacing the motion owner.
+        if(!publishInitialization()||!healthy())return false;
+    }
     const ProjectileSegment path(motion);
     bool consumed=enemy(path);
     if(!healthy())return false;
     if(!consumed){consumed=wall(path);if(!healthy())return false;}
     motion.advance();
     alive=!consumed;return true;
+}
+template<class Random,class Enemy,class Wall,class Healthy>
+bool stepMachineGunBulletChecked(MachineGunTrajectory& motion,Random& random,
+    Enemy enemy,Wall wall,bool& alive,Healthy healthy) {
+    return stepMachineGunBulletChecked(motion,random,enemy,wall,alive,healthy,[]{return true;});
 }
 template<class Random,class Enemy,class Wall>
 bool stepMachineGunBullet(MachineGunTrajectory& motion,Random& random,Enemy enemy,Wall wall){
@@ -56,16 +66,22 @@ bool stepMachineGunBullet(MachineGunTrajectory& motion,Random& random,Enemy enem
 // queries and their world origin. Animation runs separately before Begin Step,
 // so a shot created during that phase retains its Create image on this Step.
 // Consumed shots still finish this update; owners retire/compact them afterward.
-template<class Bullet,class Random,class Enemy,class Wall,class Healthy>
+template<class Bullet,class Random,class Enemy,class Wall,class Healthy,class PublishInitialization>
 bool stepMachineGunProjectileChecked(Bullet& bullet,Random& random,Enemy enemy,Wall wall,
-    bool& alive,Healthy healthy,int originY,long viewTopQ12,int viewHeight=284){
+    bool& alive,Healthy healthy,int originY,long viewTopQ12,int viewHeight,PublishInitialization publishInitialization){
     if(!healthy())return false;
     bool moving=false;
-    if(!stepMachineGunBulletChecked(bullet.trajectory,random,enemy,wall,moving,healthy))return false;
+    if(!stepMachineGunBulletChecked(bullet.trajectory,random,enemy,wall,moving,healthy,publishInitialization))return false;
     bullet.x = bullet.trajectory.x.pixel;
     bullet.y = bullet.trajectory.y.pixel;
     alive=!fractionalBulletOutsideView(bullet.trajectory.y,originY,viewTopQ12,viewHeight)&&moving;
     return true;
+}
+template<class Bullet,class Random,class Enemy,class Wall,class Healthy>
+bool stepMachineGunProjectileChecked(Bullet& bullet,Random& random,Enemy enemy,Wall wall,
+    bool& alive,Healthy healthy,int originY,long viewTopQ12,int viewHeight=284){
+    return stepMachineGunProjectileChecked(bullet,random,enemy,wall,alive,healthy,
+        originY,viewTopQ12,viewHeight,[]{return true;});
 }
 template<class Bullet,class Random,class Enemy,class Wall>
 bool stepMachineGunProjectile(Bullet& bullet,Random& random,Enemy enemy,Wall wall,

@@ -760,10 +760,6 @@ void StartupRuntime::updateMainBullets() {
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
         bool alive=false;
-        if(!bullet.trajectory.initialized&&bullet.instance.generation){
-            bullet.trajectory.initialize(random_);
-            if(!publishMainBullet(bullet,true))run_.effectsSucceeded=false;
-        }
         bool succeeded=stepMachineGunProjectileChecked(bullet, random_,
           [this, &bullet](const ProjectileSegment& path) {
             InstanceRecord* enemy = mainBulletEnemyCollision(path);
@@ -797,7 +793,11 @@ void StartupRuntime::updateMainBullets() {
                 return true;
             }
             return false;
-          },alive,[this]{return run_.effectsSucceeded;},0,ordinaryStepViewTopQ12_,surfaceHeight);
+          },alive,[this]{return run_.effectsSucceeded;},0,ordinaryStepViewTopQ12_,surfaceHeight,
+          [this,&bullet]{
+              if(!publishMainBullet(bullet,true))return run_.effectsSucceeded=false;
+              return true;
+          });
         if(succeeded&&!publishMainBullet(bullet,false))succeeded=run_.effectsSucceeded=false;
         if(succeeded&&!alive&&bullet.instance.generation){
             auto* record=instances_.resolve(bullet.instance);

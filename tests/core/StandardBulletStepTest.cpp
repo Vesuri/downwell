@@ -39,6 +39,33 @@ int main() {
             fractionalBulletOutsideView({-67,1048575},0,34*4096L),
             "negative fractional coordinates expire strictly above the upper margin");
     struct Random { unsigned draws = 0; unsigned nextU32() { ++draws; return 0x80000000u; } } random;
+    for(unsigned failure=0;failure<4;++failure){
+        struct Bullet {int x=-1,y=-1;downwell::MachineGunTrajectory trajectory;} bullet;
+        bullet.trajectory.reset(20,10,true);
+        Random rng;bool healthy=failure!=1,alive=true;
+        unsigned publications=0,queries=0;
+        auto publish=[&]{
+            ++publications;
+            require(rng.draws==1&&bullet.trajectory.initialized&&queries==0&&bullet.y==-1,
+                "shared initialization publication precedes queries and coordinate publication");
+            if(failure==3)healthy=false;
+            return failure!=2;
+        };
+        auto query=[&](const auto&){++queries;require(publications==1,"queries follow publication");return false;};
+        const bool ok=downwell::stepMachineGunProjectileChecked(bullet,rng,query,query,alive,
+            [&]{return healthy;},0,0,284,publish);
+        require(ok==(failure==0)&&publications==(failure==1?0u:1u)&&
+            rng.draws==(failure==1?0u:1u)&&queries==(failure==0?2u:0u),
+            "failed initialization callback or health latch forbids subsequent work");
+        if(failure){
+            require(alive&&bullet.x==-1&&bullet.y==-1&&bullet.trajectory.y.pixel==10,
+                "initialization failure retains spread but not movement or alive publication");
+        }else{
+            require(downwell::stepMachineGunProjectileChecked(bullet,rng,query,query,alive,
+                [&]{return healthy;},0,0,284,publish)&&publications==1&&rng.draws==1&&bullet.y==26,
+                "later live updates do not repeat initialization publication or its RNG");
+        }
+    }
     for (int origin : {0, 176}) for (int impact : {0, 1, 2}) {
         struct Bullet {
             int x = -1, y = -1;

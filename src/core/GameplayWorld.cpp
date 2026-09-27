@@ -983,16 +983,6 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             bulletChanged = true;
             const long cameraCentreQ12 = 176L * 4096 + generationCameraY * 16;
             bool alive=false;
-            const bool firstStep=!bullet.trajectory.initialized;
-            if(firstStep&&bulletLifecycle_.hasOwner()){
-                bullet.trajectory.initialize(enemyRandom_);
-                downwell::RunnerImageValue angle;
-                if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
-                    !bulletLifecycle_.transform({bullet.identitySlot,bullet.lifetimeId},bullet,
-                        downwell::RunnerTransformField::angle,angle,{0x3f800000u},0xffffffu)){
-                    run_.effectsSucceeded=false;return {};
-                }
-            }
             if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
                 [this, &bullet](const downwell::ProjectileSegment& path) {
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
@@ -1064,7 +1054,16 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                                     return true;
                     }
                     return false;
-                },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096))return {};
+                },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096,284,
+                [this,&bullet]{
+                    if(!bulletLifecycle_.hasOwner())return true;
+                    downwell::RunnerImageValue angle;
+                    if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
+                        !bulletLifecycle_.transform({bullet.identitySlot,bullet.lifetimeId},bullet,
+                            downwell::RunnerTransformField::angle,angle,{0x3f800000u},0xffffffu))
+                        return run_.effectsSucceeded=false;
+                    return true;
+                }))return {};
             if(bulletLifecycle_.hasOwner()){
                 const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
                 downwell::RunnerImageValue x,y;
