@@ -39,8 +39,8 @@ behavior, both backend integrations and relevant original-game verification.
   Integrate the [source arithmetic contract](projectile-motion.md) with absolute
   room coordinates and original collision-wrapper rounding; replace both live adapters,
   not just their displayed positions.
-  Resolve exceptional right-edge arithmetic and connect non-precise line
-  selection before enabling the source-ordered spatial line path for live bullets.
+  Connect non-precise line selection and ordered setter publication before
+  enabling the source-ordered spatial line path for live bullets.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding

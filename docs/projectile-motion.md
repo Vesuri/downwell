@@ -94,11 +94,20 @@ without turning it into a miss; earlier callbacks are not rolled back.
 
 The original right-edge strip can reach division by zero: e.g. a vertical line
 at X=16.5 against a box ending at X=16 passes the +1 broad-phase gate and then
-divides by zero during right clipping. The current normal/zero implementation
-rejects this case. Original NaN/infinity comparisons and FP-mode assumptions
-must be resolved before enabling this path for live selection. This is not an
-assertion that such a valid source query misses. Narrow-phase candidate
-0x4650b0 remains separate from the tree gate.
+divides by zero during right clipping. Under masked SSE exceptions the result
+is positive/negative infinity, or NaN for 0/0. The final COMISS/JA and
+COMISS/JAE comparisons do not take their rejection branches for unordered
+NaN. `RunnerSpatialLine` substitutes these exact final predicates without
+performing native floating-point division: NaN survives; negative infinity
+requires the remaining start Y to be at least top; positive infinity requires
+start Y to be below extended bottom. This is not an ordinary geometric
+intersection shortcut. Zero-length lines, both vertical directions and
+out-of-bounds endpoints exercise the distinct branches.
+
+The arithmetic model continues to assume nearest-even rounding and masked
+SSE exceptions; verifying the live Windows thread's FP environment remains
+open. Other nonfinite/subnormal/overflow inputs are still rejected explicitly.
+Narrow-phase candidate 0x4650b0 remains separate from the tree gate.
 
 This component is not yet the live trajectory owner: the live Q20/Q32 adapter
 must be replaced together with its collision endpoints, angle consumers,

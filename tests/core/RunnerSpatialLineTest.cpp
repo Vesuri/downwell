@@ -29,9 +29,9 @@ static bool reference(const RunnerSpatialLine& line,RunnerSpatialSplit::Box box,
     }
     if(ex>right){
         float a=right-ex,b=ey-sy,c=ex-sx;
-        a=a*b;if(c==0)return false;a=a/c;ey=ey+a;
+        a=a*b;a=a/c;ey=ey+a;
     }
-    assert(std::isfinite(sy)&&std::isfinite(ey));
+    assert(std::isfinite(sy)); // ey can be NaN or infinity in the right strip.
     hit=!(top>sy&&top>ey)&&!(sy>=bottom&&ey>=bottom);return true;
 }
 static bool candidateReference(RunnerLineArguments args,RunnerSpatialSplit::Box box,bool compatibility){
@@ -68,9 +68,20 @@ int main(){
         }
     }
     // Degenerate vertical line in the source's right+1 broad-phase strip
-    // reaches division by zero. Fail explicitly; do not report a clean miss.
+    // reaches division by zero. Preserve masked-SSE unordered/infinite gates.
     RunnerSpatialLine edge;assert(edge.assign({real(16.5f),real(0),real(16.5f),real(8)}));
-    bool untouched=true;assert(!edge.overlaps({real(0),real(0),real(16),real(16)},untouched)&&untouched);
+    bool edgeHit=false;assert(edge.overlaps({real(0),real(0),real(16),real(16)},edgeHit)&&edgeHit);
+    unsigned edgeCases=0,edgeHits=0,edgeMisses=0;
+    for(float start:{-32.f,-1.f,0.f,1.f,16.f,17.f,32.f})
+    for(float end:{-32.f,-1.f,0.f,1.f,16.f,17.f,32.f})
+    for(float x:{16.f,16.25f,16.5f,16.75f,17.f}){
+        assert(edge.assign({real(x),real(start),real(x),real(end)}));
+        const RunnerSpatialSplit::Box box{real(0),real(0),real(16),real(16)};
+        bool expected=false,actual=false;
+        assert(reference(edge,box,expected)&&edge.overlaps(box,actual)&&actual==expected);
+        ++edgeCases;if(actual)++edgeHits;else ++edgeMisses;
+    }
+    assert(edgeHits&&edgeMisses);
     bool candidate=false;
     assert(RunnerLineBounds::test({real(16.5f),real(0),real(16.5f),real(8)},
         {real(0),real(0),real(16),real(16)},true,false,candidate)&&candidate);
@@ -97,7 +108,14 @@ int main(){
     auto invalid=args;invalid.x1.bits=0x7f800000;
     assert(!tree.queryLine(invalid,[&](unsigned){assert(false);return true;}));
     assert(tree.valid()); // Invalid queries do not corrupt the index.
+    RunnerSpatialIndex<8> edgeTree;
+    assert(edgeTree.insert({real(0),real(0),real(16),real(16)},123));
+    callbacks=0;
+    assert(edgeTree.queryLine({real(16.5f),real(8),real(16.5f),real(8)},
+        [&](unsigned i){assert(i==123);++callbacks;return true;})&&callbacks==1);
+    assert(unsupported==0);
     std::printf("Spatial line: %u scalar comparisons, %u unsupported cases, split-tree order and early stop passed\n",comparisons,unsupported);
+    std::printf("Right-edge exceptional arithmetic: %u vertical/point/reversed cases (%u hits, %u misses) passed\n",edgeCases,edgeHits,edgeMisses);
     std::puts("Instance line bounds: 200000 scalar compatibility comparisons and exclusion gates passed");
 }
 #endif
