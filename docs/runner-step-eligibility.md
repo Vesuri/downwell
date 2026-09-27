@@ -31,6 +31,23 @@ binary32 additions when applying motion (`0x5031e3..0x503248`). The portable
 protocol does not substitute fixed-point additions: concrete motion/path and
 event-context callbacks remain required before live scheduler admission.
 
+`RunnerCollisionMotion` provides the concrete rollback and binary32 coordinate
+addition used by that protocol. Rollback publishes previous x/y before restoring
+path progress. Reapplication rounds the y and x additions separately before
+calling the ordinary position setter, retaining spatial/collision dirtiness.
+Component tests compare host binary32 sums (including ties and signed zeros),
+then compose paired dispatch with maintained-owner movement and handler-modified
+engine speeds. Unsupported numeric values fail before publication. The original
+runtime FP-environment audit remains a separate requirement.
+
+The post-collision preparation call `0x462820` concerns paths; it is not the
+friction/gravity routine `0x462dd0` used earlier in the frame. The pinned data's
+PATH chunk contains zero resources, and recovered assembly currently contains
+no path API or engine hspeed/vspeed references. Do not map the port's custom
+actor velocity fields onto these engine fields. Capturing previous coordinates
+at the runner's exact frame boundary and integrating this state with both live
+worlds remain required; the helper does not infer snapshots from rendered frames.
+
 `RunnerCollisionEventContext` specializes dispatcher `0x4449e0` for event 4.
 No current room (`0x4449e6`) or a pending room change (`0x4449f8`) suppresses
 collision execution. The pending-change exception list permits event types
