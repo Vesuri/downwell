@@ -152,6 +152,16 @@ public:
             });
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity,unsigned Registered,class Outside> bool stepTimeShards(
+        StoredTimeShardRegistration<instanceCapacity,Registered>& registration,TimeShardEffects<Capacity>& shards,
+        typename TimeShardEffects<Capacity>::Phase phase,bool stopped,Outside outside){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=registration.belongsTo(instances_)&&shards.phasesBoundTo(registration)&&
+            shards.step(phase,stopped,random_,[&](auto local,const auto&,auto x,auto y,bool& hit){
+                return registration.meeting(local,shards.sourceId(local),x,y,hit);
+            },outside);
+        return run_.effectsSucceeded;
+    }
     bool menuPlayerNapping() const { return menuPlayerNapping_; }
     int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }

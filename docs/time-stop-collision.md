@@ -25,12 +25,20 @@ both the effect key and the store generation before erasing the record. The
 bridge and effect store must remain alive together; shards must retire before
 room teardown. Neither adapter copies nor numeric-ID-only lookups are allowed.
 
-The automatic transition schedulers do not call this entry point yet, and the
+Phase-bound shards publish animation indices, alarm counters and final Step
+coordinates through the same registered lifetime. `stepTimeShards` checks the
+bridge belongs to the calling world, uses the shared RNG, and sends the source
+solid-family (56) probes through the maintained collision owner. Queries retain
+the old published caller position until Step's final rounded x/y writes; stopped
+shards still move while image speed is zero and lifetime counters are extended.
+Publication/query failures are terminal and cannot be reset into a retry.
+
+The automatic transition schedulers do not call these entry points yet, and the
 native world's heterogeneous registry still needs its corresponding binding.
-Global ordering across effect families, publication during movement/animation
-and exact synchronous Destroy boundaries still need scheduler integration. The
-world integration test proves shared ID/RNG consumption and record ownership,
-not those remaining phase or presentation properties.
+Global ordering across effect families and exact synchronous Destroy boundaries
+still need scheduler integration. World integration tests cover shared ID/RNG,
+resource-backed probes and phase publication, not the remaining global dispatch
+or presentation properties.
 
 The stored collision adapter provides an explicit `birthAt` path for these
 dynamic effects. It receives the already-narrowed binary32 coordinates and

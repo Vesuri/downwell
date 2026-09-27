@@ -30,6 +30,20 @@ public:
         return true;
     }
     bool succeeded()const{return succeeded_;}
+    template<class World> bool bindPhases(World& world){
+        if(!bind(world))return false;
+        animation_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+            return static_cast<World*>(p)->publishAnimation(h,id,effect);
+        };
+        step_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+            return static_cast<World*>(p)->publishStep(h,id,effect);
+        };
+        alarm_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
+            return static_cast<World*>(p)->publishAlarm(h,id,effect);
+        };
+        return true;
+    }
+    template<class World> bool phasesBoundTo(const World& world)const{return context_==&world&&animation_&&step_;}
     std::uint32_t sourceId(Handle handle)const{
         for(unsigned i=0;i<count_;++i){const auto& slot=slots_[order_[i]];
             if(slot.handle==handle)return slot.sourceId;
@@ -82,14 +96,24 @@ public:
     void advanceAlarm(Phase phase,unsigned index){
         if(!succeeded_)return;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
-            if(slot.handle<=phase.newest)slot.effect.advanceAlarm(index);
+            if(slot.handle<=phase.newest){
+                slot.effect.advanceAlarm(index);
+                if(!slot.effect.destroyRequested&&alarm_&&!alarm_(context_,slot.handle,slot.sourceId,slot.effect)){
+                    succeeded_=false;return;
+                }
+            }
         }
         retireRequested();
     }
     bool advanceAnimation(Phase phase){
         if(!succeeded_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
-            if(slot.handle<=phase.newest && !slot.effect.advanceImage())return false;
+            if(slot.handle<=phase.newest){
+                if(!slot.effect.advanceImage()||
+                   (animation_&&!animation_(context_,slot.handle,slot.sourceId,slot.effect))){
+                    succeeded_=false;return false;
+                }
+            }
         }
         return true;
     }
@@ -101,7 +125,10 @@ public:
             if(!slot.effect.step(stopped,random,
                 [&](auto x,auto y,bool& hit){return meeting(slot.handle,static_cast<const TimeShardAnimation&>(slot.effect),x,y,hit);},
                 [&](){return int(size());},
-                [&](const auto& effect,bool& retire){return outside(slot.handle,effect,retire);}))return false;
+                [&](const auto& effect,bool& retire){return outside(slot.handle,effect,retire);})||
+               (step_&&!step_(context_,slot.handle,slot.sourceId,slot.effect))){
+                succeeded_=false;return false;
+            }
         }
         return retireRequested();
     }
@@ -141,6 +168,9 @@ private:
     bool (*birth_)(void*,Handle,const TimeShardAnimation&,std::uint32_t&)=nullptr;
     bool (*created_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
     bool (*retire_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
+    bool (*animation_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
+    bool (*step_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
+    bool (*alarm_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
 };
 }
 #endif

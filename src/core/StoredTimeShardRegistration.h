@@ -34,6 +34,7 @@ public:
         :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),succeeded_(succeeded){}
     StoredTimeShardRegistration(const StoredTimeShardRegistration&)=delete;
     StoredTimeShardRegistration& operator=(const StoredTimeShardRegistration&)=delete;
+    bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
     bool birth(std::uint32_t local,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
         if(!succeeded_)return false;
         Entry* free=nullptr;
@@ -72,6 +73,38 @@ public:
         if(!e||!resolve(*e))return fail();
         if(!records_.erase(id,[&](InstanceHandle h,const InstanceRecord& r){return lifecycle_.retire(h,r);}))return fail();
         *e={};return true;
+    }
+    bool meeting(std::uint32_t local,std::uint32_t id,MotionBinary64 x,MotionBinary64 y,bool& hit){
+        if(!succeeded_)return false;
+        auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;bool next=false;
+        if(!r||!lifecycle_.placeMeeting(e->key,*r,56,x,y,next))return fail();
+        hit=next;return true;
+    }
+    bool publishAnimation(std::uint32_t local,std::uint32_t id,const TimeShardAnimation& effect){
+        if(!succeeded_)return false;
+        auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;
+        if(!r||!lifecycle_.imageIndex(e->key,*r,effect.imageIndex))return fail();
+        r->imageIndex=stored(effect.imageIndex);return true;
+    }
+    bool publishAlarm(std::uint32_t local,std::uint32_t id,const TimeShardAnimation& effect){
+        if(!succeeded_)return false;
+        auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;
+        if(!r)return fail();
+        r->alarms.set(0,effect.alarm0);r->alarms.set(1,effect.alarm1);r->alarms.set(2,effect.alarm2);
+        return true;
+    }
+    bool publishStep(std::uint32_t local,std::uint32_t id,const TimeShardAnimation& effect){
+        if(!succeeded_)return false;
+        auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;
+        std::int32_t x,y;
+        if(!r||!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y))return fail();
+        // A retiring effect completes its source event but must not acquire
+        // another spatial entry just before removal from the registry.
+        if(!effect.destroyRequested&&!lifecycle_.integerPosition(e->key,*r,x,y))return fail();
+        r->x=x;r->y=y;r->preciseX=stored(effect.x);r->preciseY=stored(effect.y);
+        r->imageSpeed=stored(effect.imageSpeed);
+        r->alarms.set(0,effect.alarm0);r->alarms.set(1,effect.alarm1);r->alarms.set(2,effect.alarm2);
+        return true;
     }
 };
 }

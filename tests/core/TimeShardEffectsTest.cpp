@@ -10,6 +10,10 @@ struct World {
     unsigned births=0,creates=0,retires=0,fail=0,failRetireAt=0;
     std::uint32_t nextId=105186;
     std::vector<unsigned> events;
+    unsigned animations=0,steps=0;
+    bool publishAnimation(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++animations;return fail!=4;}
+    bool publishStep(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++steps;return fail!=5;}
+    bool publishAlarm(std::uint32_t,std::uint32_t,const TimeShardAnimation&){return fail!=6;}
     bool birth(std::uint32_t h,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
         assert(h && x.promoted().valid() && y.promoted().valid());++births;events.push_back(1);
         assert(rng.drawCount()==6*creates);
@@ -26,6 +30,21 @@ struct World {
     }
 };
 int main(){
+    for(unsigned failure:{4u,5u,6u}){
+        GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
+        assert(effects.bindPhases(world)&&effects.phasesBoundTo(world));
+        auto old=effects.beginPhase();assert(effects.create({}, {},false,random));
+        assert(effects.advanceAnimation(old)&&world.animations==0);
+        world.fail=failure;
+        if(failure==4)assert(!effects.advanceAnimation(effects.beginPhase()));
+        else if(failure==5)assert(!effects.step(effects.beginPhase(),true,random,
+            [](auto,const auto&,auto,auto,bool& hit){hit=false;return true;},
+            [](auto,const auto&,bool& retire){retire=false;return true;}));
+        else effects.advanceAlarm(effects.beginPhase(),2);
+        assert(!effects.succeeded()&&!effects.clear());
+        const auto animations=world.animations;
+        assert(!effects.advanceAnimation(effects.beginPhase())&&world.animations==animations);
+    }
     {
         GameMakerRandom random(42);World world(random);TimeShardEffects<3> owned;
         assert(owned.bind(world));
@@ -104,16 +123,17 @@ int main(){
     unsigned calls=0;
     assert(!owner.step(owner.beginPhase(),false,rng,[&](auto,const auto&,auto,auto,bool&){++calls;return false;},onScreen));
     assert(calls==1 && owner.get(replacement));
-    owner.clear();
+    assert(!owner.clear()&&!owner.succeeded());
     // Repeated slot reuse must never revalidate a stale handle/cutoff.
+    TimeShardEffects<6> reuse;
     for(unsigned run=0;run<1024;++run){
-        const auto old=owner.beginPhase();const auto h=owner.create({}, {},false,rng);assert(h>old.newest);
-        auto* s=owner.get(h);s->alarm0=2;
-        owner.advanceAlarm(old,0);assert(s->alarm0==2);
-        const auto current=owner.beginPhase();
-        assert(owner.advanceAnimation(current));owner.advanceAlarm(current,0);
-        assert(owner.step(current,true,rng,noWall,onScreen));assert(s->alarm0==2);
-        owner.advanceAlarm(current,0);owner.advanceAlarm(current,0);assert(!owner.get(h));
+        const auto old=reuse.beginPhase();const auto h=reuse.create({}, {},false,rng);assert(h>old.newest);
+        auto* s=reuse.get(h);s->alarm0=2;
+        reuse.advanceAlarm(old,0);assert(s->alarm0==2);
+        const auto current=reuse.beginPhase();
+        assert(reuse.advanceAnimation(current));reuse.advanceAlarm(current,0);
+        assert(reuse.step(current,true,rng,noWall,onScreen));assert(s->alarm0==2);
+        reuse.advanceAlarm(current,0);reuse.advanceAlarm(current,0);assert(!reuse.get(h));
     }
     std::puts("Shard ownership: phase cutoffs, live population, alarm retirement, contact RNG, failure and 1024 reuse cycles passed");
 }

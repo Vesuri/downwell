@@ -158,7 +158,7 @@ int main(){
         PackedObject definition;require(objects.findObject(238,definition)&&definition.parentId==-1,
             "source shard PreCreate has no parent handler");
         auto registration=world->timeShardRegistration<3>();TimeShardEffects<3> shards;TimeShardBurst burst;
-        require(shards.bind(registration),"bind actual world shard registration");
+        require(shards.bindPhases(registration),"bind actual world shard phases");
         const auto first=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
         const auto count=world->activeInstanceCount();
         require(world->emitTimeShards(burst,shards,{0x43704000u},{0x43308000u},
@@ -170,6 +170,31 @@ int main(){
             require(r&&effect&&r->objectId==238&&r->spriteId==definition.spriteId&&r->maskId==definition.textureMaskId&&
                     r->preciseX==240.25f&&r->preciseY==176.5f&&r->alarms.get(0)==effect->alarm0,
                     "registered world record retains source resource and Create fields");
+        }
+        bool hit=false;
+        for(unsigned i=0;i<world->activeInstanceCount();++i){
+            const auto& wall=world->instanceAt(i);if(wall.objectId!=60)continue;
+            require(registration.meeting(1,first,MotionBinary64::fromInteger(wall.x),MotionBinary64::fromInteger(wall.y),hit)&&hit,
+                    "registered shard queries real solid-family masks");break;
+        }
+        require(hit,"test queried an actual generated wall");
+        require(registration.meeting(1,first,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(-1000),hit)&&!hit,
+                "registered shard empty query succeeds without fabricated hit");
+        // Test phase publication in empty space, preserving the old published
+        // position during every Step query until the final x/y assignments.
+        for(unsigned i=0;i<3;++i){auto* s=shards.get(i+1);s->yy=MotionBinary64::fromInteger(-1000);
+            require(s->y.assign(s->yy)&&registration.publishStep(i+1,first+i,*s),"stage above terrain");}
+        const auto phase=shards.beginPhase();
+        shards.advanceAlarm(phase,2);
+        require(shards.succeeded()&&world->instance(first)->alarms.get(2)==29,"publish alarm phase before Step");
+        require(shards.advanceAnimation(phase),"publish shard animation phase");
+        require(world->stepTimeShards(registration,shards,phase,true,
+            [](auto,const auto&,bool& retire){retire=false;return true;}),"registered shard motion with source queries");
+        for(unsigned i=0;i<3;++i){
+            const auto* r=world->instance(first+i);auto* s=shards.get(i+1);std::int32_t x,y;
+            require(r&&s&&s->x.promoted().roundPixel(x)&&s->y.promoted().roundPixel(y)&&
+                    r->x==x&&r->y==y&&r->imageSpeed==0&&r->alarms.get(0)==s->alarm0,
+                    "stopped shard still publishes motion, zero animation speed and paused lifetime");
         }
         require(shards.clear()&&world->activeInstanceCount()==count&&shardOwner->valid(),"world retirement removes every shard record");
         for(unsigned i=0;i<3;++i)require(!world->instance(first+i),"retired source ID no longer resolves");
