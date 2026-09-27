@@ -3,8 +3,9 @@
 #include "InstanceHandle.h"
 namespace downwell {
 // Capture registrations before dispatch, then order exact objects by resource
-// ID while retaining their registration order. No heap, recursion or resource
-// ID-sized array. Owners must recheck flags and lifetime at every dispatch.
+// ID while retaining their registration order. The basic sorter uses no heap,
+// recursion or resource ID-sized array; hosts can opt into dense sorting.
+// Owners must recheck flags and lifetime at every dispatch.
 // Storage is 16 bytes per entry on host/68000; large native owners must keep
 // this workspace off the task stack. See verify-runner-step-order.py.
 template<unsigned Capacity> class RunnerStepSnapshot {
@@ -31,6 +32,27 @@ public:
     void sort(){
         for(unsigned i=count_/2;i;--i)sift(i-1,count_);
         for(unsigned i=count_;i>1;--i){swap(0,i-1);sift(0,i-1);}
+    }
+    // Host stored-world fast path: resource IDs are dense and small. Stable
+    // counting sort preserves registration order without four O(n log n)
+    // sorts per tick. Call immediately after capture (append order), not on
+    // a reordered snapshot. Unusual resource IDs retain the general sorter.
+    // Explicitly opt-in: this temporary workspace is NOT for the Amiga task
+    // stack. Native owners continue to use the constant-workspace sort().
+    template<unsigned ObjectLimit> void sortDenseObjects(){
+        static_assert(ObjectLimit > 0,"nonempty object range");
+        if(count_<64){sort();return;}
+        for(unsigned i=0;i<count_;++i)
+            if(static_cast<unsigned>(entries_[i].object)>=ObjectLimit){sort();return;}
+        unsigned offsets[ObjectLimit]{};
+        for(unsigned i=0;i<count_;++i)++offsets[entries_[i].object];
+        unsigned total=0;
+        for(unsigned object=0;object<ObjectLimit;++object){
+            const unsigned count=offsets[object];offsets[object]=total;total+=count;
+        }
+        Entry ordered[Capacity?Capacity:1];
+        for(unsigned i=0;i<count_;++i)ordered[offsets[entries_[i].object]++]=entries_[i];
+        for(unsigned i=0;i<count_;++i)entries_[i]=ordered[i];
     }
     unsigned size()const{return count_;}
     InstanceHandle handle(unsigned i)const{return i<count_?entries_[i].handle:InstanceHandle{};}

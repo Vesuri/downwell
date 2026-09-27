@@ -225,7 +225,7 @@ public:
             const auto* r=resolve({slot,generation});
             return r&&(!r->active||r->destroyRequested||snapshot.append(slot,generation,object));
         });
-        if(result)snapshot.sort();
+        if(result)snapshot.template sortDenseObjects<512>();
         return result;
     }
 

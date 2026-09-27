@@ -188,6 +188,10 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 - Repeat low-overhead timing tapes and correctness gates after changes, with
   separate horizontal-shop and dense-encounter cases. Distinguish instrumentation
   overhead from ordinary gameplay cost.
+- Reproduce the reported progressive SDL framerate loss in interactive play,
+  including later levels/retries. Separate update/draw cost from presentation
+  and pacing using `DOWNWELL_PROFILE=1`; bounded descent replays alone have not
+  reproduced the reported unplayable slowdown.
 
 Reference: [profiling procedure](amiga-profiling.md).
 

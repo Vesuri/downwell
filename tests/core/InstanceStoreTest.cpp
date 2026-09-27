@@ -197,6 +197,29 @@ void testAnimationTraversal() {
     })&&seen==std::vector<unsigned>({4,3}),"failed animation stops before later records");
 }
 
+void testDenseStepOrder() {
+    // Compare every lifetime, not just the object sequence: equal-object
+    // registration order and generations must survive the optimization.
+    for(unsigned mode=0;mode<5;++mode)for(unsigned count : {0u,1u,63u,64u,511u,2048u}){
+        downwell::RunnerStepSnapshot<2048> general,dense;
+        unsigned random=12345;
+        for(unsigned i=0;i<count;++i){
+            random=random*1664525u+1013904223u;
+            const int object=mode==0?60:mode==1?int(i%386):mode==2?int(385-i%386):
+                mode==3?int(random%512):int(random%1024);
+            require(general.append(2047-i,i+1,object)&&dense.append(2047-i,i+1,object),
+                "capture step ordering fixture");
+        }
+        general.sort();dense.sortDenseObjects<512>();
+        require(general.size()==dense.size(),"dense sort preserves population");
+        for(unsigned i=0;i<count;++i){
+            const auto a=general.handle(i),b=dense.handle(i);
+            require(a.slot==b.slot&&a.generation==b.generation,
+                "dense and fallback sorting preserve exact lifetime dispatch order");
+        }
+    }
+}
+
 } // namespace
 
 int main() {
@@ -208,6 +231,7 @@ int main() {
     testMarkedRoomCleanup();
     testAnimationMembership();
     testAnimationTraversal();
+    testDenseStepOrder();
     std::cout << "instance store tests passed\n";
     return 0;
 }
