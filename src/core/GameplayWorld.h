@@ -18,6 +18,7 @@
 #include "core/RunSession.h"
 #include "core/GameplayGoalFields.h"
 #include "core/GameplayExitControllers.h"
+#include "core/GameplayScriptSpawnInstances.h"
 #include "core/AreaOneBuilder.h"
 #include "core/EnemyCreateProfile.h"
 #include "core/ObjectPack.h"
@@ -203,6 +204,11 @@ public:
                               const PlayerLifecycleBinding& playerLifecycle = {},
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
+    const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
+    bool bindScriptSpawnInstances(downwell::GameplayScriptSpawnInstances& instances){
+        if(scriptSpawnInstances_||!instances.valid()||instances.size())return false;
+        scriptSpawnInstances_=&instances;return true;
+    }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
     void configureEnemyStepOrder(bool (*capture)(void*,EnemyStepOrder&),void* context){
@@ -583,6 +589,7 @@ private:
     BreakableLifecycleBinding breakableLifecycle_;
     PlayerLifecycleBinding playerLifecycle_;
     downwell::GameplayTerrainInstances* terrainInstances_=nullptr;
+    downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
     bool roomTerrainLoaded_=false;
     PlayerInstance playerInstance_;
     std::uint32_t nextPlayerLifetimeId_=1;

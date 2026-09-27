@@ -176,6 +176,17 @@ pending-depth ordering is implemented. The bridge must outlive its effect
 owner and retire registrations before room teardown. It does not install an
 automatic Step handler or replace the live gun adapter by itself.
 
+Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
+and owned by its collision backend. Its appended handle range leaves existing
+actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;
+collision births use the effect's absolute binary32 coordinates, without native
+origin translation. Setter hooks update the same resource-backed collision
+properties used by other actors. Registry keys are monotonic owner-local
+lifetimes, not Windows numeric IDs. Retire effects before destroying their
+owner or changing rooms. Retry preserves an empty registry and rejects a
+populated one until the live room-exit cleanup path is connected. Automatic
+gun emission, scheduling and drawing remain separate integration requirements.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

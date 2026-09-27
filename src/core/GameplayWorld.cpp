@@ -37,6 +37,9 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
+    if(scriptSpawnInstances_&&scriptSpawnInstances_->size()){
+        run_.effectsSucceeded=false;return downwell::ResultsDestination::none;
+    }
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
     if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
@@ -44,6 +47,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(!exitControllers_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
+    const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto phaseBoundary=phaseBoundary_;
     const auto enemyOrderCapture=enemyOrderCapture_;
     void* const enemyOrderContext=enemyOrderContext_;
@@ -73,6 +77,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     this->~GameplayWorld();
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances);
     nextBreakableLifetimeId_=nextBreakableIdentity;
+    scriptSpawnInstances_=scriptSpawnInstances;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;

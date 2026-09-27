@@ -258,6 +258,38 @@ int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));
+        ScriptSpawnEffects<2> effects;auto& registration=collision->scriptEffects();
+        const auto phase=effects.beginPhase();
+        const auto first=effects.create({0x406e0800u,0},{0x40afff00u,0},registration);
+        assert(first&&registration.size()==1);
+        InstanceHandle key;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::scriptEffect,registration.handle(first),key));
+        const auto* effect=effects.get(first);const auto* state=collision->state(key);
+        assert(effect&&state&&state->x.bits==effect->x.bits&&state->y.bits==effect->y.bits);
+        assert(collision->properties(key)->sprite.spriteId==-1);
+        assert(effects.setSprite(first,603,1,registration));
+        assert(effects.mutate(first,[&](auto& e){
+            return e.setValue(e.imageSpeed,{0x3fe00000u,0},[&](const auto& s){return registration.speed(first,s);})&&
+                e.setValue(e.angle,MotionBinary64::fromInteger(270),[&](const auto& s){return registration.angle(first,s);})&&
+                e.setValue(e.depth,{},[&](const auto& s){return registration.depth(first,s);});
+        }));
+        assert(collision->properties(key)->sprite.spriteId==603&&collision->properties(key)->sprite.angle.bits==0x43870000u);
+        unsigned count=0;assert(collision->population(219,count)&&count==1);
+        assert(effects.advanceAnimation(phase,registration)&&effects.get(first)->imageIndex.bits==0);
+        assert(effects.advanceAnimation(effects.beginPhase(),registration)&&registration.image(first,*effects.get(first)));
+        assert(collision->properties(key)->sprite.imageIndex.bits==0x3f000000u);
+        assert(effects.advanceAnimation(effects.beginPhase(),registration)&&!collision->state(key)&&registration.size()==0);
+        assert(collision->population(219,count)&&count==0);
+        assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
+            scene->scriptSpawnInstances()==&registration);
+        const auto next=effects.create({}, {},registration);assert(next>first&&!collision->state(key));
+        assert(effects.setSprite(next,602,1,registration)&&effects.clear(registration)&&collision->valid());
+    }
     assert(masks.valid());
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

@@ -61,6 +61,7 @@ private:
             if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
             if constexpr(Kind==View::Kind::timeField)return 82;
             if constexpr(Kind==View::Kind::bullet)return 261;
+            if constexpr(Kind==View::Kind::scriptEffect)return 219;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -80,6 +81,7 @@ private:
             else if constexpr(Kind==View::Kind::goalField)pointer=actual.goalField;
             else if constexpr(Kind==View::Kind::exitController)pointer=actual.exitController;
             else if constexpr(Kind==View::Kind::bullet)pointer=actual.bullet;
+            else if constexpr(Kind==View::Kind::scriptEffect)pointer=actual.scriptEffect;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
@@ -87,9 +89,14 @@ private:
             InstanceHandle h;if(!key(local,r,h,true))return false;
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
-            if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
             Owner::State state;
-            if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
+            if constexpr(Kind==View::Kind::scriptEffect){
+                if(!r.effect||!r.effect->valid)return parent.check(false);
+                state.x=r.effect->x;state.y=r.effect->y;
+            }else{
+                if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
+                if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
+            }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
             if(!parent.check(parent.owner_.attach(h,object(r),state)))return false;
             auto& p=parent.properties_[h.slot];p={};
@@ -155,6 +162,8 @@ private:
     Binding<GameplayGoalFields::Record,View::Kind::goalField> goals_{*this};
     Binding<GameplayExitControllers::Record,View::Kind::exitController> exits_{*this};
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
+    Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
+    GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindTransforms(scriptEffectsBinding_)};
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
@@ -170,7 +179,7 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid()&&terrain_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid();}
     bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
@@ -178,6 +187,7 @@ public:
         if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindMaskDestruction(goals_)))return check(false);
         if(!world_&&!world.bindExitControllerLifecycle(GameplayExitControllers::Binding::bind(exits_)))return check(false);
         if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
+        if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         world_=&world;
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary phase){
             auto& owner=*static_cast<GameplayCollisionOwner*>(context);
@@ -224,6 +234,7 @@ public:
         return true;
     }
     GameplayTerrainInstances& terrain(){return terrain_;}
+    GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
     bool population(int object,unsigned& count)const{return valid()&&owner_.instanceNumber(object,families_,count);}
