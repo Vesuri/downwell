@@ -190,9 +190,9 @@ public:
                               bool startsGrounded = true,
                               int landingOffset = 0,
                               bool followCamera = false,
-                              EnemyLifecycleBinding enemyLifecycle = {},
-                              BreakableLifecycleBinding breakableLifecycle = {},
-                              PlayerLifecycleBinding playerLifecycle = {},
+                              const EnemyLifecycleBinding& enemyLifecycle = {},
+                              const BreakableLifecycleBinding& breakableLifecycle = {},
+                              const PlayerLifecycleBinding& playerLifecycle = {},
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     // RoomPack serializes instanceCreationOrder, not object/position order.

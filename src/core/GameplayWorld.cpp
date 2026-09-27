@@ -128,9 +128,9 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
 GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    bool startsGrounded,
                                    int landingOffset,
-                                   bool followCamera, EnemyLifecycleBinding enemyLifecycle,
-                                   BreakableLifecycleBinding breakableLifecycle,
-                                   PlayerLifecycleBinding playerLifecycle,
+                                   bool followCamera, const EnemyLifecycleBinding& enemyLifecycle,
+                                   const BreakableLifecycleBinding& breakableLifecycle,
+                                   const PlayerLifecycleBinding& playerLifecycle,
                                    downwell::GameplayTerrainInstances* terrainInstances)
     : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), playerLifecycle_(playerLifecycle), terrainInstances_(terrainInstances), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
