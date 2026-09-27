@@ -15,6 +15,10 @@ bool nativeDebrisDispatch(GameplayWorld& world,downwell::GameplayCollisionOwner&
     return world.advanceDebrisRoomAlarm(effects,local,phase,0)&&owner.stepDebris(effects,shared,phase,masks,
         [](auto,const auto&,bool& frozen){frozen=false;return true;});
 }
+bool nativeDebrisFreeze(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle local,
+    const downwell::SpriteMaskPack& masks,bool stopped,bool& frozen){
+    return owner.debrisFrozen(local,stopped,480,masks,frozen);
+}
 bool nativeScriptSpawn(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects,
     const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle& caller){
     return world.spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},
@@ -306,6 +310,44 @@ int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));
+        assert(scene->createGeneratedInstance({82,240,512},objects,[](const auto&){return true;}));
+        DebrisEffects<1> effects;InstanceHandle local;
+        assert(scene->spawnDebris(effects,{},{},1,local));auto& particle=*effects.get(local.generation);
+        SpriteMaskPack::Mask shardMask,fieldMask;
+        assert(masks.mask(598,0,shardMask)&&masks.mask(597,0,fieldMask));
+        auto move=[&](MotionBinary64 x,MotionBinary64 y){RunnerImageValue px,py;
+            assert(px.assign(x)&&py.assign(y)&&collision->debris().move(local.generation,particle,px,py));
+            particle.x=px;particle.y=py;
+        };
+        unsigned edgeHits=0;
+        for(int y=480;y<=544;++y)for(int x=208;x<=272;++x){
+            move(MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y));
+            bool overlap=false;
+            for(int py=y-5;py<=y+4&&!overlap;++py)for(int px=x-5;px<=x+4;++px)
+                if(shardMask.contains(px-x+8,py-y+8)&&fieldMask.contains(px-240+24,py-512+24)){overlap=true;break;}
+            bool frozen=overlap;
+            assert(collision->debrisFrozen(local,true,480,masks,frozen)&&frozen==!overlap);
+            if(overlap&&!fieldMask.contains(x-240+24,y-512+24))++edgeHits;
+        }
+        assert(edgeHits); // A centre-only circle/point query would miss these.
+        const SpriteMaskPack unavailable(nullptr,0);
+        for(int qx:{639,640,960,1280,1281}){
+            auto x=MotionBinary64::fromInteger(qx);x.high-=2u<<20;
+            move(x,MotionBinary64::fromInteger(20000));bool frozen=true;
+            assert(collision->debrisFrozen(local,false,480,unavailable,frozen)&&!frozen);
+            assert(collision->debrisFrozen(local,true,480,masks,frozen)&&frozen==(qx>=640&&qx<=1280));
+        }
+        move(MotionBinary64::fromInteger(159),MotionBinary64::fromInteger(20000));bool unchanged=true;
+        assert(!collision->debrisFrozen(local,true,480,unavailable,unchanged)&&unchanged);
+        // Even side-exempt particles query the field first; missing mask data
+        // is a terminal query failure, not a successful outside-area result.
+        assert(!collision->valid());
+    }
     for(unsigned seed=0;seed<16;++seed){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
@@ -320,7 +362,7 @@ int main(){
             expected[i]=*effects.get(local[i].generation);
         }
         auto random=scene->randomState();PackedSpriteCollision shape;
-        assert(sprites.sprite(115,shape)&&!shape.collisionMode);
+        assert(sprites.sprite(598,shape)&&!shape.collisionMode);
         auto real=[](MotionBinary64 v){const std::uint64_t bits=(std::uint64_t(v.high)<<32)|v.low;
             double d;std::memcpy(&d,&bits,sizeof d);return float(d);};
         auto contact=[&](MotionBinary64 px,MotionBinary64 py,bool& hit){

@@ -7,6 +7,7 @@
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include "DebrisDraw.h"
+#include "TimeStopBound.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -343,6 +344,17 @@ public:
         if(!valid()||!world_||!masks.valid()||!View::encode(View::Kind::debris,local,self)||
            !resolves(self))return check(false);
         return registeredPlaceMeeting(self,56,x,y,masks,hit);
+    }
+    bool debrisFrozen(InstanceHandle local,bool pTimeStop,int roomWidth,const SpriteMaskPack& masks,bool& frozen){
+        InstanceHandle self;
+        const auto* record=debris_.find(local);
+        if(!valid()||!world_||!record||!record->effect||!View::encode(View::Kind::debris,local,self)||!resolves(self))return check(false);
+        const auto& effect=*record->effect;bool allowed=false;
+        if(!TimeStopBound::evaluate(pTimeStop,effect.x.promoted(),effect.y.promoted(),roomWidth,
+            [&](auto x,auto y,bool& hit){
+                return masks.valid()&&registeredPlaceMeeting(self,82,x,y,masks,hit);
+            },allowed))return check(false);
+        frozen=!allowed;return true;
     }
     // Selected global Step entry, not a pool-local sweep. The caller supplies
     // the original per-instance TimeStopBound result through a checked adapter.

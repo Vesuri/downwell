@@ -5,6 +5,7 @@
 #include "ObjectPack.h"
 #include "DebrisEffects.h"
 #include "DebrisDraw.h"
+#include "TimeStopBound.h"
 #include <cstring>
 namespace downwell {
 // SDL stored-world identity bridge. Keep both owners at fixed addresses and
@@ -78,6 +79,13 @@ public:
         auto* e=checked(local,effect);auto* r=e?record(*e):nullptr;
         if(!r||!effect.destroyRequested||r->destroyRequested||!lifecycle_.markDestroyed(e->key,*r))return fail();
         r->destroyRequested=true;return true;
+    }
+    bool frozen(InstanceHandle key,const DebrisAnimation& effect,bool pTimeStop,int roomWidth,bool& frozen){
+        const auto* r=records_.resolve(key);auto* e=r?forRecord(*r):nullptr;bool allowed=false;
+        if(!e||!checked(e->local,effect))return fail();
+        if(!TimeStopBound::evaluate(pTimeStop,effect.x.promoted(),effect.y.promoted(),roomWidth,
+            [&](auto x,auto y,bool& hit){return lifecycle_.placeMeeting(key,*r,82,x,y,hit);},allowed))return fail();
+        frozen=!allowed;return true;
     }
     bool retire(unsigned local,const DebrisAnimation& effect){
         auto* e=entry(local);

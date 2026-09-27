@@ -1283,6 +1283,13 @@ bool StartupRuntime::playerOutsideTimeStopSides(MotionBinary64 x,bool& outside){
     return run_.effectsSucceeded;
 }
 
+bool StartupRuntime::timeStopRoomWidth(int& width){
+    if(!run_.effectsSucceeded)return false;
+    PackedRoom room;
+    if(!roomPack_||!roomPack_->findRoom(roomId_,room))return run_.effectsSucceeded=false;
+    width=room.width;return true;
+}
+
 bool StartupRuntime::playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit){
     if(!run_.effectsSucceeded)return false;
     for(std::size_t i=0;i<instances_.size();++i){

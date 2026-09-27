@@ -926,8 +926,45 @@ int main(){
     {
         auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
+        require(collision->attach(*world),"attach debris field fixture");world->skipToGameForTesting();
+        world->registerLevelExit(176);
+        auto registration=world->debrisRegistration<1>();DebrisEffects<1> effects;unsigned id=0;
+        const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(208);
+        require(world->spawnDebris(registration,effects,x,y,1,id),"spawn particle inside goal time field");
+        InstancePlaceResult selected;
+        require(collision->collisionPoint({},370,x,y,false,false,selected)&&selected.id==int(id),"resolve field fixture particle");
+        auto& effect=*effects.get(1);bool frozen=true;
+        require(world->debrisFrozen(registration,selected.handle,effect,true,frozen)&&!frozen,
+            "SDL debris remains running inside a parentTimeField descendant");
+        RunnerImageValue px,py;
+        require(px.assign(x)&&py.assign(MotionBinary64::fromInteger(10000))&&registration.move(1,effect,px,py),"move outside field");
+        effect.x=px;effect.y=py;
+        require(world->debrisFrozen(registration,selected.handle,effect,true,frozen)&&frozen,
+            "SDL debris freezes outside fields while pTimeStop is true");
+        require(effects.clear(registration),"clear field fixture");
+    }
+    {
+        auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
         require(collision->attach(*world),"attach script-effect registration fixture");
         world->skipToGameForTesting();
+        {
+            auto registration=world->debrisRegistration<1>();DebrisEffects<1> effects;unsigned id=0;
+            const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(10000);
+            require(world->spawnDebris(registration,effects,x,y,1,id),"spawn debris time-stop fixture");
+            InstancePlaceResult selected;
+            require(collision->collisionPoint({},370,x,y,false,false,selected)&&selected.id==int(id),"resolve time-stop particle identity");
+            const auto key=selected.handle;auto& particle=*effects.get(1);
+            for(int qx:{639,640,960,1280,1281}){
+                auto q=MotionBinary64::fromInteger(qx);q.high-=2u<<20;RunnerImageValue px,py;
+                require(px.assign(q)&&py.assign(y)&&registration.move(1,particle,px,py),"publish fractional time-stop boundary position");
+                particle.x=px;particle.y=py;bool frozen=true;
+                require(world->debrisFrozen(registration,key,particle,false,frozen)&&!frozen,"pTimeStop false leaves debris running");
+                require(world->debrisFrozen(registration,key,particle,true,frozen)&&frozen==(qx>=640&&qx<=1280),
+                    "SDL debris uses strict room-width boundaries and published coordinates");
+            }
+            require(effects.clear(registration),"clear time-stop boundary fixture");
+        }
         {
             auto registration=world->debrisRegistration<1>();DebrisEffects<1> effects;unsigned id=0;
             require(world->spawnDebris(registration,effects,MotionBinary64::fromInteger(20000),

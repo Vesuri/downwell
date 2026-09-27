@@ -460,6 +460,21 @@ dispatch, post-destruction exclusion, cleanup and Retry. It supplies freeze
 decisions explicitly; wiring original live time-stop state, both renderers and
 natural combat births remains unfinished.
 
+Both ownership adapters expose `debrisFrozen` using shared `TimeStopBound`:
+when the caller supplies true source `pTimeStop`, query the particle shape
+against parentTimeField (82) before testing strict `x<160` / `x>room_width-160`
+exemptions. False `pTimeStop` skips field queries entirely. SDL reads current
+room width from serialized metadata; the native caller supplies that width.
+The particle's explicit mask is resource 598, regardless of its area-specific
+visible sprite; the extraction verifier pins this mapping. A 4,225-position
+native test compares time-field overlap against the two original bit masks,
+including edge-only contacts a centre-point query would miss. Both backends
+test fractional side boundaries; SDL also tests a goal-field descendant.
+These adapters require the original player's current `pTimeStop` value at Step
+dispatch, not a cached frame-entry value, goal stop or control-lock substitute.
+They do not themselves wire the player's Begin Step transitions into both
+production schedulers.
+
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed
 publication/query handling and repeated slot reuse. This local owner is not

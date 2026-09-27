@@ -357,6 +357,17 @@ public:
         return run_.effectsSucceeded=registration.belongsTo(instances_)&&record&&
             registration.dispatchStep(key,*record,effects,phase,random_,stopped);
     }
+    // Read the source player's pTimeStop at the particle's Step boundary;
+    // neither goalStopped nor a shop control lock is a substitute.
+    template<unsigned Registered>
+    bool debrisFrozen(StoredDebrisRegistration<instanceCapacity,Registered>& registration,InstanceHandle key,
+        const DebrisAnimation& effect,bool pTimeStop,bool& frozen){
+        if(!run_.effectsSucceeded)return false;
+        if(!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
+        int width=0;
+        if(pTimeStop&&!timeStopRoomWidth(width))return false;
+        return run_.effectsSucceeded=registration.frozen(key,effect,pTimeStop,width,frozen);
+    }
     const ScriptSpawnEffects<scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
     template<class Frames> bool spawnScriptEffect(MotionBinary64 x,MotionBinary64 y,int sprite,
         MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
@@ -782,6 +793,7 @@ private:
     InstanceLifecycleBinding lifecycle_;
     ScriptEffectRuntimeBinding scriptEffectsBinding_;
     ScriptEffectRuntimeBinding debrisBinding_;
+    bool timeStopRoomWidth(int& width);
     bool hasDebrisRecords()const{
         for(std::size_t i=0;i<instances_.size();++i)if(instances_.at(i).objectId==370)return true;
         return false;
