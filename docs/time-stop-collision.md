@@ -57,6 +57,20 @@ their registration and requires an explicit dispatcher for other families. This
 boundary is exercised with the live collision owner; normal frame scheduling
 and the remaining family dispatchers are not yet wired to it.
 
+## Time-change registration boundary
+
+`TimeChangeEffects` supports a borrowed registration binding for object 211.
+Its `createAt` narrows explicit private xx/yy once, requests a world ID before
+Create, publishes initialized alarms after room-speed assignment and before
+the synchronous pause. Registered callers cannot use the coordinate-less
+component `create` shortcut. Registered alarms consult world eligibility,
+publish changes and mark destruction separately from physical cleanup.
+Failures preserve the completed prefix and latch the owner; reset cannot hide
+a failed registration or retirement. This binding contract is not yet connected
+to the actual room registry or the transition helper's private coordinates.
+That integration must precede automatic player time-stop dispatch so object
+211 consumes its source ID before the following shard burst.
+
 ## Shard registration contract
 
 The explicit registered-player-contact boundary uses the world's RNG and
