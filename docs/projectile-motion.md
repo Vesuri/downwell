@@ -104,6 +104,16 @@ cutoffs and animation/motion lifecycles. Burst tests compare full RNG state,
 including failed capacity cases; owner tests exercise these actual box births.
 These entry points still require wiring to the box event's live callbacks.
 
+`BoxDestructionIntegrationTest` runs the event through actual smoke, flash,
+script-impact and debris owners with one shared RNG, across all five area
+sprite choices and both low-spec modes. Independent host arithmetic checks
+the ordered child positions, velocities, animation values and final RNG state.
+An exhausted second-debris slot retains the first child and all earlier
+effects, skips alarmStop and cannot replay the event. This fixture deliberately
+has no gems or chain reaction, and records the sound callback without an audio
+backend. It proves particle creation composition, not live room registration,
+cross-family scheduling, audio, reward creation or final pixels.
+
 The stored and native collision owners expose `projectileWallParent` and
 `projectileBoxHealth`/`projectileBoxHealthWrite`/`projectileBoxHit` for the
 selected lifetime. Parent lookup uses the direct serialized parent, not an

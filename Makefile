@@ -503,9 +503,13 @@ verify-runner-sprite-vertices:
 	python3 tests/impact-angle-art-test.py
 test: verify-bullet-solid-script verify-machine-gun-source-step verify-box-destruction
 .PHONY: verify-box-destruction
-verify-box-destruction: build/box-destruction-test
+verify-box-destruction: build/box-destruction-test build/box-destruction-integration-test
 	python3 tools/verify-box-destruction.py
 	./build/box-destruction-test
+	./build/box-destruction-integration-test
+build/box-destruction-integration-test: tests/core/BoxDestructionIntegrationTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/BoxDestructionIntegrationTest.cpp src/core/GameMakerRandom.cpp
 build/box-destruction-test: tests/core/BoxDestructionScriptTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
