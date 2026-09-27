@@ -1714,15 +1714,23 @@ int main() {
     sideCamera.configureBreakables(&offscreenBoxX,&offscreenBoxY,1);
     require(sideCamera.findBreakable({0,1})&&beforeLockY<62,
         "box is above the new view's lifetime edge but inside the pre-snap view");
+    auto* snapShop=sideCamera.registerShop(480,34+beforeLockY-280);
+    require(snapShop,"native published-view fixture allocates a shop");
+    auto& snapDither=const_cast<downwell::ExitDither&>(sideCamera.exitDither());
+    snapDither.active=true;snapDither.y=318+beforeLockY;
     sideFrame = sideCamera.step(downwell::packReplayInput(walkRight));
     require(sideCamera.cameraSideLocked() && sideCamera.cameraOffsetY() == 80 &&
         sideFrame.scrollDelta == 80 - beforeLockY && sideCamera.ringOrigin() == 60,
         "collision-phase camera snap reaches the same frame's circular-buffer delta");
     require(sideCamera.findBreakable({0,1}),
         "box End Step uses the published pre-collision view, not the camera snap");
+    require(snapShop->present&&snapDither.y==318+beforeLockY,
+        "native shop and dither retain the previous published view");
     sideCamera.step(downwell::packReplayInput(walkRight));
     require(!sideCamera.findBreakable({0,1}),
         "box retires on the next update after Draw publishes the snapped view");
+    require(!snapShop->present&&snapDither.y==326+beforeLockY,
+        "native shop retires and dither advances after view publication");
     downwell::Input leaveSide; leaveSide.left = true;
     for (unsigned frame = 0; frame < 180 &&
             (sideCamera.cameraOffsetX() != 0 || sideCamera.cameraSideLocked()); ++frame)

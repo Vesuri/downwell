@@ -1037,14 +1037,22 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             }
             require(boxId&&snap.registerSideCameraLocker(int(snap.mainCameraViewX())+80,oldView+222),
                 "host camera retirement fixture has a box and overlapping locker");
+            auto* shop=snap.registerShop(480,oldView-280);
+            require(shop,"host published-view fixture allocates a shop");
+            auto& dither=const_cast<downwell::ExitDither&>(snap.exitDither());
+            dither.active=true;dither.y=oldView+284;
             snap.step(releasedMain,false);
             require(snap.effectsSucceeded()&&snap.mainCameraViewY()==oldView+80,
                 "host camera collision publishes the new view in this frame");
             require(snap.hasInstance(boxId),
                 "host box End Step lifetime retains the pre-collision published view");
+            require(shop->present&&dither.y==oldView+284,
+                "host shop and dither read the cached view throughout Step and End Step");
             snap.step(releasedMain,false);
             require(snap.effectsSucceeded()&&!snap.hasInstance(boxId),
                 "host box retires on the next update after Draw publishes the snap");
+            require(!shop->present&&dither.y==oldView+292,
+                "host shop retires and dither advances after the new view is published");
         }
         bool retainedOldStone = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {

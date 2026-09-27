@@ -417,7 +417,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         flushDeferredInstances(instances_, roomId_);
     if (!roomLoadSucceeded_ || !deferredCommandsSucceeded_ || !run_.effectsSucceeded) return;
     if (roomId_ == mainRoomId) {
-        run_.exitDither.step(mainCameraRenderViewY(), surfaceHeight);
+        run_.exitDither.step(ordinaryStepViewTopQ12_ / 4096, surfaceHeight);
         updateMainBullets();
         if(!run_.effectsSucceeded)return;
         updateMainEnemies();
@@ -457,7 +457,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         }
         updateMainLifecycle(true, ordinaryStepViewTopQ12_);
         if(!run_.effectsSucceeded)return;
-        run_.shops.endStep(mainCameraRenderViewY());
+        run_.shops.endStep(ordinaryStepViewTopQ12_ / 4096);
         run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
         run_.gameplayPresentationStep(random_);

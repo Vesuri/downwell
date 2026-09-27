@@ -28,8 +28,14 @@ The builder therefore reads the preceding Draw's published view during normal
 gameplay. Using camMain's new position just because its object ID sorts earlier
 advances generation and RNG consumption prematurely.
 
+`Shop` End Step likewise reads cached YView for its -320/+3000 retirement
+edges. `objTransDither` ordinary Step advances y by eight only while it is
+strictly below cached YView + height. At equality it must stay still, even if
+camMain is already moving to a lower view. These two VM entries are pinned too.
+
 The current adapters snapshot that normal published view at update entry for
-builder and ordinary/End Step lifetime checks. Rendering still follows the
+builder, ordinary/End Step lifetime checks, shop retirement and exit-dither
+movement. Rendering still follows the
 final camera position, preserving immediate visual collision snaps and native
 ring-scroll deltas. This is not a complete camera manager: explicit camera
 setters, dirty-mode transitions, initial room publication and remaining

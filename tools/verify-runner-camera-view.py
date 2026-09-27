@@ -14,6 +14,8 @@ for name, digest in (
     ("gml_GlobalScript_scrBuilder.asm", "0c95048af06ff612499acd64a717766441b820d19ffc6017c0ff3a95425581f5"),
     ("gml_GlobalScript___view_get.asm", "8ae49fba7a527e34b099812b7ab948f7266daec64f2182b7e20996a28165a13f"),
     ("gml_Object_camMain_Step_0.asm", "7bbb7ff179d72e3e1ebd3e7695ea8acd7723e4002bb89bc0c476978710368450"),
+    ("gml_Object_Shop_Step_2.asm", "e124d7e7d595c81e9e222a01e8570eb9f95ad58bdc37b111cc7e5909a861ea6b"),
+    ("gml_Object_objTransDither_Step_0.asm", "2a201cbf2233b297030ec00109b90de2e916a53d4ad505de870337226564b9eb"),
 ):
     assert sha256((assembly / name).read_bytes()).hexdigest() == digest, name
 for start, end, digest in (

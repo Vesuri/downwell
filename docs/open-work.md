@@ -110,7 +110,7 @@ Reference: [area-two recovery](area-two-recovery.md).
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,
   time-stop/feedback, special camera modes and overlapping camera lockers.
-  Complete phase-aware published-view reads beyond builder/lifetime checks,
+  Complete phase-aware published-view reads beyond builder/lifetime/shop/dither checks,
   including camera dirty setters and initial room publication; see
   [runner camera view](runner-camera-view.md).
 - Replace approximate live animation where original float/sequence behavior

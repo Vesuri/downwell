@@ -1205,7 +1205,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // existing stable compaction at the next birth. Never reorder live slots.
     while (bulletSlotEnd_ && !bullets_[bulletSlotEnd_-1].active) --bulletSlotEnd_;
     while (gemSlotEnd_ && !gems_[gemSlotEnd_-1].active) --gemSlotEnd_;
-    run_.exitDither.step(cameraMotion_.pixelY() - 142, 284);
+    run_.exitDither.step(34 + downwell::floorQ8Coordinate(generationCameraY), 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
     // Moving the followed instance does not dirty the camera cache. End Step
@@ -1266,7 +1266,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     trajectory_.addU64(checkpoint_);
 #endif
 
-    run_.shops.endStep(34 + downwell::floorQ8Coordinate(viewCameraYQ8()));
+    run_.shops.endStep(34 + downwell::floorQ8Coordinate(generationCameraY));
     GameplayFrame frame = {};
     run_.gameplayPresentationStep(enemyRandom_);
     if(!reconcilePhase(PhaseBoundary::endStep))return {};
