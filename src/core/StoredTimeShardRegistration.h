@@ -74,6 +74,18 @@ public:
         if(!records_.erase(id,[&](InstanceHandle h,const InstanceRecord& r){return lifecycle_.retire(h,r);}))return fail();
         *e={};return true;
     }
+    // Route one record selected by the world's cleanup traversal back to its
+    // effect owner. The record reference is invalid after successful removal.
+    template<class Effects> bool retireMarked(InstanceHandle key,const InstanceRecord& record,Effects& effects){
+        if(!succeeded_)return false;
+        if(!effects.phasesBoundTo(*this)||!record.destroyRequested||records_.resolve(key)!=&record)return fail();
+        for(const auto& e:entries_)if(e.local&&e.key.slot==key.slot&&e.key.generation==key.generation){
+            if(resolve(e)!=&record||e.id!=record.instanceId)return fail();
+            if(!effects.retireMarked(e.local,e.id))return fail();
+            return true;
+        }
+        return fail();
+    }
     bool meeting(std::uint32_t local,std::uint32_t id,MotionBinary64 x,MotionBinary64 y,bool& hit){
         if(!succeeded_)return false;
         auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;bool next=false;

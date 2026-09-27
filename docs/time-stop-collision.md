@@ -40,6 +40,13 @@ production phase bindings always select deferred cleanup. The full frame loop
 must still merge cleanup across object families in room-list order; a per-family
 sweep does not establish that global ordering.
 
+For an ordered sweep, `TimeShardEffects::retireMarked` removes only the selected
+private-handle/source-ID pair. `StartupRuntime::retireTimeShard` routes a selected
+world ID through its registered generation and effect owner before removing it.
+Live, stale, foreign or failed selections stop the operation without recycling
+the selected storage or retiring siblings. These are explicit sweep operations;
+the automatic mixed-family traversal still needs to be connected.
+
 ## Shard registration contract
 
 `TimeShardEffects` distinguishes its monotonic phase/lifetime handle from a

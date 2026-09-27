@@ -145,6 +145,21 @@ public:
         auto* effect=get(handle);
         return !effect || effect->playerContact(xsp,ysp,random);
     }
+    // A global room-list sweep selects one lifetime, not an entire family.
+    // Both keys must match: numeric IDs are external and slots may be reused.
+    // Reject live/stale selections before publishing any retirement.
+    bool retireMarked(Handle handle,std::uint32_t id){
+        if(!succeeded_)return false;
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+            if(slot.handle!=handle)continue;
+            if(slot.sourceId!=id||!slot.effect.destroyRequested){succeeded_=false;return false;}
+            if(retire_&&!retire_(context_,handle,id,slot.effect)){succeeded_=false;return false;}
+            slot.handle=slot.sourceId=0;
+            for(unsigned j=i+1;j<count_;++j)order_[j-1]=order_[j];
+            --count_;return true;
+        }
+        succeeded_=false;return false;
+    }
     bool retireRequested(){
         if(!succeeded_)return false;
         unsigned kept=0;

@@ -162,6 +162,18 @@ public:
             },outside);
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity,unsigned Registered> bool retireTimeShard(
+        StoredTimeShardRegistration<instanceCapacity,Registered>& registration,TimeShardEffects<Capacity>& shards,
+        std::uint32_t id){
+        if(!run_.effectsSucceeded)return false;
+        if(registration.belongsTo(instances_))for(std::size_t i=0;i<instances_.size();++i){
+            const auto& record=instances_.at(i);
+            if(record.instanceId!=id)continue;
+            run_.effectsSucceeded=registration.retireMarked(instances_.handleAt(i),record,shards);
+            return run_.effectsSucceeded;
+        }
+        run_.effectsSucceeded=false;return false;
+    }
     bool menuPlayerNapping() const { return menuPlayerNapping_; }
     int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }

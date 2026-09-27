@@ -10,6 +10,7 @@ struct World {
     unsigned births=0,creates=0,retires=0,fail=0,failRetireAt=0;
     std::uint32_t nextId=105186;
     std::vector<unsigned> events;
+    std::vector<unsigned> retiredIds;
     unsigned animations=0,steps=0;
     bool publishAnimation(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++animations;return fail!=4;}
     bool publishStep(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++steps;return fail!=5;}
@@ -28,10 +29,37 @@ struct World {
     }
     bool retire(unsigned h,unsigned id,const TimeShardAnimation& s){
         assert(h && id>=105186 && s.destroyRequested);++retires;events.push_back(3);
+        retiredIds.push_back(id);
         return fail!=3 && retires!=failRetireAt;
     }
 };
 int main(){
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
+        assert(effects.bindPhases(world));
+        const auto a=effects.create({}, {},false,random),b=effects.create({}, {},false,random),
+                   c=effects.create({}, {},false,random);
+        effects.get(a)->alarm0=effects.get(b)->alarm0=effects.get(c)->alarm0=1;
+        effects.advanceAlarm(effects.beginPhase(),0);
+        assert(world.retires==0&&effects.size()==0);
+        // Room depth/activation order need not be this family's newest order.
+        assert(effects.retireMarked(b,105187)&&effects.sourceId(a)==105186&&effects.sourceId(c)==105188);
+        assert(effects.retireMarked(a,105186)&&effects.retireMarked(c,105188));
+        assert((world.retiredIds==std::vector<unsigned>{105187,105186,105188}));
+        const auto replacement=effects.create({}, {},false,random);
+        assert(replacement>c&&effects.sourceId(replacement)==105189);
+        assert(!effects.retireMarked(b,105187)&&world.retires==3&&effects.sourceId(replacement)==105189);
+        assert(!effects.succeeded()&&!effects.clear());
+    }
+    for(unsigned bad=0;bad<3;++bad){
+        GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
+        assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);
+        if(bad!=0){effects.get(h)->alarm0=1;effects.advanceAlarm(effects.beginPhase(),0);}
+        if(bad==2)world.failRetireAt=1;
+        assert(!effects.retireMarked(h,bad==1?105187:105186));
+        assert(!effects.succeeded()&&effects.sourceId(h)==105186&&world.retires==(bad==2?1u:0u));
+        assert(!effects.retireMarked(h,105186)&&world.retires==(bad==2?1u:0u));
+    }
     for(bool reject:{false,true}){
         GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
         assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);
