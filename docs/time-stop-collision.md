@@ -16,10 +16,21 @@ completed callbacks and RNG draws are never replayed, and failed registrations
 are not silently recycled. Reset cannot clear this failure. Numeric IDs must be
 positive signed-32-bit values and unique among this store's live registrations.
 
-These hooks are not yet bound by either production world. Global birth ordering,
-registration of all effect families, publication during movement/animation and
-exact synchronous Destroy boundaries still need scheduler integration; the
-standalone owner tests do not prove those properties.
+`StartupRuntime::timeShardRegistration` supplies a fixed-address borrowed bridge
+to its actual record store, global numeric-ID allocator and collision binding.
+The world burst entry point uses its own RNG and repeated parent-field lookups.
+Object-238 records receive resource defaults before Create, and the bridge
+publishes Create's image index and alarm fields afterward. Retirement checks
+both the effect key and the store generation before erasing the record. The
+bridge and effect store must remain alive together; shards must retire before
+room teardown. Neither adapter copies nor numeric-ID-only lookups are allowed.
+
+The automatic transition schedulers do not call this entry point yet, and the
+native world's heterogeneous registry still needs its corresponding binding.
+Global ordering across effect families, publication during movement/animation
+and exact synchronous Destroy boundaries still need scheduler integration. The
+world integration test proves shared ID/RNG consumption and record ownership,
+not those remaining phase or presentation properties.
 
 The stored collision adapter provides an explicit `birthAt` path for these
 dynamic effects. It receives the already-narrowed binary32 coordinates and

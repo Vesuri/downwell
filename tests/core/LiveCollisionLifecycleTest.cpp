@@ -151,6 +151,41 @@ int main(){
             "missing collision resources cannot attach or silently answer a successful miss");
     }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+    {
+        auto shardOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,shardOwner->binding());
+        require(shardOwner->attach(*world),"attach shard world");world->skipToGameForTesting();
+        PackedObject definition;require(objects.findObject(238,definition)&&definition.parentId==-1,
+            "source shard PreCreate has no parent handler");
+        auto registration=world->timeShardRegistration<3>();TimeShardEffects<3> shards;TimeShardBurst burst;
+        require(shards.bind(registration),"bind actual world shard registration");
+        const auto first=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+        const auto count=world->activeInstanceCount();
+        require(world->emitTimeShards(burst,shards,{0x43704000u},{0x43308000u},
+                MotionBinary64::fromInteger(2),MotionBinary64::fromInteger(-3),false),"world burst completes");
+        require(world->randomDrawCount()==draws+24&&world->nextRuntimeInstanceId()==first+3&&
+                burst.shard==first+2&&world->activeInstanceCount()==count+3,"burst uses shared world RNG and IDs");
+        for(unsigned i=0;i<3;++i){
+            const auto* r=world->instance(first+i);const auto* effect=shards.get(i+1);
+            require(r&&effect&&r->objectId==238&&r->spriteId==definition.spriteId&&r->maskId==definition.textureMaskId&&
+                    r->preciseX==240.25f&&r->preciseY==176.5f&&r->alarms.get(0)==effect->alarm0,
+                    "registered world record retains source resource and Create fields");
+        }
+        require(shards.clear()&&world->activeInstanceCount()==count&&shardOwner->valid(),"world retirement removes every shard record");
+        for(unsigned i=0;i<3;++i)require(!world->instance(first+i),"retired source ID no longer resolves");
+        world->step({},false);require(world->effectsSucceeded(),"world continues after registered burst retirement");
+        // Exhaust registration capacity after one successful child: preserve
+        // that birth and the next scatter/speed draws, never replay the burst.
+        auto limitedRegistration=world->timeShardRegistration<1>();TimeShardEffects<3> limited;
+        require(limited.bind(limitedRegistration),"bind limited world registration");
+        const auto before=world->randomDrawCount();const auto next=world->nextRuntimeInstanceId();
+        require(!world->emitTimeShards(burst,limited,{0x43704000u},{0x43308000u},{},{},false)&&
+                !world->effectsSucceeded()&&world->randomDrawCount()==before+10&&
+                world->nextRuntimeInstanceId()==next+1&&world->instance(next),
+                "partial world burst preserves completed birth and exact RNG prefix");
+        require(!world->emitTimeShards(burst,limited,{},{},{},{},false)&&world->randomDrawCount()==before+10,
+                "failed world burst is terminal");
+    }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
         productionOwner->binding());
