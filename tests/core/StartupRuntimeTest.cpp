@@ -25,6 +25,28 @@ template<class Runtime> void stepMany(Runtime& runtime, int count) {
         runtime.step(false);
 }
 
+void verifyLiveLayers(const downwell::StartupRuntime& runtime){
+    const auto& room=runtime.sourceRoomLayers();
+    require(room.succeeded(),"live room layer owner remains healthy");
+    unsigned bound=0;
+    require(room.layers().visitLayers([&](unsigned layer,const auto& metadata){
+        return room.layers().visitElements(layer,[&](unsigned e){
+            const auto* entry=room.instances().get(e);
+            if(!entry||!entry->instance.generation)return true;
+            const auto* state=room.lifetimes().resolve(entry->instance);
+            require(state&&state->sourceId==entry->sourceId&&state->depth.attached&&state->depth.layerId==metadata.id,
+                "live instance element and lifetime agree on source and layer identity");
+            ++bound;return true;
+        });
+    }),"inspect live mixed room layers");
+    require(bound==runtime.activeInstanceCount(),"every allocated runtime instance has one layer binding");
+    for(std::size_t i=0;i<runtime.activeInstanceCount();++i){
+        const auto* state=room.lifetimes().resolve(runtime.instanceHandleAt(i));
+        require(state&&state->sourceId==runtime.instanceAt(i).instanceId&&state->inactive==!runtime.instanceAt(i).active,
+            "live record activation and generation match layer state");
+    }
+}
+
 // Test branches reconstruct independent owners from identical resources and
 // inputs. Copying a runtime would alias borrowed lifecycle/registration state.
 class ReplayRuntime:public downwell::StartupRuntime {
@@ -561,11 +583,13 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         std::array<std::uint64_t,180> checkpoints{};
         for (unsigned i=0;i<checkpoints.size();++i) {
             cached->step(i%32==0);
+            verifyLiveLayers(*cached);
             checkpoints[i]=cached->stateDigest();
         }
         cached->reset(downwell::PlatformProfile::nonDesktop);
         for (unsigned i=0;i<checkpoints.size();++i) {
             cached->step(i%32==0);
+            verifyLiveLayers(*cached);
             require(cached->stateDigest()==checkpoints[i],
                     "alarm binding cache reset preserves complete deterministic startup state");
         }
@@ -576,6 +600,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         downwell::StartupRuntime::defaultRandomSeed, patterns);
     auto& runtime=*runtimeStorage;
     require(runtime.roomLoadSucceeded(), "packed rmInit loads");
+    verifyLiveLayers(runtime);
     require(runtime.activeInstanceCount() == 2,
             "packed rmInit creates two instances");
     if (objects != nullptr) {
@@ -590,6 +615,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
     runtime.step(false);
     require(runtime.inMenu(), "packed startup reaches rmMenu");
     require(runtime.roomLoadSucceeded(), "packed rmMenu loads");
+    verifyLiveLayers(runtime);
     require(runtime.activeInstanceCount() == (objects != nullptr ? 201U : 193U),
             "rmMenu contains recovered, persistent, and translated instances");
     require(runtime.hasInstance(100065), "controller persists into packed rmMenu");
@@ -756,6 +782,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 "the next frame enters the recovered rmMain room");
         require(runtime.roomLoadSucceeded(),
                 "rmMain fits and loads from the recovered room pack");
+        verifyLiveLayers(runtime);
         require(runtime.hasInstance(100855),
                 "rmMain creates its authoritative player instance");
         require(runtime.mainPlayerX() == 240.0F &&

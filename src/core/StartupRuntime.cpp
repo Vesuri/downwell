@@ -60,6 +60,9 @@ StartupRuntime::StartupRuntime(PlatformProfile profile,
     : lifecycle_(lifecycle), roomPack_(roomPack), objectPack_(objectPack),
       builderPatternPack_(builderPatternPack),
       randomSeed_(randomSeed), random_(randomSeed) {
+    if(roomPack_&&!lifecycle_.observeLayers(roomLayers_.observer())){
+        roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;
+    }
     reset(profile);
 }
 
@@ -2051,8 +2054,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             instance->imageSpeed =
                 static_cast<float>(0.15 + random_.random(0.1));
             instance->imageIndex = static_cast<float>(random_.irandom(3));
-            if (random_.random(10.0) < 1.0)
+            if (random_.random(10.0) < 1.0) {
+                if(!publishMainInactivation(*instance))return;
                 instance->active = false;
+            }
         }
         return;
     case 2490: // gml_Object_objWell_Create_0
@@ -2259,6 +2264,7 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
     if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded){roomLoadSucceeded_=false;return;}
     if(!clearRoomDebris()){roomLoadSucceeded_=false;return;}
     if(!clearRoomScriptEffects()){roomLoadSucceeded_=false;return;}
+    if(roomPack_&&!roomLayers_.leave()){roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;}
     const auto instanceHandler = [this](InstanceRecord& instance,
                                         RoomInstancePhase phase) {
         dispatchInstancePhase(instance, phase);
@@ -2277,7 +2283,9 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
         roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enterChecked(
             instances_, *roomPack_, roomId, firstGameRoom,
             instanceHandler, roomCreationHandler,
-            deferredHandler,objectPack_,lifecycle_) == PackedRoomLoadResult::success;
+            deferredHandler,objectPack_,lifecycle_,[this](auto& survivors,int room){
+                return roomLayers_.prepare(*roomPack_,room,survivors);
+            }) == PackedRoomLoadResult::success;
     } else {
         // Bounded fallback's rmInit instances, in recovered creation order.
         const RoomInstanceDefinition definitions[] = {

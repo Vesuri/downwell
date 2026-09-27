@@ -9,6 +9,8 @@ template<unsigned Layers,unsigned Elements> class RunnerLayerElements {
     struct Layer {unsigned head=Elements,tail=Elements,count=0;};
 public:
     static constexpr unsigned End=Elements,NoLayer=Layers;
+    // Storage disposal only; caller has already unpublished all payloads.
+    void clear(){for(auto& link:links_)link=Links{};for(auto& layer:layers_)layer=Layer{};}
     unsigned owner(unsigned element)const{return element<Elements?links_[element].layer:NoLayer;}
     unsigned count(unsigned layer)const{return layer<Layers?layers_[layer].count:0;}
     // 0x4128d0: explicit append wins; otherwise type-2 elements enter at

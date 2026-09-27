@@ -16,6 +16,11 @@ public:
     };
     const Layer* get(unsigned slot)const{return slot<Capacity&&layers_[slot].present?&layers_[slot]:nullptr;}
     bool succeeded()const{return !failed_;}
+    bool discardUninitialized(){
+        if(failed_)return false;
+        for(auto& layer:layers_)layer=Layer{};
+        elements_.clear();head_=tail_=End;return true;
+    }
     unsigned find(std::int32_t id)const{
         for(unsigned i=head_;i!=End;i=layers_[i].next)if(layers_[i].id==id)return i;
         return End;

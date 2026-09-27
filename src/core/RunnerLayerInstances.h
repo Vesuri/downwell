@@ -12,6 +12,11 @@ public:
     using Layers=RunnerLayers<LayerCapacity,ElementCapacity>;
     static constexpr unsigned End=ElementCapacity;
     struct Entry {std::uint32_t sourceId=0;InstanceHandle instance;bool present=false;};
+    bool discardUninitialized(){
+        for(const auto& entry:entries_)if(entry.instance.generation)return false;
+        for(auto& entry:entries_)entry=Entry{};
+        return true;
+    }
     const Entry* get(unsigned element)const{return element<ElementCapacity&&entries_[element].present?&entries_[element]:nullptr;}
     unsigned find(std::uint32_t sourceId)const{
         for(unsigned i=0;i<ElementCapacity;++i)if(entries_[i].present&&entries_[i].sourceId==sourceId)return i;

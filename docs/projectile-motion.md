@@ -684,7 +684,7 @@ again, so it is not a per-frame stable partition. The predicate must reject null
 and non-instance elements and cannot mutate the owners. Empty dynamic layers
 survive this pass. Exhaustive tests cover all 256 inactive masks across two
 layers, traversal order, repeated invocation and terminal-owner rejection.
-The live room-entry adapter still needs to invoke the complete sequence.
+The stored runtime invokes this sequence through its room-preparation callback.
 
 The shared `RoomLoader::enterChecked` and `PackedRoomLoader::enterChecked`
 accept a checked destination-preparation callback after old nonpersistent
@@ -696,8 +696,8 @@ them. Preparation must not structurally mutate the instance store. Validation
 and retirement failures suppress it; its own failure preserves earlier
 retirement but suppresses every subsequent birth and event. The packed-room
 fixture now loads its layer reservations through this boundary rather than
-preparing them outside room entry. The live runtimes currently retain the
-default no-op callback pending installation of their complete layer owners.
+preparing them outside room entry. `StartupRuntime` installs the preparation
+callback for packed rooms; the separate native gameplay adapter still needs it.
 
 `RunnerLayerInstances::initializeRoom` composes the three instance-layer stages:
 forward layer/element initialization (`0x413500..0x413549`), caller-provided
@@ -772,9 +772,9 @@ dynamic layer even if a fixed peer has matching depth. Flag publication and
 activation relinking remain distinct calls. Retirement cancels queued depth
 writes before storage-slot reuse; stale handles and capacity failures stop the
 adapter terminally. Tests connect multi-instance departure, singleton merging,
-merged layer-ID publication, a -60000 migration and generation reuse. This is
-the shared adapter, not live installation: persistent-state transfer and room
-preparation must be connected before either backend changes Draw traversal.
+merged layer-ID publication, a -60000 migration and generation reuse. Stored
+runtime ownership is installed independently of Draw traversal; native gameplay
+ownership and live depth-setter admission remain separate integration work.
 
 Its room-entry adapter adopts surviving lifetime fields without treating them
 as new births, assigning a depth, or resetting a saved layer ID. The room owner
@@ -787,8 +787,8 @@ non-instance elements initialize through the supplied callback. Invoke this
 once at the source room-entry boundary, not once per frame: normalization is
 not idempotent. Tests retain fractional depth on serialized rebinding, honor a
 saved fixed layer during fallback, and carry adopted lifetimes through deferred
-depth service and retirement. Live room teardown/transfer and installation are
-still required; these tests do not establish persistent-room gameplay parity.
+depth service and retirement. These tests do not establish persistent-room
+gameplay parity or the native gameplay adapter's installation.
 
 Room-layer uninitialization is a separate boundary, not instance retirement.
 The original `0x414c50` visits forward layers and forward elements; its type-2
@@ -830,9 +830,21 @@ a second observer is rejected. The binding adds five pointers of storage.
 `StoredLayerLifecycle` translates stored source ID/depth/activation into the
 shared layer lifetime owner. Tests compose it with packed-room loading and with
 the real spatial owner for positioned time-change births and deferred cleanup.
-Normal game construction still needs room-owner installation, preparation and
-teardown before using this observer; adding observation alone cannot supply
-missing serialized layers or switch Draw traversal.
+`StartupRuntime` installs this observer before its first packed-room birth.
+Its `StoredRoomLayers` owner keeps lifetime and pending-depth storage across
+room transitions while replacing uninitialized layer/element/background
+storage in place. Serialized backgrounds are initialized through their own
+owner. Disposal uses bounded loops, not room-sized stack temporaries. Catalog
+layer identities survive reset. Failed publication or preparation stops the
+runtime. The garden-star activation write uses the same publication boundary
+as other stored actors, before changing the record's active flag.
+
+Runtime tests check every allocated instance's generation, source identity,
+attachment and activation against its layer element through startup, garden,
+gameplay and reset. Existing deterministic state/RNG tapes still pass. This
+installation adds bounded storage to `StartupRuntime`; it does not establish
+A500 memory fit. Neither live renderer has switched to layer Draw traversal,
+and the separate native gameplay lifetime owner still needs installation.
 
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing

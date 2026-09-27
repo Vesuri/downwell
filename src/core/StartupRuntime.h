@@ -24,6 +24,7 @@
 #include "StoredTimeChangeRegistration.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
+#include "StoredRoomLayers.h"
 #include "EventScheduler.h"
 #include "ScriptSpawnOperations.h"
 #include "EffectSpawnScript.h"
@@ -201,6 +202,7 @@ public:
     }
     std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
     const RunnerLayerIds& sourceLayerIds()const{return layerIds_;}
+    const auto& sourceRoomLayers()const{return roomLayers_;}
     bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
     // Engine x/y setter for collision response. Keeps private actor motion and
     // preciseX/Y motion caches untouched; the collision owner stores exact x/y.
@@ -803,6 +805,7 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     RunnerLayerIds layerIds_;
+    StoredRoomLayers<instanceCapacity,256,4096,8> roomLayers_{layerIds_};
     InstanceLifecycleBinding lifecycle_;
     ScriptEffectRuntimeBinding scriptEffectsBinding_;
     ScriptEffectRuntimeBinding debrisBinding_;

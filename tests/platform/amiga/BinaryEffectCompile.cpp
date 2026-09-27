@@ -8,6 +8,11 @@
 #include "core/RunnerLayerLifetimes.h"
 #include "core/StoredLayerLifecycle.h"
 #include "core/InstanceLifecycle.h"
+#include "core/StoredRoomLayers.h"
+bool compileStoredRoomLayers(downwell::StoredRoomLayers<8,4,16,2>& owner,
+    const downwell::RoomPack& pack,downwell::InstanceStore<8>& instances,int room){
+    return owner.leave()&&owner.prepare(pack,room,instances);
+}
 bool compileLayerObserver(downwell::InstanceLifecycleBinding& binding,
     downwell::StoredLayerLifecycle<4,16,8>& observer,downwell::InstanceHandle h,const downwell::InstanceRecord& r){
     return binding.observeLayers(observer)&&binding.birth(h,r)&&binding.activation(h,r,false)&&

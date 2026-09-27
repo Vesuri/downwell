@@ -37,6 +37,16 @@ public:
         for(auto& entry:entries_)if(entry.element==element){entry.background.initialize();return true;}
         return false;
     }
+    bool uninitialize(unsigned element){
+        if(element>=E)return false;
+        for(auto& entry:entries_)if(entry.element==element){entry.background.initialized=false;return true;}
+        return false;
+    }
+    bool discardUninitialized(){
+        for(const auto& entry:entries_)if(entry.element!=E&&entry.background.initialized)return false;
+        for(auto& entry:entries_)entry=Entry{};
+        return true;
+    }
     bool retire(Layers& layers,unsigned element){
         if(element>=E)return false;
         for(auto& entry:entries_)if(entry.element==element){
