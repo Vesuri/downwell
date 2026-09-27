@@ -17,6 +17,7 @@
 #include "AmigaGameplayRows.h"
 #include "AmigaGameplayScene.h"
 #include "AmigaGameplayGeneration.h"
+#include "AmigaWallCollision.h"
 #include "AmigaGameplayActors.h"
 #include "AmigaGameplayDrawList.h"
 #include "AmigaGameplayEffects.h"
@@ -827,6 +828,7 @@ enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrain
        terrainRasterX = AmigaGameplayRows::terrainX };
 static AmigaTerrainRaster terrainRaster{};
 static AmigaWallDamage<> wallDamage;
+static AmigaWallCollision wallCollision{terrainIndex};
 static void invalidateShopRaster(const downwell::ShopWorld& shops) {
     terrainRaster.invalidateShops(shops);
 }
@@ -1222,7 +1224,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     // Keep these bounded tables off the AmigaDOS stack, like the world itself.
     alignas(downwell::GameplayCollisionOwner) static UBYTE collisionStorage[sizeof(downwell::GameplayCollisionOwner)];
     auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
-        downwell::GameplayTerrainInstances::Presentation::bind(wallDamage));
+        downwell::GameplayTerrainInstances::Presentation::bind(wallDamage),
+        downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision));
     if(!collisionOwner.valid())return 20;
     checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY

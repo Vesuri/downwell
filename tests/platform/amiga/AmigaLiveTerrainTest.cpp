@@ -1,5 +1,6 @@
 #include "platform/amiga/AmigaTerrain.h"
 #include "platform/amiga/AmigaPortRuntime.h"
+#include "platform/amiga/AmigaWallCollision.h"
 #include "core/Replay.h"
 #include <cstdlib>
 #include <fstream>
@@ -15,6 +16,58 @@ void require(bool value, const char* message) {
     if (!value) { std::cerr << "FAILED: " << message << '\n'; std::exit(1); }
 }
 using Commands = std::vector<downwell::DeferredCreateInstance>;
+void verifyWallCollisionLifecycle() {
+    static AmigaTerrainIndex index;
+    AmigaTerrainCollisionContext context{nullptr,nullptr,nullptr,nullptr,0,nullptr};
+    require(amigaBuildTerrainIndex(context,index),"lifecycle cache initializes");
+    AmigaWallCollision cache{index};
+    struct Presentation {unsigned calls=0;bool changed(int,int,int,int){++calls;return true;}} presentation;
+    using Store=downwell::GameplayTerrainInstances;
+    struct Lifecycle {
+        using H=downwell::InstanceHandle;using R=Store::Record;using V=downwell::RunnerImageValue;
+        bool birth(H,const R&){return true;}bool retire(H,const R&){return true;}
+        bool activation(H,const R&,bool){return true;}bool membership(H,const R&,bool){return true;}
+        bool move(H,const R&,V,V){return true;}bool sprite(H,const R&,int){return true;}
+        bool imageIndex(H,const R&,V){return true;}bool markDestroyed(H,const R&){return true;}
+    } lifecycle;
+    const auto binding=Store::Binding::bindDestruction(lifecycle);
+    Store store(binding,Store::Presentation::bind(presentation),Store::WallCollision::bind(cache));
+    require(amigaAddTerrainObject(index,60,240,176) && store.append(60,240,176,true),"live wall birth");
+    const auto h=store.handle(0);
+    require(store.activation(h,false) && !amigaIndexedWall(index,240,176),"deactivation excludes cache immediately");
+    require(store.activation(h,false) && store.activation(h,true) && store.activation(h,true) &&
+            index.wallContacts.size()==1,"idempotent activation does not duplicate contributions");
+    downwell::GameMakerRandom random;
+    require(store.createProperties(h,51,false,random),"wall Create properties");
+    struct Ops {
+        Store& store;downwell::InstanceHandle h;AmigaTerrainIndex& index;Presentation& presentation;
+        bool outOfView(){return true;}
+        bool tile(int,int,int,int,int,int,int,int){return true;}
+        bool place(int,int,int,bool& hit){hit=true;return true;}
+        bool point(int,int,int,bool& hit){hit=true;return true;}
+        bool image(int frame){return store.imageIndex(h,frame);}
+        bool create(int,int,int){return true;}
+        bool deactivate(){return store.activation(h,false);}
+        bool destroy(){
+            const unsigned before=presentation.calls;
+            require(store.requestDestroy(h) && !amigaIndexedWall(index,240,176),
+                    "destroy excludes cache before End Step returns");
+            require(store.find(h) && store.find(h)->destroyRequested && presentation.calls==before,
+                    "marked lifetime survives while visual notification is still coalesced");
+            return true;
+        }
+    } ops{store,h,index,presentation};
+    require(store.wallEvent(h,1,random,ops) && store.wallEvent(h,1,random,ops),"surrounded wall two-event lifetime");
+    require(store.requestDestroy(h) && store.activation(h,false) && store.activation(h,true) &&
+            index.wallContacts.size()==0,"destroyed wall never reenters cache");
+    require(store.retireMarked(h) && !store.find(h),"cleanup retires identity without removing cache twice");
+    require(store.append(60,256,192,false),"inactive birth has no cache contribution");
+    const auto inactive=store.handle(0);
+    require(store.activation(inactive,true) && amigaIndexedWall(index,256,192),"inactive birth enters cache upon activation");
+    Store failed(binding, {}, Store::WallCollision::bind(cache));
+    require(failed.append(60,272,208,true),"missing contribution fixture");
+    require(!failed.requestDestroy(failed.handle(0)) && !failed.valid(),"missing contribution is terminal, not a silent miss");
+}
 void verifyWallRemoval() {
     static AmigaTerrainIndex index;
     AmigaTerrainCollisionContext context{nullptr,nullptr,nullptr,nullptr,0,nullptr};
@@ -370,6 +423,7 @@ void checkSchedule(const downwell::BuilderPatternPack& patterns, bool interleave
 }
 
 int main(int argc, char** argv) {
+    verifyWallCollisionLifecycle();
     verifyWallRemoval();
     verifyTerrainSegments();
     require(argc == 2, "builder pack path required");

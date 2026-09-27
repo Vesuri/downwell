@@ -23,7 +23,8 @@ bool AmigaGameplayGeneration::create(void* opaque,
         [&self](const downwell::DeferredCreateInstance& command) {
             {
                 DW_PROFILE_SCOPE(profileGeneratedIndex);
-                if (!amigaAddTerrainObject(self.index_, command.objectId, command.x, command.y) ||
+                if ((!(command.objectId==60&&!command.active) &&
+                     !amigaAddTerrainObject(self.index_, command.objectId, command.x, command.y)) ||
                     !self.tiles_.append(command)) return false;
             }
             if (command.objectId == 60 || command.objectId == 92 || command.objectId == 93 ||

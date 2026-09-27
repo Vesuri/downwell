@@ -33,7 +33,20 @@ public:
         }
         bool notify(int x,int y,int before,int after)const{return !changed||changed(context,x,y,before,after);}
     };
-    explicit GameplayTerrainInstances(Binding binding={},Presentation presentation={}):binding_(binding),presentation_(presentation){}
+    // Unlike presentation, collision exclusion is published immediately, even
+    // inside a coalesced End Step event. Birth/teardown remain the generator's
+    // responsibility; this observes changes to an existing wall contribution.
+    struct WallCollision {
+        void* context;
+        bool (*changed)(void*,int,int,bool);
+        WallCollision(void* p=nullptr,bool (*fn)(void*,int,int,bool)=nullptr):context(p),changed(fn){}
+        template<class Observer> static WallCollision bind(Observer& observer){
+            return {&observer,[](void* p,int x,int y,bool enabled){return static_cast<Observer*>(p)->changed(x,y,enabled);}};
+        }
+        bool notify(int x,int y,bool enabled)const{return !changed||changed(context,x,y,enabled);}
+    };
+    explicit GameplayTerrainInstances(Binding binding={},Presentation presentation={},WallCollision collision={}):
+        binding_(binding),presentation_(presentation),collision_(collision){}
     GameplayTerrainInstances(const GameplayTerrainInstances&)=delete;
     GameplayTerrainInstances& operator=(const GameplayTerrainInstances&)=delete;
     bool valid()const{return good_;}
@@ -96,7 +109,8 @@ public:
         // Publish collision exclusion before marking the local record. Keep
         // its address and identity alive through the remainder of the event.
         if(!binding_.markDestroyed(h,r))return good_=false;
-        const int before=drawSprite(r);r.destroyRequested=true;
+        const int before=drawSprite(r);const bool wasVisible=visible(r);r.destroyRequested=true;
+        if(wasVisible&&!collision_.notify(r.x,r.y,false))return good_=false;
         return note(r,before,-1,before>=0);
     }
     bool imageIndex(InstanceHandle h,int frame){
@@ -125,8 +139,11 @@ public:
         if(!good_||!find(h))return good_=false;
         auto& r=records_[h.slot];
         const int before=drawSprite(r);
+        const bool wasVisible=visible(r);
         if(!binding_.activation(h,r,active))return good_=false;
-        r.active=active;return note(r,before,drawSprite(r),before!=drawSprite(r));
+        r.active=active;
+        if(wasVisible!=visible(r)&&!collision_.notify(r.x,r.y,visible(r)))return good_=false;
+        return note(r,before,drawSprite(r),before!=drawSprite(r));
     }
     // The world scheduler supplies the runner's cross-family cleanup order.
     // Do not invent a terrain-only sweep or retire during the game callback.
@@ -169,6 +186,7 @@ private:
     }
     Binding binding_;
     Presentation presentation_;
+    WallCollision collision_;
     Record records_[capacity]{};
     unsigned order_[capacity]{}; // Birth order, independent of reusable identity slots.
     unsigned count_=0;
