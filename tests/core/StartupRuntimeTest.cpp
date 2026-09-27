@@ -3,6 +3,7 @@
 #include "core/BuilderPatternPack.h"
 #include "core/ObjectPack.h"
 #include "core/RoomPack.h"
+#include "core/GameplayContactProfileInput.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -21,6 +22,111 @@ void require(bool condition, const char* message) {
 void stepMany(downwell::StartupRuntime& runtime, int count) {
     for (int i = 0; i < count; ++i)
         runtime.step(false);
+}
+
+struct LifecycleAudit {
+    struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
+    std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
+    unsigned births=0,retires=0,activations=0,memberships=0,calls=0,fail=0;
+    bool matches(downwell::InstanceHandle h,const downwell::InstanceRecord& r)const{
+        return h.slot<entries.size()&&entries[h.slot].live&&entries[h.slot].generation==h.generation&&entries[h.slot].id==r.instanceId;
+    }
+    bool birth(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+        ++calls;if(fail==1)return false;
+        require(h.slot<entries.size()&&!entries[h.slot].live&&h.generation>entries[h.slot].generation,
+                "live runtime publishes births before reusing generation-checked slots");
+        entries[h.slot]={h.generation,r.instanceId,true};++births;return true;
+    }
+    bool retire(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+        ++calls;require(matches(h,r),"retirement still resolves the published lifetime");
+        if(fail==2)return false;
+        entries[h.slot].live=false;++retires;return true;
+    }
+    bool activation(downwell::InstanceHandle h,const downwell::InstanceRecord& r,bool active){
+        ++calls;require(matches(h,r)&&active&&!r.active,"activation sees the existing dormant record before its flag changes");
+        if(fail==3)return false;
+        ++activations;return true;
+    }
+    bool membership(downwell::InstanceHandle h,const downwell::InstanceRecord& r,bool){
+        ++calls;require(matches(h,r),"reconciliation publishes a live generation");
+        if(fail==4)return false;
+        ++memberships;return true;
+    }
+    void verify(const downwell::StartupRuntime& runtime)const{
+        unsigned count=0;
+        for(const auto& e:entries)if(e.live){
+            ++count;require(runtime.instance(e.id)!=nullptr,"external lifetime still exists in runtime");
+        }
+        require(count==runtime.activeInstanceCount(),"all stored runtime lifetimes have been published");
+    }
+};
+
+void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPack& objects,
+                       const downwell::BuilderPatternPack& patterns){
+    using Runtime=downwell::StartupRuntime;
+    const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
+    LifecycleAudit audit;
+    auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+        downwell::InstanceLifecycleBinding::bind(audit));
+    auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+    indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
+    for(unsigned tick=0;tick<1800;++tick){
+        const auto input=downwell::gameplayContactProfileInput(tick,indexed->mainPlayerX(),indexed->mainPlayerY());
+        indexed->step(input,false);plain->step(input,false);
+        require(healthy(*indexed)&&indexed->stateDigest()==plain->stateDigest(),
+                "lifecycle publication preserves complete live gameplay state and RNG");
+        audit.verify(*indexed);
+    }
+    std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
+              << " activations=" << audit.activations << " memberships=" << audit.memberships << '\n';
+    require(audit.births>100&&audit.retires>2&&audit.memberships>0,
+            "natural gameplay covers dynamic births, retirement and reconciliation");
+    indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
+    require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
+    for(unsigned failure=0;failure<=4;++failure){
+        LifecycleAudit failing;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bind(failing));
+        runtime->skipToGameForTesting();
+        if(failure==0||failure==3){
+            // Controlled lifecycle fixture, not a natural combat encounter:
+            // put an existing enemy into the activation frontier's dormant set.
+            bool prepared=false;
+            for(unsigned warmup=0;warmup<600&&!prepared;++warmup){
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                auto& record=const_cast<downwell::InstanceRecord&>(runtime->instanceAt(i));
+                if(record.objectId!=111&&record.objectId!=112&&record.objectId!=113&&record.objectId!=116&&
+                   record.objectId!=117&&record.objectId!=119)continue;
+                record.active=false;record.activationPending=true;record.x=240;record.y=1200;
+                prepared=true;break;
+            }
+            if(!prepared)runtime->step(downwell::gameplayContactProfileInput(warmup,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+            }
+            require(prepared,"activation fixture has a real published enemy lifetime");
+        }
+        failing.fail=failure;
+        for(unsigned tick=0;tick<1800&&healthy(*runtime);++tick)
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+        if(failure==0){
+            require(healthy(*runtime)&&failing.activations>0,"accepted activation reaches the live callback");
+            continue;
+        }
+        require(!healthy(*runtime),"every rejected live publication stops the runtime");
+        const auto tick=runtime->tick();const auto calls=failing.calls;
+        runtime->step(false);
+        require(runtime->tick()==tick&&failing.calls==calls,"failed publication stays latched on subsequent updates");
+    }
+    LifecycleAudit failedReset;
+    auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::desktop,nullptr,nullptr,2,nullptr,
+        downwell::InstanceLifecycleBinding::bind(failedReset));
+    failedReset.fail=2;const auto births=failedReset.births;
+    runtime->reset(downwell::PlatformProfile::desktop);
+    require(!healthy(*runtime)&&failedReset.births==births,"failed reset retirement cannot publish replacement births");
+    LifecycleAudit failedBirth;failedBirth.fail=1;
+    auto rejected=std::make_unique<Runtime>(downwell::PlatformProfile::desktop,&rooms,&objects,2,&patterns,
+        downwell::InstanceLifecycleBinding::bind(failedBirth));
+    require(!healthy(*rejected)&&failedBirth.calls==1&&rejected->implementedCodeCalls()==0,
+            "initial birth rejection precedes all game callbacks and later room births");
 }
 
 void testDesktopBootState() {
@@ -200,6 +306,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         builderPatterns.valid() ? &builderPatterns : nullptr;
     if (builderPatternPath != nullptr)
         require(patterns != nullptr, "generated builder-pattern pack is valid");
+
+    if(objects&&patterns)testLiveLifecycle(pack,*objects,*patterns);
 
     if (objects != nullptr) {
         auto cached = std::make_unique<downwell::StartupRuntime>(

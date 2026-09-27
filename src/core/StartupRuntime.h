@@ -73,7 +73,8 @@ public:
                             const RoomPack* roomPack = nullptr,
                             const ObjectPack* objectPack = nullptr,
                             std::uint32_t randomSeed = defaultRandomSeed,
-                            const BuilderPatternPack* builderPatternPack = nullptr);
+                            const BuilderPatternPack* builderPatternPack = nullptr,
+                            InstanceLifecycleBinding lifecycle = {});
 
     void reset(PlatformProfile profile);
     // Call at a room-transition boundary, after consuming the results action.
@@ -368,6 +369,7 @@ private:
     int roomDestination_ = 0;
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
+    InstanceLifecycleBinding lifecycle_;
     const RoomPack* roomPack_ = nullptr;
     const ObjectPack* objectPack_ = nullptr;
     // Object event bindings are immutable. Cache inherited alarm masks, not

@@ -50,21 +50,24 @@ StartupRuntime::StartupRuntime(PlatformProfile profile,
                                const RoomPack* roomPack,
                                const ObjectPack* objectPack,
                                std::uint32_t randomSeed,
-                               const BuilderPatternPack* builderPatternPack)
-    : roomPack_(roomPack), objectPack_(objectPack),
+                               const BuilderPatternPack* builderPatternPack,
+                               InstanceLifecycleBinding lifecycle)
+    : lifecycle_(lifecycle), roomPack_(roomPack), objectPack_(objectPack),
       builderPatternPack_(builderPatternPack),
       randomSeed_(randomSeed), random_(randomSeed) {
     reset(profile);
 }
 
 void StartupRuntime::reset(PlatformProfile profile) {
+    if(!instances_.clear([this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);})){
+        roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;
+    }
     tick_ = 0;
     profile_ = profile;
     random_.setSeed(randomSeed_); // Result of the Windows runner's randomize().
     roomId_ = entryRoomId;
     roomDestination_ = 0;
     showSplash_ = 0;
-    instances_.clear();
     initTimes_ = 0;
     achievementLoginCalls_ = 0;
     splashSpeed_ = 180;
@@ -380,8 +383,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
             if(roomId_==mainRoomId && phase==StepEventPhase::step)
                 run_.stepDamageNumbers(run_.damageNumbers.beginPhase());
             if(phase==StepEventPhase::step)smokeStepPhase=run_.smokeEffects.beginPhase();
-        },[](InstanceHandle,const InstanceRecord&,bool){return true;},
-        [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;}))return;
+        },[this](InstanceHandle h,const InstanceRecord& record,bool member){return lifecycle_.membership(h,record,member);},
+        [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;})){
+        run_.effectsSucceeded=false;return;
+    }
     if (deferredInstances_.size() != 0)
         flushDeferredInstances(instances_, roomId_);
     if (!roomLoadSucceeded_ || !deferredCommandsSucceeded_ || !run_.effectsSucceeded) return;
@@ -965,7 +970,7 @@ void StartupRuntime::updateMainLifecycle() {
         },
         [this, &removed](unsigned i) {
             const auto id = instances_.at(i - removed).instanceId;
-            if (!instances_.erase(id)) return false;
+            if (!instances_.erase(id,[this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);})) return false;
             ++removed;
             ++mainInstancesRetired_;
             return true;
@@ -1068,7 +1073,8 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         [this](unsigned index) {
             // The frontier enumerates live slots without structural mutation.
             // Use the request boundary; membership is reconciled after Begin Step.
-            return instances_.requestActivation(instances_.handleAt(index),true);
+            return instances_.requestActivation(instances_.handleAt(index),true,
+                [this](InstanceHandle h,const InstanceRecord& record,bool active){return lifecycle_.activation(h,record,active);});
         });
     mainEnemiesActivated_ += activation.activated;
     if(!activation.succeeded){run_.effectsSucceeded=false;return;}
@@ -1781,7 +1787,7 @@ void StartupRuntime::flushDeferredInstances(
         return deferredCommandsSucceeded_ && run_.effectsSucceeded;
     };
     const ApplyInstanceCommandsResult result = deferredInstances_.applyChecked(
-        instances, *objectPack_, roomId, nextRuntimeInstanceId_, createHandler);
+        instances, *objectPack_, roomId, nextRuntimeInstanceId_, createHandler,lifecycle_);
     deferredCommandsSucceeded_ = deferredCommandsSucceeded_ &&
                                  result == ApplyInstanceCommandsResult::success;
 }
@@ -1872,7 +1878,7 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
         roomLoadSucceeded_ = PackedRoomLoader<instanceCapacity>::enterChecked(
             instances_, *roomPack_, roomId, firstGameRoom,
             instanceHandler, roomCreationHandler,
-            deferredHandler,objectPack_) == PackedRoomLoadResult::success;
+            deferredHandler,objectPack_,lifecycle_) == PackedRoomLoadResult::success;
     } else {
         // Bounded fallback's rmInit instances, in recovered creation order.
         const RoomInstanceDefinition definitions[] = {
@@ -1883,7 +1889,7 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
             instances_, roomId, firstGameRoom ? definitions : nullptr,
             firstGameRoom ? 2 : 0, firstGameRoom,
             instanceHandler, roomCreationHandler,
-            deferredHandler) == LoadRoomResult::success;
+            deferredHandler,lifecycle_) == LoadRoomResult::success;
     }
     if (roomLoadSucceeded_)
         roomId_ = roomId;

@@ -51,7 +51,9 @@ bool compileStoredCollisionBirth(downwell::RunnerSpatialInstances<4,8>& owner,
     auto round=[](auto value,std::int32_t& out){return value.promoted().roundPixel(out);};
     downwell::StoredCollisionLifecycle<4,8,decltype(graph),decltype(trig),decltype(round)>
         lifecycle{owner,properties,objects,sprites,graph,trig,round};
-    return lifecycle.birth(handle,record)&&lifecycle.move(handle,record,{}, {})&&
+    auto binding=downwell::InstanceLifecycleBinding::bind(lifecycle);
+    return binding.birth(handle,record)&&binding.activation(handle,record,true)&&
+        binding.membership(handle,record,true)&&lifecycle.move(handle,record,{}, {})&&
         lifecycle.mask(handle,record,record.maskId)&&
         lifecycle.sprite(handle,record,record.spriteId)&&
         lifecycle.transform(handle,record,downwell::RunnerSpatialInstances<4,8>::TransformField::scaleX,

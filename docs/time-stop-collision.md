@@ -30,6 +30,17 @@ not populate or rebuild the index: births, writes, activation, rebinding and
 retirement must already have been routed through the owner in source order.
 Live scheduler wiring remains in the shared work queue.
 
+`StartupRuntime` accepts a borrowed `InstanceLifecycleBinding` at construction,
+before the initial room births. Packed/fallback room loading, deferred creation,
+room/reset/out-of-view retirement, activation requests and scheduler membership
+reconciliation pass through this binding. Rejected callbacks latch failure and
+stop later work; a rejected reset retirement must not create replacement births.
+The binding's owner must outlive the runtime, and a bound runtime must not be
+copied while sharing that owner. Default construction leaves the binding empty:
+it does not install a collision registry or change query selection. Position and
+resource writes, separate effect lifetimes and native-world registration still
+need explicit routing before installing the full collision owner in gameplay.
+
 Object identity changes use `InstanceStore::bindObject` with the collision
 adapter's `rebind` callback. The callback validates the old handle/object pair
 before applying the new object's membership and serialized mask/depth/sprite
