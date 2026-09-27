@@ -1172,8 +1172,18 @@ Unchanged frame writes and events, hidden walls, post-destruction deactivation
 and physical cleanup do not report redundant damage. A rejected notification
 is terminal but preserves already-published simulation/collision changes.
 Birth drawing and whole-room teardown remain owned by generation/scene reset;
-the observer does not replace them. Native cache repair still needs to consume
-these notifications before production wall dispatch is enabled.
+the observer does not replace them. `AmigaWallDamage` accepts these notifications
+and unions adjacent/overlapping world-row bands without filling clean gaps. Its
+source-specific footprint table rejects unknown artwork; out-of-range coordinates
+and capacity fail explicitly. The native renderer uses this queue for newly
+retained wall tiles: invalidate terrain raster, prefetch and out-of-view backing
+first, then repair each visible band through the existing painter/dual-display
+debt path after camera movement. Only successfully repaired bands are acknowledged.
+Scene reset discards old-room debts. The registered-owner event fixture feeds
+this same queue; production installation of that optional owner/observer is still
+required for live frame and visibility notifications. Sparse union/partial-failure
+tests establish queue behavior, not complete end-to-end retired-wall cache
+fidelity or frame-budget fit. The default queue holds 2048 bands (16 KiB).
 
 The stored collision owner's production lifecycle binding exposes both shape
 queries and a separate `positionMeeting` point query. The latter has no caller

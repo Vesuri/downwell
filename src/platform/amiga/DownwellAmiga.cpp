@@ -22,6 +22,7 @@
 #include "AmigaGameplayEffects.h"
 #include "core/CurrencySmokeComposition.h"
 #include "AmigaTerrainRaster.h"
+#include "AmigaWallDamage.h"
 #include "AmigaTerrainPainter.h"
 #include "AmigaMenuScroll.h"
 #include "AmigaPlayer.h"
@@ -807,6 +808,7 @@ static unsigned terrainCopyBuffer;
 enum { terrainRasterRows = 8192, terrainRasterWords = AmigaGameplayRows::terrainWords,
        terrainRasterX = AmigaGameplayRows::terrainX };
 static AmigaTerrainRaster terrainRaster{};
+static AmigaWallDamage<> wallDamage;
 static void invalidateShopRaster(const downwell::ShopWorld& shops) {
     terrainRaster.invalidateShops(shops);
 }
@@ -1869,6 +1871,7 @@ int main(void) {
                         port.configureSolidResolver(amigaResolveTerrainSolid, &terrainCollision,
                             amigaResolveTerrainSegment, amigaResolveTerrainPlayerMask,amigaResolveTerrainWallContacts);
                         terrainRaster.ready = false;
+                        wallDamage.clear();
                         terrainCopyTarget = nullptr;
                         terrainCopyBacking = nullptr;
                         stagedBuffer = memory.menuForeground();
@@ -2481,20 +2484,20 @@ int main(void) {
             terrainCopyBuffer = back;
             DW_PROFILE_PHASE(profileScroll);
             worldViewY += scrollDelta;
-            // Newly retained patches invalidate only their rows. Existing
-            // generation damage handling repairs the visible backing and both
-            // display debts, leaving clean circular-buffer rows untouched.
+            // Retained wall patches use sparse debts, not the min/max span of
+            // unrelated generation work. Preserve clean rows between bands.
             const auto& wallTiles=port.wallBackgroundTiles();
             for(unsigned i=oldWallTileCount;i<wallTiles.size();++i){
                 std::int32_t y;
                 if(!wallTiles.at(i)->y.roundPixel(y)||y>2147483647-16){terrainPaintSucceeded=false;break;}
-                int first=y<0?0:y,end=y+16;
-                if(end>terrainRasterRows)end=terrainRasterRows;
-                if(first>=end)continue;
-                terrainRaster.invalidate(first,end);
-                if(first<liveGeneration.dirtyFirst)liveGeneration.dirtyFirst=first;
-                if(end>liveGeneration.dirtyEnd)liveGeneration.dirtyEnd=end;
+                if(!wallDamage.mark(y,y+16)){terrainPaintSucceeded=false;break;}
             }
+            if(!wallDamage.visit([&](int first,int end){
+                terrainRaster.invalidate(first,end);
+                gameplayScene.invalidateStage();
+                gameplayScene.invalidateBackingOutside(first,end,worldViewY,downwellDisplayHeight);
+                return true;
+            }))terrainPaintSucceeded=false;
             if (liveGeneration.dirtyFirst < liveGeneration.dirtyEnd) {
                 gameplayScene.invalidateStage();
                 // Discard dirty retained rows outside the current view. Visible
@@ -2604,6 +2607,20 @@ int main(void) {
                         top, bottom - top, downwellPlayfieldX, downwellPlayfieldWidth, true, 1);
                 }
             }
+            if(!wallDamage.repair([&](int first,int end){
+                if(!terrainPaintSucceeded)return false;
+                const int viewEnd=worldViewY+downwellDisplayHeight;
+                if(end<=worldViewY||first>=viewEnd)return true;
+                const int top=first>worldViewY?first-worldViewY:0;
+                const int bottom=end<viewEnd?end-worldViewY:downwellDisplayHeight;
+                if(backingCopyPending)AmigaHardware::blitterDrain();
+                amigaRendererSetGameOrigin(&renderer,port.ringOrigin());
+                amigaRendererClearGameRows(&renderer,top,bottom-top,0);
+                drawMainWorldSpan(&renderer,rooms,mainRoom,builders,fragments,liveBuilder.fragmentCount(),
+                    generatedDecorations,liveBuilder.decorationCount(),&port,worldViewX,worldViewY,
+                    top,bottom-top,downwellPlayfieldX,downwellPlayfieldWidth,true,1);
+                return terrainPaintSucceeded;
+            }))terrainPaintSucceeded=false;
             for (unsigned i = 0; i < downwell::ShopWorld::capacity; ++i) {
                 const auto& shop = port.shops().instances[i];
                 if (!shop.allocated || shop.artRevision == oldShopArt[i]) continue;

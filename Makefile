@@ -113,6 +113,15 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 
 all: $(TARGET)
 
+.PHONY: verify-amiga-wall-damage
+test: verify-amiga-wall-damage
+verify-amiga-wall-damage: build/amiga-wall-damage-test
+	./build/amiga-wall-damage-test
+build/amiga-wall-damage-test: tests/platform/amiga/AmigaWallDamageTest.cpp src/platform/amiga/AmigaWallDamage.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+build/gameplay-collision-owner-test: src/platform/amiga/AmigaWallDamage.h
+
 .PHONY: verify-wall-draw-lookup
 .PHONY: verify-terrain-create
 test: verify-wall-end-step

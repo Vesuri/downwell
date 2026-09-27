@@ -1,5 +1,6 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/WallPresentation.h"
+#include "platform/amiga/AmigaWallDamage.h"
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -88,8 +89,8 @@ int main(){
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     assert(masks.valid());
     for(bool rejectTile:{false,true}){
-        struct Damage {std::vector<std::pair<int,int>> cells;
-            bool changed(int x,int y,int before,int after){assert(before==51&&(after==51||after==-1));cells.push_back({x,y});return true;}
+        struct Damage:AmigaWallDamage<64> {std::vector<std::pair<int,int>> cells;
+            bool changed(int x,int y,int before,int after){assert(before==51&&(after==51||after==-1));cells.push_back({x,y});return AmigaWallDamage<64>::changed(x,y,before,after);}
         } damage;
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation::bind(damage));
@@ -106,7 +107,7 @@ int main(){
         } effects{*scene,rejectTile};
         GameMakerRandom random(123);const auto draws=random.drawCount();
         for(unsigned i=0;i<9;++i)assert(owner->wallEndStepEvent(owner->terrain().handle(i),1,random,masks,effects));
-        assert(damage.cells.size()==9);damage.cells.clear();
+        assert(damage.cells.size()==9&&damage.size()==1);damage.cells.clear();damage.clear();
         const auto middle=owner->terrain().handle(4);const auto* record=owner->terrain().find(middle);
         assert(record->wall.surrounded&&record->wall.checked==1&&record->wall.lights==0&&record->imageIndex==15&&
             !record->destroyRequested&&effects.tiles==0&&scene->wallBackgroundTiles().size()==0);
@@ -116,7 +117,10 @@ int main(){
         })&&drawn==1);
         assert(owner->wallEndStepEvent(middle,1,random,masks,effects)==!rejectTile&&effects.tiles==1);
         assert(damage.cells.size()==(rejectTile?0u:1u));
-        if(!rejectTile)assert(damage.cells[0].first==256&&damage.cells[0].second==528);
+        if(!rejectTile){
+            assert(damage.cells[0].first==256&&damage.cells[0].second==528&&damage.size()==1);
+            assert(damage.visit([](int first,int end){return first==520&&end==536;}));
+        }
         assert(random.drawCount()==draws&&record->destroyRequested==!rejectTile&&owner->terrain().find(middle)==record);
         if(!rejectTile)assert(drawWallPresentation(*record,[]{assert(false);return 0u;},
             [](int,unsigned){assert(false);}));
