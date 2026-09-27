@@ -8,7 +8,8 @@
 #include "SmokeTrig.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
-// No queries are exposed until all participating families and setters exist.
+// Terrain-only queries require complete registered terrain families. Other
+// selectors remain unavailable until their families and setters are registered.
 // Install bindings before constructing the world, then attach before Step.
 class GameplayCollisionOwner {
 public:
@@ -26,7 +27,22 @@ private:
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
     bool good_=false;
+    bool terrainFamilies_[2]={false,false};
     bool check(bool ok){if(!ok)good_=false;return ok;}
+    bool terrainQuery(int object)const{
+        if(!valid()||!world_||(object!=60&&object!=93))return false;
+        return terrainFamilies_[object==60?0:1];
+    }
+    bool resolves(InstanceHandle h)const{
+        View::Record r;return world_&&owner_.resolve(h)&&View(*world_).resolve(h,r);
+    }
+    static bool inverseTrig(RunnerImageValue angle,RunnerImageValue& cosine,RunnerImageValue& sine){
+        angle.bits^=0x80000000u;
+        RunnerImageValue radians;MotionBinary64 c,s;
+        return SmokeDirection::radians(angle,radians)&&smokeTrig(radians.promoted(),c,s)&&
+            cosine.assign(c)&&sine.assign(s);
+    }
+    static bool roundPixel(RunnerImageValue v,std::int32_t& n){return v.promoted().roundPixel(n);}
     static bool real(int n,RunnerImageValue& out){return out.assign(MotionBinary64::fromInteger(n));}
     bool refresh(InstanceHandle key,bool publish){
         const auto* flags=families_.flags(unsigned(owner_.objectId(key)));
@@ -125,6 +141,12 @@ private:
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites):objects_(objects),sprites_(sprites){
         good_=sprites.valid()&&families_.bindInstanceFlags(objects);
+        if(good_)for(unsigned selector=0;selector<2;++selector){
+            terrainFamilies_[selector]=true;
+            for(unsigned i=0;i<families_.size();++i)
+                if(families_.isA(int(i),selector==0?60:93)&&i!=60&&i!=93&&i!=99)
+                    terrainFamilies_[selector]=false;
+        }
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
@@ -141,6 +163,31 @@ public:
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
     bool population(int object,unsigned& count)const{return valid()&&owner_.instanceNumber(object,families_,count);}
+    bool terrainPositionMeeting(int object,MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,bool& hit){
+        RunnerImageValue px,py;bool result=false;
+        if(!terrainQuery(object)||!masks.valid()||!px.assign(x)||!py.assign(y))return check(false);
+        auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
+        if(!owner_.point(object,px,py,true,false,families_,update,
+            [&](InstanceHandle h,RunnerImageValue rawX,RunnerImageValue rawY,bool& found){
+                return resolves(h)&&owner_.pointCandidate(h,properties_[h.slot].sprite,rawX,rawY,
+                    true,true,sprites_,masks,update,inverseTrig,roundPixel,found);
+            },result))return check(false);
+        hit=result;return true;
+    }
+    bool terrainPlaceMeeting(InstanceHandle local,int object,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,bool& hit){
+        InstanceHandle self;Owner::Result result;
+        if(!terrainQuery(object)||!masks.valid()||!View::encode(View::Kind::terrain,local,self)||
+            !resolves(self))return check(false);
+        auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
+        if(!owner_.placeVm(self,object,x,y,false,families_,update,
+            [&](InstanceHandle a,InstanceHandle b,bool publish,bool& found){
+                return resolves(a)&&resolves(b)&&owner_.collideCompatibility(a,b,
+                    properties_[a.slot].sprite,properties_[b.slot].sprite,sprites_,masks,
+                    RunnerMaskDispatch{},publish,update,inverseTrig,roundPixel,found);
+            },result))return check(false);
+        hit=result.found;return true;
+    }
     bool reconcileActivation(){
         if(!valid()||!world_)return check(false);
         const bool result=room_.reconcileChecked([&](unsigned slot){

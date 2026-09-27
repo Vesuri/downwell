@@ -14,6 +14,19 @@ def instructions(name):
     return [s.strip() for s in (export / "Assembly" / (name + ".asm")).read_text().splitlines()
             if s.strip() and not s.startswith((".", ":"))]
 
+marker = manifest["resources"]["objects"][99]
+assert (marker["id"], marker["parentId"], marker["spriteId"], marker["textureMaskId"], marker["Visible"]) == (99, 60, 46, -1, False)
+for suffix in ("Create_0", "Step_2"):
+    assert instructions("gml_Object_Wall_" + suffix) == []
+ancestor = 99
+while ancestor >= 0:
+    definition = manifest["resources"]["objects"][ancestor]
+    for event in definition["events"]:
+        if event["eventType"] == 14:
+            for action in event["actions"]:
+                assert instructions(action["codeName"]) in ([], ["call.i event_inherited(argc=0)", "popz.v"])
+    ancestor = definition["parentId"]
+
 wall = instructions("gml_Object_objWall_n_Create_0")
 assert wall[:5] == ["pushglb.v global.wallTile", "pop.v.v self.sprite_index",
                     "pushglb.v global.glitchMode", "conv.v.b", "bf [2]"]

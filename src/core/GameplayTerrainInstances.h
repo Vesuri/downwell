@@ -37,12 +37,15 @@ public:
     }
     bool append(int object,int x,int y,bool active,std::uint32_t sourceId=0,int creationCode=-1){
         if(!good_)return false;
-        if((object!=60&&object!=93)||count_==capacity||!next_)return good_=false;
+        if((object!=60&&object!=93&&object!=99)||count_==capacity||!next_)return good_=false;
         unsigned slot=freeHint_;
         while(slot<capacity&&records_[slot].lifetimeId)++slot;
         if(slot==capacity)return good_=false;
         freeHint_=slot+1;order_[count_++]=slot;
         auto& r=records_[slot];r={object,x,y,active,next_++,sourceId,creationCode};
+        // Object 99 overrides Create with an empty event, retaining its
+        // serialized sprite rather than inheriting objWall_n's tile setter.
+        if(object==99)r.spriteId=46;
         // Expose the actual record to synchronous birth callbacks.
         if(!binding_.birth({slot,r.lifetimeId},r))return good_=false;
         return true;
@@ -60,6 +63,7 @@ public:
     bool createProperties(InstanceHandle h,int wallTile,bool glitch,GameMakerRandom& random){
         if(!good_||!find(h))return good_=false;
         auto& r=records_[h.slot];
+        if(r.objectId==99)return true;
         if(!terrainCreateProperties(r.objectId,wallTile,glitch,random,
             [&](int sprite){if(!binding_.sprite(h,r,sprite))return false;r.spriteId=sprite;return true;},
             [&](int index){

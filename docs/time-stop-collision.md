@@ -1061,16 +1061,21 @@ or copied `InstanceRecord` registry is involved. Attach must identify the exact
 world whose player was registered during construction. Later callbacks validate
 the actual record address as well as its family and generation.
 
-The production executable does not install this owner yet. It intentionally
-exposes no gameplay query interface while terrain property updates, fields and the remaining
-families are absent. Native birth hooks currently observe initialized actor
+The production executable does not install this owner yet. Its checked terrain
+shape/point query interface accepts only object selectors 60 and 93 and requires
+the original mask pack. It shares the runner search, compatibility mask tests,
+VM coordinate narrowing and temporary-position restoration with the stored-world
+path. Family coverage is checked once against the resource graph; unknown
+descendants reject the query rather than silently disappear. Other selectors
+remain unavailable while fields and remaining families are absent.
+Native birth hooks currently observe initialized actor
 state; full source PreCreate/Create interleaving and omitted resource writes
 still need migration. Tests bind real worlds and resources and cover dormant
 births, published movement/art, compaction, clear/Retry, unrelated-world rejection
 and copied-record failure. This establishes ownership at existing boundaries,
 not complete native collision fidelity or an A500 memory-fit claim.
 
-Generated walls (60) and platforms (93) can publish through an optional
+Generated walls (60), platforms (93) and invisible wall subtype (99) can publish through an optional
 `GameplayTerrainInstances` store passed to `GameplayWorld` at construction.
 `createGeneratedInstance` appends after the backend terrain callback succeeds,
 before the next generated command. Records retain room coordinates and active
@@ -1078,6 +1083,14 @@ state; coincident cells remain separate instances. Breakables still use their
 existing owner and are not duplicated here. Retry and level advance retire
 terrain before reusing slots, retaining the monotonic generation sequence.
 Callback/capacity failure is terminal and preserves the completed prefix.
+Subtype 99 overrides Create and End Step with empty bytecode and retains
+serialized sprite 46, mask -1 and engine animation defaults; it must not execute
+the parent wall's tile setter. Its PreCreate ancestor chain only calls inherited.
+The terrain-source verifier checks this distinction. Native query fixtures
+compare 3249 unit-terrain points against resource bounds and mask pixels, check
+caller exclusion/restoration for shape queries, subtype membership, and immediate
+inactive/destroyed exclusion. They do not prove full live wall scheduling,
+fractional original-runner raster mode or later-area rendering.
 The store is separately allocated: normal unbound worlds gain a pointer and
 room-load guard, not a terrain array. The optional collision owner includes the terrain array
 and expanded spatial capacity; its eventual A500 residency must be measured.

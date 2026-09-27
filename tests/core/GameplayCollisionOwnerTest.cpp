@@ -75,6 +75,54 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    assert(masks.valid());
+    {
+        auto queries=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,queries->enemyBinding(),
+            queries->breakableBinding(),queries->playerBinding(),&queries->terrain());
+        assert(queries->attach(*scene));
+        for(auto p:{DeferredCreateInstance{60,240,512},DeferredCreateInstance{60,256,512},DeferredCreateInstance{60,240,528}})
+            assert(scene->createGeneratedInstance(p,objects,[](const auto&){return true;}));
+        const auto self=queries->terrain().handle(0),right=queries->terrain().handle(1);
+        InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,self,shared));
+        const auto before=*queries->state(shared);
+        for(int y=492;y<=548;++y)for(int x=220;x<=276;++x){
+            bool expected=false;
+            for(unsigned i=0;i<3;++i){
+                const auto local=queries->terrain().handle(i);const auto* r=queries->terrain().find(local);
+                InstanceHandle key;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,key));
+                const auto& p=queries->properties(key)->sprite;PackedSpriteCollision resource;
+                assert(sprites.collisionSprite(p.spriteId,p.maskId,resource));
+                const int px=x-r->x+resource.originX,py=y-r->y+resource.originY;
+                if(px<resource.marginLeft||px>resource.marginRight||py<resource.marginTop||py>resource.marginBottom)continue;
+                if(!resource.collisionMode||!resource.collisionMaskCount){expected=true;break;}
+                SpriteMaskPack::Mask mask;assert(masks.mask(unsigned(p.maskId<0?p.spriteId:p.maskId),0,mask));
+                if(mask.contains(px,py)){expected=true;break;}
+            }
+            bool hit=!expected;
+            const bool ok=queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(x),MotionBinary64::fromInteger(y),masks,hit);
+            if(!ok||hit!=expected)std::fprintf(stderr,"native point %d,%d: ok=%d hit=%d expected=%d\n",x,y,ok,hit,expected);
+            assert(ok&&hit==expected);
+        }
+        for(auto p:{DeferredCreateInstance{0,256,512},DeferredCreateInstance{0,240,528},DeferredCreateInstance{1,240,512},DeferredCreateInstance{1,224,512}}){
+            bool hit=false;
+            assert(queries->terrainPlaceMeeting(self,60,MotionBinary64::fromInteger(p.x),MotionBinary64::fromInteger(p.y),masks,hit)&&hit==(p.objectId==0));
+        }
+        const auto after=*queries->state(shared);
+        assert(before.x.bits==after.x.bits&&before.y.bits==after.y.bits&&scene->effectsSucceeded());
+        bool hit=true;assert(queries->terrain().activation(right,false));
+        assert(queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(256),MotionBinary64::fromInteger(512),masks,hit)&&!hit);
+        assert(queries->reconcileActivation()&&queries->terrain().activation(right,true)&&queries->reconcileActivation());
+        assert(queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(256),MotionBinary64::fromInteger(512),masks,hit)&&hit);
+        assert(queries->terrain().requestDestroy(right));
+        assert(queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(256),MotionBinary64::fromInteger(512),masks,hit)&&!hit);
+        assert(scene->createGeneratedInstance({99,400,800},objects,[](const auto&){return true;}));
+        const auto marker=queries->terrain().handle(3);
+        assert(queries->terrain().find(marker)->spriteId==46&&queries->terrain().find(marker)->imageSpeed==1);
+        assert(queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(400),MotionBinary64::fromInteger(800),masks,hit)&&hit);
+        hit=true;assert(!queries->terrainPositionMeeting(82,{},{},masks,hit)&&hit&&!queries->valid());
+    }
     for(bool reject:{false,true}){
         auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),
