@@ -1,4 +1,5 @@
 #include "core/Game.h"
+#include "core/GameplayContactProfileInput.h"
 #include "core/RoomPack.h"
 #include "core/ObjectPack.h"
 #include "core/BuilderPatternPack.h"
@@ -555,25 +556,23 @@ int main() {
     }
     auto damagedStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
     auto& damagedGame = *damagedStorage;
-    unsigned mainTicks = 0, hidden = 0, flashingVisible = 0;
+    const_cast<downwell::StartupRuntime&>(damagedGame.startup()).skipToGameForTesting();
+    unsigned mainTicks = 0, hidden = 0, flashingVisible = 0, firstDamage = 0;
     bool damaged = false, recovered = false, gemFlashChecked = false;
-    for (unsigned tick = 0; tick < 6000 && !recovered; ++tick) {
+    for (unsigned tick = 0; tick < downwell::gameplayContactProfileFrames && !recovered; ++tick) {
         const auto& state = damagedGame.startup();
         input = {};
         if (state.inMenu()) input.right = true;
         else if (state.inPlayMenu() && state.playMenuYOffset() == 0) input.fire = true;
         else if (state.inMainRoom()) {
-            input.right = (mainTicks / 90) % 2 == 0;
-            input.left = !input.right;
-            input.fire = mainTicks % 10 < 5;
-            // Descend through the destructible centre of the entrance bowl
-            // before sweeping later platforms for combat coverage.
-            if (state.mainPlayerY() < 1264) {
-                input.left = state.mainPlayerX() > 242;
-                input.right = state.mainPlayerX() < 238;
-            }
+            // Use the same natural-contact tape as the host/native profile
+            // gate. Phase zero no longer reaches an enemy after the corrected
+            // ceiling collision response; do not inject damage to hide that.
+            input = downwell::gameplayContactProfileInput(mainTicks,
+                int(state.mainPlayerX()), int(state.mainPlayerY()));
         }
         damagedGame.update(input);
+        require(damagedGame.simulationSucceeded(), "natural damage route has no terminal simulation failure");
         if (!state.inMainRoom()) continue;
         ++mainTicks;
         if (!gemFlashChecked && state.mainCurrencyCount()) {
@@ -596,7 +595,10 @@ int main() {
             gemFlashChecked = true;
         }
         const int immunity = state.mainPlayerInvulnerability();
-        if (immunity > 0) damaged = true;
+        if (immunity > 0) {
+            if (!damaged) firstDamage = mainTicks;
+            damaged = true;
+        }
         if (!damaged) continue;
         renderer.targetPlayer = state.mainPlayerSpriteId();
         renderer.playerDraws = 0;
@@ -638,11 +640,15 @@ int main() {
     }
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
+    require(firstDamage == 550 && mainTicks == 640 && hidden == 45 && flashingVisible == 45 &&
+            damagedGame.startup().mainPlayerHealth() == 3,
+            "render route reaches the verified natural contact and complete immunity interval");
     require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");
     require(renderer.bulletDraws > 0, "live render tape exercises projectile transforms");
     require(renderer.spreadBulletDrawn, "live rendering actually exercises nonzero spread angles");
     std::printf("Damage route: %u main updates, %u hidden and %u visible damage frames, recovered\n",
         mainTicks,hidden,flashingVisible);
+    if (std::getenv("DOWNWELL_DAMAGE_RENDER_ONLY")) return 0;
     // Renderer fixture only: natural death entry is exercised by the long
     // paired simulation replay. This tape deliberately ends after recovery.
     auto& resultsFixture = const_cast<downwell::DeathResults&>(damagedGame.startup().deathResults());
@@ -686,8 +692,7 @@ int main() {
     }
     auto deathStorage = std::make_unique<downwell::Game>(&rooms, &objects, &builders);
     auto& naturalDeath = *deathStorage;
-    // The room-entry update precedes the first gameplay input, matching the
-    // mainTicks convention in the damage route above.
+    // This separate route retains natural startup and room-entry timing.
     unsigned combatTicks = 1;
     bool retried = false;
     unsigned observedFlashFrames = 0;

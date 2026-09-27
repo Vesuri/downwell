@@ -1141,6 +1141,10 @@ test: verify-effect-depths
 verify-flash-render-paths: verify-effect-depths build/game-render-test test-amiga-gameplay-draw-list verify-sdl-flash-raster
 	DOWNWELL_FLASH_RENDER_ONLY=1 ./build/game-render-test
 
+.PHONY: verify-damage-render-path
+verify-damage-render-path: build/game-render-test verify-contact-profile
+	DOWNWELL_DAMAGE_RENDER_ONLY=1 ./build/game-render-test
+
 build/skip-intro-test: tests/core/SkipIntroTest.cpp $(filter-out tests/core/GameRenderTest.cpp,$(GAME_RENDER_TEST_SOURCES)) src/platform/amiga/AmigaSceneRuntime.cpp
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -DDOWNWELL_SKIP_INTRO -o $@ $^

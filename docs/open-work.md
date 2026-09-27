@@ -213,6 +213,9 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
+- Diagnose the stalled natural-death input route in `GameRenderTest` and restore
+  full fatal-damage, death-flash and Retry coverage without injected damage or
+  relaxed assertions. The focused damage-render gate does not cover this route.
 - Cover naturally funded purchases, all shop/side-room layouts and camera
   transitions, dense combat, uncommon upgrade combinations and repeated runs.
 - Compare new behavior through deterministic host/native replays, including
