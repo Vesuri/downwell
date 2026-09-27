@@ -1,5 +1,13 @@
 #include "core/DebrisEffects.h"
 #include "core/GameMakerRandom.h"
+#ifdef DOWNWELL_NATIVE_QUERY_PROBE
+struct Stopped {bool operator()(unsigned,const downwell::DebrisAnimation&,bool&)const;};
+struct Meeting {bool operator()(unsigned,const downwell::DebrisAnimation&,downwell::MotionBinary64,downwell::MotionBinary64,bool&)const;};
+struct Publish {bool operator()(unsigned,const downwell::DebrisAnimation&,downwell::RunnerImageValue,downwell::RunnerImageValue)const;};
+bool nativeDebrisPublication(downwell::DebrisEffects<3>& owner,downwell::GameMakerRandom& random){
+    return owner.stepPublished(owner.beginPhase(),random,Stopped{},Meeting{},Publish{});
+}
+#else
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -12,6 +20,30 @@ struct Hooks {
     bool retire(unsigned h,const DebrisAnimation&){if(rejectRetire)return false;deaths.push_back(h);return true;}
 };
 int main(){
+    {
+        DebrisEffects<2> effects;GameMakerRandom rng(42);
+        const auto old=effects.create({}, {},1,rng),newest=effects.create({}, {},1,rng);
+        auto* older=effects.get(old);auto* moving=effects.get(newest);
+        assert(older&&moving);const auto beforeOld=*older,beforeMoving=*moving;
+        unsigned writes=0,queries=0;auto px=moving->x,py=moving->y;
+        auto noStop=[](auto,const auto&,bool& frozen){frozen=false;return true;};
+        auto clear=[&](auto h,const auto& e,auto,auto,bool& hit){
+            assert(h==newest&&e.x.bits==px.bits&&e.y.bits==py.bits&&writes==0);
+            ++queries;hit=false;return true;
+        };
+        auto publish=[&](auto h,const auto& e,auto x,auto y){
+            assert(h==newest&&queries==2&&e.x.bits==px.bits&&e.y.bits==py.bits);
+            if(++writes==2)return false;
+            px=x;py=y;return true;
+        };
+        assert(!effects.stepPublished(effects.beginPhase(),rng,noStop,clear,publish)&&!effects.valid());
+        assert(writes==2&&queries==2&&moving->x.bits==px.bits&&moving->y.bits==beforeMoving.y.bits&&
+            older->x.bits==beforeOld.x.bits&&older->y.bits==beforeOld.y.bits&&
+            older->ysp.high==beforeOld.ysp.high&&older->ysp.low==beforeOld.ysp.low);
+        const auto draws=rng.drawCount();
+        assert(!effects.stepPublished(effects.beginPhase(),rng,noStop,clear,publish)&&writes==2&&queries==2&&rng.drawCount()==draws);
+        assert(effects.clear());
+    }
     DebrisEffects<3> owner;GameMakerRandom random(42);
     std::vector<unsigned> births,deaths,queries;Hooks hooks{births,deaths};
     const auto empty=owner.beginPhase();
@@ -84,3 +116,4 @@ int main(){
     assert(owner.clear());
     std::puts("Debris ownership: phase cutoffs, per-instance freeze, capacity/RNG, callbacks, latched failures and 1024 reuse cycles passed");
 }
+#endif

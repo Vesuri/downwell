@@ -301,8 +301,18 @@ X. Remaining overlap requests destruction without skipping the final flash
 assignment. Zero horizontal speed remains zero rather than acquiring a minimum
 direction; nonzero magnitudes below 0.05 are clamped to signed 0.05.
 
+The explicit `DebrisMotion::step` publication callback receives each candidate
+binary32 X/Y pair before the changed coordinate is committed. It runs for both
+ordinary axis writes and each successful escape write, including equal-value
+assignments. Later probes see the accepted coordinates. A rejected write leaves
+earlier accepted writes and RNG intact, but does not commit that coordinate,
+probe again or update the final flash state. Frozen and destroyed effects do
+not call the publisher. The no-publisher overload is for arithmetic-only use.
+
 `make verify-debris-motion` compares query coordinates/order, arithmetic and
 complete RNG state across 8,192 branch tapes, plus alarm/freeze/failure cases.
+Those tapes also compare every intermediate published position and query count,
+and reject each write in turn to verify retained prefixes.
 The owner must provide source-equivalent time-stop and precise collision
 decisions, publish coordinate mutations to collision ownership, schedule
 animation separately and retire requested lifetimes at the proper boundary.
@@ -341,11 +351,17 @@ failure latches an invalid owner; subsequent simulation is rejected. Explicit
 teardown can release remaining handles without repeating already-successful
 retirements. Full capacity rejects a birth before its four RNG draws.
 
+`stepPublished` forwards each position candidate with its owner-local handle
+and the pre-write effect state. A publication failure latches the entire owner
+before later effects can run; the old `step` entry point supplies a no-op
+publisher. Registry adapters must use `stepPublished`, not synchronize only
+after Step, because collision probes observe intermediate writes.
+
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed
 publication/query handling and repeated slot reuse. This local owner is not
 yet a unified game-instance registry. Global cross-family event/Draw ordering,
-coordinate publication, scene residency and live death admission remain the
+collision-registry wiring, scene residency and live death admission remain the
 responsibility of the integrating world scheduler.
 
 `DebrisDraw` implements the pinned Draw event's `!dflash` gate and `drawFx`

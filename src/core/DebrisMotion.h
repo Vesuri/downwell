@@ -20,7 +20,8 @@ struct DebrisMotion : DebrisBirth {
     // stopped is the original TimeStopBound decision. The owner supplies the
     // precise sParentSolid (56) query and must stop on failure, not treat it as
     // a miss. Coordinate writes are individually narrowed before later probes.
-    template<class Random,class Meeting> bool step(bool stopped,Random& random,Meeting meeting){
+    template<class Random,class Meeting,class Publish>
+    bool step(bool stopped,Random& random,Meeting meeting,Publish publish){
         if(destroyRequested)return true;
         if(stopped){
             for(unsigned i=0;i<3;++i){
@@ -50,25 +51,25 @@ struct DebrisMotion : DebrisBirth {
         if(less(magnitude,{0x3fa99999u,0x9999999au}))
             xsp=xsp.zero()?MotionBinary64{}:MotionBinary64{0x3fa99999u|(xsp.high&0x80000000u),0x9999999au};
         probe=x.promoted();
-        if(!probe.add(xsp)||!x.assign(probe))return false;
+        if(!probe.add(xsp)||!assignX(probe,publish))return false;
         probe=y.promoted();
-        if(!probe.add(ysp)||!y.assign(probe)||!meeting(x.promoted(),y.promoted(),hit))return false;
+        if(!probe.add(ysp)||!assignY(probe,publish)||!meeting(x.promoted(),y.promoted(),hit))return false;
         if(hit){
             probe=x.promoted();
             if(!probe.add(MotionBinary64::fromInteger(8))||!meeting(probe,y.promoted(),hit))return false;
-            if(!hit){if(!x.assign(probe))return false;}
+            if(!hit){if(!assignX(probe,publish))return false;}
             else{
                 probe=x.promoted();
                 if(!probe.add(MotionBinary64::fromInteger(-8))||!meeting(probe,y.promoted(),hit))return false;
-                if(!hit&&!x.assign(probe))return false;
+                if(!hit&&!assignX(probe,publish))return false;
             }
             probe=y.promoted();
             if(!probe.add(MotionBinary64::fromInteger(-8))||!meeting(x.promoted(),probe,hit))return false;
-            if(!hit){if(!y.assign(probe))return false;}
+            if(!hit){if(!assignY(probe,publish))return false;}
             else{
                 probe=y.promoted();
                 if(!probe.add(MotionBinary64::fromInteger(8))||!meeting(x.promoted(),probe,hit))return false;
-                if(!hit&&!y.assign(probe))return false;
+                if(!hit&&!assignY(probe,publish))return false;
             }
             if(!meeting(x.promoted(),y.promoted(),hit))return false;
             if(hit)destroyRequested=true;
@@ -77,7 +78,22 @@ struct DebrisMotion : DebrisBirth {
         flash=disappearing?-flash:-1;
         return true;
     }
+    template<class Random,class Meeting> bool step(bool stopped,Random& random,Meeting meeting){
+        return step(stopped,random,meeting,[](RunnerImageValue,RunnerImageValue){return true;});
+    }
 private:
+    // Each builtin setter narrows and publishes before the next query. Failed
+    // publication keeps earlier writes, but does not commit this coordinate.
+    template<class Publish> bool assignX(MotionBinary64 value,Publish publish){
+        RunnerImageValue next;
+        if(!next.assign(value)||!publish(next,y))return false;
+        x=next;return true;
+    }
+    template<class Publish> bool assignY(MotionBinary64 value,Publish publish){
+        RunnerImageValue next;
+        if(!next.assign(value)||!publish(x,next))return false;
+        y=next;return true;
+    }
     static bool less(MotionBinary64 a,MotionBinary64 b){
         if(a.zero()&&b.zero())return false;
         const bool an=a.high>>31,bn=b.high>>31;if(an!=bn)return an;

@@ -63,8 +63,9 @@ public:
         return retireRequested(lifecycle);
     }
     // TimeStopBound is evaluated per effect, not once for the entire pool.
-    template<class Random,class Stopped,class Meeting,class Lifecycle=NoLifecycle>
-    bool step(Phase phase,Random& random,Stopped stopped,Meeting meeting,Lifecycle lifecycle={}){
+    template<class Random,class Stopped,class Meeting,class Publish,class Lifecycle=NoLifecycle>
+    bool stepPublished(Phase phase,Random& random,Stopped stopped,Meeting meeting,
+                       Publish publish,Lifecycle lifecycle={}){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];
             if(s.handle>phase.newest||s.effect.destroyRequested)continue;
@@ -72,9 +73,16 @@ public:
             if(!stopped(s.handle,static_cast<const DebrisAnimation&>(s.effect),frozen)||
                !s.effect.step(frozen,random,[&](auto x,auto y,bool& hit){
                    return meeting(s.handle,static_cast<const DebrisAnimation&>(s.effect),x,y,hit);
+               },[&](auto x,auto y){
+                   return publish(s.handle,static_cast<const DebrisAnimation&>(s.effect),x,y);
                })){good_=false;return false;}
         }
         return retireRequested(lifecycle);
+    }
+    template<class Random,class Stopped,class Meeting,class Lifecycle=NoLifecycle>
+    bool step(Phase phase,Random& random,Stopped stopped,Meeting meeting,Lifecycle lifecycle={}){
+        return stepPublished(phase,random,stopped,meeting,
+            [](Handle,const DebrisAnimation&,RunnerImageValue,RunnerImageValue){return true;},lifecycle);
     }
     template<class Lifecycle=NoLifecycle> bool retireRequested(Lifecycle lifecycle={}){
         if(!good_)return false;
