@@ -22,6 +22,7 @@ template<unsigned Capacity> struct TimeStopEffects {
     struct PlayerPose {
         RunnerImageValue x,y; // published builtins, not private xx/yy
         MotionBinary64 xsp,ysp;
+        MotionBinary64 xx,yy; // private motion coordinates used by time-change Create
     };
     bool reset(){
         if(!shards.clear()){succeeded=false;return false;}
@@ -31,10 +32,10 @@ template<unsigned Capacity> struct TimeStopEffects {
     template<class Random,class Field,class Lookup,class Audio,class Emit>
     bool beginStep(bool mainRoom,bool outsideSides,const PlayerPose& pose,bool lowSpec,
                    Random& random,Field field,Lookup lookup,Audio audio,Emit emit){
-        if(!succeeded||!changes.succeeded()){succeeded=false;return false;}
+        if(!succeeded||!shards.succeeded()||!changes.succeeded()){succeeded=false;return false;}
         succeeded=player.step(mainRoom,outsideSides,field,audio,[&](PlayerTimeStop::Effect effect){
             if(effect==PlayerTimeStop::Effect::change)
-                return changes.create(roomSpeed,[&](unsigned){return emit(effect);});
+                return changes.createAt(pose.xx,pose.yy,roomSpeed,[&](unsigned){return emit(effect);});
             if(effect!=PlayerTimeStop::Effect::shards)return emit(effect);
             return burst.emit(pose.x,pose.y,pose.xsp,pose.ysp,lowSpec,random,shards,lookup,
                 [](auto ax,auto ay,auto bx,auto by,auto& angle){

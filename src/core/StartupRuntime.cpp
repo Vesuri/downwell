@@ -1127,6 +1127,18 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     syncMainBuilderState();
 }
 
+bool StartupRuntime::playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit){
+    if(!run_.effectsSucceeded)return false;
+    for(std::size_t i=0;i<instances_.size();++i){
+        const auto& player=instances_.at(i);
+        if(player.objectId==35&&player.active&&!player.destroyRequested){
+            run_.effectsSucceeded=lifecycle_.placeMeeting(instances_.handleAt(i),player,82,x,y,hit);
+            return run_.effectsSucceeded;
+        }
+    }
+    run_.effectsSucceeded=false;return false;
+}
+
 bool StartupRuntime::playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,InstancePlaceResult& result){
     if(!run_.effectsSucceeded)return false;
     for(std::size_t i=0;i<instances_.size();++i){

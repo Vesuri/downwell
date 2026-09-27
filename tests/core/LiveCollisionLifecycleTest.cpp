@@ -197,6 +197,52 @@ int main(){
         require(!world->createTimeChange(registration,changes,{},{},speed,[](unsigned){return true;})&&
             world->nextRuntimeInstanceId()==failedId+1,"failed world creation cannot consume another ID on retry");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach transition world");world->skipToGameForTesting();
+        world->registerLevelExit(176);
+        TimeStopEffects<16> state;
+        auto shards=world->timeShardRegistration<16>();auto changes=world->timeChangeRegistration<8>();
+        require(state.shards.bindPhases(shards)&&state.changes.bind(changes),"bind both transition families");
+        TimeStopEffects<16>::PlayerPose pose{{0x43700000u},{0x43300000u},{},{},
+            RunnerImageValue{0x43704000u}.promoted(),RunnerImageValue{0x43308000u}.promoted()};
+        const auto first=world->nextRuntimeInstanceId();const auto draws=world->randomDrawCount();
+        unsigned pauses=0;
+        auto emit=[&](PlayerTimeStop::Effect effect){
+            if(effect==PlayerTimeStop::Effect::change){
+                const auto id=pauses?first+10:first+3;const auto* r=world->instance(id);
+                require(r&&r->objectId==211&&r->preciseX==240.25f&&
+                    r->preciseY==(pauses?1000.5f:176.5f)&&state.roomSpeed==30&&r->alarms.get(1)==2,
+                    "transition pause follows private-coordinate registered Create");
+                ++pauses;
+            }
+            return true;
+        };
+        auto step=[&]{return world->beginTimeStop(shards,changes,state,true,false,pose,false,
+            [](auto){return true;},emit);};
+        require(step()&&state.player.stopped&&state.shards.size()==6&&pauses==1&&
+            world->randomDrawCount()==draws+48&&world->nextRuntimeInstanceId()==first+7,
+            "entry shares actual world RNG and interleaves shard/change IDs");
+        require(state.shards.sourceId(3)==first+2&&state.changes.sourceId(1)==first+3&&
+            state.shards.sourceId(4)==first+4,"source first-burst/change/second-burst creation order");
+        require(step()&&world->randomDrawCount()==draws+48&&pauses==1,"held stop creates nothing");
+        pose.y={0x447a0000u};pose.yy=RunnerImageValue{0x447a2000u}.promoted();
+        require(step()&&!state.player.stopped&&state.shards.size()==12&&pauses==2&&
+            world->randomDrawCount()==draws+96&&world->nextRuntimeInstanceId()==first+14,
+            "exit preserves both bursts and registered transition ordering");
+        require(state.reset(),"retire both transition families before bindings leave scope");
+        pose.y={0x43300000u};pose.yy=RunnerImageValue{0x43308000u}.promoted();
+        const auto failedId=world->nextRuntimeInstanceId();const auto failedDraws=world->randomDrawCount();
+        auto failPause=[](auto effect){return effect!=PlayerTimeStop::Effect::change;};
+        require(!world->beginTimeStop(shards,changes,state,true,false,pose,false,[](auto){return true;},failPause)&&
+            !world->effectsSucceeded()&&state.shards.size()==3&&state.changes.size()==1&&
+            world->instance(failedId+3)&&world->randomDrawCount()==failedDraws+24&&
+            world->nextRuntimeInstanceId()==failedId+4,
+            "failed transition pause retains first burst and Create but prevents second burst");
+        require(!step()&&world->randomDrawCount()==failedDraws+24&&world->nextRuntimeInstanceId()==failedId+4,
+            "failed transition cannot restart through a later Begin Step");
+    }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
     {
         auto shardOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
