@@ -357,6 +357,24 @@ before later effects can run; the old `step` entry point supplies a no-op
 publisher. Registry adapters must use `stepPublished`, not synchronize only
 after Step, because collision probes observe intermediate writes.
 
+For room-registry integration, use `createRegistered` and the per-handle
+`advanceRegisteredAnimationOne`, `advanceRegisteredAlarmOne` and
+`stepRegisteredOne` entry points. They let the room dispatcher choose global
+cross-family order rather than iterating this pool's local order. Animation
+publishes the resulting image value; alarm/Step destruction publishes a mark
+once, without calling retirement. `retained` continues resolving the same
+record after that mark, although ordinary `get` and Draw visitation omit it.
+Marked instances ignore later event dispatch and continue occupying capacity.
+`retireMarked` is the explicit room-cleanup operation that frees the slot.
+Do not mix these entry points with the isolated-owner `create`/bulk-phase
+methods, which retain their immediate local-cleanup behavior.
+
+The registered-lifecycle test covers alarm and trapped-motion destruction,
+retained addresses, no duplicate marking, capacity before cleanup, monotonic
+reuse, old-phase exclusion, and terminal image/mark/retirement failures. These
+APIs do not themselves install native or stored-world collision records; that
+mapping and the world's phase traversal remain live-integration requirements.
+
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed
 publication/query handling and repeated slot reuse. This local owner is not

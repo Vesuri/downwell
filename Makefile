@@ -350,8 +350,12 @@ build/debris-draw-test: tests/core/DebrisDrawTest.cpp $(wildcard src/core/*.h) s
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DebrisDrawTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-debris-effects
-verify-debris-effects: build/debris-effects-test
+verify-debris-effects: build/debris-effects-test build/debris-registered-test
 	./build/debris-effects-test
+	./build/debris-registered-test
+build/debris-registered-test: tests/core/DebrisRegisteredLifecycleTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/DebrisRegisteredLifecycleTest.cpp src/core/GameMakerRandom.cpp
 
 build/debris-effects-test: tests/core/DebrisEffectsTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build
