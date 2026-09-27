@@ -109,7 +109,12 @@ public:
     bool retire(InstanceHandle h){
         const auto* state=resolve(h);
         if(!succeeded()||!state)return fail();
-        if(!pending_.retire(h.slot)||!registry_.retire(layers_,state->sourceId,h))return fail();
+        if(!pending_.retire(h.slot))return fail();
+        // 0x4258f4 skips detachment when room uninitialization has already
+        // cleared the attached flag. Its unbound placeholder is room-owned.
+        if(state->depth.attached){
+            if(!registry_.retire(layers_,state->sourceId,h))return fail();
+        }else if(registry_.find(h)!=Registry::End)return fail();
         states_[h.slot]=State{};return true;
     }
     unsigned pendingDepths()const{return pending_.size();}

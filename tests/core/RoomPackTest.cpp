@@ -5,6 +5,7 @@
 #include "core/RunnerLayerBackgrounds.h"
 #include "core/RunnerLayerBackgroundDraw.h"
 #include "core/RunnerLayerDraw.h"
+#include "core/RunnerLayerLifetimes.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -64,7 +65,7 @@ void appendInstance(std::vector<std::uint8_t>& bytes,
     appendU32(bytes, persistent ? 1 : 0);
 }
 
-std::vector<std::uint8_t> makePack() {
+std::vector<std::uint8_t> makePack(bool persistentController=true) {
     std::vector<std::uint8_t> bytes;
     bytes.insert(bytes.end(), {'D', 'W', 'R', 'M'});
     appendU16(bytes, downwell::RoomPack::formatVersion);
@@ -88,7 +89,7 @@ std::vector<std::uint8_t> makePack() {
     appendU32(bytes, 0);
     appendU32(bytes, 1);
 
-    appendInstance(bytes, 100065, 37, true);
+    appendInstance(bytes, 100065, 37, persistentController);
     appendInstance(bytes, 100066, 36, false);
 
     appendU32(bytes, 13);
@@ -563,6 +564,59 @@ void testLayerStartup(){
     require(!downwell::PackedRoomLayerLoader::load(bad,7,badLayers,badRegistry,[](unsigned,const auto&){return true;}),"duplicate membership rejected");
 }
 
+void testLayerRoomReentry(){
+    using namespace downwell;
+    const auto bytes=makePack(false);const RoomPack pack(bytes.data(),bytes.size());
+    using Registry=RunnerLayerInstances<4,4>;using Layers=Registry::Layers;
+    using Owner=RunnerLayerLifetimes<4,4,3>;
+    Layers layers;Registry registry;RunnerLayerIds ids;
+    require(PackedRoomLayerLoader::loadCatalogIds(pack,ids),"reentry catalog identities");
+    Owner owner(layers,registry,ids);InstanceStore<3> store;
+    require(store.create(513,10,6,true)==CreateInstanceResult::success,"reentry persistent instance");
+    const auto survivor=store.handleAt(0);
+    require(owner.adopt({survivor,513,{{0x41280000u},13,false,false},false}),"adopt preexisting survivor");
+    struct Binding {
+        Owner& owner;
+        bool birth(InstanceHandle h,const InstanceRecord& r){
+            RunnerImageValue depth;
+            return depth.assign(MotionBinary64::fromInteger(r.depth))&&owner.birth(h,r.instanceId,depth,!r.active);
+        }
+        bool retire(InstanceHandle h,const InstanceRecord&){return owner.retire(h);}
+    } binding{owner};
+    RunnerStepSnapshot<3> globals;
+    unsigned preparations=0,events=0;
+    auto enter=[&](bool first){
+        return PackedRoomLoader<3>::enterChecked(store,pack,7,first,[&](auto& r,auto){
+            ++events;const auto e=registry.find(r.instanceId);
+            return e!=Registry::End&&store.resolve(registry.get(e)->instance)==&r&&owner.resolve(registry.get(e)->instance);
+        },[](int){return true;},[](auto&){return true;},nullptr,binding,[&](auto& survivors,int room){
+            ++preparations;
+            require(survivors.size()==1&&survivors.resolve(survivor)&&owner.resolve(survivor),"same survivor at preparation");
+            if(preparations>1){layers=Layers{};registry=Registry{};}
+            if(!PackedRoomLayerLoader::load(pack,room,layers,registry,[](unsigned,const auto&){return true;})||
+                !survivors.captureGlobalInstanceOrder(globals))return false;
+            return owner.initializeRoom([&](auto visit){
+                for(unsigned i=0;i<globals.size();++i)if(!visit(globals.handle(i)))return false;
+                return true;
+            },[](unsigned){return false;});
+        })==PackedRoomLoadResult::success;
+    };
+    require(enter(true)&&events&&preparations==1,"first packed room entry uses lifetime owner");
+    const auto oldPlaced=registry.get(registry.find(100065))->instance;
+    require(owner.writeDepth(survivor,MotionBinary64::fromInteger(-60000))&&
+        owner.writeDepth(oldPlaced,MotionBinary64::fromInteger(5))&&owner.pendingDepths()==2,
+        "pending writes before room exit");
+    require(owner.uninitializeRoom([](unsigned){return false;})&&enter(false),"packed reentry retires unbound lifetimes");
+    require(preparations==2&&owner.pendingDepths()==1&&!store.resolve(oldPlaced)&&!owner.resolve(oldPlaced)&&
+        store.resolve(survivor)&&owner.resolve(survivor),"retirement cancels only departing lifetime request");
+    require(owner.serviceDepths()&&owner.pendingDepths()==0,"surviving pending request completes after fallback");
+    require(layers.get(layers.find(owner.resolve(survivor)->depth.layerId))->depth==-60000,
+        "room fallback preserves surviving published depth across owner storage replacement");
+    const auto newPlaced=registry.get(registry.find(100065))->instance;
+    require(owner.resolve(newPlaced)&&!(newPlaced.slot==oldPlaced.slot&&newPlaced.generation==oldPlaced.generation),
+        "serialized rebirth uses a new generation");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -574,6 +628,7 @@ int main(int argc, char** argv) {
     testValidation();
     testPackedRoomLoader();
     testLayerStartup();
+    testLayerRoomReentry();
     if (argc == 2)
         testGeneratedPack(argv[1]);
     std::cout << "room pack tests passed\n";

@@ -805,6 +805,17 @@ new attachment. Tests exercise both timings without asserting that every room
 transition schedules them identically. Full room destruction, survivor transfer
 and persistent-room storage remain the live room owner's responsibility.
 
+Retirement after uninitialization must not attempt to detach an already-unbound
+element: `0x4258f4` skips that operation when the attached flag is clear. The
+lifetime adapter cancels the departing instance's pending depth request and
+releases its state, leaving the placeholder owned by the room. A packed-room
+re-entry test now composes the loader, lifecycle adapter, preparation callback
+and global-instance ordering twice: two placed instances retire/reappear with
+new generations while one persistent lifetime and its pending depth request
+survive replacement of the room's layer storage. This exercises the actual
+shared loader boundary, not the live SDL/Amiga scene drivers or the original
+runner's complete Room End/Cleanup event sequence.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;
