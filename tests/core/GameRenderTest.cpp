@@ -43,6 +43,9 @@ public:
     }
     void clearClipRect() override { ++clearClipCount; }
     void fillRect(int x, int y, int w, int h, downwell::Color color) override {
+        if(recordRoomBackground&&x==110&&y==0&&w==160&&h==284&&
+           !color.r&&!color.g&&!color.b&&color.a==255)
+            spriteOrder.push_back(-1000001);
         if(recordWallTile&&x==134&&y==35&&w==16&&h==16&&color.r==0&&color.g==0&&color.b==0&&color.a==255)
             spriteOrder.push_back(-739);
         if (w == 1 && h == 1 && color.r == 255 && !color.g && !color.b) ++redPixels;
@@ -86,6 +89,7 @@ public:
     }
     unsigned bulletDraws = 0;
     bool recordWallTile=false;
+    bool recordRoomBackground=false;
     unsigned redPixels = 0;
     std::vector<float> bulletAngles;
     bool spreadBulletDrawn = false;
@@ -501,32 +505,71 @@ int main() {
             bound->update(control);plain->update(control);
             require(bound->simulationSucceeded()&&plain->simulationSucceeded()&&
                 bound->startup().stateDigest()==plain->startup().stateDigest(),"production owner preserves boot-to-game state and RNG");
-            RecordingRenderer a,b;bound->render(a);plain->render(b);
+            RecordingRenderer a,b;
+            a.recordRoomBackground=b.recordRoomBackground=state.inMenu();
+            bound->render(a);plain->render(b);
             require(bound->renderingSucceeded()&&plain->renderingSucceeded()&&a.spriteOrder==b.spriteOrder,
                 "production owner preserves boot-to-game sprite painter order");
             if(state.inMenu()&&!gardenDrawChecked){
-                // Room entry has not undergone activation/depth changes here.
-                // Independently model the runner's before-equal insertion;
-                // do not use visitDrawChecked to compute its own expectation.
+                // Source rmMenu has serialized visible instances at entry.
+                // Reverse layers, then reverse serialized membership (the
+                // runner reserves each element at the head). Do not derive
+                // the expectation from either runtime traversal implementation.
                 std::vector<const downwell::InstanceRecord*> order;
+                std::vector<std::uint32_t> serialized;
+                downwell::PackedRoom room;
+                require(rooms.findRoom(state.roomId(),room),"garden room resource exists");
+                unsigned backgrounds=0;
+                for(unsigned i=room.layerCount;i>0;--i){
+                    downwell::PackedRoomLayer layer;
+                    require(rooms.roomLayer(room,i-1,layer),"garden layer resource exists");
+                    if(!layer.visible())continue;
+                    if(layer.type==1){
+                        require(order.empty()&&layer.backgroundSpriteId==-1&&
+                            layer.backgroundColor==0xff000000u&&layer.backgroundFlags==1,
+                            "original garden starts with an opaque black background element");
+                        ++backgrounds;continue;
+                    }
+                    require(layer.type==2,"garden uses background and instance layers");
+                    for(unsigned j=layer.membershipCount;j>0;--j){
+                        std::uint32_t id;
+                        require(rooms.membership(layer.firstMembership+j-1,id),"garden membership exists");
+                        serialized.push_back(id);
+                        const auto* r=state.instance(id);
+                        downwell::PackedObject object;
+                        if(!r||!r->active||r->destroyRequested||r->objectId==382||r->objectId==69||
+                           !objects.findObject(r->objectId,object)||!object.visible()||object.spriteId<0||
+                           (r->objectId==35&&!state.menuPlayerVisible()))continue;
+                        order.push_back(r);
+                    }
+                }
+                require(backgrounds==1,"garden has one source background quad");
+                // Well Create adds a title, and room startup adds a fade.
+                // Dynamic layers are inserted after fixed equal-depth layers
+                // (hence drawn before them), with newest active elements first.
                 for(unsigned i=0;i<state.activeInstanceCount();++i){
                     const auto& r=state.instanceAt(i);
+                    if(std::find(serialized.begin(),serialized.end(),r.instanceId)!=serialized.end())continue;
                     downwell::PackedObject object;
                     if(!r.active||r.destroyRequested||r.objectId==382||r.objectId==69||
-                       !objects.findObject(r.objectId,object)||!object.visible()||object.spriteId<0||
-                       (r.objectId==35&&!state.menuPlayerVisible()))continue;
+                       !objects.findObject(r.objectId,object)||!object.visible()||object.spriteId<0)continue;
                     auto at=order.begin();
                     while(at!=order.end()&&(*at)->depth>r.depth)++at;
                     order.insert(at,&r);
                 }
-                std::vector<int> expected;
+                std::vector<int> expected{-1000001};
                 for(const auto* r:order){
                     downwell::PackedObject object;require(objects.findObject(r->objectId,object),"garden object exists");
                     expected.push_back(r->objectId==35?state.menuPlayerSpriteId():
                         r->objectId==60?76:r->spriteId>=0?r->spriteId:object.spriteId);
                 }
+                if(a.spriteOrder!=expected){
+                    std::fprintf(stderr,"Garden actual:");for(int id:a.spriteOrder)std::fprintf(stderr," %d",id);
+                    std::fprintf(stderr,"\nGarden expected:");for(int id:expected)std::fprintf(stderr," %d",id);
+                    std::fprintf(stderr,"\n");
+                }
                 require(expected.size()>2&&a.spriteOrder==expected,
-                    "garden painter follows original high-depth/newest-equal room insertion");
+                    "garden painter follows source background and serialized layer memberships");
                 gardenDrawChecked=true;
             }
             gameplay+=state.inMainRoom();

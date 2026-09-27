@@ -42,6 +42,16 @@ int main(int argc, char** argv) {
         !platform.loadFontAssets(fonts)) return 4;
     downwell::Game game(&rooms, &objects, &builders);
     bool styleSeen = false, lockedSeen = false, landed = false;
+    // Optional garden-frame capture along the same unmodified startup tape.
+    // Count updates in rmMenu rather than relying on publisher timing.
+    const char* gardenArgument = std::getenv("DOWNWELL_CAPTURE_GARDEN_TICK");
+    unsigned gardenTarget = 0, gardenTicks = 0;
+    if (gardenArgument) {
+        char* end = nullptr;
+        const auto value = std::strtoul(gardenArgument, &end, 10);
+        if (!*gardenArgument || *end || !value || value >= 6000 || targetTick) return 2;
+        gardenTarget = static_cast<unsigned>(value);
+    }
     const bool gemHighFixture = std::getenv("DOWNWELL_CAPTURE_GEM_HIGH") != nullptr;
     const bool laserFixture = std::getenv("DOWNWELL_CAPTURE_LASER") != nullptr;
     bool gemHighInjected = false;
@@ -78,6 +88,18 @@ int main(int argc, char** argv) {
             gemHighInjected = true;
         }
         game.update(input);
+        if (!game.simulationSucceeded()) return 20;
+        if (gardenTarget) {
+            if (!state.inMenu() || ++gardenTicks != gardenTarget) continue;
+            game.render(platform);
+            if (!game.renderingSucceeded()) return 20;
+            platform.present();
+            game.render(platform);
+            if (!game.renderingSucceeded()) return 20;
+            std::cout << "garden_ticks=" << gardenTicks << " view="
+                      << state.menuCameraViewX() << ',' << state.menuCameraViewY() << '\n';
+            return platform.saveScreenshot(argv[1]) ? 0 : 5;
+        }
         if (state.inPlayMenu() && state.playMenuYOffset() == 0 && !state.playMenuSelected()) {
             styleSeen = true;
             if (state.playMenuCursor() == 1) lockedSeen = true;

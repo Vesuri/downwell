@@ -836,15 +836,15 @@ room transitions while replacing uninitialized layer/element/background
 storage in place. Serialized backgrounds are initialized through their own
 owner. Disposal uses bounded loops, not room-sized stack temporaries. Catalog
 layer identities survive reset. Failed publication or preparation stops the
-runtime. The garden-star activation write uses the same publication boundary
+runtime. The garden-grass activation write uses the same publication boundary
 as other stored actors, before changing the record's active flag.
 
 Runtime tests check every allocated instance's generation, source identity,
 attachment and activation against its layer element through startup, garden,
 gameplay and reset. Existing deterministic state/RNG tapes still pass. This
 installation adds bounded storage to `StartupRuntime`; it does not establish
-A500 memory fit. Neither live renderer has switched to layer Draw traversal,
-and the separate native gameplay lifetime owner still needs installation.
+A500 memory fit. The separate native gameplay lifetime owner still needs
+installation.
 
 `StoredRoomLayers::visitDraw` supplies mixed element traversal through
 `RunnerLayerDraw`: retained serialized visibility, reverse layer order, forward
@@ -858,6 +858,18 @@ or reuse elements or move layers during this traversal. Renderer integration
 must use the background callback at its actual ordered position, not replace
 it with a frame-wide clear. Tests cover hidden/fixed/dynamic peers, failure
 propagation and background traversal in all 25 original rooms.
+
+The SDL garden renderer uses this mixed traversal for its translated object
+Draw bodies and the original rmMenu solid background. The background submits
+a clipped viewport rectangle at its layer position, not a framebuffer clear.
+This adapter only supports the garden's sprite-less background; it rejects a
+sprite background until a resource-backed tiling/stretch path exists. The
+gameplay terrain/effect batches and native retained renderer have not switched
+to this traversal. This does not establish complete custom Draw-event fidelity
+or Draw-time mutation support. The garden regression independently enumerates
+serialized layers/memberships and runtime births before comparing Draw output.
+`DOWNWELL_CAPTURE_GARDEN_TICK=N build/capture-sdl-landing captures/example`
+captures the Nth rmMenu update along the bounded full-startup input tape.
 
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing

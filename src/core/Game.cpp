@@ -13,6 +13,7 @@
 #include "DeathResultsProgressBar.h"
 #include "DeathResultsProgressLabels.h"
 #include "ObjectPack.h"
+#include "RunnerLayerBackgroundDraw.h"
 #include "ShopFixtures.h"
 #include "LaserSightLine.h"
 #include "ShopMenuText.h"
@@ -578,7 +579,7 @@ void Game::renderMenu(Renderer& renderer) const {
     const float viewX = startup_.menuCameraViewX();
     const float viewY = startup_.menuCameraViewY();
 
-    renderingSucceeded_ = startup_.visitDrawChecked([&](InstanceHandle, const InstanceRecord& instance) {
+    const auto drawInstance = [&](InstanceHandle, const InstanceRecord& instance) {
         PackedObject object;
         if (!instance.active || instance.destroyRequested ||
             instance.objectId == 382 || // ditherFade draws a captured surface
@@ -622,7 +623,46 @@ void Game::renderMenu(Renderer& renderer) const {
             instance.scaleX * (isPlayer ? startup_.menuPlayerFacing() : 1),
             instance.scaleY, instance.rotation);
         return true;
-    });
+    };
+    // rmMenu uses the runner's positive-layer-count Draw branch, not the
+    // legacy room list. Keep translated object Draw bodies at their owned
+    // element positions, with the room background in the same traversal.
+    renderingSucceeded_ = startup_.sourceRoomLayers().visitDraw(
+        [&](InstanceHandle key, std::uint32_t sourceId, RunnerLayerDraw::Element& out) {
+            const auto* record = startup_.resolveInstance(key);
+            if (!record || record->instanceId != sourceId) return false;
+            PackedObject object;
+            out.object = objectPack_->findObject(record->objectId, object);
+            out.flags = (!record->active ? 2u : 0u) |
+                        (record->destroyRequested ? 1u : 0u) |
+                        (out.object && object.visible() ? 0x10u : 0u);
+            PackedObjectEvent event;
+            out.drawEvent = out.object && objectPack_->findEvent(record->objectId, 8, 0, event);
+            // The garden's translated defaults use the packed object sprite
+            // unless Create has selected a runtime sprite.
+            out.sprite = record->spriteId >= 0 || (out.object && object.spriteId >= 0);
+            return true;
+        },
+        [&](InstanceHandle key, std::uint32_t sourceId, int, RunnerLayerDraw::Action) {
+            const auto* record = startup_.resolveInstance(key);
+            return record && record->instanceId == sourceId && drawInstance(key, *record);
+        },
+        [&](const RunnerLayerBackground& background, int) {
+            return RunnerLayerBackgroundDraw::visit(background,
+                [](int spriteId, bool& exists) {
+                    // rmMenu has a solid background. Sprite backgrounds need
+                    // a resource-backed tiling/stretch adapter, not a clear.
+                    exists = false;
+                    return spriteId == -1;
+                },
+                [&](std::uint32_t color) {
+                    renderer.fillRect(0, 0, StartupRuntime::surfaceWidth, logicalHeight,
+                        {static_cast<std::uint8_t>(color), static_cast<std::uint8_t>(color >> 8),
+                         static_cast<std::uint8_t>(color >> 16), static_cast<std::uint8_t>(color >> 24)});
+                    return true;
+                },
+                [](const RunnerLayerBackground&) { return false; });
+        });
 }
 
 void Game::renderPlayMenu(Renderer& renderer) const {
