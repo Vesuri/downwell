@@ -2,10 +2,20 @@
 #ifdef DOWNWELL_NATIVE_MOTION_PROBE
 // Compile the actual arithmetic for 68000 and inspect undefined helpers.
 struct Sample { unsigned value; unsigned nextU32(){return value;} };
+struct NativeEffects {
+    using Handle=unsigned;
+    bool create(int,downwell::MotionBinary64,downwell::MotionBinary64,Handle& h){h=1;return true;}
+    bool myFx(Handle){return true;}
+    bool sprite(Handle,int){return true;}
+    bool imageSpeed(Handle,downwell::MotionBinary64){return true;}
+    bool imageAngle(Handle,downwell::MotionBinary64){return true;}
+    bool depth(Handle,downwell::MotionBinary64){return true;}
+};
 extern "C" bool machineGunSourceMotionProbe(downwell::MachineGunSourceMotion& motion,unsigned word){
-    Sample sample{word};unsigned queries=0,iterations=0;
+    Sample sample{word};NativeEffects effects;unsigned queries=0,iterations=0;
     return motion.reset(downwell::MotionBinary64::fromInteger(239),
-        downwell::MotionBinary64::fromInteger(8191)) && motion.initialize(sample) &&
+        downwell::MotionBinary64::fromInteger(8191)) &&
+        motion.initializeWithEffects(sample,[](auto){return true;},false,effects) &&
         motion.approachSolid([&](auto,auto,bool& hit){hit=++queries==3;return true;},
             [](auto,auto){return true;},iterations) && motion.commitPosition();
 }

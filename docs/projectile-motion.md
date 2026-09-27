@@ -134,6 +134,20 @@ integer-only arithmetic with scalar execution of the recovered trig program,
 not a claim that a fresh Windows execution has been captured. The original
 runtime FP-environment assumptions remain part of the open work queue.
 
+The source initialization path's `initializeWithEffects` executes
+`EffectSpawnScript` after publishing the bullet angle and before setting
+`allSet`. The script synchronously creates object 219, publishes the caller's
+`myFx`, then assigns sprite, image speed, image angle and depth separately.
+It passes the unrounded VM direction to the effect angle setter, not the
+bullet's already narrowed angle. Object 219 has no Create event and starts
+without a sprite; batching overrides into constructor defaults would change
+observable setter and registration order. Its inherited Animation End event
+kills the child. Usual-gun profiles select single-frame sprites 603/602 and
+speed 0.5. The operation adapter deliberately does not allocate or draw:
+runtime ownership, global animation scheduling and depth-zero painter order
+must accompany live integration. `make verify-effect-spawn` checks the VM
+contract and initialization's publication/failure boundaries.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

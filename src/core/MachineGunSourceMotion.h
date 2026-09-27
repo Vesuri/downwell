@@ -6,6 +6,7 @@
 #include "MachineGunProfile.h"
 #include "DivideBinary64.h"
 #include "RunnerLineArguments.h"
+#include "EffectSpawnScript.h"
 namespace downwell {
 // Arithmetic contract for bulletStandard Step, not its event scheduler.
 // Always store ABSOLUTE room coordinates: translating before the builtin
@@ -49,6 +50,13 @@ public:
     template<class Random> bool initialize(Random& random){
         return initialize(random,[](RunnerImageValue){return true;},
             [](const MachineGunSourceMotion&){return true;});
+    }
+    template<class Random,class PublishAngle,class Effects>
+    bool initializeWithEffects(Random& random,PublishAngle publishAngle,bool gemHigh,Effects& effects){
+        return initialize(random,publishAngle,[&](const MachineGunSourceMotion& shot){
+            return EffectSpawnScript::run(effects,shot.x.promoted(),shot.y.promoted(),
+                machineGunProfile(gemHigh).muzzle,{0x3fe00000u,0},shot.direction,{});
+        });
     }
     bool endpoint(MotionBinary64& px,MotionBinary64& py)const{
         if(!initialized)return false;
