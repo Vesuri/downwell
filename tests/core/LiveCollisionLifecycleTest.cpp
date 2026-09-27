@@ -10,6 +10,7 @@
 #include "core/SmokeTrig.h"
 #include "core/GameplayContactProfileInput.h"
 #include "core/TimeShardBurst.h"
+#include "core/ProjectilePublication.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -123,6 +124,23 @@ struct RecordingLifecycle:Lifecycle {
 static bool tracked(int id){
     return id==35||id==60||id==92||id==111||id==112||id==113||id==116||id==117||id==119;
 }
+struct ProjectileFailureOwner:StoredWorldCollision {
+    using StoredWorldCollision::StoredWorldCollision;
+    unsigned reject=0,calls=0,rejected=0;
+    bool allow(const InstanceRecord& r,unsigned event){
+        if(r.objectId!=261)return true;
+        ++calls;if(event==reject){rejected=event;return false;}return true;
+    }
+    bool birth(InstanceHandle h,const InstanceRecord& r){return allow(r,1)&&StoredWorldCollision::birth(h,r);}
+    bool sprite(InstanceHandle h,const InstanceRecord& r,int s){return allow(r,2)&&StoredWorldCollision::sprite(h,r,s);}
+    bool transform(InstanceHandle h,const InstanceRecord& r,RunnerTransformField f,RunnerImageValue v,RunnerImageValue a,std::uint32_t b){
+        return allow(r,3)&&StoredWorldCollision::transform(h,r,f,v,a,b);
+    }
+    bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){return allow(r,4)&&StoredWorldCollision::move(h,r,x,y);}
+    bool imageIndex(InstanceHandle h,const InstanceRecord& r,RunnerImageValue v){return (!v.bits||allow(r,5))&&StoredWorldCollision::imageIndex(h,r,v);}
+    bool markDestroyed(InstanceHandle h,const InstanceRecord& r){return allow(r,6)&&StoredWorldCollision::markDestroyed(h,r);}
+    bool retire(InstanceHandle h,const InstanceRecord& r){return allow(r,7)&&StoredWorldCollision::retire(h,r);}
+};
 int main(){
     const auto rb=read("generated/downwell-rooms.dwrm"),ob=read("generated/downwell-objects.dwob"),
         bb=read("generated/downwell-builder-patterns.dwbp"),sb=read("generated/downwell-sprites.dwsc"),
@@ -131,6 +149,47 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(unsigned failure=1;failure<=7;++failure){
+        auto owner=std::make_unique<ProjectileFailureOwner>(objects,sprites,masks);owner->reject=failure;
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach projectile failure fixture");world->skipToGameForTesting();
+        for(unsigned tick=0;tick<1000&&world->effectsSucceeded();++tick)
+            world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+        require(!world->effectsSucceeded()&&owner->rejected==failure,"publication failure reaches a terminal simulation latch");
+        const auto calls=owner->calls;const auto draws=world->randomDrawCount();world->step({},false);
+        require(owner->calls==calls&&world->randomDrawCount()==draws,"failed projectile frame cannot replay callbacks or RNG");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach projectile ownership world");world->skipToGameForTesting();
+        std::vector<InstanceHandle> previous;unsigned births=0,retirements=0;
+        for(unsigned tick=0;tick<1800;++tick){
+            world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+            unsigned population=0;
+            require(world->effectsSucceeded()&&owner->valid()&&owner->instanceNumber(261,population)&&
+                population==world->mainBulletCount(),"stored projectile population equals live gameplay shots");
+            for(auto old:previous)if(!owner->resolve(old))++retirements;
+            std::vector<InstanceHandle> current;
+            for(unsigned i=0;i<world->mainBulletCount();++i){
+                const auto& bullet=world->mainBulletAt(i);const auto* record=owner->resolve(bullet.instance);
+                RunnerImageValue x,y,actualX,actualY;
+                require(record&&record->objectId==261&&!record->destroyRequested&&
+                    record->spriteId==machineGunProfile(bullet.gemHigh).sprite&&
+                    ProjectilePublication::coordinate(bullet.trajectory.x,0,x)&&
+                    ProjectilePublication::coordinate(bullet.trajectory.y,0,y)&&
+                    owner->collisionPosition(bullet.instance,actualX,actualY)&&x.bits==actualX.bits&&y.bits==actualY.bits,
+                    "live projectile handle resolves current resource and fractional position");
+                bool found=false;for(auto old:previous)found|=old.slot==bullet.instance.slot&&old.generation==bullet.instance.generation;
+                if(!found)++births;current.push_back(bullet.instance);
+            }
+            previous=current;
+        }
+        require(births>20&&retirements>20,"natural firing exercises repeated births, impacts and slot reuse");
+        require(world->restartFromResults(DeathMenuSequence::Action::Retry,2),"projectile world Retry");
+        for(auto old:previous)require(!owner->resolve(old),"Retry invalidates former stored projectile handles");
+    }
     {
         PackedObjectEvent event;
         require(!objects.findEvent(371,1,0,event)&&!objects.findEvent(371,12,0,event),

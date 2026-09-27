@@ -19,6 +19,7 @@
 #include "FrogBehavior.h"
 #include "FrogMotion.h"
 #include "StandardBulletStep.h"
+#include "ProjectilePublication.h"
 #include "StandardBulletImpact.h"
 #include "BatMotion.h"
 #include "GameMakerRounding.h"
@@ -30,6 +31,7 @@
 #include "StateDigest.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace downwell {
 
@@ -301,8 +303,17 @@ void StartupRuntime::stepInternal(bool advancePressed,
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
     if(roomId_==mainRoomId)run_.advanceCorpseExpiryAnimation();
     if(!run_.effectsSucceeded)return;
-    if(roomId_==mainRoomId)for(std::size_t i=0;i<mainBulletCount_;++i)
-        if(!mainBullets_[i].animation.advance()){run_.effectsSucceeded=false;return;}
+    if(roomId_==mainRoomId)for(std::size_t i=0;i<mainBulletCount_;++i){
+        auto& bullet=mainBullets_[i];
+        if(!bullet.animation.advance()){run_.effectsSucceeded=false;return;}
+        if(bullet.instance.generation){
+            auto* record=instances_.resolve(bullet.instance);
+            if(!record||!lifecycle_.imageIndex(bullet.instance,*record,bullet.animation.index)){
+                run_.effectsSucceeded=false;return;
+            }
+            std::memcpy(&record->imageIndex,&bullet.animation.index.bits,4);
+        }
+    }
     ++tick_;
     inputLeftPressed_ = left && !inputLeft_;
     inputRightPressed_ = right && !inputRight_;
@@ -380,6 +391,9 @@ void StartupRuntime::stepInternal(bool advancePressed,
     };
     const auto handler = [this, advancePressed](InstanceRecord& instance,
                                                  StepEvent event) {
+        // Projectiles still use the shared supported Step adapter below.
+        // Registration does not authorize a second dispatch of their events.
+        if(instance.objectId==261)return;
         if (event.phase==StepEventPhase::step) instance.enemyStepEligible=true;
         if (objectPack_ != nullptr) {
             if (event.phase == StepEventPhase::alarm) {
@@ -464,6 +478,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
         run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
         run_.gameplayPresentationStep(random_);
+        // This frame adapter finishes at the pre-Draw boundary. Only the
+        // projectile family is owned here; external effect owners retain their
+        // separate cleanup dispatch until the full room scheduler is joined.
+        if(!cleanupMainBullets())run_.effectsSucceeded=false;
     }
 }
 
@@ -669,6 +687,19 @@ void StartupRuntime::emitMainBullet(int x,int y) {
     };
     mainBullets_[mainBulletCount_ - 1].trajectory.reset(x + muzzleOffset, y + 4,
                                                       run_.upgrades.levels[12] != 0);
+    if(objectPack_){
+        auto& bullet=mainBullets_[mainBulletCount_-1];
+        DeferredInstanceQueue<1> create;
+        if(!create.enqueueCreate(261,x+muzzleOffset,y+4)||
+            create.applyChecked(instances_,*objectPack_,roomId_,nextRuntimeInstanceId_,[&](InstanceRecord& record){
+                bullet.instance=instances_.handleAt(instances_.size()-1);
+                const auto sprite=machineGunProfile(bullet.gemHigh).sprite;
+                if(!lifecycle_.sprite(bullet.instance,record,sprite))return false;
+                record.spriteId=sprite;record.imageSpeed=0.3F;
+                if(!lifecycle_.imageIndex(bullet.instance,record,{}))return false;
+                record.imageIndex=0;return true;
+            },lifecycle_)!=ApplyInstanceCommandsResult::success){run_.effectsSucceeded=false;return;}
+    }
     ++soundPlayRequests_;
 }
 
@@ -719,7 +750,11 @@ void StartupRuntime::updateMainBullets() {
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
         MainBulletState bullet = mainBullets_[index];
         bool alive=false;
-        const bool succeeded=stepMachineGunProjectileChecked(bullet, random_,
+        if(!bullet.trajectory.initialized&&bullet.instance.generation){
+            bullet.trajectory.initialize(random_);
+            if(!publishMainBullet(bullet,true))run_.effectsSucceeded=false;
+        }
+        bool succeeded=stepMachineGunProjectileChecked(bullet, random_,
           [this, &bullet](const ProjectileSegment& path) {
             InstanceRecord* enemy = mainBulletEnemyCollision(path);
             if (enemy != nullptr) {
@@ -753,6 +788,13 @@ void StartupRuntime::updateMainBullets() {
             }
             return false;
           },alive,[this]{return run_.effectsSucceeded;},0,ordinaryStepViewTopQ12_,surfaceHeight);
+        if(succeeded&&!publishMainBullet(bullet,false))succeeded=run_.effectsSucceeded=false;
+        if(succeeded&&!alive&&bullet.instance.generation){
+            auto* record=instances_.resolve(bullet.instance);
+            if(!record||(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(bullet.instance,*record)))
+                succeeded=run_.effectsSucceeded=false;
+            else record->destroyRequested=true;
+        }
         if(!succeeded){
             // Keep the failed shot's completed initialization and all untouched
             // later shots, while retaining earlier successful retirements.
@@ -764,6 +806,43 @@ void StartupRuntime::updateMainBullets() {
             mainBullets_[write++] = bullet;
     }
     mainBulletCount_ = write;
+}
+
+bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
+    if(!bullet.instance.generation)return true; // Explicit resource-less fixture.
+    auto* record=instances_.resolve(bullet.instance);
+    if(!record||record->objectId!=261)return false;
+    if(angle){
+        RunnerImageValue value;
+        if(!ProjectilePublication::angle(bullet.trajectory.direction,value)||
+            !lifecycle_.transform(bullet.instance,*record,RunnerTransformField::angle,value,{0x3f800000u},0xffffffu))return false;
+        std::memcpy(&record->rotation,&value.bits,4);return true;
+    }
+    RunnerImageValue x,y;std::int32_t ix,iy;
+    if(!ProjectilePublication::coordinate(bullet.trajectory.x,0,x)||
+        !ProjectilePublication::coordinate(bullet.trajectory.y,0,y)||
+        !x.promoted().roundPixel(ix)||!y.promoted().roundPixel(iy)||
+        (lifecycle_.hasOwner()&&!lifecycle_.publishedPosition(bullet.instance,*record,x,y)))return false;
+    record->x=ix;record->y=iy;
+    std::memcpy(&record->preciseX,&x.bits,4);std::memcpy(&record->preciseY,&y.bits,4);
+    return true;
+}
+
+bool StartupRuntime::cleanupMainBullets(){
+    return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
+        [](const InstanceRecord& r){return r.objectId==261;},
+        [this](InstanceHandle,const InstanceRecord& r){return instances_.erase(r.instanceId,
+            [this](InstanceHandle h,const InstanceRecord& record){return lifecycle_.retire(h,record);});});
+}
+bool StartupRuntime::clearMainBullets(){
+    if(!run_.effectsSucceeded)return false;
+    for(std::size_t i=0;i<instances_.size();){
+        const auto& record=instances_.at(i);
+        if(record.objectId!=261){++i;continue;}
+        if(!instances_.erase(record.instanceId,[this](InstanceHandle h,const InstanceRecord& r){return lifecycle_.retire(h,r);}))
+            return run_.effectsSucceeded=false;
+    }
+    mainBulletCount_=0;return true;
 }
 
 void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
@@ -2211,7 +2290,7 @@ int StartupRuntime::alarm0() const {
 
 std::uint64_t StartupRuntime::stateDigest() const {
     StateDigest digest;
-    digest.addU32(48); // Projectile sequence phase is binary32, advanced before Begin Step.
+    digest.addU32(49); // Stored projectile records and lifetime links participate in replay state.
     digest.addU64(tick_);
     digest.addI32(roomId_);
     digest.addI32(roomDestination_);
@@ -2322,6 +2401,8 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(mainBullets_[index].y);
         digest.addBool(mainBullets_[index].gemHigh);
         digest.addU32(mainBullets_[index].animation.index.bits);
+        digest.addU32(mainBullets_[index].instance.slot);
+        digest.addU32(mainBullets_[index].instance.generation);
         const auto& motion = mainBullets_[index].trajectory;
         digest.addI32(motion.x.pixel); digest.addU32(motion.x.fraction);
         digest.addI32(motion.y.pixel); digest.addU32(motion.y.fraction);

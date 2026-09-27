@@ -1053,10 +1053,22 @@ ownership, with terminal failure propagation at each publication boundary.
 `ProjectilePublication` narrows the current Q20 position and Q32-turn direction
 without discarding fractions at the drawing-pixel boundary. This is an adapter
 for the existing approximation, **not** evidence that projectile motion matches
-the Windows setters/trigonometry. Projectile selectors remain unavailable: source
-motion precision, collision-event/mark timing, muzzle-effect creation order and
-the stored-world projectile owner's registration still need integration. The
+the Windows setters/trigonometry. Live projectile hits still use the old adapters: source
+motion precision, collision-event/mark timing and muzzle-effect creation order
+still need integration. The
 existing enemy-first impact adapter is not replaced by this ownership work.
+
+The SDL stored world retains object-261 records in `InstanceStore`, linking
+each compact-array shot to its generational handle. Birth publishes original
+resource defaults before the selected sprite/image assignments. Position,
+angle and animation publications use the same supported shot state as native;
+no pointers into compacting instance records survive callbacks. Consumed shots
+are marked immediately and removed in room-list order at the frame adapter's
+pre-Draw boundary, after End Step. `cleanupDestroyedIf` selects this owned
+family without silently erasing marked records belonging to external effect
+owners. Full cross-family cleanup/animation and source collision dispatch are
+still separate integration requirements. Level-clear entry retires the shots,
+and room reload/Retry invalidates stored handles through normal lifecycle calls.
 
 Native exit creation also registers the object-306 trigger and object-74
 camera-limit child in `GameplayExitControllers`, before the object-255 goal

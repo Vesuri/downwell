@@ -95,12 +95,12 @@ void testReplayProducesStableStartupState() {
     require(runtime.inMenu(), "replayed press edges reach rmMenu");
     require(runtime.tick() == 13, "replay advances one simulation tick per frame");
     const std::uint64_t digest = runtime.stateDigest();
-    // Schema 48 stores the projectile's binary32 sequence phase.
-    if (digest != 0xd0abc7698ecf86e9ULL)
+    // Schema 49 includes stored projectile identities and their lifetime links.
+    if (digest != 0xbf4d5aed1cf0989eULL)
         std::cerr << "startup state digest: 0x" << std::hex << digest
                   << std::dec << '\n';
-    require(digest == 0xd0abc7698ecf86e9ULL,
-            "schema-48 startup state digest remains wire-stable");
+    require(digest == 0xbf4d5aed1cf0989eULL,
+            "schema-49 startup state digest remains wire-stable");
     auto& record=const_cast<downwell::InstanceRecord&>(runtime.instanceAt(0));
     const auto mask=record.maskId;record.maskId=31;
     require(runtime.stateDigest()!=digest,"digest detects mask-only changes behind identical artwork");

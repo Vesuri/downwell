@@ -55,6 +55,7 @@ public:
         bool gemHigh = false;
         ProjectileAnimation animation;
         MachineGunTrajectory trajectory;
+        InstanceHandle instance{};
     };
     struct MainCurrencyState {
         GemMotion motion;
@@ -482,6 +483,7 @@ public:
     // Scene owner retires old presentation before entering. While active,
     // update via stepLevelClear, not the main-room event scheduler.
     bool enterLevelClear(unsigned style, bool heartGoal) {
+        if(!run_.levelResultRequested||run_.levelClearActive||!clearMainBullets())return false;
         if (!run_.enterLevelClear(style, heartGoal, mainPlayerHealth_, mainPlayerMotion_, random_)) return false;
         mainAmmo_ = mainPlayerMotion_.ammo();
         return true;
@@ -594,6 +596,9 @@ private:
     bool mainSolidAt(float x, float y) const;
     void emitMainBullet(int x,int y);
     void updateMainBullets();
+    bool publishMainBullet(MainBulletState& bullet,bool angle);
+    bool cleanupMainBullets();
+    bool clearMainBullets();
     bool publishMainInactivation(const InstanceRecord& record);
     bool publishMainEnemyImage(std::size_t index,unsigned phase);
     bool publishMainEnemyTransform(std::size_t index,RunnerTransformField field,int value);

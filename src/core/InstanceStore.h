@@ -243,11 +243,16 @@ public:
     // Resolve again after dispatch: success without retirement is an error.
     // Earlier successful removals survive a later failure; callers must latch it.
     template<class Retire> bool cleanupDestroyed(Retire retire){
+        return cleanupDestroyedIf([](const InstanceRecord&){return true;},retire);
+    }
+    // Partial integration: leave other families for their owning cleanup
+    // dispatch. Selected records retain the same room-list traversal order.
+    template<class Select,class Retire> bool cleanupDestroyedIf(Select select,Retire retire){
         return roomMembership_.visitCleanupChecked([&](unsigned slot){
             const InstanceHandle key{slot,slots_[slot].generation};
             const auto* record=resolve(key);
             if(!record)return false;
-            if(!record->destroyRequested)return true;
+            if(!record->destroyRequested||!select(*record))return true;
             return retire(key,*record)&&!resolve(key);
         });
     }

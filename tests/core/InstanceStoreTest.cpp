@@ -161,6 +161,16 @@ void testMarkedRoomCleanup() {
     }
 }
 void testAnimationMembership() {
+    {
+        downwell::InstanceStore<3> store;
+        store.create(1,261,7,false);store.create(2,238,7,false);
+        const auto shot=store.handleAt(0),shard=store.handleAt(1);
+        store.find(1)->destroyRequested=store.find(2)->destroyRequested=true;
+        require(store.cleanupDestroyedIf([](const auto& r){return r.objectId==261;},
+            [&](auto,const auto& r){return store.erase(r.instanceId);}),"family cleanup succeeds");
+        require(!store.resolve(shot)&&store.resolve(shard)&&store.resolve(shard)->destroyRequested,
+            "partial cleanup invalidates selected lifetimes and leaves other marked owners untouched");
+    }
     downwell::InstanceStore<1> store;store.create(1,238,7,false);
     const auto key=store.handleAt(0);bool member=false;
     require(store.animationMember(key,member)&&member,"new lifetime belongs to active animation list");
