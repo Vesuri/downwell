@@ -112,6 +112,40 @@ int main(){
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
     {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach wall-event world");world->skipToGameForTesting();
+        InstanceHandle handles[9];unsigned count=0;
+        for(unsigned i=0;i<world->activeInstanceCount()&&count<9;++i){
+            const auto& r=world->instanceAt(i);if(r.objectId!=60||r.wall.pillar)continue;
+            handles[count]=world->instanceHandleAt(i);
+            RunnerImageValue x,y;
+            require(x.assign(MotionBinary64::fromInteger(1000+int(count%3)*16))&&
+                y.assign(MotionBinary64::fromInteger(10000+int(count/3)*16))&&
+                world->publishCollisionPosition(handles[count],x,y),"publish isolated wall fixture via engine setters");
+            ++count;
+        }
+        require(count==9,"room provides nine ordinary walls");
+        struct Effects {
+            bool outOfView(InstanceHandle){require(false,"unexpected cavern out-of-view callback");return false;}
+            bool create(int,MotionBinary64,MotionBinary64){require(false,"unexpected cavern flower creation");return false;}
+        } effects;
+        const auto draws=world->randomDrawCount();
+        for(auto h:handles)require(owner->wallEndStepEvent(*world,h,1,effects),"stored wall first event");
+        const auto* middle=world->resolveInstance(handles[4]);
+        require(middle&&middle->wall.surrounded&&middle->wall.checked==1&&middle->imageIndex==15&&
+            !middle->destroyRequested&&world->wallBackgroundTiles().size()==0,"stored wall first event defers replacement");
+        const auto id=middle->instanceId;
+        require(owner->wallEndStepEvent(*world,handles[4],1,effects)&&middle->destroyRequested&&
+            world->wallBackgroundTiles().size()==1&&world->randomDrawCount()==draws,"stored second event retains tile and requests destruction");
+        std::int32_t x,y;const auto* tile=world->wallBackgroundTiles().at(0);
+        require(tile->x.roundPixel(x)&&tile->y.roundPixel(y)&&x==1008&&y==10008,
+            "tile uses live engine coordinates, not stale actor motion caches");
+        require(world->deactivateWall(handles[4])&&!middle->active&&world->hasInstance(id),"deactivation after destruction retains stored lifetime");
+        require(world->retireMarkedWall(handles[4])&&!world->hasInstance(id)&&!owner->resolve(handles[4])&&
+            world->wallBackgroundTiles().size()==1,"explicit stored cleanup retains wall artwork");
+    }
+    {
         struct PointOwner:StoredWorldCollision {
             using StoredWorldCollision::StoredWorldCollision;
             bool succeed=false,answer=false;int selector=-1;

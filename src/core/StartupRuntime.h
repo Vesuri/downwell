@@ -114,6 +114,41 @@ public:
     const InstanceRecord* resolveInstance(InstanceHandle handle) const {
         return instances_.resolve(handle);
     }
+    InstanceHandle instanceHandleAt(std::size_t index)const{return instances_.handleAt(index);}
+    bool publishWallImage(InstanceHandle h,int frame){
+        auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=60||frame<0||frame>15)
+            return run_.effectsSucceeded=false;
+        if(!lifecycle_.phaseIndex(h,*r,unsigned(frame)*256u))return run_.effectsSucceeded=false;
+        r->imageIndex=static_cast<float>(frame);return true;
+    }
+    bool requestWallDestroy(InstanceHandle h){
+        auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=60)return run_.effectsSucceeded=false;
+        if(r->destroyRequested)return true;
+        if(!lifecycle_.markDestroyed(h,*r))return run_.effectsSucceeded=false;
+        r->destroyRequested=true;return true;
+    }
+    bool deactivateWall(InstanceHandle h){
+        const auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=60)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=instances_.requestActivation(h,false,
+            [&](auto key,const auto& record,bool active){return lifecycle_.activation(key,record,active);});
+    }
+    bool retireMarkedWall(InstanceHandle h){
+        const auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=60||!r->destroyRequested)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=instances_.erase(r->instanceId,
+            [&](auto key,const auto& record){return lifecycle_.retire(key,record);});
+    }
+    template<class Ops> bool wallEndStepEvent(InstanceHandle h,int area,Ops& ops){
+        auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r)return run_.effectsSucceeded=false;
+        if(!r->active||r->destroyRequested)return true;
+        if(r->objectId==99)return true;
+        if(r->objectId!=60)return run_.effectsSucceeded=false;
+        return run_.effectsSucceeded=wallEndStep(r->wall,area,random_,ops);
+    }
     const InstanceRecord& instanceAt(std::size_t index) const {
         return instances_.at(index);
     }

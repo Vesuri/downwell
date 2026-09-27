@@ -1142,6 +1142,18 @@ RNG, failure before destruction, and tile survival after ordered cleanup.
 This is per-event integration, not a claim that production frame dispatch,
 area-four flowers, area-five retirement or global creation order is complete.
 
+`StoredWorldCollision` has the corresponding one-handle adapter for
+`StartupRuntime`, sharing the portable event handler and resource queries.
+Image writes, destroyed exclusion and deactivation go through checked lifecycle
+publication; marked wall retirement is an explicit typed cleanup operation.
+The adapter reads source positions from the maintained collision owner, not
+`preciseX/Y` actor-motion caches, which collision setters intentionally leave
+unchanged. Its real-resource fixture moves nine room walls through engine
+setters, verifies both events and tile coordinates, then deactivates and retires
+the marked lifetime without losing its retained tile. This adapter likewise
+does not enable code 986 in production dispatch or replace the legacy wall
+renderer/occupancy reconciliation yet.
+
 The stored collision owner's production lifecycle binding exposes both shape
 queries and a separate `positionMeeting` point query. The latter has no caller
 handle, forwards binary64 VM coordinate words unchanged to the resource-backed

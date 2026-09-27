@@ -203,6 +203,31 @@ public:
                 angle.bits^=0x80000000u;return Trig{}(angle,c,s);
             },hit);
     }
+    template<class Effects> bool wallEndStepEvent(StartupRuntime& world,InstanceHandle self,int area,Effects& effects){
+        if(!valid()||runtime_!=&world||!resolve(self))return false;
+        struct Ops {
+            StoredWorldCollision& owner;StartupRuntime& world;InstanceHandle self;Effects& effects;
+            bool coordinates(int dx,int dy,MotionBinary64& x,MotionBinary64& y){
+                RunnerImageValue px,py;if(!owner.collisionPosition(self,px,py))return false;
+                x=px.promoted();y=py.promoted();
+                return x.add(MotionBinary64::fromInteger(dx))&&y.add(MotionBinary64::fromInteger(dy));
+            }
+            bool place(int dx,int dy,int object,bool& hit){MotionBinary64 x,y;const auto* r=owner.resolve(self);
+                return r&&coordinates(dx,dy,x,y)&&owner.placeMeeting(self,*r,object,x,y,hit);}
+            bool point(int dx,int dy,int object,bool& hit){MotionBinary64 x,y;
+                return coordinates(dx,dy,x,y)&&owner.positionMeeting(object,x,y,hit);}
+            bool image(int frame){return world.publishWallImage(self,frame);}
+            bool tile(int resource,int sx,int sy,int w,int h,int dx,int dy,int depth){MotionBinary64 x,y;
+                return resource==739&&sx==48&&sy==48&&w==16&&h==16&&depth==100&&
+                    coordinates(dx,dy,x,y)&&world.addWallBackground(x,y);}
+            bool destroy(){return world.requestWallDestroy(self);}
+            bool deactivate(){return world.deactivateWall(self);}
+            bool outOfView(){return effects.outOfView(self);}
+            bool create(int object,int dx,int dy){MotionBinary64 x,y;
+                return coordinates(dx,dy,x,y)&&effects.create(object,x,y);}
+        } ops{*this,world,self,effects};
+        return world.wallEndStepEvent(self,area,ops);
+    }
 };
 }
 #endif
