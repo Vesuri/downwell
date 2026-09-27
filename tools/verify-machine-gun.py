@@ -77,6 +77,15 @@ assert "push.v self.x\npush.v self.xsp\nadd.v.v\npop.v.v self.x" in step
 assert "push.v self.y\npush.v self.ysp\nadd.v.v\npop.v.v self.y" in step
 print("VM spread/velocity initialization precedes solid checks and retained vector movement")
 solid = (export / "Assembly/gml_GlobalScript_scrBulCheckSolid.asm").read_text()
+assert hashlib.sha256((export / "Assembly/gml_GlobalScript_scrBulCheckSolid.asm").read_bytes()).hexdigest() == \
+    "7e2e5107502d9671858a0e7c4cdf23501f9e21c4e7c810a3a1fdabe3e2053e4c"
+assert solid.count("call.i collision_line(argc=7)") == 3
+assert "call.i object_get_parent(argc=1)\npushi.e 84\ncmp.i.v EQ" in solid
+assert "pushi.e 90\nconv.i.v\npush.v self.y\npush.v self.x\ncall.i place_meeting(argc=3)" in solid
+assert "pushi.e 90\nconv.i.v\npush.v self.y\npush.v self.x\ncall.i instance_place(argc=3)" in solid
+assert solid.index("call.i instance_destroy(argc=0)", solid.index(":[16]")) < solid.index("pushi.e 272")
+assert "push.v self.bDir\npush.d 0.4\nconv.d.v\npushi.e 605" in solid
+print("Solid script branches pinned: repeated wall selection, direct parent 84, shootable 90 and post-destroy explosion")
 assert ("push.v self.y\npush.v self.ysp\nadd.v.v\n"
         "push.v self.x\npush.v self.xsp\nadd.v.v\n"
         "push.v self.y\npush.v self.x\ncall.i collision_line(argc=7)") in solid

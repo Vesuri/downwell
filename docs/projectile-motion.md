@@ -47,6 +47,23 @@ callbacks. Division by 10 must not be replaced by multiplication by rounded
 runs after a destruction request. Selector identity, those side effects and
 deferred retirement belong to the scheduler, not this arithmetic component.
 
+`BulletSolidScript` transcribes the branch/side-effect sequence around those
+operations. It performs the wall-line test, short-circuited enemy-line guard,
+fresh wall selection and approach before testing the wall's **direct** parent
+against 84. Positive health is reduced without clamping before `hit=1`; a
+destruction request does not skip the later explosion branch. Non-breakable
+walls create the configured effect at speed 0.5/angle 0 before sound and
+destruction. The alternative branch separately performs parent-90 shape and
+identity queries, damage/hit, optional effect 605 at speed 0.4 and the retained
+real direction, then non-consistent destruction. It never runs both branches.
+
+The callbacks own actual target identities, audio, effects and source storage.
+The shared script latches failures and retains completed operations; invoking
+it again on a failed runtime cannot replay damage or creation. It is not yet
+the live gun Step: parent-90 adapters, target writes/effects and collision-event
+dispatch remain prerequisites. `verify-bullet-solid-script` checks 1024 branch
+combinations and every callback failure boundary against the pinned VM flow.
+
 ## Collision lookup boundaries
 
 `verify-runner-line-point.py` pins the reviewed registrations, wrappers and
