@@ -60,6 +60,20 @@ public:
         if(!owns(key,record,effects)||!record.destroyRequested)return good_=false;
         return good_=effects.retireMarked(key.generation,*this);
     }
+    template<unsigned N> bool dispatchAlarm(InstanceHandle key,const Record& record,
+        DebrisEffects<N>& effects,typename DebrisEffects<N>::Phase phase,unsigned index){
+        if(!owns(key,record,effects))return good_=false;
+        return good_=effects.advanceRegisteredAlarmOne(key.generation,phase,index,*this);
+    }
+    template<unsigned N,class Random,class Stopped,class Meeting>
+    bool dispatchStep(InstanceHandle key,const Record& record,DebrisEffects<N>& effects,
+        typename DebrisEffects<N>::Phase phase,Random& random,Stopped stopped,Meeting meeting){
+        if(!owns(key,record,effects))return good_=false;
+        return good_=effects.stepRegisteredOne(key.generation,phase,random,
+            [&](auto,const auto& effect,bool& frozen){return stopped(key,effect,frozen);},
+            [&](auto,const auto& effect,auto x,auto y,bool& hit){return meeting(key,effect,x,y,hit);},
+            [&](auto h,const auto& effect,auto x,auto y){return move(h,effect,x,y);},*this);
+    }
 private:
     bool check(unsigned local,const DebrisAnimation& effect){
         const auto* r=find(handle(local));return good_=good_&&r&&r->effect==&effect;

@@ -416,6 +416,22 @@ collision resources; this matrix does not verify every precise-mask or rotated
 family member. Shop furniture and other still-unregistered solid actors remain
 a coverage gap before natural debris Step admission.
 
+Selected-event dispatch is available through `advanceDebrisRoomAlarm` and
+`GameplayCollisionOwner::stepDebris`. The latter accepts a shared room key,
+resolves the lifetime again, consumes `GameplayWorld`'s RNG, queries registered
+solids and publishes every coordinate write through the registry. The caller
+must supply a checked per-instance freeze decision derived from `TimeStopBound`;
+there is no default that silently treats missing time-field state as running.
+Both entry points preserve phase cutoffs and destruction marks; they do not
+sweep the debris pool or retire during Step. A failed decision/query poisons the
+world and stops later dispatch rather than repeating partially completed work.
+The integration fixture dispatches selected particles through the real room
+Step snapshot for 16 seeds and 40 frames, comparing full state/RNG with the
+source-motion component using independent rectangular terrain overlaps. It also
+checks newborn exclusion and terminal decision failure. This is not yet normal
+gameplay scheduling: cross-family alarm dispatch, live time-field decisions,
+SDL ownership and rendering remain required before natural birth admission.
+
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed
 publication/query handling and repeated slot reuse. This local owner is not

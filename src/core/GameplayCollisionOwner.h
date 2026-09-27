@@ -344,6 +344,18 @@ public:
            !resolves(self))return check(false);
         return registeredPlaceMeeting(self,56,x,y,masks,hit);
     }
+    // Selected global Step entry, not a pool-local sweep. The caller supplies
+    // the original per-instance TimeStopBound result through a checked adapter.
+    template<unsigned Capacity,class Stopped>
+    bool stepDebris(DebrisEffects<Capacity>& effects,InstanceHandle shared,
+        typename DebrisEffects<Capacity>::Phase phase,const SpriteMaskPack& masks,Stopped stopped){
+        View::Kind kind;InstanceHandle local;
+        if(!valid()||!world_||!View::decode(shared,kind,local)||kind!=View::Kind::debris||!resolves(shared))return check(false);
+        return check(world_->stepDebrisRoomEffect(effects,local,phase,stopped,
+            [&](InstanceHandle key,const DebrisAnimation&,MotionBinary64 x,MotionBinary64 y,bool& hit){
+                return debrisPlaceMeeting(key,x,y,masks,hit);
+            }));
+    }
 private:
     bool registeredPlaceMeeting(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){

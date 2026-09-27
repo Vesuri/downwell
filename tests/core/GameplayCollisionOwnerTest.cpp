@@ -8,6 +8,13 @@ bool nativeDebrisQuery(downwell::GameplayCollisionOwner& owner,downwell::Instanc
     downwell::MotionBinary64 x,downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
     return owner.debrisPlaceMeeting(local,x,y,masks,hit);
 }
+bool nativeDebrisDispatch(GameplayWorld& world,downwell::GameplayCollisionOwner& owner,
+    downwell::DebrisEffects<2>& effects,downwell::InstanceHandle local,downwell::InstanceHandle shared,
+    const downwell::SpriteMaskPack& masks){
+    const auto phase=effects.beginPhase();
+    return world.advanceDebrisRoomAlarm(effects,local,phase,0)&&owner.stepDebris(effects,shared,phase,masks,
+        [](auto,const auto&,bool& frozen){frozen=false;return true;});
+}
 bool nativeScriptSpawn(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects,
     const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle& caller){
     return world.spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},
@@ -61,6 +68,7 @@ bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 using namespace downwell;
 static std::vector<std::uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
 struct TerrainAudit {
@@ -298,6 +306,89 @@ int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    for(unsigned seed=0;seed<16;++seed){
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));scene->configureEnemyRandom(GameMakerRandom(seed));
+        for(int x:{224,240,256})assert(scene->createGeneratedInstance({60,x,512},objects,[](const auto&){return true;}));
+        DebrisEffects<3> effects;InstanceHandle local[3],shared[3];DebrisAnimation expected[3];
+        for(unsigned i=0;i<3;++i){
+            assert(scene->spawnDebris(effects,MotionBinary64::fromInteger(232+int(i)*8),
+                MotionBinary64::fromInteger(500+int(i)*4),1,local[i]));
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,local[i],shared[i]));
+            expected[i]=*effects.get(local[i].generation);
+        }
+        auto random=scene->randomState();PackedSpriteCollision shape;
+        assert(sprites.sprite(115,shape)&&!shape.collisionMode);
+        auto real=[](MotionBinary64 v){const std::uint64_t bits=(std::uint64_t(v.high)<<32)|v.low;
+            double d;std::memcpy(&d,&bits,sizeof d);return float(d);};
+        auto contact=[&](MotionBinary64 px,MotionBinary64 py,bool& hit){
+            const float x=real(px),y=real(py);
+            const int left=int(std::nearbyint(x+float(shape.marginLeft-shape.originX)));
+            const int right=int(std::nearbyint(x+float(shape.marginRight-shape.originX+1)))-1;
+            const int top=int(std::nearbyint(y+float(shape.marginTop-shape.originY)));
+            const int bottom=int(std::nearbyint(y+float(shape.marginBottom-shape.originY+1)))-1;
+            hit=left<=263&&right>=216&&top<=519&&bottom>=504;return true;
+        };
+        for(unsigned tick=0;tick<40;++tick){
+            const auto phase=effects.beginPhase();
+            for(unsigned alarm=0;alarm<3;++alarm)for(unsigned i=0;i<3;++i){
+                if(!effects.retained(local[i].generation))continue;
+                expected[i].advanceAlarm(alarm);
+                assert(scene->advanceDebrisRoomAlarm(effects,local[i],phase,alarm));
+            }
+            RunnerStepSnapshot<8> snapshot;unsigned next=0,stops=0;
+            assert(collision->dispatchStepPhase(0,snapshot,[&](InstanceHandle h,const PackedObjectEvent&){
+                GameplayCollisionView::Kind kind;InstanceHandle selected;
+                assert(GameplayCollisionView::decode(h,kind,selected));
+                if(kind!=GameplayCollisionView::Kind::debris)return true;
+                while(next<3&&expected[next].destroyRequested)++next;
+                assert(next<3&&selected.generation==local[next].generation);
+                const auto i=next++;const bool frozen=i==1&&(tick%3)!=0;
+                assert(expected[i].step(frozen,random,contact));
+                assert(collision->stepDebris(effects,h,phase,masks,
+                    [&](InstanceHandle key,const DebrisAnimation&,bool& stopped){
+                        assert(key.generation==local[i].generation);++stops;stopped=frozen;return true;
+                    }));
+                return true;
+            }));
+            assert(stops<=3);
+            for(unsigned i=0;i<3;++i){
+                const auto* actual=effects.retained(local[i].generation);if(!actual)continue;
+                const auto& e=expected[i];
+                assert(actual->x.bits==e.x.bits&&actual->y.bits==e.y.bits&&
+                    actual->xsp.high==e.xsp.high&&actual->xsp.low==e.xsp.low&&
+                    actual->ysp.high==e.ysp.high&&actual->ysp.low==e.ysp.low&&
+                    actual->imageSpeed.bits==e.imageSpeed.bits&&actual->flash==e.flash&&
+                    actual->noTouch==e.noTouch&&actual->disappearing==e.disappearing&&actual->destroyRequested==e.destroyRequested);
+                for(unsigned a=0;a<3;++a)assert(actual->alarms.get(a)==e.alarms.get(a));
+                assert(collision->state(shared[i])->x.bits==e.x.bits&&collision->state(shared[i])->y.bits==e.y.bits);
+            }
+            assert(scene->randomState().drawCount()==random.drawCount()&&scene->randomState().stateIndex()==random.stateIndex());
+            for(unsigned w=0;w<16;++w)assert(scene->randomState().stateWord(w)==random.stateWord(w));
+            assert(collision->prepareDraw());
+            for(unsigned i=0;i<3;++i)if(expected[i].destroyRequested)
+                assert(!effects.retained(local[i].generation)&&!collision->state(shared[i]));
+        }
+        assert(effects.clear(collision->debris()));
+    }
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));DebrisEffects<1> effects;
+        const auto oldPhase=effects.beginPhase();InstanceHandle local,shared;
+        assert(scene->spawnDebris(effects,{},{},1,local)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,local,shared));
+        unsigned stops=0;const auto draws=scene->randomDrawCount();
+        auto reject=[&](auto,const auto&,bool&){++stops;return false;};
+        assert(scene->advanceDebrisRoomAlarm(effects,local,oldPhase,0)&&effects.get(local.generation)->alarms.get(0)==30);
+        assert(collision->stepDebris(effects,shared,oldPhase,masks,reject)&&!stops);
+        assert(!collision->stepDebris(effects,shared,effects.beginPhase(),masks,reject)&&stops==1&&
+            !scene->effectsSucceeded()&&!effects.valid()&&!collision->valid());
+        assert(!collision->stepDebris(effects,shared,effects.beginPhase(),masks,reject)&&stops==1&&scene->randomDrawCount()==draws);
+    }
     // Family 56 is broader than either wall selector: thin platforms and
     // shootable boxes must participate. These resource masks are rectangular;
     // independently round their quarter-pixel edges, not the particle anchor.

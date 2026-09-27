@@ -248,6 +248,22 @@ public:
         const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&record&&debrisBinding_.retire(key,record);
     }
+    template<unsigned Capacity>
+    bool advanceDebrisRoomAlarm(downwell::DebrisEffects<Capacity>& effects,downwell::InstanceHandle key,
+        typename downwell::DebrisEffects<Capacity>::Phase phase,unsigned index){
+        if(!run_.effectsSucceeded)return false;
+        const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
+        return run_.effectsSucceeded=record&&debrisBinding_.effects==&effects&&
+            debrisInstances_->dispatchAlarm(key,*record,effects,phase,index);
+    }
+    template<unsigned Capacity,class Stopped,class Meeting>
+    bool stepDebrisRoomEffect(downwell::DebrisEffects<Capacity>& effects,downwell::InstanceHandle key,
+        typename downwell::DebrisEffects<Capacity>::Phase phase,Stopped stopped,Meeting meeting){
+        if(!run_.effectsSucceeded)return false;
+        const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
+        return run_.effectsSucceeded=record&&debrisBinding_.effects==&effects&&
+            debrisInstances_->dispatchStep(key,*record,effects,phase,enemyRandom_,stopped,meeting);
+    }
     bool bindScriptSpawnInstances(downwell::GameplayScriptSpawnInstances& instances){
         if(scriptSpawnInstances_||!instances.valid()||instances.size())return false;
         scriptSpawnInstances_=&instances;return true;
