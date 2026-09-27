@@ -53,6 +53,12 @@ public:
         visitAt(root_,box,visit);return true;
     }
 private:
+    static constexpr unsigned depthLimit=[](){unsigned n=Capacity,bits=0;
+        do{++bits;n>>=1;}while(n);return bits;}();
+    // Mutation is non-reentrant. Retain bounded descent scratch with its owner
+    // rather than stacking it under generated-instance Create and world Step.
+    unsigned parents_[depthLimit]{},selections_[depthLimit]{};
+    Box choices_[6]{};
     Node nodes_[Capacity]={};unsigned links_[Capacity]={};
     unsigned used_=1,live_=1,root_=0,free_=Capacity;bool good_=true;
     bool insertRoot(const Node::Entry& entry,int level){
@@ -86,23 +92,21 @@ private:
         // Every internal node has at least two children: the bit width of
         // Capacity bounds tree height. Keep only the descent path, rather than
         // a complete split/child-selection call frame at every tree level.
-        constexpr unsigned depthLimit=[](){unsigned n=Capacity,bits=0;
-            do{++bits;n>>=1;}while(n);return bits;}();
-        unsigned parents[depthLimit],selections[depthLimit],depth=0;
+        unsigned depth=0;
         while(nodes_[node].level!=level){
             const Node& n=nodes_[node];
             if(n.level<level||depth==depthLimit)return false;
-            Box choices[6];for(unsigned i=0;i<n.count;++i)choices[i]=n.entries[i].bounds;
+            for(unsigned i=0;i<n.count;++i)choices_[i]=n.entries[i].bounds;
             unsigned selected;
-            if(!Math::chooseChild(choices,n.count,entry.bounds,selected))return false;
-            parents[depth]=node;selections[depth++]=selected;
+            if(!Math::chooseChild(choices_,n.count,entry.bounds,selected))return false;
+            parents_[depth]=node;selections_[depth++]=selected;
             node=n.entries[selected].child;
         }
         unsigned split=Capacity;
         if(!add(node,entry,split))return false;
         while(depth){
-            const unsigned child=node;node=parents[--depth];
-            auto& selected=nodes_[node].entries[selections[depth]];
+            const unsigned child=node;node=parents_[--depth];
+            auto& selected=nodes_[node].entries[selections_[depth]];
             if(split==Capacity)selected.bounds=Math::unite(selected.bounds,entry.bounds);
             else {
                 selected.bounds=bounds(child);
