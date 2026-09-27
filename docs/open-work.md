@@ -98,10 +98,6 @@ Reference: [area-two recovery](area-two-recovery.md).
 
 ## 3. Close original-game fidelity gaps
 
-- Restore specialized death encounter coverage: the phase-six death route
-  ends without kills or combo.
-  Retain its real-damage, reward and death/results assertions; use explicit
-  deterministic encounter inputs rather than forcing health or enemy state.
 - Audit remaining random-choice call sites and full RNG state through creation,
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,

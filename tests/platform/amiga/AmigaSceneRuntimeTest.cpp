@@ -1595,6 +1595,26 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const int firePhase = std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")
                 ? std::atoi(std::getenv("DOWNWELL_COMBAT_FIRE_PHASE")) : 1;
             input.fire = (tick + firePhase) % 10 < 5;
+            if (std::getenv("DOWNWELL_VERIFY_DEATH") && gameplay.enemiesDefeated() > 0) {
+                // Once reward coverage exists, seek a nearby enemy and stop
+                // shooting during airborne approach. Keep grounded firing to
+                // break through platforms when the threat is below our feet.
+                const downwell::InstanceRecord* threat = nullptr;
+                float nearest = 96;
+                for (unsigned i = 0; i < reference.activeInstanceCount(); ++i) {
+                    const auto& enemy = reference.instanceAt(i);
+                    if (!enemy.active || enemy.health <= 0 || !amigaEnemyHealth(enemy.objectId)) continue;
+                    const float distance = std::fabs(enemy.x-reference.mainPlayerX()) +
+                                           std::fabs(enemy.y-reference.mainPlayerY());
+                    if (distance < nearest) { nearest=distance; threat=&enemy; }
+                }
+                if (threat) {
+                    input.left = reference.mainPlayerX() > threat->x;
+                    input.right = reference.mainPlayerX() < threat->x;
+                    if (!reference.mainPlayerGrounded() ||
+                        std::fabs(threat->y-reference.mainPlayerY()) < 16) input.fire=false;
+                }
+            }
             const bool bothWereDead = gameplay.deathSequence().movementDead() && reference.mainDeathSequence().movementDead();
             const auto beforeNativeTime = gameplay.runTimeTicks();
             const auto beforeHostTime = reference.runTimeTicks();
@@ -1619,6 +1639,7 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             const int healthBefore = gameplay.health();
             gameplay.step(downwell::packReplayInput(input));
             reference.step(input, input.fire && (tick + firePhase) % 10 == 0);
+            parityFrame = gameplay.tick();
             if (laserFixture && tick % 30 == 0) {
                 using C = downwell::LaserSightRay::Coordinate;
                 const C x{static_cast<int>(reference.mainPlayerX()), 12345};

@@ -973,6 +973,7 @@ verify-area-two-patterns: generate-area-two-patterns
 	python3 tools/export-area-two-patterns.py --check
 
 .PHONY: verify-natural-exit verify-route-sweep verify-gameplay-death-state
+test: verify-gameplay-death-state
 verify-route-sweep: generate-room-pack generate-object-pack generate-builder-pattern-pack $(AMIGA_SCENE_TEST_TARGET)
 	DOWNWELL_VERIFY_ROUTE_SWEEP=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
@@ -980,7 +981,7 @@ verify-natural-exit: generate-room-pack generate-object-pack generate-builder-pa
 	DOWNWELL_VERIFY_NATURAL_EXIT=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
 verify-gameplay-death-state: generate-room-pack generate-object-pack generate-builder-pattern-pack $(AMIGA_SCENE_TEST_TARGET)
-	DOWNWELL_COMBAT_TICKS=6000 DOWNWELL_COMBAT_FIRE_PHASE=6 DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_DEATH=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
+	DOWNWELL_COMBAT_TICKS=6000 DOWNWELL_COMBAT_FIRE_PHASE=4 DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_DEATH=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 	DOWNWELL_COMBAT_TICKS=6000 DOWNWELL_COMBAT_FIRE_PHASE=5 DOWNWELL_VERIFY_COMBAT=1 DOWNWELL_VERIFY_SURVIVAL=1 ./$(AMIGA_SCENE_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
 # These executables compile multiple translation units in one command. The
