@@ -43,10 +43,13 @@ enum class LoadRoomResult {
     callbackFailure
 };
 
-// Loads ordered room definitions after validating the whole transition. Event
-// Instance and room-code handlers must not mutate storage. The optional
-// deferred-command handler is the one mutation boundary: it runs after room
-// creation code and before Room Start.
+// Loads ordered room definitions after validating the whole transition.
+// Creation handlers may synchronously create/retire instances. Resolve the
+// original lifetime again between callbacks: destruction or compaction must
+// not send the remaining creation phases to a replacement record. Game/Room
+// Start handlers may retire themselves, but must not otherwise structurally
+// mutate storage during that broadcast. Deferred commands run after room code
+// and before Room Start.
 // Lifecycle failures stop a partially applied transition; external publication
 // cannot be rolled back. Callers must stop rather than retry the transition.
 template <std::size_t Capacity>
@@ -130,12 +133,15 @@ public:
             instance.depth = definition.depth;
             instance.spriteId = definition.spriteId;
             instance.maskId = definition.maskId;
-            if (!lifecycle.birth(instances.handleAt(instances.size() - 1), instance))
+            const auto handle=instances.handleAt(instances.size() - 1);
+            if (!lifecycle.birth(handle, instance))
                 return LoadRoomResult::lifecycleFailure;
-            if(!instanceHandler(instance, RoomInstancePhase::preCreate) ||
-               !instanceHandler(instance, RoomInstancePhase::create) ||
-               !instanceHandler(instance, RoomInstancePhase::instanceCreation))
-                return LoadRoomResult::callbackFailure;
+            const RoomInstancePhase phases[]={RoomInstancePhase::preCreate,RoomInstancePhase::create,RoomInstancePhase::instanceCreation};
+            for(auto phase:phases){
+                auto* live=instances.resolve(handle);
+                if(!live)break;
+                if(!instanceHandler(*live,phase))return LoadRoomResult::callbackFailure;
+            }
         }
 
         if (firstGameRoom && !dispatchAll(instances, RoomInstancePhase::gameStart, instanceHandler))
@@ -176,9 +182,14 @@ private:
     static bool dispatchAll(InstanceStore<Capacity>& instances,
                             RoomInstancePhase phase,
                             InstanceHandler& handler) {
-        for (std::size_t index = 0; index < instances.size(); ++index) {
+        for (std::size_t index = 0; index < instances.size();) {
+            const auto handle=instances.handleAt(index);
             InstanceRecord& instance = instances.at(index);
             if (instance.active && !handler(instance, phase))return false;
+            // Retirement can compact the next unvisited record into this
+            // position. Never retain/dereference instance across a callback.
+            const auto current=instances.handleAt(index);
+            if(current.slot==handle.slot&&current.generation==handle.generation)++index;
         }
         return true;
     }

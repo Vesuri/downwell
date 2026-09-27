@@ -191,12 +191,68 @@ static void testCheckedRoomCallbacks(){
     }
 }
 
+static void testCreateRetirementAndReplacement(){
+    using namespace downwell;
+    for(auto retireAt:{RoomInstancePhase::preCreate,RoomInstancePhase::create,RoomInstancePhase::instanceCreation}){
+        InstanceStore<5> instances;
+        const RoomInstanceDefinition definitions[]={{100,1,false},{101,2,false}};
+        InstanceHandle original;
+        unsigned oldCalls=0,replacementCreationCalls=0,secondCalls=0;
+        bool retired=false;
+        const auto callback=[&](InstanceRecord& record,RoomInstancePhase phase){
+            if(record.objectId==1){
+                require(!retired,"retired lifetime must not receive another callback");
+                ++oldCalls;
+                if(phase==retireAt){
+                    original=instances.handleAt(0);
+                    require(instances.erase(record.instanceId),"self retirement during creation");
+                    // Reuse the same public ID to prove phase continuation is
+                    // generation-based, not an ID lookup or a borrowed pointer.
+                    require(instances.create(100,3,7,false)==CreateInstanceResult::success,"replacement birth");
+                    require(!instances.resolve(original),"replacement invalidates original lifetime");
+                    retired=true;
+                }
+            }else if(record.objectId==3){
+                if(phase==RoomInstancePhase::preCreate||phase==RoomInstancePhase::create||phase==RoomInstancePhase::instanceCreation)
+                    ++replacementCreationCalls;
+            }else if(record.objectId==2)++secondCalls;
+            return true;
+        };
+        require(RoomLoader<5>::enterChecked(instances,7,definitions,2,true,callback,
+            [](int){return true;},[](auto&){return true;})==LoadRoomResult::success,"room accepts synchronous self retirement");
+        require(retired&&oldCalls==unsigned(retireAt)+1&&replacementCreationCalls==0&&secondCalls==5,
+            "retirement stops only the old creation chain, preserving later definitions and broadcasts");
+    }
+}
+
+static void testBroadcastRetirement(){
+    using namespace downwell;
+    for(auto retireAt:{RoomInstancePhase::gameStart,RoomInstancePhase::roomStart}){
+        InstanceStore<4> instances;
+        const RoomInstanceDefinition definitions[]={{100,1,false},{101,2,false},{102,3,false}};
+        unsigned visits=0;
+        require(RoomLoader<4>::enterChecked(instances,7,definitions,3,true,
+            [&](InstanceRecord& record,RoomInstancePhase phase){
+                if(phase==retireAt){
+                    require(record.instanceId==100+visits,"compaction preserves broadcast order");
+                    ++visits;
+                    return instances.erase(record.instanceId);
+                }
+                return true;
+            },[](int){return true;},[](auto&){return true;})==LoadRoomResult::success,
+            "broadcast supports synchronous retirement");
+        require(visits==3&&instances.empty(),"self retirement does not skip the shifted successor");
+    }
+}
+
 int main() {
     testFirstRoomOrder();
     testDestinationRoomKeepsPersistentFirst();
     testValidationIsAtomic();
     testDeferredCreationPrecedesRoomStart();
     testCheckedRoomCallbacks();
+    testCreateRetirementAndReplacement();
+    testBroadcastRetirement();
     std::cout << "room loader tests passed\n";
     return 0;
 }
