@@ -27,8 +27,8 @@ public:
         }
         return End;
     }
-    // 0x412820 dynamic creation order: after all equal-depth layers. Fixed
-    // room-layer loader ordering must be established before using this there.
+    // 0x412820 dynamic creation and 0x4143f6 serialized room-layer insertion:
+    // after all equal-depth layers. Call in source creation/serialized order.
     bool insertAfterEquals(std::int32_t id,std::int32_t depth,bool dynamic,unsigned& slot){
         if(failed_||find(id)!=End)return false;
         unsigned free=0;while(free<Capacity&&layers_[free].present)++free;

@@ -52,6 +52,14 @@ for start, end, digest in (
     (0x4266e0, 0x42679c, "dd0babd9e0005cfafac6148ce742b90df2f432e0b00dee603bfe59dabb17fa31"),
     (0x412a00, 0x412a2f, "09296d5f50a7d421fd9a2726608a0300751e1ef08cbf62e0f854c785cab54d0e"),
     (0x412c20, 0x412c52, "e88d63238b22f89cf79b8e7bca0fbf0f6ad5f847e7a9ad33c919bbc267b79294"),
+    # Serialized layers, placeholder instance elements, and room instance
+    # attachment through the source instance-ID to layer lookup.
+    (0x4136a3, 0x4136cf, "8eb8dd13087f44ce329a1f856617398b3a44e9f6010718357d465ac27abaa4db"),
+    (0x413701, 0x41373e, "96fdd96e0f3ea69586d98efe4fb2bb16901af6a81d9746b3ab7d404f51d1c079"),
+    (0x413cdc, 0x413cf6, "b9b8fe7dc78bcb0cd471a9ce9f7cdffa52eb68291854200fe5e65147a15772a1"),
+    (0x413dee, 0x413e2b, "b0a9b78e517ce89bbe47e42b40eb27260a78af3f690fa6f50a4ef07b47194bdd"),
+    (0x4143f6, 0x4144e8, "d409721cd9222c5a51a9a61c5b19551340e698ea0c70521a4e06085b870e2bec"),
+    (0x48871f, 0x48873d, "98e137270f00baad3232036fdb8fcfc9dee532275112f1942cc83b4fb22e232c"),
     # Retirement removes an instance from the pending queue by stable compaction.
     (0x50f6c5, 0x50f6d9, "f00979b8847f3a5a9dd9913d8dbaae6267fc1618afbe618eb9a31f490d0fc389"),
     (0x50d740, 0x50d793, "6ee03835d9451e9681567d9b5cccda322bdf74663a62c36896bbff3127a9d541"),

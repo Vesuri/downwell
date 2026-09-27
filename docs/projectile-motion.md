@@ -540,6 +540,35 @@ singleton-layer survival and no reordering during unchanged reconciliation.
 The live stored and native world adapters still need to invoke this operation
 once their complete layer ownership is established.
 
+#### Serialized layer and instance attachment order
+
+The room-layer reader at `0x413660` walks the serialized layer-pointer array in
+order, copies IDs/depth/visibility, and inserts each layer after existing equal
+depths (`0x4143f6`). The instance-layer branch (`0x413cdc`) visits the serialized
+instance-ID array forwards. Each ID receives an empty type-2 element inserted
+with append=false (`0x413df7..0x413e20`), hence at the head. This reverses that
+membership array independently of room instance creation order.
+
+Room instance setup resolves the reserved element's layer by source instance ID
+before calling attachment (`0x48871f..0x48873d`). Attachment `0x412ab0` reuses an
+existing element only when its instance pointer is null; an occupied entry is an
+error. It publishes attached state, layer ID and binary32 layer depth. A reused
+active entry stays in place; a reused inactive entry invokes activation relinking
+to move to the tail. A newly allocated entry instead uses the separate 0x80000
+registration flag to choose head/tail insertion. The two flags must not be
+conflated.
+
+`RunnerLayerInstances` provides the source-instance-ID lookup and borrowed,
+generation-checked instance binding. Reserve in serialized membership order,
+then attach in room creation order. All 24 permutations of four instance births
+produce the same reserved element order in tests. Additional tests cover
+inactive reuse, duplicate IDs/handles, retirement, slot reuse, new dormant
+registration and capacity failure. Source instance IDs, store handles and
+element slots remain distinct; source element-ID allocation is not fabricated.
+This registry does not yet load all non-instance room elements or replace live
+room startup. Persistent-room rebinding and full serialized metadata publication
+remain integration work.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

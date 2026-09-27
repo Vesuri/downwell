@@ -4,6 +4,11 @@
 #include "core/RunnerLayers.h"
 #include "core/RunnerDepthChanges.h"
 #include "core/RunnerLayerDraw.h"
+#include "core/RunnerLayerInstances.h"
+bool compileLayerInstances(downwell::RunnerLayerInstances<4,16>& registry,downwell::RunnerLayers<4,16>& layers,
+    unsigned layer,unsigned id,downwell::InstanceHandle handle,downwell::RunnerDepthService::Instance& state){
+    return registry.reserve(layers,layer,id)&&registry.attach(layers,layer,id,handle,state,false)&&registry.retire(layers,id,handle);
+}
 bool compileLayerDraw(const downwell::RunnerLayers<4,16>& layers,unsigned flags){
     return downwell::RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},
         [](unsigned,const auto&){return true;},[&](unsigned,auto& e){e={2,flags,true,true,true,true};return true;},
