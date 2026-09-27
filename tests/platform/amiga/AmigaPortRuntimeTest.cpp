@@ -1028,12 +1028,47 @@ int main() {
                 distantBat.enemyAt(0).activationPending,
             "off-screen bat remains dormant until the camera reaches it");
     const auto dormantIdentity = distantBat.enemyAt(0).lifetimeId;
+    const auto dormantHandle = distantBat.enemyHandle(dormantIdentity);
     require(dormantIdentity && distantBat.findEnemy(dormantIdentity) == &distantBat.enemyAt(0) &&
+                distantBat.findEnemy(dormantHandle)==&distantBat.enemyAt(0)&&
                 !distantBat.findEnemy(0), "pending activation retains a resolvable lifetime");
     require(distantBat.configureEnemy(0, 116, 153, 40, 500, 0, 0, 15, 12) &&
                 distantBat.enemyAt(0).lifetimeId > dormantIdentity &&
-                !distantBat.findEnemy(dormantIdentity),
+                !distantBat.findEnemy(dormantIdentity)&&!distantBat.findEnemy(dormantHandle),
             "explicit enemy replacement retires the old key even at the same slot");
+
+    {
+        AmigaPortRuntime handles(300);
+        handles.configureSolidResolver(noSolid,0);
+        require(handles.configureEnemy(0,111,163,100,-2000,0,0,5,6)&&
+                handles.configureEnemy(1,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false),
+                "configure retired-prefix and dormant-survivor handle fixture");
+        const auto retired=handles.enemyHandle(handles.enemyAt(0).lifetimeId);
+        const auto survivor=handles.enemyHandle(handles.enemyAt(1).lifetimeId);
+        handles.step(0);
+        require(handles.enemyCount()==1&&!handles.findEnemy(retired)&&
+                handles.findEnemy(survivor)==&handles.enemyAt(0),
+                "out-of-view compaction preserves survivor handle while retiring the removed actor");
+        require(handles.configureEnemy(1,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false),
+                "append after out-of-view retirement");
+        const auto reused=handles.enemyHandle(handles.enemyAt(1).lifetimeId);
+        require(reused.slot==retired.slot&&reused.generation>retired.generation&&!handles.findEnemy(retired)&&
+                !handles.findEnemy(downwell::InstanceHandle{survivor.slot,reused.generation}),
+                "slot reuse advances generation and rejects mismatched slot/key pairs");
+        for(unsigned i=2;i<handles.enemyCapacity;++i)
+            require(handles.configureEnemy(i,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false),
+                    "all enemy ownership slots can be populated");
+        require(!handles.configureEnemy(handles.enemyCapacity,116,153,0,0,0,0,1,1)&&
+                handles.findEnemy(survivor)&&handles.findEnemy(reused),
+                "capacity rejection preserves existing handles");
+        handles.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
+        require(!handles.findEnemy(survivor)&&!handles.findEnemy(reused)&&
+                handles.configureEnemy(0,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false),
+                "Retry retires old ownership slots and permits fresh births");
+        const auto restarted=handles.enemyHandle(handles.enemyAt(0).lifetimeId);
+        require(restarted.generation>reused.generation&&!handles.findEnemy(reused)&&handles.findEnemy(restarted),
+                "Retry preserves the generation high-water mark");
+    }
 
     {
         AmigaPortRuntime identities(300);

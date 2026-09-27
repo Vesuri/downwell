@@ -87,7 +87,11 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     enemyCount_ = breakableCount_ = blocksDestroyed_ = 0;
     bulletSlotEnd_ = gemSlotEnd_ = 0;
     for (unsigned i = 0; i < bulletCapacity; ++i) bullets_[i].active = false;
-    for (unsigned i = 0; i < enemyCapacity; ++i) enemies_[i].active = false;
+    for (unsigned i = 0; i < enemyCapacity; ++i) {
+        enemies_[i].active = false;
+        enemies_[i].identitySlot = 0xffffu;
+        enemyIdentitySlots_[i] = false;
+    }
     for (unsigned i = 0; i < gemCapacity; ++i) gems_[i].active = false;
     generationStep_ = nullptr; generationContext_ = nullptr;
     generationSucceeded_ = true;
@@ -244,6 +248,14 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
         return false;
     }
     EnemyState& enemy = enemies_[index];
+    unsigned slot=enemy.identitySlot;
+    if(index>=enemyCount_ || slot>=enemyCapacity){
+        slot=0;
+        while(slot<enemyCapacity&&enemyIdentitySlots_[slot])++slot;
+    }
+    if(slot==enemyCapacity){run_.effectsSucceeded=false;return false;}
+    enemyIdentitySlots_[slot]=true;
+    enemy.identitySlot=static_cast<unsigned short>(slot);
     enemy.lifetimeId = nextEnemyLifetimeId_++;
     enemy.objectId = objectId;
     enemy.spriteId = spriteId;
@@ -960,9 +972,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         },
         [this, &retiredEnemies](unsigned i) {
             const unsigned index = i - retiredEnemies;
+            enemyIdentitySlots_[enemies_[index].identitySlot]=false;
             for (unsigned next = index + 1; next < enemyCount_; ++next)
                 enemies_[next - 1] = enemies_[next];
             --enemyCount_;
+            enemies_[enemyCount_].identitySlot=0xffffu;
             ++retiredEnemies;
             return true;
         });

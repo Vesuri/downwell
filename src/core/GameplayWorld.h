@@ -30,6 +30,7 @@
 #include "core/WalkingEnemyMotion.h"
 #include "core/BatHitState.h"
 #include "core/BatBehavior.h"
+#include "core/InstanceHandle.h"
 
 #include <cstdint>
 
@@ -100,6 +101,8 @@ public:
     struct EnemyState {
         // Family-local lifetime key; never a recovered Windows instance ID.
         std::uint32_t lifetimeId = 0;
+        // Stable ownership slot, independent of the compacted traversal index.
+        unsigned short identitySlot = 0xffffu;
         int objectId;
         int spriteId;
         int x;
@@ -285,6 +288,15 @@ public:
                enemies_[i].lifetimeId==lifetimeId)return &enemies_[i];
         return nullptr;
     }
+    downwell::InstanceHandle enemyHandle(std::uint32_t lifetimeId) const {
+        const auto* enemy=findEnemy(lifetimeId);
+        return enemy?downwell::InstanceHandle{enemy->identitySlot,enemy->lifetimeId}:downwell::InstanceHandle{};
+    }
+    const EnemyState* findEnemy(downwell::InstanceHandle handle) const {
+        if(handle.slot>=enemyCapacity||!handle.generation||!enemyIdentitySlots_[handle.slot])return nullptr;
+        const auto* enemy=findEnemy(handle.generation);
+        return enemy&&enemy->identitySlot==handle.slot?enemy:nullptr;
+    }
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const downwell::CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
     const downwell::PlayerDamageNumbers<8>& damageNumbers()const{return run_.damageNumbers;}
@@ -441,6 +453,7 @@ private:
     std::uint32_t nextEnemyLifetimeId_ = 1, nextGemLifetimeId_ = 1;
     unsigned bulletSlotEnd_ = 0, gemSlotEnd_ = 0;
     EnemyState enemies_[enemyCapacity];
+    bool enemyIdentitySlots_[enemyCapacity]{};
     GemState gems_[gemCapacity];
     unsigned enemyCount_;
     downwell::GameMakerRandom enemyRandom_;

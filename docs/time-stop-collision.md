@@ -717,6 +717,15 @@ These keys are not reconstructed Windows instance IDs and must not be used as
 source ordering evidence. Mapping them into a shared spatial registry, including
 synchronous membership retirement, remains necessary before live queries use it.
 
+Native enemy handles pair an ownership slot with the monotonically increasing
+enemy lifetime key. The ownership slot is independent of the compacted traversal
+index: retiring a prefix record must not invalidate surviving handles. Reusing
+the freed slot assigns a new key, and lookup checks both parts. Dormant enemies
+remain resolvable; dead or retired enemies do not. Retry and level changes clear
+slot ownership without rewinding the lifetime counter. These handles remain
+world- and family-local; they neither establish original traversal order nor
+replace registration and synchronous retirement in the shared collision owner.
+
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty
 owners, just as it does for damage numbers and corpse-expiry effects. A restore
