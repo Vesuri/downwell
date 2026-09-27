@@ -42,6 +42,16 @@ public:
     template<class Active> bool attach(unsigned layer,unsigned element,bool instance,bool append,Active active){
         return !failed_&&get(layer)&&elements_.insert(layer,element,instance,append,active);
     }
+    // 0x4266e0, called in room reconciliation order: remove/reinsert the SAME
+    // element at head (active) or tail (inactive). Do not use detach here:
+    // a singleton dynamic layer must survive this temporary empty list.
+    // Adapter checks attached/type/identity before invoking this operation.
+    bool reconcileInstanceActivation(unsigned element,bool inactive){
+        if(failed_)return false;
+        const unsigned layer=elements_.owner(element);
+        return get(layer)&&elements_.remove(element)&&
+            elements_.insert(layer,element,true,inactive,[](unsigned){return false;});
+    }
     // Hash removal and external instance/current-element publication belong to
     // the adapter. Empty dynamic layers are retired; fixed layers remain.
     bool detach(unsigned element){

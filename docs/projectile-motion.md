@@ -520,6 +520,26 @@ mutation during callbacks; original Draw-time removal, insertion, layer scripts,
 shader setup and non-instance rendering still require adapter integration/audit.
 It is not yet a replacement for either live renderer's room-list adapter.
 
+#### Activation and layer membership
+
+Room reconciliation (`0x48d630`) scans inactive-room promotions before
+active-room demotions. After object membership publication, both branches call
+`0x4266e0` (`0x48d777` and `0x48d85f`). That selected GMS2 routine requires the
+attached flag, resolves the instance's layer and element, unlinks the element,
+and reinserts it at the head for an active instance (`0x412a00`) or tail for an
+inactive instance (`0x412c20`). It does not detach/recreate the element or retire
+a temporarily empty dynamic layer. Layer and element IDs remain unchanged.
+This differs from the backward inactive normalization used during layer merge.
+
+`RunnerLayers::reconcileInstanceActivation` exposes that same-element relinking.
+Its caller must validate attachment and identity and invoke it only at actual
+room membership transitions, after object registration. Connected component
+tests use `RunnerRoomMembership` to drive those transitions and `RunnerLayerDraw`
+to observe the result. They verify request-order independence, promotion order,
+singleton-layer survival and no reordering during unchanged reconciliation.
+The live stored and native world adapters still need to invoke this operation
+once their complete layer ownership is established.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

@@ -19,6 +19,9 @@ bool compileDepthChanges(downwell::RunnerDepthChanges<16>& queue,downwell::Runne
 bool compileLayers(downwell::RunnerLayers<4,16>& owner,unsigned slot,int depth){
     return owner.move(slot,depth,true,[](unsigned,int){return true;},[](unsigned){return false;});
 }
+bool compileLayerActivation(downwell::RunnerLayers<4,16>& owner,unsigned element,bool inactive){
+    return owner.reconcileInstanceActivation(element,inactive);
+}
 bool compileLayerElements(downwell::RunnerLayerElements<4,16>& owner,unsigned slot,unsigned inactive){
     return owner.insert(0,slot,true,false,[](unsigned){return false;}) &&
         owner.concatenate(1,0) && owner.normalize(1,[&](unsigned i){return i==inactive;}) &&

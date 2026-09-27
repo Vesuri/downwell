@@ -97,5 +97,19 @@ void exhaustiveMoves(){
         }
     }
 }
+void activation(){
+    Owner o;const auto layer=add(o,10,0);
+    require(o.attach(layer,0,true,false,inactive),"singleton activation seed");
+    require(o.reconcileInstanceActivation(0,true)&&o.get(layer)&&o.get(layer)->id==10,"singleton layer survives deactivation");
+    require(o.reconcileInstanceActivation(0,false),"singleton reactivation");elements(o,layer,{0});
+    for(unsigned e=1;e<4;++e)require(o.attach(layer,e,true,false,inactive),"activation peers");
+    elements(o,layer,{3,2,1,0});
+    require(o.reconcileInstanceActivation(2,true),"deactivate middle");elements(o,layer,{3,1,0,2});
+    require(o.reconcileInstanceActivation(3,true),"deactivate head");elements(o,layer,{1,0,2,3});
+    require(o.reconcileInstanceActivation(2,false),"reactivate middle");elements(o,layer,{2,1,0,3});
+    require(o.reconcileInstanceActivation(3,false),"reactivate tail");elements(o,layer,{3,2,1,0});
+    require(!o.reconcileInstanceActivation(7,false)&&!o.reconcileInstanceActivation(8,true),"missing activation has no mutation");
+    elements(o,layer,{3,2,1,0});
 }
-int main(){movement();merging();failure();exhaustiveMoves();std::cout<<"Layer depth movement, ownership and merge publication verified (3840 movement cases)\n";}
+}
+int main(){movement();merging();failure();exhaustiveMoves();activation();std::cout<<"Layer depth movement, ownership and merge publication verified (3840 movement cases)\n";}

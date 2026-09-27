@@ -360,7 +360,7 @@ build/runner-depth-changes-test: tests/core/RunnerDepthChangesTest.cpp $(wildcar
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
-build/runner-layer-draw-test: tests/core/RunnerLayerDrawTest.cpp src/core/RunnerLayerDraw.h src/core/RunnerLayers.h src/core/RunnerLayerElements.h
+build/runner-layer-draw-test: tests/core/RunnerLayerDrawTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 

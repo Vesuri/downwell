@@ -1,5 +1,6 @@
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayers.h"
+#include "core/RunnerRoomMembership.h"
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -54,5 +55,30 @@ void traversal(){
     trace.clear();require(!RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},begin,lookup,draw,
         [](unsigned,const auto&){return false;})&&trace==std::vector<int>({30,105}),"end failure terminal");
 }
+void roomActivation(){
+    RunnerRoomMembership<3> room;RunnerLayers<1,3> layers;unsigned layer=1;
+    require(layers.insertAfterEquals(10,0,true,layer),"room layer");
+    bool active[3]={true,true,true};std::vector<unsigned> calls;
+    for(unsigned i=0;i<3;++i)require(room.bind(i,{})&&layers.attach(layer,i,true,false,[](unsigned){return false;}),"room actor birth");
+    auto reconcile=[&](){return room.reconcileChecked([&](unsigned i){return !active[i];},[&](unsigned i,bool registered){
+        calls.push_back(i);return layers.reconcileInstanceActivation(i,!registered);
+    });};
+    auto draw=[&](){
+        std::vector<unsigned> result;
+        require(RunnerLayerDraw::visit(layers,[](unsigned,const auto&){return true;},[](unsigned,const auto&){return true;},
+            [&](unsigned i,auto& e){e={2,active[i]?0x10u:0x12u,true,true,true,false};return true;},
+            [&](unsigned,unsigned i,Action){result.push_back(i);return true;},[](unsigned,const auto&){return true;}),"room Draw");
+        return result;
+    };
+    require(draw()==std::vector<unsigned>({2,1,0}),"initial layer order");
+    // Flag writes can occur in any order; layer updates follow room scans.
+    active[1]=false;active[0]=false;
+    require(reconcile()&&calls==std::vector<unsigned>({0,1}),"deactivation follows active-room order");
+    require(draw()==std::vector<unsigned>({2}),"inactive suffix does not suppress remaining active actor");
+    calls.clear();active[1]=true;active[0]=true;
+    require(reconcile()&&calls==std::vector<unsigned>({0,1}),"promotion follows inactive-room order");
+    require(draw()==std::vector<unsigned>({1,0,2}),"promotions enter layer head");
+    calls.clear();require(reconcile()&&calls.empty()&&draw()==std::vector<unsigned>({1,0,2}),"unchanged reconciliation does not reorder");
 }
-int main(){dispatch();traversal();std::cout<<"Selected layer Draw order and 1024 instance-dispatch cases verified\n";}
+}
+int main(){dispatch();traversal();roomActivation();std::cout<<"Selected layer Draw order and 1024 instance-dispatch cases verified\n";}

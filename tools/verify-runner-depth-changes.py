@@ -45,6 +45,13 @@ for start, end, digest in (
     (0x49074d, 0x490767, "8211696ebdffabaa68d2d4d7569be09e9f533e6c8356a661e1ac021ed6b7d8b6"),
     (0x49081e, 0x490835, "1b2d77b572d1a762154ae9bb95552c8db2f2b92ff5de9e4fbe3adb909a214147"),
     (0x490a64, 0x490a84, "626112d83e906f2a98d62865b5b7b392f8cbd5ccea5fc5a0b7a2acbbe69a3a1e"),
+    # Room activation reconciliation invokes the selected layer re-linker
+    # after object membership publication, for promotions then demotions.
+    (0x48d760, 0x48d77f, "492fbee702f7d86fa5eeadb12fff133c47a3a4abfe606a86ae7e6083f8aca52c"),
+    (0x48d848, 0x48d867, "b21446bbed167f74ffae0641c0c359b5b9e3268b072ce17bf830e806793d163a"),
+    (0x4266e0, 0x42679c, "dd0babd9e0005cfafac6148ce742b90df2f432e0b00dee603bfe59dabb17fa31"),
+    (0x412a00, 0x412a2f, "09296d5f50a7d421fd9a2726608a0300751e1ef08cbf62e0f854c785cab54d0e"),
+    (0x412c20, 0x412c52, "e88d63238b22f89cf79b8e7bca0fbf0f6ad5f847e7a9ad33c919bbc267b79294"),
     # Retirement removes an instance from the pending queue by stable compaction.
     (0x50f6c5, 0x50f6d9, "f00979b8847f3a5a9dd9913d8dbaae6267fc1618afbe618eb9a31f490d0fc389"),
     (0x50d740, 0x50d793, "6ee03835d9451e9681567d9b5cccda322bdf74663a62c36896bbff3127a9d541"),
