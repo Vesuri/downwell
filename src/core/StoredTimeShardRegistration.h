@@ -113,6 +113,16 @@ public:
         }
         return fail();
     }
+    template<class Effects> bool dispatchAnimation(const InstanceRecord& record,Effects& effects){
+        if(!succeeded_)return false;
+        if(!effects.phasesBoundTo(*this))return fail();
+        for(auto& e:entries_)if(e.local&&e.id==record.instanceId){
+            if(resolve(e)!=&record)return fail();
+            if(!effects.advanceAnimationFor(e.local,e.id))return fail();
+            return true;
+        }
+        return fail();
+    }
     bool meeting(std::uint32_t local,std::uint32_t id,MotionBinary64 x,MotionBinary64 y,bool& hit){
         if(!succeeded_)return false;
         auto* e=entry(local,id);auto* r=e?resolve(*e):nullptr;bool next=false;

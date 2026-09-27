@@ -144,18 +144,20 @@ public:
         if(!succeeded_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle<=phase.newest&&!slot.effect.destroyRequested){
-                bool eligible=true;
-                if(animationEligible_&&!animationEligible_(context_,slot.handle,slot.sourceId,eligible)){
-                    succeeded_=false;return false;
-                }
-                if(!eligible)continue;
-                if(!slot.effect.advanceImage()||
-                   (animation_&&!animation_(context_,slot.handle,slot.sourceId,slot.effect))){
-                    succeeded_=false;return false;
-                }
+                if(!advanceImage(slot))return false;
             }
         }
         return true;
+    }
+    bool advanceAnimationFor(Handle handle,std::uint32_t id){
+        if(!succeeded_)return false;
+        if(!deferCleanup_){succeeded_=false;return false;}
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+            if(slot.handle!=handle)continue;
+            if(slot.sourceId!=id){succeeded_=false;return false;}
+            return slot.effect.destroyRequested||advanceImage(slot);
+        }
+        succeeded_=false;return false;
     }
     template<class Random,class Meeting,class Outside>
     bool step(Phase phase,bool stopped,Random& random,Meeting meeting,Outside outside){
@@ -232,6 +234,17 @@ public:
         }
     }
 private:
+    bool advanceImage(Slot& slot){
+        bool eligible=true;
+        if(animationEligible_&&!animationEligible_(context_,slot.handle,slot.sourceId,eligible)){
+            succeeded_=false;return false;
+        }
+        if(!eligible)return true;
+        if(!slot.effect.advanceImage()||(animation_&&!animation_(context_,slot.handle,slot.sourceId,slot.effect))){
+            succeeded_=false;return false;
+        }
+        return true;
+    }
     bool eventEligible(const Slot& slot,bool& eligible){
         if(eligible_&&!eligible_(context_,slot.handle,slot.sourceId,eligible)){
             succeeded_=false;return false;

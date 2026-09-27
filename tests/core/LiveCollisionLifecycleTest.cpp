@@ -358,8 +358,13 @@ int main(){
         require(world->emitTimeShards(state.burst,state.shards,{0x43700000u},{0x43300000u},{},{},false),"live routed shards");
         const auto changeId=state.changes.sourceId(1),shardId=state.shards.sourceId(1);
         const auto lifetime=world->instance(shardId)->alarms.get(0);
+        auto expectedAnimation=*state.shards.get(1);
         for(unsigned tick=1;tick<=14;++tick){
-            require(world->stepWithTimeStopAlarms(shards,changes,state,Input{}),"normal world tick dispatches registered alarms");
+            require(expectedAnimation.advanceImage(),"portable source shard animation oracle");
+            require(world->stepWithTimeStopEffects(shards,changes,state,Input{}),"normal world tick dispatches registered effects");
+            require(state.shards.get(1)->imageIndex.bits==expectedAnimation.imageIndex.bits&&
+                state.shards.get(1)->timeline.bits==expectedAnimation.timeline.bits,
+                "world animation traversal advances each registered shard exactly once");
             require(state.roomSpeed==int(tick<12?30+5*(tick/2):60)&&
                 world->instance(shardId)->alarms.get(0)==lifetime-int(tick)&&
                 world->instance(changeId)->destroyRequested==(tick==14),
@@ -374,11 +379,11 @@ int main(){
         require(foreignChanges.bind(foreignRegistration)&&world->createTimeChange(foreignRegistration,foreignChanges,{},{},
             foreignSpeed,[](unsigned){return true;}),"unrouted family lifetime fixture");
         const auto foreignId=foreignChanges.sourceId(1);
-        require(world->stepWithTimeStopAlarms(shards,changes,state,Input{}),"unrouted lifetime has not fired yet");
-        require(!world->stepWithTimeStopAlarms(shards,changes,state,Input{})&&!world->effectsSucceeded()&&
+        require(world->stepWithTimeStopEffects(shards,changes,state,Input{}),"unrouted lifetime has not fired yet");
+        require(!world->stepWithTimeStopEffects(shards,changes,state,Input{})&&!world->effectsSucceeded()&&
             world->instance(foreignId)->alarms.get(0)==0&&world->instance(foreignId)->alarms.get(1)==1,
             "missing registered alarm owner stops phase before later counter changes");
-        require(!world->stepWithTimeStopAlarms(shards,changes,state,Input{})&&
+        require(!world->stepWithTimeStopEffects(shards,changes,state,Input{})&&
             world->instance(foreignId)->alarms.get(1)==1,"failed live alarm dispatch cannot be retried");
     }
     auto productionOwner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

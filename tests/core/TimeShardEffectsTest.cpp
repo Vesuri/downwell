@@ -40,6 +40,19 @@ struct World {
     }
 };
 int main(){
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<2> effects;
+        assert(effects.bindPhases(world));const auto a=effects.create({},{},false,random),b=effects.create({},{},false,random);
+        auto expected=*effects.get(a);const auto other=*effects.get(b);
+        assert(expected.advanceImage()&&effects.advanceAnimationFor(a,effects.sourceId(a)));
+        assert(world.animations==1&&effects.get(a)->timeline.bits==expected.timeline.bits&&
+            effects.get(b)->timeline.bits==other.timeline.bits&&effects.get(b)->imageIndex.bits==other.imageIndex.bits);
+        world.animationMember=false;
+        assert(effects.advanceAnimationFor(a,effects.sourceId(a))&&world.animations==1);
+        world.animationMember=true;world.fail=4;
+        assert(!effects.advanceAnimationFor(a,effects.sourceId(a))&&!effects.succeeded()&&world.animations==2);
+        assert(!effects.advanceAnimationFor(b,effects.sourceId(b))&&world.animations==2);
+    }
     for(unsigned fault=0;fault<7;++fault){
         GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
         assert(effects.bindPhases(world));const auto h=effects.create({},{},false,random);

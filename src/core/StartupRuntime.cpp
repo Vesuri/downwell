@@ -312,6 +312,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
         if (instance.active && instance.objectId == 116) instance.batHit.advanceFrame();
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
+        if(instance.objectId==238&&timeEffectDispatch_&&
+            !timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::animation,0))return false;
         const bool enemyObject=instance.objectId==111 || instance.objectId==112 ||
             instance.objectId==113 || instance.objectId==116 || instance.objectId==117 || instance.objectId==119;
         if (enemyObject) {
@@ -1357,9 +1359,9 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
-    if(eventType==2&&(instance.objectId==211||instance.objectId==238)&&timeStopAlarmDispatch_){
+    if(eventType==2&&(instance.objectId==211||instance.objectId==238)&&timeEffectDispatch_){
         ++implementedCodeCalls_;
-        run_.effectsSucceeded=timeStopAlarmDispatch_(timeStopAlarmContext_,instance,unsigned(eventSubtype));
+        run_.effectsSucceeded=timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::alarm,unsigned(eventSubtype));
         return run_.effectsSucceeded;
     }
     executeCode(&instance, event.codeId, advancePressed);

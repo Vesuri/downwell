@@ -135,29 +135,31 @@ public:
     bool playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,InstancePlaceResult& result);
     bool playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit);
     bool playerOutsideTimeStopSides(MotionBinary64 x,bool& outside);
-    // Scoped alarm ownership for one ordinary world tick. No borrowed callback
-    // survives the call (or a later copy/reset of this runtime). Other shard
-    // phases and player transitions are not supplied by this alarm adapter.
-    template<unsigned Capacity,unsigned Registered,unsigned Changes> bool stepWithTimeStopAlarms(
+    // Scoped animation/alarm ownership for one ordinary world tick. No borrowed
+    // callback survives the call. Shard Step/contact phases and player
+    // transitions are not supplied by this adapter yet.
+    enum class TimeEffectPhase {animation,alarm};
+    template<unsigned Capacity,unsigned Registered,unsigned Changes> bool stepWithTimeStopEffects(
         StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
         const Input& input,bool advancePressed=false){
         if(!run_.effectsSucceeded)return false;
-        if(timeStopAlarmDispatch_||!state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
+        if(timeEffectDispatch_||!state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
             !shards.belongsTo(instances_)||!changes.belongsTo(instances_)||
             !state.shards.phasesBoundTo(shards)||!state.changes.boundTo(changes)){
             run_.effectsSucceeded=false;return false;
         }
-        auto dispatch=[&](InstanceRecord& record,unsigned index){
+        auto dispatch=[&](InstanceRecord& record,TimeEffectPhase phase,unsigned index){
+            if(phase==TimeEffectPhase::animation)return shards.dispatchAnimation(record,state.shards);
             return record.objectId==238?shards.dispatchAlarm(record,state.shards,index):
                 changes.dispatchAlarm(record,state.changes,index,state.roomSpeed);
         };
-        timeStopAlarmContext_=&dispatch;
-        timeStopAlarmDispatch_=[](void* context,InstanceRecord& record,unsigned index){
-            return (*static_cast<decltype(dispatch)*>(context))(record,index);
+        timeEffectContext_=&dispatch;
+        timeEffectDispatch_=[](void* context,InstanceRecord& record,TimeEffectPhase phase,unsigned index){
+            return (*static_cast<decltype(dispatch)*>(context))(record,phase,index);
         };
         step(input,advancePressed);
-        timeStopAlarmDispatch_=nullptr;timeStopAlarmContext_=nullptr;
+        timeEffectDispatch_=nullptr;timeEffectContext_=nullptr;
         return run_.effectsSucceeded;
     }
     // Explicit Begin Step boundary; the scheduler supplies synchronous audio,
@@ -530,8 +532,8 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     InstanceLifecycleBinding lifecycle_;
-    void* timeStopAlarmContext_=nullptr;
-    bool (*timeStopAlarmDispatch_)(void*,InstanceRecord&,unsigned)=nullptr;
+    void* timeEffectContext_=nullptr;
+    bool (*timeEffectDispatch_)(void*,InstanceRecord&,TimeEffectPhase,unsigned)=nullptr;
     const RoomPack* roomPack_ = nullptr;
     const ObjectPack* objectPack_ = nullptr;
     // Object event bindings are immutable. Cache inherited alarm masks, not
