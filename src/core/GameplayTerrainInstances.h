@@ -89,6 +89,21 @@ public:
         if(!binding_.markDestroyed(h,r))return good_=false;
         r.destroyRequested=true;return true;
     }
+    bool imageIndex(InstanceHandle h,int frame){
+        if(!good_||!find(h)||frame<0||frame>15)return good_=false;
+        auto& r=records_[h.slot];
+        if(!binding_.phaseIndex(h,r,unsigned(frame)*256u))return good_=false;
+        r.imageIndex=frame;return true;
+    }
+    template<class Ops> bool wallEvent(InstanceHandle h,int area,GameMakerRandom& random,Ops& ops){
+        if(!good_||!find(h))return good_=false;
+        auto& r=records_[h.slot];
+        if(!r.active||r.destroyRequested)return true;
+        if(r.objectId==99)return true; // Explicit empty End Step override.
+        if(r.objectId!=60)return good_=false;
+        if(!wallEndStep(r.wall,area,random,ops))return good_=false;
+        return true;
+    }
     bool activation(InstanceHandle h,bool active){
         if(!good_||!find(h))return good_=false;
         auto& r=records_[h.slot];

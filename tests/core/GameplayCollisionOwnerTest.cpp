@@ -77,6 +77,42 @@ int main(){
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     assert(masks.valid());
+    for(bool rejectTile:{false,true}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*scene));
+        for(int y=0;y<3;++y)for(int x=0;x<3;++x)
+            assert(scene->createGeneratedInstance({60,240+x*16,512+y*16},objects,[](const auto&){return true;}));
+        struct Effects {
+            GameplayWorld& world;bool reject;unsigned tiles=0;
+            bool tile(MotionBinary64 x,MotionBinary64 y){++tiles;return !reject&&world.addWallBackground(x,y);}
+            bool outOfView(InstanceHandle){assert(false);return false;}
+            bool create(int,MotionBinary64,MotionBinary64){assert(false);return false;}
+        } effects{*scene,rejectTile};
+        GameMakerRandom random(123);const auto draws=random.drawCount();
+        for(unsigned i=0;i<9;++i)assert(owner->wallEndStepEvent(owner->terrain().handle(i),1,random,masks,effects));
+        const auto middle=owner->terrain().handle(4);const auto* record=owner->terrain().find(middle);
+        assert(record->wall.surrounded&&record->wall.checked==1&&record->wall.lights==0&&record->imageIndex==15&&
+            !record->destroyRequested&&effects.tiles==0&&scene->wallBackgroundTiles().size()==0);
+        assert(owner->wallEndStepEvent(middle,1,random,masks,effects)==!rejectTile&&effects.tiles==1);
+        assert(random.drawCount()==draws&&record->destroyRequested==!rejectTile&&owner->terrain().find(middle)==record);
+        if(rejectTile){
+            assert(!owner->valid()&&scene->wallBackgroundTiles().size()==0);
+            assert(!owner->wallEndStepEvent(middle,1,random,masks,effects)&&effects.tiles==1);
+        }else{
+            assert(scene->wallBackgroundTiles().size()==1);
+            std::int32_t x,y;const auto* tile=scene->wallBackgroundTiles().at(0);
+            assert(tile->x.roundPixel(x)&&tile->y.roundPixel(y)&&x==248&&y==520);
+            assert(owner->wallEndStepEvent(middle,1,random,masks,effects)&&effects.tiles==1);
+            assert(owner->cleanupDestroyed([&](InstanceHandle shared,const auto&){
+                GameplayCollisionView::Kind kind;InstanceHandle local;
+                return GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::terrain&&
+                    owner->terrain().retireMarked(local);
+            }));
+            assert(!owner->terrain().find(middle)&&owner->terrain().size()==8&&scene->wallBackgroundTiles().size()==1);
+        }
+    }
     {
         auto queries=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,queries->enemyBinding(),

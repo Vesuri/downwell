@@ -1118,7 +1118,7 @@ engine request during the callback: the VM continues executing the event.
 Area-five out-of-view runs before either branch. Area-four flower choice and
 area-zero repeated frame writes preserve the VM's order and RNG calls.
 
-The handler is not installed in either live scheduler yet. It requires
+The handler is not installed in either production scheduler yet. It requires
 source-equivalent shape/point queries, retained background-tile ownership and
 destruction/reconciliation adapters; boolean terrain occupancy is not a generic
 replacement for these operations. `verify-wall-end-step.py` interprets the
@@ -1126,6 +1126,21 @@ pinned assembly's integer/control-flow subset against the portable handler's
 two-event traces, checking complete modeled state and external-call order.
 Query answers, out-of-view and engine side effects are fixtures in that test;
 it proves control flow, not their implementation or end-to-end wall fidelity.
+
+The optional native collision owner has a `wallEndStepEvent` adapter for one
+scheduler-selected terrain handle. It runs the same portable handler against
+resource-backed shape/point queries, publishes image-index writes through
+collision ownership, and retains the record through destruction/deactivation.
+Checked binary64 additions form room-coordinate query/tile/child positions.
+Tile publication, flower Create and area-five out-of-view policy are explicit
+external callbacks; no generic successful stubs are installed. Inactive or
+destroy-requested records are skipped and subtype 99's empty override is honored.
+An event failure latches terrain/owner validity without undoing its prefix.
+Real-resource 3-by-3 wall fixtures check the first-event surrounded state, the
+second-event retained tile at `(x-8,y-8)`, deferred destruction, unchanged cavern
+RNG, failure before destruction, and tile survival after ordered cleanup.
+This is per-event integration, not a claim that production frame dispatch,
+area-four flowers, area-five retirement or global creation order is complete.
 
 The stored collision owner's production lifecycle binding exposes both shape
 queries and a separate `positionMeeting` point query. The latter has no caller

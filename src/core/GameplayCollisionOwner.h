@@ -199,6 +199,35 @@ public:
         });
         return check(result&&good_);
     }
+    // Dispatch a scheduler-selected wall, not a terrain-only phase. Effects
+    // owns tile publication, synchronous flower Create and area-five lifetime
+    // policy; none may physically retire this record during the callback.
+    template<class Effects> bool wallEndStepEvent(InstanceHandle local,int area,GameMakerRandom& random,
+        const SpriteMaskPack& masks,Effects& effects){
+        if(!valid()||!world_||!terrain_.find(local))return check(false);
+        struct Ops {
+            GameplayCollisionOwner& owner;InstanceHandle local;const SpriteMaskPack& masks;Effects& effects;
+            bool coordinates(int dx,int dy,MotionBinary64& x,MotionBinary64& y){
+                const auto* r=owner.terrain_.find(local);if(!r)return false;
+                x=MotionBinary64::fromInteger(r->x);y=MotionBinary64::fromInteger(r->y);
+                return x.add(MotionBinary64::fromInteger(dx))&&y.add(MotionBinary64::fromInteger(dy));
+            }
+            bool place(int dx,int dy,int object,bool& hit){MotionBinary64 x,y;
+                return coordinates(dx,dy,x,y)&&owner.terrainPlaceMeeting(local,object,x,y,masks,hit);}
+            bool point(int dx,int dy,int object,bool& hit){MotionBinary64 x,y;
+                return coordinates(dx,dy,x,y)&&owner.terrainPositionMeeting(object,x,y,masks,hit);}
+            bool image(int frame){return owner.terrain_.imageIndex(local,frame);}
+            bool tile(int resource,int sx,int sy,int w,int h,int dx,int dy,int depth){MotionBinary64 x,y;
+                return resource==739&&sx==48&&sy==48&&w==16&&h==16&&depth==100&&
+                    coordinates(dx,dy,x,y)&&effects.tile(x,y);}
+            bool destroy(){return owner.terrain_.requestDestroy(local);}
+            bool deactivate(){return owner.terrain_.activation(local,false);}
+            bool outOfView(){return effects.outOfView(local);}
+            bool create(int object,int dx,int dy){MotionBinary64 x,y;
+                return coordinates(dx,dy,x,y)&&effects.create(object,x,y);}
+        } ops{*this,local,masks,effects};
+        return check(terrain_.wallEvent(local,area,random,ops));
+    }
     // Source room cleanup visits active entries before inactive entries.
     // Retire may remove only the supplied lifetime, never create/rebind; it
     // must dispatch to the corresponding typed store before this call returns.
