@@ -45,6 +45,11 @@ constitutes exhaustive proof or a native frame-budget measurement.
 the recovered x87 operation sequence and compares its narrowed result with
 host libm. It requires an x86-capable macOS execution environment (Rosetta on
 Apple Silicon). The ordinary build and tests do not require that environment.
+It also compares complete `RunnerPointDirection` results for contact offsets
+from -32 through +32 on both axes, at world origin (240,176), with player
+fractions 0, 1/4, 1/2 and 3/4. This includes the wrapper's argument narrowing
+and degree conversion, not just its atan dependency. It does not validate
+the subsequent lengthdir impulse, player integration or collision scheduling.
 
 The probe is hand-written numeric instrumentation, not an execution of the
 Windows binary. Rosetta's implementation of x87 and a finite sample cannot

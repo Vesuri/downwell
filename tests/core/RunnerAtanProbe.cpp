@@ -9,6 +9,7 @@
 #include <cstdio>
 #include "core/PortableAtan.h"
 #include "core/RunnerImageValue.h"
+#include "core/RunnerPointDirection.h"
 static double recovered(double y,double x){
     const double ax=std::abs(x),ay=std::abs(y);
     const bool negativeX=std::signbit(x),negativeY=std::signbit(y);
@@ -50,5 +51,27 @@ int main(){
     }
     std::printf("x87 finite atan2 probe: %u inputs, %u binary32 differences against host libm\n",checked,mismatch);
     std::printf("Portable candidate: %u binary32 comparisons against recovered x87 sequence passed\n",portableChecked);
+    // Contacts use world coordinates narrowed separately by the wrapper,
+    // including fractional player positions. Exercise that complete path,
+    // rather than comparing only unconstrained atan inputs near the origin.
+    unsigned contacts=0;
+    auto number=[](double d){std::uint64_t n;std::memcpy(&n,&d,8);return downwell::MotionBinary64{unsigned(n>>32),unsigned(n)};};
+    auto x87=[&](downwell::MotionBinary64 y,downwell::MotionBinary64 x,downwell::MotionBinary64& out){
+        auto value=[](downwell::MotionBinary64 v){std::uint64_t n=(std::uint64_t(v.high)<<32)|v.low;double d;std::memcpy(&d,&n,8);return d;};
+        out=number(recovered(value(y),value(x)));return true;
+    };
+    for(int dx=-32;dx<=32;++dx)for(int dy=-32;dy<=32;++dy)
+    for(unsigned fraction=0;fraction<4;++fraction){
+        downwell::MotionBinary64 candidate,original;
+        const auto ax=number(240+dx),ay=number(176+dy);
+        const auto bx=number(240+fraction/4.0),by=number(176+fraction/4.0);
+        if(!downwell::RunnerPointDirection::evaluate(ax,ay,bx,by,candidate,downwell::portableAtan)||
+           !downwell::RunnerPointDirection::evaluate(ax,ay,bx,by,original,x87)||
+           candidate.high!=original.high||candidate.low!=original.low){
+            std::printf("Contact direction differs: dx=%d dy=%d fraction=%u\n",dx,dy,fraction);return 3;
+        }
+        ++contacts;
+    }
+    std::printf("Contact wrapper: %u integer/fractional world-coordinate comparisons against recovered x87 sequence passed\n",contacts);
     return mismatch?1:0;
 }
