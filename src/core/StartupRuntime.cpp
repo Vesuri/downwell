@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "RunnerSpatialSplit.h"
 #include "PlayerBoxContact.h"
 #include "GameplayPlayerStep.h"
 #include "MainRoomLifetime.h"
@@ -263,6 +264,19 @@ void StartupRuntime::initRoomCreate() {
 
 void StartupRuntime::step(bool advancePressed) {
     stepInternal(advancePressed, false, false, advancePressed, advancePressed);
+}
+
+bool StartupRuntime::publishCollisionPosition(InstanceHandle h,RunnerImageValue x,RunnerImageValue y){
+    if(!run_.effectsSucceeded)return false;
+    auto* record=instances_.resolve(h);
+    std::int32_t drawX,drawY;
+    if(!record||!RunnerSpatialSplit::valid(x)||!RunnerSpatialSplit::valid(y)||
+       !x.promoted().roundPixel(drawX)||!y.promoted().roundPixel(drawY)||
+       !lifecycle_.publishedPosition(h,*record,x,y)){
+        run_.effectsSucceeded=false;return false;
+    }
+    record->x=drawX;record->y=drawY;
+    return true;
 }
 
 void StartupRuntime::step(const Input& input, bool advancePressed) {

@@ -159,6 +159,11 @@ public:
         return px.assign(MotionBinary64::fromInteger(x))&&py.assign(MotionBinary64::fromInteger(y))&&
                move_(context_,h,r,px,py);
     }
+    // Engine position publication requires an installed authoritative owner;
+    // unlike legacy integer-only adapters, absence is not a successful no-op.
+    bool publishedPosition(InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y)const{
+        return move_&&move_(context_,h,r,x,y);
+    }
     bool birth(InstanceHandle h,const Record& r)const{return !birth_||birth_(context_,h,r);}
     bool retire(InstanceHandle h,const Record& r)const{return !retire_||retire_(context_,h,r);}
     bool activation(InstanceHandle h,const Record& r,bool v)const{return !activation_||activation_(context_,h,r,v);}

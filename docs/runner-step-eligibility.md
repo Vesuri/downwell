@@ -44,7 +44,8 @@ The post-collision preparation call `0x462820` concerns paths; it is not the
 friction/gravity routine `0x462dd0` used earlier in the frame. The pinned data's
 PATH chunk contains zero resources, and recovered assembly currently contains
 no path API or engine hspeed/vspeed references. Do not map the port's custom
-actor velocity fields onto these engine fields.
+actor velocity fields onto these engine fields, or infer that they must be
+zero: built-in speed/direction writes can also change the engine components.
 
 The previous-position snapshot is at `0x50dbf8..0x50dc0a`, immediately before
 the same instance's animation call `0x50dc25`, in active-room traversal order.
@@ -58,8 +59,19 @@ animation traversal before animation and Begin Step, using authoritative
 binary32 position rather than rounded drawing coordinates. This adds eight
 bytes per owner slot (16 KiB for 2,048 slots), without allocating per frame or
 dirtying spatial/collision queues. Legacy bindings without an external owner
-remain unchanged. Native heterogeneous-world snapshot integration, path state
-and actual collision rollback publication to actor state remain open.
+remain unchanged. Native heterogeneous-world snapshot integration and path
+state remain open.
+
+`StartupRuntime::publishCollisionPosition` publishes exact binary32 x/y through
+the installed lifecycle owner, then updates integer drawing x/y. It must not
+rewrite private actor motion or the legacy `preciseX`/`preciseY` motion caches.
+The owner exposes exact current/previous coordinates and routes positional
+rollback/reapplication through this setter. Engine velocity is explicit, not
+borrowed from custom motion. Stale handles, unsupported drawing conversion or
+missing ownership fail the world rather than silently losing a position write.
+Live tests cover fractions, snapshot rollback, speed reapplication and unchanged
+motion caches/RNG. This does not yet execute the full pair pass automatically;
+engine-field setters, handler execution and native publication still need wiring.
 
 `RunnerCollisionEventContext` specializes dispatcher `0x4449e0` for event 4.
 No current room (`0x4449e6`) or a pending room change (`0x4449f8`) suppresses

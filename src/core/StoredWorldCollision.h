@@ -53,6 +53,27 @@ public:
         const auto* state=owner_.resolve(h);if(!state)return false;
         previous=state->previous;return true;
     }
+    bool collisionPosition(InstanceHandle h,RunnerImageValue& x,RunnerImageValue& y)const{
+        if(!valid()||!resolve(h))return false;
+        const auto* state=owner_.resolve(h);if(!state)return false;
+        x=state->x;y=state->y;return true;
+    }
+    // Position portion only; path progress is owned separately. Call these
+    // with the attached mutable world, never with a copy sharing this owner.
+    bool rollbackCollisionPosition(StartupRuntime& world,InstanceHandle h){
+        RunnerCollisionMotion::Previous previous;
+        return runtime_==&world&&collisionPreviousPosition(h,previous)&&
+            RunnerCollisionMotion::rollback(previous,nullptr,[&](auto x,auto y){
+                return world.publishCollisionPosition(h,x,y);
+            });
+    }
+    bool advanceCollisionPosition(StartupRuntime& world,InstanceHandle h,RunnerCollisionMotion::Velocity engine){
+        RunnerImageValue x,y;
+        return runtime_==&world&&collisionPosition(h,x,y)&&
+            RunnerCollisionMotion::advance(x,y,engine,[&](auto nextX,auto nextY){
+                return world.publishCollisionPosition(h,nextX,nextY);
+            });
+    }
     const InstanceRecord* resolve(InstanceHandle h)const{
         if(!runtime_||!owner_.resolve(h))return nullptr;
         const auto* record=runtime_->instance(ids_[h.slot]);

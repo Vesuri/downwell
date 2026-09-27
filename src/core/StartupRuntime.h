@@ -127,6 +127,9 @@ public:
     }
     std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
     bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
+    // Engine x/y setter for collision response. Keeps private actor motion and
+    // preciseX/Y motion caches untouched; the collision owner stores exact x/y.
+    bool publishCollisionPosition(InstanceHandle h,RunnerImageValue x,RunnerImageValue y);
     bool inMenu() const { return roomId_ == menuRoomId; }
     bool inPlayMenu() const { return roomId_ == playMenuRoomId; }
     bool inMainRoom() const { return roomId_ == mainRoomId; }

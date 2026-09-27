@@ -280,8 +280,31 @@ int main(){
         require(world->effectsSucceeded()&&owner->collisionPreviousPosition(tracked,previous)&&
             previous.x.bits==expectedX.bits&&previous.y.bits==expectedY.bits,
             "ordinary live tick snapshots authoritative position before animation and Step");
+        const auto savedRecord=*owner->resolve(tracked);
+        const auto drawsBeforeMove=world->randomDrawCount();
+        RunnerImageValue movedX{0x43706000u},movedY{0x4330a000u}; // 240.375, 176.625
+        require(world->publishCollisionPosition(tracked,movedX,movedY),"publish fractional collision x/y");
+        RunnerImageValue actualX,actualY;
+        const auto* movedRecord=owner->resolve(tracked);
+        require(owner->collisionPosition(tracked,actualX,actualY)&&actualX.bits==movedX.bits&&actualY.bits==movedY.bits&&
+            movedRecord->x==240&&movedRecord->y==177&&movedRecord->preciseX==savedRecord.preciseX&&
+            movedRecord->preciseY==savedRecord.preciseY&&world->randomDrawCount()==drawsBeforeMove,
+            "collision publication preserves fractional owner coordinates without rewriting motion caches or RNG");
+        require(owner->rollbackCollisionPosition(*world,tracked)&&owner->collisionPosition(tracked,actualX,actualY)&&
+            actualX.bits==previous.x.bits&&actualY.bits==previous.y.bits,
+            "live collision rollback publishes this frame's captured position");
+        RunnerCollisionMotion::Velocity engine{{0x3e800000u},{0xbf000000u}}; // +.25, -.5
+        RunnerImageValue expectedMovedX,expectedMovedY;
+        require(RunnerCollisionMotion::advance(previous.x,previous.y,engine,[&](auto x,auto y){
+            expectedMovedX=x;expectedMovedY=y;return true;
+        })&&owner->advanceCollisionPosition(*world,tracked,engine)&&owner->collisionPosition(tracked,actualX,actualY)&&
+            actualX.bits==expectedMovedX.bits&&actualY.bits==expectedMovedY.bits,
+            "live collision reapplication uses explicit engine speeds and binary32 coordinates");
         require(owner->collectCollisionPairs(*pairs,true)&&owner->valid(),
             "next collection resolves retained animated masks through real sprite resources");
+        require(!world->publishCollisionPosition({tracked.slot,tracked.generation+1},movedX,movedY)&&
+            !world->effectsSucceeded()&&!world->publishCollisionPosition(tracked,movedX,movedY),
+            "stale collision publication latches world failure and prevents retry");
     }
     auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"bind full source families");
     RecordingLifecycle lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
