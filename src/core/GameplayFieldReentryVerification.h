@@ -27,12 +27,21 @@ struct GameplayFieldReentryVerification {
 
         stage=2;
         if(!world.registerLevelExit(176+world.player().offsetY())||!owner.population(255,population)||population!=1)return false;
+        const auto trigger=world.exitControllers().handle(0),setter=world.exitControllers().handle(1);
+        InstanceHandle triggerKey,setterKey;
+        if(!GameplayCollisionView::encode(GameplayCollisionView::Kind::exitController,trigger,triggerKey)||
+            !GameplayCollisionView::encode(GameplayCollisionView::Kind::exitController,setter,setterKey)||
+            !owner.state(triggerKey)||!owner.state(setterKey)||
+            !owner.population(306,population)||population!=1||!owner.population(74,population)||population!=1)return false;
         for(unsigned i=0;i<100;++i){world.step(0);++gameSteps;if(!world.effectsSucceeded())return false;}
         if(!world.levelResultRequested()||!world.goalStopped())return false;
         checks|=2;
 
         stage=3;
         if(!world.enterLevelClear(0,false)||!owner.population(255,population)||population)return false;
+        if(owner.state(triggerKey)||owner.state(setterKey)||world.exitControllers().find(trigger)||
+            world.exitControllers().find(setter)||!owner.population(306,population)||population||
+            !owner.population(74,population)||population)return false;
         bool heart=false;
         while(clearSteps<400&&!world.nextLevelRequested()){
             bool confirm=true;++clearSteps;

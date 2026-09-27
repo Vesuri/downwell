@@ -17,6 +17,7 @@
 #include "core/PlayerDeathSequence.h"
 #include "core/RunSession.h"
 #include "core/GameplayGoalFields.h"
+#include "core/GameplayExitControllers.h"
 #include "core/AreaOneBuilder.h"
 #include "core/EnemyCreateProfile.h"
 #include "core/ObjectPack.h"
@@ -488,10 +489,16 @@ public:
         return run_.effectsSucceeded=run_.effectsSucceeded&&goalFieldInstances_.bind(binding);
     }
     bool registerLevelExit(int y) {
+        if(!run_.effectsSucceeded||!exitControllers_.create(306,240,y))return run_.effectsSucceeded=false;
         return run_.createLevelExit(480,y,enemyRandom_,cameraMotion_,
             [&](downwell::LevelExit::Effect effect,int x,int childY){
-                return effect!=downwell::LevelExit::Effect::goalTimeField||goalFieldInstances_.create(x,childY);
+                return effect==downwell::LevelExit::Effect::roomEndSetter?
+                    exitControllers_.create(74,x,childY):goalFieldInstances_.create(x,childY);
             });
+    }
+    const downwell::GameplayExitControllers& exitControllers()const{return exitControllers_;}
+    bool bindExitControllerLifecycle(downwell::GameplayExitControllers::Binding binding){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&exitControllers_.bind(binding);
     }
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const downwell::LevelExit& levelExit() const { return run_.levelExit; }
@@ -506,7 +513,7 @@ public:
     // instead of gameplay step until the next-room request is consumed.
     bool enterLevelClear(unsigned style, bool heartGoal) {
         if(!run_.levelResultRequested||run_.levelClearActive)return false;
-        if(!run_.effectsSucceeded||!goalFieldInstances_.clear())return run_.effectsSucceeded=false;
+        if(!run_.effectsSucceeded||!goalFieldInstances_.clear()||!exitControllers_.clear())return run_.effectsSucceeded=false;
         return run_.enterLevelClear(style, heartGoal, health_, player_, enemyRandom_);
     }
     template<class Emit>
@@ -615,6 +622,7 @@ private:
     downwell::PlayerDeathSequence death_;
     downwell::RunSession run_;
     downwell::GameplayGoalFields goalFieldInstances_;
+    downwell::GameplayExitControllers exitControllers_;
     downwell::MachineGunEmitter emitter_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;

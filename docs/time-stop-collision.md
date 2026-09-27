@@ -1044,6 +1044,20 @@ These keys are not reconstructed Windows instance IDs and must not be used as
 source ordering evidence. Mapping them into a shared spatial registry, including
 synchronous membership retirement, remains necessary before live queries use it.
 
+Native exit creation also registers the object-306 trigger and object-74
+camera-limit child in `GameplayExitControllers`, before the object-255 goal
+field. The VM's `objLineToResult.Create` calls inherited `objLineToMain.Create`
+first: center X, create 74 (whose Create writes camera `roomEnd`), then create
+255 at Y+32. Publication precedes each child's camera/radius side effects;
+failure stops subsequent births and RNG. The trigger's script variable `active`
+is distinct from runner activation and must not suppress its registration.
+Original resource sprite/mask/default transform properties apply to both.
+Room changes retire these records; Retry preserves the generation cursor.
+This records the exit subtree's order, not full room-family creation or cleanup
+order, nor Windows numeric instance IDs. The ordinary exit gameplay state still
+belongs to `LevelExit` and `MainCameraMotion`; selectors remain gated while
+other required families lack registration.
+
 Native enemy handles pair an ownership slot with the monotonically increasing
 enemy lifetime key. The ownership slot is independent of the compacted traversal
 index: retiring a prefix record must not invalidate surviving handles. Reusing

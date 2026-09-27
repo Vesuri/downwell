@@ -39,6 +39,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
     if(!run_.timeFields.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!goalFieldInstances_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(!exitControllers_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
     const auto phaseBoundary=phaseBoundary_;
@@ -58,6 +59,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto fieldLifecycle=run_.timeFields.lifecycle();
     const auto goalBirths=goalFieldInstances_.birthSequence();
     const auto goalLifecycle=goalFieldInstances_.binding();
+    const auto exitBirths=exitControllers_.birthSequence();
+    const auto exitLifecycle=exitControllers_.binding();
     const auto numberBirths=run_.damageNumbers.birthSequence();
     const auto expiryBirths=run_.corpseExpiryEffects.birthSequence();
     const auto smokeBirths=run_.smokeEffects.birthSequence();
@@ -81,6 +84,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(!run_.timeFields.restoreEmptyBirthSequence(fieldBirths))run_.effectsSucceeded=false;
     if(!run_.timeFields.bindLifecycle(fieldLifecycle))run_.effectsSucceeded=false;
     if(!goalFieldInstances_.restoreEmptyBirthSequence(goalBirths)||!goalFieldInstances_.bind(goalLifecycle))run_.effectsSucceeded=false;
+    if(!exitControllers_.restoreEmptyBirthSequence(exitBirths)||!exitControllers_.bind(exitLifecycle))run_.effectsSucceeded=false;
     if(!run_.smokeEffects.restoreEmptyBirthSequence(smokeBirths)||
        !run_.bloodEffects.restoreEmptyBirthSequence(bloodBirths)||
        !run_.flashEffects.restoreEmptyBirthSequence(flashBirths))run_.effectsSucceeded=false;
@@ -97,6 +101,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
     if(!goalFieldInstances_.clear()){run_.effectsSucceeded=false;return false;}
+    if(!exitControllers_.clear()){run_.effectsSucceeded=false;return false;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return false;}
     roomTerrainLoaded_=false;
     if (!run_.advanceAfterLevelClear()) return false;

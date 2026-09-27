@@ -43,6 +43,10 @@ struct GoalAudit {
     using Record=GameplayGoalFields::Record;
     bool birth(InstanceHandle h,const Record& r){
         assert(world->goalFieldInstances().find(h)==&r&&r.scaleX==1&&r.scaleY==1&&world->randomDrawCount()==draws);
+        if(r.objectId==255){
+            const auto& exits=world->exitControllers();
+            assert(exits.find(exits.handle(0))->objectId==306&&exits.find(exits.handle(1))->objectId==74);
+        }
         stage=1;return reject!=stage;
     }
     bool transform(InstanceHandle h,const Record& r,RunnerTransformField field,RunnerImageValue value,RunnerImageValue,unsigned){
@@ -68,7 +72,41 @@ struct GoalAudit {
     bool sprite(InstanceHandle,const Record&,int){return true;}
     bool imageIndex(InstanceHandle,const Record&,RunnerImageValue){return true;}
 };
+struct ExitAudit {
+    GameplayWorld* world;
+    unsigned reject=0,births=0,retires=0;
+    std::uint64_t draws;
+    bool birth(InstanceHandle h,const GameplayExitControllers::Record& r){
+        assert(world->exitControllers().find(h)==&r&&r.active&&r.x==240&&r.y==700);
+        assert(world->randomDrawCount()==draws&&!world->goalFieldInstances().find({0,1}));
+        assert(r.objectId==(births==0?306:74));
+        return ++births!=reject;
+    }
+    bool retire(InstanceHandle h,const GameplayExitControllers::Record& r){
+        assert(world->exitControllers().find(h)==&r);++retires;return reject!=3;
+    }
+    bool activation(InstanceHandle,const GameplayExitControllers::Record&,bool){return true;}
+    bool membership(InstanceHandle,const GameplayExitControllers::Record&,bool){return true;}
+};
 int main(){
+    for(unsigned failure=0;failure<4;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+        ExitAudit audit{world.get(),failure,0,0,world->randomDrawCount()};
+        assert(world->bindExitControllerLifecycle(GameplayExitControllers::Binding::bind(audit)));
+        const bool created=world->registerLevelExit(700);
+        assert(created==(failure==0||failure==3));
+        if(!created){
+            assert(audit.births==failure&&world->randomDrawCount()==audit.draws&&!world->effectsSucceeded());
+            assert(!world->registerLevelExit(700)&&audit.births==failure);
+            continue;
+        }
+        assert(audit.births==2&&world->randomDrawCount()==audit.draws+1);
+        const auto old=world->exitControllers().handle(0);
+        const auto result=world->restartFromResults(DeathMenuSequence::Action::Retry,2,300);
+        if(failure==3){assert(result==ResultsDestination::none&&!world->effectsSucceeded()&&audit.retires==1);continue;}
+        assert(result==ResultsDestination::gameplay&&audit.retires==2&&!world->exitControllers().find(old));
+        assert(world->exitControllers().birthSequence()>old.generation);
+    }
     for(unsigned failure=0;failure<=6;++failure){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false);
         GoalAudit audit{world.get(),failure,world->randomDrawCount(),0};
@@ -559,6 +597,17 @@ int main(){
         assert(fieldsOwner->population(82,population)&&population==1&&
             fieldsOwner->properties(fieldKey)->sprite.spriteId==597&&fieldWorld->randomDrawCount()==draws);
         assert(fieldWorld->registerLevelExit(900));
+        const auto exitLocal=fieldWorld->exitControllers().handle(0);
+        InstanceHandle exitKey,setterKey;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::exitController,exitLocal,exitKey)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::exitController,fieldWorld->exitControllers().handle(1),setterKey));
+        for(auto key:{exitKey,setterKey}){
+            const auto* p=fieldsOwner->properties(key);const auto* s=fieldsOwner->state(key);
+            PackedObject definition;
+            assert(objects.findObject(key.slot==exitKey.slot?306:74,definition)&&p&&s&&!(s->flags&0x100003u)&&
+                p->sprite.spriteId==definition.spriteId&&p->sprite.maskId==definition.textureMaskId&&
+                p->sprite.scaleX.bits==0x3f800000u&&p->sprite.scaleY.bits==0x3f800000u);
+        }
         const auto goalLocal=fieldWorld->goalFieldInstances().handle(0);
         InstanceHandle goalKey;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,goalLocal,goalKey));
@@ -573,6 +622,8 @@ int main(){
         assert(fieldsOwner->valid()&&!fieldsOwner->state(fieldKey)&&
             !GameplayCollisionView(*fieldWorld).resolve(fieldKey,record)&&fieldsOwner->population(82,population)&&population==0);
         assert(!fieldsOwner->state(goalKey)&&fieldsOwner->population(255,population)&&population==0);
+        assert(!fieldsOwner->state(exitKey)&&!fieldsOwner->state(setterKey)&&
+            fieldsOwner->population(306,population)&&population==0&&fieldsOwner->population(74,population)&&population==0);
         assert(fieldWorld->registerLevelExit(920));
         const auto nextGoal=fieldWorld->goalFieldInstances().handle(0);
         assert(nextGoal.generation>goalLocal.generation&&fieldWorld->goalFieldInstances().find(nextGoal));

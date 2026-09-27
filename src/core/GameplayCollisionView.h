@@ -8,13 +8,14 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
     static constexpr unsigned timeFieldBase=terrainBase+GameplayTerrainInstances::capacity;
     static constexpr unsigned goalFieldBase=timeFieldBase+64;
-    static constexpr unsigned capacity=goalFieldBase+GameplayGoalFields::capacity;
+    static constexpr unsigned exitControllerBase=goalFieldBase+GameplayGoalFields::capacity;
+    static constexpr unsigned capacity=exitControllerBase+GameplayExitControllers::capacity;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -22,6 +23,7 @@ public:
         const GameplayTerrainInstances::Record* terrain=nullptr;
         const OrdinaryTimeField* timeField=nullptr;
         const GameplayGoalFields::Record* goalField=nullptr;
+        const GameplayExitControllers::Record* exitController=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -34,6 +36,7 @@ public:
             case Kind::terrain:base=terrainBase;count=GameplayTerrainInstances::capacity;break;
             case Kind::timeField:base=timeFieldBase;count=64;break;
             case Kind::goalField:base=goalFieldBase;count=GameplayGoalFields::capacity;break;
+            case Kind::exitController:base=exitControllerBase;count=GameplayExitControllers::capacity;break;
             default:return false;
         }
         if(local.slot>=count)return false;
@@ -41,8 +44,8 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
-        const unsigned base=key.slot<enemyBase?0:key.slot<breakableBase?enemyBase:key.slot<terrainBase?breakableBase:key.slot<timeFieldBase?terrainBase:key.slot<goalFieldBase?timeFieldBase:goalFieldBase;
-        kind=base==0?Kind::player:base==enemyBase?Kind::enemy:base==breakableBase?Kind::breakable:base==terrainBase?Kind::terrain:base==timeFieldBase?Kind::timeField:Kind::goalField;
+        const unsigned base=key.slot<enemyBase?0:key.slot<breakableBase?enemyBase:key.slot<terrainBase?breakableBase:key.slot<timeFieldBase?terrainBase:key.slot<goalFieldBase?timeFieldBase:key.slot<exitControllerBase?goalFieldBase:exitControllerBase;
+        kind=base==0?Kind::player:base==enemyBase?Kind::enemy:base==breakableBase?Kind::breakable:base==terrainBase?Kind::terrain:base==timeFieldBase?Kind::timeField:base==goalFieldBase?Kind::goalField:Kind::exitController;
         local={key.slot-base,key.generation};return true;
     }
     bool resolve(InstanceHandle key,Record& record)const{
@@ -62,6 +65,9 @@ public:
                 break;
             case Kind::goalField:
                 if(!(next.goalField=world_.goalFieldInstances().find(local)))return false;
+                break;
+            case Kind::exitController:
+                if(!(next.exitController=world_.exitControllers().find(local)))return false;
                 break;
         }
         record=next;return true;
