@@ -3,6 +3,7 @@
 
 #include "AreaOneBuilder.h"
 #include "InstanceStore.h"
+#include "RunnerLayerIds.h"
 #include "ScriptEffectRuntimeBinding.h"
 #include "DeferredInstanceQueue.h"
 #include "GameMakerRandom.h"
@@ -199,6 +200,7 @@ public:
         return ditherFadeSpawnRequests_;
     }
     std::uint32_t nextRuntimeInstanceId() const { return nextRuntimeInstanceId_; }
+    const RunnerLayerIds& sourceLayerIds()const{return layerIds_;}
     bool deferredCommandsSucceeded() const { return deferredCommandsSucceeded_; }
     // Engine x/y setter for collision response. Keeps private actor motion and
     // preciseX/Y motion caches untouched; the collision owner stores exact x/y.
@@ -800,6 +802,7 @@ private:
     int roomDestination_ = 0;
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
+    RunnerLayerIds layerIds_;
     InstanceLifecycleBinding lifecycle_;
     ScriptEffectRuntimeBinding scriptEffectsBinding_;
     ScriptEffectRuntimeBinding debrisBinding_;

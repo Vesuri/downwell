@@ -9,6 +9,19 @@ namespace downwell {
 // background/tile/shader payloads. Use fresh owners; a failed load is terminal
 // for those owners and may leave a published prefix (never retry it in place).
 struct PackedRoomLayerLoader {
+    // The original loads the entire room resource catalog before gameplay.
+    // For this pinned build all room sequence lists are empty: catalog loading
+    // raises only the loaded-layer maximum, not the dynamic-layer counter.
+    // This seeds identities, not room elements or their separate ID counter.
+    static bool loadCatalogIds(const RoomPack& pack,RunnerLayerIds& ids){
+        if(!pack.valid())return false;
+        for(unsigned i=0;i<pack.layerCount();++i){
+            PackedRoomLayer layer;
+            if(!pack.layer(i,layer)||layer.layerId>0x7fffffffu||
+                !ids.observeLoaded(std::int32_t(layer.layerId)))return false;
+        }
+        return true;
+    }
     template<unsigned L,unsigned E,class Publish>
     static bool load(const RoomPack& pack,int roomId,RunnerLayers<L,E>& layers,
         RunnerLayerInstances<L,E>& instances,Publish publish,RunnerLayerIds* ids=nullptr){

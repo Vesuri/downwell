@@ -23,9 +23,37 @@ data = (root / "data/data.win").read_bytes()
 assert sha256(data).hexdigest() == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert data[8:12] == b"GEN8"
 assert struct.unpack_from("<I", data, 16 + 0x2c)[0] == 2
+# All serialized room resources are loaded before room entry. Their version-3
+# sequence arrays are empty, so the extra sequence-layer allocator is skipped.
+offset = 8
+room_offsets = None
+while offset < len(data):
+    size = struct.unpack_from("<I", data, offset + 4)[0]
+    if data[offset:offset + 4] == b"ROOM":
+        count = struct.unpack_from("<I", data, offset + 8)[0]
+        room_offsets = struct.unpack_from(f"<{count}I", data, offset + 12)
+        break
+    offset += 8 + size
+assert room_offsets is not None and len(room_offsets) == 25
+loaded_ids = []
+for room in room_offsets:
+    assert struct.unpack_from("<h", data, room + 0x26)[0] == 3
+    sequences = struct.unpack_from("<I", data, room + 0x5c)[0]
+    assert struct.unpack_from("<I", data, sequences)[0] == 0
+    layers = struct.unpack_from("<I", data, room + 0x58)[0]
+    for index in range(struct.unpack_from("<I", data, layers)[0]):
+        layer = struct.unpack_from("<I", data, layers + 4 + index * 4)[0]
+        loaded_ids.append(struct.unpack_from("<i", data, layer + 4)[0])
+assert len(loaded_ids) == 132 and max(loaded_ids) == 131
 assert region(0x7fe384, 6) == b"depth\0"
 assert struct.unpack("<d", region(0x7fcc90, 8))[0] == 20.0
 for start, end, digest in (
+    # Resource catalog loop, serialized-layer and empty sequence-list branches.
+    (0x496cd5, 0x496d52, "fa126e1b78f63516f014f6efd70b05c2fa8bb25fb719a4a8b49fd213b06e9cc2"),
+    (0x496dc2, 0x496de5, "da43f5890ac19906acd9026004828bee259248d45836db66af69290c471952c8"),
+    (0x48b497, 0x48b4a9, "71bf9d7ba8d2065829fd9b9c94aa48316002046b2d46be627f112af8f7eb0f73"),
+    (0x48b930, 0x48b974, "518029927e4253d985c94a63f08bdecee20b853697b90993e76488cbd223fffe"),
+    (0x4d962c, 0x4d9637, "eca37ec7e9ad2b655ef98ed0622723b13993e26fe9351ae24801c94ecd84c4d3"),
     # GEN8 >= 2 selects the nonzero global flag, hence the layer path below.
     (0x4979e8, 0x4979f3, "6eac5342e3808148018dd3a35a296710671b01b546f4a319e5d6d17ecdea715c"),
     (0x430c91, 0x430ca7, "dae81cbfd493cd8f9a401a945f9f90f0a471a984dc906dbeb129bca11520c7ab"),

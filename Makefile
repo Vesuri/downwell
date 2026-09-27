@@ -1526,6 +1526,15 @@ $(STARTUP_TEST_TARGET): $(STARTUP_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(STARTUP_TEST_SOURCES)
 
+ROOM_LAYER_CATALOG_SOURCES := tests/core/RoomLayerCatalogTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES))
+build/room-layer-catalog-test: $(ROOM_LAYER_CATALOG_SOURCES) $(wildcard src/core/*.h)
+	@mkdir -p $(@D)
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ROOM_LAYER_CATALOG_SOURCES)
+.PHONY: verify-room-layer-catalog
+verify-room-layer-catalog: build/room-layer-catalog-test generate-room-pack
+	./build/room-layer-catalog-test generated/downwell-rooms.dwrm
+test: verify-room-layer-catalog
+
 $(REPLAY_TEST_TARGET): $(REPLAY_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(REPLAY_TEST_SOURCES)

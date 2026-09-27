@@ -237,6 +237,10 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
+- Replace copied `StartupRuntime` fixtures in `StartupRuntimeTest.cpp` with
+  independently constructed/replayed runtimes. Its full test target currently
+  fails to compile because lifecycle owners are intentionally noncopyable;
+  do not restore unsafe copying to make the tests build.
 - Cover naturally funded purchases, all shop/side-room layouts and camera
   transitions, dense combat, uncommon upgrade combinations and repeated runs.
 - Compare new behavior through deterministic host/native replays, including

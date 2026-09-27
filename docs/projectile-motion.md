@@ -605,9 +605,19 @@ packed rooms' maximum publication, dynamic allocation across different room
 owners, slot reuse, insertion failure and explicit exhaustion. Negative and
 wrapped IDs are outside the admitted domain and fail rather than silently
 emulating signed wraparound. Source element IDs use a separate counter and
-are not supplied by this layer-ID owner. Live startup must reproduce original
-resource-loading order before depending on these IDs; loading only the current
-room is not proof that the process high-water mark matches the runner.
+are not supplied by this layer-ID owner.
+
+The room resource catalog loop (`0x496cd5..0x496ddf`) calls the room reader
+for every resource. That reader loads serialized layers (`0x48b930..0x48b94e`)
+and, for room format 3, may allocate a sequence layer. All 25 original rooms
+have format 3 and empty sequence arrays, so the latter branch allocates nothing
+(`0x4d962c..0x4d9637`). The 132 serialized layer IDs have maximum 131.
+The source verifier now checks these raw ROOM facts as well as the loop bytes.
+Shared `StartupRuntime` seeds its owned `RunnerLayerIds` from the complete
+catalog before first-room loading, preserving the counters across reset.
+`verify-room-layer-catalog` exercises desktop and non-desktop startup/reset and
+invalid-pack failure without copying live lifecycle owners. This seeds process
+identity state only: the live layer structures and renderer switch remain open.
 
 Room initialization's later global-instance pass (`0x413590..0x413610`) skips
 already-attached instances. For an unattached instance it first resolves its

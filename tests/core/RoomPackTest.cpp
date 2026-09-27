@@ -285,6 +285,13 @@ void testGeneratedPack(const char* path) {
                 player.instanceId == 104218 && player.objectId == 35,
             "rmMenu begins with recovered player instance");
     downwell::RunnerLayerIds sourceIds;unsigned expectedMaximum=0;
+    downwell::RunnerLayerIds catalogIds;
+    require(downwell::PackedRoomLayerLoader::loadCatalogIds(pack,catalogIds)&&catalogIds.loadedMaximum==131&&
+        catalogIds.dynamicMaximum==0,"catalog seed matches original all-room load");
+    std::int32_t nextId=-1;
+    require(catalogIds.allocate(nextId)&&nextId==132&&
+        downwell::PackedRoomLayerLoader::loadCatalogIds(pack,catalogIds)&&catalogIds.allocate(nextId)&&nextId==133,
+        "catalog refresh cannot rewind dynamic allocation");
     for(unsigned roomIndex=0;roomIndex<pack.roomCount();++roomIndex){
         require(pack.room(roomIndex,room),"generated layer room");
         downwell::RunnerLayers<16,1200> layers;

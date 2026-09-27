@@ -25,6 +25,7 @@
 #include "GameMakerRounding.h"
 #include "ObjectPack.h"
 #include "PackedRoomLoader.h"
+#include "PackedRoomLayerLoader.h"
 #include "PlayerCollision.h"
 #include "SolidCollision.h"
 #include "RoomLoader.h"
@@ -105,6 +106,11 @@ void StartupRuntime::reset(PlatformProfile profile) {
     anyInput_ = false;
     resetSceneState();
 
+    // Resource-layer IDs are process state, not reset with the current room.
+    // Re-observing the catalog cannot rewind IDs already allocated at runtime.
+    if(roomPack_&&!PackedRoomLayerLoader::loadCatalogIds(*roomPack_,layerIds_)){
+        roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;
+    }
     loadRoom(entryRoomId, true);
 }
 
