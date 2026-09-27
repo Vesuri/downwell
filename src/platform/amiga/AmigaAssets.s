@@ -70,6 +70,13 @@ amiga_collision_pack:
 amiga_collision_pack_end:
 
 	.balign 4
+	.globl amiga_collision_masks
+amiga_collision_masks:
+	.incbin "../generated/downwell-sprite-masks.dwsm"
+	.globl amiga_collision_masks_end
+amiga_collision_masks_end:
+
+	.balign 4
 	.globl amiga_builder_pack
 amiga_builder_pack:
 	.incbin "../generated/downwell-builder-patterns.dwbp"

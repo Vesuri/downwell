@@ -2,6 +2,10 @@ set pagination off
 target remote 127.0.0.1:2345
 break downwellGameplayFrameReady
 continue
+if gDownwellPreciseMaskChecks != 2
+    printf "Resident original-mask hit/miss checks did not complete\n"
+    quit 1
+end
 if gDownwellStackGuardReady != 1
     printf "Target could not install the task-stack guard\n"
     quit 1

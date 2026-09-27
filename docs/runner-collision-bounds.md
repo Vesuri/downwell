@@ -386,7 +386,9 @@ metadata as the host and constructs `GameplayCollisionOwner` before its world.
 Player, enemy, breakable and terrain births/setters/retirements publish through
 that owner, including in-place Retry. Its storage is static, not on the task
 stack; the current 68000 layout consumes 1,360,392 bytes before the 26,700-byte
-sprite metadata pack. This is an expanded-memory development configuration,
+sprite metadata pack and the 511,580-byte original collision-mask pack. Mask
+bytes are borrowed directly from the executable's read-only data, not converted
+into Chip bitmaps or reconstructed from artwork alpha. This is an expanded-memory development configuration,
 not evidence of stock-A500 memory fit.
 
 The task requires an 8 KiB stack. Launch scripts set it explicitly; the small
@@ -396,9 +398,12 @@ failing boundary without resetting it. `verify_stack_stage.gdb` is diagnostic:
 its marker means the breakpoint was reached, not that the reported stage passed.
 
 This wiring does not replace the native world's existing collision callbacks:
-other families and their original scheduling still need integration. Precise
-mask payloads are not yet resident in the native executable, and wall End Step
-is not dispatched by its production scheduler. The registered terrain supplies
+other families and their original scheduling still need integration. Wall End Step
+is not dispatched by its production scheduler. Scene verification exercises
+the resident-mask query route against an active room wall and an out-of-room
+miss; its gameplay-frame gate requires both checks and the intact stack guard.
+These checks establish resource availability, not complete collision coverage.
+The registered terrain supplies
 the retained painter, with changed-wall notifications routed to sparse row
 damage. No broad collision-parity or frame-budget claim follows from this.
 

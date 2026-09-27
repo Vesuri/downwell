@@ -108,6 +108,8 @@ extern const UBYTE amiga_object_pack[];
 extern const UBYTE amiga_object_pack_end[];
 extern const UBYTE amiga_collision_pack[];
 extern const UBYTE amiga_collision_pack_end[];
+extern const UBYTE amiga_collision_masks[];
+extern const UBYTE amiga_collision_masks_end[];
 extern const UBYTE amiga_builder_pack[];
 extern const UBYTE amiga_builder_pack_end[];
 }
@@ -265,6 +267,7 @@ volatile ULONG gDownwellResultsBackdropChecks;
 
 #if defined(DOWNWELL_SCENE_VERIFY) || defined(DOWNWELL_REPLAY_VERIFY)
 extern "C" { volatile ULONG gDownwellStackGuardReady; }
+extern "C" { volatile ULONG gDownwellPreciseMaskChecks; }
 #endif
 #ifdef DOWNWELL_SCENE_VERIFY
 extern "C" { volatile ULONG gDownwellSceneStackFailureStage; }
@@ -1218,7 +1221,9 @@ __attribute__((noinline)) static int runDownwell(void) {
         (unsigned long)(amiga_object_pack_end-amiga_object_pack));
     const downwell::SpriteCollisionPack collisionSprites(amiga_collision_pack,
         (unsigned long)(amiga_collision_pack_end-amiga_collision_pack));
-    if(!objects.valid()||!collisionSprites.valid())return 20;
+    const downwell::SpriteMaskPack collisionMasks(amiga_collision_masks,
+        (unsigned long)(amiga_collision_masks_end-amiga_collision_masks));
+    if(!objects.valid()||!collisionSprites.valid()||!collisionMasks.valid())return 20;
     checkSceneStack(1);
     // Ownership precedes player construction and survives in-place run resets.
     // Keep these bounded tables off the AmigaDOS stack, like the world itself.
@@ -1396,6 +1401,32 @@ __attribute__((noinline)) static int runDownwell(void) {
             return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
         }
         terrainCollision.index = &terrainIndex;
+#ifdef DOWNWELL_SCENE_VERIFY
+        // Exercise the target's actual precise-mask route, not an occupancy
+        // answer. This does not replace the legacy live collision adapters.
+        bool testedWall=false,maskChecksSucceeded=true;
+        for(unsigned i=0;i<collisionOwner.terrain().size()&&!testedWall;++i){
+            const auto* wall=collisionOwner.terrain().find(collisionOwner.terrain().handle(i));
+            if(!wall||wall->objectId!=60||!wall->active)continue;
+            bool hit=false;
+            if(!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(wall->x),
+                downwell::MotionBinary64::fromInteger(wall->y),collisionMasks,hit)||!hit){
+                maskChecksSucceeded=false;break;
+            }
+            ++gDownwellPreciseMaskChecks;testedWall=true;
+        }
+        bool outside=true;
+        if(!maskChecksSucceeded||!testedWall||!collisionOwner.terrainPositionMeeting(60,downwell::MotionBinary64::fromInteger(-10000),
+            downwell::MotionBinary64::fromInteger(-10000),collisionMasks,outside)||outside){
+            platform.restore();
+            FreeMem(startupCopperWords,4*sizeof(UWORD));
+            memory.release();
+            gDownwellStartupFailure=6;
+            downwellStartupFailed();
+            return 20;
+        }
+        ++gDownwellPreciseMaskChecks;
+#endif
         checkSceneStack(5);
         port.configureLandingResolver(amigaResolveTerrainLanding,
                                       &terrainCollision);

@@ -138,6 +138,7 @@ AMIGA_CLEAR := $(REPO)/generated/amiga-clear.dwap
 ROOM_PACK := $(REPO)/generated/downwell-rooms.dwrm
 OBJECT_PACK := $(REPO)/generated/downwell-objects.dwob
 COLLISION_PACK := $(REPO)/generated/downwell-sprites.dwsc
+COLLISION_MASK_PACK := $(REPO)/generated/downwell-sprite-masks.dwsm
 BUILDER_PACK := $(REPO)/generated/downwell-builder-patterns.dwbp
 OBJECTS := obj/DownwellAmiga.o obj/AmigaProfile.o obj/AmigaInput.o obj/AmigaPlayer.o \
 	obj/AmigaPortRuntime.o obj/AmigaSceneRuntime.o \
@@ -420,6 +421,9 @@ $(OBJECT_PACK):
 $(COLLISION_PACK):
 	$(MAKE) -C $(REPO) generate-sprite-pack
 
+$(COLLISION_MASK_PACK):
+	$(MAKE) -C $(REPO) generate-collision-masks
+
 $(BUILDER_PACK):
 	$(MAKE) -C $(REPO) generate-builder-pattern-pack
 
@@ -430,7 +434,7 @@ $(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
 obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_SELECTION_MASK) \
-		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(BUILDER_PACK)
+		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<
 
