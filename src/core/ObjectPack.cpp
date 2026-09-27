@@ -174,15 +174,23 @@ bool ObjectPack::directEvent(const PackedObject& objectValue,
 }
 
 bool ObjectPack::collisionEventExists(std::int32_t selfObject,std::int32_t otherObject,bool& found) const {
+    PackedObjectEvent event;
+    return collisionEvent(selfObject,otherObject,found,event);
+}
+
+bool ObjectPack::collisionEvent(std::int32_t selfObject,std::int32_t otherObject,
+                                bool& found,PackedObjectEvent& output) const {
     PackedObject self,other;
     if(!findObject(selfObject,self)||!findObject(otherObject,other))return false;
     // 0x478830 copies absent ancestor entries; 0x478b60/0x4782a0
     // expand collision targets and retain inherited collision entries.
-    // Existence does not require resolving precedence between matching entries.
+    // Exact entries are inherited BEFORE target expansion (0x47b812/0x47b893).
+    // Expansion stops at existing descendant entries (0x478341), so the
+    // nearest seeded target wins regardless of hash-table traversal order.
     for(int target=otherObject;target>=0;target=other.parentId){
         if(!findObject(target,other))return false;
         PackedObjectEvent event;
-        if(findEvent(selfObject,4,target,event)){found=true;return true;}
+        if(findEvent(selfObject,4,target,event)){output=event;found=true;return true;}
     }
     found=false;return true;
 }

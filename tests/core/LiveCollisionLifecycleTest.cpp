@@ -245,6 +245,13 @@ int main(){
             require(a&&b&&a!=b&&objects.collisionEventExists(a->objectId,b->objectId,ab)&&
                 objects.collisionEventExists(b->objectId,a->objectId,ba)&&(ab||ba),
                 "live candidates retain real identities and inherited event eligibility");
+            PackedObjectEvent forward{},backward{};bool hasForward=false,hasBackward=false;
+            require(owner->collisionEvent(pair->self,pair->other,hasForward,forward)&&
+                owner->collisionEvent(pair->other,pair->self,hasBackward,backward)&&
+                hasForward==ab&&hasBackward==ba,
+                "live pair directions resolve handlers using actual lifetime identities");
+            if(hasForward)require(forward.eventType==4&&forward.codeId>=0,"forward handler has source code binding");
+            if(hasBackward)require(backward.eventType==4&&backward.codeId>=0,"reverse handler has source code binding");
         }
         require(owner->collectCollisionPairs(*pairs,true)&&owner->valid(),
             "next collection resolves retained animated masks through real sprite resources");

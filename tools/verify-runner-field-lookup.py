@@ -59,6 +59,7 @@ for start, end, digest in (
     (0x4798f0, 0x479951, "a37d63bc53c6e8dccc5af694b3c84d0df396305ad21de4408e88a078f4218358"),
     (0x47b740, 0x47b78a, "c955cf45d9c30e2e49a481b40eab91104affe58df06e278cb46c83ab6aa04cbf"),
     # Initial flags, inherited events, descendant collision targets, endpoints.
+    (0x47b7c9, 0x47b8d1, "3fff4294221825fc0ea7bc36ac19509a43f92b5ea891e4d6952b2ec4ab2fdef1"),
     (0x478550, 0x478582, "f4920da5e35ae3d1d98aeecfcaf11caaa66abfea52a44bfcb8b96c6a70f694e7"),
     (0x478830, 0x478b60, "677fe6e09bcd1cab26cffc605cf9177ec3fbd07482590d493a12f874e25faf03"),
     (0x478b60, 0x478e2c, "d649039de47de8d9274d8a0167b08345e1d369f72101240cb1cecd28bbf939f5"),

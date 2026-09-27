@@ -69,6 +69,14 @@ public:
     bool collectCollisionPairs(RunnerCollisionPairs<capacity,Pairs>& pairs,bool indexAvailable){
         return valid()&&runtime_&&adapter_.collectCollisionPairs(*this,pairs,indexAvailable);
     }
+    // Resolve at dispatch time, not collection time: an earlier handler can
+    // change object identity. No destruction/activation filter belongs here;
+    // the paired-dispatch wrapper controls those source-specific checks.
+    bool collisionEvent(InstanceHandle self,InstanceHandle other,bool& found,PackedObjectEvent& event)const{
+        if(!valid())return false;
+        const auto* a=resolve(self);const auto* b=resolve(other);
+        return a&&b&&adapter_.objects.collisionEvent(a->objectId,b->objectId,found,event);
+    }
     bool activation(InstanceHandle h,const InstanceRecord& r,bool active){return adapter_.activation(h,r,active);}
     bool membership(InstanceHandle h,const InstanceRecord& r,bool registered){return adapter_.membership(h,r,registered);}
     bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){return adapter_.move(h,r,x,y);}

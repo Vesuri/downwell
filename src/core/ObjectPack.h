@@ -78,6 +78,11 @@ public:
     // Both event-owner inheritance and descendant collision targets count.
     // False is invalid input/pack; a valid miss writes found=false.
     bool collisionEventExists(std::int32_t selfObject,std::int32_t otherObject,bool& found) const;
+    // Nearest target ancestor first, then nearest owner ancestor for that
+    // exact target. output retains the serialized binding's subtype/owner;
+    // event execution must separately use the actual other object's ID.
+    bool collisionEvent(std::int32_t selfObject,std::int32_t otherObject,
+                        bool& found,PackedObjectEvent& output) const;
 
 private:
     bool validateObjects();

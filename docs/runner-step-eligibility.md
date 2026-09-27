@@ -55,8 +55,23 @@ The stored-world adapter resolves those callbacks from actual lifetime records,
 sprite/mask resources and `ObjectPack::collisionEventExists`. Existence follows
 both ancestor chains: `0x478830` retains missing owner-ancestor entries, while
 `0x478b60` and `0x4782a0` expand collision targets to descendants and preserve
-inherited collision entries. This is intentionally a presence-only API: it does
-not select a code entry when multiple ancestor combinations match. The ordinary
+inherited collision entries. `collisionEvent` additionally selects the handler:
+nearest target ancestor first, then nearest owner ancestor for that exact
+target. `0x47b812` performs owner inheritance for every object before the
+expansion pass at `0x47b893`. Expansion at `0x478341` skips an existing child
+entry and its subtree. Thus existing, more-specific target entries are barriers,
+independent of hash-table traversal order. The later copy from the expanded
+parent at `0x478df6..0x478e1f` fills only absent keys.
+
+The selected binding retains its serialized owner, subtype and code. These
+are not the dispatch context: `0x50319c..0x5031b5` passes the actual opposite
+object ID as event subtype. `StoredWorldCollision::collisionEvent` resolves
+current handles when called, not cached object identities from collection.
+It deliberately does not add a destruction guard between pair directions.
+Both forward and reversed table-propagation tests cover all recovered pairs,
+including exact code/owner/subtype; a synthetic cross-specificity test separates
+target-first precedence from the incorrect owner-first ancestor walk.
+The ordinary
 `findEvent` lookup of an exact subtype is not sufficient for collision presence.
 The original routines are pinned by `verify-runner-field-lookup.py`.
 

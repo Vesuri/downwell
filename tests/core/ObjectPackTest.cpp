@@ -108,6 +108,24 @@ void testDecodeAndInheritance() {
     }
     bool absent=true;
     require(pack.collisionEventExists(1,1,absent)&&!absent,"valid collision table miss");
+    // Both objects are in a parent chain. The parent targets the child,
+    // while the child targets the parent: target specificity beats owner
+    // specificity, unlike the tempting owner-first nested ancestor walk.
+    auto priorityBytes=makePack();
+    priorityBytes[eventOffset]=4;priorityBytes[eventOffset+4]=1;
+    priorityBytes[eventOffset+downwell::ObjectPack::bindingRecordSize]=4;
+    downwell::ObjectPack priority(priorityBytes.data(),priorityBytes.size());
+    downwell::PackedObjectEvent selected{};bool found=false;
+    require(priority.collisionEvent(1,1,found,selected)&&found&&
+        selected.ownerObjectId==0&&selected.eventSubtype==1&&selected.codeId==100,
+        "target-specific inherited handler beats owner's broader target handler");
+    require(priority.collisionEvent(1,0,found,selected)&&found&&selected.codeId==200,
+        "owner handler still applies to its exact target");
+    selected.codeId=999;found=true;
+    require(!priority.collisionEvent(1,2,found,selected)&&found&&selected.codeId==999,
+        "invalid handler lookup leaves outputs unchanged");
+    require(pack.collisionEvent(1,1,found,selected)&&!found&&selected.codeId==999,
+        "valid handler miss does not invent a code entry");
     collisionBytes[eventOffset]=4; // Root's event targets root: child inherits both sides.
     downwell::ObjectPack rootCollision(collisionBytes.data(),collisionBytes.size());
     require(spatialFlags.bindSpatialFlags(rootCollision) && *spatialFlags.flags(0)==0x18 && *spatialFlags.flags(1)==0x18,
@@ -246,6 +264,37 @@ void testGeneratedPack(const char* path) {
         bool found=false;
         require(pack.collisionEventExists(a,b,found)&&found==bool(expanded[a*count+b]),
             "all recovered collision pairs match explicit endpoint table expansion");
+    }
+    // Build the runner's expanded table independently: seed exact inherited
+    // keys, then propagate existing entries into unoccupied child keys. Try
+    // both traversal directions so hash iteration cannot determine precedence.
+    for(bool reverse:{false,true}){
+        std::vector<downwell::PackedObjectEvent> table(count*count,{-1,4,-1,-1});
+        for(unsigned a=0;a<count;++a)for(unsigned b=0;b<count;++b){
+            downwell::PackedObjectEvent event;
+            if(pack.findEvent(a,4,b,event))table[a*count+b]=event;
+        }
+        bool changed=true;
+        while(changed){
+            changed=false;
+            for(unsigned a=0;a<count;++a)for(unsigned i=0;i<count;++i){
+                const unsigned b=reverse?count-1-i:i;
+                downwell::PackedObject object;pack.object(b,object);
+                if(object.parentId<0||table[a*count+b].ownerObjectId>=0)continue;
+                const auto& parent=table[a*count+unsigned(object.parentId)];
+                if(parent.ownerObjectId<0)continue;
+                table[a*count+b]=parent;changed=true;
+            }
+        }
+        for(unsigned a=0;a<count;++a)for(unsigned b=0;b<count;++b){
+            downwell::PackedObjectEvent selected{};bool found=false;
+            const auto& expected=table[a*count+b];
+            require(pack.collisionEvent(a,b,found,selected)&&found==(expected.ownerObjectId>=0),
+                "expanded handler presence matches original table construction");
+            if(found)require(selected.ownerObjectId==expected.ownerObjectId&&
+                selected.codeId==expected.codeId&&selected.eventSubtype==expected.eventSubtype,
+                "all recovered handlers retain source owner/code/target through expansion");
+        }
     }
     downwell::RunnerObjectFamilies<386> instanceFamilies;
     require(instanceFamilies.bindInstanceFlags(pack),"derive runtime instance property flags");
