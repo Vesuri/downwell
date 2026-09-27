@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "WallDrawLookup.h"
+#include "WallPresentation.h"
 #include "TimeFieldOutlines.h"
 #include "EnemyPresentation.h"
 #include "HudNumbers.h"
@@ -313,21 +314,22 @@ void Game::renderMain(Renderer& renderer) const {
         return walls.contains(x, y);
     };
 
-    // objWall_n computes this four-neighbour bit mask on its first End Step.
-    // Area one uses sprTile1 (resource 51) with its native 16-pixel mask.
+    // Retain event-selected frames, including authored pillar remapping.
     for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
         const InstanceRecord& instance = startup_.instanceAt(index);
-        if (!instance.active || instance.objectId != 60)
-            continue;
+        if(!drawWallPresentation(instance,[&]{
         std::uint32_t frame = 0;
         frame |= hasWallAt(instance.x, instance.y - 16) ? 1U : 0U;
         frame |= hasWallAt(instance.x + 16, instance.y) ? 2U : 0U;
         frame |= hasWallAt(instance.x, instance.y + 16) ? 4U : 0U;
         frame |= hasWallAt(instance.x - 16, instance.y) ? 8U : 0U;
-        renderer.drawSpriteTransformed(51, frame,
+        return frame;
+        },[&](int sprite,unsigned frame){
+        renderer.drawSpriteTransformed(sprite, frame,
                                        instance.x - viewX,
                                        instance.y - viewY,
                                        1.0F, 1.0F, 0.0F);
+        })){renderingSucceeded_=false;return;}
     }
 
     TimeFieldOutlines field;

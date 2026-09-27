@@ -3,6 +3,7 @@
 #include "core/GameplayWorld.h"
 #include "core/Profile.h"
 #include "core/ShopFixtures.h"
+#include "core/WallPresentation.h"
 
 namespace {
 static bool roomHasMainWall(const downwell::RoomPack& rooms,
@@ -71,10 +72,20 @@ bool AmigaTerrainPainter::paint(AmigaRenderer* renderer,
     }
     {
     DW_PROFILE_SCOPE(profileTerrainWalls);
-    if (terrainIndex)
+    const auto* records=runtime?runtime->terrainInstances():nullptr;
+    if(records){
+        for(unsigned i=0;i<records->size();++i){
+            const auto& r=*records->find(records->handle(i));
+            if(r.y+8<firstWorldY||r.y-8>=finalWorldY)continue;
+            if(!downwell::drawWallPresentation(r,[&]{return mainWallFrame(terrainIndex,rooms,room,r.x,r.y);},
+                [&](int sprite,unsigned frame){drawGameAsset(renderer,UWORD(sprite),UWORD(frame),
+                    downwellPlayfieldX+r.x-viewX,r.y-viewY,0);})){amigaRendererClearClipRect(renderer);return false;}
+        }
+    }
+    if (!records&&terrainIndex)
         drawIndexedWalls(renderer, rooms, room, viewX, viewY,
                              clipX, clipY, clipWidth, clipHeight);
-    for (index = 0; !terrainIndex && index < room.instanceCount; ++index) {
+    for (index = 0; !records && !terrainIndex && index < room.instanceCount; ++index) {
         downwell::PackedRoomInstance instance;
         if (!rooms.roomInstance(room, index, instance) ||
             instance.objectId != 60 || instance.y + 8 < firstWorldY ||

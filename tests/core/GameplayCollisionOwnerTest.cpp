@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "core/WallPresentation.h"
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -95,8 +96,14 @@ int main(){
         const auto middle=owner->terrain().handle(4);const auto* record=owner->terrain().find(middle);
         assert(record->wall.surrounded&&record->wall.checked==1&&record->wall.lights==0&&record->imageIndex==15&&
             !record->destroyRequested&&effects.tiles==0&&scene->wallBackgroundTiles().size()==0);
+        unsigned drawn=0;
+        assert(drawWallPresentation(*record,[]{assert(false);return 0u;},[&](int sprite,unsigned frame){
+            assert(sprite==record->spriteId&&frame==15);++drawn;
+        })&&drawn==1);
         assert(owner->wallEndStepEvent(middle,1,random,masks,effects)==!rejectTile&&effects.tiles==1);
         assert(random.drawCount()==draws&&record->destroyRequested==!rejectTile&&owner->terrain().find(middle)==record);
+        if(!rejectTile)assert(drawWallPresentation(*record,[]{assert(false);return 0u;},
+            [](int,unsigned){assert(false);}));
         if(rejectTile){
             assert(!owner->valid()&&scene->wallBackgroundTiles().size()==0);
             assert(!owner->wallEndStepEvent(middle,1,random,masks,effects)&&effects.tiles==1);

@@ -397,6 +397,31 @@ int main() {
     const downwell::BuilderPatternPack builders(builderBytes.data(), builderBytes.size());
     require(rooms.valid() && objects.valid() && builders.valid(), "damage-render test loads real room/object/builder data");
     {
+        auto game=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
+        auto& world=const_cast<downwell::StartupRuntime&>(game->startup());world.skipToGameForTesting();
+        unsigned index=0;while(index<world.activeInstanceCount()&&world.instanceAt(index).objectId!=60)++index;
+        require(index<world.activeInstanceCount(),"wall draw fixture has a wall");
+        const auto key=world.instanceHandleAt(index);
+        struct Ops {
+            downwell::StartupRuntime& world;downwell::InstanceHandle key;
+            bool place(int,int,int,bool& hit){hit=false;return true;}
+            bool point(int,int,int,bool& hit){hit=false;return true;}
+            bool image(int frame){return world.publishWallImage(key,frame);}
+            bool tile(int,int,int,int,int,int,int,int){return false;}
+            bool destroy(){return false;}bool deactivate(){return false;}bool outOfView(){return false;}
+            bool create(int,int,int){return false;}
+        } ops{world,key};
+        require(world.wallEndStepEvent(key,0,ops),"publish selected wall frame for draw fixture");
+        const auto* wall=world.resolveInstance(key);require(wall&&wall->imageIndex==14,"area-zero event selects frame 14");
+        RecordingRenderer frame;frame.recordTransforms=true;game->render(frame);
+        unsigned matches=0;
+        for(const auto& draw:frame.transforms)if(draw.sprite==wall->spriteId&&
+            draw.x==110+wall->x-world.mainCameraRenderViewX()&&draw.y==wall->y-world.mainCameraRenderViewY()){
+            require(draw.frame==14,"renderer uses event-selected wall frame instead of neighbor reconstruction");++matches;
+        }
+        require(game->renderingSucceeded()&&matches==1,"event-selected wall reaches SDL renderer once");
+    }
+    {
         const auto collisionBytes=read("generated/downwell-sprites.dwsc"),maskBytes=read("generated/downwell-sprite-masks.dwsm");
         const downwell::SpriteCollisionPack collisions(collisionBytes.data(),collisionBytes.size());
         const downwell::SpriteMaskPack masks(maskBytes.data(),maskBytes.size());

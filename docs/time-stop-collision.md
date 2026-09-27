@@ -1151,8 +1151,17 @@ The adapter reads source positions from the maintained collision owner, not
 unchanged. Its real-resource fixture moves nine room walls through engine
 setters, verifies both events and tile coordinates, then deactivates and retires
 the marked lifetime without losing its retained tile. This adapter likewise
-does not enable code 986 in production dispatch or replace the legacy wall
-renderer/occupancy reconciliation yet.
+does not enable code 986 in production dispatch or reconcile legacy occupancy
+caches yet. `drawWallPresentation` is shared by SDL and native terrain
+composition: once End Step has selected a frame, it uses published sprite/index
+instead of recomputing neighbors. Destroy-requested/inactive walls and subtype
+99 are not drawn. Walls with no executed End Step retain the transitional
+legacy lookup. Native composition uses registered terrain records when supplied,
+so retired records do not reappear from a still-populated occupancy cell. This
+does not yet make the production collision cache reflect wall retirement.
+Native record-backed composition scans the bounded store for each requested
+strip; production installation still needs measured row indexing and cache
+invalidation for selected-frame changes, not a full-frame repaint workaround.
 
 The stored collision owner's production lifecycle binding exposes both shape
 queries and a separate `positionMeeting` point query. The latter has no caller
