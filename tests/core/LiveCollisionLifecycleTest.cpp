@@ -984,6 +984,30 @@ int main(){
         require(spawn(first)&&world->restartFromResults(DeathMenuSequence::Action::Retry,44)&&
             effects.size()==0&&!world->instance(first),"ordinary Retry clears bound still-live script effects");
     }
+    {
+        auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
+        require(collision->attach(*world),"attach world-owned script effects");world->skipToGameForTesting();
+        unsigned previous=0;
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision r;if(!sprites.sprite(id,r))return false;
+            count=r.frameCount;return true;};
+        auto spawn=[&](unsigned& caller){return world->spawnScriptEffect(
+            MotionBinary64::fromInteger(int(world->mainPlayerX())),MotionBinary64::fromInteger(int(world->mainPlayerY())),
+            603,{0x3fe00000u,0},{},{},frames,caller);};
+        for(unsigned cycle=0;cycle<3;++cycle){
+            unsigned caller=0;
+            require(spawn(caller)&&caller>previous,"world-owned effects allocate fresh source IDs");
+            world->step({},false);
+            require(world->effectsSucceeded()&&world->scriptEffects().size()==1&&world->instance(caller)->imageIndex==0.5F,
+                "ordinary tick animates world-owned effect");
+            world->step({},false);
+            require(world->effectsSucceeded()&&world->scriptEffects().size()==0&&!world->instance(caller),
+                "ordinary cleanup retires world-owned effect");
+            require(spawn(caller),"world-owned live effect before Retry");previous=caller;
+            require(world->restartFromResults(DeathMenuSequence::Action::Retry,43+cycle)&&
+                world->scriptEffects().size()==0&&!world->instance(previous),"Retry clears internal script ownership");
+        }
+    }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
         productionOwner->binding());

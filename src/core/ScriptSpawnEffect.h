@@ -3,6 +3,7 @@
 #include "NonLoopSpriteAnimation.h"
 #include "NonLoopEffects.h"
 namespace downwell {
+constexpr unsigned scriptSpawnEffectCapacity=64;
 // Object 219 defaults, before scrEffectSpawn's caller-side overrides.
 // No Create event or RNG; coordinates remain absolute published room values.
 struct ScriptSpawnEffect:NonLoopSpriteAnimation {

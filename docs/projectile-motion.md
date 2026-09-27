@@ -212,8 +212,16 @@ before rebuilding the world, including effects still awaiting Animation End.
 It neither fabricates Animation End nor clears the caller's saved identity;
 new births cannot revive old handles. No results action performs no cleanup,
 and terminal effect failures cannot be reset through this entry point.
-Cross-family teardown order, production ownership of the effect store, gun
-emission and drawing remain separate integration requirements. Direct low-level
+Both runtime objects contain a fixed-address, 64-entry script-effect store;
+their ordinary spawn overload uses it without an external owner or allocation.
+The stored runtime also owns its source-ID registry. Native in-place Retry
+preserves the internal store's lifetime sequence before reconstructing the
+world, so the collision registry cannot mistake a new effect for an old one.
+The bound runtime types are intentionally noncopyable through this ownership.
+This adds bounded runtime storage; stock-A500 memory fit remains unproven.
+
+Cross-family teardown order, gun emission and drawing remain separate
+integration requirements. Direct low-level
 registry births without a runtime binding must still use the explicit scoped
 interfaces; they are not automatically adopted into another owner.
 

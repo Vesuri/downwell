@@ -13,6 +13,11 @@ bool nativeScriptCleanup(downwell::GameplayCollisionOwner& owner,downwell::Scrip
 bool nativeScriptTick(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects){
     return world.stepWithScriptEffects(effects,0);
 }
+bool nativeOwnedScript(GameplayWorld& world,const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle& caller){
+    return world.spawnScriptEffect({},{},603,{0x3fe00000u,0},{},{},
+        [&](int id,unsigned& frames){downwell::PackedSpriteCollision r;if(!sprites.sprite(id,r))return false;
+            frames=r.frameCount;return true;},caller);
+}
 downwell::ResultsDestination nativeScriptRetry(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects){
     return world.restartFromResultsWithScriptEffects(downwell::DeathMenuSequence::Action::Retry,43,300,effects);
 }
@@ -341,6 +346,28 @@ int main(){
         assert(!scene->advanceScriptEffectAnimation(effects,effects.beginPhase())&&effects.size()==1);
         assert(scene->restartFromResultsWithScriptEffects(DeathMenuSequence::Action::Retry,43,300,effects)==ResultsDestination::none&&
             effects.size()==1&&registration.find(caller)&&scene->randomDrawCount()==draws);
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        InstanceHandle previous{};
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision r;if(!sprites.sprite(id,r))return false;
+            count=r.frameCount;return true;};
+        for(unsigned cycle=0;cycle<3;++cycle){
+            InstanceHandle caller;
+            assert(world->spawnScriptEffect({},{},603,{0x3fe00000u,0},{},{},frames,caller)&&
+                caller.generation>previous.generation&&!owner->scriptEffects().find(previous));
+            world->step(0);
+            assert(world->effectsSucceeded()&&world->scriptEffects().size()==1&&
+                world->scriptEffects().atNewest(0)->imageIndex.bits==0x3f000000u&&owner->prepareDraw());
+            world->step(0);
+            assert(world->effectsSucceeded()&&owner->prepareDraw()&&world->scriptEffects().size()==0);
+            assert(world->spawnScriptEffect({},{},602,{0x3fe00000u,0},{},{},frames,caller));previous=caller;
+            assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43+cycle,300)!=ResultsDestination::none&&
+                world->scriptEffects().size()==0&&!owner->scriptEffects().find(previous));
+        }
     }
     assert(masks.valid());
     {

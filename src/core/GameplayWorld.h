@@ -238,6 +238,12 @@ public:
         },run_.effectsSucceeded);
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
+    const downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Frames> bool spawnScriptEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,
+        downwell::MotionBinary64 speed,downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,
+        Frames frames,downwell::InstanceHandle& myFx){
+        return spawnScriptEffect(ownedScriptEffects_,x,y,sprite,speed,angle,depth,frames,myFx);
+    }
     template<unsigned Capacity>
     bool advanceScriptEffectAnimation(downwell::ScriptSpawnEffects<Capacity>& effects,
         typename downwell::ScriptSpawnEffects<Capacity>::Phase phase){
@@ -640,6 +646,7 @@ public:
 private:
     EnemyLifecycleBinding enemyLifecycle_;
     downwell::ScriptEffectRuntimeBinding scriptEffectsBinding_;
+    downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity> ownedScriptEffects_;
     bool clearRoomScriptEffects(){
         if(scriptSpawnInstances_&&scriptSpawnInstances_->size()&&
             (!run_.effectsSucceeded||!scriptEffectsBinding_.clearRoom()))return run_.effectsSucceeded=false;

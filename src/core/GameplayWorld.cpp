@@ -70,6 +70,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto exitLifecycle=exitControllers_.binding();
     const auto numberBirths=run_.damageNumbers.birthSequence();
     const auto expiryBirths=run_.corpseExpiryEffects.birthSequence();
+    const auto scriptBirths=ownedScriptEffects_.birthSequence();
     const auto smokeBirths=run_.smokeEffects.birthSequence();
     const auto bloodBirths=run_.bloodEffects.birthSequence();
     const auto flashBirths=run_.flashEffects.birthSequence();
@@ -100,6 +101,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
        !run_.flashEffects.restoreEmptyBirthSequence(flashBirths))run_.effectsSucceeded=false;
     if(!run_.damageNumbers.restoreEmptyBirthSequence(numberBirths)||
        !run_.corpseExpiryEffects.restoreEmptyBirthSequence(expiryBirths))run_.effectsSucceeded=false;
+    if(!ownedScriptEffects_.restoreEmptyBirthSequence(scriptBirths))run_.effectsSucceeded=false;
     run_.nextForegroundBirth=foregroundBirth;
     enemyRandom_.setSeed(seed);
     if(!birthPlayerOwnership())return downwell::ResultsDestination::none;

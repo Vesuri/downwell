@@ -7,7 +7,7 @@ namespace downwell {
 // owner through these hooks before room teardown or destroying either owner.
 class GameplayScriptSpawnInstances {
 public:
-    static constexpr unsigned capacity=64;
+    static constexpr unsigned capacity=scriptSpawnEffectCapacity;
     struct Record {const ScriptSpawnEffect* effect=nullptr;unsigned lifetimeId=0;bool active=true,destroyRequested=false;};
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayScriptSpawnInstances(Binding binding={}):binding_(binding){}

@@ -293,6 +293,11 @@ public:
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
+    const ScriptSpawnEffects<scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Frames> bool spawnScriptEffect(MotionBinary64 x,MotionBinary64 y,int sprite,
+        MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
+        return spawnScriptEffect(ownedScriptRegistration_,ownedScriptEffects_,x,y,sprite,speed,angle,depth,frames,myFx);
+    }
     template<unsigned Capacity,unsigned Registered,class Frames>
     bool spawnScriptEffect(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
         ScriptSpawnEffects<Capacity>& effects,MotionBinary64 x,MotionBinary64 y,int sprite,
@@ -856,6 +861,10 @@ private:
     long ordinaryStepViewLeftQ12_ = 160L * 4096;
     float mainCameraY_ = 176.0F;
     float mainCameraTargetY_ = 176.0F;
+    // Stable world-owned storage; the registry outlives its borrowed effects.
+    StoredScriptSpawnRegistration<instanceCapacity,scriptSpawnEffectCapacity> ownedScriptRegistration_{
+        instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    ScriptSpawnEffects<scriptSpawnEffectCapacity> ownedScriptEffects_;
 };
 
 } // namespace downwell
