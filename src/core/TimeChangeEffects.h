@@ -90,6 +90,19 @@ public:
         }
         return fail();
     }
+    // Global cleanup selects one lifetime at a time across all object families.
+    // Never sweep siblings here: their place in room-list order may be later.
+    bool retireMarked(Handle handle,std::uint32_t id){
+        if(!succeeded_)return false;
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[i];
+            if(slot.handle!=handle)continue;
+            if(slot.sourceId!=id||!slot.effect.destroyRequested)return fail();
+            if(retire_&&!retire_(context_,handle,id,slot.effect))return fail();
+            for(unsigned j=i+1;j<count_;++j)slots_[j-1]=slots_[j];
+            --count_;return true;
+        }
+        return fail();
+    }
     bool retireRequested(){
         if(!succeeded_)return false;
         for(unsigned i=0;i<count_;){

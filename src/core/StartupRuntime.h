@@ -240,6 +240,19 @@ public:
             });
         return run_.effectsSucceeded;
     }
+    template<unsigned Capacity,unsigned Registered,unsigned Changes,class Other> bool cleanupDestroyed(
+        StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
+        StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,Other other){
+        if(!run_.effectsSucceeded)return false;
+        run_.effectsSucceeded=shards.belongsTo(instances_)&&changes.belongsTo(instances_)&&
+            state.shards.phasesBoundTo(shards)&&state.changes.boundTo(changes)&&
+            instances_.cleanupDestroyed([&](InstanceHandle key,const InstanceRecord& record){
+                if(record.objectId==238)return shards.retireMarked(key,record,state.shards);
+                if(record.objectId==211)return changes.retireMarked(key,record,state.changes);
+                return other(key,record);
+            });
+        return run_.effectsSucceeded;
+    }
     bool menuPlayerNapping() const { return menuPlayerNapping_; }
     int menuPlayerSpriteId() const { return menuPlayerSpriteId_; }
     float menuPlayerImageIndex() const { return menuPlayerImageIndex_; }

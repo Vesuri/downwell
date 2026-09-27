@@ -46,6 +46,19 @@ int main(){
         if(failure==5)assert(!registered.succeeded()&&!registered.retireRequested()&&world.retires==1);
         else assert(registered.sourceId(1)==0);
     }
+    for(unsigned fault=0;fault<5;++fault){
+        int speed=60;Registration world{speed};TimeChangeEffects<1> effects;
+        assert(effects.bind(world)&&effects.createAt(x,y,speed,[](unsigned){return true;}));
+        if(fault!=1)for(unsigned tick=0;tick<14;++tick)effects.advanceAlarm(effects.beginPhase(),1,speed);
+        if(fault==4)world.failure=5;
+        assert(effects.retireMarked(fault==2?2:1,fault==3?999:105186)==(fault==0));
+        assert(world.retires==unsigned(fault==0||fault==4));
+        if(fault==0)assert(effects.succeeded()&&effects.sourceId(1)==0);
+        else{
+            assert(!effects.succeeded()&&effects.sourceId(1)==105186);
+            assert(!effects.retireMarked(1,105186)&&world.retires==unsigned(fault==4));
+        }
+    }
     TimeChangeEffects<3> owner;int speed=60;unsigned pauses=0;
     for(unsigned fault=0;fault<4;++fault){
         int speed=60;Registration world{speed};TimeChangeEffects<1> effects;

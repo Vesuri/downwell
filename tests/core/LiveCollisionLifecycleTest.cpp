@@ -147,7 +147,16 @@ int main(){
             records.find(100)->destroyRequested&&records.find(101)->destroyRequested&&
             records.find(100)->alarms.get(0)==-1&&records.find(100)->alarms.get(1)==0,
             "event publication cannot resurrect a stale sibling countdown; retirement is deferred");
-        require(effects.retireRequested()&&records.size()==1,"scheduled changes retire through registered ownership");
+        unsigned retired=0;
+        require(records.cleanupDestroyed([&](InstanceHandle key,const InstanceRecord& record){
+            const auto id=record.instanceId;
+            if(!registration.retireMarked(key,record,effects))return false;
+            ++retired;
+            require(!records.find(id)&&records.size()==3-retired&&
+                (retired!=1||records.find(id==100?101:100)),
+                "selected cleanup retires exactly one lifetime without sweeping marked siblings");
+            return true;
+        })&&retired==2&&records.size()==1,"scheduled changes retire through global cleanup");
         require(effects.createAt({},{},speed,[](unsigned){return true;}),"new lifetime after scheduled retirement");
         const InstanceRecord copied=*records.find(nextId-1);
         require(!registration.dispatchAlarm(copied,effects,1,speed)&&!healthy&&speed==30,
@@ -275,6 +284,20 @@ int main(){
         require(step()&&!state.player.stopped&&state.shards.size()==12&&pauses==2&&
             world->randomDrawCount()==draws+96&&world->nextRuntimeInstanceId()==first+14,
             "exit preserves both bursts and registered transition ordering");
+        for(unsigned tick=0;tick<160;++tick){
+            const auto sp=state.shards.beginPhase();const auto cp=state.changes.beginPhase();
+            for(unsigned alarm=0;alarm<3;++alarm){
+                state.shards.advanceAlarm(sp,alarm);
+                if(alarm<2)require(world->advanceTimeChangeAlarm(changes,state.changes,cp,alarm,state.roomSpeed),
+                    "registered transition expiry");
+            }
+        }
+        require(state.shards.succeeded()&&state.shards.size()==0&&state.changes.size()==0&&
+            world->instance(first)&&world->instance(first+3),"both expired families remain registered until cleanup");
+        require(world->cleanupDestroyed(shards,changes,state,[](auto,const auto&){return false;}),
+            "world cleanup routes both transition families without a family-wide sweep");
+        for(auto id=first;id<first+14;++id)require(!world->instance(id),"cleanup removes each transition lifetime");
+        require(world->randomDrawCount()==draws+96,"expiry and mixed cleanup do not consume RNG");
         require(state.reset(),"retire both transition families before bindings leave scope");
         // No field at this height: room-width side exemptions use PRIVATE x,
         // not the published x=240 kept here for scrTimeShard.

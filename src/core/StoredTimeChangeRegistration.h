@@ -82,6 +82,16 @@ public:
         if(!records_.erase(id,[&](InstanceHandle key,const InstanceRecord& record){return lifecycle_.retire(key,record);}))return fail();
         *e={};return true;
     }
+    template<class Effects> bool retireMarked(InstanceHandle key,const InstanceRecord& record,Effects& effects){
+        if(!succeeded_)return false;
+        if(!effects.boundTo(*this)||!record.destroyRequested||records_.resolve(key)!=&record)return fail();
+        for(const auto& e:entries_)if(e.local&&e.key.slot==key.slot&&e.key.generation==key.generation){
+            if(resolve(e)!=&record||e.id!=record.instanceId)return fail();
+            if(!effects.retireMarked(e.local,e.id))return fail();
+            return true;
+        }
+        return fail();
+    }
 };
 }
 #endif
