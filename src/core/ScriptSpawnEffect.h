@@ -23,6 +23,29 @@ struct ScriptSpawnEffect:NonLoopSpriteAnimation {
         field=next;valid=publish(*this);return valid;
     }
 };
-template<unsigned Capacity> using ScriptSpawnEffects=NonLoopEffects<ScriptSpawnEffect,Capacity>;
+template<unsigned Capacity> class ScriptSpawnEffects:public NonLoopEffects<ScriptSpawnEffect,Capacity> {
+    using Base=NonLoopEffects<ScriptSpawnEffect,Capacity>;
+    const void* registry_=nullptr;
+    template<class Registry> bool bind(Registry& registry){
+        if(!registry_){registry_=&registry;return true;}
+        if(registry_==&registry)return true;
+        return Base::mutate(0,[](auto&){return false;}); // Latch mismatched ownership.
+    }
+public:
+    ScriptSpawnEffects()=default;
+    ScriptSpawnEffects(const ScriptSpawnEffects&)=delete;
+    ScriptSpawnEffects& operator=(const ScriptSpawnEffects&)=delete;
+    template<class Registry> bool boundTo(const Registry& registry)const{return registry_==&registry;}
+    template<class Registry> typename Base::Handle create(MotionBinary64 x,MotionBinary64 y,Registry& registry){
+        return bind(registry)?Base::create(x,y,registry):0;
+    }
+    template<class Registry> bool setSprite(typename Base::Handle h,int sprite,unsigned count,Registry& registry){
+        return bind(registry)&&Base::setSprite(h,sprite,count,registry);
+    }
+    template<class Registry> bool advanceAnimation(typename Base::Phase phase,Registry& registry){
+        return bind(registry)&&Base::advanceAnimation(phase,registry);
+    }
+    template<class Registry> bool clear(Registry& registry){return bind(registry)&&Base::clear(registry);}
+};
 }
 #endif

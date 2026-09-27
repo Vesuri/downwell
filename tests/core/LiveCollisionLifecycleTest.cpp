@@ -12,6 +12,7 @@
 #include "core/TimeShardBurst.h"
 #include "core/ProjectilePublication.h"
 #include "core/EffectSpawnScript.h"
+#include "core/ScriptSpawnOperations.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -892,28 +893,17 @@ int main(){
         require(collision->attach(*world),"attach script-effect registration fixture");
         world->skipToGameForTesting();
         auto registration=world->scriptSpawnRegistration<2>();ScriptSpawnEffects<2> effects;
-        using Registration=decltype(registration);
-        struct Ops {
-            using Handle=unsigned;
-            Registration& registration;ScriptSpawnEffects<2>& effects;unsigned callerId=0;
-            bool create(int object,MotionBinary64 x,MotionBinary64 y,unsigned& h){
-                if(object!=219)return false;h=effects.create(x,y,registration);return h!=0;
-            }
-            bool myFx(unsigned h){callerId=registration.sourceId(h);return callerId!=0;}
-            bool sprite(unsigned h,int id){return effects.setSprite(h,id,1,registration);}
-            bool imageSpeed(unsigned h,MotionBinary64 n){return effects.mutate(h,[&](auto& e){
-                return e.setValue(e.imageSpeed,n,[&](const auto& state){return registration.speed(h,state);});});}
-            bool imageAngle(unsigned h,MotionBinary64 n){return effects.mutate(h,[&](auto& e){
-                return e.setValue(e.angle,n,[&](const auto& state){return registration.angle(h,state);});});}
-            bool depth(unsigned h,MotionBinary64 n){return effects.mutate(h,[&](auto& e){
-                return e.setValue(e.depth,n,[&](const auto& state){return registration.depth(h,state);});});}
-        } ops{registration,effects};
+        unsigned callerId=0;
+        auto frames=[&](int id,unsigned& count){
+            PackedSpriteCollision resource;if(!sprites.sprite(id,resource))return false;
+            count=resource.frameCount;return true;
+        };
         const auto before=world->nextRuntimeInstanceId();const auto random=world->randomDrawCount();
         const auto phase=effects.beginPhase();
-        require(EffectSpawnScript::run(ops,{0x406e0800u,0},{0x40afff00u,0},603,
-            {0x3fe00000u,0},MotionBinary64::fromInteger(270),{}),"source effect script publishes registered child and setters");
+        require(world->spawnScriptEffect(registration,effects,{0x406e0800u,0},{0x40afff00u,0},603,
+            {0x3fe00000u,0},MotionBinary64::fromInteger(270),{},frames,callerId),"source effect script publishes registered child and setters");
         const auto* r=world->instance(before);
-        require(r&&ops.callerId==before&&world->nextRuntimeInstanceId()==before+1&&world->randomDrawCount()==random&&
+        require(r&&callerId==before&&world->nextRuntimeInstanceId()==before+1&&world->randomDrawCount()==random&&
             r->objectId==219&&r->preciseX==240.25F&&r->preciseY==4095.5F&&r->spriteId==603&&
             r->imageSpeed==0.5F&&r->rotation==270&&r->depth==0,"child uses real source ID, fractional position and caller overrides without RNG");
         InstancePlaceResult result;
@@ -927,8 +917,17 @@ int main(){
             "publish first child animation through source registry");
         require(world->instance(before)->imageIndex==0.5F,"source record retains fractional image index");
         require(effects.advanceAnimation(effects.beginPhase(),registration)&&!world->instance(before)&&
-            !collision->resolve(stale)&&ops.callerId==before&&world->effectsSucceeded(),
+            !collision->resolve(stale)&&callerId==before&&world->effectsSucceeded(),
             "animation retirement removes generation-checked membership without clearing caller ID");
+        unsigned lookups=0;
+        auto rejectFrames=[&](int,unsigned&){++lookups;return false;};
+        const auto next=world->nextRuntimeInstanceId();
+        require(!world->spawnScriptEffect(registration,effects,{},{},603,{0x3fe00000u,0},{},{},rejectFrames,callerId)&&
+            !world->effectsSucceeded()&&callerId==next&&world->instance(next)&&effects.size()==1&&lookups==1,
+            "failed script setter preserves birth and caller ID while latching world failure");
+        require(!world->spawnScriptEffect(registration,effects,{},{},603,{},{},{},rejectFrames,callerId)&&
+            lookups==1&&world->nextRuntimeInstanceId()==next+1&&world->randomDrawCount()==random,
+            "failed script creation cannot replay earlier side effects or consume RNG");
     }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

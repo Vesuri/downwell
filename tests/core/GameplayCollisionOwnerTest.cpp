@@ -1,5 +1,11 @@
 #include "core/GameplayCollisionOwner.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeScriptSpawn(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects,
+    const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle& caller){
+    return world.spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},
+        [&](int id,unsigned& frames){downwell::PackedSpriteCollision sprite;
+            if(!sprites.sprite(id,sprite))return false;frames=sprite.frameCount;return true;},caller);
+}
 // Compile-only A500 gate: instantiate the public selectors without the host
 // fixture loader, filesystem, heap-backed assertions or C++ runtime headers.
 bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
@@ -265,19 +271,17 @@ int main(){
         assert(collision->attach(*scene));
         ScriptSpawnEffects<2> effects;auto& registration=collision->scriptEffects();
         const auto phase=effects.beginPhase();
-        const auto first=effects.create({0x406e0800u,0},{0x40afff00u,0},registration);
+        InstanceHandle caller;
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision resource;
+            if(!sprites.sprite(id,resource))return false;count=resource.frameCount;return true;};
+        assert(scene->spawnScriptEffect(effects,{0x406e0800u,0},{0x40afff00u,0},603,
+            {0x3fe00000u,0},MotionBinary64::fromInteger(270),{},frames,caller));
+        const auto first=caller.generation;
         assert(first&&registration.size()==1);
         InstanceHandle key;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::scriptEffect,registration.handle(first),key));
         const auto* effect=effects.get(first);const auto* state=collision->state(key);
         assert(effect&&state&&state->x.bits==effect->x.bits&&state->y.bits==effect->y.bits);
-        assert(collision->properties(key)->sprite.spriteId==-1);
-        assert(effects.setSprite(first,603,1,registration));
-        assert(effects.mutate(first,[&](auto& e){
-            return e.setValue(e.imageSpeed,{0x3fe00000u,0},[&](const auto& s){return registration.speed(first,s);})&&
-                e.setValue(e.angle,MotionBinary64::fromInteger(270),[&](const auto& s){return registration.angle(first,s);})&&
-                e.setValue(e.depth,{},[&](const auto& s){return registration.depth(first,s);});
-        }));
         assert(collision->properties(key)->sprite.spriteId==603&&collision->properties(key)->sprite.angle.bits==0x43870000u);
         unsigned count=0;assert(collision->population(219,count)&&count==1);
         assert(effects.advanceAnimation(phase,registration)&&effects.get(first)->imageIndex.bits==0);
@@ -289,6 +293,14 @@ int main(){
             scene->scriptSpawnInstances()==&registration);
         const auto next=effects.create({}, {},registration);assert(next>first&&!collision->state(key));
         assert(effects.setSprite(next,602,1,registration)&&effects.clear(registration)&&collision->valid());
+        // Failure after Create must poison the actual runtime, retain its
+        // completed birth/caller publication and never repeat the event.
+        const auto draws=scene->randomDrawCount();unsigned lookups=0;
+        auto rejectFrames=[&](int,unsigned&){++lookups;return false;};
+        assert(!scene->spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},rejectFrames,caller));
+        assert(!scene->effectsSucceeded()&&registration.find(caller)&&effects.size()==1&&lookups==1);
+        assert(!scene->spawnScriptEffect(effects,{},{},603,{},{},{},rejectFrames,caller)&&lookups==1&&
+            scene->randomDrawCount()==draws);
     }
     assert(masks.valid());
     {

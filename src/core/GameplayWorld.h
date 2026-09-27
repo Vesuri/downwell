@@ -19,6 +19,8 @@
 #include "core/GameplayGoalFields.h"
 #include "core/GameplayExitControllers.h"
 #include "core/GameplayScriptSpawnInstances.h"
+#include "core/ScriptSpawnOperations.h"
+#include "core/EffectSpawnScript.h"
 #include "core/AreaOneBuilder.h"
 #include "core/EnemyCreateProfile.h"
 #include "core/ObjectPack.h"
@@ -208,6 +210,18 @@ public:
     bool bindScriptSpawnInstances(downwell::GameplayScriptSpawnInstances& instances){
         if(scriptSpawnInstances_||!instances.valid()||instances.size())return false;
         scriptSpawnInstances_=&instances;return true;
+    }
+    template<unsigned Capacity,class Frames>
+    bool spawnScriptEffect(downwell::ScriptSpawnEffects<Capacity>& effects,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,
+        downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,Frames frames,downwell::InstanceHandle& myFx){
+        if(!run_.effectsSucceeded)return false;
+        if(!scriptSpawnInstances_){run_.effectsSucceeded=false;return false;}
+        auto& registration=*scriptSpawnInstances_;
+        auto ops=downwell::scriptSpawnOperations(effects,registration,frames,[&](unsigned local){
+            const auto key=registration.handle(local);if(!key.generation)return false;myFx=key;return true;
+        },run_.effectsSucceeded);
+        return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;

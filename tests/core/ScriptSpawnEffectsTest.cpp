@@ -27,6 +27,13 @@ struct Ops {
         id,{0x3fe00000u,0},MotionBinary64::fromInteger(270),{});}
 };
 int main(){
+    {
+        ScriptSpawnEffects<2> bound;Hooks first,other;
+        const auto h=bound.create({},{},first);assert(h);
+        assert(!bound.setSprite(h,603,1,other)&&!bound.valid()&&other.sprites==0);
+        assert(bound.clear(first)&&first.retires==1&&bound.valid());
+        assert(!bound.create({},{},other)&&other.births==0&&!bound.valid());
+    }
     ScriptSpawnEffects<2> owner;Hooks hooks;Ops ops{owner,hooks};
     const auto beforeBirth=owner.beginPhase();assert(ops.spawn(603));const auto first=ops.callerMyFx;
     const auto* stable=owner.get(first);assert(stable&&stable->angle.bits==0x43870000u);

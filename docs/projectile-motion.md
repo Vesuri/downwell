@@ -187,6 +187,16 @@ owner or changing rooms. Retry preserves an empty registry and rejects a
 populated one until the live room-exit cleanup path is connected. Automatic
 gun emission, scheduling and drawing remain separate integration requirements.
 
+Both runtime `spawnScriptEffect` entry points use `ScriptSpawnOperations` for
+the same creation and setter sequence. They supply resource frame lookup and
+caller identity publication, and latch partial failures into the runtime's
+existing terminal effect status. A failed setter retains completed birth and
+caller assignment; a subsequent call cannot retry the earlier operations.
+Script effect stores are noncopyable and bound to one fixed-address registry,
+including after clearing their records. Moving lifetime keys between registries
+is rejected before publication. The stored backend publishes a source numeric
+ID; the native backend publishes its checked local handle.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

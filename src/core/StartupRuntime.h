@@ -21,6 +21,8 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredScriptSpawnRegistration.h"
+#include "ScriptSpawnOperations.h"
+#include "EffectSpawnScript.h"
 #include "TimeChangeEffects.h"
 #include "TimeStopEffects.h"
 #include "TimeShardBurst.h"
@@ -260,6 +262,17 @@ public:
     }
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,unsigned Registered,class Frames>
+    bool spawnScriptEffect(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
+        ScriptSpawnEffects<Capacity>& effects,MotionBinary64 x,MotionBinary64 y,int sprite,
+        MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
+        if(!run_.effectsSucceeded)return false;
+        if(!registration.belongsTo(instances_)){run_.effectsSucceeded=false;return false;}
+        auto ops=scriptSpawnOperations(effects,registration,frames,[&](unsigned local){
+            const auto id=registration.sourceId(local);if(!id)return false;myFx=id;return true;
+        },run_.effectsSucceeded);
+        return EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
     template<unsigned Capacity,unsigned Registered,class Pause> bool createTimeChange(
         StoredTimeChangeRegistration<instanceCapacity,Registered>& registration,TimeChangeEffects<Capacity>& changes,
