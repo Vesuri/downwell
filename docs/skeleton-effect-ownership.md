@@ -350,6 +350,10 @@ borrowed pointers that would become invalid after a world copy. Callback/query
 failure latches an invalid owner; subsequent simulation is rejected. Explicit
 teardown can release remaining handles without repeating already-successful
 retirements. Full capacity rejects a birth before its four RNG draws.
+All lifecycle entry points borrow the supplied adapter, including bulk-method
+delegation and teardown. Stateful registries must not be copied: retirement
+must update the same membership that accepted birth. Regression tests use a
+non-copyable adapter and check teardown publication after terminal failures.
 
 `stepPublished` forwards each position candidate with its owner-local handle
 and the pre-write effect state. A publication failure latches the entire owner

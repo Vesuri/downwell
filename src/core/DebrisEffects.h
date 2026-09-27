@@ -37,14 +37,16 @@ public:
         }
         return nullptr;
     }
-    template<class Lifecycle=NoLifecycle> bool clear(Lifecycle lifecycle={}){
+    // Keep caller-owned registry state: copying a lifecycle would retire only
+    // its copy, leaving stale membership after the effect storage is reused.
+    template<class Lifecycle=NoLifecycle> bool clear(Lifecycle&& lifecycle={}){
         for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];
             if(s.handle){if(!lifecycle.retire(s.handle,s.effect)){good_=false;return false;}s.handle=0;}
         }
         count_=0;good_=true;return true; // Never rewind lifetime keys.
     }
     template<class Random,class Lifecycle=NoLifecycle>
-    Handle create(MotionBinary64 x,MotionBinary64 y,int area,Random& random,Lifecycle lifecycle={}){
+    Handle create(MotionBinary64 x,MotionBinary64 y,int area,Random& random,Lifecycle&& lifecycle={}){
         if(!good_||!retireRequested(lifecycle))return 0;
         return createRegistered(x,y,area,random,lifecycle);
     }
@@ -106,7 +108,7 @@ public:
         }
         return true;
     }
-    template<class Lifecycle=NoLifecycle> bool advanceAlarm(Phase phase,unsigned index,Lifecycle lifecycle={}){
+    template<class Lifecycle=NoLifecycle> bool advanceAlarm(Phase phase,unsigned index,Lifecycle&& lifecycle={}){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];
             if(s.handle<=phase.newest)s.effect.advanceAlarm(index);
@@ -116,7 +118,7 @@ public:
     // TimeStopBound is evaluated per effect, not once for the entire pool.
     template<class Random,class Stopped,class Meeting,class Publish,class Lifecycle=NoLifecycle>
     bool stepPublished(Phase phase,Random& random,Stopped stopped,Meeting meeting,
-                       Publish publish,Lifecycle lifecycle={}){
+                       Publish publish,Lifecycle&& lifecycle={}){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];
             if(s.handle>phase.newest||s.effect.destroyRequested)continue;
@@ -131,11 +133,11 @@ public:
         return retireRequested(lifecycle);
     }
     template<class Random,class Stopped,class Meeting,class Lifecycle=NoLifecycle>
-    bool step(Phase phase,Random& random,Stopped stopped,Meeting meeting,Lifecycle lifecycle={}){
+    bool step(Phase phase,Random& random,Stopped stopped,Meeting meeting,Lifecycle&& lifecycle={}){
         return stepPublished(phase,random,stopped,meeting,
             [](Handle,const DebrisAnimation&,RunnerImageValue,RunnerImageValue){return true;},lifecycle);
     }
-    template<class Lifecycle=NoLifecycle> bool retireRequested(Lifecycle lifecycle={}){
+    template<class Lifecycle=NoLifecycle> bool retireRequested(Lifecycle&& lifecycle={}){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& s=slots_[order_[i]];
             if(s.effect.destroyRequested){
