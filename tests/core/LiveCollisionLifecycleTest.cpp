@@ -935,6 +935,32 @@ int main(){
         require(!world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase())&&world->instance(next),
             "failed world cannot advance or retire the partially created effect");
     }
+    {
+        auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
+        require(collision->attach(*world),"attach scheduled script effects");world->skipToGameForTesting();
+        auto registration=world->scriptSpawnRegistration<2>();ScriptSpawnEffects<2> effects;
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision r;
+            if(!sprites.sprite(id,r))return false;count=r.frameCount;return true;};
+        auto spawn=[&](unsigned& caller){return world->spawnScriptEffect(registration,effects,
+            MotionBinary64::fromInteger(int(world->mainPlayerX())),MotionBinary64::fromInteger(int(world->mainPlayerY())),
+            603,{0x3fe00000u,0},{},{},frames,caller);};
+        unsigned first=0,second=0;require(spawn(first),"create pre-animation effect");
+        require(world->stepWithScriptEffects(registration,effects,{},false,[&]{return spawn(second);}),
+            "schedule effect animation and later collision-phase birth in one tick");
+        require(world->instance(first)->imageIndex==0.5F&&world->instance(second)->imageIndex==0,
+            "room animation advances existing effect but not later child");
+        require(world->stepWithScriptEffects(registration,effects,{})&&world->instance(first)->destroyRequested&&
+            !world->instance(second)->destroyRequested&&world->instance(second)->imageIndex==0.5F,
+            "Animation End leaves later room entries traversable");
+        require(world->stepWithScriptEffects(registration,effects,{})&&world->instance(second)->destroyRequested,
+            "marked effect does not prevent subsequent room animation");
+        require(world->cleanupDestroyed(registration,effects,[](InstanceHandle,const InstanceRecord&){return false;})&&
+            !world->instance(first)&&!world->instance(second)&&effects.size()==0,
+            "scheduled effects retire through explicit typed cleanup");
+        world->step({},false);
+        require(world->effectsSucceeded(),"scoped animation callback does not survive its tick");
+    }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
         productionOwner->binding());

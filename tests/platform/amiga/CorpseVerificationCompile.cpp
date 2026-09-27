@@ -15,7 +15,7 @@ bool compileScriptSpawnOwner(downwell::ScriptSpawnEffects<4>& owner){
     const auto phase=owner.beginPhase();const auto h=owner.create({},{},hooks);
     return h&&owner.setSprite(h,603,1,hooks)&&owner.mutate(h,[](auto& effect){
         return effect.setValue(effect.imageSpeed,{0x3fe00000u,0},[](const auto&){return true;});
-    })&&owner.advanceRegistered(phase,hooks)&&owner.clear(hooks);
+    })&&owner.advanceRegisteredOne(h,phase,hooks)&&owner.clear(hooks);
 }
 bool compileSessionCorpseAlarm(downwell::RunSession& session,downwell::CorpseLifecycle& corpse){
     return session.advanceCorpseAlarm(corpse,0,[](int id){return id==102?12u:0u;},[](){});

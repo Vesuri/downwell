@@ -89,6 +89,15 @@ public:
         if(!r||!lifecycle_.markDestroyed(e->key,*r))return fail();
         r->destroyRequested=true;return true;
     }
+    template<class Effects> bool dispatchAnimation(InstanceHandle key,const InstanceRecord& r,Effects& effects,
+        typename Effects::Phase phase){
+        if(!succeeded_||!effects.boundTo(*this)||records_.resolve(key)!=&r)return fail();
+        for(const auto& e:entries_)if(e.local&&e.key.slot==key.slot&&e.key.generation==key.generation){
+            if(record(e)!=&r)return fail();
+            return effects.advanceRegisteredOne(e.local,phase,*this)||fail();
+        }
+        return fail();
+    }
     template<class Effects> bool retireMarked(InstanceHandle key,const InstanceRecord& r,Effects& effects){
         if(!succeeded_||!effects.boundTo(*this)||records_.resolve(key)!=&r||!r.destroyRequested)return fail();
         for(const auto& e:entries_)if(e.local&&e.key.slot==key.slot&&e.key.generation==key.generation){

@@ -211,6 +211,15 @@ retirement; later phase calls on the failed runtime do nothing. Integrators
 must still capture and dispatch that phase at the original global animation
 boundary rather than advancing effects immediately after a Step birth.
 
+The stored runtime's scoped `stepWithScriptEffects` entry point dispatches each
+registered effect from the active-room animation traversal, immediately after
+that instance's previous-position capture. It captures the birth cutoff before
+the tick and releases its borrowed callback on return; collision-phase births
+wait until the next tick. Callers retain responsibility for typed pre-Draw
+cleanup and room teardown. The native scheduler and automatic live gun emission
+still need integration; the family-wide animation entry point is not evidence
+of global room ordering.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

@@ -196,13 +196,34 @@ public:
         collisionDispatch_=nullptr;collisionContext_=nullptr;
         return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;
     }
+    struct NoCollisionPass {bool operator()()const{return true;}};
+    // Script effects join the real active-room animation traversal, not a
+    // separate family-wide pass. The callback is scoped to this ordinary tick.
+    template<unsigned Capacity,unsigned Registered,class Collisions=NoCollisionPass>
+    bool stepWithScriptEffects(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
+        ScriptSpawnEffects<Capacity>& effects,const Input& input,bool advancePressed=false,Collisions collisions={}){
+        if(!run_.effectsSucceeded)return false;
+        if(scriptAnimationDispatch_||!registration.belongsTo(instances_)||!effects.boundTo(registration)||!effects.valid()){
+            run_.effectsSucceeded=false;return false;
+        }
+        const auto phase=effects.beginPhase();
+        auto dispatch=[&](InstanceHandle key,const InstanceRecord& record){
+            return registration.dispatchAnimation(key,record,effects,phase);
+        };
+        scriptAnimationContext_=&dispatch;
+        scriptAnimationDispatch_=[](void* context,InstanceHandle key,const InstanceRecord& record){
+            return (*static_cast<decltype(dispatch)*>(context))(key,record);
+        };
+        const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
+        scriptAnimationDispatch_=nullptr;scriptAnimationContext_=nullptr;
+        return ok;
+    }
     // Scoped animation/alarm/Step ownership for one ordinary world tick. No borrowed
     // callback survives the call. The optional collision pass shares this tick;
     // callers must route all admitted handlers, not silently discard unknowns.
     // The optional
     // transition callback runs at the shared player's source Begin Step boundary.
     struct NoTimeTransition {bool operator()(const InstanceRecord&,const PlayerMotion&,int,int)const{return true;}};
-    struct NoCollisionPass {bool operator()()const{return true;}};
     enum class TimeEffectPhase {animation,alarm,step,playerBegin};
     template<unsigned Capacity,unsigned Registered,unsigned Changes,class Transition=NoTimeTransition,class Collisions=NoCollisionPass> bool stepWithTimeStopEffects(
         StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
@@ -671,6 +692,8 @@ private:
     InstanceLifecycleBinding lifecycle_;
     void* collisionContext_=nullptr;
     bool (*collisionDispatch_)(void*)=nullptr;
+    void* scriptAnimationContext_=nullptr;
+    bool (*scriptAnimationDispatch_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
     void* timeEffectContext_=nullptr;
     bool (*timeEffectDispatch_)(void*,InstanceRecord&,TimeEffectPhase,unsigned)=nullptr;
     const RoomPack* roomPack_ = nullptr;

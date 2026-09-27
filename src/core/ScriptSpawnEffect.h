@@ -52,6 +52,11 @@ public:
             [&](auto h,const auto& effect){return registry.image(h,effect);},
             [&](auto h,const auto& effect){return registry.destroyed(h,effect);});
     }
+    template<class Registry> bool advanceRegisteredOne(typename Base::Handle h,typename Base::Phase phase,Registry& registry){
+        return bind(registry)&&Base::advanceDeferredOne(h,phase,
+            [&](auto key,const auto& effect){return registry.image(key,effect);},
+            [&](auto key,const auto& effect){return registry.destroyed(key,effect);});
+    }
     template<class Registry> bool retireMarked(typename Base::Handle h,Registry& registry){
         return bind(registry)&&Base::retireMarked(h,registry);
     }

@@ -345,6 +345,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
+        if(instance.objectId==219&&scriptAnimationDispatch_&&
+            !scriptAnimationDispatch_(scriptAnimationContext_,key,instance))return false;
         if(instance.objectId==238&&timeEffectDispatch_&&
             !timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::animation,0))return false;
         const bool enemyObject=instance.objectId==111 || instance.objectId==112 ||

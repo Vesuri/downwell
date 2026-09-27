@@ -84,6 +84,16 @@ public:
     }
     // Registered animation walks the room list. It may mark its current
     // lifetime, but cannot unlink it until the later room cleanup pass.
+    template<class Publish,class Mark> bool advanceDeferredOne(Handle h,Phase phase,Publish publish,Mark mark){
+        if(!good_)return false;
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
+            if(slot.handle!=h)continue;
+            if(h>phase.newest||slot.effect.destroyRequested)return true;
+            return good_=slot.effect.advanceImage([&](const auto&){return publish(h,static_cast<const Effect&>(slot.effect));})&&
+                (!slot.effect.destroyRequested||mark(h,static_cast<const Effect&>(slot.effect)));
+        }
+        return good_=false;
+    }
     template<class Publish,class Mark> bool advanceDeferred(Phase phase,Publish publish,Mark mark){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
