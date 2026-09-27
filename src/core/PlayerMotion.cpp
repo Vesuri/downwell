@@ -187,7 +187,6 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
     }
 
     const bool wasSpinning = spinJumping_;
-    const int oldFacing = facing_;
     if (dead) {
         if (controlsLocked) speedX_ = 0;
         // scrPlMovement death branch bypasses living input/friction. Like
@@ -202,10 +201,12 @@ PlayerMotionDelta PlayerMotion::step(const downwell::Input& rawInput, bool contr
             gravityRemainder_ = static_cast<int>(halved % 5);
         }
     } else {
-        downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
-            speedX_, facing_, grounded_, input.left, input.right, controlsLocked);
+        if(!downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
+            speedX_, facing_, grounded_, input.left, input.right, controlsLocked,!spinJumping_,
+            [this](int value){return !facingPublication_||facingPublication_(facingPublicationContext_,value);})){
+            motionSucceeded_=false;return {};
+        }
     }
-    if (spinJumping_) facing_ = oldFacing;
     if (solidResolver_ != 0) {
         long remaining = speedX_;
         while (remaining != 0) {

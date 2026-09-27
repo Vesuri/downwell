@@ -181,6 +181,7 @@ public:
         int x=240,y=176; // Published world coordinates, not motion accumulators.
         bool active=true;
         std::uint32_t lifetimeId=0;
+        int scaleX=1;
     };
     using PlayerLifecycleBinding = downwell::RecordLifecycleBinding<PlayerInstance>;
     explicit GameplayWorld(unsigned initialRingOrigin,

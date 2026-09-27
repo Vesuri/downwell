@@ -63,7 +63,8 @@ struct LifecycleAudit {
             require(field==downwell::RunnerTransformField::scaleX,"frog publishes horizontal scale");
             ++frogTransforms;
         }
-        if(fail==9)return false;
+        const bool enemy=r.objectId==111||r.objectId==112||r.objectId==113||r.objectId==116||r.objectId==117||r.objectId==119;
+        if((fail==9&&enemy)||(fail==11&&!enemy))return false;
         ++transforms;return true;
     }
     bool imageIndex(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerImageValue value){
@@ -279,7 +280,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         require(healthy(*runtime)&&snail&&!snail->active&&!snail->activationPending,
                 "wall-less snail stops before post-retirement movement and sprite publication");
     }
-    for(unsigned failure=0;failure<=10;++failure){
+    for(unsigned failure=0;failure<=11;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
             downwell::InstanceLifecycleBinding::bindTransforms(failing));

@@ -73,6 +73,25 @@ template<class Math> void checkControls() {
 }
 
 int main() {
+    for(unsigned reject:{0u,1u,2u}){
+        long speed=256;int facing=1;unsigned calls=0;
+        const bool ok=downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(
+            speed,facing,true,true,true,false,true,[&](int value){
+                ++calls;
+                require(value==(calls==1?-1:1),"both-key scale writes execute left before right");
+                require(facing==(calls==1?1:-1),"scale publication precedes internal facing update");
+                return calls!=reject;
+            });
+        require(ok==(reject==0)&&calls==(reject==1?1u:2u),"rejected scale stops later branch writes");
+        require(speed==(reject==1?-307:reject==2?256:0)&&facing==(reject==2?-1:1),
+                "rejection preserves source-ordered speed and accepted facing without final both-key override");
+    }
+    {
+        long speed=0;int facing=-1;unsigned calls=0;
+        require(downwell::applyPlayerHorizontalInput<downwell::FixedPlayerMath>(speed,facing,true,true,true,false,false,
+                    [&](int){++calls;return false;})&&calls==0&&facing==-1&&speed==0,
+                "spin-facing guard skips writes but retains both-key motion rules");
+    }
     for (unsigned remaining = 0; remaining <= 90; ++remaining)
         require(downwell::playerDamageVisible(remaining) == (remaining % 2 == 0),
                 "default damage flash alternates and both endpoints remain visible");

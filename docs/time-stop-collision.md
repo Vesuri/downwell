@@ -975,6 +975,14 @@ sprite/mask/transform publication and global collision registration are still
 required before the native player can use the resource-backed owner. Positions here
 remain derived from the existing fixed-point motion; this is not a migration
 to the runner's full binary64 integration or sequential X/Y setter semantics.
+Both adapters publish `scrPlMovement`'s horizontal input `image_xscale` writes
+through the shared controls path. Left and right branches publish separately,
+before the final both-key speed override; a spinning player skips these writes.
+Rejection retains earlier acceleration/accepted scale and stops subsequent
+motion, clock and position publication. The opaque-white appearance assumption
+matches the currently implemented player path. The separate scale/sprite/index
+writes in `playerSpriteControl`, shop-facing overrides, water and wall-side
+queries are not supplied by this hook and remain necessary for a full adapter.
 Camera/interactable queries follow, then the time-stop transition query uses
 private `xx/yy`. `scrTimeShard` performs its own field lookup using the newly
 published `x/y`. These are different positions at the same event boundary.

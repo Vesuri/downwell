@@ -1222,6 +1222,13 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
                 instance.x=x;instance.y=y;return true;
             }
             return false;
+        },[this,&instance](int value){
+            for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==&instance){
+                if(!lifecycle_.integerTransform(instances_.handleAt(i),instance,RunnerTransformField::scaleX,
+                        value,{0x3f800000u},0xffffffu))return false;
+                instance.scaleX=static_cast<float>(value);return true;
+            }
+            return false;
         });
     mainPlayerMotion_.configureSolidResolver(nullptr, nullptr,
         4 - mainPlayerOriginX_, 476 - mainPlayerOriginX_);

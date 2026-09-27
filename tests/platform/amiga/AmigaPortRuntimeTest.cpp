@@ -343,6 +343,22 @@ void testNativeBoxLifecycle(){
 struct NativePlayerAudit {
     downwell::InstanceHandle live{};
     unsigned births=0,retirements=0,moves=0,calls=0,fail=0;
+    unsigned scales=0,rejectScaleAt=0;
+    bool sprite(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,int){return true;}
+    bool imageIndex(downwell::InstanceHandle,const GameplayWorld::PlayerInstance&,downwell::RunnerImageValue){return true;}
+    bool transform(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p,downwell::RunnerTransformField field,
+                   downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
+        ++calls;++scales;
+        std::int32_t scale=0;
+        require(h.generation==live.generation&&field==downwell::RunnerTransformField::scaleX&&
+                value.promoted().roundPixel(scale)&&alpha.bits==0x3f800000u&&blend==0xffffffu,
+                "native player scale targets current opaque-white lifetime");
+        if(rejectScaleAt){
+            require(scale==(scales==1?-1:1)&&p.scaleX==(scales==1?1:-1),
+                    "native owner sees old scale at each ordered both-key write");
+        }
+        return scales!=rejectScaleAt;
+    }
     bool birth(downwell::InstanceHandle h,const GameplayWorld::PlayerInstance& p){
         ++calls;++births;
         require(h.slot==0&&h.generation>live.generation&&p.lifetimeId==h.generation&&p.active&&p.x==240&&p.y==176,
@@ -368,6 +384,15 @@ struct NativePlayerAudit {
 
 void testNativePlayerLifecycle(){
     using Binding=GameplayWorld::PlayerLifecycleBinding;
+    {
+        NativePlayerAudit audit;audit.rejectScaleAt=2;
+        GameplayWorld world(0,true,0,false,{},{},Binding::bindTransforms(audit));
+        world.step(3);
+        require(!world.effectsSucceeded()&&audit.scales==2&&audit.moves==0&&
+                world.findPlayer(world.playerHandle())->scaleX==-1&&world.player().facing()==-1&&world.runTimeTicks()==0,
+                "second scale failure preserves first write and stops before clock/position publication");
+        const auto calls=audit.calls;world.step(3);require(audit.calls==calls,"failed scale remains terminal");
+    }
     for(unsigned fail:{0u,1u,2u,3u}){
         NativePlayerAudit audit;audit.fail=fail==1?1:0;
         GameplayWorld world(0,true,0,false,{},{},Binding::bindMovement(audit));

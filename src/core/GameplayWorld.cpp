@@ -733,7 +733,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     PlayerMotionDelta motion = downwell::stepGameplayPlayer(player_, death_, run_,
         currencyAccount_, health_, enemyRandom_, input, 240, 176,
         cameraMotion_.pixelX() - 80, cameraMotion_.pixelY() - 142,false,
-        [this](int x,int y){return publishPlayerPosition(x,y);});
+        [this](int x,int y){return publishPlayerPosition(x,y);},
+        [this](int value){
+            if(!playerLifecycle_.integerTransform(playerHandle(),playerInstance_,downwell::RunnerTransformField::scaleX,
+                    value,{0x3f800000u},0xffffffu))return false;
+            playerInstance_.scaleX=value;return true;
+        });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
     if (headBreak.index >= 0) {

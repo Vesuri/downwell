@@ -20,6 +20,10 @@ public:
     typedef int (*LandingResolver)(void* context, int x, int minimumY);
     typedef bool (*SolidResolver)(void* context, int x, int y);
     typedef void (*ComboCompletion)(void* context);
+    typedef bool (*FacingPublication)(void* context,int value);
+    void configureFacingPublication(FacingPublication callback,void* context){
+        facingPublication_=callback;facingPublicationContext_=context;
+    }
     void configureComboCompletion(ComboCompletion callback, void* context, bool timeStopped = false) {
         comboCompletion_ = callback; comboContext_ = context; comboTimeStopped_ = timeStopped;
     }
@@ -157,6 +161,8 @@ private:
     void* comboContext_ = nullptr;
     bool comboTimeStopped_ = false;
     ComboCompletion movementBoundary_ = nullptr;
+    FacingPublication facingPublication_=nullptr;
+    void* facingPublicationContext_=nullptr;
     void* movementBoundaryContext_ = nullptr;
     bool grounded_;
     bool priorFire_;

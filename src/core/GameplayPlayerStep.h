@@ -11,17 +11,18 @@ namespace downwell {
 struct NoPlayerPositionPublication {
     bool operator()(int,int) const { return true; }
 };
+struct NoPlayerScalePublication { bool operator()(int)const{return true;} };
 
 // Shared implemented objPlayer_n Begin Step phase. Owners bind terrain and
 // head-break callbacks first, then publish the returned motion and emit shots.
 // Activation remains before this phase; enemy alarms remain after it.
 // No renderer or instance-store representation is selected here.
-template<class PublishPosition=NoPlayerPositionPublication>
+template<class PublishPosition=NoPlayerPositionPublication,class PublishScale=NoPlayerScalePublication>
 inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     PlayerDeathSequence& death, RunSession& run, CurrencyAccount& currency,
     int& health, GameMakerRandom& random, const Input& input,
     int originX, int originY, int viewX, int viewY, bool controlsLocked = false,
-    PublishPosition publishPosition = {}) {
+    PublishPosition publishPosition = {},PublishScale publishScale={}) {
     death.beginStep(input.fire);
     run.combo.beginStep();
     struct Context {
@@ -30,7 +31,11 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
         RunSession& run;
         CurrencyAccount& currency;
         int& health;
-    } context{player, death, run, currency, health};
+        PublishScale& publishScale;
+    } context{player, death, run, currency, health,publishScale};
+    player.configureFacingPublication([](void* opaque,int value){
+        return static_cast<Context*>(opaque)->publishScale(value);
+    },&context);
     player.configureComboCompletion([](void* opaque) {
         auto& c = *static_cast<Context*>(opaque);
         c.run.combo.finish(c.player, c.currency, c.health,
@@ -45,10 +50,11 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     const auto motion = player.step(input,
         controlsLocked || run.shops.noControl || run.exitControlsLocked,
         death.movementDead(), run.shops.interactable, run.goalStopped, run.gemHigh);
-    // Both callbacks point into this invocation and are only used by motion.
+    // These callbacks point into this invocation and are only used by motion.
     // Clear them before any later checked operation can return early.
     player.configureComboCompletion(nullptr,nullptr);
     player.configureMovementBoundary(nullptr,nullptr);
+    player.configureFacingPublication(nullptr,nullptr);
     if(!player.motionSucceeded()){
         run.effectsSucceeded=false;
         return motion;
