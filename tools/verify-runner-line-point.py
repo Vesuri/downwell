@@ -14,10 +14,12 @@ for start, end, digest in (
     (0x4fd370, 0x4fd6d6, "0f0da904dd3ae825559ee1b3aa85242ae0e85564ca7e2baabd12def101a3226b"),
     (0x4fd6e0, 0x4fd8d3, "169f6db40ad58a26512f10356fa05adee57131dc7c5958282f6edb53056cc222"),
     (0x5014c0, 0x501590, "0ffeae73fb72fb0907a7964b85686b38f8a9e41f8d51a818e7102609e402ffcf"),
+    (0x500860, 0x500af7, "294ec6aaac83299027514fb0eefd88bc2f255267f2866ac2be650a2a5c727f3a"),
 ):
     assert sha256(region(start, end-start)).hexdigest() == digest
 assert region(0x80ccd4, 15) == b"collision_line\0"
 assert region(0x80cc24, 16) == b"collision_point\0"
+assert region(0x795ab8, 4) == bytes.fromhex("0000803f")  # broad-phase far-edge extension +1
 # fstp dword stores from argument conversion: all four line coordinates.
 for address, data in ((0x528bb3,"d95c2428"), (0x528bbf,"d95c242c"),
                       (0x528bcb,"d95c2430"), (0x528bd8,"d95c2438")):

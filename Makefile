@@ -485,6 +485,16 @@ verify-runner-step-order:
 .PHONY: verify-smoke-direction
 test: verify-machine-gun-source-motion
 .PHONY: verify-machine-gun-source-motion
+test: verify-runner-spatial-line
+.PHONY: verify-runner-spatial-line
+verify-runner-spatial-line: build/runner-spatial-line-test
+	python3 tools/verify-runner-line-point.py
+	./build/runner-spatial-line-test
+
+build/runner-spatial-line-test: tests/core/RunnerSpatialLineTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ $<
+
 verify-machine-gun-source-motion: build/machine-gun-source-motion-test
 	python3 tools/verify-machine-gun.py
 	python3 tools/verify-runner-line-point.py

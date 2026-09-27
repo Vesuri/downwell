@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_INDEX_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_INDEX_H
 #include "RunnerSpatialNode.h"
+#include "RunnerSpatialLine.h"
 namespace downwell {
 // Source-ordered spatial owner. It does not select eligible instances or
 // maintain the runner's dirty queue.
@@ -51,6 +52,13 @@ public:
     template<class Visit> bool query(Box box,Visit visit)const{
         if(!good_ || !Math::valid(box))return false;
         visitAt(root_,box,visit);return true;
+    }
+    // 0x500860 walks entries in their stored order at every tree level. It
+    // does not clip the line passed to children or sort leaves by hit distance.
+    template<class Visit> bool queryLine(const RunnerLineArguments& args,Visit visit)const{
+        RunnerSpatialLine line;
+        if(!good_||!line.assign(args))return false;
+        bool good=true;visitLineAt(root_,line,visit,good);return good;
     }
 private:
     static constexpr unsigned depthLimit=[](){unsigned n=Capacity,bits=0;
@@ -135,6 +143,17 @@ private:
             const auto& e=n.entries[i];if(!Math::overlaps(box,e.bounds))continue;
             if(n.level>0){if(!visitAt(e.child,box,visit))return false;}
             else if(!visit(e.instance))return false;
+        }
+        return true;
+    }
+    template<class Visit> bool visitLineAt(unsigned node,const RunnerSpatialLine& line,Visit& visit,bool& good)const{
+        const auto& n=nodes_[node];
+        for(unsigned i=0;i<n.count;++i){
+            const auto& entry=n.entries[i];bool hit=false;
+            if(!line.overlaps(entry.bounds,hit)){good=false;return false;}
+            if(!hit)continue;
+            if(n.level>0){if(!visitLineAt(entry.child,line,visit,good))return false;}
+            else if(!visit(entry.instance))return false;
         }
         return true;
     }

@@ -71,6 +71,23 @@ traversal and candidate geometry must be implemented before switching live
 projectile selection; the existing rectangle-segment intersection is not a
 verified replacement.
 
+`RunnerSpatialLine` transcribes the normal/zero arithmetic of the tree gates:
+each add/subtract/multiply/divide narrows to binary32, right/bottom broad-phase
+edges are extended by float one, and clipping the left endpoint changes the
+arithmetic used when clipping the right endpoint. `RunnerSpatialIndex::queryLine`
+uses those gates at every node, preserving stored entry order and propagating
+an early visitor stop through the whole tree. It passes the original normalized
+line to children, not a parent-clipped line. Invalid arithmetic fails the query
+without turning it into a miss; earlier callbacks are not rolled back.
+
+The original right-edge strip can reach division by zero: e.g. a vertical line
+at X=16.5 against a box ending at X=16 passes the +1 broad-phase gate and then
+divides by zero during right clipping. The current normal/zero implementation
+rejects this case. Original NaN/infinity comparisons and FP-mode assumptions
+must be resolved before enabling this path for live selection. This is not an
+assertion that such a valid source query misses. Narrow-phase candidate
+0x4650b0 remains separate from the tree gate.
+
 This component is not yet the live trajectory owner: the live Q20/Q32 adapter
 must be replaced together with its collision endpoints, angle consumers,
 muzzle-effect creation and setter publication. Neither a common implementation
