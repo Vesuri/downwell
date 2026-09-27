@@ -180,6 +180,40 @@ are outside its contract. The runner evidence verifier pins these regions.
 
 ## Step creation cutoff
 
+### Object and instance traversal order
+
+The table builder `0x47a330` is called with event type 3 and subtype upper
+bound 16 at `0x47a585`. For each subtype it scans numeric object IDs from zero
+through `objectCount-1`, looks up that object's resolved event, and appends
+qualifying IDs. Therefore the dispatcher's outer order is **ascending object
+resource ID**, not room creation order, depth, hash-bucket order or the
+ancestor that originally supplied an inherited event.
+
+Counts use `0x941d40 + (type*256 + subtype)*4`; array pointers use
+`0x93a544 + (type*256 + subtype)*8`. For Step these become precisely the
+`0x942940` and `0x93bd44` tables read by `0x50b7e0`.
+
+The inheritance pass `0x478830` walks ancestors and copies missing event-table
+entries into the child; an existing child key is retained. Lookup `0x478f40`
+then reads the resolved table. An explicit empty override still has its own
+event entry; it is not equivalent to an absent handler.
+
+Within each selected object, `0x50b895` loads head `object+0x38` and follows
+node `+0`, reading the instance at node `+8`. Registration `0x478380` appends
+to this exact-object head/tail pair `+0x38/+0x3c` **once**, before its ancestor
+loop. The loop instead appends to family head/tail `+0x44/+0x48`. Step uses
+the first list, so descendants are not dispatched again through the parent's
+collision-family list. Same-object dispatch follows registration order;
+completed activation reconciliation can change it as described in
+[activation fidelity](activation-fidelity.md).
+
+`tools/verify-runner-step-order.py` pins the reviewed builder, inheritance,
+registration and traversal ranges to the original executable. This establishes
+the ordering contract, not live-scheduler fidelity: the host's current phase
+snapshot and native typed-family scheduling still need to consume this order.
+Keep the phase cutoff and immediate flag rechecks below when integrating it;
+sorting by resource ID alone does not handle reactivation or new lifetimes.
+
 Read-only inspection of the pinned Windows `Downwell.exe` establishes a
 phase-local creation cutoff, not a whole-frame exclusion rule.
 

@@ -476,6 +476,11 @@ build/smoke-trig-test: tests/core/SmokeTrigTest.cpp $(wildcard src/core/*.h) src
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/SmokeTrigTest.cpp src/core/GameMakerRandom.cpp
 
+.PHONY: verify-runner-step-order
+verify-runner-step-order:
+	python3 tools/verify-runner-step-order.py
+	python3 tools/verify-runner-step-eligibility.py
+
 .PHONY: verify-smoke-direction
 verify-smoke-direction: build/smoke-direction-test
 	./build/smoke-direction-test
