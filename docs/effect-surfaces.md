@@ -76,6 +76,17 @@ backend must draw each producer at its own world-depth boundary, not flatten
 them into a controller overlay. A missing normal effect surface remains empty.
 Preparation failure clears partial output so it cannot publish stale pixels.
 
+`prepareWithLateEffects` additionally accepts source-ordered surface producers
+between smoke and controller publication, before shade subtraction. The caller
+supplies resolved offline artwork and exact published world coordinates; this
+entry point does not choose subimages, round coordinates or enumerate families.
+The scalar composition test overlays all fourteen debris frames on existing
+effects across camera/flag combinations, checking palette replacement and shade
+holes. Enumeration failure discards partial coverage. Direct fallback and absent
+surfaces do not enumerate these producers. This establishes the composition
+mechanism, not natural debris births, live global Draw order or Windows GPU
+sampling; those remain integration and verification work.
+
 Currency Step publishes rounded `xx`/`yy` into its builtin `x`/`y` before Draw;
 the private integration fractions must not be passed directly to `drawFx` or
 truncated at drawing time. Both adapters use `GemMotion::rounded` for that

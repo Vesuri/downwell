@@ -368,6 +368,14 @@ bool compileCurrencySmokeComposition(downwell::CurrencySmokeComposition& composi
         smoke,assets,view,settings,[&](auto emit){emit(view.x,view.y);},
         [](downwell::MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);});
 }
+bool compileLateEffectComposition(downwell::CurrencySmokeComposition& composition,
+    const downwell::SmokeEffects<32>& smoke,const downwell::EffectMaskAssets& assets,
+    const downwell::EffectSurfacePlacement::View& view){
+    return composition.prepareWithLateEffects([](auto){},smoke,assets,view,{},
+        [&](auto emit){downwell::EffectMaskAssets::Asset asset;
+            return assets.debris(115,0,asset)&&emit(asset,view.x,view.y);},
+        [](auto){},[](downwell::MotionBinary64 n,std::int32_t& out){return n.roundPixel(out);});
+}
 #include "core/RunnerObjectMembership.h"
 #include "core/RunnerObjectFamilies.h"
 bool compileObjectFamilies(downwell::RunnerObjectFamilies<386>& families,

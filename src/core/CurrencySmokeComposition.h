@@ -20,6 +20,19 @@ public:
     bool prepare(Currency currency,const SmokeOwner& smoke,const EffectMaskAssets& assets,
                  const EffectSurfacePlacement::View& view,Settings settings,
                  Shades shades,Raster raster){
+        return prepareWithLateEffects(currency,smoke,assets,view,settings,
+            [](auto){return true;},shades,raster);
+    }
+
+    // Additional surfaceFx producers between smoke and controller Draw (for
+    // example depth -1000 debris). The caller enumerates global painter order,
+    // resolves subimages, and emits (offline asset, published world X/Y).
+    // Return false on enumeration failure. No local family sort, frame rounding
+    // or simulation belongs here. Direct fallback remains world Draw's job.
+    template<class Currency,class SmokeOwner,class LateEffects,class Shades,class Raster>
+    bool prepareWithLateEffects(Currency currency,const SmokeOwner& smoke,const EffectMaskAssets& assets,
+                 const EffectSurfacePlacement::View& view,Settings settings,
+                 LateEffects lateEffects,Shades shades,Raster raster){
         surface_.clear();visible_=false;direct_=settings.death||settings.lowSpec;
         if(direct_ || !settings.effectsExist)return true;
         bool okay=true,added=false;
@@ -37,6 +50,9 @@ public:
         smoke.visitNewest([&](std::uint32_t,const SmokeEffect& effect){
             if(!effect.destroyRequested)add(assets.smoke(effect.drawFrame()),effect.x.promoted(),effect.y.promoted());
         });
+        if(okay)okay=lateEffects([&](const EffectMaskAssets::Asset& asset,MotionBinary64 x,MotionBinary64 y){
+            add(&asset,x,y);return okay;
+        })&&okay;
         if(okay && added && settings.shadeExists && !settings.noControl){
             shades([&](MotionBinary64 x,MotionBinary64 y){
                 if(!okay)return;

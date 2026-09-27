@@ -50,7 +50,18 @@ int main(int argc,char**argv){
                 for(unsigned i=0;i<12;++i)
                     emit(bool(i&1),(tick+i)%4,number(int(i%6)*29-3),number(int(i/6)*75+1));
             };
-            assert(colored.prepare(gems,smoke,assets,view,settings,[&](auto emit){
+            // Overlapping frames exercise masked replacement, including black
+            // pixels, followed by shade subtraction. Fractional anchors must
+            // reach the supplied sampling policy unchanged.
+            auto debris=[&](auto emit){
+                for(unsigned sprite:{91u,115u,116u})
+                    for(unsigned frame=0;frame<(sprite==91?6u:4u);++frame){
+                        EffectMaskAssets::Asset asset;assert(assets.debris(sprite,frame,asset));
+                        if(!emit(asset,number(62.25+frame),number(77.5)))return false;
+                    }
+                return true;
+            };
+            assert(colored.prepareWithLateEffects(gems,smoke,assets,view,settings,debris,[&](auto emit){
                 for(auto light:lights)emit(number(light[0]),number(light[1]));
             },raster));
             assert(random.drawCount()==saved.drawCount() && random.stateIndex()==saved.stateIndex());
@@ -87,6 +98,10 @@ int main(int argc,char**argv){
                     const double x=value(e.x.promoted()),y=value(e.y.promoted());
                     if(!e.destroyRequested && visible(x,y))paint(*assets.smoke(e.drawFrame()),x-vx,y-vy,false);
                 });
+                assert(debris([&](const auto& asset,auto x,auto y){
+                    if(visible(value(x),value(y)))paint(asset,value(x)-vx,value(y)-vy,false);
+                    return true;
+                }));
                 if(settings.shadeExists && !settings.noControl)
                     for(auto light:lights)if(visible(light[0],light[1]))
                         paint(*assets.shade(),std::nearbyint(light[0]/2)*2-vx,std::nearbyint(light[1]/2)*2-vy,true);
@@ -138,6 +153,21 @@ int main(int argc,char**argv){
     assert(!colored.visible());
     words=0;colored.surface().visit([&](auto,auto,auto,auto,auto){++words;});assert(!words);
     assert(!colored.prepare(oneGem,smoke,missing,view,{},noShades,raster));
+    unsigned lateVisits=0;
+    auto failingLate=[&](auto emit){
+        ++lateVisits;EffectMaskAssets::Asset asset;assert(assets.debris(115,0,asset));
+        assert(emit(asset,number(80.25),number(140.5)));return false;
+    };
+    assert(!colored.prepareWithLateEffects(oneGem,smoke,assets,view,{},failingLate,noShades,raster));
+    assert(lateVisits==1&&!colored.visible());
+    words=0;colored.surface().visit([&](auto,auto,auto,auto,auto){++words;});assert(!words);
+    for(unsigned mode=0;mode<3;++mode){
+        SmokeComposition::Settings settings;
+        settings.death=mode==0;settings.lowSpec=mode==1;settings.effectsExist=mode!=2;
+        assert(colored.prepareWithLateEffects(oneGem,smoke,assets,view,settings,
+            [&](auto){assert(false);return false;},noShades,raster));
+        assert(!colored.visible());
+    }
     std::printf("Currency/smoke composition: %u joint color/shade frames match scalar painter\n",frames);
     std::printf("Smoke composition: %u lifecycle/flag/camera frames match scalar masks; direct=%u controller=%u hidden=%u\n",frames,directFrames,controllerFrames,hiddenFrames);
 }
