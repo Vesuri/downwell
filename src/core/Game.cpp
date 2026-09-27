@@ -355,6 +355,7 @@ void Game::renderMain(Renderer& renderer) const {
             if (x >= 0 && x < 160 && y >= 0 && y < 284)
                 renderer.fillRect(x, y, 1, 1, pen == 1 ? Color{255,255,255,255} : Color{255,0,0,255});
         });
+        continue; // Registered actors are merged in room Draw order below.
       }
       for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
         const InstanceRecord& instance = startup_.instanceAt(index);
@@ -386,36 +387,64 @@ void Game::renderMain(Renderer& renderer) const {
     drawShopPrompts(startup_.shops(), false, [&](int sprite, int frame, int x, int y) {
         renderer.drawSprite(sprite, frame, x - static_cast<int>(viewX), y - static_cast<int>(viewY));
     });
-    // Bullets are depth 0, player -50000.
-    for (std::size_t index = 0; index < startup_.mainBulletCount(); ++index) {
-        const StartupRuntime::MainBulletState& bullet =
-            startup_.mainBulletAt(index);
+    bool foregroundDrawn=false;
+    const auto drawForeground=[&](){
+        if(foregroundDrawn)return true;
+        foregroundDrawn=true;
+        return startup_.visitForegroundEffects([&](const CorpseExpiryEffect& effect){
+            float x,y;
+            std::memcpy(&x,&effect.x.bits,sizeof x);std::memcpy(&y,&effect.y.bits,sizeof y);
+            renderer.drawSpriteTransformed(effect.spriteId,effect.drawFrame(),x-viewX,y-viewY,1,1,0);
+            return true;
+        },[&](const PlayerDamageNumber& effect){
+            DamageNumberText label;if(!label.format(effect.amount))return false;
+            struct Draw {
+                Renderer& renderer;const char* label;float viewX,viewY;unsigned pen=0;
+                void align(int){}
+                void color(unsigned value){pen=value;}
+                bool text(MotionBinary64 x,MotionBinary64 y,MotionBinary64){
+                    RunnerImageValue px,py;if(!px.assign(x)||!py.assign(y))return false;
+                    float fx,fy;std::memcpy(&fx,&px.bits,4);std::memcpy(&fy,&py.bits,4);
+                    renderer.drawText(2,label,fx-viewX,fy-viewY,Color{std::uint8_t(pen),0,0,255},TextAlign::center);
+                    return true;
+                }
+            } draw{renderer,label.text,viewX,viewY};
+            return effect.draw(draw);
+        });
+    };
+    const auto drawBullet=[&](const StartupRuntime::MainBulletState& bullet){
         renderer.drawSpriteTransformed(machineGunProfile(bullet.gemHigh).sprite, bullet.animation.frame(),
                             static_cast<int>(bullet.x - viewX),
                             static_cast<int>(bullet.y - viewY), 1.0F, 1.0F,
                             static_cast<float>(bullet.trajectory.direction * (360.0 / 4294967296.0)));
-    }
-    // fxJobutsu uses ordinary Draw at -1000, between bullets and player.
-    if(!startup_.visitForegroundEffects([&](const CorpseExpiryEffect& effect){
-        float x,y;
-        std::memcpy(&x,&effect.x.bits,sizeof x);std::memcpy(&y,&effect.y.bits,sizeof y);
-        renderer.drawSpriteTransformed(effect.spriteId,effect.drawFrame(),x-viewX,y-viewY,1,1,0);
-        return true;
-    },[&](const PlayerDamageNumber& effect){
-        DamageNumberText label;if(!label.format(effect.amount))return false;
-        struct Draw {
-            Renderer& renderer;const char* label;float viewX,viewY;unsigned pen=0;
-            void align(int){} // Each renderer call carries the source center alignment explicitly.
-            void color(unsigned value){pen=value;}
-            bool text(MotionBinary64 x,MotionBinary64 y,MotionBinary64){
-                RunnerImageValue px,py;if(!px.assign(x)||!py.assign(y))return false;
-                float fx,fy;std::memcpy(&fx,&px.bits,4);std::memcpy(&fy,&py.bits,4);
-                renderer.drawText(2,label,fx-viewX,fy-viewY,Color{std::uint8_t(pen),0,0,255},TextAlign::center);
-                return true;
+    };
+    renderingSucceeded_=startup_.visitDrawChecked([&](InstanceHandle key,const InstanceRecord& instance){
+        if(!instance.active||instance.destroyRequested)return true;
+        if(instance.depth < -1000&&!drawForeground())return false;
+        if(instance.objectId==261){
+            for(unsigned i=0;i<startup_.mainBulletCount();++i){
+                const auto& bullet=startup_.mainBulletAt(i);
+                if(bullet.instance.slot==key.slot&&bullet.instance.generation==key.generation){drawBullet(bullet);return true;}
             }
-        } draw{renderer,label.text,viewX,viewY};
-        return effect.draw(draw);
-    })){renderingSucceeded_=false;return;}
+            return false;
+        }
+        const bool effect=instance.objectId==219;
+        if(effect||enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0){
+            if(instance.spriteId<0)return true;
+            renderer.drawSpriteTransformed(instance.spriteId,static_cast<unsigned>(instance.imageIndex),
+                (effect?instance.preciseX:float(instance.x))-viewX,
+                (effect?instance.preciseY:float(instance.y))-viewY,
+                instance.scaleX,instance.scaleY,instance.rotation);
+        }
+        return true;
+    });
+    if(!renderingSucceeded_)return;
+    // Explicit resource-less fixtures have no registered projectile record.
+    for(unsigned i=0;i<startup_.mainBulletCount();++i){
+        const auto& bullet=startup_.mainBulletAt(i);
+        if(!bullet.instance.generation)drawBullet(bullet);
+    }
+    if(!drawForeground()){renderingSucceeded_=false;return;}
     if (startup_.mainPlayerVisible())
         renderer.drawSpriteTransformed(
             startup_.mainPlayerSpriteId(),

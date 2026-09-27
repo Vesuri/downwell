@@ -1,6 +1,10 @@
 #include "platform/amiga/AmigaGameplayDrawList.h"
 #include "core/ShopFixtures.h"
 #include "core/GameMakerRounding.h"
+#include "core/GameplayCollisionOwner.h"
+#include <fstream>
+#include <iterator>
+#include <memory>
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -10,6 +14,45 @@ int amigaRendererAssetBounds(const UBYTE*,const UBYTE*,UWORD,UWORD,int x,int y,i
     *left=x-8; *top=y-8; *width=*height=16; return boundsOK;
 }
 int main() {
+    {
+        auto read=[](const char* path){std::ifstream f(path,std::ios::binary);
+            return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(f),{});};
+        const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
+        downwell::ObjectPack objects(ob.data(),ob.size());
+        downwell::SpriteCollisionPack sprites(sb.data(),sb.size());
+        auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->valid()&&owner->attach(*scene)&&scene->hasRoomActorDraw());
+        auto n=[](int v){return downwell::MotionBinary64::fromInteger(v);};
+        auto frames=[&](int id,unsigned& count){downwell::PackedSpriteCollision s;
+            if(!sprites.sprite(id,s))return false;count=s.frameCount;return true;};
+        downwell::InstanceHandle a,b;
+        assert(scene->spawnScriptEffect(n(240),n(120),603,{0x3fe00000u,0},n(270),{},frames,a));
+        assert(scene->configureEnemy(0,112,163,0,0,0,0,5,14,0,0,-1,-1,0,0,true,true,true));
+        assert(scene->spawnScriptEffect(n(244),n(124),602,{0x3fe00000u,0},{},{},frames,b));
+        assert(scene->emitCorpseExpiry(n(240),n(128)));
+        std::vector<GameplayWorld::DrawActor> kinds;
+        assert(scene->visitRoomActors([&](auto kind,auto,auto){kinds.push_back(kind);return true;}));
+        downwell::PackedObject def;assert(objects.findObject(112,def)&&def.creationDepth==-10000);
+        assert(
+            kinds==std::vector<GameplayWorld::DrawActor>({GameplayWorld::DrawActor::scriptEffect,
+                GameplayWorld::DrawActor::scriptEffect,GameplayWorld::DrawActor::enemy}));
+        UBYTE pack[8]{};AmigaGameplayDrawList list;const auto checkpoint=scene->checkpoint();
+        assert(list.collect(*scene,pack,pack+8,160,34)&&scene->checkpoint()==checkpoint);
+        assert(list.actors[0].sprite==602&&list.actors[0].frame==0&&list.actors[0].x==194&&list.actors[0].y==90);
+#ifndef DOWNWELL_REPLAY_VERIFY
+        assert(list.actors[1].sprite==603&&list.actors[1].frame==768&&
+            list.actors[2].sprite==102&&list.actors[3].sprite==163);
+#else
+        assert(list.actors[1].sprite==603&&list.actors[1].frame==768);
+#endif
+        unsigned visited=0;
+        assert(!scene->visitRoomActors([&](auto,auto,auto){++visited;return false;})&&visited==1);
+        // Unknown fractional anchors must not be rounded into a proven variant.
+        assert(scene->spawnScriptEffect({0x406e1000u,0},n(124),603,{0x3fe00000u,0},n(270),{},frames,b));
+        assert(!list.collect(*scene,pack,pack+8,160,34)&&list.failedSprite==603);
+    }
     {
         GameplayWorld scene(0,true,0,false);UBYTE pack[8]{};AmigaGameplayDrawList list;
         auto n=[](int v){return downwell::MotionBinary64::fromInteger(v);};

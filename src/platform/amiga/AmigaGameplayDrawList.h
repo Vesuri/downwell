@@ -5,7 +5,8 @@
 class AmigaGameplayDrawList {
 public:
     static constexpr unsigned capacity = 2 + 32 + 32 + 8 + GameplayWorld::bulletCapacity +
-        GameplayWorld::enemyCapacity + GameplayWorld::gemCapacity + 2 * downwell::ShopWorld::capacity;
+        GameplayWorld::enemyCapacity + GameplayWorld::gemCapacity + downwell::scriptSpawnEffectCapacity +
+        2 * downwell::ShopWorld::capacity;
     static constexpr int playerStartY = 142, replayGroundY = 200;
     GameplayBob actors[capacity];
     unsigned count = 0;

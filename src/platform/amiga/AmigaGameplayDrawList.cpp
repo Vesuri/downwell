@@ -3,6 +3,7 @@
 #include "core/ShopFixtures.h"
 #include "core/GameMakerRounding.h"
 #include "core/DamageNumberText.h"
+#include "core/RunnerSpatialSplit.h"
 
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
@@ -32,7 +33,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         return true;
     };
 #ifndef DOWNWELL_REPLAY_VERIFY
-    for (unsigned index = 0; index < port.enemyCount(); ++index) {
+    for (unsigned index = 0; !port.hasRoomActorDraw() && index < port.enemyCount(); ++index) {
         const auto& enemy = port.enemyAt(index);
         if (!enemy.active || !enemy.awake) continue;
         if (!append(
@@ -62,7 +63,80 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
     }
 #endif
 
-    for (unsigned index = 0; index < port.bulletSlotEnd(); ++index) {
+    bool foregroundDrawn=false;
+    const auto drawForeground=[&](){
+        if(foregroundDrawn)return true;
+        foregroundDrawn=true;
+        return port.visitForegroundEffects([&](const downwell::CorpseExpiryEffect& effect){
+            std::int32_t x,y;
+            if(!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)){
+                failedSprite=effect.spriteId;return false;
+            }
+            return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
+        },[&](const downwell::PlayerDamageNumber& effect){
+            downwell::DamageNumberText label;std::int32_t x,y;
+            auto fail=[&](){failedSprite=gameplayDamageTextMarker;return false;};
+            if(!label.format(effect.amount)||!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y))return fail();
+            const std::int64_t sx=std::int64_t(downwellPlayfieldX)+x-worldViewX,sy=std::int64_t(y)-worldViewY;
+            const int half=int(label.length)*4;
+            if(sx+half+1<=downwellPlayfieldX||sx-half-1>=downwellPlayfieldX+downwellPlayfieldWidth||sy+11<=0||sy-1>=downwellDisplayHeight)return true;
+            for(unsigned i=0;i<label.length;++i){
+                int left,top,width,height;
+                if(!amigaRendererAssetBounds(pack,packEnd,label.glyph(label.text[i]),0,0,0,0,&left,&top,&width,&height))return fail();
+            }
+            if(count==capacity)return fail();
+            actors[count++]={gameplayDamageTextMarker,0,int(sx),int(sy),int(label.integerValue)};
+            return true;
+        });
+    };
+    if(port.hasRoomActorDraw()) {
+        downwell::RunnerImageValue foregroundDepth;foregroundDepth.assign(downwell::MotionBinary64::fromInteger(-1000));
+        if(!port.visitRoomActors([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){
+            if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
+            if(kind==GameplayWorld::DrawActor::enemy){
+#ifndef DOWNWELL_REPLAY_VERIFY
+                const auto* enemy=port.resolveEnemyLifetime(key);
+                if(!enemy)return false;
+                return !enemy->active||!enemy->awake||append(enemy->spriteId,enemy->drawFrame(),
+                    downwellPlayfieldX+80+enemy->x-port.cameraOffsetX(),
+                    playerStartY+enemy->y-port.cameraOffsetY(),enemy->objectId!=119&&enemy->facing<0);
+#else
+                return true;
+#endif
+            }
+            if(kind==GameplayWorld::DrawActor::bullet){
+                const auto* bullet=port.resolveBulletLifetime(key);
+                return bullet&&(!bullet->active||append(downwell::machineGunProfile(bullet->gemHigh).sprite,
+                    768+bullet->animation.frame(),downwellPlayfieldX+80+bullet->x-port.cameraOffsetX(),
+                    playerStartY+bullet->y-port.cameraOffsetY(),0));
+            }
+            const auto* record=port.scriptSpawnInstances()?port.scriptSpawnInstances()->find(key):nullptr;
+            if(!record||!record->effect)return false;
+            const auto& effect=*record->effect;
+            failedSprite=effect.spriteId;failedFrame=effect.drawFrame();
+            std::int32_t x,y;downwell::RunnerImageValue ix,iy;
+            // The offline muzzle proof covers integer anchors and either no
+            // rotation or 267..273 degrees. Reject other transforms explicitly;
+            // no runtime conversion or silently rounded fractional artwork.
+            if(!effect.valid||(effect.spriteId!=602&&effect.spriteId!=603)||effect.drawFrame()!=0||
+               !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)||
+               !ix.assign(downwell::MotionBinary64::fromInteger(x))||
+               !iy.assign(downwell::MotionBinary64::fromInteger(y))||
+               ((ix.bits!=effect.x.bits)&&((ix.bits|effect.x.bits)&0x7fffffffu))||
+               ((iy.bits!=effect.y.bits)&&((iy.bits|effect.y.bits)&0x7fffffffu)))return false;
+            unsigned frame=0;
+            if(effect.angle.bits&0x7fffffffu){
+                downwell::RunnerImageValue lo,hi;
+                lo.assign(downwell::MotionBinary64::fromInteger(267));
+                hi.assign(downwell::MotionBinary64::fromInteger(273));
+                if(effect.angle.bits<lo.bits||effect.angle.bits>hi.bits)return false;
+                frame=768;
+            }
+            failedSprite=failedFrame=0;
+            return append(effect.spriteId,frame,downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
+        }))ready=false;
+    }
+    for (unsigned index = 0; !port.hasRoomActorDraw() && index < port.bulletSlotEnd(); ++index) {
         const auto& bullet = port.bulletAt(index);
         // The pack generator checks every possible nearest-pixel
         // sample over 267..273 degrees for all twelve source frames:
@@ -74,29 +148,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 playerStartY + bullet.y - port.cameraOffsetY(), 0))
             ready = false;
     }
-    // Ordinary sprite depth -1000, not a controller effect-surface layer.
-    if(!port.visitForegroundEffects([&](const downwell::CorpseExpiryEffect& effect){
-        std::int32_t x,y;
-        if(!effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y)){
-            failedSprite=effect.spriteId;return false;
-        }
-        return append(effect.spriteId,effect.drawFrame(),downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
-    },[&](const downwell::PlayerDamageNumber& effect){
-        downwell::DamageNumberText label;std::int32_t x,y;
-        auto fail=[&](){failedSprite=gameplayDamageTextMarker;return false;};
-        if(!label.format(effect.amount)||
-           !effect.x.promoted().roundPixel(x)||!effect.y.promoted().roundPixel(y))return fail();
-        const std::int64_t sx=std::int64_t(downwellPlayfieldX)+x-worldViewX,sy=std::int64_t(y)-worldViewY;
-        const int half=int(label.length)*4;
-        if(sx+half+1<=downwellPlayfieldX||sx-half-1>=downwellPlayfieldX+downwellPlayfieldWidth||sy+11<=0||sy-1>=downwellDisplayHeight)return true;
-        for(unsigned i=0;i<label.length;++i){
-            int left,top,width,height;
-            if(!amigaRendererAssetBounds(pack,packEnd,label.glyph(label.text[i]),0,0,0,0,&left,&top,&width,&height))return fail();
-        }
-        if(count==capacity)return fail();
-        actors[count++]={gameplayDamageTextMarker,0,int(sx),int(sy),int(label.integerValue)};
-        return true;
-    }))ready=false;
+    if(!drawForeground())ready=false;
     if (port.playerVisible() && !append(
             (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
             (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),

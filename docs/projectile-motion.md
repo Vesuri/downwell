@@ -258,6 +258,15 @@ binding through Retry. Unregistered effect families and automatic live gun
 emission still need integration; this does not establish complete cross-family
 room creation or animation order.
 
+Registered object-219 effects reach both ordinary gameplay renderers in room
+Draw order, independent of owner-local handles. SDL retains published binary32
+positions and angles. The Amiga collector uses the offline 602/603 frame 0 or
+quarter-turn frame 768, admitting only integer anchors and the verified
+267..273-degree interval (or zero rotation). Unsupported fractional anchors,
+sprites or angles fail the draw rather than silently rounding or converting
+assets at runtime. This presentation support does not enable automatic muzzle
+emission from the still-approximate live gun trajectory.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

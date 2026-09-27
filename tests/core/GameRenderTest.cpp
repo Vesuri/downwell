@@ -397,6 +397,33 @@ int main() {
     const downwell::BuilderPatternPack builders(builderBytes.data(), builderBytes.size());
     require(rooms.valid() && objects.valid() && builders.valid(), "damage-render test loads real room/object/builder data");
     {
+        const auto cb=read("generated/downwell-sprites.dwsc"),mb=read("generated/downwell-sprite-masks.dwsm");
+        downwell::SpriteCollisionPack sprites(cb.data(),cb.size());downwell::SpriteMaskPack masks(mb.data(),mb.size());
+        auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
+        auto scene=std::make_unique<downwell::Game>(&rooms,&objects,&builders,nullptr,owner->binding());
+        require(owner->attach(scene->startup()),"muzzle drawing fixture attaches production collision owner");
+        auto& world=const_cast<downwell::StartupRuntime&>(scene->startup());world.skipToGameForTesting();
+        auto n=[](int v){return downwell::MotionBinary64::fromInteger(v);};
+        auto frames=[](int id,unsigned& count){count=1;return id==602||id==603;};
+        std::uint32_t a=0,b=0;
+        require(world.spawnScriptEffect(n(240),n(120),603,{0x3fe00000u,0},n(270),{},frames,a)&&
+            world.spawnScriptEffect(n(244),n(124),602,{0x3fe00000u,0},{},{},frames,b)&&b>a,
+            "registered muzzle drawing fixture uses ordinary owned script creation");
+        const auto digest=world.stateDigest();RecordingRenderer draw;draw.recordTransforms=true;scene->render(draw);
+        std::vector<RecordingRenderer::Transform> muzzles;
+        for(const auto& item:draw.transforms)if(item.sprite==602||item.sprite==603)muzzles.push_back(item);
+        require(scene->renderingSucceeded()&&world.stateDigest()==digest&&muzzles.size()==2&&
+            muzzles[0].sprite==602&&muzzles[1].sprite==603&&muzzles[1].angle==270&&
+            muzzles[0].x==110+244-world.mainCameraRenderViewX()&&
+            muzzles[0].y==124-world.mainCameraRenderViewY(),
+            "SDL draws owned muzzle effects newest-first at published room coordinates without mutation");
+        scene->update({});scene->update({});RecordingRenderer retired;scene->render(retired);
+        require(scene->simulationSucceeded()&&scene->renderingSucceeded()&&
+            std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),602)==retired.spriteOrder.end()&&
+            std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),603)==retired.spriteOrder.end(),
+            "ordinary Animation End and cleanup remove muzzles from SDL drawing");
+    }
+    {
         auto game=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
         auto& world=const_cast<downwell::StartupRuntime&>(game->startup());world.skipToGameForTesting();
         unsigned index=0;while(index<world.activeInstanceCount()&&world.instanceAt(index).objectId!=60)++index;
@@ -705,8 +732,8 @@ int main() {
                 "each live projectile emits exactly one artwork transform");
         for (std::size_t i = 0; i < state.mainBulletCount(); ++i)
             require(renderer.bulletAngles[i] == static_cast<float>(
-                        state.mainBulletAt(i).trajectory.direction * (360.0 / 4294967296.0)),
-                    "artwork receives the retained trajectory direction in creation order");
+                        state.mainBulletAt(state.mainBulletCount()-1-i).trajectory.direction * (360.0 / 4294967296.0)),
+                    "artwork receives retained direction in original newest-first Draw order");
         require(renderer.playerDraws == (immunity % 2 == 0 ? 1u : 0u),
                 "actual Game render suppresses odd damage phases and draws even phases once");
         auto& inventory = const_cast<downwell::UpgradeInventory&>(state.upgrades());

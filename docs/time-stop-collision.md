@@ -611,8 +611,13 @@ this reverse traversal without sorting or allocating another list. Reactivation
 at `0x48d69c..0x48d760` reinserts before equal-depth Draw peers, so numeric
 birth-ID sorting is not a substitute after activation cycles. Callers must
 still apply Draw eligibility and preserve separate custom Draw paths. The
-stored garden renderer uses this traversal; gameplay's grouped family paths
-are not yet a complete ordinary-Draw scheduler.
+stored garden renderer uses this traversal. Registered gameplay enemies,
+bullets and object-219 effects are merged through it on both backends, with
+the damage-number/corpse-expiry depth -1000 boundary interposed. The native
+owner supplies source depth alongside a resolved family/slot/generation, and
+Retry preserves that binding. Retained terrain, shops, field outlines and
+controller surfaces still have separate composition paths: this is not yet a
+complete ordinary-Draw scheduler across every family.
 
 ## Unrotated transformed sampling
 

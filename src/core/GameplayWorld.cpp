@@ -49,6 +49,8 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     void* const roomAnimationContext=roomAnimationContext_;
+    const auto roomActorDraw=roomActorDraw_;
+    const auto roomActorDrawContext=roomActorDrawContext_;
     const auto enemyOrderCapture=enemyOrderCapture_;
     void* const enemyOrderContext=enemyOrderContext_;
     void* const phaseBoundaryContext=phaseBoundaryContext_;
@@ -81,6 +83,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     scriptSpawnInstances_=scriptSpawnInstances;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
+    configureRoomActorDraw(roomActorDraw,roomActorDrawContext);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;
     bulletLifecycle_=bulletLifecycle;

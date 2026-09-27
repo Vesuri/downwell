@@ -251,6 +251,17 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
+    enum class DrawActor { enemy, bullet, scriptEffect };
+    using DrawActorVisitor=bool (*)(void*,DrawActor,downwell::InstanceHandle,downwell::RunnerImageValue);
+    using RoomActorDraw=bool (*)(const void*,DrawActorVisitor,void*);
+    // Borrowed owner traversal, not a snapshot or a family-local birth sort.
+    // Drawing must not mutate room membership; failure stops further visits.
+    void configureRoomActorDraw(RoomActorDraw callback,const void* context){roomActorDraw_=callback;roomActorDrawContext_=context;}
+    bool hasRoomActorDraw()const{return roomActorDraw_!=nullptr;}
+    template<class Visit> bool visitRoomActors(Visit visit)const{
+        return roomActorDraw_&&roomActorDraw_(roomActorDrawContext_,
+            [](void* p,DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){return (*static_cast<Visit*>(p))(kind,key,depth);},&visit);
+    }
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
     bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
@@ -654,6 +665,8 @@ private:
     }
     bool (*roomAnimation_)(void*)=nullptr;
     void* roomAnimationContext_=nullptr;
+    RoomActorDraw roomActorDraw_=nullptr;
+    const void* roomActorDrawContext_=nullptr;
     bool (*scriptAnimation_)(void*,downwell::InstanceHandle)=nullptr;
     void* scriptAnimationContext_=nullptr;
     bool (*phaseBoundary_)(void*,PhaseBoundary)=nullptr;

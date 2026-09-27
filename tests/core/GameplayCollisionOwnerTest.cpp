@@ -18,6 +18,9 @@ bool nativeOwnedScript(GameplayWorld& world,const downwell::SpriteCollisionPack&
         [&](int id,unsigned& frames){downwell::PackedSpriteCollision r;if(!sprites.sprite(id,r))return false;
             frames=r.frameCount;return true;},caller);
 }
+bool nativeActorDraw(const GameplayWorld& world){
+    return world.visitRoomActors([](auto,downwell::InstanceHandle key,auto){return key.generation!=0;});
+}
 downwell::ResultsDestination nativeScriptRetry(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects){
     return world.restartFromResultsWithScriptEffects(downwell::DeathMenuSequence::Action::Retry,43,300,effects);
 }
@@ -366,7 +369,8 @@ int main(){
             assert(world->effectsSucceeded()&&owner->prepareDraw()&&world->scriptEffects().size()==0);
             assert(world->spawnScriptEffect({},{},602,{0x3fe00000u,0},{},{},frames,caller));previous=caller;
             assert(world->restartFromResults(DeathMenuSequence::Action::Retry,43+cycle,300)!=ResultsDestination::none&&
-                world->scriptEffects().size()==0&&!owner->scriptEffects().find(previous));
+                world->scriptEffects().size()==0&&!owner->scriptEffects().find(previous)&&world->hasRoomActorDraw());
+            assert(world->visitRoomActors([](auto kind,auto,auto){return kind!=GameplayWorld::DrawActor::scriptEffect;}));
         }
     }
     assert(masks.valid());

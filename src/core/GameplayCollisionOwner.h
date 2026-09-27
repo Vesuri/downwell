@@ -189,6 +189,27 @@ public:
         if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
         world_=&world;
+        world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
+            const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
+            if(!self.valid())return false;
+            return self.room_.visitDrawChecked([&](unsigned slot){
+                const auto shared=self.roomKeys_[slot];View::Record record;
+                View::Kind kind;InstanceHandle local;
+                if(!View::decode(shared,kind,local))return false;
+                // Retained terrain/field composition is not part of this
+                // visitor. Do not resolve or copy their records per frame.
+                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect)return true;
+                const auto* state=self.owner_.resolve(shared);
+                if(!state||!View(*self.world_).resolve(shared,record))return false;
+                if(state->flags&0x100003u)return true;
+                switch(kind){
+                    case View::Kind::enemy:return visit(visitor,GameplayWorld::DrawActor::enemy,local,self.properties_[slot].depth);
+                    case View::Kind::bullet:return visit(visitor,GameplayWorld::DrawActor::bullet,local,self.properties_[slot].depth);
+                    case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,self.properties_[slot].depth);
+                    default:return true;
+                }
+            });
+        },this);
         world.configureRoomAnimation([](void* context){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
