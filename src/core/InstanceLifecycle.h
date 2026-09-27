@@ -67,6 +67,14 @@ public:
         return narrowed.assign(MotionBinary64::fromInteger(value))&&
                transform_(context_,h,r,field,narrowed,alpha,blend);
     }
+    template<class Owner> static RecordLifecycleBinding bindMasks(Owner& owner) {
+        auto b=bindTransforms(owner);
+        b.mask_=[](void* p,InstanceHandle h,const Record& r,int mask){
+            return static_cast<Owner*>(p)->mask(h,r,mask);
+        };
+        return b;
+    }
+    bool mask(InstanceHandle h,const Record& r,int next)const{return !mask_||mask_(context_,h,r,next);}
     bool transform(InstanceHandle h,const Record& r,RunnerTransformField field,RunnerImageValue value,
                    RunnerImageValue alpha,std::uint32_t blend)const {
         return !transform_||transform_(context_,h,r,field,value,alpha,blend);
@@ -105,6 +113,7 @@ private:
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*move_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
     bool (*sprite_)(void*,InstanceHandle,const Record&,int)=nullptr;
+    bool (*mask_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*imageIndex_)(void*,InstanceHandle,const Record&,RunnerImageValue)=nullptr;
     bool (*transform_)(void*,InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t)=nullptr;
 };

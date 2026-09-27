@@ -12,6 +12,25 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    require(enemyContactMask(116,162,-1)==162&&enemyContactMask(116,162,153)==153,
+            "bat contact uses its stored mask or sprite fallback, not presentation alone");
+    const auto rightProbe=[](int x,int){return x==6;};
+    require(batMeetsTiles(0,0,1,rightProbe,154)&&!batMeetsTiles(0,0,1,rightProbe,162),
+            "terrain queries use the selected mask's bounds rather than a fixed flying sprite");
+    const auto finish=[](const BatActivity& state,int sprite,BatMotion& bat){
+        return finishBatFields(state,sprite,[](int){return true;},[&](int scale){bat.facing=scale;return true;},
+            [&]{bat.direction=270;bat.directionFraction=0;bat.speedFortieths=80;});
+    };
+    for(bool flying:{false,true})for(int hang:{-10,-1,1})for(bool accept:{false,true}){
+        unsigned masks=0,scales=0,rests=0;
+        const bool ok=finishBatFields(BatActivity{true,flying,hang},154,
+            [&](int mask){++masks;require(mask==154&&scales==0&&rests==0,"flying mask follows selected sprite only");return accept;},
+            [&](int scale){++scales;require(scale==-hang&&masks==0&&rests==0,"wall scale precedes rest heading");return accept;},
+            [&]{++rests;});
+        require(masks==unsigned(flying)&&scales==unsigned(!flying&&hang>-10)&&
+                ok==(accept||(!flying&&hang==-10))&&rests==unsigned(!flying&&ok),
+                "bat final fields select one branch and reject before later assignments");
+    }
     for(int speed:{-52,-51,-1,0,1,51,52})for(bool accept:{false,true}){
         BatMotion bat{100,200,speed,16,0,50,speed<0?1:-1};
         const int oldFacing=bat.facing;unsigned writes=0;
@@ -92,6 +111,8 @@ int main() {
         BatActivity activity;
         const auto ceiling = [](int, int y) { return y <= -8; };
         auto effect = stepBatBehavior(bat, hit, activity, 0, 0, 153, 0, -20 * 256, draws, ceiling);
+        require(bat.direction==45&&bat.speedFortieths==50,"motion does not assign later hanging fields");
+        require(finish(activity,effect.sprite,bat),"finish ceiling presentation");
         require(!activity.flying && activity.hang == -10 && effect.sprite == 157 &&
                     bat.direction == 270 && bat.speedFortieths == 80 && draws.calls == 0,
                 "ceiling attachment selects hanging art without consuming flight RNG");
@@ -121,6 +142,7 @@ int main() {
             const auto wall = [side](int x, int) { return side < 0 ? x <= -8 : x >= 8; };
             auto wallEffect = stepBatBehavior(wallBat, wallHit, wallState, 0, 0, 153,
                 0, -20 * 256, draws, wall);
+            require(finish(wallState,wallEffect.sprite,wallBat),"finish wall presentation");
             require(!wallState.flying && wallState.hang == side && wallEffect.sprite == 162 &&
                         wallBat.facing == -side, "left/right support sets wall art and source facing");
             wallEffect = stepBatBehavior(wallBat, wallHit, wallState, 0, 0, 162,

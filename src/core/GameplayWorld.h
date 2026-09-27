@@ -106,6 +106,7 @@ public:
         unsigned short identitySlot = 0xffffu;
         int objectId;
         int spriteId;
+        int maskId=-1; // Bat OBJT default; flying Step later copies sprite_index.
         int x;
         int y;
         int health;

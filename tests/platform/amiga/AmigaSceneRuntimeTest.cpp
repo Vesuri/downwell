@@ -240,7 +240,8 @@ void verifyFrogMotion(const AmigaPortRuntime& amiga,
             require(native.alarm0 == enemy.alarms.get(0) && native.alarm1 == enemy.alarms.get(1),
                     "live enemy alarm slots match exactly across compact and full stores");
         if (enemy.objectId == 116 && enemy.active && native.active)
-            require(native.batActivity.initialized == enemy.batActivity.initialized &&
+            require(native.maskId == enemy.maskId &&
+                    native.batActivity.initialized == enemy.batActivity.initialized &&
                     native.batActivity.flying == enemy.batActivity.flying &&
                     native.batActivity.hang == enemy.batActivity.hang &&
                     native.batHit.pending == enemy.batHit.pending &&

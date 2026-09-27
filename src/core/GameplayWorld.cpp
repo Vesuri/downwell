@@ -297,6 +297,7 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     enemy.lifetimeId = nextEnemyLifetimeId_++;
     enemy.objectId = objectId;
     enemy.spriteId = spriteId;
+    enemy.maskId=-1;
     enemy.x = x;
     enemy.y = y;
     enemy.health = health;
@@ -420,7 +421,7 @@ downwell::LaserSightRay GameplayWorld::traceLaserSight(
                 if (!enemy.active) continue;
                 const downwell::ContactActor contact{enemy.x*256L, enemy.y*256L,
                     enemy.objectId == 117 ? enemy.motionState : enemy.facing,
-                    enemy.imageScaleY(), downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
+                    enemy.imageScaleY(), downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)};
                 if (path.intersects(contact)) return true;
             }
             return false;
@@ -619,7 +620,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 return downwell::ActivationInstance{enemy.objectId, {}, enemy.active, enemy.activationPending};
             const auto bounds = downwell::contactWorldBounds({(enemy.x + 240L) * 256, (enemy.y + 176L) * 256,
                 enemy.objectId == 117 ? enemy.motionState : enemy.facing,
-                enemy.imageScaleY(), downwell::enemyContactMask(enemy.objectId, enemy.spriteId)});
+                enemy.imageScaleY(), downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)});
             return downwell::ActivationInstance{enemy.objectId, bounds,
                                                enemy.active, enemy.activationPending};
         },
@@ -755,7 +756,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                             enemy.x * 256L, enemy.y * 256L,
                             enemy.objectId == 117 ? enemy.motionState : enemy.facing,
                             enemy.imageScaleY(),
-                            downwell::enemyContactMask(enemy.objectId, enemy.spriteId)};
+                            downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)};
                         if (!enemy.active || enemy.health <= 0 ||
                             !path.intersects(contact))
                             continue;
@@ -870,8 +871,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
                 enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing,
                 enemy.batDirectionFraction};
+            bat.collisionMask=downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
             const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
-                enemy.x, enemy.y, enemy.spriteId, player_.frameStartXFixed(),
+                enemy.x, enemy.y, bat.collisionMask, player_.frameStartXFixed(),
                 player_.frameStartYFixed(), enemyRandom_,
                 [this](int x, int y) {
                     return solidResolver_(solidResolverContext_, x, y);
@@ -982,6 +984,16 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             run_.effectsSucceeded=false;return {};
         }
         enemy.spriteId=nextSprite;
+        if(enemy.objectId==116 && !downwell::finishBatFields(enemy.batActivity,nextSprite,
+            [this,&enemy](int mask){
+                if(!enemyLifecycle_.mask({enemy.identitySlot,enemy.lifetimeId},enemy,mask)){
+                    run_.effectsSucceeded=false;return false;
+                }
+                enemy.maskId=mask;return true;
+            },[this,&enemy](int scale){
+                if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+                enemy.facing=scale;return true;
+            },[&enemy]{enemy.direction=270;enemy.batDirectionFraction=0;enemy.moveSpeed=512;}))return {};
         if(!publishEnemyImage(enemy,enemy.imagePhase))return {};
         enemy.imageFrame = enemy.imagePhase >> 8;
     }
@@ -1004,7 +1016,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.preciseX, enemy.preciseY,
             enemy.objectId == 117 ? enemy.motionState : enemy.facing,
             enemy.imageScaleY(),
-            downwell::enemyContactMask(enemy.objectId, enemy.spriteId)}, enemy.x, enemy.y};
+            downwell::enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)}, enemy.x, enemy.y};
         },
         [this](EnemyState& enemy) { spawnReward(enemy, true); return run_.effectsSucceeded; },
         [](downwell::EnemyContact) {},

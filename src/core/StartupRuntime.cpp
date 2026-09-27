@@ -571,7 +571,7 @@ LaserSightRay StartupRuntime::traceLaserSight(LaserSightRay::Coordinate x,
                                       id == 116 || id == 117 || id == 119)) continue;
                 const ContactActor contact{enemy.x*256L, enemy.y*256L,
                     enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
-                    enemyContactMask(id, enemy.spriteId)};
+                    enemyContactMask(id, enemy.spriteId,enemy.maskId)};
                 if (path.intersects(contact)) return true;
             }
             return false;
@@ -619,7 +619,7 @@ InstanceRecord* StartupRuntime::mainBulletEnemyCollision(const ProjectileSegment
             continue;
         const ContactActor contact{enemy.x * 256L, enemy.y * 256L,
             enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
-            enemyContactMask(enemy.objectId, enemy.spriteId)};
+            enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)};
         if (path.intersects(contact))
             return &enemy;
     }
@@ -905,8 +905,9 @@ void StartupRuntime::updateMainEnemies() {
                 static_cast<int>(std::round(enemy.moveSpeed * 40.0F)),
                 enemy.scaleX < 0 ? -1 : 1, enemy.batDirectionFraction
             };
+            bat.collisionMask=enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
             const auto effects = stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
-                enemy.x, enemy.y, enemy.spriteId,
+                enemy.x, enemy.y, bat.collisionMask,
                 mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
                 mainPlayerOriginY_ * 256L + mainPlayerMotion_.frameStartYFixed(),
                 random_,
@@ -991,6 +992,16 @@ void StartupRuntime::updateMainEnemies() {
             run_.effectsSucceeded=false;return;
         }
         enemy.spriteId=nextSprite;
+        if(enemy.objectId==116 && !finishBatFields(enemy.batActivity,nextSprite,
+            [this,index,&enemy](int mask){
+                if(!lifecycle_.mask(instances_.handleAt(index),enemy,mask)){
+                    run_.effectsSucceeded=false;return false;
+                }
+                enemy.maskId=mask;return true;
+            },[this,index,&enemy](int scale){
+                if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
+                enemy.scaleX=static_cast<float>(scale);return true;
+            },[&enemy]{enemy.direction=270;enemy.batDirectionFraction=0;enemy.moveSpeed=2;}))return;
         if(!publishMainEnemyImage(index,enemy.enemyImagePhase))return;
         enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
     }
@@ -1006,7 +1017,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
             static_cast<long>(std::round((enemy.preciseX - mainPlayerOriginX_) * 256.0F)),
             static_cast<long>(std::round((enemy.preciseY - mainPlayerOriginY_) * 256.0F)),
             enemy.scaleX < 0 ? -1 : 1, enemy.scaleY < 0 ? -1 : 1,
-            enemyContactMask(enemy.objectId, enemy.spriteId)},
+            enemyContactMask(enemy.objectId, enemy.spriteId,enemy.maskId)},
                 enemy.x - mainPlayerOriginX_, enemy.y - mainPlayerOriginY_};
         },
         [this](InstanceRecord& enemy) {
@@ -1134,7 +1145,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
             }
             const auto bounds = contactWorldBounds({static_cast<long>(std::round(enemy.x * 256.0)),
                 static_cast<long>(std::round(enemy.y * 256.0)), enemy.scaleX < 0 ? -1 : 1,
-                enemy.scaleY < 0 ? -1 : 1, enemyContactMask(enemy.objectId, sprite)});
+                enemy.scaleY < 0 ? -1 : 1, enemyContactMask(enemy.objectId, sprite,enemy.maskId)});
             return ActivationInstance{enemy.objectId, bounds,
                                       enemy.active, enemy.activationPending};
         },

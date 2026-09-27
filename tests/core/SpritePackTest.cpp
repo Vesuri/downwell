@@ -97,6 +97,8 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         downwell::StoredCollisionLifecycle<4,8,decltype(families),decltype(trig),decltype(round)>
             lifecycle{storedOwner,properties,objects,compact,families,trig,round};
         downwell::PackedObject field;require(objects.findObject(82,field),"read placed field defaults");
+        downwell::PackedObject bat;require(objects.findObject(116,bat)&&bat.spriteId==153&&bat.textureMaskId==-1,
+                "bat serialized default follows its sprite until Step sets an explicit mask");
         downwell::RoomInstanceDefinition definition{123,82,false};
         definition.spriteId=field.spriteId;definition.maskId=field.textureMaskId;
         definition.x=32;definition.y=64;definition.scaleX=0.5f;definition.depth=-123;
@@ -133,7 +135,7 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 "dormant dynamic birth leaves active object list");
         require(records.requestActivation(born,true,[&](auto h,const auto& record,bool active){return lifecycle.activation(h,record,active);}),
                 "activate dynamic birth through collision adapter");
-        const auto movement=downwell::InstanceLifecycleBinding::bindTransforms(lifecycle);
+        const auto movement=downwell::InstanceLifecycleBinding::bindMasks(lifecycle);
         require(movement.integerPosition(born,records.at(0),-32,64)&&
                 storedOwner.resolve(born)->x.bits==0xc2000000u&&
                 storedOwner.resolve(born)->y.bits==0x42800000u&&records.at(0).x==30&&
@@ -198,6 +200,15 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 animated.sprite.scaleX.bits==0x3f000000u,
                 "equal transforms stay clean and retired handles cannot change their replacement");
         auto wrong=records.at(0);wrong.objectId=35;
+        const auto originalMask=animated.sprite.maskId;
+        require(movement.mask(born,records.at(0),153)&&animated.sprite.maskId==153&&
+                (storedOwner.resolve(born)->flags&8u)&&storedOwner.pendingSpatial()!=0&&
+                storedOwner.flush([&](auto h,bool publish){return lifecycle.refresh(h,*records.resolve(h),publish);}),
+                "mask binding updates resource bounds and dirty queues");
+        require(movement.mask(born,records.at(0),153)&&!(storedOwner.resolve(born)->flags&8u)&&
+                !movement.mask(old,records.at(0),154)&&!movement.mask(born,wrong,154)&&animated.sprite.maskId==153,
+                "same mask is clean and stale or mismatched records cannot change it");
+        require(movement.mask(born,records.at(0),originalMask),"restore original field mask");
         require(!lifecycle.move(born,wrong,{}, {})&&!lifecycle.refresh(old,records.at(0),true)&&
                 !lifecycle.sprite(born,wrong,206)&&!lifecycle.sprite(old,records.at(0),206)&&
                 animated.sprite.spriteId==205,

@@ -32,9 +32,10 @@ inline ContactBounds contactSpriteBounds(int sprite) {
     }
 }
 
-inline int enemyContactMask(int object, int sprite) {
+inline int enemyContactMask(int object, int sprite,int explicitMask=-1) {
     switch (object) {
-        case 111: case 116: return sprite;
+        case 111: return sprite;
+        case 116: return explicitMask>=0?explicitMask:sprite;
         case 112: return 186; // Create: mask_index = sprite_index
         case 113: return 166; // serialized explicit mask
         case 117: return 177;

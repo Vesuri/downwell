@@ -806,8 +806,8 @@ only when `xsp` is nonzero. These setters run even when movement is offscreen;
 a zero velocity retains the previous scale. Rejection preserves earlier
 collision/gravity changes but stops integration and final position publication.
 The final shared animation normalization remains the existing approximation;
-the adapters do not issue a second sprite setter at that point. Frog and bat
-scale/mask assignments still require their own source-ordered integration.
+the adapters do not issue a second sprite setter at that point. Frog scale
+assignments still require their own source-ordered integration.
 
 Active bat pursuit calls the checked X-scale binding at `xscaleXsp`, after
 blocked velocity components are cleared and before motion integration. The
@@ -818,8 +818,18 @@ motion representation, not a claim of original binary64 pursuit arithmetic.
 Both adapters retain calculated heading, velocity, collision displacement and
 consumed RNG on rejection, but stop integration and later position/sprite writes.
 The native final facing update must not overwrite that result using any-nonzero
-velocity. Hanging-bat scale and flying-bat mask setters are separate later Step
-assignments and remain to be connected.
+velocity.
+
+`bindMasks` extends the checked binding to explicit mask setters. After bat X/Y
+and sprite selection, shared `finishBatFields` dispatches exactly one source
+branch: flying copies the selected sprite to `mask_index`; wall hanging sets
+`image_xscale = -hang`; ceiling hanging does not write scale. Hanging preserves
+the mask, then sets direction 270 and movesp 2 only after accepted scale
+publication. Both adapters store accepted mask changes and use the effective
+mask for support, pursuit terrain, activation, player and projectile contacts.
+Object 116's serialized mask is -1, so its initial mask follows its sprite.
+These contact paths still use the existing rectangle approximation; storing the
+mask does not install precise sampling or source-equivalent spatial traversal.
 
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty

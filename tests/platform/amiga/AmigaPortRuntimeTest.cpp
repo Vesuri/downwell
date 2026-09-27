@@ -73,6 +73,14 @@ struct NativeEnemyLifecycleAudit {
     struct Entry { unsigned generation=0;bool live=false,active=false; } entries[GameplayWorld::enemyCapacity]{};
     unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,indices=0,zeroIndices=0,transforms=0,calls=0,fail=0;
     bool checkWalkingOrder=false;
+    unsigned masks=0;
+    bool mask(downwell::InstanceHandle h,const Enemy& e,int next){
+        ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active&&
+                e.objectId==116&&e.batActivity.flying&&next==e.spriteId&&moves>0&&sprites>0,
+                "bat mask setter follows position and sprite publication");
+        if(fail==10)return false;
+        ++masks;return true;
+    }
     bool transform(downwell::InstanceHandle h,const Enemy& e,downwell::RunnerTransformField field,
                    downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
         ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active&&
@@ -187,19 +195,31 @@ void testNativeEnemyLifecycle(){
                        walking.enemyAt(0).walker.vy==256,
                 "failed walker presentation retains earlier gravity without integrating motion");
     }
-    for(unsigned fail:{0u,8u}){
+    for(unsigned fail:{0u,8u,10u}){
         NativeEnemyLifecycleAudit checked;checked.fail=fail;
-        GameplayWorld bat(300,true,0,false,Binding::bindTransforms(checked));
+        GameplayWorld bat(300,true,0,false,Binding::bindMasks(checked));
         bat.configureSolidResolver(noSolid,nullptr);
         require(bat.configureEnemy(0,116,153,40,0,0,0,15,12,0,0,-1,-1,180,320),
                 "configure checked pursuit-scale bat");
         bat.step(0);
-        require(bat.effectsSucceeded()==(fail==0)&&checked.transforms==(fail?0u:1u)&&
-                checked.moves==(fail?0u:1u)&&checked.sprites==(fail?0u:1u),
+        require(bat.effectsSucceeded()==(fail==0)&&checked.transforms==(fail==8?0u:1u)&&
+                checked.moves==(fail==8?0u:1u)&&checked.sprites==(fail==8?0u:1u)&&
+                checked.masks==(fail?0u:1u)&&bat.enemyAt(0).maskId==(fail?-1:153),
                 "bat scale rejection stops position and sprite publication");
-        if(fail)require(bat.enemyAt(0).preciseX==40*256&&bat.enemyAt(0).preciseY==0&&
+        if(fail==8)require(bat.enemyAt(0).preciseX==40*256&&bat.enemyAt(0).preciseY==0&&
                        bat.enemyAt(0).speedX!=0&&bat.enemyAt(0).facing==1,
                 "bat rejection preserves calculated velocity but neither integrates nor changes facing");
+    }
+    for(unsigned fail:{0u,8u}){
+        NativeEnemyLifecycleAudit checked;checked.fail=fail;
+        GameplayWorld bat(300,true,0,false,Binding::bindMasks(checked));
+        bat.configureSolidResolver([](void*,int x,int){return x>=8;},nullptr);
+        require(bat.configureEnemy(0,116,153,0,40,0,0,15,12,0,0,-1,-1,0,320),"configure wall-hanging bat");
+        bat.step(0);
+        require(bat.effectsSucceeded()==(fail==0)&&checked.moves==1&&checked.sprites==1&&checked.masks==0&&
+                bat.enemyAt(0).spriteId==162&&bat.enemyAt(0).maskId==-1&&
+                bat.enemyAt(0).direction==(fail?0:270)&&bat.enemyAt(0).facing==(fail?1:-1),
+                "wall scale follows sprite, retains mask, and rejection stops rest heading");
     }
     {
         NativeEnemyLifecycleAudit checked;checked.fail=8;

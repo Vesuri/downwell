@@ -32,6 +32,14 @@ struct LifecycleAudit {
     unsigned walkingTransforms=0;
     unsigned batTransforms=0;
     bool rejectBatScale=false;
+    bool rejectBatMask=false;
+    unsigned masks=0;
+    bool mask(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int next){
+        ++calls;require(matches(h,r)&&r.active&&r.objectId==116&&r.batActivity.flying&&next==r.spriteId,
+                "host bat mask uses already-published flying sprite");
+        if(rejectBatMask)return false;
+        ++masks;return true;
+    }
     bool transform(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerTransformField field,
                    downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
         ++calls;require(matches(h,r)&&r.active&&value.promoted().valid()&&alpha.bits==0x3f800000u&&blend==0xffffffu,
@@ -130,10 +138,10 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
-    for(bool reject:{false,true}){
+    for(unsigned reject:{0u,1u,2u}){
         LifecycleAudit checked;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindTransforms(checked));
+            downwell::InstanceLifecycleBinding::bindMasks(checked));
         runtime->skipToGameForTesting();
         std::uint32_t id=0;
         int startX=0,startY=0;
@@ -146,7 +154,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                 // Controlled pursuit above the player, not a natural encounter.
                 startX=static_cast<int>(runtime->mainPlayerX());
                 startY=static_cast<int>(runtime->mainPlayerY())-32;
-                r.objectId=116;r.spriteId=153;r.health=15;r.x=startX;r.y=startY;
+                r.objectId=116;r.spriteId=153;r.maskId=-1;r.health=15;r.x=startX;r.y=startY;
                 r.preciseX=startX;r.preciseY=startY;r.motionInitialized=true;
                 r.velocityX=r.velocityY=0;r.scaleX=-1;r.direction=0;r.moveSpeed=1.25f;
                 r.batDirectionFraction=0;r.batActivity={true,true,0};r.batHit={};r.alarms={};
@@ -154,7 +162,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             }
         }
         require(id!=0,"host pursuit fixture has an owned enemy");
-        checked.rejectBatScale=reject;
+        checked.rejectBatScale=reject==1;checked.rejectBatMask=reject==2;
         const auto before=checked.batTransforms;
         runtime->step(false);
         const auto* bat=runtime->instance(id);
@@ -165,7 +173,8 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                       << " direction=" << (bat?bat->direction:0) << '\n';
         require(bat&&healthy(*runtime)==!reject&&checked.batTransforms==before+1,
                 "host pursuit reaches checked scale publication once");
-        if(reject)require(bat->preciseX==startX&&bat->preciseY==startY&&bat->velocityX!=0&&bat->scaleX==-1,
+        require(bat->maskId==(reject?-1:153),"host mask is stored only after accepted publication");
+        if(reject==1)require(bat->preciseX==startX&&bat->preciseY==startY&&bat->velocityX!=0&&bat->scaleX==-1,
                 "host scale failure retains calculated motion but skips integration and facing change");
     }
     for(int object:{111,112})for(int velocity:{0,640}){

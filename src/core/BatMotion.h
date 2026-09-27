@@ -70,6 +70,7 @@ struct BatMotion {
     int speedFortieths;
     int facing = 1;
     unsigned short directionFraction = 0; // Q16 tail retained across pursuit turns.
+    int collisionMask=153;
 };
 
 inline long batFractionalSine(int direction, unsigned short fraction) {
@@ -81,9 +82,9 @@ inline long batFractionalSine(int direction, unsigned short fraction) {
 }
 
 template<class Solid>
-bool batMeetsTiles(long x, long y, int facing, Solid solid) {
+bool batMeetsTiles(long x, long y, int facing, Solid solid,int mask=153) {
     const auto b = contactWorldBounds({FixedCollisionMath::round(x) / 5,
-        FixedCollisionMath::round(y) / 5, facing, 1, 153});
+        FixedCollisionMath::round(y) / 5, facing, 1, mask});
     return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
            solid(b.left, b.bottom - 1) || solid(b.right - 1, b.bottom - 1);
 }
@@ -96,7 +97,7 @@ bool resolveBatMotion(BatMotion& bat, Solid solid,Scale scale={}) {
     long x = bat.x * 5, y = bat.y * 5;
     const auto contact = resolveSolidCollision<FixedCollisionMath>(x, y,
         bat.speedX * 5, bat.speedY * 5, [&](long px, long py) {
-            return batMeetsTiles(px, py, bat.facing, solid);
+            return batMeetsTiles(px, py, bat.facing, solid,bat.collisionMask);
         });
     if (contact.x) bat.speedX = 0;
     if (contact.y) bat.speedY = 0;

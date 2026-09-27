@@ -15,15 +15,23 @@ struct BatStepEffects {
 inline int batPresentation(const BatActivity& state, const BatHitState& hit) {
     return !state.flying ? (state.hang > -10 ? 162 : 157) : (hit.stunned ? 154 : 153);
 }
+// After x/y and sprite_index in enmBat Step: flight copies sprite to mask;
+// hanging preserves its mask, optionally mirrors wall art, then resets heading.
+template<class Mask,class Scale,class Rest>
+bool finishBatFields(const BatActivity& state,int sprite,Mask mask,Scale scale,Rest rest){
+    if(state.flying)return mask(sprite);
+    if(state.hang>-10&&!scale(-state.hang))return false;
+    rest();return true;
+}
 
 // enmBat Step: support discovery precedes hit handling. Waking in the inactive
 // branch changes art immediately, but pursuit starts on the following Step.
 template<class Random, class Solid,class Scale=NoBatScale>
 BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& state,
-    int publishedX, int publishedY, int previousSprite,
+    int publishedX, int publishedY, int previousMask,
     long targetX, long targetY, Random& random, Solid solid,Scale scale={}) {
     const auto meeting = [&](int x, int y) {
-        const auto b = contactWorldBounds({x * 256L, y * 256L, bat.facing, 1, previousSprite});
+        const auto b = contactWorldBounds({x * 256L, y * 256L, bat.facing, 1, previousMask});
         return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
                solid(b.left, b.bottom - 1) || solid(b.right - 1, b.bottom - 1);
     };
@@ -40,7 +48,7 @@ BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& st
     const bool pursuit = state.flying && !hit.stunned && !hit.ready;
     const auto active=state.flying ? stepActiveBat(bat, hit, targetX, targetY, random, solid,scale)
                                   : BatActiveStep{false,true};
-    if(!active.succeeded)return {active.hit,0,previousSprite,false};
+    if(!active.succeeded)return {active.hit,0,-1,false};
     const bool consumed=active.hit;
     unsigned sounds = 0;
     if (!pursuit) {
@@ -49,12 +57,6 @@ BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& st
         const bool support = state.hang == -10 ? meeting(publishedX, publishedY - 16)
             : meeting(publishedX + (state.hang > 0 ? 16 : -16), publishedY);
         if (!support) { state.flying = true; ++sounds; }
-    }
-    if (!state.flying) {
-        if (state.hang > -10) bat.facing = -state.hang;
-        bat.direction = 270;
-        bat.directionFraction = 0;
-        bat.speedFortieths = 80;
     }
     return {consumed, sounds, batPresentation(state, hit)};
 }
