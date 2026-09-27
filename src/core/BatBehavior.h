@@ -10,6 +10,7 @@ struct BatStepEffects {
     bool hit;
     unsigned wakeSounds;
     int sprite;
+    bool succeeded=true;
 };
 inline int batPresentation(const BatActivity& state, const BatHitState& hit) {
     return !state.flying ? (state.hang > -10 ? 162 : 157) : (hit.stunned ? 154 : 153);
@@ -17,10 +18,10 @@ inline int batPresentation(const BatActivity& state, const BatHitState& hit) {
 
 // enmBat Step: support discovery precedes hit handling. Waking in the inactive
 // branch changes art immediately, but pursuit starts on the following Step.
-template<class Random, class Solid>
+template<class Random, class Solid,class Scale=NoBatScale>
 BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& state,
     int publishedX, int publishedY, int previousSprite,
-    long targetX, long targetY, Random& random, Solid solid) {
+    long targetX, long targetY, Random& random, Solid solid,Scale scale={}) {
     const auto meeting = [&](int x, int y) {
         const auto b = contactWorldBounds({x * 256L, y * 256L, bat.facing, 1, previousSprite});
         return solid(b.left, b.top) || solid(b.right - 1, b.top) ||
@@ -37,7 +38,10 @@ BatStepEffects stepBatBehavior(BatMotion& bat, BatHitState& hit, BatActivity& st
     }
     if (hit.ready) state.flying = true;
     const bool pursuit = state.flying && !hit.stunned && !hit.ready;
-    const bool consumed = state.flying && stepActiveBat(bat, hit, targetX, targetY, random, solid);
+    const auto active=state.flying ? stepActiveBat(bat, hit, targetX, targetY, random, solid,scale)
+                                  : BatActiveStep{false,true};
+    if(!active.succeeded)return {active.hit,0,previousSprite,false};
+    const bool consumed=active.hit;
     unsigned sounds = 0;
     if (!pursuit) {
         if (targetY > (publishedY - 4L) * 256) { state.flying = true; ++sounds; }

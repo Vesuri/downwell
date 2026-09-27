@@ -12,6 +12,21 @@ void require(bool ok, const char* message) {
 
 int main() {
     using namespace downwell;
+    for(int speed:{-52,-51,-1,0,1,51,52})for(bool accept:{false,true}){
+        BatMotion bat{100,200,speed,16,0,50,speed<0?1:-1};
+        const int oldFacing=bat.facing;unsigned writes=0;
+        const bool changes=speed<-51||speed>51;
+        const bool ok=resolveBatMotion(bat,[](int,int){return false;},[&](int scale){
+            ++writes;
+            require(scale==(speed<0?-1:1)&&bat.facing==oldFacing&&bat.x==100&&bat.y==200,
+                    "xscaleXsp setter precedes facing storage and velocity integration");
+            return accept;
+        });
+        require(writes==unsigned(changes)&&ok==(!changes||accept)&&
+                bat.facing==(changes&&accept?-oldFacing:oldFacing)&&
+                bat.x==100+(ok?speed:0)&&bat.y==200+(ok?16:0),
+                "bat facing retains source .2 deadband and stops motion on rejected scale");
+    }
     {
         BatHitState hit;
         hit.queueTurns(0xc1000000u); // 271.40625 degrees.
@@ -21,7 +36,7 @@ int main() {
         BatMotion bat{0, 0, 0, 0, 270, 50};
         struct Random { unsigned calls = 0; std::uint32_t nextU32() { ++calls; return 0x80000000u; } } random;
         auto clear = [](int, int) { return false; };
-        require(stepActiveBat(bat, hit, 0, 10000, random, clear) &&
+        require(stepActiveBat(bat, hit, 0, 10000, random, clear).hit &&
                     bat.direction == 271 && bat.directionFraction == 26624 && random.calls == 0,
                 "hit adopts the fractional heading but does not move or draw pursuit RNG");
         hit.alarm();
@@ -121,12 +136,12 @@ int main() {
     BatHitState hit;
     hit.queue(270);
     hit.advanceFrame();
-    require(stepActiveBat(injured, hit, 1000, 2000, random, [](int, int) { return false; }) &&
+    require(stepActiveBat(injured, hit, 1000, 2000, random, [](int, int) { return false; }).hit &&
             hit.stunned && injured.direction == 270 && injured.speedFortieths == 120 &&
             injured.x == 256 && injured.y == 512 && random.calls == 0,
             "bat hit resets direction/speed but neither moves nor consumes pursuit RNG");
     hit.advanceFrame();
-    require(!stepActiveBat(injured, hit, 1000, 2000, random, [](int, int) { return false; }) &&
+    require(!stepActiveBat(injured, hit, 1000, 2000, random, [](int, int) { return false; }).hit &&
             injured.x == 256 && injured.y == 512 && random.calls == 0,
             "stunned bat remains stationary without re-consuming the hit");
     hit.alarm();

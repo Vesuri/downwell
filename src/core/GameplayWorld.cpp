@@ -875,13 +875,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 player_.frameStartYFixed(), enemyRandom_,
                 [this](int x, int y) {
                     return solidResolver_(solidResolverContext_, x, y);
+                },[this,&enemy](int scale){
+                    if(!publishEnemyTransform(enemy,downwell::RunnerTransformField::scaleX,scale))return false;
+                    enemy.facing=scale;return true;
                 });
-            if (effects.hit) {
-                enemy.alarm0 = 3;
-                if(!publishEnemyImage(enemy,0))return {};
-                enemy.imagePhase = 0;
-                enemy.imageRemainder = 0;
-            }
             enemy.preciseX = bat.x;
             enemy.preciseY = bat.y;
             enemy.speedX = bat.speedX;
@@ -890,6 +887,13 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.batDirectionFraction = bat.directionFraction;
             enemy.facing = bat.facing;
             enemy.moveSpeed = (bat.speedFortieths * 256 + 20) / 40;
+            if(!effects.succeeded)return {};
+            if (effects.hit) {
+                enemy.alarm0 = 3;
+                if(!publishEnemyImage(enemy,0))return {};
+                enemy.imagePhase = 0;
+                enemy.imageRemainder = 0;
+            }
         } else if (enemy.objectId == 113) {
             const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
                 (cameraPixelX_ - 80) * 256L, viewCameraYQ8() - 142 * 256L,
@@ -966,7 +970,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         enemy.x=publishedX;enemy.y=publishedY;
         if(enemy.objectId==119 &&
            !publishEnemyTransform(enemy,downwell::RunnerTransformField::angle,enemy.crawler.imageDirection*90))return {};
-        if (enemy.speedX != 0)
+        if (enemy.objectId!=116 && enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
         const auto nextSprite = downwell::finishEnemyPresentation(
             {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.speedY < 0,

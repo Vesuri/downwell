@@ -910,15 +910,13 @@ void StartupRuntime::updateMainEnemies() {
                 mainPlayerOriginX_ * 256L + mainPlayerMotion_.frameStartXFixed(),
                 mainPlayerOriginY_ * 256L + mainPlayerMotion_.frameStartYFixed(),
                 random_,
-                [this](int x, int y) { return mainSolidAt(x, y); });
-            if (effects.hit) {
-                enemy.alarms.set(0, 3);
-                if(!publishMainEnemyImage(index,0))return;
-                enemy.imageIndex = 0;
-                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
-                ++soundPlayRequests_;
-            }
-            soundPlayRequests_ += effects.wakeSounds;
+                [this](int x, int y) { return mainSolidAt(x, y); },
+                [this,index,&enemy](int scale){
+                    if(!publishMainEnemyTransform(index,RunnerTransformField::scaleX,scale))return false;
+                    enemy.scaleX=static_cast<float>(scale);return true;
+                });
+            // Preserve completed turn/collision work even if the scale setter
+            // rejects publication. The checked helper skips subsequent motion.
             enemy.preciseX = bat.x / 256.0F;
             enemy.preciseY = bat.y / 256.0F;
             enemy.velocityX = bat.speedX / 256.0F;
@@ -927,6 +925,15 @@ void StartupRuntime::updateMainEnemies() {
             enemy.batDirectionFraction = bat.directionFraction;
             enemy.moveSpeed = bat.speedFortieths / 40.0F;
             enemy.scaleX = static_cast<float>(bat.facing);
+            if(!effects.succeeded)return;
+            if (effects.hit) {
+                enemy.alarms.set(0, 3);
+                if(!publishMainEnemyImage(index,0))return;
+                enemy.imageIndex = 0;
+                enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
+                ++soundPlayRequests_;
+            }
+            soundPlayRequests_ += effects.wakeSounds;
         } else if (enemy.objectId == 117) {
             const int hitAlarm = enemy.snailHit.consume(random_);
             if (hitAlarm >= 0) {

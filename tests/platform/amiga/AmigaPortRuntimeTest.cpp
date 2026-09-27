@@ -187,6 +187,20 @@ void testNativeEnemyLifecycle(){
                        walking.enemyAt(0).walker.vy==256,
                 "failed walker presentation retains earlier gravity without integrating motion");
     }
+    for(unsigned fail:{0u,8u}){
+        NativeEnemyLifecycleAudit checked;checked.fail=fail;
+        GameplayWorld bat(300,true,0,false,Binding::bindTransforms(checked));
+        bat.configureSolidResolver(noSolid,nullptr);
+        require(bat.configureEnemy(0,116,153,40,0,0,0,15,12,0,0,-1,-1,180,320),
+                "configure checked pursuit-scale bat");
+        bat.step(0);
+        require(bat.effectsSucceeded()==(fail==0)&&checked.transforms==(fail?0u:1u)&&
+                checked.moves==(fail?0u:1u)&&checked.sprites==(fail?0u:1u),
+                "bat scale rejection stops position and sprite publication");
+        if(fail)require(bat.enemyAt(0).preciseX==40*256&&bat.enemyAt(0).preciseY==0&&
+                       bat.enemyAt(0).speedX!=0&&bat.enemyAt(0).facing==1,
+                "bat rejection preserves calculated velocity but neither integrates nor changes facing");
+    }
     {
         NativeEnemyLifecycleAudit checked;checked.fail=8;
         GameplayWorld crawler(300,true,0,false,Binding::bindTransforms(checked));

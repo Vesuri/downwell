@@ -30,6 +30,8 @@ struct LifecycleAudit {
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
     unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,indices=0,transforms=0,calls=0,fail=0;
     unsigned walkingTransforms=0;
+    unsigned batTransforms=0;
+    bool rejectBatScale=false;
     bool transform(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerTransformField field,
                    downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
         ++calls;require(matches(h,r)&&r.active&&value.promoted().valid()&&alpha.bits==0x3f800000u&&blend==0xffffffu,
@@ -39,6 +41,11 @@ struct LifecycleAudit {
                         r.objectId,r.walker.grounded,r.auxiliaryState)&&r.x==r.walker.publishedX&&r.y==r.walker.publishedY,
                     "host walker scale sees selected sprite before final position publication");
             ++walkingTransforms;
+        }
+        if(r.objectId==116){
+            require(field==downwell::RunnerTransformField::scaleX,"pursuit publishes only X scale");
+            ++batTransforms;
+            if(rejectBatScale)return false;
         }
         if(fail==9)return false;
         ++transforms;return true;
@@ -123,6 +130,44 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
+    for(bool reject:{false,true}){
+        LifecycleAudit checked;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindTransforms(checked));
+        runtime->skipToGameForTesting();
+        std::uint32_t id=0;
+        int startX=0,startY=0;
+        for(unsigned tick=0;tick<600&&!id;++tick){
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                auto& r=const_cast<downwell::InstanceRecord&>(runtime->instanceAt(i));
+                if(!r.active||r.health<=0||
+                   (r.objectId!=111&&r.objectId!=112&&r.objectId!=113&&r.objectId!=116&&r.objectId!=117&&r.objectId!=119))continue;
+                // Controlled pursuit above the player, not a natural encounter.
+                startX=static_cast<int>(runtime->mainPlayerX());
+                startY=static_cast<int>(runtime->mainPlayerY())-32;
+                r.objectId=116;r.spriteId=153;r.health=15;r.x=startX;r.y=startY;
+                r.preciseX=startX;r.preciseY=startY;r.motionInitialized=true;
+                r.velocityX=r.velocityY=0;r.scaleX=-1;r.direction=0;r.moveSpeed=1.25f;
+                r.batDirectionFraction=0;r.batActivity={true,true,0};r.batHit={};r.alarms={};
+                id=r.instanceId;break;
+            }
+        }
+        require(id!=0,"host pursuit fixture has an owned enemy");
+        checked.rejectBatScale=reject;
+        const auto before=checked.batTransforms;
+        runtime->step(false);
+        const auto* bat=runtime->instance(id);
+        if(!(bat&&healthy(*runtime)==!reject&&checked.batTransforms==before+1))
+            std::cerr << "Bat fixture reject=" << reject << " healthy=" << healthy(*runtime)
+                      << " transforms=" << checked.batTransforms-before << " active=" << (bat?bat->active:false)
+                      << " eligible=" << (bat?bat->enemyStepEligible:false) << " vx=" << (bat?bat->velocityX:0)
+                      << " direction=" << (bat?bat->direction:0) << '\n';
+        require(bat&&healthy(*runtime)==!reject&&checked.batTransforms==before+1,
+                "host pursuit reaches checked scale publication once");
+        if(reject)require(bat->preciseX==startX&&bat->preciseY==startY&&bat->velocityX!=0&&bat->scaleX==-1,
+                "host scale failure retains calculated motion but skips integration and facing change");
+    }
     for(int object:{111,112})for(int velocity:{0,640}){
         LifecycleAudit walking;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

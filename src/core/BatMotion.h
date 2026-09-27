@@ -89,9 +89,10 @@ bool batMeetsTiles(long x, long y, int facing, Solid solid) {
 }
 
 // Bat Step calls scrCheckCollisionWith, zeros only the blocked components,
-// updates facing from the remaining horizontal velocity, then integrates.
-template<class Solid>
-void resolveBatMotion(BatMotion& bat, Solid solid) {
+// calls xscaleXsp on the remaining horizontal velocity, then integrates.
+struct NoBatScale { bool operator()(int)const{return true;} };
+template<class Solid,class Scale=NoBatScale>
+bool resolveBatMotion(BatMotion& bat, Solid solid,Scale scale={}) {
     long x = bat.x * 5, y = bat.y * 5;
     const auto contact = resolveSolidCollision<FixedCollisionMath>(x, y,
         bat.speedX * 5, bat.speedY * 5, [&](long px, long py) {
@@ -99,18 +100,26 @@ void resolveBatMotion(BatMotion& bat, Solid solid) {
         });
     if (contact.x) bat.speedX = 0;
     if (contact.y) bat.speedY = 0;
-    if (bat.speedX != 0) bat.facing = bat.speedX < 0 ? -1 : 1;
-    bat.x = x / 5 + bat.speedX;
-    bat.y = y / 5 + bat.speedY;
+    bat.x=x/5;bat.y=y/5;
+    // xscaleXsp requires abs(xsp) > .2. In the existing Q8 motion
+    // representation 51/256 is below that boundary and 52/256 is above.
+    if (bat.speedX>51 || bat.speedX<-51) {
+        const int facing=bat.speedX<0?-1:1;
+        if(!scale(facing))return false;
+        bat.facing=facing;
+    }
+    bat.x += bat.speedX;
+    bat.y += bat.speedY;
+    return true;
 }
 
 // Active/non-stunned enmBat Step subset. Caller supplies exactly one nextU32
 // draw for random_range(-20,20); no extra or integer-rounded jitter draws.
 // The rectangle query supports aligned 16x16 terrain cells. Exact runner mask
 // rounding and parentWall filtering remain adapter work. stepActiveBat gates stun.
-template<class Solid>
-void stepBatMotion(BatMotion& bat, long targetX, long targetY,
-                   std::uint32_t random, Solid solid) {
+template<class Solid,class Scale=NoBatScale>
+bool stepBatMotion(BatMotion& bat, long targetX, long targetY,
+                   std::uint32_t random, Solid solid,Scale scale={}) {
     const long jitter = (long)(random >> 16) * 40 +
         (long)(((random & 65535u) * 40u) >> 16) - 20L * 65536;
     const long target = batPointDirection(targetX - bat.x, targetY - bat.y) + jitter;
@@ -129,21 +138,22 @@ void stepBatMotion(BatMotion& bat, long targetX, long targetY,
     bat.direction = batNormalizeDirection(bat.direction);
     bat.speedX = batFractionalSine(bat.direction + 90, bat.directionFraction) * bat.speedFortieths / 5120;
     bat.speedY = -batFractionalSine(bat.direction, bat.directionFraction) * bat.speedFortieths / 5120;
-    resolveBatMotion(bat, solid);
+    return resolveBatMotion(bat, solid,scale);
 }
 
 // Recovered active-bat hit branch precedes pursuit. Stun skips both movement
 // and its random jitter draw; it does not integrate the new speed immediately.
-template<class Random, class Solid>
-bool stepActiveBat(BatMotion& bat, BatHitState& hit, long targetX, long targetY,
-                   Random& random, Solid solid) {
+struct BatActiveStep { bool hit; bool succeeded; };
+template<class Random, class Solid,class Scale=NoBatScale>
+BatActiveStep stepActiveBat(BatMotion& bat, BatHitState& hit, long targetX, long targetY,
+                   Random& random, Solid solid,Scale scale={}) {
     const bool consumed = hit.consume();
     if (consumed) {
         bat.direction = hit.direction; bat.directionFraction = hit.fraction;
         bat.speedFortieths = 120;
     }
-    if (!hit.stunned) stepBatMotion(bat, targetX, targetY, random.nextU32(), solid);
-    return consumed;
+    const bool succeeded=hit.stunned || stepBatMotion(bat, targetX, targetY, random.nextU32(), solid,scale);
+    return {consumed,succeeded};
 }
 
 } // namespace downwell

@@ -809,6 +809,18 @@ The final shared animation normalization remains the existing approximation;
 the adapters do not issue a second sprite setter at that point. Frog and bat
 scale/mask assignments still require their own source-ordered integration.
 
+Active bat pursuit calls the checked X-scale binding at `xscaleXsp`, after
+blocked velocity components are cleared and before motion integration. The
+original helper only assigns scale for `abs(xsp) > 0.2`; the current Q8 motion
+path therefore retains facing through magnitudes 51/256 and assigns it from
+52/256 upward. This is a source threshold applied to the existing approximate
+motion representation, not a claim of original binary64 pursuit arithmetic.
+Both adapters retain calculated heading, velocity, collision displacement and
+consumed RNG on rejection, but stop integration and later position/sprite writes.
+The native final facing update must not overwrite that result using any-nonzero
+velocity. Hanging-bat scale and flying-bat mask setters are separate later Step
+assignments and remain to be connected.
+
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty
 owners, just as it does for damage numbers and corpse-expiry effects. A restore
