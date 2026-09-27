@@ -134,18 +134,21 @@ public:
     // the maintained search again; missing ownership is a terminal failure.
     bool playerTimeFieldInstance(RunnerImageValue x,RunnerImageValue y,InstancePlaceResult& result);
     bool playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit);
-    // Explicit Begin Step boundary; the scheduler supplies room/side state and
-    // synchronous audio, shake, pause and oxygen effects. Registrations must
+    bool playerOutsideTimeStopSides(MotionBinary64 x,bool& outside);
+    // Explicit Begin Step boundary; the scheduler supplies synchronous audio,
+    // shake, pause and oxygen effects. Registrations must
     // outlive the effect owner and be retired before room teardown.
     template<unsigned Capacity,unsigned Registered,unsigned Changes,class Audio,class Emit>
     bool beginTimeStop(StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
-        bool mainRoom,bool outsideSides,const typename TimeStopEffects<Capacity>::PlayerPose& pose,
+        const typename TimeStopEffects<Capacity>::PlayerPose& pose,
         bool lowSpec,Audio audio,Emit emit){
         if(!run_.effectsSucceeded)return false;
         run_.effectsSucceeded=shards.belongsTo(instances_)&&changes.belongsTo(instances_)&&
             state.shards.phasesBoundTo(shards)&&state.changes.boundTo(changes)&&
-            state.beginStep(mainRoom,outsideSides,pose,lowSpec,random_,
+            state.beginStepChecked(roomId_==11||roomId_==14,[&](bool& outside){
+                    return playerOutsideTimeStopSides(pose.xx,outside);
+                },pose,lowSpec,random_,
                 [&](bool& hit){return playerTimeFieldMeeting(pose.xx,pose.yy,hit);},
                 [&](auto x,auto y,auto& id,auto& fx,auto& fy){
                     InstancePlaceResult result;

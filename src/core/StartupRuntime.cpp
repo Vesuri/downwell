@@ -1127,6 +1127,14 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     syncMainBuilderState();
 }
 
+bool StartupRuntime::playerOutsideTimeStopSides(MotionBinary64 x,bool& outside){
+    if(!run_.effectsSucceeded)return false;
+    PackedRoom room;
+    run_.effectsSucceeded=roomPack_&&roomPack_->findRoom(roomId_,room)&&
+        TimeStopBound::outsideSides(x,room.width,outside);
+    return run_.effectsSucceeded;
+}
+
 bool StartupRuntime::playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit){
     if(!run_.effectsSucceeded)return false;
     for(std::size_t i=0;i<instances_.size();++i){

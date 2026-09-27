@@ -21,9 +21,17 @@ struct PlayerTimeStop {
     // mainRoom includes rmTutorialMain. Other rooms have no side exemption.
     template<class Field,class Audio,class Emit>
     bool step(bool mainRoom,bool outsideSides,Field field,Audio audio,Emit emit){
+        return stepChecked(mainRoom,[&](bool& outside){outside=outsideSides;return true;},field,audio,emit);
+    }
+    // Side predicates are short-circuited after the first field query, and
+    // never evaluated outside rmMain/rmTutorialMain.
+    template<class Side,class Field,class Audio,class Emit>
+    bool stepChecked(bool mainRoom,Side side,Field field,Audio audio,Emit emit){
         bool inField=false;
         if(!field(inField))return false;
         if(mainRoom){
+            bool outsideSides=false;
+            if(!inField&&!side(outsideSides))return false;
             if(inField || outsideSides){
                 if(!checkStop){
                     checkStop=true;

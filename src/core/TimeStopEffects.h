@@ -32,8 +32,14 @@ template<unsigned Capacity> struct TimeStopEffects {
     template<class Random,class Field,class Lookup,class Audio,class Emit>
     bool beginStep(bool mainRoom,bool outsideSides,const PlayerPose& pose,bool lowSpec,
                    Random& random,Field field,Lookup lookup,Audio audio,Emit emit){
+        return beginStepChecked(mainRoom,[&](bool& outside){outside=outsideSides;return true;},
+            pose,lowSpec,random,field,lookup,audio,emit);
+    }
+    template<class Side,class Random,class Field,class Lookup,class Audio,class Emit>
+    bool beginStepChecked(bool mainRoom,Side side,const PlayerPose& pose,bool lowSpec,
+                   Random& random,Field field,Lookup lookup,Audio audio,Emit emit){
         if(!succeeded||!shards.succeeded()||!changes.succeeded()){succeeded=false;return false;}
-        succeeded=player.step(mainRoom,outsideSides,field,audio,[&](PlayerTimeStop::Effect effect){
+        succeeded=player.stepChecked(mainRoom,side,field,audio,[&](PlayerTimeStop::Effect effect){
             if(effect==PlayerTimeStop::Effect::change)
                 return changes.createAt(pose.xx,pose.yy,roomSpeed,[&](unsigned){return emit(effect);});
             if(effect!=PlayerTimeStop::Effect::shards)return emit(effect);

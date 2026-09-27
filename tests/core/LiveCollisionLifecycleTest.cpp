@@ -219,7 +219,7 @@ int main(){
             }
             return true;
         };
-        auto step=[&]{return world->beginTimeStop(shards,changes,state,true,false,pose,false,
+        auto step=[&]{return world->beginTimeStop(shards,changes,state,pose,false,
             [](auto){return true;},emit);};
         require(step()&&state.player.stopped&&state.shards.size()==6&&pauses==1&&
             world->randomDrawCount()==draws+48&&world->nextRuntimeInstanceId()==first+7,
@@ -232,10 +232,19 @@ int main(){
             world->randomDrawCount()==draws+96&&world->nextRuntimeInstanceId()==first+14,
             "exit preserves both bursts and registered transition ordering");
         require(state.reset(),"retire both transition families before bindings leave scope");
+        // No field at this height: room-width side exemptions use PRIVATE x,
+        // not the published x=240 kept here for scrTimeShard.
+        for(int x:{159,160,320,321}){
+            pose.xx=MotionBinary64::fromInteger(x);
+            require(world->beginTimeStop(shards,changes,state,pose,false,[](auto){return false;},[](auto){return true;})&&
+                state.player.stopped==(x==159||x==321),"strict source room-width side boundaries");
+            require(state.reset(),"reset side-boundary fixture");
+        }
+        pose.xx=RunnerImageValue{0x43704000u}.promoted();
         pose.y={0x43300000u};pose.yy=RunnerImageValue{0x43308000u}.promoted();
         const auto failedId=world->nextRuntimeInstanceId();const auto failedDraws=world->randomDrawCount();
         auto failPause=[](auto effect){return effect!=PlayerTimeStop::Effect::change;};
-        require(!world->beginTimeStop(shards,changes,state,true,false,pose,false,[](auto){return true;},failPause)&&
+        require(!world->beginTimeStop(shards,changes,state,pose,false,[](auto){return true;},failPause)&&
             !world->effectsSucceeded()&&state.shards.size()==3&&state.changes.size()==1&&
             world->instance(failedId+3)&&world->randomDrawCount()==failedDraws+24&&
             world->nextRuntimeInstanceId()==failedId+4,

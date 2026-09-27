@@ -6,6 +6,12 @@ namespace downwell {
 // not private motion accumulators. Field queries must use the instance's mask
 // (including transforms), against parentTimeField (82), not its centre alone.
 struct TimeStopBound {
+    static bool outsideSides(MotionBinary64 x,int roomWidth,bool& outside){
+        if(!x.valid()||roomWidth<0)return false;
+        outside=less(x,MotionBinary64::fromInteger(160))||
+            less(MotionBinary64::fromInteger(roomWidth-160),x);
+        return true;
+    }
     template<class Meeting> static bool evaluate(bool stopped,MotionBinary64 x,
         MotionBinary64 y,int roomWidth,Meeting meeting,bool& allowed){
         if(!stopped){allowed=true;return true;}
@@ -13,9 +19,8 @@ struct TimeStopBound {
         bool inField=false;
         // The VM calls place_meeting BEFORE either strict side comparison.
         if(!meeting(x,y,inField))return false;
-        allowed=inField || less(x,MotionBinary64::fromInteger(160)) ||
-            less(MotionBinary64::fromInteger(roomWidth-160),x);
-        return true;
+        if(inField){allowed=true;return true;}
+        return outsideSides(x,roomWidth,allowed);
     }
 private:
     static bool less(MotionBinary64 a,MotionBinary64 b){

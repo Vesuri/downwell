@@ -38,6 +38,18 @@ int main(){
         [](auto){return false;},[&](E e){events.push_back(e);return true;}));
     assert(queries==2 && events==std::vector<E>({E::change,E::shards,E::enterSound,E::oxygenFloor}));
     State failed;unsigned emitted=0;
+    for(bool main:{false,true})for(bool field:{false,true}){
+        State lazy;unsigned order=0;
+        assert(lazy.stepChecked(main,[&](bool& outside){assert(main&&!field&&order==1);++order;outside=false;return true;},
+            [&](bool& hit){++order;hit=field;return true;},[](auto){return false;},[](auto){return true;}));
+        assert(order==unsigned(main?2:1));
+    }
+    State badSide;unsigned sideCalls=0;
+    assert(!badSide.stepChecked(true,[&](bool&){++sideCalls;return false;},
+        [](bool& hit){hit=false;return true;},[](auto){assert(false);return false;},[](auto){assert(false);return false;}));
+    assert(sideCalls==1&&!badSide.checkStop&&!badSide.stopped);
+    assert(!badSide.stepChecked(true,[](bool&){assert(false);return false;},
+        [](bool&){return false;},[](auto){assert(false);return false;},[](auto){assert(false);return false;}));
     assert(!failed.step(true,true,[](bool& hit){hit=false;return true;},[](auto){assert(false);return false;},
         [&](E e){++emitted;assert(e==E::change);return false;}));
     assert(emitted==1 && failed.checkStop && failed.stopped && failed.bgmOn);
