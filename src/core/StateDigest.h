@@ -22,8 +22,10 @@ public:
     }
 
     void addU64(std::uint64_t value) {
-        for (int shift = 0; shift < 64; shift += 8)
-            addByte(static_cast<std::uint8_t>(value >> shift));
+        // Constant split: a variable 64-bit shift requires __lshrdi3 when
+        // target optimization elects not to unroll the old eight-byte loop.
+        addU32(static_cast<std::uint32_t>(value));
+        addU32(static_cast<std::uint32_t>(value >> 32));
     }
 
     void addF32(float value) {

@@ -123,6 +123,16 @@ build/wall-draw-lookup-test: tests/core/WallDrawLookupTest.cpp src/core/WallDraw
 
 test: verify-wall-draw-lookup
 
+build/state-digest-test: tests/core/StateDigestTest.cpp src/core/StateDigest.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
+
+.PHONY: verify-state-digest
+verify-state-digest: build/state-digest-test
+	./build/state-digest-test
+
+test: verify-state-digest
+
 .PHONY: generate-area-two-patterns verify-area-two-patterns
 .PHONY: verify-catacomb-symbols
 .PHONY: verify-skeleton-throw
