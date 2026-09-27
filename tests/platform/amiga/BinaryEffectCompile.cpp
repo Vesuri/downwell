@@ -1,5 +1,11 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/InstanceStore.h"
+#include "core/RunnerLayerElements.h"
+bool compileLayerElements(downwell::RunnerLayerElements<4,16>& owner,unsigned slot,unsigned inactive){
+    return owner.insert(0,slot,true,false,[](unsigned){return false;}) &&
+        owner.concatenate(1,0) && owner.normalize(1,[&](unsigned i){return i==inactive;}) &&
+        owner.visitForward(1,[](unsigned){return true;}) && owner.remove(slot);
+}
 bool compileInstanceHandles(downwell::InstanceStore<4>& store,unsigned id){
     if(store.create(id,82,1,false)!=downwell::CreateInstanceResult::success)return false;
     auto handle=store.handleAt(store.size()-1);store.enterRoom(2);

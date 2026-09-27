@@ -386,12 +386,56 @@ if that matches the existing layer depth. Otherwise:
   ID and rewrites the instance's depth to the layer's integer depth.
 
 The -60000 box-impact jump takes the migration case when born at depth zero.
-Layer list movement/merging, element order, empty-layer disposal and selected
-Draw traversal still require recovery and integration. The current renderer's
+Selected Draw traversal still requires recovery; layer ownership and migration
+still require live integration. The current renderer's
 room-list order is not proof of selected GMS2 layer order, including unchanged
 equal-depth births. Existing draw-order tests only validate the port's current
 adapter. Nonzero effect-depth admission remains intentionally disabled until
 the selected owner is connected; no legacy re-sorting fallback is enabled.
+
+#### Layer element and migration contract
+
+`0x4128d0` inserts an element at the tail when its explicit append argument is
+true. Otherwise a type-2 instance element enters at the head, even if its
+instance pointer is null. Other element types go immediately after the
+contiguous prefix of type-2 elements with non-null, active instances. The first
+non-instance, null instance or inactive instance terminates that prefix; this
+is not a search for the last active instance anywhere in the list.
+
+`0x4147b0` writes the new integer layer depth before repositioning the layer.
+Decreasing depth scans backwards past greater-or-equal depths, placing the
+layer before equal-depth peers without merging. Increasing depth scans
+forwards; an equal-depth dynamic layer can absorb the moving dynamic layer
+when merging is enabled. Without that match it inserts before the first
+greater depth, or at the tail. Dynamic-layer creation instead inserts after
+equal-depth layers (`0x412820`). These operations cannot share an unqualified
+stable-sort rule.
+
+The merge at `0x41487f` updates each element's owner and each non-null type-2
+instance's layer ID, then appends the complete source element chain to the
+destination tail. It invokes `0x426630` before unlinking and pooling the source
+layer. That normalization scans backwards using the saved previous link and
+moves inactive instances to the tail. The resulting inactive subsequence is
+**reversed**, not stable; other elements retain their forward order. Instance
+depth fields are not rewritten by this merge body.
+
+Detachment (`0x425a40`) removes both element/instance hash entries and the
+element links, clears the instance's attached flag and layer ID, and clears
+the room's current-element pointer if it names the removed element. An empty
+dynamic layer is then deleted. Layer disposal (`0x425b60`) guards reentry with
+byte +0x19, removes remaining elements if any, unlinks the layer, decrements
+the room count, removes its hash entry and returns it to the pool. The empty
+dynamic-layer path does not invoke element destruction again.
+
+`RunnerLayerElements` supplies bounded, allocation-free link operations for
+insertion, concatenation, removal and inactive normalization. Its slots are
+borrowed identities, not original resource or instance IDs. The owning adapter
+must detach slots before reuse, provide source type/null/activation predicates,
+publish instance layer IDs, and manage layer lifetime and depth. Forward and
+backward visitors expose raw links only; neither asserts selected Draw order.
+The regression exhausts all 256 activity masks across nine source/destination
+splits and checks both link directions and ownership. Binary range hashes pin
+the recovered routines; these tests are not live Windows rendering comparisons.
 
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing

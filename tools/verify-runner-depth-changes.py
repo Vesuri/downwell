@@ -29,6 +29,14 @@ for start, end, digest in (
     (0x412820, 0x4128ce, "844ff5dceb7f1212b0926d58e5c05830284953ef899ab8fdfa9d7ae0bf27e22a"),
     (0x412a30, 0x412ab0, "6cda25459cdff969edb5900e9fae6122b469b20b55eac581a44d01bc29e67819"),
     (0x412ab0, 0x412bdc, "d6430edf874ff3b161026a9741e2f0f9772fc6476d05c9f08d5f7db9d00acc89"),
+    # Element insertion, layer movement/merge, and reverse inactive tail moves.
+    (0x4128d0, 0x4129cd, "be01d3600e3a984f13b2927abc893d7cb279e2449dcfc4c2f68ac3910b4d1f8b"),
+    (0x4147b0, 0x414949, "0b5d221b348ec2f8d5ed5edee3b106279214ac4a81c5c2541f17ee49f07db835"),
+    (0x426630, 0x4266af, "dc06a4a0d158f6f9b5f6e7ed1d29c4904841043923fbfaec0e9eb210b4c668fb"),
+    # Instance detachment and empty dynamic-layer disposal.
+    (0x4258e0, 0x42595d, "617c2bfaf8772dee654e8b1809276df86290e756396612c9090202ffa81747ca"),
+    (0x425a40, 0x425b5a, "b20cd62a9d8c6490c080e1e04578b96668ec8d7cf174e7857b867d55e56513a7"),
+    (0x425b60, 0x425c1b, "686844692cb51f131db70e17575d63c0a92b6a134ee41848e78c9efb1892591d"),
     # Retirement removes an instance from the pending queue by stable compaction.
     (0x50f6c5, 0x50f6d9, "f00979b8847f3a5a9dd9913d8dbaae6267fc1618afbe618eb9a31f490d0fc389"),
     (0x50d740, 0x50d793, "6ee03835d9451e9681567d9b5cccda322bdf74663a62c36896bbff3127a9d541"),
