@@ -720,10 +720,14 @@ int main() {
             } else {
                 input.left = (combatTicks / 90) % 2 == 0;
                 input.right = !input.left;
-                input.fire = combatTicks % 10 < 5;
-                if (runtime.mainPlayerY() < 1264) {
-                    // Break the entrance bowl through ordinary shots instead
-                    // of spending a fixed interval pushing into its side wall.
+                input.fire = (combatTicks + downwell::gameplayContactProfilePhase) % 10 < 5;
+                // Do not let the timed sweep settle into the left side room:
+                // its floor can trap this periodic tape away from new enemies.
+                if (runtime.mainPlayerX() < 192) { input.left=false; input.right=true; }
+                else if (runtime.mainPlayerX() > 288) { input.left=true; input.right=false; }
+                if (runtime.runStage().level == 1 && runtime.mainPlayerY() < 1264) {
+                    // Only level one has this recovered entrance bowl. Later
+                    // entrances need the normal sweep to find an opening.
                     input.left = runtime.mainPlayerX() > 242;
                     input.right = runtime.mainPlayerX() < 238;
                 }
@@ -746,7 +750,11 @@ int main() {
                     if (threat) {
                         input.left=runtime.mainPlayerX()>threat->x;
                         input.right=runtime.mainPlayerX()<threat->x;
-                        input.fire=false;
+                        // Stop shooting only when the threat is at contact
+                        // height. Otherwise the player can wait forever on a
+                        // platform above it instead of breaking through.
+                        if (std::abs(threat->y-runtime.mainPlayerY()) < 16)
+                            input.fire=false;
                     }
                     ++combatTicks;
                 }
@@ -755,6 +763,13 @@ int main() {
         const bool wasDeadWithResults = runtime.mainPlayerHealth() == 0 && runtime.deathResults().active;
         const auto lifetime = runtime.runGemStatistics().lifetime;
         naturalDeath.update(input, 42);
+        require(naturalDeath.simulationSucceeded(), "natural death route has no terminal simulation failure");
+        if (std::getenv("DOWNWELL_TRACE_DEATH_ROUTE") && frame % 100 == 0)
+            std::fprintf(stderr,"route frame=%u combat=%u level=%u xy=%.3f,%.3f v=%.3f,%.3f ground=%d ammo=%d hp=%d input=%d%d%d lock=%d\n",
+                frame,combatTicks,unsigned(runtime.runStage().level),runtime.mainPlayerX(),runtime.mainPlayerY(),
+                runtime.mainPlayerSpeedX(),runtime.mainPlayerSpeedY(),runtime.mainPlayerGrounded(),
+                runtime.mainAmmo(),runtime.mainPlayerHealth(),input.left,input.right,input.fire,
+                runtime.shops().noControl);
         if (runtime.mainDeathSequence().started && runtime.mainDeathSequence().frames <= 3) {
             RecordingRenderer flashRenderer;
             naturalDeath.render(flashRenderer);
