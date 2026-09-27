@@ -173,6 +173,20 @@ bool ObjectPack::directEvent(const PackedObject& objectValue,
     return false;
 }
 
+bool ObjectPack::collisionEventExists(std::int32_t selfObject,std::int32_t otherObject,bool& found) const {
+    PackedObject self,other;
+    if(!findObject(selfObject,self)||!findObject(otherObject,other))return false;
+    // 0x478830 copies absent ancestor entries; 0x478b60/0x4782a0
+    // expand collision targets and retain inherited collision entries.
+    // Existence does not require resolving precedence between matching entries.
+    for(int target=otherObject;target>=0;target=other.parentId){
+        if(!findObject(target,other))return false;
+        PackedObjectEvent event;
+        if(findEvent(selfObject,4,target,event)){found=true;return true;}
+    }
+    found=false;return true;
+}
+
 bool ObjectPack::findEvent(std::int32_t objectId,
                            std::int32_t eventType,
                            std::int32_t eventSubtype,

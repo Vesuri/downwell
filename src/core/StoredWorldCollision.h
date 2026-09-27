@@ -65,6 +65,10 @@ public:
     bool instanceNumber(int object,unsigned& result)const{
         return valid()&&owner_.instanceNumber(object,families_,result);
     }
+    template<unsigned Pairs>
+    bool collectCollisionPairs(RunnerCollisionPairs<capacity,Pairs>& pairs,bool indexAvailable){
+        return valid()&&runtime_&&adapter_.collectCollisionPairs(*this,pairs,indexAvailable);
+    }
     bool activation(InstanceHandle h,const InstanceRecord& r,bool active){return adapter_.activation(h,r,active);}
     bool membership(InstanceHandle h,const InstanceRecord& r,bool registered){return adapter_.membership(h,r,registered);}
     bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){return adapter_.move(h,r,x,y);}

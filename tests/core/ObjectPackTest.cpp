@@ -90,6 +90,24 @@ void testDecodeAndInheritance() {
             "objects with sprites but no collision events are not collision-pair prepared");
     auto collisionBytes=makePack();
     const auto eventOffset=downwell::ObjectPack::headerSize+2*downwell::ObjectPack::objectRecordSize;
+    for(unsigned owner=0;owner<2;++owner)for(unsigned target=0;target<2;++target){
+        auto table=makePack();
+        const auto offset=eventOffset+owner*downwell::ObjectPack::bindingRecordSize;
+        table[offset]=4;table[offset+4]=static_cast<std::uint8_t>(target);
+        downwell::ObjectPack collisions(table.data(),table.size());
+        for(int self=0;self<2;++self)for(int other=0;other<2;++other){
+            bool found=false;
+            require(collisions.collisionEventExists(self,other,found)&&
+                found==(self>=int(owner)&&other>=int(target)),
+                "collision presence inherits owner and expands target descendants independently");
+        }
+        bool untouched=true;
+        require(!collisions.collisionEventExists(-1,0,untouched)&&untouched&&
+            !collisions.collisionEventExists(0,2,untouched)&&untouched,
+            "invalid collision endpoint is failure rather than a miss");
+    }
+    bool absent=true;
+    require(pack.collisionEventExists(1,1,absent)&&!absent,"valid collision table miss");
     collisionBytes[eventOffset]=4; // Root's event targets root: child inherits both sides.
     downwell::ObjectPack rootCollision(collisionBytes.data(),collisionBytes.size());
     require(spatialFlags.bindSpatialFlags(rootCollision) && *spatialFlags.flags(0)==0x18 && *spatialFlags.flags(1)==0x18,
@@ -212,6 +230,23 @@ void testGeneratedPack(const char* path) {
             "generated object pack has audited totals");
     downwell::RunnerObjectFamilies<386> collisionFamilies;
     require(collisionFamilies.bindSpatialFlags(pack),"derive initial spatial flags from recovered collisions");
+    const unsigned count=pack.objectCount();
+    std::vector<unsigned char> expanded(count*count,0);
+    for(unsigned owner=0;owner<count;++owner){
+        downwell::PackedObject object;require(pack.object(owner,object),"read expanded owner");
+        for(unsigned i=0;i<object.bindingCount;++i){
+            downwell::PackedObjectEvent event;require(pack.binding(object.firstBinding+i,event),"read expanded binding");
+            if(event.eventType!=4)continue;
+            for(unsigned a=0;a<count;++a)if(collisionFamilies.isA(a,owner))
+                for(unsigned b=0;b<count;++b)if(collisionFamilies.isA(b,event.eventSubtype))
+                    expanded[a*count+b]=1;
+        }
+    }
+    for(unsigned a=0;a<count;++a)for(unsigned b=0;b<count;++b){
+        bool found=false;
+        require(pack.collisionEventExists(a,b,found)&&found==bool(expanded[a*count+b]),
+            "all recovered collision pairs match explicit endpoint table expansion");
+    }
     downwell::RunnerObjectFamilies<386> instanceFamilies;
     require(instanceFamilies.bindInstanceFlags(pack),"derive runtime instance property flags");
     unsigned participants=0;

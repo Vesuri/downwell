@@ -74,6 +74,10 @@ public:
                    std::int32_t eventType,
                    std::int32_t eventSubtype,
                    PackedObjectEvent& output) const;
+    // Existence in the runner's expanded collision table, not handler choice.
+    // Both event-owner inheritance and descendant collision targets count.
+    // False is invalid input/pack; a valid miss writes found=false.
+    bool collisionEventExists(std::int32_t selfObject,std::int32_t otherObject,bool& found) const;
 
 private:
     bool validateObjects();

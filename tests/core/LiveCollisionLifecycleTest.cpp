@@ -222,6 +222,33 @@ int main(){
         born=positioned->owner.resolve({0,2});
         require(born&&born->x.bits==0x447a0000u&&born->y.bits==0x447a0000u,"legacy birth remains at integer snapshot");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach collision collection world");
+        world->skipToGameForTesting();
+        auto registration=world->timeShardRegistration<3>();TimeShardEffects<3> shards;TimeShardBurst burst;
+        require(shards.bindPhases(registration),"bind collection fixture shards");
+        RunnerImageValue x,y;
+        require(x.assign(MotionBinary64::fromInteger(static_cast<int>(world->mainPlayerX())))&&
+            y.assign(MotionBinary64::fromInteger(static_cast<int>(world->mainPlayerY())))&&
+            world->emitTimeShards(burst,shards,x,y,{},{},false),
+            "create real collision-capable shards at the player");
+        auto pairs=std::make_unique<RunnerCollisionPairs<capacity,16384>>();
+        require(world->roomLoadSucceeded()&&world->deferredCommandsSucceeded()&&owner->collectCollisionPairs(*pairs,true),
+            "collect source-resource collision candidates from live room births");
+        require(pairs->size()>0,"generated room exercises collision candidates");
+        for(unsigned i=0;i<pairs->size();++i){
+            const auto* pair=pairs->at(i);
+            const auto* a=owner->resolve(pair->self);const auto* b=owner->resolve(pair->other);
+            bool ab=false,ba=false;
+            require(a&&b&&a!=b&&objects.collisionEventExists(a->objectId,b->objectId,ab)&&
+                objects.collisionEventExists(b->objectId,a->objectId,ba)&&(ab||ba),
+                "live candidates retain real identities and inherited event eligibility");
+        }
+        require(owner->collectCollisionPairs(*pairs,true)&&owner->valid(),
+            "next collection resolves retained animated masks through real sprite resources");
+    }
     auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"bind full source families");
     RecordingLifecycle lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
     auto runtime=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

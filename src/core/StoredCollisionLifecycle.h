@@ -18,6 +18,25 @@ struct StoredCollisionLifecycle {
     Trig trig;
     Round round;
     bool allPrepared=false;
+    template<unsigned Pairs,class Registry>
+    bool collectCollisionPairs(const Registry& registry,RunnerCollisionPairs<Capacity,Pairs>& pairs,
+                               bool indexAvailable){
+        return owner.collectCollisionPairs(pairs,indexAvailable,
+            [&](InstanceHandle h,bool publish){
+                const auto* r=registry.resolve(h);return r&&refresh(h,*r,publish);
+            },[&](InstanceHandle a,InstanceHandle b,bool& found){
+                const auto* ra=registry.resolve(a);const auto* rb=registry.resolve(b);
+                return ra&&rb&&matchingFlags(a,*ra)&&matchingFlags(b,*rb)&&
+                    objects.collisionEventExists(ra->objectId,rb->objectId,found);
+            },[&](InstanceHandle h,unsigned& frames){
+                const auto* r=registry.resolve(h);
+                if(!r||!matchingFlags(h,*r)||!sprites.valid())return false;
+                const auto& sprite=properties[h.slot].sprite;
+                PackedSpriteCollision resource;
+                frames=sprites.collisionSprite(sprite.spriteId,sprite.maskId,resource)?resource.frameCount:0;
+                return true;
+            });
+    }
     bool birth(InstanceHandle h,const InstanceRecord& record){
         RunnerImageValue x,y;
         return x.assign(MotionBinary64::fromInteger(record.x))&&

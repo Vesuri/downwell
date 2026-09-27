@@ -48,8 +48,17 @@ it only for resources with more than one frame. Two prepend passes preserve
 the retained query order for the next frame (`0x50242a..0x5025b4`). The shared
 owner uses a temporary slot array (four bytes per capacity slot) and reverse
 prepend to produce the same order. Resource resolution and inherited event
-lookup remain checked callbacks; callbacks cannot mutate lifetimes. Failures
+lookup use checked callbacks; callbacks cannot mutate lifetimes. Failures
 latch the owner and preserve completed mutations rather than retrying.
+
+The stored-world adapter resolves those callbacks from actual lifetime records,
+sprite/mask resources and `ObjectPack::collisionEventExists`. Existence follows
+both ancestor chains: `0x478830` retains missing owner-ancestor entries, while
+`0x478b60` and `0x4782a0` expand collision targets to descendants and preserve
+inherited collision entries. This is intentionally a presence-only API: it does
+not select a code entry when multiple ancestor combinations match. The ordinary
+`findEvent` lookup of an exact subtype is not sufficient for collision presence.
+The original routines are pinned by `verify-runner-field-lookup.py`.
 
 This does not yet supply live scheduler wiring, precise overlap dispatch or
 solid response. The pair buffer's completed-instance set models
