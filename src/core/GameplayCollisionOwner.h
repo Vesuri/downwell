@@ -109,7 +109,7 @@ private:
     Binding<GameplayWorld::EnemyState,View::Kind::enemy> enemies_{*this};
     Binding<GameplayWorld::Breakable,View::Kind::breakable> boxes_{*this};
     Binding<GameplayTerrainInstances::Record,View::Kind::terrain> terrainBinding_{*this};
-    GameplayTerrainInstances terrain_{GameplayTerrainInstances::Binding::bind(terrainBinding_)};
+    GameplayTerrainInstances terrain_{GameplayTerrainInstances::Binding::bindAnimation(terrainBinding_)};
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites):objects_(objects),sprites_(sprites){
         good_=sprites.valid()&&families_.bindInstanceFlags(objects);

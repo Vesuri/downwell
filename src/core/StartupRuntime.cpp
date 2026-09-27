@@ -1,4 +1,5 @@
 #include "StartupRuntime.h"
+#include "TerrainCreate.h"
 #include "RunnerSpatialSplit.h"
 #include "PlayerBoxContact.h"
 #include "GameplayPlayerStep.h"
@@ -1579,9 +1580,25 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         return;
     case 985: // gml_Object_objWall_n_Create_0
+    case 1090: // gml_Object_objThinPlatform_Create_0
         ++implementedCodeCalls_;
-        if (instance != nullptr)
-            instance->imageSpeed = 0.0F;
+        if(!run_.effectsSucceeded)return;
+        if(instance!=nullptr){
+            for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==instance){
+                const auto h=instances_.handleAt(i);
+                run_.effectsSucceeded=terrainCreateProperties(instance->objectId,
+                    terrainTileForArea(run_.stage.area),false,random_,
+                    [&](int sprite){
+                        if(!lifecycle_.sprite(h,*instance,sprite))return false;
+                        instance->spriteId=sprite;return true;
+                    },[&](int index){
+                        if(!lifecycle_.phaseIndex(h,*instance,unsigned(index)*256u))return false;
+                        instance->imageIndex=static_cast<float>(index);return true;
+                    },[&](int speed){instance->imageSpeed=static_cast<float>(speed);return true;});
+                return;
+            }
+            run_.effectsSucceeded=false;
+        }
         return;
     case 1047: // gml_Object_Spawner_Create_0 / spawnerInit
         ++implementedCodeCalls_;
@@ -1590,13 +1607,6 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++implementedCodeCalls_;
         if (instance != nullptr)
             instance->imageSpeed = 0.0F;
-        return;
-    case 1090: // gml_Object_objThinPlatform_Create_0
-        ++implementedCodeCalls_;
-        if (instance != nullptr) {
-            instance->imageIndex = 23.0F;
-            instance->imageSpeed = 0.0F;
-        }
         return;
     case 1193: // gml_Object_enmSnake_Create_0
         ++implementedCodeCalls_;

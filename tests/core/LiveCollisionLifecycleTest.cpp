@@ -1,4 +1,5 @@
 #include "core/StartupRuntime.h"
+#include "core/TerrainCreate.h"
 #include "core/RoomPack.h"
 #include "core/StoredCollisionLifecycle.h"
 #include "core/StoredWorldCollision.h"
@@ -742,6 +743,13 @@ int main(){
             require(found!=lifecycle.handles.end(),"resolve live instance key");
             const auto* state=storage->owner.resolve(found->second);
             require(state&&storage->owner.objectId(found->second)==record.objectId,"owner identity matches live object");
+            if(record.objectId==60||record.objectId==93){
+                const auto& sprite=storage->properties[found->second.slot].sprite;
+                require(sprite.spriteId==record.spriteId&&record.spriteId==terrainTileForArea(runtime->runStage().area)&&
+                    record.imageSpeed==0.0F,"live terrain Create publishes area sprite and stops animation");
+                if(record.objectId==93)require(record.imageIndex==23.0F&&sprite.imageIndex.bits==0x41b80000u,
+                    "live platform Create publishes frame 23 to collision ownership");
+            }
             if(!tracked(record.objectId))continue;
             std::int32_t x,y;
             if(!state->x.promoted().roundPixel(x)||!state->y.promoted().roundPixel(y)||x!=record.x||y!=record.y||

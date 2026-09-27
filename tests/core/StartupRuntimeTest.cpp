@@ -28,7 +28,7 @@ void stepMany(downwell::StartupRuntime& runtime, int count) {
 struct LifecycleAudit {
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,indices=0,transforms=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,terrainSprites=0,spriteChanges=0,indices=0,transforms=0,calls=0,fail=0;
     unsigned walkingTransforms=0;
     unsigned frogTransforms=0;
     unsigned batTransforms=0;
@@ -77,7 +77,8 @@ struct LifecycleAudit {
     bool sprite(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int next){
         ++calls;require(matches(h,r)&&r.active,"sprite setter resolves an active published lifetime");
         if(fail==7)return false;
-        ++sprites;if(next!=r.spriteId)++spriteChanges;return true;
+        ++sprites;if(r.objectId==60||r.objectId==93)++terrainSprites;
+        if(next!=r.spriteId)++spriteChanges;return true;
     }
     bool move(downwell::InstanceHandle h,const downwell::InstanceRecord& r,
               downwell::RunnerImageValue x,downwell::RunnerImageValue y){
@@ -155,7 +156,8 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
               << " memberships=" << audit.memberships << " moves=" << audit.moves
               << " sprites=" << audit.sprites << " spriteChanges=" << audit.spriteChanges << " indices=" << audit.indices
               << " transforms=" << audit.transforms << '\n';
-    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&audit.sprites==audit.moves&&audit.indices>audit.sprites,
+    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&
+            audit.terrainSprites>0&&audit.sprites==audit.moves+audit.terrainSprites&&audit.indices>audit.sprites,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     require(audit.playerMoves>=1800,"live player publishes each Begin Step position to its owner");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_GAMEPLAY_TERRAIN_INSTANCES_H
 #include "InstanceLifecycle.h"
 #include "RoomPack.h"
+#include "TerrainCreate.h"
 #include <cstring>
 namespace downwell {
 // Optional identity store, separate from backend occupancy/drawing caches.
@@ -17,6 +18,7 @@ public:
         std::uint32_t lifetimeId=0;
         std::uint32_t sourceInstanceId=0; // Authored ID only; zero for generated records.
         int creationCodeId=-1;
+        int spriteId=-1,imageIndex=0,imageSpeed=1;
     };
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayTerrainInstances(Binding binding={}):binding_(binding){}
@@ -48,6 +50,17 @@ public:
             (bits(r.imageIndex)&0x7fffffffu)||r.preCreateCodeId!=-1||r.flags)
             return good_=false;
         return append(r.objectId,r.x,r.y,true,r.instanceId,r.creationCodeId);
+    }
+    bool createProperties(InstanceHandle h,int wallTile,bool glitch,GameMakerRandom& random){
+        if(!good_||!find(h))return good_=false;
+        auto& r=records_[h.slot];
+        if(!terrainCreateProperties(r.objectId,wallTile,glitch,random,
+            [&](int sprite){if(!binding_.sprite(h,r,sprite))return false;r.spriteId=sprite;return true;},
+            [&](int index){
+                if(!binding_.phaseIndex(h,r,unsigned(index)*256u))return false;
+                r.imageIndex=index;return true;
+            },[&](int speed){r.imageSpeed=speed;return true;}))return good_=false;
+        return true;
     }
     bool clear(){
         if(!good_)return false;

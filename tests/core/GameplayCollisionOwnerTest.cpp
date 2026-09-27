@@ -43,6 +43,7 @@ int main(){
                 GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,local,shared));
             const auto* state=roomOwner->state(shared);std::int32_t x,y;
             assert(state&&state->x.promoted().roundPixel(x)&&state->y.promoted().roundPixel(y)&&x==r.x&&y==r.y);
+            assert(stored->spriteId==51&&stored->imageSpeed==0&&roomOwner->properties(shared)->sprite.spriteId==51);
         }
         const auto old=roomOwner->terrain().handle(0);
         assert(roomWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
@@ -99,6 +100,10 @@ int main(){
         GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,owner->terrain().handle(1),otherWall)&&
         GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,owner->terrain().handle(2),ledge));
     assert(wall.slot!=otherWall.slot&&owner->state(wall)&&owner->state(otherWall));
+    assert(owner->properties(ledge)->sprite.spriteId==51&&
+        owner->properties(ledge)->sprite.imageIndex.bits==0x41b80000u&&
+        owner->terrain().find(owner->terrain().handle(2))->imageIndex==23&&
+        owner->terrain().find(owner->terrain().handle(2))->imageSpeed==0);
     assert(owner->state(wall)->x.promoted().roundPixel(px)&&px==240&&
         owner->state(wall)->y.promoted().roundPixel(py)&&py==512&&(owner->state(ledge)->flags&2));
     assert(owner->population(60,count)&&count==2);

@@ -1081,10 +1081,19 @@ Callback/capacity failure is terminal and preserves the completed prefix.
 The store is separately allocated: normal unbound worlds gain a pointer and
 room-load guard, not a terrain array. The optional collision owner includes the terrain array
 and expanded spatial capacity; its eventual A500 residency must be measured.
-This is registration at the current handoff, not original PreCreate execution:
-wall Create chooses `global.wallTile`, and End Step assigns adjacency frames.
-Those resource writes and per-instance activation/retirement
-still need their source boundaries before enabling live terrain queries.
+This is registration at the current handoff, not original PreCreate execution.
+After registration, `terrainCreateProperties` publishes the selected area tile
+to `sprite_index`, then frame 23 for thin platforms, then stops animation.
+The same property sequence runs in stored-world Create codes 985/1090. Native
+sprite/frame setters use the terrain's lifetime binding; the image-speed value
+belongs to its record, not the collision-shape properties. Current live callers
+select the normal area's tile and disable glitch mode. The helper preserves
+the wall glitch branch's additional five-way choice, but live glitch state and
+temporary controller/boxFlash tile overrides are not yet connected.
+Wall End Step adjacency frames, surrounded-wall tile replacement and
+per-instance activation/retirement still need their source boundaries before
+enabling live terrain queries. Drawing a neighbor-derived tile does not publish
+that frame or retire the corresponding collision instance.
 
 Room terrain enters through `GameplayWorld::loadRoomTerrain`, shared by native
 startup/re-entry and scene tests via `AmigaGameplayGeneration::loadRoom`.

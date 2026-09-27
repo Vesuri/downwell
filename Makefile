@@ -114,6 +114,15 @@ TEST_TARGETS := $(STARTUP_TEST_TARGET) $(REPLAY_TEST_TARGET) $(ALARM_TEST_TARGET
 all: $(TARGET)
 
 .PHONY: verify-wall-draw-lookup
+.PHONY: verify-terrain-create
+test: verify-terrain-create
+verify-terrain-create: build/terrain-create-test
+	python3 tools/verify-terrain-create.py
+	./build/terrain-create-test
+build/terrain-create-test: tests/core/TerrainCreateTest.cpp src/core/GameMakerRandom.cpp src/core/TerrainCreate.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
 verify-wall-draw-lookup: build/wall-draw-lookup-test
 	./build/wall-draw-lookup-test
 

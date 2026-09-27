@@ -206,7 +206,9 @@ public:
             downwell::PackedRoomInstance instance;
             if(!rooms.roomInstance(room,i,instance)){run_.effectsSucceeded=false;return false;}
             if(instance.objectId!=60&&instance.objectId!=93)continue;
-            if(!terrain(instance)||(terrainInstances_&&!terrainInstances_->appendRoom(instance))){
+            if(!terrain(instance)||(terrainInstances_&&(!terrainInstances_->appendRoom(instance)||
+                !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
+                    downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_)))){
                 run_.effectsSucceeded=false;return false;
             }
         }
@@ -297,7 +299,9 @@ public:
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
         if (!terrain(command)) return false;
         if(terrainInstances_&&(command.objectId==60||command.objectId==93)&&
-            !terrainInstances_->append(command.objectId,command.x,command.y,command.active)){
+            (!terrainInstances_->append(command.objectId,command.x,command.y,command.active)||
+             !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
+                 downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_))){
             run_.effectsSucceeded=false;return false;
         }
         if (command.objectId == 92) {
