@@ -1,8 +1,13 @@
 #include "core/RunnerSpatialIndex.h"
+#include "core/RunnerLineBounds.h"
 #ifdef DOWNWELL_NATIVE_LINE_PROBE
 extern "C" bool spatialLineProbe(const downwell::RunnerLineArguments& args,
     downwell::RunnerSpatialSplit::Box box,bool& hit){
     downwell::RunnerSpatialLine line;return line.assign(args)&&line.overlaps(box,hit);
+}
+extern "C" bool candidateLineProbe(const downwell::RunnerLineArguments& args,
+    downwell::RunnerSpatialSplit::Box box,bool& hit){
+    return downwell::RunnerLineBounds::test(args,box,true,false,hit);
 }
 #else
 #include <cassert>
@@ -29,6 +34,17 @@ static bool reference(const RunnerSpatialLine& line,RunnerSpatialSplit::Box box,
     assert(std::isfinite(sy)&&std::isfinite(ey));
     hit=!(top>sy&&top>ey)&&!(sy>=bottom&&ey>=bottom);return true;
 }
+static bool candidateReference(RunnerLineArguments args,RunnerSpatialSplit::Box box,bool compatibility){
+    float sx=scalar(args.x1),sy=scalar(args.y1),ex=scalar(args.x2),ey=scalar(args.y2);
+    const float extension=compatibility?1.f:-0.00001f;
+    const float left=scalar(box.left),top=scalar(box.top),right=scalar(box.right)+extension,bottom=scalar(box.bottom)+extension;
+    if(std::fmin(sx,ex)>=right||left>std::fmax(sx,ex)||std::fmin(sy,ey)>=bottom||top>std::fmax(sy,ey))return false;
+    if(sx>ex){std::swap(sx,ex);std::swap(sy,ey);}
+    if(left>sx){float a=left-sx,b=ey-sy,c=ex-sx;a=a*b;a=a/c;sy=sy+a;sx=left;}
+    if(ex>right){float a=right-ex,b=ey-sy,c=ex-sx;a=a*b;a=a/c;ey=ey+a;}
+    assert(std::isfinite(sy)&&std::isfinite(ey));
+    return !(top>sy&&top>ey)&&!(sy>=bottom&&ey>=bottom);
+}
 int main(){
     unsigned seed=42,comparisons=0,unsupported=0;
     const auto coordinate=[&](){seed=seed*1664525u+1013904223u;return float(int(seed%4096)-2048)/8.f;};
@@ -45,11 +61,21 @@ int main(){
         const bool ok=reference(line,box,expected);
         assert(line.overlaps(box,actual)==ok);
         if(ok){assert(actual==expected);++comparisons;}else ++unsupported;
+        for(bool compatibility:{false,true}){
+            assert(RunnerLineBounds::test(args,box,compatibility,false,actual));
+            assert(actual==candidateReference(args,box,compatibility));
+            assert(RunnerLineBounds::test(args,box,compatibility,true,actual)&&!actual);
+        }
     }
     // Degenerate vertical line in the source's right+1 broad-phase strip
     // reaches division by zero. Fail explicitly; do not report a clean miss.
     RunnerSpatialLine edge;assert(edge.assign({real(16.5f),real(0),real(16.5f),real(8)}));
     bool untouched=true;assert(!edge.overlaps({real(0),real(0),real(16),real(16)},untouched)&&untouched);
+    bool candidate=false;
+    assert(RunnerLineBounds::test({real(16.5f),real(0),real(16.5f),real(8)},
+        {real(0),real(0),real(16),real(16)},true,false,candidate)&&candidate);
+    assert(RunnerLineBounds::test({real(16.5f),real(0),real(16.5f),real(8)},
+        {real(0),real(0),real(16),real(16)},false,false,candidate)&&!candidate);
     RunnerSpatialLine vertical;assert(vertical.assign({real(16),real(0),real(16),real(8)}));
     bool hit=false;assert(vertical.overlaps({real(0),real(0),real(16),real(16)},hit)&&hit);
     assert(vertical.assign({real(17),real(0),real(17),real(8)}));
@@ -72,5 +98,6 @@ int main(){
     assert(!tree.queryLine(invalid,[&](unsigned){assert(false);return true;}));
     assert(tree.valid()); // Invalid queries do not corrupt the index.
     std::printf("Spatial line: %u scalar comparisons, %u unsupported cases, split-tree order and early stop passed\n",comparisons,unsupported);
+    std::puts("Instance line bounds: 200000 scalar compatibility comparisons and exclusion gates passed");
 }
 #endif

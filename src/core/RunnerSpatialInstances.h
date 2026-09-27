@@ -13,6 +13,7 @@
 #include "SpriteCollisionPack.h"
 #include "RunnerMaskPair.h"
 #include "RunnerMaskPoint.h"
+#include "RunnerLineBounds.h"
 #include "RunnerSpriteChange.h"
 #include "ObjectPack.h"
 namespace downwell {
@@ -326,6 +327,26 @@ public:
         if(!checked(RunnerMaskPair::test(shapes[0],shapes[1],dispatch,inverseTrig,round,result)))return false;
         hit=result.hit;return true;
     }
+    // collision_line precise=false, ordinary sprite candidate (0x4650b0).
+    // Bounds refresh precedes exclusions and missing-resource checks. Pack
+    // admission excludes rotated-box/skeletal resource paths; those must not
+    // silently fall through to this non-precise rectangle gate.
+    template<class Refresh>
+    bool nonPreciseLineCandidate(InstanceHandle h,const Sprite& sprite,const RunnerLineArguments& args,
+        bool compatibility,const SpriteCollisionPack& sprites,Refresh refreshBounds,bool& hit){
+        if(!valid()||!live(h))return false;
+        auto& state=entries_[h.slot].state;
+        if(state.special&&sprite.maskId<0)return checked(false);
+        if((state.flags&8u)&&!checked(refreshBounds(h,true)))return false;
+        bool inside=false;
+        if(!checked(RunnerLineBounds::test(args,state.bounds,compatibility,
+            (state.flags&0x100001u)!=0,inside)))return false;
+        if(!inside){hit=false;return true;}
+        if(!sprites.valid())return checked(false);
+        PackedSpriteCollision resource;
+        hit=sprites.collisionSprite(sprite.spriteId,sprite.maskId,resource)&&resource.frameCount;
+        return true;
+    }
     // Ordinary candidate portion of position_meeting, 0x465520. The outer
     // query owns suppression, inactivity, family filtering and traversal.
     // Dirty bounds refresh precedes even destroyed/bounds rejection here.
@@ -517,6 +538,41 @@ public:
         }else membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});
         if(!checked(good))return false;
         hit=result;return true;
+    }
+    // collision_line object-resource selector, 0x4fd370. Args have passed the
+    // VM float wrapper. Family preparation selects list/tree; tree queries
+    // flush dirty bounds and filter kind/family before the candidate call.
+    template<class Graph,class Refresh,class Candidate>
+    bool collisionLine(InstanceHandle self,int object,const RunnerLineArguments& args,bool notMe,
+        bool allPrepared,Graph& graph,Refresh refreshBounds,Candidate candidate,Result& result){
+        if(!valid()||object<0||object>=100000||!graph.valid()||!graph.flags(unsigned(object)))return false;
+        if(!checked(Math::valid(args.x1)&&Math::valid(args.y1)&&Math::valid(args.x2)&&Math::valid(args.y2))||
+           (notMe&&!live(self)))return false;
+        auto isA=[&](int child,int parent){return graph.isA(child,parent);};
+        using Prep=RunnerSpatialObjectPreparation;
+        const auto path=Prep::prepare(membership_.count(object,isA),index_.height(),
+            *graph.flags(unsigned(object)),allPrepared,[&]{return graph.markSpatialFamily(unsigned(object));},
+            [&](auto emit){membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){
+                auto& state=entries_[slot].state;return emit(slot,state.flags,state.bounds);
+            });},[&](unsigned slot,auto&,auto&){return refreshBounds(handle(slot),false);},
+            [&](Box box,unsigned slot){return index_.insert(box,slot);});
+        if(path==Prep::Path::failed)return checked(false);
+        if(path==Prep::Path::none){result={};return true;}
+        const bool indexed=path==Prep::Path::spatial;
+        if(indexed&&!checked(flush(refreshBounds)))return false;
+        Result next;bool good=true;
+        auto visit=[&](unsigned slot){
+            if(slot>=Capacity||entries_[slot].object<0){good=false;return false;}
+            const auto h=handle(slot);const auto& entry=entries_[slot];
+            if((entry.state.flags&0x100003u)||(notMe&&h.slot==self.slot&&h.generation==self.generation)||
+               (indexed&&(entry.state.kind!=1||!isA(entry.object,object))))return true;
+            bool hit=false;if(!candidate(h,args,hit)){good=false;return false;}
+            if(hit){next={true,h};return false;}return true;
+        };
+        if(indexed){if(!index_.queryLine(args,visit))good=false;}
+        else membership_.visit(object,isA,[&](unsigned slot,std::uint32_t){return visit(slot);});
+        if(!checked(good))return false;
+        result=next;return true;
     }
     // collision_point object-resource path, 0x4fd79c. This is deliberately NOT
     // point()/position_meeting: no family preparation, no index query and no

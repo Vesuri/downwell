@@ -25,6 +25,46 @@ struct Graph {
 };
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
+    for(unsigned mode=0;mode<4;++mode){
+        Owner owner;Graph graph;const InstanceHandle first{9,1},second{4,1};
+        assert(owner.attach(first,1,{})&&owner.attach(second,2,{}));
+        unsigned refreshes=0,candidates=0;
+        const Owner::Box box{{},{},{0x41800000},{0x41800000}};
+        auto refresh=[&](InstanceHandle h,bool publish){++refreshes;return owner.refresh(h,*graph.flags(owner.objectId(h)),false,&box,true,publish);};
+        if(mode==2)assert(owner.setExclusions(first,2));
+        RunnerLineArguments args{{0xc0800000},{0x40800000},{0x41a00000},{0x40800000}};
+        Owner::Result result{true,{55,99}};
+        const bool ok=owner.collisionLine(first,0,args,mode==1,false,graph,refresh,
+            [&](InstanceHandle h,const RunnerLineArguments& received,bool& hit){
+                ++candidates;assert(h.slot==(mode==1||mode==2?4u:9u));
+                assert(received.x1.bits==args.x1.bits&&received.x2.bits==args.x2.bits);
+                hit=true;return mode!=3;
+            },result);
+        assert(candidates==1&&refreshes==(mode==2?1u:2u));
+        assert(graph.values[0]&0x20); // Source family preparation ran.
+        if(mode==3){assert(!ok&&!owner.valid()&&result.handle.slot==55);continue;}
+        assert(ok&&result.found&&result.handle.slot==(mode==1||mode==2?4u:9u));
+    }
+    {
+        Owner owner;Graph graph;graph.values[3]=0x18;
+        for(unsigned i=0;i<40;++i){
+            Owner::State state;state.flags=0;
+            assert(state.x.assign(MotionBinary64::fromInteger(int(i)*32)));
+            state.bounds={state.x,{},state.x,{0x41800000}};
+            assert(owner.attach({i,1},3,state));
+            assert(owner.publishBirth({i,1},graph,[&](InstanceHandle h,bool publish){
+                return owner.refresh(h,graph.values[3],false,&state.bounds,true,publish);
+            }));
+        }
+        Owner::State target;target.kind=7;
+        assert(owner.attach({60,1},1,target));
+        unsigned calls=0;Owner::Result result;
+        assert(owner.collisionLine({},0,{},false,false,graph,
+            [](auto,bool){assert(false);return false;},
+            [&](InstanceHandle h,const auto&,bool& hit){++calls;assert(h.slot==60);hit=true;return true;},result));
+        assert(calls==1&&result.found&&result.handle.slot==60&&graph.values[0]==0x10);
+        assert(owner.resolve({60,1})->flags&8); // List candidate owns lazy refresh.
+    }
     // collision_point does not share position_meeting's preparation/index
     // branch. Registration order and exclusion flags alone gate candidates.
     for(unsigned mode=0;mode<6;++mode){

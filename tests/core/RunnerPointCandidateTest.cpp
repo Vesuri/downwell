@@ -52,6 +52,36 @@ int main(){
         }else assert(rounded.empty());
         assert(hit==expected);++cases;
     }
+    unsigned lineCases=0;
+    for(unsigned flags:{0u,1u,2u,0x100000u})for(bool compatibility:{false,true})
+    for(int id:{0,1,2,3,-1})for(int maskId:{-1,0,99})
+    for(float x:{-0.01F,0.0F,0.25F,0.99998F,1.0F,1.99F,2.0F}){
+        Owner owner;Owner::State state;state.flags=flags|8;
+        const InstanceHandle h{0,1};assert(owner.attach(h,0,state));
+        Owner::Sprite sprite;sprite.spriteId=id;sprite.maskId=maskId;
+        unsigned refreshed=0;
+        auto refresh=[&](InstanceHandle key,bool publish){
+            ++refreshed;assert(key.slot==h.slot&&publish);
+            const Owner::Box b{{},{},real(1),real(1)};
+            return owner.refresh(key,0,false,&b,true,publish);
+        };
+        const RunnerLineArguments args{real(x),real(0.25F),real(x),real(0.75F)};
+        bool hit=true;assert(owner.nonPreciseLineCandidate(h,sprite,args,compatibility,sprites,refresh,hit));
+        const int selected=maskId<0?id:maskId;
+        const bool expected=x>=0 && x<(compatibility?2.f:1.f-0.00001f) &&
+            !(flags&0x100001u)&&selected>=0&&selected<4&&selected!=2;
+        assert(refreshed==1&&hit==expected);++lineCases;
+        // Clean bounds bypass refresh, and a stale lifetime cannot enter it.
+        assert(owner.nonPreciseLineCandidate(h,sprite,args,compatibility,sprites,refresh,hit)&&refreshed==1);
+        assert(!owner.nonPreciseLineCandidate({0,2},sprite,args,compatibility,sprites,refresh,hit)&&refreshed==1);
+    }
+    {
+        Owner owner;const InstanceHandle h{0,1};assert(owner.attach(h,0,{}));
+        Owner::Sprite sprite;sprite.spriteId=0;bool hit=true;
+        assert(!owner.nonPreciseLineCandidate(h,sprite,{},true,sprites,[](auto,bool){return false;},hit));
+        assert(hit&&!owner.valid());
+    }
+    std::printf("Non-precise line candidate: %u resource/bounds/flags cases and refresh/failure order passed\n",lineCases);
     // Negative image index uses positive modulo, and a clean box is not refreshed.
     Owner owner;Owner::State state;state.flags=0;state.bounds={{},{},real(1),real(1)};
     const InstanceHandle h{0,1};assert(owner.attach(h,0,state));

@@ -66,10 +66,22 @@ search. The spatial branch flushes dirty bounds, orders endpoints by X (ties
 take the reverse branch), forms float differences, and traverses 0x500860
 using callback 0x5014c0. That callback filters flags, kind 1, family and `notme`
 before candidate 0x4650b0; it stops on the first hit rather than sorting by
-distance. The fallback object list also returns its first hit. The exact line
-traversal and candidate geometry must be implemented before switching live
-projectile selection; the existing rectangle-segment intersection is not a
-verified replacement.
+distance. The fallback object list also returns its first hit.
+`RunnerSpatialInstances::collisionLine` preserves this object-selector
+dispatch, passing the original narrowed arguments to candidates and latching
+partial preparation/query failures. Special all/instance-ID selectors and
+collect-all are outside this entry point.
+
+`nonPreciseLineCandidate` refreshes dirty bounds before rejection, applies
+the candidate geometry from 0x46517c, then requires an existing nonempty
+sprite or mask resource. The collision pack admits only ordinary box/precise
+bitmap modes; special and rotated-box resources are not approximated.
+`RunnerLineBounds` preserves the original narrowed endpoints (without
+reconstructing endpoint 2 from a float delta), retains order on equal X, and
+clips against right+extension rather than the tree gate's unextended right.
+Compatibility extension is +1; fractional mode uses float -0.00001.
+The API explicitly requests non-precise behavior, as the usual gun does.
+Precise bitmap line sampling is not implemented by this candidate.
 
 `RunnerSpatialLine` transcribes the normal/zero arithmetic of the tree gates:
 each add/subtract/multiply/divide narrows to binary32, right/bottom broad-phase
