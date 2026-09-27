@@ -1179,8 +1179,15 @@ still resolve the same record, as required by the wall event's destroy-then-
 deactivate sequence. Failed publication latches the terrain store; previously
 accepted effects remain, and later callbacks do not execute. Repeated accepted
 destruction requests do not republish. Room clear retires those retained records
-normally. Per-event cleanup and activation-membership reconciliation are still
-required before live wall dispatch; this API does not implement those boundaries.
+normally. `retireMarked(handle)` accepts a handle from the world's cross-family
+cleanup traversal, retires collision ownership before freeing storage, and
+preserves surviving record addresses and birth-relative iteration order. Reused
+slots receive fresh monotonically increasing lifetime IDs. A compact slot-order
+array costs 8 KiB at capacity 2048; it is not a room traversal oracle. Failed
+retirement leaves its record available, while successful room-clear prefixes
+are removed from the reported population even if a later callback fails.
+The world cleanup traversal and activation-membership reconciliation are still
+required before live wall dispatch; these APIs do not choose those boundaries.
 Generated records have no authored ID. Their local lifetime keys remain separate
 from source IDs. Unsupported room transforms/pre-create properties are rejected
 when identity tracking is installed, not silently flattened. A room-load guard

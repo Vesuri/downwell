@@ -55,6 +55,24 @@ int main(){
         const auto h=terrain->handle(0);
         assert(!terrain->requestDestroy(h)&&!terrain->find(h)->destroyRequested&&!terrain->valid());
     }
+    {
+        TerrainDestructionAudit audit;
+        auto store=std::make_unique<GameplayTerrainInstances>(GameplayTerrainInstances::Binding::bindDestruction(audit));
+        audit.store=store.get();
+        for(unsigned i=0;i<32;++i)assert(store->append(60,int(i),0,true));
+        for(unsigned i=0;i<4096;++i){
+            const unsigned index=(i*13u)%32u;const auto old=store->handle(index);
+            InstanceHandle survivors[31];const GameplayTerrainInstances::Record* pointers[31];unsigned n=0;
+            for(unsigned j=0;j<32;++j)if(j!=index){survivors[n]=store->handle(j);pointers[n]=store->find(survivors[n]);++n;}
+            assert(store->requestDestroy(old)&&store->retireMarked(old)&&!store->find(old)&&store->size()==31);
+            assert(store->append(60,int(i),0,true));const auto fresh=store->handle(31);
+            assert(fresh.slot==old.slot&&fresh.generation>old.generation&&!store->find(old));
+            for(unsigned j=0;j<31;++j)assert(store->handle(j).slot==survivors[j].slot&&store->find(survivors[j])==pointers[j]);
+        }
+        const auto rejected=store->handle(7);assert(store->requestDestroy(rejected));audit.failRetire=audit.retires+1;
+        assert(!store->retireMarked(rejected)&&!store->valid()&&store->size()==32&&store->find(rejected));
+        assert(!store->retireMarked(rejected)&&audit.retires==audit.failRetire);
+    }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
@@ -161,6 +179,16 @@ int main(){
     assert(owner->terrain().requestDestroy(wallLocal)); // repeated request retains the same lifetime
     assert(owner->terrain().activation(wallLocal,false)&&!dying->active&&
         (owner->state(wall)->flags&3u)==3u&&owner->terrain().find(wallLocal)==dying);
+    const auto* survivor=owner->terrain().find(owner->terrain().handle(1));
+    const auto survivorHandle=owner->terrain().handle(1);
+    assert(owner->terrain().retireMarked(wallLocal)&&!owner->terrain().find(wallLocal)&&!owner->state(wall));
+    assert(owner->terrain().size()==2&&owner->terrain().handle(0).slot==survivorHandle.slot&&
+        owner->terrain().find(survivorHandle)==survivor&&owner->state(otherWall));
+    assert(world->createGeneratedInstance({60,240,512},objects,terrain));
+    const auto replacement=owner->terrain().handle(2);
+    assert(replacement.slot==wallLocal.slot&&replacement.generation!=wallLocal.generation&&
+        !owner->terrain().find(wallLocal)&&owner->terrain().find(survivorHandle)==survivor);
+    assert(owner->terrain().find(replacement)->spriteId==51&&!owner->terrain().find(replacement)->destroyRequested);
     // A backend rejection must not invent an identity for a cell it rejected.
     assert(!world->createGeneratedInstance({60,1,2},objects,[](const auto&){return false;})&&owner->terrain().size()==3);
     world->step(0);
@@ -215,6 +243,7 @@ int main(){
         audit.failRetire=2;
         assert(!store->clear()&&!store->valid()&&audit.retires==2);
         assert(!store->find(first)&&store->find(second)); // Successful prefix is not rolled back.
+        assert(store->size()==1&&store->handle(0).slot==second.slot);
         assert(!store->clear()&&audit.retires==2&&!store->append(60,5,6,true));
     }
     {

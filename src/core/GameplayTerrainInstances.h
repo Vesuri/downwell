@@ -30,18 +30,21 @@ public:
     bool valid()const{return good_;}
     unsigned size()const{return count_;}
     const Record* find(InstanceHandle h)const{
-        return h.slot<count_&&h.generation&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
+        return h.slot<capacity&&h.generation&&records_[h.slot].lifetimeId==h.generation?&records_[h.slot]:nullptr;
     }
     InstanceHandle handle(unsigned index)const{
-        return index<count_?InstanceHandle{index,records_[index].lifetimeId}:InstanceHandle{};
+        return index<count_?InstanceHandle{order_[index],records_[order_[index]].lifetimeId}:InstanceHandle{};
     }
     bool append(int object,int x,int y,bool active,std::uint32_t sourceId=0,int creationCode=-1){
         if(!good_)return false;
         if((object!=60&&object!=93)||count_==capacity||!next_)return good_=false;
-        const unsigned slot=count_++;
+        unsigned slot=freeHint_;
+        while(slot<capacity&&records_[slot].lifetimeId)++slot;
+        if(slot==capacity)return good_=false;
+        freeHint_=slot+1;order_[count_++]=slot;
         auto& r=records_[slot];r={object,x,y,active,next_++,sourceId,creationCode};
         // Expose the actual record to synchronous birth callbacks.
-        if(!binding_.birth(handle(slot),r))return good_=false;
+        if(!binding_.birth({slot,r.lifetimeId},r))return good_=false;
         return true;
     }
     bool appendRoom(const PackedRoomInstance& r){
@@ -88,14 +91,30 @@ public:
         if(!binding_.activation(h,r,active))return good_=false;
         r.active=active;return true;
     }
+    // The world scheduler supplies the runner's cross-family cleanup order.
+    // Do not invent a terrain-only sweep or retire during the game callback.
+    bool retireMarked(InstanceHandle h){
+        if(!good_||!find(h)||!records_[h.slot].destroyRequested)return good_=false;
+        unsigned index=0;while(index<count_&&order_[index]!=h.slot)++index;
+        if(index==count_)return good_=false;
+        if(!binding_.retire(h,records_[h.slot]))return good_=false;
+        records_[h.slot].lifetimeId=0;
+        if(h.slot<freeHint_)freeHint_=h.slot;
+        for(unsigned i=index+1;i<count_;++i)order_[i-1]=order_[i];
+        --count_;return true;
+    }
     bool clear(){
         if(!good_)return false;
+        unsigned retired=0;
         for(unsigned i=0;i<count_;++i){
-            auto& r=records_[i];
-            if(!binding_.retire(handle(i),r))return good_=false;
-            r.lifetimeId=0;
+            const auto h=handle(i);auto& r=records_[h.slot];
+            if(!binding_.retire(h,r)){good_=false;break;}
+            r.lifetimeId=0;++retired;
+            if(h.slot<freeHint_)freeHint_=h.slot;
         }
-        count_=0;return true; // Never reset the generation sequence on Retry.
+        for(unsigned i=retired;i<count_;++i)order_[i-retired]=order_[i];
+        count_-=retired;
+        return good_; // Never reset the generation sequence on Retry.
     }
 private:
     // Metadata comparison only: do not pull floating-point helpers into the
@@ -106,7 +125,9 @@ private:
     }
     Binding binding_;
     Record records_[capacity]{};
+    unsigned order_[capacity]{}; // Birth order, independent of reusable identity slots.
     unsigned count_=0;
+    unsigned freeHint_=0;
     std::uint32_t next_=1;
     bool good_=true;
 };
