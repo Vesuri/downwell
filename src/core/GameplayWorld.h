@@ -20,6 +20,7 @@
 #include "core/GameplayGoalFields.h"
 #include "core/GameplayExitControllers.h"
 #include "core/GameplayScriptSpawnInstances.h"
+#include "core/GameplayDebrisInstances.h"
 #include "core/ScriptSpawnOperations.h"
 #include "core/EffectSpawnScript.h"
 #include "core/AreaOneBuilder.h"
@@ -219,6 +220,34 @@ public:
                               downwell::GameplayTerrainInstances* terrainInstances = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
+    const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
+    bool bindDebrisInstances(downwell::GameplayDebrisInstances& instances){
+        if(debrisInstances_||!instances.valid()||instances.size())return false;
+        debrisInstances_=&instances;return true;
+    }
+    // Borrowed fixed storage must outlive the registered particles and retry.
+    // Natural combat admission follows after source Step/Draw integration.
+    template<unsigned Capacity>
+    bool spawnDebris(downwell::DebrisEffects<Capacity>& effects,downwell::MotionBinary64 x,
+        downwell::MotionBinary64 y,int area,downwell::InstanceHandle& result){
+        if(!run_.effectsSucceeded)return false;
+        if(!debrisInstances_||!roomAnimation_)return run_.effectsSucceeded=false;
+        if(debrisBinding_.effects!=&effects){
+            if(debrisInstances_->size())return run_.effectsSucceeded=false;
+            debrisBinding_=downwell::ScriptEffectRuntimeBinding::bind<downwell::GameplayDebrisInstances::Record>(effects,*debrisInstances_);
+        }
+        const auto h=effects.createRegistered(x,y,area,enemyRandom_,*debrisInstances_);
+        if(!h)return run_.effectsSucceeded=false;
+        result=debrisInstances_->handle(h);return run_.effectsSucceeded=result.generation!=0;
+    }
+    bool advanceDebrisRoomAnimation(downwell::InstanceHandle key){
+        const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&record&&debrisBinding_.advance(key,record);
+    }
+    bool retireDebrisRoomEffect(downwell::InstanceHandle key){
+        const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
+        return run_.effectsSucceeded=run_.effectsSucceeded&&record&&debrisBinding_.retire(key,record);
+    }
     bool bindScriptSpawnInstances(downwell::GameplayScriptSpawnInstances& instances){
         if(scriptSpawnInstances_||!instances.valid()||instances.size())return false;
         scriptSpawnInstances_=&instances;return true;
@@ -668,6 +697,11 @@ public:
 private:
     EnemyLifecycleBinding enemyLifecycle_;
     downwell::ScriptEffectRuntimeBinding scriptEffectsBinding_;
+    downwell::ScriptEffectRuntimeBinding debrisBinding_;
+    bool clearRoomDebris(){
+        if(debrisInstances_&&debrisInstances_->size()&&!debrisBinding_.clearRoom())return run_.effectsSucceeded=false;
+        debrisBinding_={};return true;
+    }
     downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity> ownedScriptEffects_;
     bool clearRoomScriptEffects(){
         if(scriptSpawnInstances_&&scriptSpawnInstances_->size()&&
@@ -693,6 +727,7 @@ private:
     PlayerLifecycleBinding playerLifecycle_;
     downwell::GameplayTerrainInstances* terrainInstances_=nullptr;
     downwell::GameplayScriptSpawnInstances* scriptSpawnInstances_=nullptr;
+    downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     bool roomTerrainLoaded_=false;
     PlayerInstance playerInstance_;
     std::uint32_t nextPlayerLifetimeId_=1;

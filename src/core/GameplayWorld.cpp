@@ -37,6 +37,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
         downwell::DeathMenuSequence::Action action, std::uint32_t seed, unsigned initialRingOrigin) {
     const auto destination = downwell::resultsDestination(action);
     if (destination == downwell::ResultsDestination::none) return destination;
+    if(!clearRoomDebris())return downwell::ResultsDestination::none;
     if(!clearRoomScriptEffects())return downwell::ResultsDestination::none;
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return downwell::ResultsDestination::none;
@@ -46,6 +47,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
     const auto scriptSpawnInstances=scriptSpawnInstances_;
+    const auto debrisInstances=debrisInstances_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     void* const roomAnimationContext=roomAnimationContext_;
@@ -81,6 +83,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances);
     nextBreakableLifetimeId_=nextBreakableIdentity;
     scriptSpawnInstances_=scriptSpawnInstances;
+    debrisInstances_=debrisInstances;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureRoomActorDraw(roomActorDraw,roomActorDrawContext);
@@ -769,6 +772,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if (run_.levelClearActive || !run_.effectsSucceeded || !generationSucceeded_) return {}; // Result owner uses stepLevelClear.
     if(scriptSpawnInstances_&&scriptSpawnInstances_->size())scriptEffectsBinding_.beginAnimation();
     else scriptEffectsBinding_={};
+    if(debrisInstances_&&debrisInstances_->size())debrisBinding_.beginAnimation();
+    else debrisBinding_={};
     // Only valid unit-sequence state is admitted through the effect owner.
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();

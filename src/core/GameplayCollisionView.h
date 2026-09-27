@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -17,7 +17,8 @@ public:
     static constexpr unsigned exitControllerBase=goalFieldBase+GameplayGoalFields::capacity;
     static constexpr unsigned bulletBase=exitControllerBase+GameplayExitControllers::capacity;
     static constexpr unsigned scriptEffectBase=bulletBase+GameplayWorld::bulletCapacity;
-    static constexpr unsigned capacity=scriptEffectBase+GameplayScriptSpawnInstances::capacity;
+    static constexpr unsigned debrisBase=scriptEffectBase+GameplayScriptSpawnInstances::capacity;
+    static constexpr unsigned capacity=debrisBase+GameplayDebrisInstances::capacity;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -28,6 +29,7 @@ public:
         const GameplayExitControllers::Record* exitController=nullptr;
         const GameplayWorld::BulletState* bullet=nullptr;
         const GameplayScriptSpawnInstances::Record* scriptEffect=nullptr;
+        const GameplayDebrisInstances::Record* debris=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -43,6 +45,7 @@ public:
             case Kind::exitController:base=exitControllerBase;count=GameplayExitControllers::capacity;break;
             case Kind::bullet:base=bulletBase;count=GameplayWorld::bulletCapacity;break;
             case Kind::scriptEffect:base=scriptEffectBase;count=GameplayScriptSpawnInstances::capacity;break;
+            case Kind::debris:base=debrisBase;count=GameplayDebrisInstances::capacity;break;
             default:return false;
         }
         if(local.slot>=count)return false;
@@ -50,8 +53,8 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
-        const unsigned base=key.slot<enemyBase?0:key.slot<breakableBase?enemyBase:key.slot<terrainBase?breakableBase:key.slot<timeFieldBase?terrainBase:key.slot<goalFieldBase?timeFieldBase:key.slot<exitControllerBase?goalFieldBase:key.slot<bulletBase?exitControllerBase:key.slot<scriptEffectBase?bulletBase:scriptEffectBase;
-        kind=base==0?Kind::player:base==enemyBase?Kind::enemy:base==breakableBase?Kind::breakable:base==terrainBase?Kind::terrain:base==timeFieldBase?Kind::timeField:base==goalFieldBase?Kind::goalField:base==exitControllerBase?Kind::exitController:base==bulletBase?Kind::bullet:Kind::scriptEffect;
+        const unsigned base=key.slot<enemyBase?0:key.slot<breakableBase?enemyBase:key.slot<terrainBase?breakableBase:key.slot<timeFieldBase?terrainBase:key.slot<goalFieldBase?timeFieldBase:key.slot<exitControllerBase?goalFieldBase:key.slot<bulletBase?exitControllerBase:key.slot<scriptEffectBase?bulletBase:key.slot<debrisBase?scriptEffectBase:debrisBase;
+        kind=base==0?Kind::player:base==enemyBase?Kind::enemy:base==breakableBase?Kind::breakable:base==terrainBase?Kind::terrain:base==timeFieldBase?Kind::timeField:base==goalFieldBase?Kind::goalField:base==exitControllerBase?Kind::exitController:base==bulletBase?Kind::bullet:base==scriptEffectBase?Kind::scriptEffect:Kind::debris;
         local={key.slot-base,key.generation};return true;
     }
     bool resolve(InstanceHandle key,Record& record)const{
@@ -80,6 +83,9 @@ public:
                 break;
             case Kind::scriptEffect:
                 if(!world_.scriptSpawnInstances()||!(next.scriptEffect=world_.scriptSpawnInstances()->find(local)))return false;
+                break;
+            case Kind::debris:
+                if(!world_.debrisInstances()||!(next.debris=world_.debrisInstances()->find(local)))return false;
                 break;
         }
         record=next;return true;

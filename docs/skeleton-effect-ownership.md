@@ -388,8 +388,21 @@ image index); this adapter does not claim pre-Create registration. Selected
 animation/cleanup dispatch verifies both registry-record identity and the
 effect owner's retained address, not just coincident local IDs. Teardown can
 release records after failure, but a failed registry cannot admit new work.
-The adapter tests cover fractional movement and failure cleanup; neither live
-world's collision-key mapping or global scheduler installs it yet.
+The adapter tests cover fractional movement and failure cleanup.
+
+The native `GameplayCollisionOwner` now installs this registry with a disjoint
+key range after script effects. `GameplayWorld::spawnDebris` accepts borrowed
+fixed storage, consumes the world's RNG, and publishes the completed Create
+state through the resource-backed owner. Debris uses compatibility depth -1000
+instead of the OBJT default. Room animation captures the owner's cutoff and
+dispatches in the existing cross-family room order; explicit Draw-entry cleanup
+retires marked particles. Retry clears borrowed storage before reconstructing
+the world and retains the registry and monotonic identities. The native-owner
+tests cover all five area sprites, full birth RNG, fractional position writes,
+animation publication, marked-record retention and retry. This does not yet
+connect natural combat births, debris alarm/Step dispatch, collision queries or
+Draw submission, nor the SDL stored-world owner. Those paths must be integrated
+before enabling the effect in normal gameplay.
 
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed

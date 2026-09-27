@@ -6,6 +6,7 @@
 #include "RunnerRoomMembership.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
+#include "DebrisDraw.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -63,6 +64,7 @@ private:
             if constexpr(Kind==View::Kind::timeField)return 82;
             if constexpr(Kind==View::Kind::bullet)return 261;
             if constexpr(Kind==View::Kind::scriptEffect)return 219;
+            if constexpr(Kind==View::Kind::debris)return 370;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -83,6 +85,7 @@ private:
             else if constexpr(Kind==View::Kind::exitController)pointer=actual.exitController;
             else if constexpr(Kind==View::Kind::bullet)pointer=actual.bullet;
             else if constexpr(Kind==View::Kind::scriptEffect)pointer=actual.scriptEffect;
+            else if constexpr(Kind==View::Kind::debris)pointer=actual.debris;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
@@ -93,6 +96,9 @@ private:
             Owner::State state;
             if constexpr(Kind==View::Kind::scriptEffect){
                 if(!r.effect||!r.effect->valid)return parent.check(false);
+                state.x=r.effect->x;state.y=r.effect->y;
+            }else if constexpr(Kind==View::Kind::debris){
+                if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
@@ -105,6 +111,12 @@ private:
                 parent.objects_,parent.sprites_,parent.families_,false)))return false;
             PackedObject definition;
             if(!parent.objects_.findObject(object(r),definition)||!real(definition.creationDepth,p.depth))return parent.check(false);
+            if constexpr(Kind==View::Kind::debris){
+                // instance_create uses the compatibility depth table, not the
+                // GMS2 OBJT default; Create also selects area-specific art.
+                if(!real(DebrisDraw::sourceDepth,p.depth))return parent.check(false);
+                p.sprite.spriteId=r.effect->spriteId;p.sprite.imageIndex=r.effect->imageIndex;
+            }
             if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
             parent.roomKeys_[h.slot]=h;
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)parent.activationPending_=true;
@@ -165,6 +177,8 @@ private:
     Binding<GameplayWorld::BulletState,View::Kind::bullet> bullets_{*this};
     Binding<GameplayScriptSpawnInstances::Record,View::Kind::scriptEffect> scriptEffectsBinding_{*this};
     GameplayScriptSpawnInstances scriptEffects_{GameplayScriptSpawnInstances::Binding::bindMaskDestruction(scriptEffectsBinding_)};
+    Binding<GameplayDebrisInstances::Record,View::Kind::debris> debrisBinding_{*this};
+    GameplayDebrisInstances debris_{GameplayDebrisInstances::Binding::bindDestruction(debrisBinding_)};
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
@@ -180,7 +194,7 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid();}
     bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
@@ -189,6 +203,7 @@ public:
         if(!world_&&!world.bindExitControllerLifecycle(GameplayExitControllers::Binding::bind(exits_)))return check(false);
         if(!world_&&!world.bindBulletLifecycle(GameplayWorld::BulletLifecycleBinding::bindMaskDestruction(bullets_)))return check(false);
         if(!world_&&!world.bindScriptSpawnInstances(scriptEffects_))return check(false);
+        if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         world_=&world;
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -223,6 +238,7 @@ public:
                     case View::Kind::enemy:return self.world_->advanceEnemyRoomAnimation(local);
                     case View::Kind::bullet:return self.world_->advanceBulletRoomAnimation(local);
                     case View::Kind::scriptEffect:return self.world_->advanceScriptRoomAnimation(local);
+                    case View::Kind::debris:return self.world_->advanceDebrisRoomAnimation(local);
                     default:return true;
                 }
             }));
@@ -273,6 +289,7 @@ public:
     }
     GameplayTerrainInstances& terrain(){return terrain_;}
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
+    GameplayDebrisInstances& debris(){return debris_;}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
     // These take selected shared collision handles, not box-array indices.
@@ -459,6 +476,7 @@ private:
                 case View::Kind::goalField:return record.goalField==world_->goalFieldInstances().find(local)&&world_->retireMarkedGoalField(local);
                 case View::Kind::bullet:return record.bullet==world_->resolveBulletLifetime(local)&&world_->retireMarkedBullet(local);
                 case View::Kind::scriptEffect:return retireEffect(local,record);
+                case View::Kind::debris:return record.debris&&world_->retireDebrisRoomEffect(local);
                 default:return false;
             }
         });

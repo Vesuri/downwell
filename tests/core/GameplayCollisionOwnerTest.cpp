@@ -1,5 +1,9 @@
 #include "core/GameplayCollisionOwner.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeDebrisOwnership(GameplayWorld& world,downwell::DebrisEffects<2>& effects,
+    downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle& key){
+    return world.spawnDebris(effects,{},{},1,key)&&owner.prepareDraw();
+}
 bool nativeScriptSpawn(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects,
     const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle& caller){
     return world.spawnScriptEffect(effects,{},{},603,{0x3fe00000u,0},{},{},
@@ -290,6 +294,55 @@ int main(){
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
+    for(int area=1;area<=5;++area){
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));
+        DebrisEffects<2> effects;auto& registry=collision->debris();InstanceHandle local,key;
+        const MotionBinary64 x{0x406e0800u,0},y{0x40660100u,0};
+        auto expectedRandom=scene->randomState();DebrisAnimation expected;
+        assert(expected.create(x,y,area,expectedRandom));
+        assert(scene->spawnDebris(effects,x,y,area,local));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,local,key));
+        GameplayCollisionView::Kind kind;InstanceHandle decoded;
+        assert(GameplayCollisionView::decode(key,kind,decoded)&&kind==GameplayCollisionView::Kind::debris&&
+            decoded.slot==local.slot&&decoded.generation==local.generation);
+        const auto* record=registry.find(local);assert(record);
+        const auto* state=collision->state(key);const auto* properties=collision->properties(key);
+        RunnerImageValue depth;assert(depth.assign(MotionBinary64::fromInteger(-1000)));
+        assert(state&&state->x.bits==expected.x.bits&&state->y.bits==expected.y.bits&&
+            properties&&properties->depth.bits==depth.bits&&properties->sprite.spriteId==expected.spriteId&&
+            properties->sprite.imageIndex.bits==expected.imageIndex.bits);
+        assert(scene->randomState().drawCount()==expectedRandom.drawCount());
+        assert(scene->randomState().stateIndex()==expectedRandom.stateIndex());
+        for(unsigned word=0;word<16;++word)assert(scene->randomState().stateWord(word)==expectedRandom.stateWord(word));
+        unsigned count=0;assert(collision->population(370,count)&&count==1);
+        assert(expected.advanceImage());scene->step(0);
+        assert(scene->effectsSucceeded()&&record->effect->imageIndex.bits==expected.imageIndex.bits&&
+            collision->properties(key)->sprite.imageIndex.bits==expected.imageIndex.bits);
+        assert(collision->state(key)->previous.x.bits==expected.x.bits);
+        unsigned writes=0;
+        assert(effects.stepRegisteredOne(local.generation,effects.beginPhase(),expectedRandom,
+            [](auto,const auto&,bool& stopped){stopped=false;return true;},
+            [&](auto,const auto& effect,auto,auto,bool& hit){
+                assert(collision->state(key)->x.bits==effect.x.bits&&collision->state(key)->y.bits==effect.y.bits);
+                hit=false;return true;
+            },[&](auto h,const auto& effect,auto px,auto py){++writes;return registry.move(h,effect,px,py);},registry));
+        assert(writes==2&&collision->state(key)->x.bits==record->effect->x.bits&&
+            collision->state(key)->y.bits==record->effect->y.bits);
+        effects.get(local.generation)->alarms.set(0,1);
+        assert(effects.advanceRegisteredAlarmOne(local.generation,effects.beginPhase(),0,registry));
+        assert(collision->state(key)->flags&1u);
+        assert(registry.find(local)==record&&effects.retained(local.generation)==record->effect);
+        assert(collision->prepareDraw()&&!collision->state(key)&&!registry.find(local)&&registry.size()==0);
+        assert(collision->population(370,count)&&count==0);
+        InstanceHandle next;assert(scene->spawnDebris(effects,x,y,area,next)&&next.generation>local.generation);
+        assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
+            !registry.size()&&!effects.size()&&scene->debrisInstances()==&registry&&collision->valid());
+        InstanceHandle renewed;assert(scene->spawnDebris(effects,x,y,area,renewed)&&renewed.generation>next.generation);
+        scene->step(0);assert(scene->effectsSucceeded()&&effects.clear(registry));
+    }
     {
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
