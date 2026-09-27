@@ -197,9 +197,15 @@ collision births use the effect's absolute binary32 coordinates, without native
 origin translation. Setter hooks update the same resource-backed collision
 properties used by other actors. Registry keys are monotonic owner-local
 lifetimes, not Windows numeric IDs. Retire effects before destroying their
-owner or changing rooms. Retry preserves an empty registry and rejects a
-populated one until the live room-exit cleanup path is connected. Automatic
-gun emission, scheduling and drawing remain separate integration requirements.
+owner or changing rooms. The plain native Retry entry point preserves an empty
+registry and rejects a populated one. Both runtimes provide a typed
+`restartFromResultsWithScriptEffects` entry point that clears owned effects
+before rebuilding the world, including effects still awaiting Animation End.
+It neither fabricates Animation End nor clears the caller's saved identity;
+new births cannot revive old handles. No results action performs no cleanup,
+and terminal effect failures cannot be reset through this entry point.
+Automatic scene-owner use, other room transitions, cross-family teardown order,
+gun emission and drawing remain separate integration requirements.
 
 Both runtime `spawnScriptEffect` entry points use `ScriptSpawnOperations` for
 the same creation and setter sequence. They supply resource frame lookup and

@@ -13,6 +13,9 @@ bool nativeScriptCleanup(downwell::GameplayCollisionOwner& owner,downwell::Scrip
 bool nativeScriptTick(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects){
     return world.stepWithScriptEffects(effects,0);
 }
+downwell::ResultsDestination nativeScriptRetry(GameplayWorld& world,downwell::ScriptSpawnEffects<2>& effects){
+    return world.restartFromResultsWithScriptEffects(downwell::DeathMenuSequence::Action::Retry,43,300,effects);
+}
 // Compile-only A500 gate: instantiate the public selectors without the host
 // fixture loader, filesystem, heap-backed assertions or C++ runtime headers.
 bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
@@ -308,7 +311,14 @@ int main(){
         assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
             scene->scriptSpawnInstances()==&registration);
         const auto next=effects.create({}, {},registration);assert(next>first&&!collision->state(key));
-        assert(effects.setSprite(next,602,1,registration)&&effects.clear(registration)&&collision->valid());
+        assert(effects.setSprite(next,602,1,registration));
+        const auto oldHandle=registration.handle(next);
+        assert(scene->restartFromResultsWithScriptEffects(DeathMenuSequence::Action::None,43,300,effects)==ResultsDestination::none&&
+            registration.find(oldHandle)&&effects.size()==1&&scene->effectsSucceeded());
+        assert(scene->restartFromResultsWithScriptEffects(DeathMenuSequence::Action::Retry,43,300,effects)!=ResultsDestination::none&&
+            effects.size()==0&&registration.size()==0&&!registration.find(oldHandle)&&collision->valid());
+        const auto renewed=effects.create({}, {},registration);
+        assert(renewed>next&&!registration.find(oldHandle)&&effects.clear(registration));
         // Failure after Create must poison the actual runtime, retain its
         // completed birth/caller publication and never repeat the event.
         const auto draws=scene->randomDrawCount();unsigned lookups=0;
@@ -318,6 +328,8 @@ int main(){
         assert(!scene->spawnScriptEffect(effects,{},{},603,{},{},{},rejectFrames,caller)&&lookups==1&&
             scene->randomDrawCount()==draws);
         assert(!scene->advanceScriptEffectAnimation(effects,effects.beginPhase())&&effects.size()==1);
+        assert(scene->restartFromResultsWithScriptEffects(DeathMenuSequence::Action::Retry,43,300,effects)==ResultsDestination::none&&
+            effects.size()==1&&registration.find(caller)&&scene->randomDrawCount()==draws);
     }
     assert(masks.valid());
     {

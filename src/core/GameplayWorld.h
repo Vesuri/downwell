@@ -95,6 +95,16 @@ public:
     // Owner must rebuild terrain and rebind callbacks before stepping again.
     downwell::ResultsDestination restartFromResults(downwell::DeathMenuSequence::Action action,
         std::uint32_t seed, unsigned initialRingOrigin);
+    template<unsigned Capacity> downwell::ResultsDestination restartFromResultsWithScriptEffects(
+        downwell::DeathMenuSequence::Action action,std::uint32_t seed,unsigned initialRingOrigin,
+        downwell::ScriptSpawnEffects<Capacity>& effects){
+        using downwell::ResultsDestination;
+        if(!run_.effectsSucceeded||downwell::resultsDestination(action)==ResultsDestination::none)return ResultsDestination::none;
+        if(!scriptSpawnInstances_||!effects.boundTo(*scriptSpawnInstances_)||!effects.valid()||!effects.clear(*scriptSpawnInstances_)){
+            run_.effectsSucceeded=false;return ResultsDestination::none;
+        }
+        return restartFromResults(action,seed,initialRingOrigin);
+    }
     void confirmFirstStage() { if (run_.stage.area == 0) run_.stage.advance(1); }
 
     struct BulletState {

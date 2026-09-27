@@ -93,6 +93,14 @@ public:
     // Call at a room-transition boundary, after consuming the results action.
     // Seed is explicit so randomize can be recorded/replayed by the platform.
     bool restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed);
+    template<unsigned Capacity,unsigned Registered> bool restartFromResultsWithScriptEffects(
+        DeathMenuSequence::Action action,std::uint32_t seed,
+        StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,ScriptSpawnEffects<Capacity>& effects){
+        if(!run_.effectsSucceeded||resultsDestination(action)==ResultsDestination::none)return false;
+        if(!registration.belongsTo(instances_)||!effects.boundTo(registration)||!effects.valid()||!effects.clear(registration))
+            return run_.effectsSucceeded=false;
+        return restartFromResults(action,seed);
+    }
     void step(bool advancePressed);
     void step(const Input& input, bool advancePressed);
 

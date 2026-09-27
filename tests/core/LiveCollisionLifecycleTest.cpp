@@ -934,6 +934,8 @@ int main(){
             "failed script creation cannot replay earlier side effects or consume RNG");
         require(!world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase())&&world->instance(next),
             "failed world cannot advance or retire the partially created effect");
+        require(!world->restartFromResultsWithScriptEffects(DeathMenuSequence::Action::Retry,43,registration,effects)&&
+            world->instance(next)&&world->randomDrawCount()==random,"failed effect world cannot reset itself through Retry");
     }
     {
         auto collision=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
@@ -960,6 +962,20 @@ int main(){
             "scheduled effects retire through explicit typed cleanup");
         world->step({},false);
         require(world->effectsSucceeded(),"scoped animation callback does not survive its tick");
+        const auto birthSequence=effects.birthSequence().next;
+        require(spawn(first),"create still-live effect before Retry");
+        require(!world->restartFromResultsWithScriptEffects(DeathMenuSequence::Action::None,43,registration,effects)&&
+            world->instance(first)&&effects.size()==1&&world->effectsSucceeded(),"no results action preserves live effects");
+        InstancePlaceResult old;
+        require(collision->collisionPoint({},219,MotionBinary64::fromInteger(int(world->mainPlayerX())),
+            MotionBinary64::fromInteger(int(world->mainPlayerY())),false,false,old)&&old.id==int(first),
+            "capture old effect collision identity before Retry");
+        require(world->restartFromResultsWithScriptEffects(DeathMenuSequence::Action::Retry,43,registration,effects)&&
+            effects.size()==0&&!world->instance(first)&&!collision->resolve(old.handle),
+            "Retry retires unmarked effects through typed ownership before replacing the room");
+        require(spawn(second)&&second!=first&&effects.birthSequence().next>birthSequence&&!collision->resolve(old.handle),
+            "new room cannot revive old script-effect identity");
+        require(effects.clear(registration),"retire renewed effect before fixture teardown");
     }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
