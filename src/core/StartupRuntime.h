@@ -139,15 +139,30 @@ public:
     bool playerTimeFieldMeeting(MotionBinary64 x,MotionBinary64 y,bool& hit);
     bool playerOutsideTimeStopSides(MotionBinary64 x,bool& outside);
     bool timeShardOutsideView(RunnerImageValue publishedY,bool& retire);
+    // Install a collision pass for exactly one ordinary tick. The scheduler
+    // invokes it after Step reconciliation and before End Step. No callback or
+    // borrowed state survives this call, including on terminal failure.
+    template<class Collisions> bool stepWithCollisionPass(const Input& input,bool advancePressed,Collisions collisions){
+        if(!run_.effectsSucceeded)return false;
+        if(collisionDispatch_){run_.effectsSucceeded=false;return false;}
+        collisionContext_=&collisions;
+        collisionDispatch_=[](void* context){return (*static_cast<Collisions*>(context))();};
+        step(input,advancePressed);
+        collisionDispatch_=nullptr;collisionContext_=nullptr;
+        return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;
+    }
     // Scoped animation/alarm/Step ownership for one ordinary world tick. No borrowed
-    // callback survives the call. Contacts are not supplied yet. The optional
+    // callback survives the call. The optional collision pass shares this tick;
+    // callers must route all admitted handlers, not silently discard unknowns.
+    // The optional
     // transition callback runs at the shared player's source Begin Step boundary.
     struct NoTimeTransition {bool operator()(const InstanceRecord&,const PlayerMotion&,int,int)const{return true;}};
+    struct NoCollisionPass {bool operator()()const{return true;}};
     enum class TimeEffectPhase {animation,alarm,step,playerBegin};
-    template<unsigned Capacity,unsigned Registered,unsigned Changes,class Transition=NoTimeTransition> bool stepWithTimeStopEffects(
+    template<unsigned Capacity,unsigned Registered,unsigned Changes,class Transition=NoTimeTransition,class Collisions=NoCollisionPass> bool stepWithTimeStopEffects(
         StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
-        const Input& input,bool advancePressed=false,Transition transition={}){
+        const Input& input,bool advancePressed=false,Transition transition={},Collisions collisions={}){
         if(!run_.effectsSucceeded)return false;
         if(timeEffectDispatch_||!state.succeeded||!state.shards.succeeded()||!state.changes.succeeded()||
             !shards.belongsTo(instances_)||!changes.belongsTo(instances_)||
@@ -166,9 +181,9 @@ public:
         timeEffectDispatch_=[](void* context,InstanceRecord& record,TimeEffectPhase phase,unsigned index){
             return (*static_cast<decltype(dispatch)*>(context))(record,phase,index);
         };
-        step(input,advancePressed);
+        const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
         timeEffectDispatch_=nullptr;timeEffectContext_=nullptr;
-        return run_.effectsSucceeded;
+        return ok;
     }
     // Explicit Begin Step boundary; the scheduler supplies synchronous audio,
     // shake, pause and oxygen effects. Registrations must
@@ -540,6 +555,8 @@ private:
     int showSplash_ = 0;
     InstanceStore<instanceCapacity> instances_;
     InstanceLifecycleBinding lifecycle_;
+    void* collisionContext_=nullptr;
+    bool (*collisionDispatch_)(void*)=nullptr;
     void* timeEffectContext_=nullptr;
     bool (*timeEffectDispatch_)(void*,InstanceRecord&,TimeEffectPhase,unsigned)=nullptr;
     const RoomPack* roomPack_ = nullptr;

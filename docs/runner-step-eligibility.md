@@ -91,8 +91,20 @@ the legacy host room-change timing has not yet been adopted as source truth.
 the existing whole-executable hash guard. The scheduler's optional checked
 collision callback runs after Step reconciliation and before End Step,
 followed by another reconciliation. It does not yet enumerate collision pairs.
-Its tests cover phase placement, collision births, activation/destruction and
-failure cutoffs, not original collision ordering or backend integration.
+`StartupRuntime::stepWithCollisionPass` installs that callback for one ordinary
+tick and removes it on return, including failure. `stepWithTimeStopEffects` can
+compose it with registered animation, alarm and Step effects in the same tick.
+A failed pass stops End Step and post-scheduler gameplay work; recursive scoped
+ticks latch failure even if the outer callback ignores the error. The live
+fixture executes collected shard contacts at this boundary and verifies that
+cooldown contacts consume no RNG and the callback cannot survive into another
+tick. Scheduler tests also cover collision births and membership reconciliation.
+
+Normal host gameplay still uses legacy contact loops after End Step, and the
+native scheduler has not adopted this pass. Admitting all handlers requires
+moving their existing work to the source phases and removing the replaced
+routes; do not enable the pass alongside duplicate contacts or skip unknown
+handlers. Engine movement and pending-room semantics remain explicit inputs.
 
 ### Collision candidate collection evidence
 

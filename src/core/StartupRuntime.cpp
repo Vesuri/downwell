@@ -405,7 +405,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
                 run_.stepDamageNumbers(run_.damageNumbers.beginPhase());
             if(phase==StepEventPhase::step)smokeStepPhase=run_.smokeEffects.beginPhase();
         },[this](InstanceHandle h,const InstanceRecord& record,bool member){return lifecycle_.membership(h,record,member);},
-        [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;})){
+        [this]{return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;},
+        [this]{return !collisionDispatch_||collisionDispatch_(collisionContext_);})){
         run_.effectsSucceeded=false;return;
     }
     if (deferredInstances_.size() != 0)

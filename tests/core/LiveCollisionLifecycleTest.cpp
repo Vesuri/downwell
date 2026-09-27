@@ -297,11 +297,31 @@ int main(){
         RunnerImageValue expectedX,expectedY;
         std::memcpy(&expectedX.bits,&beforeFrame->preciseX,4);
         std::memcpy(&expectedY.bits,&beforeFrame->preciseY,4);
-        world->step(Input{},false);
+        unsigned scheduledPasses=0,scheduledContacts=0;
+        require(world->stepWithCollisionPass(Input{},false,[&]{
+            ++scheduledPasses;
+            const auto before=world->randomDrawCount();
+            return owner->collectCollisionPairs(*pairs,true)&&
+                owner->executeCollisionPairs(*world,*pairs,eventContext,motion,
+                    []{return RunnerCollisionEventContext::RoomState{true,false};},
+                    [&](const RunnerCollisionEventContext::Frame& frame){
+                        const auto* self=owner->resolve(frame.self);const auto* other=owner->resolve(frame.other);
+                        if(!self||!other||frame.code!=2081||self->objectId!=238||other->objectId!=35)return false;
+                        for(unsigned h=1;h<=3;++h)if(shards.sourceId(h)==self->instanceId){
+                            ++scheduledContacts;
+                            return world->contactTimeShard(registration,shards,h,{},{});
+                        }
+                        return false;
+                    })&&world->randomDrawCount()==before;
+        })&&scheduledPasses==1&&scheduledContacts>0,
+            "ordinary scheduler executes live collected contacts once; cooldown consumes no RNG");
         RunnerCollisionMotion::Previous previous;
         require(world->effectsSucceeded()&&owner->collisionPreviousPosition(tracked,previous)&&
             previous.x.bits==expectedX.bits&&previous.y.bits==expectedY.bits,
             "ordinary live tick snapshots authoritative position before animation and Step");
+        world->step(Input{},false);
+        require(world->effectsSucceeded()&&scheduledPasses==1,
+            "borrowed collision callback is removed before the next ordinary tick");
         const auto savedRecord=*owner->resolve(tracked);
         const auto drawsBeforeMove=world->randomDrawCount();
         RunnerImageValue movedX{0x43706000u},movedY{0x4330a000u}; // 240.375, 176.625
@@ -327,6 +347,22 @@ int main(){
         require(!world->publishCollisionPosition({tracked.slot,tracked.generation+1},movedX,movedY)&&
             !world->effectsSucceeded()&&!world->publishCollisionPosition(tracked,movedX,movedY),
             "stale collision publication latches world failure and prevents retry");
+    }
+    for(bool recursive:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach failing collision phase world");world->skipToGameForTesting();
+        unsigned calls=0;std::uint32_t draws=0;
+        require(!world->stepWithCollisionPass(Input{},false,[&]{
+            ++calls;draws=world->randomDrawCount();
+            if(!recursive)return false;
+            require(!world->stepWithCollisionPass(Input{},false,[]{return true;}),"reject recursive scoped collision tick");
+            return true; // Ignoring nested failure must not resume End Step.
+        })&&!world->effectsSucceeded()&&calls==1&&world->randomDrawCount()==draws,
+            "collision failure stops later phases and latches ignored nested errors");
+        const auto tick=world->tick();
+        require(!world->stepWithCollisionPass(Input{},false,[&]{++calls;return true;})&&
+            calls==1&&world->tick()==tick,"failed collision world cannot resume or reuse borrowed callback");
     }
     auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"bind full source families");
     RecordingLifecycle lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
@@ -467,7 +503,12 @@ int main(){
         for(unsigned tick=1;tick<=14;++tick){
             auto expectedAnimation=*state.shards.get(1);
             require(expectedAnimation.advanceImage(),"portable source shard animation oracle");
-            require(world->stepWithTimeStopEffects(shards,changes,state,Input{}),"normal world tick dispatches registered effects");
+            unsigned collisions=0;
+            require(world->stepWithTimeStopEffects(shards,changes,state,Input{},false,StartupRuntime::NoTimeTransition{},[&]{
+                ++collisions;
+                return state.shards.get(1)->imageIndex.bits==expectedAnimation.imageIndex.bits&&
+                    world->instance(shardId)->alarms.get(0)==lifetime-int(tick);
+            })&&collisions==1,"time effects and collision pass share one tick after animation and alarms");
             require(state.shards.get(1)->imageIndex.bits==expectedAnimation.imageIndex.bits&&
                 state.shards.get(1)->timeline.bits==expectedAnimation.timeline.bits,
                 "world animation traversal advances each registered shard exactly once");
