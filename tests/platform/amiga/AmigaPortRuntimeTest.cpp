@@ -1143,9 +1143,9 @@ int main() {
     AmigaPortFrame contactFrame = contact.step(0);
     require(contact.health() == 3 && contactFrame.healthChanged &&
                 contact.invulnerability() == 90 &&
-                contact.player().speedXFixed() == 0 &&
+                contact.player().speedXFixed() == 3 * 256 &&
                 contact.playerVisible(),
-            "side contact removes one health and starts invulnerability");
+            "coincident contact damages, grants immunity and applies source direction-zero impulse");
     contactFrame = contact.step(0);
     require(contact.health() == 3 && !contactFrame.healthChanged &&
                 contact.invulnerability() == 89 &&
@@ -1155,8 +1155,19 @@ int main() {
     require(contact.invulnerability() == 88 && contact.playerVisible(),
             "recovered dFlash alternates player visibility every damaged Step");
 
-    while (contact.health() > 0 && contact.tick() < 400)
+    // This is a controlled collision/death-phase fixture, not a natural input
+    // replay. Positive coincident knockback moves away from the original enemy.
+    // Arrange another real contact at immunity expiry instead of assuming the
+    // player stays at x=0. Health still changes only through the damage path.
+    // GameRenderTest separately covers natural fatal damage and Retry.
+    while (contact.health() > 0 && contact.tick() < 400) {
+        if(contact.invulnerability()==1)
+            require(contact.configureEnemy(0,117,177,contact.player().offsetX(),
+                contact.player().offsetY(),0,0,20,24),
+                "arrange the next phase-test contact at immunity expiry");
         contact.step(0);
+        require(contact.effectsSucceeded(), "controlled contacts keep effect dispatch valid");
+    }
     require(contact.health() == 0 && !contact.dead() && !contact.deathSequence().movementDead(),
             "fatal contact depletes health without publishing death in the collision phase");
     contact.step(0);

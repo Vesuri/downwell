@@ -213,10 +213,6 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
-- Diagnose the `AmigaPortRuntimeTest` side-contact fixture that no longer loses
-  one health/starts immunity; verify its setup against the current precise mask
-  and event timing without weakening the assertion. Natural contact coverage
-  alone does not establish that this low-level fixture is correct.
 - Cover naturally funded purchases, all shop/side-room layouts and camera
   transitions, dense combat, uncommon upgrade combinations and repeated runs.
 - Compare new behavior through deterministic host/native replays, including
