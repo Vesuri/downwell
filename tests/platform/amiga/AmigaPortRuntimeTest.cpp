@@ -71,7 +71,17 @@ struct GenerationOrderProbe {
 struct NativeEnemyLifecycleAudit {
     using Enemy=GameplayWorld::EnemyState;
     struct Entry { unsigned generation=0;bool live=false,active=false; } entries[GameplayWorld::enemyCapacity]{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,indices=0,zeroIndices=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,indices=0,zeroIndices=0,transforms=0,calls=0,fail=0;
+    bool transform(downwell::InstanceHandle h,const Enemy& e,downwell::RunnerTransformField field,
+                   downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
+        ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active&&
+                        value.promoted().valid()&&alpha.bits==0x3f800000u&&blend==0xffffffu,
+                        "native transform resolves current opaque-white actor");
+        if(e.objectId==119)require(moves>0&&lastX==e.x+240&&lastY==e.y+176&&e.alarm0==2,
+                "crawler angle follows Step position publication, not Alarm 0");
+        if(fail==8||(fail==9&&field==downwell::RunnerTransformField::scaleY))return false;
+        ++transforms;return true;
+    }
     bool imageIndex(downwell::InstanceHandle h,const Enemy& e,downwell::RunnerImageValue value){
         ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active&&value.promoted().valid(),
                         "native animation publication resolves a live actor");
@@ -145,6 +155,29 @@ void testNativeEnemyLifecycle(){
     const auto resetCalls=audit.calls;
     world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
     require(audit.calls==resetCalls,"failed clear cannot replay owner callbacks");
+
+    for(unsigned fail : {0u,8u,9u}){
+        NativeEnemyLifecycleAudit checked;checked.fail=fail;
+        GameplayWorld snail(300,true,0,false,Binding::bindTransforms(checked));
+        snail.configureSolidResolver(shortRightWall,nullptr);
+        require(snail.configureEnemy(0,117,177,0,0,0,26,20,24),"configure checked-transform snail");
+        snail.step(0);
+        require(snail.effectsSucceeded()==(fail==0)&&snail.enemyAt(0).active&&checked.inactivations==0,
+                "failed snail transform must not become a death notification");
+        if(fail) {
+            const auto calls=checked.calls,tick=snail.tick();snail.step(0);
+            require(checked.calls==calls&&snail.tick()==tick,"transform rejection remains terminal");
+        }else require(checked.transforms==2,"snail publishes attachment and vertical orientation");
+    }
+    {
+        NativeEnemyLifecycleAudit checked;checked.fail=8;
+        GameplayWorld crawler(300,true,0,false,Binding::bindTransforms(checked));
+        crawler.configureSolidResolver(noSolid,nullptr);
+        require(crawler.configureEnemy(0,119,278,40,0,0,0,5,6,0,0,1),"configure crawler alarm followed by Step setter failure");
+        crawler.step(0);
+        require(!crawler.effectsSucceeded()&&crawler.enemyAt(0).alarm0==2&&checked.moves==1&&checked.sprites==0,
+                "failed crawler Step angle retains earlier alarm rearm and position but stops later sprite publication");
+    }
 
     for(unsigned failure=0;failure<=7;++failure){
         NativeEnemyLifecycleAudit checked;

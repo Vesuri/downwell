@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_CORE_RUNNER_SPATIAL_INSTANCES_H
 #define DOWNWELL_CORE_RUNNER_SPATIAL_INSTANCES_H
 #include "InstanceHandle.h"
+#include "RunnerTransformField.h"
 #include "RunnerObjectMembership.h"
 #include "RunnerSpatialIndex.h"
 #include "RunnerSpatialBoundsUpdate.h"
@@ -39,7 +40,7 @@ public:
         Sprite sprite;
         Real depth{},timeline{},cachedFrame{0xbf800000u};
     };
-    enum class TransformField {scaleX,scaleY,angle};
+    using TransformField=RunnerTransformField;
     // 0x432170 stores only the narrowed image_index. Sequence reconciliation
     // belongs to animation; do not invent bounds dirtiness or reset timeline.
     bool writeImageIndex(InstanceHandle h,Sprite& sprite,Real value){

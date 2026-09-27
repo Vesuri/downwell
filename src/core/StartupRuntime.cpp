@@ -659,6 +659,13 @@ void StartupRuntime::syncMainPlayerState() {
     mainShotsFired_ = mainPlayerMotion_.shots();
 }
 
+bool StartupRuntime::publishMainEnemyTransform(std::size_t index,RunnerTransformField field,int value) {
+    // Currently implemented enemy transforms use opaque white artwork.
+    if(lifecycle_.integerTransform(instances_.handleAt(index),instances_.at(index),field,value,
+                                   {0x3f800000u},0xffffffu))return true;
+    run_.effectsSucceeded=false;return false;
+}
+
 bool StartupRuntime::publishMainEnemyImage(std::size_t index,unsigned phase) {
     if(lifecycle_.phaseIndex(instances_.handleAt(index),instances_.at(index),phase))return true;
     run_.effectsSucceeded=false;return false;
@@ -795,7 +802,6 @@ void StartupRuntime::updateCrawler(InstanceRecord& enemy, bool alarm) {
     enemy.velocityX = enemy.crawler.vx / 1280.0F;
     enemy.velocityY = enemy.crawler.vy / 1280.0F;
     enemy.grounded = enemy.crawler.latched;
-    enemy.rotation = enemy.crawler.imageDirection * 90;
 }
 
 void StartupRuntime::updateMainEnemies() {
@@ -920,7 +926,9 @@ void StartupRuntime::updateMainEnemies() {
             }
             if (!enemy.snail.initialized)
                 enemy.snail.initialize(enemy.x, enemy.y, enemy.velocityY >= 0);
-            const bool alive = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); });
+            const bool alive = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); },false,
+                [this,index](RunnerTransformField field,int value){return publishMainEnemyTransform(index,field,value);});
+            if(!run_.effectsSucceeded)return;
             if (!alive && !publishMainEnemyInactivation(enemy)) return;
             enemy.active = alive;
             if (!alive) continue;
@@ -949,6 +957,11 @@ void StartupRuntime::updateMainEnemies() {
             run_.effectsSucceeded=false;return;
         }
         enemy.x=publishedX;enemy.y=publishedY;
+        if(enemy.objectId==119){
+            // Step publishes image_angle after x/y; Alarm 0 never assigns it.
+            if(!publishMainEnemyTransform(index,RunnerTransformField::angle,enemy.crawler.imageDirection*90))return;
+            enemy.rotation=enemy.crawler.imageDirection*90;
+        }
         const auto nextSprite = finishEnemyPresentation(
             {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.velocityY < 0.0F,
              enemy.frogHit.remaining != 0, enemy.snailHit.stunned},

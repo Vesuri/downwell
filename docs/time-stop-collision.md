@@ -782,6 +782,23 @@ corresponds to the reviewed `0x432170` store: it changes only `imageIndex`, leav
 bounds flags, dirty queues, cached frame and sequence timeline untouched. The
 later animation owner remains responsible for sequence reconciliation.
 
+`bindTransforms` additionally forwards the shared snail attachment's `scaleX`
+setter before subsequent motion queries, and its nonzero-velocity `scaleY`
+setter after movement but before final position publication. These boundaries
+follow `enmSnail_Step_0` VM assignments; a time-stopped attachment still sets X
+scale, but does not set Y scale. Rejected publication is a terminal failure, not
+snail death: both schedulers check failure before interpreting the motion result.
+Crawler Step publishes `imageDirection * 90` as angle after its X/Y setters;
+Alarm 0 changes movement but does not publish an angle. Rejection retains earlier
+position publication and alarm rearming, but stops later sprite publication. Native
+crawler facing is not an X-scale setter (its artwork uses rotated frames).
+The supported enemy adapter supplies opaque-white appearance to the original
+transform setter's fast-draw flag calculation. Actors with different alpha or
+blend must supply their real appearance, not reuse that assumption. Other enemy
+scale setters, mask mutations, precise source scheduling and installation of the
+full live collision registry remain necessary; these callbacks alone do not
+establish original collision selection.
+
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty
 owners, just as it does for damage numbers and corpse-expiry effects. A restore

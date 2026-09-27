@@ -429,6 +429,7 @@ private:
     EnemyLifecycleBinding enemyLifecycle_;
     bool publishEnemyActivation(const EnemyState& enemy, bool active);
     bool publishEnemyImage(const EnemyState& enemy,unsigned phase);
+    bool publishEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value);
     bool retireEnemyOwnership(EnemyState& enemy);
     bool clearEnemyOwnership();
     // Normal gameplay reads camMain's published pixel position. Preserve the

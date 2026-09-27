@@ -133,7 +133,7 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 "dormant dynamic birth leaves active object list");
         require(records.requestActivation(born,true,[&](auto h,const auto& record,bool active){return lifecycle.activation(h,record,active);}),
                 "activate dynamic birth through collision adapter");
-        const auto movement=downwell::InstanceLifecycleBinding::bindAnimation(lifecycle);
+        const auto movement=downwell::InstanceLifecycleBinding::bindTransforms(lifecycle);
         require(movement.integerPosition(born,records.at(0),-32,64)&&
                 storedOwner.resolve(born)->x.bits==0xc2000000u&&
                 storedOwner.resolve(born)->y.bits==0x42800000u&&records.at(0).x==30&&
@@ -174,6 +174,29 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         require(!movement.phaseIndex(born,records.at(0),0x80000000u)&&
                 !movement.phaseIndex(old,records.at(0),0)&&animated.sprite.imageIndex.bits==savedIndex,
                 "unsupported phase and stale lifetime cannot overwrite index");
+        using Transform=downwell::RunnerTransformField;
+        const downwell::RunnerImageValue opaque{0x3f800000u};
+        require(movement.integerTransform(born,records.at(0),Transform::scaleX,-1,opaque,0xffffffu)&&
+                animated.sprite.scaleX.bits==0xbf800000u&&(storedOwner.resolve(born)->flags&8u)&&
+                !(storedOwner.resolve(born)->flags&0x4000u)&&storedOwner.pendingSpatial()!=0,
+                "mirroring publishes narrowed scale and invalidates resource-backed bounds");
+        require(movement.integerTransform(born,records.at(0),Transform::scaleY,-1,opaque,0xffffffu)&&
+                movement.integerTransform(born,records.at(0),Transform::angle,270,opaque,0xffffffu)&&
+                animated.sprite.scaleY.bits==0xbf800000u&&animated.sprite.angle.bits==0x43870000u,
+                "binding forwards vertical mirror and crawler quarter-turn angle");
+        require(movement.integerTransform(born,records.at(0),Transform::scaleX,1,opaque,0xffffffu)&&
+                movement.integerTransform(born,records.at(0),Transform::scaleY,1,opaque,0xffffffu)&&
+                movement.integerTransform(born,records.at(0),Transform::angle,0,opaque,0xffffffu)&&
+                (storedOwner.resolve(born)->flags&0x4000u),"ordinary transforms restore source fast-draw flag");
+        require(movement.transform(born,records.at(0),Transform::scaleX,{0x3f000000u},opaque,0xffffffu)&&
+                !(storedOwner.resolve(born)->flags&0x4000u)&&
+                storedOwner.flush([&](auto h,bool publish){return lifecycle.refresh(h,*records.resolve(h),publish);}),
+                "fractional scale retains original placed transform and refreshes zero-angle bounds");
+        require(movement.transform(born,records.at(0),Transform::scaleX,{0x3f000000u},opaque,0xffffffu)&&
+                !(storedOwner.resolve(born)->flags&8u)&&storedOwner.pendingSpatial()==0&&
+                !movement.integerTransform(old,records.at(0),Transform::scaleX,-1,opaque,0xffffffu)&&
+                animated.sprite.scaleX.bits==0x3f000000u,
+                "equal transforms stay clean and retired handles cannot change their replacement");
         auto wrong=records.at(0);wrong.objectId=35;
         require(!lifecycle.move(born,wrong,{}, {})&&!lifecycle.refresh(old,records.at(0),true)&&
                 !lifecycle.sprite(born,wrong,206)&&!lifecycle.sprite(old,records.at(0),206)&&

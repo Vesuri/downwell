@@ -28,6 +28,22 @@ int main() {
     hit.advanceFrame();
     require(hit.alarm2 == -1, "zero alarm disables on the following frame");
     using downwell::SnailMotion;
+    using Field=downwell::RunnerTransformField;
+    for(unsigned reject=0;reject<3;++reject){
+        SnailMotion checked;checked.initialize(0,0,true);
+        unsigned writes=0;
+        const bool alive=checked.step([](int x,int){return x<=-8;},false,[&](Field field,int value){
+            ++writes;
+            if(field==Field::scaleX)require(writes==1&&value==-1&&!checked.attached&&checked.facing==1&&checked.y==0,
+                "attachment scale setter precedes attachment state and movement");
+            else require(field==Field::scaleY&&writes==2&&value==-1&&checked.attached&&checked.y==128&&checked.verticalFlip==1,
+                "vertical scale setter follows movement but precedes stored flip");
+            return writes!=reject;
+        });
+        require(alive==(reject==0)&&writes==(reject==1?1u:2u),"rejected transform stops snail motion at its setter");
+        if(reject==1)require(!checked.attached&&checked.y==0,"failed attachment cannot advance motion");
+        if(reject==2)require(checked.attached&&checked.y==128&&checked.verticalFlip==1,"failed flip retains earlier movement only");
+    }
     const auto rightWall = [](int x, int) { return x >= 8; };
     SnailMotion snail;
     snail.initialize(0, 0, true);
@@ -42,10 +58,13 @@ int main() {
             "negative motion and left attachment retain source precision");
     SnailMotion paused;
     paused.initialize(0, 0, true);
-    require(paused.step(rightWall, true) && paused.attached && paused.y == 0 && paused.verticalFlip == 1,
+    unsigned pausedWrites=0;
+    require(paused.step(rightWall, true,[&](Field field,int value){
+                ++pausedWrites;return field==Field::scaleX&&value==1;
+            }) && pausedWrites==1 && paused.attached && paused.y == 0 && paused.verticalFlip == 1,
             "attachment precedes the time-stop movement guard");
     snail.vy = 0;
-    require(snail.step(rightWall) && snail.verticalFlip == -1,
+    require(snail.step(rightWall,false,[](Field,int){return false;}) && snail.verticalFlip == -1,
             "source nonzero-speed guard retains image orientation at zero speed");
     SnailMotion embedded;
     embedded.initialize(0, 0, true);

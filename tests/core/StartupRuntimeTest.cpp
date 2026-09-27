@@ -27,7 +27,14 @@ void stepMany(downwell::StartupRuntime& runtime, int count) {
 struct LifecycleAudit {
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,indices=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,indices=0,transforms=0,calls=0,fail=0;
+    bool transform(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerTransformField,
+                   downwell::RunnerImageValue value,downwell::RunnerImageValue alpha,std::uint32_t blend){
+        ++calls;require(matches(h,r)&&r.active&&value.promoted().valid()&&alpha.bits==0x3f800000u&&blend==0xffffffu,
+                        "host transform resolves current opaque-white actor");
+        if(fail==9)return false;
+        ++transforms;return true;
+    }
     bool imageIndex(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerImageValue value){
         ++calls;require(matches(h,r)&&r.active&&value.promoted().valid(),"animation publication resolves a live actor");
         if(fail==8)return false;
@@ -89,7 +96,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
     LifecycleAudit audit;
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        downwell::InstanceLifecycleBinding::bindAnimation(audit));
+        downwell::InstanceLifecycleBinding::bindTransforms(audit));
     auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
     for(unsigned tick=0;tick<1800;++tick){
@@ -102,7 +109,8 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
               << " activations=" << audit.activations << " inactivations=" << audit.inactivations
               << " memberships=" << audit.memberships << " moves=" << audit.moves
-              << " sprites=" << audit.sprites << " spriteChanges=" << audit.spriteChanges << " indices=" << audit.indices << '\n';
+              << " sprites=" << audit.sprites << " spriteChanges=" << audit.spriteChanges << " indices=" << audit.indices
+              << " transforms=" << audit.transforms << '\n';
     require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&audit.sprites==audit.moves&&audit.indices>audit.sprites,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
@@ -144,14 +152,15 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         require(healthy(*runtime)&&snail&&!snail->active&&!snail->activationPending,
                 "wall-less snail stops before post-retirement movement and sprite publication");
     }
-    for(unsigned failure=0;failure<=8;++failure){
+    for(unsigned failure=0;failure<=9;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindAnimation(failing));
+            downwell::InstanceLifecycleBinding::bindTransforms(failing));
         runtime->skipToGameForTesting();
-        if(failure==0||failure==3){
+        if(failure==0||failure==3||failure==9){
             // Controlled lifecycle fixture, not a natural combat encounter:
-            // put an existing enemy into the activation frontier's dormant set.
+            // put an existing enemy into the activation frontier's dormant set,
+            // or schedule a crawler alarm before rejected Step angle publication.
             bool prepared=false;
             for(unsigned warmup=0;warmup<600&&!prepared;++warmup){
             for(unsigned i=0;i<runtime->activeInstanceCount();++i){
@@ -159,6 +168,10 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
                 if(record.objectId!=111&&record.objectId!=112&&record.objectId!=113&&record.objectId!=116&&
                    record.objectId!=117&&record.objectId!=119)continue;
                 record.active=false;record.activationPending=true;record.x=240;record.y=1200;
+                if(failure==9){
+                    record.objectId=119;record.active=true;record.activationPending=false;record.health=5;
+                    record.crawler={};record.alarms.set(0,1);
+                }
                 prepared=true;break;
             }
             if(!prepared)runtime->step(downwell::gameplayContactProfileInput(warmup,runtime->mainPlayerX(),runtime->mainPlayerY()),false);

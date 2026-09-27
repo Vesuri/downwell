@@ -3,6 +3,7 @@
 
 #include "InstanceHandle.h"
 #include "RunnerImageValue.h"
+#include "RunnerTransformField.h"
 
 namespace downwell {
 
@@ -51,6 +52,25 @@ public:
         };
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindTransforms(Owner& owner) {
+        auto b=bindAnimation(owner);
+        b.transform_=[](void* p,InstanceHandle h,const Record& r,RunnerTransformField field,
+                       RunnerImageValue value,RunnerImageValue alpha,std::uint32_t blend){
+            return static_cast<Owner*>(p)->transform(h,r,field,value,alpha,blend);
+        };
+        return b;
+    }
+    bool integerTransform(InstanceHandle h,const Record& r,RunnerTransformField field,int value,
+                          RunnerImageValue alpha,std::uint32_t blend)const {
+        if(!transform_)return true;
+        RunnerImageValue narrowed;
+        return narrowed.assign(MotionBinary64::fromInteger(value))&&
+               transform_(context_,h,r,field,narrowed,alpha,blend);
+    }
+    bool transform(InstanceHandle h,const Record& r,RunnerTransformField field,RunnerImageValue value,
+                   RunnerImageValue alpha,std::uint32_t blend)const {
+        return !transform_||transform_(context_,h,r,field,value,alpha,blend);
+    }
     bool phaseIndex(InstanceHandle h,const Record& r,unsigned phase)const {
         if(!imageIndex_)return true;
         if(phase>0x7fffffffu)return false;
@@ -86,6 +106,7 @@ private:
     bool (*move_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
     bool (*sprite_)(void*,InstanceHandle,const Record&,int)=nullptr;
     bool (*imageIndex_)(void*,InstanceHandle,const Record&,RunnerImageValue)=nullptr;
+    bool (*transform_)(void*,InstanceHandle,const Record&,RunnerTransformField,RunnerImageValue,RunnerImageValue,std::uint32_t)=nullptr;
 };
 using InstanceLifecycleBinding = RecordLifecycleBinding<InstanceRecord>;
 

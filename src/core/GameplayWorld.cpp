@@ -235,6 +235,12 @@ GameplayWorld::gemAt(unsigned index) const
     return gems_[index < gemCapacity ? index : 0];
 }
 
+bool GameplayWorld::publishEnemyTransform(const EnemyState& enemy,downwell::RunnerTransformField field,int value) {
+    if(enemyLifecycle_.integerTransform({enemy.identitySlot,enemy.lifetimeId},enemy,field,value,
+                                        {0x3f800000u},0xffffffu))return true;
+    run_.effectsSucceeded=false;return false;
+}
+
 bool GameplayWorld::publishEnemyImage(const EnemyState& enemy,unsigned phase) {
     if(enemyLifecycle_.phaseIndex({enemy.identitySlot,enemy.lifetimeId},enemy,phase))return true;
     run_.effectsSucceeded=false;return false;
@@ -913,7 +919,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             }
             const bool alive = enemy.snail.step([this](int x, int y) {
                 return solidResolver_(solidResolverContext_, x, y);
-            });
+            },false,[this,&enemy](downwell::RunnerTransformField field,int value){return publishEnemyTransform(enemy,field,value);});
+            if(!run_.effectsSucceeded)return {};
             if (!alive && !publishEnemyActivation(enemy,false)) return {};
             enemy.active = alive;
             if (!enemy.active)
@@ -946,6 +953,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             run_.effectsSucceeded=false;return {};
         }
         enemy.x=publishedX;enemy.y=publishedY;
+        if(enemy.objectId==119 &&
+           !publishEnemyTransform(enemy,downwell::RunnerTransformField::angle,enemy.crawler.imageDirection*90))return {};
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
         const auto nextSprite = downwell::finishEnemyPresentation(

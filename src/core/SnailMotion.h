@@ -2,7 +2,11 @@
 #define DOWNWELL_CORE_SNAIL_MOTION_H
 #include "SolidCollision.h"
 #include "EnemyContact.h"
+#include "RunnerTransformField.h"
 namespace downwell {
+struct NoSnailTransform {
+    bool operator()(RunnerTransformField,int)const{return true;}
+};
 struct SnailMotion {
     long x = 0, y = 0, vy = 128; // fifth-Q8: exactly 0.1 pixel
     int facing = 1, verticalFlip = 1;
@@ -14,8 +18,8 @@ struct SnailMotion {
         initialized = true;
     }
     static int pixel(long p) { return static_cast<int>(p / 1280 - (p % 1280 < 0)); }
-    template<class Solid>
-    bool step(Solid solid, bool timeStopped = false) {
+    template<class Solid,class Transform=NoSnailTransform>
+    bool step(Solid solid, bool timeStopped = false,Transform transform={}) {
         const auto meeting = [this, &solid](long px, long py) {
             const int ix = static_cast<int>(FixedCollisionMath::round(px) / 1280);
             const int iy = static_cast<int>(FixedCollisionMath::round(py) / 1280);
@@ -26,9 +30,12 @@ struct SnailMotion {
         };
         if (!attached) {
             if (meeting(x, y)) return false;
-            if (meeting(x + 8 * 1280L, y)) facing = 1;
-            else if (meeting(x - 8 * 1280L, y)) facing = -1;
+            int nextFacing;
+            if (meeting(x + 8 * 1280L, y)) nextFacing = 1;
+            else if (meeting(x - 8 * 1280L, y)) nextFacing = -1;
             else return false;
+            if(!transform(RunnerTransformField::scaleX,nextFacing))return false;
+            facing=nextFacing;
             attached = true;
         }
         if (timeStopped) return true;
@@ -37,7 +44,11 @@ struct SnailMotion {
         if (collision.y != 0 || !solid(pixel(x) + facing * 16, pixel(y + sign * 8 * 1280L)))
             vy = -vy;
         y += vy;
-        if (vy != 0) verticalFlip = vy < 0 ? 1 : -1;
+        if (vy != 0) {
+            const int nextFlip=vy<0?1:-1;
+            if(!transform(RunnerTransformField::scaleY,nextFlip))return false;
+            verticalFlip=nextFlip;
+        }
         return true;
     }
 };
