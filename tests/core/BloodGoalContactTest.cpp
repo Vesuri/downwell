@@ -23,6 +23,9 @@ int main(){
         RunnerImageValue rad,c,s;MotionBinary64 dc,ds;
         assert(SmokeDirection::radians(real(angle),rad) && smokeTrig(rad.promoted(),dc,ds) && c.assign(dc) && s.assign(ds));
         const float C=value(c),S=value(s);
+        assert(SmokeDirection::radians(real(-angle),rad) && smokeTrig(rad.promoted(),dc,ds) &&
+               c.assign(dc) && s.assign(ds));
+        const float IC=value(c),IS=value(s);
         for(int dy=-extent-8;dy<=extent+8;dy+=4)for(int dx=-extent-8;dx<=extent+8;dx+=4){
             const float x=240+dx+.25f,y=4032+dy+.5f;
             BloodEffect blood;blood.x=real(x);blood.y=real(y);blood.imageAngle=real(angle);
@@ -36,8 +39,8 @@ int main(){
                 const int fx=(px-field.x+extent)/pixelScale,fy=(py-field.y+extent)/pixelScale;
                 if(!(mask[fy*(canvas/8)+fx/8]&(128>>(fx%8))))continue;
                 broad=true;
-                const float sx=((float(py)-y)*(-S)+(float(px)-x)*C)+12;
-                const float sy=((float(py)-y)*C-(float(px)-x)*(-S))+12;
+                const float sx=((float(py)-y)*IS+(float(px)-x)*IC)+12;
+                const float sy=((float(py)-y)*IC-(float(px)-x)*IS)+12;
                 oldExpected|=sx>=10&&sx<14&&sy>=11&&sy<14;
                 if(std::abs(double(angle))<=1e-5){
                     const int mx=kind?12-int(std::nearbyint(x))+px:int((float(px)-x)+12);

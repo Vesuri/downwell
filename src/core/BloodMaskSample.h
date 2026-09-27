@@ -24,10 +24,12 @@ struct BloodMaskSample {
             *this=next;return true;
         }
         if(selected!=RunnerMaskDispatch::Path::rotated)return false;
-        if(!SmokeDirection::radians(effect.imageAngle,radians) ||
+        // 0x4b93f6 negates the stored angle BEFORE float pi/division and
+        // trigonometry. Do not assume symmetry of the runner's polynomial.
+        auto inverseAngle=effect.imageAngle;
+        inverseAngle.bits^=0x80000000u;
+        if(!SmokeDirection::radians(inverseAngle,radians) ||
            !smokeTrig(radians.promoted(),c,s) || !cosine.assign(c) || !negativeSine.assign(s))return false;
-        // sin(-a)=-sin(a), cos(-a)=cos(a); rounding symmetry retains signed zero.
-        negativeSine.bits^=0x80000000u;
         if(!next.transform.prepare(effect.x,effect.y,{0x3f800000},{0x3f800000},cosine,negativeSine,12,12))return false;
         *this=next;return true;
     }

@@ -219,6 +219,10 @@ the same float pi/division and float-result narrowing as bounds. Reciprocal
 scales come from binary32 `1/scale`. Negative scales shift that sprite's
 position by minus one before evaluating coordinates.
 
+`BloodMaskSample` evaluates that negated input through the recovered trig
+program. It does not replace the signed-input evaluation with a sign flip on
+the positive-angle sine result; polynomial symmetry is not assumed.
+
 For each inclusive candidate world pixel, with `dx/dy` relative to that
 adjusted position, the unit uses this order (round every operation to binary32):
 
