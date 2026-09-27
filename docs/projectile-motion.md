@@ -676,6 +676,16 @@ iteration. Its constant-extra-workspace sorter is usable on 68000, but large
 snapshot storage must live outside the task stack. This ordering helper does
 not by itself connect live room fallback or inactive-tail normalization.
 
+`RunnerLayers::normalizeRoomInstances` exposes the final room-entry pass at
+`0x41363e..0x413658`: forward layer order, invoking the existing backward
+inactive-to-tail operation for each layer. Call it once after serialized
+initialization and global fallback. Repeating it reverses the inactive suffix
+again, so it is not a per-frame stable partition. The predicate must reject null
+and non-instance elements and cannot mutate the owners. Empty dynamic layers
+survive this pass. Exhaustive tests cover all 256 inactive masks across two
+layers, traversal order, repeated invocation and terminal-owner rejection.
+The live room-entry adapter still needs to invoke the complete sequence.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

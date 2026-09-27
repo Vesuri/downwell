@@ -131,4 +131,39 @@ void sourceIds(){
     require(ids.allocate(id)&&id==0x7fffffff,"last supported positive identity");
     id=123;require(!ids.allocate(id)&&id==123,"exhaustion cannot wrap into negative ID");
 }
-int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases)\n";}
+void roomNormalization(){
+    for(unsigned mask=0;mask<256;++mask){
+        Owner owner;
+        const auto high=add(owner,11,10),low=add(owner,12,-10,false);
+        const auto empty=add(owner,13,20);
+        for(unsigned e=0;e<8;++e)
+            require(owner.attach(e<4?high:low,e,true,true,inactive),"room normalization seed");
+        std::vector<unsigned> visited;
+        auto normalize=[&](){return owner.normalizeRoomInstances([&](unsigned e){
+            visited.push_back(e);return (mask&(1u<<e))!=0;
+        });};
+        require(normalize(),"room normalization");
+        require(visited==std::vector<unsigned>({7,6,5,4,3,2,1,0}),"forward layers, saved reverse element traversal");
+        for(unsigned first:{0u,4u}){
+            std::vector<unsigned> expected;
+            for(unsigned e=first;e<first+4;++e)if(!(mask&(1u<<e)))expected.push_back(e);
+            for(unsigned e=first+4;e>first;--e)if(mask&(1u<<(e-1)))expected.push_back(e-1);
+            elements(owner,first?low:high,expected);
+        }
+        require(owner.get(empty)&&owner.elementCount(empty)==0,"normalization retains empty dynamic layer");
+        // A second invocation reverses the inactive suffix again. Do not
+        // accidentally treat this operation as a per-frame cleanup pass.
+        require(normalize(),"repeat normalization");
+        for(unsigned first:{0u,4u}){
+            std::vector<unsigned> expected;
+            for(unsigned e=first;e<first+4;++e)if(!(mask&(1u<<e)))expected.push_back(e);
+            for(unsigned e=first;e<first+4;++e)if(mask&(1u<<e))expected.push_back(e);
+            elements(owner,first?low:high,expected);
+        }
+    }
+    Owner failed;const auto from=add(failed,1,0),to=add(failed,2,1);
+    require(failed.attach(from,0,true,true,inactive)&&failed.attach(to,1,true,true,inactive),"failed normalization seed");
+    require(!failed.move(from,1,true,[](unsigned,int){return false;},inactive),"terminal publication failure");
+    require(!failed.normalizeRoomInstances([](unsigned){std::abort();return false;}),"failed owner never calls normalization predicate");
+}
+int main(){movement();merging();failure();exhaustiveMoves();activation();sourceIds();roomNormalization();std::cout<<"Layer identities, depth movement, ownership and merge publication verified (3840 movement cases, 256 room normalization cases)\n";}

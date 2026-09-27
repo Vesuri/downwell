@@ -50,6 +50,9 @@ bool compileLayers(downwell::RunnerLayers<4,16>& owner,unsigned slot,int depth){
 bool compileLayerActivation(downwell::RunnerLayers<4,16>& owner,unsigned element,bool inactive){
     return owner.reconcileInstanceActivation(element,inactive);
 }
+bool compileRoomLayerNormalization(downwell::RunnerLayers<4,16>& owner,unsigned inactive){
+    return owner.normalizeRoomInstances([&](unsigned element){return element==inactive;});
+}
 bool compileLayerElements(downwell::RunnerLayerElements<4,16>& owner,unsigned slot,unsigned inactive){
     return owner.insert(0,slot,true,false,[](unsigned){return false;}) &&
         owner.concatenate(1,0) && owner.normalize(1,[&](unsigned i){return i==inactive;}) &&

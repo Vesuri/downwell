@@ -67,6 +67,17 @@ public:
     bool detachForRebind(unsigned element){
         return !failed_&&get(elements_.owner(element))&&elements_.remove(element);
     }
+    // Room initialization (0x41363e): forward layer traversal, then the same
+    // backward inactive-to-tail pass used after merging. Invoke once after
+    // serialized initialization and global-instance fallback, before Draw.
+    // Predicate must reject null/non-instance elements and must not mutate
+    // owners. This is deliberately NOT an idempotent stable partition.
+    template<class Inactive> bool normalizeRoomInstances(Inactive inactive){
+        if(failed_)return false;
+        for(unsigned i=head_;i!=End;i=layers_[i].next)
+            if(!elements_.normalize(i,inactive)){failed_=true;return false;}
+        return true;
+    }
     // 0x4147b0: merge is only possible while INCREASING depth. Publication
     // sees source element order and the destination ID before list splicing.
     // publish must filter type-2/null references and write instance layer IDs.
