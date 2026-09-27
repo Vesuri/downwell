@@ -430,7 +430,7 @@ int main() {
         auto bound=std::make_unique<downwell::Game>(&rooms,&objects,&builders,nullptr,owner->binding());
         auto plain=std::make_unique<downwell::Game>(&rooms,&objects,&builders);
         require(owner->attach(bound->startup()),"production Game attaches before its first update");
-        unsigned gameplay=0,splashStages=0;bool garden=false,style=false;
+        unsigned gameplay=0,splashStages=0;bool garden=false,style=false,gardenDrawChecked=false;
         for(unsigned frame=0;frame<4000&&gameplay<120;++frame){
             const auto& state=bound->startup();
             require(state.showSplash()>=0&&state.showSplash()<=6,"boot splash state is in source range");
@@ -444,9 +444,34 @@ int main() {
             RecordingRenderer a,b;bound->render(a);plain->render(b);
             require(bound->renderingSucceeded()&&plain->renderingSucceeded()&&a.spriteOrder==b.spriteOrder,
                 "production owner preserves boot-to-game sprite painter order");
+            if(state.inMenu()&&!gardenDrawChecked){
+                // Room entry has not undergone activation/depth changes here.
+                // Independently model the runner's before-equal insertion;
+                // do not use visitDrawChecked to compute its own expectation.
+                std::vector<const downwell::InstanceRecord*> order;
+                for(unsigned i=0;i<state.activeInstanceCount();++i){
+                    const auto& r=state.instanceAt(i);
+                    downwell::PackedObject object;
+                    if(!r.active||r.destroyRequested||r.objectId==382||r.objectId==69||
+                       !objects.findObject(r.objectId,object)||!object.visible()||object.spriteId<0||
+                       (r.objectId==35&&!state.menuPlayerVisible()))continue;
+                    auto at=order.begin();
+                    while(at!=order.end()&&(*at)->depth>r.depth)++at;
+                    order.insert(at,&r);
+                }
+                std::vector<int> expected;
+                for(const auto* r:order){
+                    downwell::PackedObject object;require(objects.findObject(r->objectId,object),"garden object exists");
+                    expected.push_back(r->objectId==35?state.menuPlayerSpriteId():
+                        r->objectId==60?76:r->spriteId>=0?r->spriteId:object.spriteId);
+                }
+                require(expected.size()>2&&a.spriteOrder==expected,
+                    "garden painter follows original high-depth/newest-equal room insertion");
+                gardenDrawChecked=true;
+            }
             gameplay+=state.inMainRoom();
         }
-        require((splashStages&0x7eu)==0x7eu&&garden&&style&&gameplay==120,
+        require((splashStages&0x7eu)==0x7eu&&garden&&gardenDrawChecked&&style&&gameplay==120,
             "production boot traverses all six splash stages, garden and style selection into gameplay");
     }
     {

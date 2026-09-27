@@ -604,6 +604,16 @@ own scheduler handling; this is not proof of complete global Draw ordering.
 `tools/verify-runner-field-draw.py` pins the reviewed executable bytes, not an
 execution trace of the original game.
 
+The active room list is also the animation list, traversed in reverse: Draw
+starts at room `+0x84` and follows instance `+0x150`; animation starts at room
+`+0x80` and follows `+0x14c`. `RunnerRoomMembership::visitDrawChecked` exposes
+this reverse traversal without sorting or allocating another list. Reactivation
+at `0x48d69c..0x48d760` reinserts before equal-depth Draw peers, so numeric
+birth-ID sorting is not a substitute after activation cycles. Callers must
+still apply Draw eligibility and preserve separate custom Draw paths. The
+stored garden renderer uses this traversal; gameplay's grouped family paths
+are not yet a complete ordinary-Draw scheduler.
+
 ## Unrotated transformed sampling
 
 The unrotated precise path at Windows runner `0x4b9227..0x4b93f6`

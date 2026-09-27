@@ -138,6 +138,13 @@ public:
             return record&&visit(key,*record);
         });
     }
+    template<class Visit> bool visitDrawChecked(Visit visit)const{
+        return roomMembership_.visitDrawChecked([&](unsigned slot){
+            const InstanceHandle key{slot,slots_[slot].generation};
+            const auto* record=resolve(key);
+            return record&&visit(key,*record);
+        });
+    }
 
     // Explicit activation requests are not destruction. Notify collision state
     // while the old flags are still observable; defer object-list changes until

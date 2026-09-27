@@ -533,45 +533,20 @@ void Game::renderMenu(Renderer& renderer) const {
     const float viewX = startup_.menuCameraViewX();
     const float viewY = startup_.menuCameraViewY();
 
-    std::array<std::size_t, StartupRuntime::instanceCapacity> order{};
-    std::size_t count = 0;
-    for (std::size_t index = 0; index < startup_.activeInstanceCount(); ++index) {
-        const InstanceRecord& instance = startup_.instanceAt(index);
+    renderingSucceeded_ = startup_.visitDrawChecked([&](InstanceHandle, const InstanceRecord& instance) {
         PackedObject object;
-        if (instance.active &&
-            instance.objectId != 382 && // ditherFade draws a captured surface
-            instance.objectId != 69 &&  // EnterSequence has a custom Draw event
-            objectPack_->findObject(instance.objectId, object) &&
-            object.visible() && object.spriteId >= 0) {
-            order[count++] = index;
-        }
-    }
-
-    // GameMaker draws high depths first, with later creation-order instances
-    // naturally appearing over earlier peers at the same depth.
-    for (std::size_t index = 1; index < count; ++index) {
-        const std::size_t value = order[index];
-        std::size_t destination = index;
-        while (destination > 0 &&
-               startup_.instanceAt(order[destination - 1]).depth <
-                   startup_.instanceAt(value).depth) {
-            order[destination] = order[destination - 1];
-            --destination;
-        }
-        order[destination] = value;
-    }
-
-    for (std::size_t index = 0; index < count; ++index) {
-        const InstanceRecord& instance = startup_.instanceAt(order[index]);
-        PackedObject object;
-        if (!objectPack_->findObject(instance.objectId, object))
-            continue;
+        if (!instance.active || instance.destroyRequested ||
+            instance.objectId == 382 || // ditherFade draws a captured surface
+            instance.objectId == 69 ||  // EnterSequence has a custom Draw event
+            !objectPack_->findObject(instance.objectId, object) ||
+            !object.visible() || object.spriteId < 0)
+            return true;
 
         const bool isPlayer = instance.objectId == 35;
         // playerDraw() suppresses the sprite while the well teleporter holds
         // goalStop, before EnterSequence scrolls the camera into the shaft.
         if (isPlayer && !startup_.menuPlayerVisible())
-            continue;
+            return true;
 
         float roomX = static_cast<float>(instance.x);
         float roomY = static_cast<float>(instance.y);
@@ -601,7 +576,8 @@ void Game::renderMenu(Renderer& renderer) const {
             roomX - viewX, roomY - viewY,
             instance.scaleX * (isPlayer ? startup_.menuPlayerFacing() : 1),
             instance.scaleY, instance.rotation);
-    }
+        return true;
+    });
 }
 
 void Game::renderPlayMenu(Renderer& renderer) const {

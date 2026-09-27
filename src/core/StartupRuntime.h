@@ -117,6 +117,9 @@ public:
     int achievementLoginCalls() const { return achievementLoginCalls_; }
     bool controllerPersistent() const;
     std::size_t activeInstanceCount() const { return instances_.size(); }
+    template<class Visit> bool visitDrawChecked(Visit visit)const{
+        return instances_.visitDrawChecked(visit);
+    }
     bool hasInstance(std::uint32_t instanceId) const {
         return instances_.find(instanceId) != nullptr;
     }

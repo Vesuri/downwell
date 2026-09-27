@@ -196,12 +196,31 @@ void testAnimationTraversal() {
     };
     require(store.visitAnimationChecked(visit)&&seen==std::vector<unsigned>({2,4,3,1}),
         "animation follows active depth list, with stable equal-depth order");
+    auto draw=[&](auto key,const auto& record){
+        require(store.resolve(key)==&record,"Draw callback retains generation identity");
+        seen.push_back(record.instanceId);return true;
+    };
+    seen.clear();
+    require(store.visitDrawChecked(draw)&&seen==std::vector<unsigned>({1,3,4,2}),
+        "Draw walks high depths first and newest first within equal depths");
     const auto key=store.handleAt(1);store.requestActivation(key,false);seen.clear();
     require(store.visitAnimationChecked(visit)&&seen==std::vector<unsigned>({2,4,3,1}),
         "pending deactivation remains in animation traversal");
     store.reconcileObjectMembership();seen.clear();
     require(store.visitAnimationChecked(visit)&&seen==std::vector<unsigned>({4,3,1}),
         "inactive membership removed from animation traversal");
+    seen.clear();
+    require(store.visitDrawChecked(draw)&&seen==std::vector<unsigned>({1,3,4}),
+        "Draw excludes reconciled inactive membership");
+    require(store.requestActivation(key,true),"reactivate Draw lifetime");
+    store.reconcileObjectMembership();seen.clear();
+    require(store.visitDrawChecked(draw)&&seen==std::vector<unsigned>({1,3,2,4}),
+        "reactivation inserts before equal-depth Draw peers, not original birth-ID order");
+    seen.clear();
+    require(!store.visitDrawChecked([&](auto,const auto& record){
+        seen.push_back(record.instanceId);return record.instanceId!=3;
+    })&&seen==std::vector<unsigned>({1,3}),"failed Draw stops traversal");
+    store.requestActivation(key,false);store.reconcileObjectMembership();
     seen.clear();require(!store.visitAnimationChecked([&](auto,auto& record){
         seen.push_back(record.instanceId);return record.instanceId!=3;
     })&&seen==std::vector<unsigned>({4,3}),"failed animation stops before later records");

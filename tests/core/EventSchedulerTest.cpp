@@ -287,6 +287,10 @@ void testRoomMembershipCycles() {
             [&](unsigned member,bool registered){actual.push_back(member*2+registered);});
         require(actual==expected,"room publication matches independent ordered lists");
         rooms=copied;
+        std::vector<unsigned> drawOrder;
+        require(rooms.visitDrawChecked([&](unsigned member){drawOrder.push_back(member);return true;}) &&
+            drawOrder==std::vector<unsigned>(active.rbegin(),active.rend()),
+            "Draw reverses the active list through depth ties, reuse and activation cycles");
         if(iteration%91==0){rooms.clear();active.clear();inactive.clear();}
         for(unsigned member=0;member<capacity;++member)
             require(rooms.contains(member)==(std::find(active.begin(),active.end(),member)!=active.end() ||

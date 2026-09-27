@@ -17,6 +17,15 @@ public:
             if(!visit(slot))return false;
         return true;
     }
+    // Ordinary Draw walks the SAME active list in the opposite direction:
+    // room+0x84, next+0x150 (0x490f11), versus animation's room+0x80,
+    // next+0x14c. Higher depths and newly inserted equal-depth peers go first.
+    // The visitor owns visibility/destruction filtering. No list mutation.
+    template<class Visit> bool visitDrawChecked(Visit visit)const{
+        for(unsigned slot=tail_[0];slot!=End;slot=entries_[slot].previous)
+            if(!visit(slot))return false;
+        return true;
+    }
     bool bind(unsigned slot,RunnerImageValue key){
         if(slot>=Capacity || !RunnerSpatialSplit::valid(key))return false;
         remove(slot);entries_[slot].key=key;insertActive(slot);return true;
