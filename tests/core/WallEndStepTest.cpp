@@ -30,6 +30,14 @@ struct Ops {
     bool create(int object,int dx,int dy){assert(object==379&&dx==0&&dy==-16);++flowers;return call(7);}
 };
 int main(int argc,char** argv){
+    {
+        WallEndStepState s;s.checked=2;s.imageIndex=14;
+        assert(wallRoomCreation(676,s)&&s.pillar==-1&&s.checked==2&&s.imageIndex==14);
+        assert(wallRoomCreation(677,s)&&s.pillar==1);
+        assert(wallRoomCreation(678,s)&&s.pillar==-1);
+        assert(wallRoomCreation(-1,s)&&s.pillar==-1);
+        assert(!wallRoomCreation(679,s)&&s.pillar==-1);
+    }
     const bool dump=argc==2&&std::strcmp(argv[1],"--oracle")==0;
     if(argc!=1&&!dump)return 2;
     const int right[]={15,7,2,7,7,7,6,7,15,15,15,15,15,15,15,15};

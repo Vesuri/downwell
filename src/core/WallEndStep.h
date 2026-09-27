@@ -9,6 +9,20 @@ struct WallEndStepState {
     bool surrounded=false,deactivate=false;
     unsigned lights=0; // upper-left, upper-right, lower-left, lower-right
 };
+// rmMain authored instance creation scripts, executed after object Create.
+// Other creation code is not an implicit no-op.
+inline bool wallRoomCreation(int code,WallEndStepState& state){
+    if(code==-1)return true;
+    if(code==676||code==678){state.pillar=-1;return true;}
+    if(code==677){state.pillar=1;return true;}
+    return false;
+}
+template<class Digest>
+void appendWallEndStepState(const WallEndStepState& s,Digest& digest){
+    digest.addI32(s.checked);digest.addI32(s.pillar);digest.addI32(s.neighbors);
+    digest.addI32(s.imageIndex);digest.addI32(s.checkThing);digest.addI32(s.checkDistance);
+    digest.addBool(s.surrounded);digest.addBool(s.deactivate);digest.addU32(s.lights);
+}
 inline int wallPillarFrame(int frame,int pillar){
     if(pillar==1){
         switch(frame){

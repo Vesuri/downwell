@@ -1579,6 +1579,13 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1004: // gml_Object_objBuilder_PreCreate_0 (event_inherited; no parent)
         ++implementedCodeCalls_;
         return;
+    case 676: // gml_RoomCC_rmMain_1_Create
+    case 677: // gml_RoomCC_rmMain_2_Create
+    case 678: // gml_RoomCC_rmMain_3_Create
+        ++implementedCodeCalls_;
+        if(instance==nullptr||instance->objectId!=60||!wallRoomCreation(codeId,instance->wall))
+            run_.effectsSucceeded=false;
+        return;
     case 985: // gml_Object_objWall_n_Create_0
     case 1090: // gml_Object_objThinPlatform_Create_0
         ++implementedCodeCalls_;
@@ -1595,6 +1602,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                         if(!lifecycle_.phaseIndex(h,*instance,unsigned(index)*256u))return false;
                         instance->imageIndex=static_cast<float>(index);return true;
                     },[&](int speed){instance->imageSpeed=static_cast<float>(speed);return true;});
+                if(run_.effectsSucceeded&&instance->objectId==60)instance->wall={};
                 return;
             }
             run_.effectsSucceeded=false;
@@ -2371,6 +2379,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
         digest.addF32(instance.rotation);
         digest.addF32(instance.imageSpeed);
         digest.addF32(instance.imageIndex);
+        if(instance.objectId==60)appendWallEndStepState(instance.wall,digest);
         if (instance.enemyImageInitialized) {
             digest.addU32(instance.enemyImagePhase);
             digest.addU32(instance.enemyImageRemainder);

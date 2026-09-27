@@ -15,6 +15,7 @@
 #include "RunnerObjectMembership.h"
 #include "RunnerRoomMembership.h"
 #include "InstanceHandle.h"
+#include "WallEndStep.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -73,6 +74,7 @@ struct InstanceRecord {
     WalkingEnemyMotion walker;
     bool frogMotionInitialized = false;
     AlarmBank alarms;
+    WallEndStepState wall{};
 };
 
 enum class CreateInstanceResult {

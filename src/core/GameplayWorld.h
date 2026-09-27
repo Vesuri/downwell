@@ -208,7 +208,8 @@ public:
             if(instance.objectId!=60&&instance.objectId!=93)continue;
             if(!terrain(instance)||(terrainInstances_&&(!terrainInstances_->appendRoom(instance)||
                 !terrainInstances_->createProperties(terrainInstances_->handle(terrainInstances_->size()-1),
-                    downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_)))){
+                    downwell::terrainTileForArea(run_.stage.area),false,enemyRandom_)||
+                !terrainInstances_->roomCreation(terrainInstances_->handle(terrainInstances_->size()-1))))){
                 run_.effectsSucceeded=false;return false;
             }
         }

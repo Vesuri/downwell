@@ -44,6 +44,8 @@ int main(){
             const auto* state=roomOwner->state(shared);std::int32_t x,y;
             assert(state&&state->x.promoted().roundPixel(x)&&state->y.promoted().roundPixel(y)&&x==r.x&&y==r.y);
             assert(stored->spriteId==51&&stored->imageSpeed==0&&roomOwner->properties(shared)->sprite.spriteId==51);
+            assert(stored->wall.pillar==(r.creationCodeId==677?1:r.creationCodeId==676||r.creationCodeId==678?-1:0));
+            assert(!stored->wall.checked&&!stored->wall.surrounded&&!stored->wall.deactivate&&!stored->wall.lights);
         }
         const auto old=roomOwner->terrain().handle(0);
         assert(roomWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
@@ -69,6 +71,14 @@ int main(){
         assert(!terrain->appendRoom(r)&&!terrain->valid()&&terrain->size()==0);
     }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+    {
+        auto terrain=std::make_unique<GameplayTerrainInstances>();GameMakerRandom random;
+        assert(terrain->append(60,128,0,true,123,999));
+        const auto h=terrain->handle(0);
+        assert(terrain->createProperties(h,51,false,random));
+        assert(!terrain->roomCreation(h)&&!terrain->valid());
+        assert(terrain->size()==1&&terrain->find(h)->spriteId==51&&terrain->find(h)->wall.pillar==0);
+    }
     assert(owner->valid());
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
     auto unrelated=std::make_unique<GameplayWorld>(300,true,0,false);

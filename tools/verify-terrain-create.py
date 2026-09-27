@@ -21,6 +21,15 @@ assert wall[5:17] == [op for sprite in (57, 55, 53, 52, 51)
                       for op in (f"pushi.e {sprite}", "conv.i.v")] + [
                           "call.i choose(argc=5)", "pop.v.v self.sprite_index"]
 assert wall[17:21] == ['push.s "foliage"@776', "pop.v.s self.material", "pushi.e 0", "pop.v.i self.image_speed"]
+assert wall[21:] == [op for name, value in (
+    ("deactivate", 0), ("checked", 0), ("checkwall", 0), ("i", 0),
+    ("grass", -1), ("surrounded", 0), ("lightCheck", 0), ("isPillar", 0),
+    ("lightUpLeft", 0), ("lightUpRight", 0), ("lightDownLeft", 0), ("lightDownRight", 0))
+    for op in (f"pushi.e {value}", f"pop.v.i self.{name}")]
+for code, number, value in ((676, 1, -1), (677, 2, 1), (678, 3, -1)):
+    name = f"gml_RoomCC_rmMain_{number}_Create"
+    assert manifest["resources"]["code"][code]["name"] == name
+    assert instructions(name) == [f"pushi.e {value}", "pop.v.i self.isPillar"]
 thin = instructions("gml_Object_objThinPlatform_Create_0")
 assert thin == ['push.s "thin"@775', "pop.v.s self.material",
                 "pushglb.v global.wallTile", "pop.v.v self.sprite_index",

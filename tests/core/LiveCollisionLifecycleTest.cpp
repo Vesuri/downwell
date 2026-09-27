@@ -723,6 +723,18 @@ int main(){
     production->skipToGameForTesting();
     runtime->skipToGameForTesting();plain->skipToGameForTesting();
     {
+        unsigned pillars=0;
+        for(unsigned i=0;i<production->activeInstanceCount();++i){
+            const auto& r=production->instanceAt(i);
+            if(r.objectId!=60)continue;
+            const int expected=r.creationCodeId==677?1:r.creationCodeId==676||r.creationCodeId==678?-1:0;
+            require(r.wall.pillar==expected&&!r.wall.checked&&!r.wall.surrounded&&!r.wall.lights,
+                "wall Create defaults precede authored pillar room scripts");
+            pillars+=expected!=0;
+        }
+        require(pillars==3,"all three authored room pillar assignments execute");
+    }
+    {
         const auto digest=production->stateDigest();
         const InstanceRecord* wall=nullptr;
         for(unsigned i=0;i<production->activeInstanceCount();++i)

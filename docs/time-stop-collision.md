@@ -1122,7 +1122,14 @@ preserves terrain-relative order, without claiming original cross-family order
 240 authored walls, all unit scale/zero rotation/default image properties.
 Records retain the original instance ID and creation-code reference. The three
 wall instance-creation scripts (`gml_RoomCC_rmMain_1/2/3_Create.asm`, codes
-676–678) set `isPillar` to -1/+1/-1; registration does not execute those scripts.
+676–678) set `isPillar` to -1/+1/-1. `wallRoomCreation` applies those assignments
+after object Create in the stored scheduler and in the optional native terrain
+store. Wall records retain `WallEndStepState`; Create resets its consumed
+bookkeeping fields before the room-specific pillar override. The stored-world
+state digest includes those fields. An unsupported terrain room-creation code
+fails without undoing its already-published birth/Create prefix. This is the
+wall-specific room-code path, not a general VM room-script interpreter; it does
+not yet drive native drawing, adjacency or retained background replacement.
 Generated records have no authored ID. Their local lifetime keys remain separate
 from source IDs. Unsupported room transforms/pre-create properties are rejected
 when identity tracking is installed, not silently flattened. A room-load guard

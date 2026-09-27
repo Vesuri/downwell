@@ -3,6 +3,7 @@
 #include "InstanceLifecycle.h"
 #include "RoomPack.h"
 #include "TerrainCreate.h"
+#include "WallEndStep.h"
 #include <cstring>
 namespace downwell {
 // Optional identity store, separate from backend occupancy/drawing caches.
@@ -19,6 +20,7 @@ public:
         std::uint32_t sourceInstanceId=0; // Authored ID only; zero for generated records.
         int creationCodeId=-1;
         int spriteId=-1,imageIndex=0,imageSpeed=1;
+        WallEndStepState wall{};
     };
     using Binding=RecordLifecycleBinding<Record>;
     explicit GameplayTerrainInstances(Binding binding={}):binding_(binding){}
@@ -44,7 +46,7 @@ public:
     bool appendRoom(const PackedRoomInstance& r){
         // These are the supported rmMain terrain birth properties. Reject
         // new transformed/pre-create variants rather than silently lose
-        // their source shape. The retained creation code is not executed here.
+        // their source shape. Object and room Create execute after birth.
         if(!r.instanceId||bits(r.scaleX)!=0x3f800000u||bits(r.scaleY)!=0x3f800000u||
             (bits(r.rotation)&0x7fffffffu)||bits(r.imageSpeed)!=0x3f800000u||
             (bits(r.imageIndex)&0x7fffffffu)||r.preCreateCodeId!=-1||r.flags)
@@ -60,6 +62,14 @@ public:
                 if(!binding_.phaseIndex(h,r,unsigned(index)*256u))return false;
                 r.imageIndex=index;return true;
             },[&](int speed){r.imageSpeed=speed;return true;}))return good_=false;
+        if(r.objectId==60)r.wall={};
+        return true;
+    }
+    bool roomCreation(InstanceHandle h){
+        if(!good_||!find(h))return good_=false;
+        auto& r=records_[h.slot];
+        if(r.creationCodeId==-1)return true;
+        if(r.objectId!=60||!wallRoomCreation(r.creationCodeId,r.wall))return good_=false;
         return true;
     }
     bool clear(){
