@@ -8,8 +8,9 @@
 #include "SmokeTrig.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
-// Terrain-only queries require complete registered terrain families. Other
-// selectors remain unavailable until their families and setters are registered.
+// Terrain-only queries retain their explicit resource-family gate. Projectile
+// line queries cover the currently registered solid/enemy lifetimes; other
+// selectors and unimplemented actors are not synthesized by these adapters.
 // Install bindings before constructing the world, then attach before Step.
 class GameplayCollisionOwner {
 public:
@@ -305,7 +306,18 @@ public:
     // queried until all of their lifetimes and setters are owned here.
     bool terrainCollisionPoint(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         bool precise,bool notMe,const SpriteMaskPack& masks,Owner::Result& result){
-        if(!terrainQuery(object)||!masks.valid())return check(false);
+        if(!terrainQuery(object))return check(false);
+        return registeredCollisionPoint(self,object,x,y,precise,notMe,masks,result);
+    }
+    bool projectileSolidPoint(InstanceHandle self,MotionBinary64 x,MotionBinary64 y,
+        bool notMe,const SpriteMaskPack& masks,Owner::Result& result){
+        if(!valid()||!world_)return check(false);
+        return registeredCollisionPoint(self,59,x,y,false,notMe,masks,result);
+    }
+private:
+    bool registeredCollisionPoint(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        bool precise,bool notMe,const SpriteMaskPack& masks,Owner::Result& result){
+        if(!masks.valid())return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         return check(owner_.collisionPointVm(self,object,x,y,notMe,families_,
             [&](InstanceHandle h,RunnerImageValue px,RunnerImageValue py,bool& hit){
@@ -313,10 +325,26 @@ public:
                     true,precise,sprites_,masks,update,inverseTrig,roundPixel,hit);
             },result));
     }
+public:
     bool terrainNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
         MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
+        if(!terrainQuery(object))return check(false);
+        return registeredNonPreciseLine(self,object,x1,y1,x2,y2,notMe,result);
+    }
+    // scrBulCheckSolid uses parent solid 59 and parent enemy 83, not nearest
+    // distance or an enemy-first sweep. Query registered wall, box and enemy
+    // lifetimes through the original family/list/tree dispatcher. This does
+    // not run impact events or admit parentShootableThing shape queries.
+    bool projectileNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
+        MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
+        if(!valid()||!world_||(object!=59&&object!=83))return check(false);
+        return registeredNonPreciseLine(self,object,x1,y1,x2,y2,notMe,result);
+    }
+private:
+    bool registeredNonPreciseLine(InstanceHandle self,int object,MotionBinary64 x1,MotionBinary64 y1,
+        MotionBinary64 x2,MotionBinary64 y2,bool notMe,Owner::Result& result){
         RunnerLineArguments args;
-        if(!terrainQuery(object)||!args.assign(x1,y1,x2,y2))return check(false);
+        if(!args.assign(x1,y1,x2,y2))return check(false);
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         return check(owner_.collisionLine(self,object,args,notMe,false,families_,update,
             [&](InstanceHandle h,const RunnerLineArguments& line,bool& hit){
@@ -324,6 +352,7 @@ public:
                     line,true,sprites_,update,hit);
             },result));
     }
+public:
     bool reconcileActivation(){
         if(!valid()||!world_)return check(false);
         if(!activationPending_)return true;

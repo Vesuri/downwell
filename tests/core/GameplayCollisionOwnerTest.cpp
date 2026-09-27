@@ -31,7 +31,10 @@ bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
     downwell::MotionBinary64 x,downwell::MotionBinary64 y,
     downwell::GameplayCollisionOwner::Owner::Result& result){
     return owner.terrainCollisionPoint(self,60,x,y,true,true,masks,result)&&
-        owner.terrainNonPreciseLine(self,60,x,y,x,y,true,result);
+        owner.terrainNonPreciseLine(self,60,x,y,x,y,true,result)&&
+        owner.projectileNonPreciseLine(self,59,x,y,x,y,false,result)&&
+        owner.projectileNonPreciseLine(self,83,x,y,x,y,false,result)&&
+        owner.projectileSolidPoint(self,x,y,false,masks,result);
 }
 #else
 #include "core/GameplayFieldReentryVerification.h"
@@ -374,6 +377,54 @@ int main(){
         }
     }
     assert(masks.valid());
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*scene));
+        assert(scene->createGeneratedInstance({60,240,512},objects,[](const auto&){return true;}));
+        assert(scene->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
+        assert(scene->configureEnemy(0,112,163,0,336,0,0,5,14,0,0,-1,-1,0,0,true,true,true));
+        const auto enemy=scene->enemyHandle(scene->enemyAt(0).lifetimeId);
+        InstanceHandle enemyShared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::enemy,enemy,enemyShared));
+        auto n=[](int v){return MotionBinary64::fromInteger(v);};
+        auto query=[&](int object,InstanceHandle self={},bool notMe=false){
+            GameplayCollisionOwner::Owner::Result selected;
+            assert(owner->projectileNonPreciseLine(self,object,n(240),n(496),n(240),n(528),notMe,selected));
+            return selected;
+        };
+        const auto wall=query(59),actor=query(83);
+        GameplayCollisionOwner::Owner::Result point;
+        assert(owner->projectileSolidPoint({},n(240),n(512),false,masks,point)&&point.found);
+        const auto firstPoint=point.handle;
+        assert(owner->projectileSolidPoint(firstPoint,n(240),n(512),true,masks,point)&&
+            point.found&&point.handle.slot!=firstPoint.slot);
+        assert(wall.found&&actor.found&&actor.handle.slot==enemyShared.slot&&actor.handle.generation==enemyShared.generation);
+        const auto excluded=query(83,enemyShared,true);assert(!excluded.found);
+        assert(query(83,enemyShared,false).found); // VM uses notme=false.
+        const auto* liveEnemy=scene->resolveEnemyLifetime(enemy);assert(liveEnemy);
+        assert(owner->enemyBinding().activation(enemy,*liveEnemy,false)&&!query(83).found);
+        assert(owner->reconcileActivation()&&!query(83).found);
+        assert(owner->enemyBinding().activation(enemy,*liveEnemy,true)&&owner->reconcileActivation()&&query(83).found);
+        const auto otherSolid=query(59,wall.handle,true);
+        assert(otherSolid.found&&otherSolid.handle.slot!=wall.handle.slot);
+        GameplayCollisionView::Kind firstKind,otherKind;InstanceHandle firstLocal,otherLocal;
+        assert(GameplayCollisionView::decode(wall.handle,firstKind,firstLocal)&&
+            GameplayCollisionView::decode(otherSolid.handle,otherKind,otherLocal)&&
+            ((firstKind==GameplayCollisionView::Kind::terrain&&otherKind==GameplayCollisionView::Kind::breakable)||
+             (otherKind==GameplayCollisionView::Kind::terrain&&firstKind==GameplayCollisionView::Kind::breakable)));
+        // The enemy guard must not accidentally return the overlapping solid.
+        assert(scene->markEnemyDestroyed(enemy)&&!query(83).found&&query(59).found);
+        assert(owner->prepareDraw()&&!scene->resolveEnemyLifetime(enemy));
+        assert(scene->configureEnemy(0,112,163,0,336,0,0,5,14));
+        const auto replacement=query(83);
+        assert(replacement.found&&replacement.handle.generation!=enemyShared.generation);
+        assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,43,300)!=ResultsDestination::none);
+        assert(!query(59).found&&!query(83).found&&owner->valid());
+        GameplayCollisionOwner::Owner::Result sentinel;sentinel.found=true;sentinel.handle=enemyShared;
+        assert(!owner->projectileNonPreciseLine({},90,n(240),n(496),n(240),n(528),false,sentinel)&&
+            !owner->valid()&&sentinel.found&&sentinel.handle.generation==enemyShared.generation);
+    }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),

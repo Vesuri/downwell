@@ -116,8 +116,12 @@ generation-checked handle, source instance ID and published position snapshot;
 a failed query does not publish a miss. The native owner's corresponding
 `terrainCollisionPoint` and `terrainNonPreciseLine` return shared collision
 handles (not terrain-local slots). They retain the completed-family gate for
-60/93; these methods do not authorize queries against incomplete projectile
-parent families. Point queries accept the original precise flag. Line queries
+60/93. `projectileNonPreciseLine` separately admits the VM's parent selectors
+59/83 across registered native walls, boxes and enemies; `projectileSolidPoint`
+uses parent 59 with precise=false for the approach loop. These selectors do
+not synthesize unimplemented actors, replace collision events, or admit the
+parent-90 shape query. Their targets remain generation-checked across marking,
+retirement and Retry. Point queries accept the original precise flag. Line queries
 explicitly support only precise=false, not an approximation of bitmap lines.
 
 `LiveCollisionLifecycleTest` exercises the stored adapters against the loaded
