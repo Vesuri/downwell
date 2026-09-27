@@ -437,6 +437,24 @@ The regression exhausts all 256 activity masks across nine source/destination
 splits and checks both link directions and ownership. Binary range hashes pin
 the recovered routines; these tests are not live Windows rendering comparisons.
 
+`RunnerLayers` owns bounded layer slots and composes those element lists with
+the recovered integer-depth movement and merge rules. Layer IDs are supplied
+by its caller and remain separate from reusable slots. It finds the first
+equal-depth dynamic layer, retires empty dynamic layers on element detachment,
+and retains empty fixed layers. During a merge its checked callback publishes
+external instance layer IDs in source-element order before splicing and
+normalization. Publication failure is terminal; the new depth and any earlier
+external publications are not rolled back or retried. Tests exercise all 64
+fixed/dynamic combinations across six source positions, five requested depths
+and both merge settings (3,840 cases), as well as inactive element order,
+detachment, slot reuse and failed publication.
+
+This is not yet the full runtime layer owner. The room adapter must provide
+source ID allocation, fixed-layer loader order, type/null/activation predicates,
+hash-equivalent lookup and external attached/current-element publication. The
+binary32 depth setter, unique deferred queue and instance migration service
+still need connection, followed by the selected Draw walk in both backends.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

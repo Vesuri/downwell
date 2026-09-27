@@ -1,6 +1,10 @@
 #include "core/BinaryEffectSurface.h"
 #include "core/InstanceStore.h"
 #include "core/RunnerLayerElements.h"
+#include "core/RunnerLayers.h"
+bool compileLayers(downwell::RunnerLayers<4,16>& owner,unsigned slot,int depth){
+    return owner.move(slot,depth,true,[](unsigned,int){return true;},[](unsigned){return false;});
+}
 bool compileLayerElements(downwell::RunnerLayerElements<4,16>& owner,unsigned slot,unsigned inactive){
     return owner.insert(0,slot,true,false,[](unsigned){return false;}) &&
         owner.concatenate(1,0) && owner.normalize(1,[&](unsigned i){return i==inactive;}) &&
