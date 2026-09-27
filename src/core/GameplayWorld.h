@@ -262,7 +262,7 @@ public:
             DW_GENERATION_SCOPE(profileGeneratedShop);
             return registerShop(command.x, command.y) != nullptr;
         }
-        if (command.objectId == 306) registerLevelExit(command.y);
+        if (command.objectId == 306 && !registerLevelExit(command.y)) return false;
         if (command.objectId == 82)
             return run_.adoptTimeField(command.x,command.y,command.timeFieldRadiusWord());
         if (command.objectId == 62) return registerSideCameraLocker(command.x, command.y);
@@ -399,7 +399,7 @@ public:
         run_.sideCameraLockers.collide(camera);
         return camera.pixelY() - 142;
     }
-    void registerLevelExit(int y) { run_.createLevelExit(480, y, enemyRandom_, cameraMotion_); }
+    bool registerLevelExit(int y) { return run_.createLevelExit(480, y, enemyRandom_, cameraMotion_); }
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const downwell::LevelExit& levelExit() const { return run_.levelExit; }
     const downwell::GoalTimeField& goalField() const { return run_.goalField; }

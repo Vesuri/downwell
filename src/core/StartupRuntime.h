@@ -213,7 +213,7 @@ public:
     const OrdinaryTimeFields<64>& timeFields() const {return run_.timeFields;}
     bool cameraSideLocked() const { return mainCameraMotion_.sideLocked; }
     std::uint64_t sideCameraDigest() const { return run_.sideCameraLockers.digest(mainCameraMotion_); }
-    void registerLevelExit(int y) { run_.createLevelExit(480, y, random_, mainCameraMotion_); }
+    void registerLevelExit(int y);
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const LevelExit& levelExit() const { return run_.levelExit; }
     const GoalTimeField& goalField() const { return run_.goalField; }
@@ -358,6 +358,7 @@ private:
     void dispatchRoomCreation(std::int32_t roomId);
     void flushDeferredInstances(InstanceStore<instanceCapacity>& instances,
                                 std::int32_t roomId);
+    bool createLevelExitChild(LevelExit::Effect effect,int x,int y);
     void executeCode(InstanceRecord* instance,
                      std::int32_t codeId,
                      bool advancePressed = false);

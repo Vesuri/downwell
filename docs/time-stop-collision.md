@@ -85,6 +85,33 @@ performs its transformed per-pixel intersection after the compatibility-mode
 bounds test. Float narrowing, inverse sampling and negative-scale alignment
 must agree with [the runner collision rules](runner-collision-bounds.md).
 
+## Exit children and Create order
+
+`objLineToResult` (306) calls inherited `objLineToMain` Create: set the custom
+trigger variable `active=0`, center X at half the room width, and synchronously
+create `roomEndSetter` (74). That child's Create finds camera 63 and sets its
+room end to `y-176`. The derived event then creates `goalTimeField` (255) at
+`(x,y+32)`. Its Create writes X scale 2, then Y scale 2, then samples radius
+`128+random(2)`. Neither child has substantive PreCreate code. The trigger's
+custom `active` variable must not disable runner collision membership.
+
+The stored runtime flushes earlier builder commands before creating the exit,
+then registers these children synchronously through separate checked queues.
+Birth publishes serialized resource defaults at unit scale; ordered scale
+callbacks update the collision owner before the shared radius draw. The shared
+`RunSession::createLevelExit` callback boundary stops later children and RNG on
+failure without undoing the preceding camera write or completed births. Both
+worlds use that shared camera/radius sequence; native-world collision-registry
+registration is still required. An empty publication callback does not install
+such a registry.
+
+The live collision gate checks the three instance identities, both scale writes,
+the complete post-Create RNG state, and resource-backed direct/parent-family
+queries beyond the unscaled radius. Fault cases reject either child birth or
+either scale write. These are controlled exit fixtures, not natural-end-of-level
+or original traversal-order verification, and the diagnostic query still does
+not drive the player's clock.
+
 ## Ordinary fields
 
 `parentTimeField` (object 82) itself is instantiated by builder symbol `O`

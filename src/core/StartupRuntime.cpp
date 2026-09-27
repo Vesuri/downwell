@@ -1106,11 +1106,9 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
             // builder visits its next cell. Do not defer it with plain tiles.
             if (command.objectId == 277)
                 return runtime->registerShop(command.x, command.y) != nullptr;
-            if (command.objectId == 306)
-                runtime->registerLevelExit(command.y);
             if (command.objectId == 82 && !runtime->run_.adoptTimeField(
                 command.x,command.y,command.timeFieldRadiusWord()))return false;
-            if (command.objectId == 62) {
+            if (command.objectId == 62 || command.objectId == 306) {
                 // Materialize Create before the later camera Step, retaining
                 // prior queued instances' creation order and the real record.
                 if (!runtime->deferredInstances_.enqueueCreate(command)) return false;
@@ -1343,6 +1341,24 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                                  std::int32_t codeId,
                                  bool advancePressed) {
     switch (codeId) {
+    case 2461: // objLineToResult Create -> inherited objLineToMain Create
+        ++implementedCodeCalls_;
+        if(instance!=nullptr){
+            // The inherited event centers the parent before either child is
+            // born. Its custom `active=0` is LevelExit::active, NOT the runner
+            // instance activation flag.
+            for(std::size_t i=0;i<instances_.size();++i)if(&instances_.at(i)==instance){
+                if(!lifecycle_.integerPosition(instances_.handleAt(i),*instance,240,instance->y)){
+                    run_.effectsSucceeded=false;return;
+                }
+                instance->x=240;instance->preciseX=240.0F;
+                run_.createLevelExit(480,instance->y,random_,mainCameraMotion_,
+                    [this](LevelExit::Effect effect,int x,int y){return createLevelExitChild(effect,x,y);});
+                return;
+            }
+            run_.effectsSucceeded=false;
+        }
+        return;
     case 649: // gml_Room_rmPlayMenu_Create
         ++implementedCodeCalls_;
         cameraViewWidth_ = surfaceWidth;
@@ -1866,6 +1882,36 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
         ++unimplementedCodeCalls_;
         return;
     }
+}
+
+void StartupRuntime::registerLevelExit(int y) {
+    if(!deferredCommandsSucceeded_ || !run_.effectsSucceeded)return;
+    if(objectPack_==nullptr){run_.createLevelExit(480,y,random_,mainCameraMotion_);return;}
+    if(!deferredInstances_.enqueueCreate(306,240,y)){deferredCommandsSucceeded_=false;return;}
+    flushDeferredInstances(instances_,roomId_);
+}
+
+bool StartupRuntime::createLevelExitChild(LevelExit::Effect effect,int x,int y) {
+    // A separate queue permits synchronous child Create without reapplying the
+    // parent's in-flight batch. These two children's PreCreate chains contain
+    // only event_inherited, ending at no parent. Shared camera/radius writes
+    // run immediately after this publication in RunSession::createLevelExit.
+    DeferredInstanceQueue<1> child;
+    const int objectId=effect==LevelExit::Effect::roomEndSetter?74:255;
+    if(!objectPack_ || !child.enqueueCreate(objectId,x,y))return false;
+    return child.applyChecked(instances_,*objectPack_,roomId_,nextRuntimeInstanceId_,
+        [&](InstanceRecord& record){
+            if(objectId==255){
+                const auto handle=instances_.handleAt(instances_.size()-1);
+                if(!lifecycle_.integerTransform(handle,record,RunnerTransformField::scaleX,2,
+                                                {0x3f800000u},0xffffffu))return false;
+                record.scaleX=2.0F;
+                if(!lifecycle_.integerTransform(handle,record,RunnerTransformField::scaleY,2,
+                                                {0x3f800000u},0xffffffu))return false;
+                record.scaleY=2.0F;
+            }
+            return true;
+        },lifecycle_)==ApplyInstanceCommandsResult::success;
 }
 
 void StartupRuntime::flushDeferredInstances(

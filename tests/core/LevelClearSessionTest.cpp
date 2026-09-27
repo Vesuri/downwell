@@ -6,6 +6,24 @@ static void require(bool ok, const char* why) {
 }
 int main() {
     using namespace downwell;
+    for(unsigned failAt:{1u,2u}){
+        RunSession run;GameMakerRandom random(42);
+        struct Camera {int end=0;void setLevelExit(int y){end=y;}} camera;
+        unsigned calls=0;
+        auto publish=[&](LevelExit::Effect effect,int x,int y){
+            ++calls;
+            require(x==240&&y==(calls==1?4000:4032)&&
+                effect==(calls==1?LevelExit::Effect::roomEndSetter:LevelExit::Effect::goalTimeField),
+                "shared exit child source order");
+            return calls!=failAt;
+        };
+        const auto draws=random.drawCount();
+        require(!run.createLevelExit(480,4000,random,camera,publish)&&!run.effectsSucceeded&&!run.levelExitPresent&&
+            calls==failAt&&camera.end==(failAt==1?0:4000)&&random.drawCount()==draws,
+            "checked exit child failure retains earlier camera write but consumes no radius RNG");
+        require(!run.createLevelExit(480,4000,random,camera,publish)&&calls==failAt,
+            "failed session cannot retry exit children");
+    }
     {
         RunSession run;GameMakerRandom random(84);
         for(unsigned i=0;i<31;++i)require(run.flashEffects.create({}, {},random)!=0,"flash capacity fixture");

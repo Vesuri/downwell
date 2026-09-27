@@ -455,19 +455,28 @@ struct RunSession {
             levelExit.collide(dead, goalStopped, exitControlsLocked);
     }
 
-    template<class Camera>
-    void createLevelExit(int roomWidth, int y, GameMakerRandom& random, Camera& camera) {
+    template<class Camera,class PublishChild=LevelExit::NoChildPublication>
+    bool createLevelExit(int roomWidth, int y, GameMakerRandom& random, Camera& camera,
+                         PublishChild publishChild={}) {
+        if(!effectsSucceeded)return false;
+        levelExitPresent = false;
         goalStopped = exitControlsLocked = false;
         exitDitherRequested = levelResultRequested = false;
         exitDither = {};
         levelExit.create(roomWidth, y, [&](LevelExit::Effect effect, int x, int childY) {
+            // Child birth and collision-property writes precede its remaining
+            // Create effects. In particular the goal field is scaled before
+            // radius consumes RNG. A failed child stops later child creation.
+            if(!effectsSucceeded)return;
+            if(!publishChild(effect,x,childY)){effectsSucceeded=false;return;}
             if (effect == LevelExit::Effect::roomEndSetter) camera.setLevelExit(childY);
             else if (effect == LevelExit::Effect::goalTimeField) {
                 goalFieldBirthBoundary = timeFields.size();
                 goalField.create(x, childY, random);
             }
         });
-        levelExitPresent = true;
+        levelExitPresent = effectsSucceeded;
+        return effectsSucceeded;
     }
 
     RunRecords records() const {

@@ -6,6 +6,9 @@ namespace downwell {
 // must execute synchronously (their Create events may consume shared RNG).
 struct LevelExit {
     enum class Effect { roomEndSetter, goalTimeField, ditherTransition, resultRoom };
+    struct NoChildPublication {
+        bool operator()(Effect, int, int) const { return true; }
+    };
     int x = 0, y = 0;
     int alarm0 = -1, alarm1 = -1;
     bool active = false;

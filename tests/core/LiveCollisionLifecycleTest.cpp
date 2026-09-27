@@ -34,10 +34,25 @@ struct RecordingLifecycle:Lifecycle {
     std::unordered_map<std::uint32_t,InstanceHandle> handles;
     std::uint32_t ids[capacity]{};
     unsigned births=0,retires=0;
+    unsigned goalWrites=0,rejectGoalStage=0;
     explicit RecordingLifecycle(Lifecycle base):Lifecycle(base){}
     bool birth(InstanceHandle h,const InstanceRecord& r){
+        if((rejectGoalStage==1&&r.objectId==74)||(rejectGoalStage==2&&r.objectId==255))return false;
+        if(r.objectId==255)require(r.scaleX==1.0F&&r.scaleY==1.0F,"goal birth precedes Create scales");
         if(!Lifecycle::birth(h,r)){std::fprintf(stderr,"birth failed: object=%d id=%u\n",r.objectId,r.instanceId);return false;}
         require(handles.emplace(r.instanceId,h).second,"duplicate live instance ID");ids[h.slot]=r.instanceId;++births;return true;
+    }
+    bool transform(InstanceHandle h,const InstanceRecord& r,RunnerTransformField field,
+                   RunnerImageValue value,RunnerImageValue alpha,std::uint32_t blend){
+        if(r.objectId==255){
+            ++goalWrites;
+            require(value.bits==0x40000000u&&r.scaleY==1.0F&&
+                ((field==RunnerTransformField::scaleX&&r.scaleX==1.0F)||
+                 (field==RunnerTransformField::scaleY&&r.scaleX==2.0F)),"goal scales publish X then Y before record writes");
+            if((rejectGoalStage==3&&field==RunnerTransformField::scaleX)||
+               (rejectGoalStage==4&&field==RunnerTransformField::scaleY))return false;
+        }
+        return Lifecycle::transform(h,r,field,value,alpha,blend);
     }
     bool retire(InstanceHandle h,const InstanceRecord& r){
         if(!Lifecycle::retire(h,r))return false;
@@ -125,6 +140,30 @@ int main(){
                 MotionBinary64::fromInteger(-100000),masks,dispatch,inverse,miss)&&!miss.found,
                 "empty query cannot reuse a previous hit");
     require(runtime->stateDigest()==digest,"diagnostic queries leave world state and RNG untouched");
+    const auto beforeExit=runtime->activeInstanceCount();
+    auto expectedRandom=runtime->randomState();
+    const auto expectedRadius=GoalTimeField::nextRadius(expectedRandom);
+    runtime->registerLevelExit(6000);
+    require(runtime->effectsSucceeded()&&runtime->deferredCommandsSucceeded()&&runtime->levelExitPresent()&&
+        runtime->activeInstanceCount()==beforeExit+3&&lifecycle.goalWrites==2,"exit owns parent and synchronous children");
+    for(unsigned i=0;i<3;++i){
+        const auto& r=runtime->instanceAt(beforeExit+i);
+        require(r.objectId==(i==0?306:i==1?74:255)&&r.x==240&&r.y==(i==2?6032:6000)&&r.active,
+                "exit birth order and published positions match VM Create");
+        if(i)require(r.instanceId==runtime->instanceAt(beforeExit+i-1).instanceId+1,"children consume IDs synchronously");
+    }
+    const auto& goal=runtime->instanceAt(beforeExit+2);
+    require(goal.scaleX==2.0F&&goal.scaleY==2.0F&&runtime->goalField().radius.equal(expectedRadius)&&
+        runtime->randomDrawCount()==expectedRandom.drawCount(),"goal Create consumes one radius draw after scaling");
+    for(unsigned i=0;i<16;++i)require(runtime->randomState().stateWord(i)==expectedRandom.stateWord(i),"exit full RNG state");
+    // Ninety pixels from center misses the unscaled circle, but lies inside
+    // the actual doubled mask. Both direct and parent selectors must find it.
+    for(int selector:{255,82}){
+        Owner::Result result;
+        require(lifecycle.placeVm(view,player,selector,MotionBinary64::fromInteger(330),
+            MotionBinary64::fromInteger(6032),masks,dispatch,inverse,result)&&result.found&&
+            view.resolve(result.handle)==&goal,"live precise query resolves scaled goal child through its family");
+    }
     runtime->reset(PlatformProfile::nonDesktop);runtime->skipToGameForTesting();
     require(runtime->effectsSucceeded()&&runtime->roomLoadSucceeded()&&runtime->deferredCommandsSucceeded()&&
             !storage->owner.resolve(player)&&lifecycle.handles.size()==runtime->activeInstanceCount(),
@@ -132,4 +171,27 @@ int main(){
     std::printf("Live resource owner: %u births, %u retirements, %u position/activation checks\n",
         lifecycle.births,lifecycle.retires,checks);
     std::printf("Live precise terrain queries: %u hits and one empty query\n",queries);
+    for(unsigned failure=1;failure<=4;++failure){
+        auto failedStorage=std::make_unique<Storage>();
+        require(failedStorage->families.bindInstanceFlags(objects),"failed-birth family fixture");
+        RecordingLifecycle failedLifecycle({failedStorage->owner,failedStorage->properties,objects,sprites,failedStorage->families,{}, {}});
+        auto failed=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindMasks(failedLifecycle));
+        failed->skipToGameForTesting();
+        failedLifecycle.rejectGoalStage=failure;
+        const auto records=failed->activeInstanceCount();const auto draws=failed->randomDrawCount();
+        failed->registerLevelExit(6000);
+        require(!failed->effectsSucceeded()&&!failed->deferredCommandsSucceeded()&&!failed->levelExitPresent()&&
+            failed->randomDrawCount()==draws&&failed->activeInstanceCount()==records+(failure==1?2:3),
+            "rejected child birth/scale stops Create before radius RNG and preserves earlier records");
+        if(failure>=2){
+            const auto& partial=failed->instanceAt(records+2);
+            require(partial.objectId==255&&partial.scaleX==(failure==4?2.0F:1.0F)&&partial.scaleY==1.0F,
+                    "failed goal creation retains exactly the accepted scale writes");
+        }
+        const auto count=failed->activeInstanceCount();const auto writes=failedLifecycle.goalWrites;
+        failed->registerLevelExit(7000);
+        require(failed->activeInstanceCount()==count&&failed->randomDrawCount()==draws&&failedLifecycle.goalWrites==writes,
+                "failed exit creation cannot replay children or scale writes");
+    }
 }
