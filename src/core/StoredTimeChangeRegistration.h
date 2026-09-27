@@ -30,6 +30,16 @@ public:
     StoredTimeChangeRegistration(const StoredTimeChangeRegistration&)=delete;
     StoredTimeChangeRegistration& operator=(const StoredTimeChangeRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    template<class Effects> bool dispatchAlarm(const InstanceRecord& record,Effects& effects,unsigned index,int& speed){
+        if(!succeeded_)return false;
+        if(!effects.boundTo(*this))return fail();
+        for(auto& e:entries_)if(e.local&&e.id==record.instanceId){
+            if(resolve(e)!=&record)return fail();
+            if(!effects.dispatchAlarm(e.local,e.id,record.alarms,index,speed))return fail();
+            return true;
+        }
+        return fail();
+    }
     bool birth(std::uint32_t local,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
         if(!succeeded_)return false;
         Entry* free=nullptr;

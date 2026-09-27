@@ -3,6 +3,7 @@
 #include "core/StoredCollisionLifecycle.h"
 #include "core/StoredWorldCollision.h"
 #include "core/TimeChangeEffects.h"
+#include "core/EventScheduler.h"
 #include "core/RunnerObjectFamilies.h"
 #include "core/SmokeDirection.h"
 #include "core/SmokeTrig.h"
@@ -109,6 +110,49 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"scheduled-change families");
+        // This scheduler fixture owns its records directly, not through a
+        // StartupRuntime. Collision queries are deliberately unavailable.
+        struct AlarmLifecycle:Lifecycle {
+            explicit AlarmLifecycle(Lifecycle base):Lifecycle(base){}
+            bool placeMeeting(InstanceHandle,const InstanceRecord&,int,MotionBinary64,MotionBinary64,bool&){return false;}
+            bool instancePlace(InstanceHandle,const InstanceRecord&,int,MotionBinary64,MotionBinary64,InstancePlaceResult&){return false;}
+            bool instanceNumber(int,unsigned&){return false;}
+        } lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
+        InstanceStore<4> records;std::uint32_t nextId=100;int room=11,speed=60;bool healthy=true;
+        StoredTimeChangeRegistration<4,2> registration(records,&objects,InstanceLifecycleBinding::bindPositionedBirths(lifecycle),nextId,room,healthy);
+        TimeChangeEffects<2> effects;require(effects.bind(registration),"bind scheduler-selected changes");
+        require(effects.createAt({},{},speed,[](unsigned){return true;}),"first scheduled change");
+        require(records.create(99,36,room,false,0)==CreateInstanceResult::success,"interleaved scheduler actor");
+        records.find(99)->alarms.set(1,2);
+        require(effects.createAt({},{},speed,[](unsigned){return true;}),"second scheduled change");
+        speed=55;std::vector<unsigned> order;
+        auto tick=[&]{return EventScheduler<4>::runStepChecked(records,
+            [](const auto& r){return r.objectId==211?3u:2u;},
+            [&](auto& r,StepEvent event){
+                if(event.phase!=StepEventPhase::alarm)return;
+                if(event.subtype==1)order.push_back(r.instanceId);
+                if(r.objectId==211){
+                    healthy=registration.dispatchAlarm(r,effects,event.subtype,speed);
+                }else speed=58;
+            },[](auto){},[](auto,const auto&,bool){return true;},[&]{return healthy;});};
+        require(tick()&&speed==55&&order.empty()&&records.find(100)->alarms.get(1)==1,
+            "global scheduler decrements each registered alarm exactly once");
+        require(tick()&&speed==63&&order==std::vector<unsigned>({100,99,101})&&
+            records.find(100)->alarms.get(0)==0&&records.find(101)->alarms.get(1)==2,
+            "selected effects interleave with other actors and preserve source unclamped speed");
+        const bool third=tick();const auto thirdAlarm=records.find(100)->alarms.get(0);const bool fourth=tick();
+        require(third&&thirdAlarm==-1&&fourth&&speed==60&&effects.size()==0&&
+            records.find(100)->destroyRequested&&records.find(101)->destroyRequested&&
+            records.find(100)->alarms.get(0)==-1&&records.find(100)->alarms.get(1)==0,
+            "event publication cannot resurrect a stale sibling countdown; retirement is deferred");
+        require(effects.retireRequested()&&records.size()==1,"scheduled changes retire through registered ownership");
+        require(effects.createAt({},{},speed,[](unsigned){return true;}),"new lifetime after scheduled retirement");
+        const InstanceRecord copied=*records.find(nextId-1);
+        require(!registration.dispatchAlarm(copied,effects,1,speed)&&!healthy&&speed==30,
+            "world-selected dispatch rejects a copied record rather than trusting its numeric ID");
+    }
     {
         auto positioned=std::make_unique<Storage>();
         require(positioned->families.bindInstanceFlags(objects),"positioned birth families");

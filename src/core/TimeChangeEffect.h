@@ -21,9 +21,17 @@ struct TimeChangeEffect {
     }
     void advanceAlarm(unsigned index,int& roomSpeed){
         if(destroyRequested)return;
-        if(index==0){if(AlarmBank::advanceValue(alarm0))flash=false;return;}
+        if(index==0){if(AlarmBank::advanceValue(alarm0))fireAlarm(index,roomSpeed);return;}
         if(index!=1)return;
         if(!AlarmBank::advanceValue(alarm1))return;
+        fireAlarm(index,roomSpeed);
+    }
+    // The global scheduler has already decremented the authoritative alarm.
+    // Do not count it down again when dispatching its zero event.
+    void fireAlarm(unsigned index,int& roomSpeed){
+        if(destroyRequested)return;
+        if(index==0){flash=false;return;}
+        if(index!=1)return;
         if(roomSpeed<60){
             roomSpeed+=5;
             alarm1=2;

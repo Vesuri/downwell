@@ -47,6 +47,13 @@ int main(){
         else assert(registered.sourceId(1)==0);
     }
     TimeChangeEffects<3> owner;int speed=60;unsigned pauses=0;
+    for(unsigned fault=0;fault<4;++fault){
+        int speed=60;Registration world{speed};TimeChangeEffects<1> effects;
+        assert(effects.bind(world)&&effects.createAt(x,y,speed,[](unsigned){return true;}));
+        AlarmBank alarms;alarms.set(0,-1);alarms.set(1,fault==0?1:0);
+        assert(!effects.dispatchAlarm(fault==1?2:1,fault==2?999:105186,alarms,fault==3?2:1,speed));
+        assert(!effects.succeeded()&&speed==30&&world.publishes==1&&world.destroys==0);
+    }
     auto pause=[&](unsigned ms){assert(ms==30 && speed==30);++pauses;return true;};
     const auto empty=owner.beginPhase();assert(owner.create(speed,pause));
     for(unsigned i=0;i<4;++i)owner.advanceAlarm(empty,1,speed);

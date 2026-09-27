@@ -70,6 +70,26 @@ public:
         }
         if(!context_)retireRequested();
     }
+    // World-selected fired event, not a family-wide countdown. The registered
+    // record owns alarm storage while using this path; import both counters
+    // before the handler so publication cannot restore a stale sibling alarm.
+    bool dispatchAlarm(Handle handle,std::uint32_t id,const AlarmBank& alarms,unsigned index,int& speed){
+        if(!succeeded_)return false;
+        if(!context_||index>1||alarms.get(index)!=0)return fail();
+        for(unsigned i=0;i<count_;++i){auto& slot=slots_[i];
+            if(slot.handle!=handle)continue;
+            if(slot.sourceId!=id||slot.effect.destroyRequested)return fail();
+            bool eligible=true;
+            if(!eligible_(context_,handle,id,eligible))return fail();
+            if(!eligible)return true;
+            slot.effect.alarm0=alarms.get(0);slot.effect.alarm1=alarms.get(1);
+            slot.effect.fireAlarm(index,speed);
+            if(!publish_(context_,handle,id,slot.effect))return fail();
+            if(slot.effect.destroyRequested&&!destroyed_(context_,handle,id,slot.effect))return fail();
+            return true;
+        }
+        return fail();
+    }
     bool retireRequested(){
         if(!succeeded_)return false;
         for(unsigned i=0;i<count_;){
