@@ -138,6 +138,21 @@ the old published caller position until Step's final rounded x/y writes; stopped
 shards still move while image speed is zero and lifetime counters are extended.
 Publication/query failures are terminal and cannot be reset into a retry.
 
+`dispatchTimeShardContact` routes recovered code 2081 from a collision-event
+frame to this registration, validating the self/other generations and exact
+object/event binding before RNG consumption. The registration additionally
+checks the real record address, effect handle and numeric source ID; missing
+or recycled effects fail instead of becoming successful no-ops. The current
+entry point is specifically for the main-room player's movement owner.
+
+`gml_Object_fxTimeShard_Collision_objPlayer_n.asm` reads `sign(other.xsp)` and
+`sign(other.ysp)` and multiplies each by a separate `random(2)` draw, then sets
+`noTouch` and alarm 2 to 5. Only signs cross the live motion adapter: horizontal
+Q8 and vertical fifth-Q8 numerators retain them without rounding through pixel
+or engine velocities. This does not establish original precision for the
+player's underlying motion. Live tests cover left/right ground jumps, upward
+velocity, cooldown RNG suppression and stale/wrong-event rejection.
+
 The automatic transition schedulers do not call these entry points yet, and the
 native world's heterogeneous registry still needs its corresponding binding.
 Global ordering across effect families and exact synchronous Destroy boundaries

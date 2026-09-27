@@ -23,6 +23,7 @@
 #include "TimeChangeEffects.h"
 #include "TimeStopEffects.h"
 #include "TimeShardBurst.h"
+#include "RunnerCollisionEventContext.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include <array>
@@ -264,6 +265,24 @@ public:
         if(!run_.effectsSucceeded)return false;
         run_.effectsSucceeded=registration.belongsTo(instances_)&&shards.phasesBoundTo(registration)&&
             shards.playerContact(handle,xsp,ysp,random_);
+        return run_.effectsSucceeded;
+    }
+    // Recovered fxTimeShard Collision objPlayer_n (2081). Unlike engine speed,
+    // other.xsp/ysp are the player's private movement fields. This handler
+    // observes only their signs, so the Q8/fifths numerators are sufficient.
+    template<unsigned Capacity,unsigned Registered> bool dispatchTimeShardContact(
+        StoredTimeShardRegistration<instanceCapacity,Registered>& registration,TimeShardEffects<Capacity>& shards,
+        const RunnerCollisionEventContext::Frame& event){
+        if(!run_.effectsSucceeded)return false;
+        const auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        if(!registration.belongsTo(instances_)||!mainPlayerInitialized_||roomId_!=mainRoomId||
+            event.type!=4||event.code!=2081||event.owner!=238||event.subtype!=35||
+            !self||!other||self->objectId!=238||other->objectId!=35){
+            run_.effectsSucceeded=false;return false;
+        }
+        run_.effectsSucceeded=registration.dispatchContact(event.self,*self,shards,
+            MotionBinary64::fromInteger(mainPlayerMotion_.speedXFixed()),
+            MotionBinary64::fromInteger(mainPlayerMotion_.speedYFifths()),random_);
         return run_.effectsSucceeded;
     }
     template<unsigned Capacity,unsigned Registered> bool retireTimeShard(

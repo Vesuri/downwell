@@ -283,12 +283,9 @@ int main(){
             [&](const RunnerCollisionEventContext::Frame& frame){
                 const auto* self=owner->resolve(frame.self);const auto* other=owner->resolve(frame.other);
                 if(!self||!other||frame.code!=2081||self->objectId!=238||other->objectId!=35)return false;
-                for(unsigned h=1;h<=3;++h)if(shards.sourceId(h)==self->instanceId){
-                    ++contacts;
-                    return world->contactTimeShard(registration,shards,h,{},{})&&
-                        shards.get(h)->noTouch&&world->instance(self->instanceId)->alarms.get(2)==5;
-                }
-                return false;
+                ++contacts;
+                return world->dispatchTimeShardContact(registration,shards,frame)&&
+                    world->instance(self->instanceId)->alarms.get(2)==5;
             })&&contacts==preciseHits&&contacts>0&&world->randomDrawCount()==beforeContactDraws+2*contacts,
             "source-ordered live pair execution dispatches real shard contacts and exact RNG/cooldown effects");
         const auto tracked=pairs->at(0)->self;
@@ -307,11 +304,8 @@ int main(){
                     [&](const RunnerCollisionEventContext::Frame& frame){
                         const auto* self=owner->resolve(frame.self);const auto* other=owner->resolve(frame.other);
                         if(!self||!other||frame.code!=2081||self->objectId!=238||other->objectId!=35)return false;
-                        for(unsigned h=1;h<=3;++h)if(shards.sourceId(h)==self->instanceId){
-                            ++scheduledContacts;
-                            return world->contactTimeShard(registration,shards,h,{},{});
-                        }
-                        return false;
+                        ++scheduledContacts;
+                        return world->dispatchTimeShardContact(registration,shards,frame);
                     })&&world->randomDrawCount()==before;
         })&&scheduledPasses==1&&scheduledContacts>0,
             "ordinary scheduler executes live collected contacts once; cooldown consumes no RNG");
@@ -347,6 +341,54 @@ int main(){
         require(!world->publishCollisionPosition({tracked.slot,tracked.generation+1},movedX,movedY)&&
             !world->effectsSucceeded()&&!world->publishCollisionPosition(tracked,movedX,movedY),
             "stale collision publication latches world failure and prevents retry");
+    }
+    for(unsigned mode=0;mode<5;++mode){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach live shard handler world");world->skipToGameForTesting();
+        for(unsigned tick=0;tick<240&&!world->mainPlayerGrounded();++tick)world->step(Input{},false);
+        world->step(Input{},false); // Release the style-selection fire edge.
+        require(world->effectsSucceeded()&&world->mainPlayerGrounded(),"land before directional jump contact test");
+        auto registration=world->timeShardRegistration<3>();TimeShardEffects<3> shards;TimeShardBurst burst;
+        require(shards.bindPhases(registration),"bind directional contact shards");
+        RunnerImageValue x,y;
+        require(x.assign(MotionBinary64::fromInteger(int(world->mainPlayerX())))&&
+            y.assign(MotionBinary64::fromInteger(int(world->mainPlayerY())))&&
+            world->emitTimeShards(burst,shards,x,y,{},{},false),"emit directional contact shards");
+        auto pairs=std::make_unique<RunnerCollisionPairs<capacity,16384>>();
+        require(owner->collectCollisionPairs(*pairs,true),"collect directional fixture identities");
+        RunnerCollisionEventContext::Frame event;bool found=false;
+        for(unsigned i=0;i<pairs->size()&&!found;++i){
+            const auto pair=*pairs->at(i);
+            for(unsigned reverse=0;reverse<2&&!found;++reverse){
+                const auto self=reverse?pair.other:pair.self,other=reverse?pair.self:pair.other;
+                if(owner->resolve(self)->instanceId==shards.sourceId(1)&&owner->resolve(other)->objectId==35){
+                    event={self,other,4,35,238,2081};found=true;
+                }
+            }
+        }
+        require(found,"resolve exact player and registered shard lifetime for handler routing");
+        Input jump; jump.fire=true;jump.right=mode!=1;jump.left=mode==1;
+        world->step(jump,true);
+        require(world->effectsSucceeded()&&world->mainPlayerSpeedY()<0&&
+            (mode==1?world->mainPlayerSpeedX()<0:world->mainPlayerSpeedX()>0),
+            "directional fixture has real nonzero player jump velocities");
+        shards.get(1)->noTouch=false;
+        if(mode==2)++event.code;
+        if(mode==3)++event.self.generation;
+        if(mode==4)++event.other.generation;
+        const auto draws=world->randomDrawCount();
+        const bool ok=world->dispatchTimeShardContact(registration,shards,event);
+        require(ok==(mode<2)&&world->randomDrawCount()==draws+(mode<2?2:0),
+            "event identity validation precedes contact RNG and fails loudly");
+        if(mode<2){
+            const auto* shard=shards.get(1);
+            require(!shard->xsp.zero()&&!shard->ysp.zero()&&
+                bool(shard->xsp.high&0x80000000u)==(mode==1)&&bool(shard->ysp.high&0x80000000u)&&
+                shard->noTouch&&world->instance(shards.sourceId(1))->alarms.get(2)==5,
+                "live handler inherits actual horizontal and upward jump signs and publishes cooldown");
+        }else require(!world->effectsSucceeded()&&!world->dispatchTimeShardContact(registration,shards,event)&&
+            world->randomDrawCount()==draws,"invalid collision routing stays terminal");
     }
     for(bool recursive:{false,true}){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);

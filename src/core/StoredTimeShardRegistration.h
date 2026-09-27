@@ -123,6 +123,18 @@ public:
         }
         return fail();
     }
+    template<class Effects,class Random>
+    bool dispatchContact(InstanceHandle key,const InstanceRecord& record,Effects& effects,
+        MotionBinary64 playerXsp,MotionBinary64 playerYsp,Random& random){
+        if(!succeeded_)return false;
+        if(!effects.phasesBoundTo(*this)||records_.resolve(key)!=&record)return fail();
+        for(const auto& e:entries_)if(e.local&&e.key.slot==key.slot&&e.key.generation==key.generation){
+            if(resolve(e)!=&record||e.id!=record.instanceId||effects.sourceId(e.local)!=e.id||!effects.get(e.local))return fail();
+            if(!effects.playerContact(e.local,playerXsp,playerYsp,random))return fail();
+            return true;
+        }
+        return fail();
+    }
     template<class Effects,class Random,class Outside>
     bool dispatchStep(const InstanceRecord& record,Effects& effects,bool stopped,Random& random,Outside outside){
         if(!succeeded_)return false;
