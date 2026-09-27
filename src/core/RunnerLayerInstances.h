@@ -52,6 +52,26 @@ public:
         if(element==End||entries_[element].sourceId!=sourceId||!layers.detach(element))return false;
         entries_[element]=Entry{};return true;
     }
+    // Search only this room for the attachment described by the instance.
+    // Missing layer/element or a different lifetime is a source no-op. Do not
+    // clear the instance's attached flag, saved ID or depth: the destination
+    // initialization publishes those fields after this release succeeds.
+    bool releaseForRebind(Layers& layers,InstanceHandle h,const RunnerDepthService::Instance& state){
+        if(!layers.succeeded())return false;
+        if(!state.attached||state.layerId==-1)return true;
+        const unsigned layer=layers.find(state.layerId);
+        if(layer==Layers::End)return true;
+        const unsigned element=find(h);
+        if(element==End||layers.elementOwner(element)!=layer)return true;
+        if(!layers.detachForRebind(element))return false;
+        entries_[element]=Entry{};return true;
+    }
+    template<class Lookup>
+    bool initializeReserved(Layers& layers,unsigned element,Lookup lookup){
+        return initializeReserved(layers,element,lookup,[&](InstanceHandle h,const auto& state){
+            return releaseForRebind(layers,h,state);
+        });
+    }
     // Serialized type-2 initialization (0x412ea5..0x412fe6), not ordinary
     // birth attachment. Missing global instances leave placeholders unbound.
     // Lookup returns a borrowed state pointer plus generation-checked handle;

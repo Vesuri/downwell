@@ -144,5 +144,36 @@ void serializedInitialization(){
     require(registry.reserve(layers,layer,0xffffffffu)&&registry.initializeReserved(layers,registry.find(0xffffffffu),
         [](unsigned,InstanceHandle&,RunnerDepthService::Instance*&){return false;},release),"negative source ID is skipped before lookup");
 }
+void rebindRelease(){
+    for(bool dynamic:{false,true}){
+        Registry registry;Layers layers;unsigned layer=2,other=2;
+        require(layers.insertAfterEquals(17,10,dynamic,layer)&&layers.insertAfterEquals(18,20,false,other),"rebind layers");
+        RunnerDepthService::Instance state;
+        require(registry.attach(layers,layer,100,{50,1},state,false),"rebind original binding");
+        state.depth.bits=0x41280000u; // 10.5, not layer's integer depth
+        auto unchanged=[&](){return state.attached&&state.layerId==17&&state.depth.bits==0x41280000u;};
+        require(registry.releaseForRebind(layers,{50,2},state)&&registry.find(100)!=Registry::End,"stale generation cannot release");
+        auto missing=state;missing.layerId=999;
+        require(registry.releaseForRebind(layers,{50,1},missing)&&registry.find(100)!=Registry::End,"missing layer no-op");
+        missing.layerId=18;
+        require(registry.releaseForRebind(layers,{50,1},missing)&&registry.find(100)!=Registry::End,"wrong layer no-op");
+        missing.layerId=-1;
+        require(registry.releaseForRebind(layers,{50,1},missing)&&registry.find(100)!=Registry::End,"unset saved layer no-op");
+        missing=state;missing.attached=false;
+        require(registry.releaseForRebind(layers,{50,1},missing)&&registry.find(100)!=Registry::End,"unattached flag no-op");
+        require(registry.releaseForRebind(layers,{50,1},state)&&unchanged(),"release preserves instance fields");
+        require(layers.get(layer)&&layers.elementCount(layer)==0&&registry.find(100)==Registry::End,
+            "release retains empty dynamic and fixed layers but frees element");
+        require(registry.releaseForRebind(layers,{50,1},state)&&unchanged(),"repeated missing-element release no-op");
+        require(registry.reserve(layers,other,100),"same source ID can acquire a new placeholder after release");
+        require(registry.initializeReserved(layers,registry.find(100),
+            [&](unsigned id,InstanceHandle& h,RunnerDepthService::Instance*& out){
+                require(id==100,"rebind source ID preserved");h={50,1};out=&state;return true;
+            }),"shared release adapter binds destination without a second instance birth");
+        require(state.attached&&state.layerId==18&&state.depth.bits==0x41280000u&&layers.get(layer),
+            "rebinding publishes new layer only, not its depth");
+        require(registry.find(InstanceHandle{50,1})==registry.find(100),"instance lifetime survives rebind");
+    }
 }
-int main(){permutations();lifecycle();bounds();roomFallback();serializedInitialization();std::cout<<"Serialized layer initialization, room fallback and lifetime-checked attachment verified\n";}
+}
+int main(){permutations();lifecycle();bounds();roomFallback();serializedInitialization();rebindRelease();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}

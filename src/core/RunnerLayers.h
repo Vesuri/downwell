@@ -61,6 +61,12 @@ public:
         if(layers_[layer].dynamic&&!elements_.count(layer))eraseEmpty(layer);
         return true;
     }
+    // Serialized element rebinding (0x412f32): unlink the old element, but
+    // keep its layer even when dynamic and empty. Instance retirement and
+    // pending-depth state are deliberately not part of this operation.
+    bool detachForRebind(unsigned element){
+        return !failed_&&get(elements_.owner(element))&&elements_.remove(element);
+    }
     // 0x4147b0: merge is only possible while INCREASING depth. Publication
     // sees source element order and the destination ID before list splicing.
     // publish must filter type-2/null references and write instance layer IDs.

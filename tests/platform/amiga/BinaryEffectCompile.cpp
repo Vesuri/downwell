@@ -32,7 +32,7 @@ bool compileReservedLayerInitialization(downwell::RunnerLayerInstances<4,16>& re
     return registry.initializeReserved(layers,element,
         [&](unsigned,downwell::InstanceHandle& h,downwell::RunnerDepthService::Instance*& out){
             h=handle;out=&state;return true;
-        },[](downwell::InstanceHandle,const auto&){return true;});
+        });
 }
 bool compileDepthChanges(downwell::RunnerDepthChanges<16>& queue,downwell::RunnerLayers<4,16>& layers,
     downwell::RunnerDepthService::Instance& instance,unsigned element,downwell::MotionBinary64 value){

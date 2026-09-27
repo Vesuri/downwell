@@ -622,6 +622,15 @@ callbacks. The release adapter must implement the same-room search, preserve
 the instance lifetime and destination placeholder, and not substitute normal
 destruction/empty-dynamic-layer retirement. Tests cover preserved fractional
 depth and position, absent/already-initialized entries and callback failures.
+The default `initializeReserved` overload now uses the shared
+`releaseForRebind` operation: it checks saved layer ID and the exact registered
+lifetime in this room, unlinks the matching element with `detachForRebind`,
+and frees its registry entry without changing instance state or disposing an
+empty dynamic layer. Missing IDs, wrong layers and nonmatching generations do
+not release anything. Tests release the old element, reserve a new placeholder
+for the same source ID and bind the same instance lifetime, checking that its
+fractional depth survives and the old layer remains allocated. This release
+does not retire the instance or cancel its pending depth writes.
 The caller must also preserve original global-instance hash iteration order
 and the subsequent per-layer inactive-tail normalization (`0x41363e`). Neither
 is implied by iterating storage slots. Live persistence integration remains open.
