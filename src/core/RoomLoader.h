@@ -185,7 +185,9 @@ private:
         for (std::size_t index = 0; index < instances.size();) {
             const auto handle=instances.handleAt(index);
             InstanceRecord& instance = instances.at(index);
-            if (instance.active && !handler(instance, phase))return false;
+            // Broadcast helper 0x444980 skips destroyed/inactive instances.
+            // Their storage remains live until the room-entry cleanup sweep.
+            if (instance.active && !instance.destroyRequested && !handler(instance, phase))return false;
             // Retirement can compact the next unvisited record into this
             // position. Never retain/dereference instance across a callback.
             const auto current=instances.handleAt(index);

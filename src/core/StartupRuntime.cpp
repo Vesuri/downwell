@@ -1447,8 +1447,15 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
                 }
                 instance->scaleY=2.0F;
                 if(!run_.createStartField(instance->x,instance->y,random_))return;
-                if(!run_.startFieldPresent&&!instances_.erase(instance->instanceId,
-                    [this](InstanceHandle h,const InstanceRecord& r){return lifecycle_.retire(h,r);}))run_.effectsSucceeded=false;
+                if(!run_.startFieldPresent){
+                    // instance_destroy marks/excludes self; it does not free
+                    // the lifetime during Create. Room entry sweeps after
+                    // Room Start and activation reconciliation (0x510820).
+                    if(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(handle,*instance)){
+                        run_.effectsSucceeded=false;return;
+                    }
+                    instance->destroyRequested=true;
+                }
                 return;
             }
             run_.effectsSucceeded=false;
@@ -2169,6 +2176,16 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
             [this](InstanceHandle key,const InstanceRecord& record,bool member){
                 return lifecycle_.membership(key,record,member);
             });
+        if(roomLoadSucceeded_){
+            // Original room-entry cleanup, distinct from inter-Step list
+            // reconciliation. Only the entrance field currently destroys
+            // itself here; unsupported families must supply owned cleanup.
+            run_.effectsSucceeded=instances_.cleanupDestroyed([this](InstanceHandle,const InstanceRecord& record){
+                return record.objectId==371&&instances_.erase(record.instanceId,
+                    [this](InstanceHandle h,const InstanceRecord& r){return lifecycle_.retire(h,r);});
+            });
+            roomLoadSucceeded_=run_.effectsSucceeded;
+        }
     }
 }
 

@@ -64,6 +64,24 @@ function `0x50db60` has two additional cleanup calls only on its conditional
 pre-update event path. Room transitions also force sweeps. These reviewed byte
 ranges are pinned by the same verifier.
 
+Room entry specifically broadcasts Room Start via `0x444980` at `0x5107f8`,
+reconciles at `0x510813`, then calls `0x48bbb0` at `0x510820`. The broadcast
+helper tests exclusion mask `0x100003` at `0x4449b8`, so a destroy-marked
+lifetime remains allocated but receives neither Game Start nor Room Start.
+These ranges are also pinned by `verify-runner-destroy.py`.
+
+For first-level `startTimeField` (371), VM Create writes scale X, scale Y,
+samples radius, then calls `instance_destroy`. Its resource inheritance has
+no Destroy/Clean Up handler. The stored runtime publishes the mark through
+its collision owner before setting `destroyRequested`; later room Create
+events cannot reuse that slot. Room-entry cleanup retires it only after
+reconciliation. Failed marking retains the unmarked record; failed cleanup
+retains the marked record, and either failure stops subsequent execution.
+An entirely unindexed fixture marks its local record; an installed owner
+must provide destruction publication rather than silently retaining a
+query-visible field. Other effect families still require their owned cleanup
+dispatch, and the native entrance-field lifetime is not registered yet.
+
 Phase-bound `TimeShardEffects` consequently retains marked storage through
 alarms, Step and subsequent births until `retireRequested()` is called at an
 explicit sweep boundary (or `clear()` for teardown). Marked entries no longer

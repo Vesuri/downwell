@@ -40,7 +40,8 @@ struct RecordingLifecycle:Lifecycle {
     std::uint32_t ids[capacity]{};
     unsigned births=0,retires=0;
     unsigned goalWrites=0,rejectGoalStage=0;
-    unsigned startWrites=0,rejectStartStage=0,startRetires=0;
+    unsigned startWrites=0,rejectStartStage=0,startRetires=0,startMarks=0;
+    InstanceHandle markedStart{};
     const StartupRuntime* runtime=nullptr;
     const SpriteMaskPack* masks=nullptr;
     unsigned meetingCalls=0;
@@ -93,11 +94,30 @@ struct RecordingLifecycle:Lifecycle {
     bool retire(InstanceHandle h,const InstanceRecord& r){
         if(r.objectId==371){
             require(r.scaleX==2.0F&&r.scaleY==2.0F,"start retirement follows both scale writes");
+            if(h.slot==markedStart.slot&&h.generation==markedStart.generation)require(r.destroyRequested&&(owner.resolve(h)->flags&1u),
+                "marked entrance lifetime survives until owned room cleanup");
             ++startRetires;
             if(rejectStartStage==3)return false;
         }
         if(!Lifecycle::retire(h,r))return false;
         require(handles.erase(r.instanceId)==1,"retire unknown instance ID");ids[h.slot]=0;++retires;return true;
+    }
+    bool markDestroyed(InstanceHandle h,const InstanceRecord& r){
+        if(r.objectId==371){
+            require(r.scaleX==2&&r.scaleY==2&&!r.destroyRequested&&handles.count(r.instanceId),
+                "entrance destruction publishes after scales while its lifetime is live");
+            ++startMarks;
+            if(rejectStartStage==4)return false;
+        }
+        if(!Lifecycle::markDestroyed(h,r))return false;
+        if(r.objectId==371){
+            unsigned population=99;
+            require(owner.resolve(h)&&(owner.resolve(h)->flags&1u)&&
+                owner.instanceNumber(371,graph,population)&&population==0,
+                "entrance mark excludes population without retiring spatial storage");
+            markedStart=h;
+        }
+        return true;
     }
 };
 static bool tracked(int id){
@@ -111,6 +131,11 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        PackedObjectEvent event;
+        require(!objects.findEvent(371,1,0,event)&&!objects.findEvent(371,12,0,event),
+            "entrance field has no inherited Destroy/Clean Up handlers to run before marking");
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
@@ -470,7 +495,7 @@ int main(){
     auto storage=std::make_unique<Storage>();require(storage->families.bindInstanceFlags(objects),"bind full source families");
     RecordingLifecycle lifecycle({storage->owner,storage->properties,objects,sprites,storage->families,{}, {}});
     auto runtime=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        InstanceLifecycleBinding::bindQueries(lifecycle));
+        InstanceLifecycleBinding::bindQueryDestruction(lifecycle));
     lifecycle.runtime=runtime.get();lifecycle.masks=&masks;
     auto plain=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     {
@@ -856,7 +881,7 @@ int main(){
     }
     require(!runtime->instance(101097)&&!runtime->startTimeField()&&runtime->randomDrawCount()==331,
         "first-level start field consumes Create RNG then retires its placed lifetime");
-    require(lifecycle.startWrites==2&&lifecycle.startRetires==1&&!lifecycle.handles.count(101097),
+    require(lifecycle.startWrites==2&&lifecycle.startMarks==1&&lifecycle.startRetires==1&&!lifecycle.handles.count(101097),
         "first-level start field retires its registered collision identity");
     unsigned checks=0;
     for(unsigned tick=0;tick<1800;++tick){
@@ -1092,7 +1117,7 @@ int main(){
         require(clockStorage->families.bindInstanceFlags(objects),"clock query family fixture");
         RecordingLifecycle clockLife({clockStorage->owner,clockStorage->properties,objects,sprites,clockStorage->families,{}, {}});
         auto clock=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            InstanceLifecycleBinding::bindQueries(clockLife));
+            InstanceLifecycleBinding::bindQueryDestruction(clockLife));
         clockLife.runtime=clock.get();clockLife.masks=&masks;
         clock->skipToGameForTesting();
         clock->registerLevelExit(int(clock->mainPlayerY()));
@@ -1130,20 +1155,22 @@ int main(){
                 "maintained goal-family query finds the later-level entrance descendant");
         }
     }
-    for(unsigned failure=1;failure<=3;++failure){
+    for(unsigned failure=1;failure<=4;++failure){
         auto failedStorage=std::make_unique<Storage>();
         require(failedStorage->families.bindInstanceFlags(objects),"start failure family fixture");
         RecordingLifecycle failedLifecycle({failedStorage->owner,failedStorage->properties,objects,sprites,failedStorage->families,{}, {}});
         failedLifecycle.rejectStartStage=failure;
         auto failed=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            InstanceLifecycleBinding::bindMasks(failedLifecycle));
+            InstanceLifecycleBinding::bindMaskDestruction(failedLifecycle));
         failed->skipToGameForTesting();
         const auto* partial=failed->instance(101097);
         require(!failed->effectsSucceeded()&&partial&&partial->scaleX==(failure==1?1.0F:2.0F)&&
-            partial->scaleY==(failure==3?2.0F:1.0F)&&failed->randomDrawCount()==(failure==3?331u:330u),
+            partial->scaleY==(failure>=3?2.0F:1.0F)&&failed->randomDrawCount()==(failure>=3?331u:330u),
             "start failure preserves accepted scales and samples radius only before retirement");
         require(failedLifecycle.startWrites==(failure==1?1u:2u)&&failedLifecycle.startRetires==(failure==3?1u:0u),
             "start failure stops subsequent publication");
+        require(failedLifecycle.startMarks==(failure>=3?1u:0u)&&partial->destroyRequested==(failure==3),
+            "failed mark never publishes a record flag; failed cleanup retains the accepted mark");
         const auto digest=failed->stateDigest();
         failed->step({},false);
         require(failed->stateDigest()==digest,"failed start Create remains terminal");
@@ -1153,7 +1180,7 @@ int main(){
         require(failedStorage->families.bindInstanceFlags(objects),"failed-birth family fixture");
         RecordingLifecycle failedLifecycle({failedStorage->owner,failedStorage->properties,objects,sprites,failedStorage->families,{}, {}});
         auto failed=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            InstanceLifecycleBinding::bindMasks(failedLifecycle));
+            InstanceLifecycleBinding::bindMaskDestruction(failedLifecycle));
         failed->skipToGameForTesting();
         failedLifecycle.rejectGoalStage=failure;
         const auto records=failed->activeInstanceCount();const auto draws=failed->randomDrawCount();

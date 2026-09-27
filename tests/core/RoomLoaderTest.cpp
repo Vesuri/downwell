@@ -246,6 +246,30 @@ static void testBroadcastRetirement(){
 }
 
 int main() {
+    {
+        downwell::InstanceStore<4> instances;
+        const downwell::RoomInstanceDefinition defs[]={{1,371,false},{2,35,false}};
+        downwell::InstanceHandle marked;
+        unsigned laterCreates=0,broadcasts=0;
+        const auto result=downwell::RoomLoader<4>::enterChecked(instances,7,defs,2,true,
+            [&](auto& record,auto phase){
+                if(phase==downwell::RoomInstancePhase::create){
+                    if(record.instanceId==1){marked=instances.handleAt(0);record.destroyRequested=true;}
+                    else{++laterCreates;require(instances.resolve(marked)&&instances.resolve(marked)->destroyRequested,
+                        "later Create sees allocated marked lifetime, not a reused slot");}
+                }
+                if(phase==downwell::RoomInstancePhase::gameStart||phase==downwell::RoomInstancePhase::roomStart){
+                    require(record.instanceId==2,"destroy-marked lifetime excluded from room broadcasts");++broadcasts;
+                }
+                return true;
+            },[](int){return true;},[](auto&){return true;});
+        require(result==downwell::LoadRoomResult::success&&laterCreates==1&&broadcasts==2&&instances.resolve(marked),
+            "room initialization retains marked storage until explicit cleanup");
+        require(instances.cleanupDestroyed([&](auto key,const auto& record){
+            require(key.slot==marked.slot&&key.generation==marked.generation,"cleanup resolves original generation");
+            return instances.erase(record.instanceId);
+        })&&!instances.resolve(marked)&&instances.find(2),"room cleanup retires only the marked lifetime");
+    }
     testFirstRoomOrder();
     testDestinationRoomKeepsPersistentFirst();
     testValidationIsAtomic();

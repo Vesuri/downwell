@@ -16,6 +16,8 @@ for start, end, digest in (
     (0x50da30, 0x50da99, "ff064ca17a97c1644b1964b2d77efceb4c8c19ee33f1c707aa90a5f63a844f3e"),
     (0x5108d0, 0x5109ef, "f63cc7f447bc7b7d7fed387df0b8f91fc23ab5f97ce70047d3f33049bc3e4a08"),
     (0x50db60, 0x50df26, "ef00c233951574519cbf318d6ebe28ce58e05ebb632e9d663ea45d480fc36153"),
+    (0x5107f4, 0x510825, "743e96b6903a39deab31d92dc324a391cd83c2ad4f8d1c733e61b98ae55a7ad9"),
+    (0x444980, 0x4449db, "e07005881e8054cbc4ad30cf5193d85f1d129be917579a558c9effc29b49932e"),
 ):
     assert sha256(region(start, end - start)).hexdigest() == digest
 assert region(0x80cdf0, 17) == b"instance_destroy\0"
@@ -25,4 +27,8 @@ assert region(0x80cdf0, 17) == b"instance_destroy\0"
 assert region(0x4fdfa4, 4) == bytes.fromhex("83 4e 78 01")
 assert region(0x4fe49b, 7) == bytes.fromhex("f7 41 78 03 00 14 00")
 assert region(0x800180, 5) == b"Draw\0"
-print("Pinned ordinary Destroy exclusion, marked-record sweep and Draw-entry cleanup")
+# Room Start broadcast, activation reconciliation, then physical cleanup.
+assert region(0x5107f4, 4) == bytes.fromhex("6a 04 6a 07")
+assert region(0x510820, 5) == bytes.fromhex("e8 8b b3 f7 ff")
+assert region(0x4449b8, 7) == bytes.fromhex("f7 40 78 03 00 10 00")
+print("Pinned ordinary Destroy exclusion, room broadcasts, room-entry and Draw-entry cleanup")

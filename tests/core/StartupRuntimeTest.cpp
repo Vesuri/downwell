@@ -26,6 +26,9 @@ void stepMany(downwell::StartupRuntime& runtime, int count) {
 }
 
 struct LifecycleAudit {
+    bool markDestroyed(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+        require(matches(h,r)&&!r.destroyRequested,"destroy marks a still-live lifetime");return true;
+    }
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
     unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,terrainSprites=0,spriteChanges=0,indices=0,transforms=0,calls=0,fail=0;
@@ -141,7 +144,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
     LifecycleAudit audit;
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        downwell::InstanceLifecycleBinding::bindTransforms(audit));
+        downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
     auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
     for(unsigned tick=0;tick<1800;++tick){
@@ -165,7 +168,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     for(bool reject:{false,true}){
         LifecycleAudit boxes;boxes.rejectBoxRemoval=reject;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bind(boxes));
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(boxes));
         runtime->skipToGameForTesting();
         for(unsigned tick=0;tick<1800&&healthy(*runtime);++tick)
             runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
@@ -181,7 +184,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     for(unsigned reject:{0u,1u,2u}){
         LifecycleAudit checked;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindMasks(checked));
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(checked));
         runtime->skipToGameForTesting();
         std::uint32_t id=0;
         int startX=0,startY=0;
@@ -220,7 +223,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     for(int object:{111,112,113})for(int velocity:{0,640}){
         LifecycleAudit walking;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindTransforms(walking));
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(walking));
         runtime->skipToGameForTesting();
         std::uint32_t id=0;
         for(unsigned tick=0;tick<600&&!id;++tick){
@@ -250,7 +253,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     {
         LifecycleAudit changed;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindAnimation(changed));
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(changed));
         runtime->skipToGameForTesting();
         bool prepared=false;
         for(unsigned tick=0;tick<600&&!prepared;++tick){
@@ -287,7 +290,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     for(unsigned failure=0;failure<=11;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindTransforms(failing));
+            downwell::InstanceLifecycleBinding::bindMaskDestruction(failing));
         runtime->skipToGameForTesting();
         if(failure==0||failure==3||failure==9){
             // Controlled lifecycle fixture, not a natural combat encounter:
@@ -324,13 +327,13 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     }
     LifecycleAudit failedReset;
     auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::desktop,nullptr,nullptr,2,nullptr,
-        downwell::InstanceLifecycleBinding::bind(failedReset));
+        downwell::InstanceLifecycleBinding::bindMaskDestruction(failedReset));
     failedReset.fail=2;const auto births=failedReset.births;
     runtime->reset(downwell::PlatformProfile::desktop);
     require(!healthy(*runtime)&&failedReset.births==births,"failed reset retirement cannot publish replacement births");
     LifecycleAudit failedBirth;failedBirth.fail=1;
     auto rejected=std::make_unique<Runtime>(downwell::PlatformProfile::desktop,&rooms,&objects,2,&patterns,
-        downwell::InstanceLifecycleBinding::bind(failedBirth));
+        downwell::InstanceLifecycleBinding::bindMaskDestruction(failedBirth));
     require(!healthy(*rejected)&&failedBirth.calls==1&&rejected->implementedCodeCalls()==0,
             "initial birth rejection precedes all game callbacks and later room births");
 }
