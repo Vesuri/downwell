@@ -93,6 +93,49 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        for(int object:{112,92,60,112})
+            assert(world->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}));
+        const auto first=world->enemyHandle(world->enemyAt(0).lifetimeId);
+        const auto survivor=world->enemyHandle(world->enemyAt(1).lifetimeId);
+        const InstanceHandle box{0,1};assert(world->findBreakable(box));
+        const auto wall=owner->terrain().handle(0);
+        assert(world->markEnemyDestroyed(first)&&world->markEnemyDestroyed(first));
+        assert(world->markBreakableDestroyed(box)&&world->markBreakableDestroyed(box));
+        assert(owner->terrain().requestDestroy(wall));
+        assert(world->resolveEnemyLifetime(first)->active&&world->resolveEnemyLifetime(first)->destroyRequested);
+        assert(world->findBreakable(box)->active&&world->findBreakable(box)->destroyRequested);
+        unsigned count=99;
+        assert(owner->population(112,count)&&count==1);
+        assert(owner->population(92,count)&&count==0);
+        assert(owner->reconcileActivation()&&world->resolveEnemyLifetime(first)&&world->findBreakable(box));
+        RunnerStepSnapshot<16> snapshot;unsigned enemies=0,boxes=0;
+        assert(owner->dispatchStepPhase(2,snapshot,[&](InstanceHandle,const PackedObjectEvent& event){
+            enemies+=event.codeId==1200;boxes+=event.codeId==1087;return true;
+        }));
+        assert(enemies==1&&boxes==0);
+        assert(owner->prepareDraw()&&owner->prepareDraw());
+        assert(!world->resolveEnemyLifetime(first)&&!world->findBreakable(box)&&!owner->terrain().find(wall));
+        assert(world->enemyCount()==1&&world->resolveEnemyLifetime(survivor)==&world->enemyAt(0));
+        assert(world->createGeneratedInstance({112,272,512},objects,[](const auto&){return true;}));
+        const auto replacement=world->enemyHandle(world->enemyAt(1).lifetimeId);
+        assert(replacement.slot==first.slot&&replacement.generation!=first.generation);
+        assert(!world->resolveEnemyLifetime(replacement)->destroyRequested);
+        assert(world->markEnemyDestroyed(replacement)&&owner->prepareDraw());
+        assert(world->resolveEnemyLifetime(survivor)&&!world->resolveEnemyLifetime(replacement));
+        assert(!world->markEnemyDestroyed(first)&&!world->effectsSucceeded());
+    }
+    {
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+        assert(world->createGeneratedInstance({112,240,512},objects,[](const auto&){return true;}));
+        const auto h=world->enemyHandle(world->enemyAt(0).lifetimeId);
+        assert(!world->markEnemyDestroyed(h)&&!world->effectsSucceeded());
+        assert(world->resolveEnemyLifetime(h)&&!world->resolveEnemyLifetime(h)->destroyRequested);
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
         // Deliberately interleave registration/storage order across families.
         for(int object:{99,60,112,93,60})
             assert(world->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}));

@@ -384,6 +384,7 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     enemy.imageSpeed = downwell::enemyCreateProfile(objectId).animationRate;
     enemy.imageFrame = 0;
     enemy.active = active;
+    enemy.destroyRequested = false;
     enemy.awake = awake;
     enemy.grounded = grounded;
     enemy.frogLanded = true;
@@ -513,6 +514,41 @@ bool GameplayWorld::retireBreakable(unsigned index) {
     box.lifetimeId=0;box.active=false;return true;
 }
 
+bool GameplayWorld::markEnemyDestroyed(downwell::InstanceHandle handle) {
+    auto* enemy=const_cast<EnemyState*>(resolveEnemyLifetime(handle));
+    if(!run_.effectsSucceeded||!enemy){run_.effectsSucceeded=false;return false;}
+    if(enemy->destroyRequested)return true;
+    if(!enemyLifecycle_.markDestroyed(handle,*enemy)){run_.effectsSucceeded=false;return false;}
+    enemy->destroyRequested=true;return true;
+}
+
+bool GameplayWorld::markBreakableDestroyed(downwell::InstanceHandle handle) {
+    auto* box=const_cast<Breakable*>(findBreakable(handle));
+    if(!run_.effectsSucceeded||!box){run_.effectsSucceeded=false;return false;}
+    if(box->destroyRequested)return true;
+    if(!breakableLifecycle_.markDestroyed(handle,*box)){run_.effectsSucceeded=false;return false;}
+    box->destroyRequested=true;return true;
+}
+
+bool GameplayWorld::retireMarkedEnemy(downwell::InstanceHandle handle) {
+    auto* enemy=const_cast<EnemyState*>(resolveEnemyLifetime(handle));
+    if(!run_.effectsSucceeded||!enemy||!enemy->destroyRequested){run_.effectsSucceeded=false;return false;}
+    const unsigned index=unsigned(enemy-enemies_);
+    if(!retireEnemyOwnership(*enemy))return false;
+    for(unsigned next=index+1;next<enemyCount_;++next)enemies_[next-1]=enemies_[next];
+    --enemyCount_;
+    enemies_[enemyCount_].identitySlot=0xffffu;
+    enemies_[enemyCount_].lifetimeId=0;
+    enemies_[enemyCount_].active=false;
+    return true;
+}
+
+bool GameplayWorld::retireMarkedBreakable(downwell::InstanceHandle handle) {
+    const auto* box=findBreakable(handle);
+    if(!run_.effectsSucceeded||!box||!box->destroyRequested){run_.effectsSucceeded=false;return false;}
+    return retireBreakable(handle.slot);
+}
+
 bool GameplayWorld::clearBreakableOwnership() {
     for(unsigned i=0;i<breakableCount_;++i)
         if(!retireBreakable(i))return false;
@@ -530,6 +566,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count)
         breakables_[index].x = x[source];
         breakables_[index].y = y[source];
         breakables_[index].active = true;
+        breakables_[index].destroyRequested = false;
         breakables_[index].lifetimeId = nextBreakableLifetimeId_++;
         if(!breakableLifecycle_.birth({index,breakables_[index].lifetimeId},breakables_[index])) {
             run_.effectsSucceeded=false;return false;

@@ -89,6 +89,11 @@ public:
         b.destroyed_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->markDestroyed(h,r);};
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindMaskDestruction(Owner& owner){
+        auto b=bindMasks(owner);
+        b.destroyed_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->markDestroyed(h,r);};
+        return b;
+    }
     template<class Owner> static RecordLifecycleBinding bindPointQueries(Owner& owner){
         auto b=bindFrameSnapshots(owner);
         b.positionMeeting_=[](void* p,int object,MotionBinary64 x,MotionBinary64 y,bool& hit){

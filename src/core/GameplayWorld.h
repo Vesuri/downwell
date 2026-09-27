@@ -146,6 +146,7 @@ public:
         bool grounded;
         bool frogLanded;
         bool activationPending;
+        bool destroyRequested=false;
         int imageScaleY() const { return objectId == 117 ? snail.verticalFlip : 1; }
         unsigned drawFrame() const {
             if (objectId == 119)
@@ -178,6 +179,7 @@ public:
         int y;
         bool active;
         std::uint32_t lifetimeId;
+        bool destroyRequested=false;
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     struct PlayerInstance {
@@ -242,6 +244,12 @@ public:
         return box.lifetimeId==handle.generation ? &box : nullptr;
     }
     GameplayFrame step(std::uint8_t packedInput);
+    // Engine destruction mark, after any game Destroy/CleanUp callbacks.
+    // Keep the typed record until the owner's Draw-entry cleanup.
+    bool markEnemyDestroyed(downwell::InstanceHandle handle);
+    bool markBreakableDestroyed(downwell::InstanceHandle handle);
+    bool retireMarkedEnemy(downwell::InstanceHandle handle);
+    bool retireMarkedBreakable(downwell::InstanceHandle handle);
     void initializeEntryInput(bool fireHeld) { player_.initializeEntryInput(fireHeld); }
     void configureLandingProfile(const int* offsets, unsigned count) {
         player_.configureLandingProfile(offsets, count);

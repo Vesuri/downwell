@@ -23,7 +23,7 @@ private:
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
     const SpriteCollisionPack& sprites_;
-    const GameplayWorld* world_=nullptr;
+    GameplayWorld* world_=nullptr;
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
     bool good_=false;
@@ -178,8 +178,8 @@ public:
         return true;
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
-    auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMasks(enemies_);}
-    auto breakableBinding(){return GameplayWorld::BreakableLifecycleBinding::bindMovement(boxes_);}
+    auto enemyBinding(){return GameplayWorld::EnemyLifecycleBinding::bindMaskDestruction(enemies_);}
+    auto breakableBinding(){return GameplayWorld::BreakableLifecycleBinding::bindDestruction(boxes_);}
     // Caller owns the phase workspace; a full native snapshot must not live on
     // the 8 KiB task stack. Capture all registered families, then resolve again
     // immediately before each event. An empty own event is still dispatched.
@@ -295,13 +295,18 @@ public:
         destructionPending_=false;return true;
     }
     // Invoke at Draw entry, not at an inter-Step reconciliation boundary.
-    // Terrain is the currently registered deferred-destruction family. Reject
-    // any other marked family until its typed retirement is integrated.
+    // Retire through the typed stores, retaining identity across compaction.
+    // Player destruction remains unsupported rather than silently discarded.
     bool prepareDraw(){
         return cleanupDestroyed([&](InstanceHandle shared,const View::Record& record){
             View::Kind kind;InstanceHandle local;
-            return View::decode(shared,kind,local)&&kind==View::Kind::terrain&&
-                record.terrain==terrain_.find(local)&&terrain_.retireMarked(local);
+            if(!View::decode(shared,kind,local))return false;
+            switch(kind){
+                case View::Kind::terrain:return record.terrain==terrain_.find(local)&&terrain_.retireMarked(local);
+                case View::Kind::enemy:return record.enemy==world_->resolveEnemyLifetime(local)&&world_->retireMarkedEnemy(local);
+                case View::Kind::breakable:return record.breakable==world_->findBreakable(local)&&world_->retireMarkedBreakable(local);
+                default:return false;
+            }
         });
     }
 };

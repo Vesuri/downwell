@@ -409,11 +409,17 @@ damage. No broad collision-parity or frame-budget claim follows from this.
 
 Wall activation and destruction marks publish occupancy changes immediately,
 separately from coalesced presentation damage. The native gameplay Draw entry
-calls the owner's checked cleanup: marked terrain identities survive all phase
+calls the owner's checked cleanup: marked terrain, enemy and box identities survive all phase
 reconciliation, then retire in active-room order followed by inactive-room
-order. A pending-mark flag avoids scanning unchanged rooms. An unsupported
-marked family fails rather than silently bypassing typed retirement. This
-cleanup wiring does not establish the missing source event-list dispatch order.
+order. A pending-mark flag avoids scanning unchanged rooms. Enemy cleanup
+compacts the typed store without changing surviving lifetime handles; box
+cleanup invalidates its lifetime without recycling another slot's identity.
+The engine-mark methods run after any game Destroy/CleanUp callbacks and do
+not stand in for those callbacks. They are idempotent for a live marked record;
+stale handles or missing destruction publication fail the world. Player
+destruction remains unsupported rather than silently bypassing typed retirement.
+Legacy native death/out-of-view paths still need migration to source handlers;
+the typed cleanup wiring alone does not establish their phase or event order.
 
 Spatial insertion uses a bounded descent path and reverse unwind rather than
 recursive split frames. Child selection, bounds propagation and sibling order
