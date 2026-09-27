@@ -1,5 +1,32 @@
 # Time-stop collision inputs
 
+## Field wind audio ordering
+
+`goalTimeField`'s player collision checks `global.voidWind` first. If it is not
+playing, it chooses from sound IDs 349–355 (one runner `choose` draw), assigns
+`self.windsnd`, calls `soundPlayOL(sound,90,0,1,"UI")`, stores the returned
+voice in `global.voidWind`, then sets that voice's gain to 0.5 immediately.
+The initial global voice is -1 (`scrGlobalStuff`).
+
+The UI specialization of `soundPlayOL` selects channel 8, forces `cutPrv=0`,
+checks/stops the selected sound resource, and writes its resource ID to
+`global.OLchannel[8]`. It plays with priority 90 and no looping, reads the new
+voice's gain, multiplies by `global.gameVolume`, publishes gain and pitch 1,
+then returns the voice only if it is playing (otherwise -1). Offscreen,
+underwater-pitch and no-music branches do not apply to channel 8. The outer
+collision still calls gain on the returned value, including -1.
+
+`TimeFieldWind` implements this sequence with a synchronous checked audio
+interface. Per-instance sound and shared channel storage are supplied by the
+caller; its voice is shared across fields. Failures retain completed writes,
+RNG and audio effects and stop later work. Tests cover every operation's failure
+prefix, both sound-resource guards, unsuccessful playback and repeated contacts.
+This is not yet installed in the live field owners or either audio backend;
+inherited event admission and persistent voice ownership remain integration work.
+
+Source: recovered `gml_Object_goalTimeField_Collision_objPlayer_n.asm`,
+`gml_GlobalScript_soundPlayOL.asm` and `gml_GlobalScript_scrGlobalStuff.asm`.
+
 ## Ordinary Destroy versus storage retirement
 
 The Windows `instance_destroy` registration at `0x52cd80` selects wrapper

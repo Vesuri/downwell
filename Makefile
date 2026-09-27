@@ -749,6 +749,15 @@ build/time-shard-motion-test: tests/core/TimeShardMotionTest.cpp $(wildcard src/
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardMotionTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-time-shard-lifecycle
+test: verify-time-field-wind
+.PHONY: verify-time-field-wind
+verify-time-field-wind: build/time-field-wind-test
+	./build/time-field-wind-test
+
+build/time-field-wind-test: tests/core/TimeFieldWindTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
 verify-time-shard-lifecycle: build/time-shard-lifecycle-test
 	./build/time-shard-lifecycle-test
 
