@@ -133,6 +133,15 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 "dormant dynamic birth leaves active object list");
         require(records.requestActivation(born,true,[&](auto h,const auto& record,bool active){return lifecycle.activation(h,record,active);}),
                 "activate dynamic birth through collision adapter");
+        const auto movement=downwell::InstanceLifecycleBinding::bindMovement(lifecycle);
+        require(movement.integerPosition(born,records.at(0),-32,64)&&
+                storedOwner.resolve(born)->x.bits==0xc2000000u&&
+                storedOwner.resolve(born)->y.bits==0x42800000u&&records.at(0).x==30&&
+                storedOwner.pendingSpatial()!=0,
+                "movement binding publishes signed runner coordinates and queues bounds before record mutation");
+        require(!movement.integerPosition(old,records.at(0),0,0)&&
+                storedOwner.resolve(born)->x.bits==0xc2000000u,
+                "movement binding rejects an expired lifetime without moving its replacement");
         require(lifecycle.move(born,records.at(0),{0x41f40000u},{0x42700000u}),"move using explicit fractional actor position");
         require(storedOwner.resolve(born)->x.bits==0x41f40000u&&records.at(0).x==30,
                 "collision owner retains 30.5 rather than rounded record position");

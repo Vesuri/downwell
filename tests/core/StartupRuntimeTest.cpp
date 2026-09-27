@@ -27,7 +27,15 @@ void stepMany(downwell::StartupRuntime& runtime, int count) {
 struct LifecycleAudit {
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,calls=0,fail=0;
+    bool move(downwell::InstanceHandle h,const downwell::InstanceRecord& r,
+              downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+        ++calls;require(matches(h,r)&&r.active,"movement resolves an active published lifetime");
+        std::int32_t px,py;
+        require(x.promoted().roundPixel(px)&&y.promoted().roundPixel(py),"published enemy coordinates are representable");
+        if(fail==6)return false;
+        ++moves;return true;
+    }
     bool matches(downwell::InstanceHandle h,const downwell::InstanceRecord& r)const{
         return h.slot<entries.size()&&entries[h.slot].live&&entries[h.slot].generation==h.generation&&entries[h.slot].id==r.instanceId;
     }
@@ -71,7 +79,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
     LifecycleAudit audit;
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        downwell::InstanceLifecycleBinding::bind(audit));
+        downwell::InstanceLifecycleBinding::bindMovement(audit));
     auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
     for(unsigned tick=0;tick<1800;++tick){
@@ -83,15 +91,15 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     }
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
               << " activations=" << audit.activations << " inactivations=" << audit.inactivations
-              << " memberships=" << audit.memberships << '\n';
-    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0,
+              << " memberships=" << audit.memberships << " moves=" << audit.moves << '\n';
+    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
-    for(unsigned failure=0;failure<=5;++failure){
+    for(unsigned failure=0;failure<=6;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bind(failing));
+            downwell::InstanceLifecycleBinding::bindMovement(failing));
         runtime->skipToGameForTesting();
         if(failure==0||failure==3){
             // Controlled lifecycle fixture, not a natural combat encounter:

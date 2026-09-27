@@ -917,20 +917,25 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
         // World origins (240,176) are even integers, so ties-to-even is
         // unchanged by storing these positions relative to the origin.
-        enemy.x = (int)downwell::roundGameMakerQ8(enemy.preciseX);
-        enemy.y = (int)downwell::roundGameMakerQ8(enemy.preciseY);
+        int publishedX = (int)downwell::roundGameMakerQ8(enemy.preciseX);
+        int publishedY = (int)downwell::roundGameMakerQ8(enemy.preciseY);
         if (enemy.objectId == 111 || enemy.objectId == 112) {
-            enemy.x = enemy.walker.publishedX;
-            enemy.y = enemy.walker.publishedY;
+            publishedX = enemy.walker.publishedX;
+            publishedY = enemy.walker.publishedY;
         }
         if (enemy.objectId == 119) {
-            enemy.x = enemy.crawler.pixelX();
-            enemy.y = enemy.crawler.pixelY();
+            publishedX = enemy.crawler.pixelX();
+            publishedY = enemy.crawler.pixelY();
         }
         if (enemy.objectId == 117) {
-            enemy.x = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.x) / 1280);
-            enemy.y = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.y) / 1280);
+            publishedX = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.x) / 1280);
+            publishedY = static_cast<int>(downwell::FixedCollisionMath::round(enemy.snail.y) / 1280);
         }
+        if(!enemyLifecycle_.integerPosition({enemy.identitySlot,enemy.lifetimeId},enemy,
+                                           publishedX+240,publishedY+176)) {
+            run_.effectsSucceeded=false;return {};
+        }
+        enemy.x=publishedX;enemy.y=publishedY;
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
         enemy.spriteId = downwell::finishEnemyPresentation(

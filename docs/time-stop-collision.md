@@ -739,13 +739,26 @@ its own record type. It publishes fully initialized births, checked replacement
 and out-of-view retirement, frontier activation, fatal-contact/snail inactivation,
 and old-record retirement before Retry or the next level. Retry retains the
 binding and generation counter. Failure is terminal, with completed earlier
-callbacks retained. Native handles remain family-local; movement/resource writes,
-object-list traversal and other families are not supplied by this binding.
+callbacks retained. Native handles remain family-local; object-list traversal
+and other families are not supplied by this binding.
 The default bindings remain empty until their resource-backed owner is installed.
 This boundary is not evidence
 that the current immediate death response matches the runner's deferred enemy
 death events. Whole-world room-clear ownership across other families still needs
 integration.
+
+`bindMovement` additionally routes the supported enemy Step's explicit published
+position assignments to `StoredCollisionLifecycle::move`. The callback receives
+the old record and proposed runner binary32 world coordinates before the record
+changes; native local positions add the `(240,176)` origin. The bat, snake and
+snail Step VM code explicitly stores `round(xx)` into `x`, then `round(yy)` into
+`y`. These are not the fractional motion accumulators. The current integer
+publication helper is restricted to that representation, with no conversion work
+for an empty binding. A rejected update latches failure before later actors.
+This is not a query-time synchronization pass, and does not yet cover player,
+other effect families, resource/transform assignments or original scheduling
+differences in the adapted enemy steps. Those remain prerequisites to installing
+the full live query owner.
 
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_INSTANCE_LIFECYCLE_H
 
 #include "InstanceHandle.h"
+#include "RunnerImageValue.h"
 
 namespace downwell {
 
@@ -29,6 +30,21 @@ public:
         b.membership_=[](void* p,InstanceHandle h,const Record& r,bool v){return static_cast<Owner*>(p)->membership(h,r,v);};
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindMovement(Owner& owner) {
+        auto b=bind(owner);
+        b.move_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
+            return static_cast<Owner*>(p)->move(h,r,x,y);
+        };
+        return b;
+    }
+    // For explicit rounded x/y assignments in the supported enemy scripts,
+    // not xx/yy motion accumulators or a query-time synchronization pass.
+    bool integerPosition(InstanceHandle h,const Record& r,std::int32_t x,std::int32_t y)const {
+        if(!move_)return true;
+        RunnerImageValue px,py;
+        return px.assign(MotionBinary64::fromInteger(x))&&py.assign(MotionBinary64::fromInteger(y))&&
+               move_(context_,h,r,px,py);
+    }
     bool birth(InstanceHandle h,const Record& r)const{return !birth_||birth_(context_,h,r);}
     bool retire(InstanceHandle h,const Record& r)const{return !retire_||retire_(context_,h,r);}
     bool activation(InstanceHandle h,const Record& r,bool v)const{return !activation_||activation_(context_,h,r,v);}
@@ -39,6 +55,7 @@ private:
     bool (*retire_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;
+    bool (*move_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
 };
 using InstanceLifecycleBinding = RecordLifecycleBinding<InstanceRecord>;
 

@@ -925,16 +925,20 @@ void StartupRuntime::updateMainEnemies() {
         } else if (enemy.objectId == 119) {
             updateCrawler(enemy, false);
         }
-        enemy.x = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
-        enemy.y = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
+        auto publishedX = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseX));
+        auto publishedY = static_cast<std::int32_t>(roundGameMakerCoordinate(enemy.preciseY));
         if ((enemy.objectId == 111 || enemy.objectId == 112) && enemy.walker.initialized) {
-            enemy.x = enemy.walker.publishedX;
-            enemy.y = enemy.walker.publishedY;
+            publishedX = enemy.walker.publishedX;
+            publishedY = enemy.walker.publishedY;
         }
         if (enemy.objectId == 117 && enemy.snail.initialized) {
-            enemy.x = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.x) / 1280);
-            enemy.y = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.y) / 1280);
+            publishedX = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.x) / 1280);
+            publishedY = static_cast<std::int32_t>(FixedCollisionMath::round(enemy.snail.y) / 1280);
         }
+        if(!lifecycle_.integerPosition(instances_.handleAt(index),enemy,publishedX,publishedY)) {
+            run_.effectsSucceeded=false;return;
+        }
+        enemy.x=publishedX;enemy.y=publishedY;
         enemy.spriteId = finishEnemyPresentation(
             {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.velocityY < 0.0F,
              enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
