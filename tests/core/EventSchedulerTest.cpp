@@ -380,6 +380,28 @@ void testDeferredDestroyEligibility() {
     }
 }
 
+void testCollisionBoundary(){
+    using namespace downwell;
+    for(unsigned failure=0;failure<3;++failure){
+        InstanceStore<4> instances;instances.create(1,10,11,false);instances.create(2,20,11,false);
+        bool healthy=true;unsigned collisions=0,ends=0;std::vector<unsigned> steps;
+        const bool ok=EventScheduler<4>::runStepChecked(instances,[](const auto&){return AlarmBank::allEvents;},
+            [&](auto& r,StepEvent event){
+                if(event.phase==StepEventPhase::step)steps.push_back(r.instanceId);
+                if(event.phase==StepEventPhase::endStep){++ends;require(r.instanceId==3,"collision birth participates in End Step");}
+            },[](auto){},[](auto,const auto&,bool){return true;},[&]{return healthy;},[&]{
+                ++collisions;require(steps==std::vector<unsigned>({1,2}),"collision pass follows all Step handlers");
+                instances.find(1)->active=false;instances.find(2)->destroyRequested=true;
+                instances.create(3,30,11,false);instances.find(3)->alarms.set(0,2);
+                if(failure==2)healthy=false;
+                return failure!=1;
+            });
+        require(ok==(failure==0)&&collisions==1&&ends==unsigned(failure==0),"collision failure stops before End Step");
+        require(instances.find(2)&&instances.find(2)->destroyRequested&&instances.find(3)->alarms.get(0)==2,
+            "collision mutations survive failure; new alarms do not run retroactively");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -394,6 +416,7 @@ int main() {
     testExternalMembershipPublication();
     testCheckedDispatch();
     testDeferredDestroyEligibility();
+    testCollisionBoundary();
     std::cout << "event scheduler tests passed\n";
     return 0;
 }

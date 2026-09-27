@@ -121,7 +121,11 @@ build/wall-draw-lookup-test: tests/core/WallDrawLookupTest.cpp src/core/WallDraw
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ $<
 
-test: verify-wall-draw-lookup
+test: verify-wall-draw-lookup verify-runner-collision-phase
+
+.PHONY: verify-runner-collision-phase
+verify-runner-collision-phase:
+	python3 tools/verify-runner-collision-phase.py
 
 build/state-digest-test: tests/core/StateDigestTest.cpp src/core/StateDigest.h
 	@mkdir -p build

@@ -1,5 +1,29 @@
 # Creation during a Step phase
 
+## Collision boundary
+
+The normal Windows frame loop calls Step at `0x50dd76`, reconciles at
+`0x50dd80`, and later conditionally enters the collision pass `0x5022c0`
+at `0x50decc`. It reconciles again at `0x50ded1`, then calls End Step at
+`0x50def3`. The condition at `0x50dec8` skips this pass when BL is nonzero;
+the alternative path is not modeled by this boundary.
+
+The collision pass calls pair processing `0x5030d0` at `0x5025cb`. Pair
+processing checks overlap and destruction flags, then invokes event type 4
+at `0x5031a6` and `0x5031b5`, swapping self/other and selecting the other
+object's ID. Solid-instance position rollback/reapplication surrounds those
+calls. This establishes a separate phase and bidirectional dispatch, not the
+complete candidate ordering, mask rules or solid response semantics.
+
+`tools/verify-runner-collision-phase.py` pins these reviewed regions through
+the existing whole-executable hash guard. The scheduler's optional checked
+collision callback runs after Step reconciliation and before End Step,
+followed by another reconciliation. It does not yet enumerate collision pairs.
+Its tests cover phase placement, collision births, activation/destruction and
+failure cutoffs, not original collision ordering or backend integration.
+
+## Step creation cutoff
+
 Read-only inspection of the pinned Windows `Downwell.exe` establishes a
 phase-local creation cutoff, not a whole-frame exclusion rule.
 

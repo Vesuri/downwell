@@ -58,6 +58,15 @@ public:
     static bool runStepChecked(InstanceStore<Capacity>& instances,
         AlarmEvents alarmEvents,Handler handler,BeforePhase beforePhase,
         Publish publish,Healthy healthy) {
+        return runStepChecked(instances,alarmEvents,handler,beforePhase,publish,healthy,[]{return true;});
+    }
+    // The normal runner has a separate collision pass before End Step. Pair
+    // selection/order and both event directions belong to the callback, not
+    // to an approximate storage-order overlap scan in this scheduler.
+    template<class AlarmEvents,class Handler,class BeforePhase,class Publish,class Healthy,class Collisions>
+    static bool runStepChecked(InstanceStore<Capacity>& instances,
+        AlarmEvents alarmEvents,Handler handler,BeforePhase beforePhase,
+        Publish publish,Healthy healthy,Collisions collisions) {
         if(!healthy())return false;
         const auto checkedPublish=[&](InstanceHandle h,const InstanceRecord& record,bool member){
             return healthy()&&publish(h,record,member)&&healthy();
@@ -70,6 +79,8 @@ public:
         if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
         beforePhase(StepEventPhase::step);
         if(!healthy() || !dispatchPhase(instances, StepEventPhase::step, handler,healthy))return false;
+        if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
+        if(!collisions()||!healthy())return false;
         if(!instances.reconcileObjectMembership(checkedPublish)||!healthy())return false;
         beforePhase(StepEventPhase::endStep);
         if(!healthy() || !dispatchPhase(instances, StepEventPhase::endStep, handler,healthy))return false;
