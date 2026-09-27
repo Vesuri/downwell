@@ -1546,7 +1546,7 @@ $(ROOM_TEST_TARGET): $(ROOM_TEST_SOURCES)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ROOM_TEST_SOURCES)
 
-$(ROOM_PACK_TEST_TARGET): $(ROOM_PACK_TEST_SOURCES)
+$(ROOM_PACK_TEST_TARGET): $(ROOM_PACK_TEST_SOURCES) $(wildcard src/core/*.h)
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ROOM_PACK_TEST_SOURCES)
 

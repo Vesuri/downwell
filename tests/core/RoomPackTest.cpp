@@ -1,5 +1,6 @@
 #include "core/RoomPack.h"
 #include "core/PackedRoomLoader.h"
+#include "core/PackedRoomLayerLoader.h"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -283,6 +284,61 @@ void testGeneratedPack(const char* path) {
     require(pack.roomInstance(room, 0, player) &&
                 player.instanceId == 104218 && player.objectId == 35,
             "rmMenu begins with recovered player instance");
+    for(unsigned roomIndex=0;roomIndex<pack.roomCount();++roomIndex){
+        require(pack.room(roomIndex,room),"generated layer room");
+        downwell::RunnerLayers<16,1200> layers;
+        downwell::RunnerLayerInstances<16,1200> registry;
+        unsigned published=0;
+        require(downwell::PackedRoomLayerLoader::load(pack,room.roomId,layers,registry,
+            [&](unsigned,const auto&){++published;return true;}),"all original room memberships load");
+        require(published==room.layerCount,"all layer metadata published");
+        for(unsigned l=0;l<room.layerCount;++l){
+            downwell::PackedRoomLayer packed;require(pack.roomLayer(room,l,packed),"generated layer");
+            const auto slot=layers.find(int(packed.layerId));unsigned remaining=packed.membershipCount;
+            require(layers.get(slot)&&!layers.get(slot)->dynamic&&layers.get(slot)->depth==packed.depth,"fixed layer identity/depth");
+            require(layers.visitElements(slot,[&](unsigned e){
+                if(!remaining)return false;
+                std::uint32_t id;
+                return pack.membership(packed.firstMembership+--remaining,id)&&registry.get(e)&&
+                    registry.get(e)->sourceId==id&&!registry.get(e)->instance.generation;
+            })&&!remaining,"all serialized instance elements reversed, initially unbound");
+        }
+    }
+}
+
+void testLayerStartup(){
+    const auto bytes=makePack();const downwell::RoomPack pack(bytes.data(),bytes.size());
+    using Layers=downwell::RunnerLayers<2,3>;using Registry=downwell::RunnerLayerInstances<2,3>;
+    Layers layers;Registry registry;
+    unsigned metadataCalls=0;
+    require(downwell::PackedRoomLayerLoader::load(pack,7,layers,registry,[&](unsigned,const auto& l){
+        ++metadataCalls;return l.layerId==13&&l.visible();
+    })&&metadataCalls==1,"prepare fixed layer metadata");
+    struct Binding {
+        Layers& layers;Registry& registry;
+        bool birth(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+            downwell::RunnerDepthService::Instance state;
+            return registry.attach(layers,layers.find(int(r.layerId)),r.instanceId,h,state,!r.active)&&state.layerId==int(r.layerId);
+        }
+        bool retire(downwell::InstanceHandle h,const downwell::InstanceRecord& r){return registry.retire(layers,r.instanceId,h);}
+    } binding{layers,registry};
+    downwell::InstanceStore<3> store;unsigned events=0;
+    require(downwell::PackedRoomLoader<3>::enterChecked(store,pack,7,true,[&](auto& r,auto){
+        ++events;const unsigned element=registry.find(r.instanceId);
+        return element!=Registry::End&&store.resolve(registry.get(element)->instance)==&r;
+    },[](int){return true;},[](auto&){return true;},nullptr,binding)==downwell::PackedRoomLoadResult::success&&events,
+        "real packed room creation binds layers before first instance event");
+    std::vector<unsigned> ids;
+    layers.visitElements(layers.find(13),[&](unsigned e){ids.push_back(registry.get(e)->sourceId);return true;});
+    require(ids==std::vector<unsigned>({100066,100065}),"packed startup retains reserved element order");
+    require(!downwell::PackedRoomLayerLoader::load(pack,7,layers,registry,[](unsigned,const auto&){return true;}),"reject loading over live layer owner");
+    Layers rejected;Registry rejectedRegistry;
+    require(!downwell::PackedRoomLayerLoader::load(pack,7,rejected,rejectedRegistry,[](unsigned,const auto&){return false;})&&
+        rejected.find(13)!=Layers::End&&rejectedRegistry.find(100065)==Registry::End,"metadata failure stops before reservations without rollback");
+    auto corrupt=bytes;const auto offset=corrupt.size()-4;
+    for(unsigned i=0;i<4;++i)corrupt[offset+i]=static_cast<unsigned char>(100065u>>(8*i));
+    const downwell::RoomPack bad(corrupt.data(),corrupt.size());Layers badLayers;Registry badRegistry;
+    require(!downwell::PackedRoomLayerLoader::load(bad,7,badLayers,badRegistry,[](unsigned,const auto&){return true;}),"duplicate membership rejected");
 }
 
 } // namespace
@@ -291,6 +347,7 @@ int main(int argc, char** argv) {
     testDecode();
     testValidation();
     testPackedRoomLoader();
+    testLayerStartup();
     if (argc == 2)
         testGeneratedPack(argv[1]);
     std::cout << "room pack tests passed\n";

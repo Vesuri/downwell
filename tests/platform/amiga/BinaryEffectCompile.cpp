@@ -5,6 +5,11 @@
 #include "core/RunnerDepthChanges.h"
 #include "core/RunnerLayerDraw.h"
 #include "core/RunnerLayerInstances.h"
+#include "core/PackedRoomLayerLoader.h"
+bool compilePackedLayers(const downwell::RoomPack& pack,int room,downwell::RunnerLayers<4,16>& layers,
+    downwell::RunnerLayerInstances<4,16>& registry){
+    return downwell::PackedRoomLayerLoader::load(pack,room,layers,registry,[](unsigned,const auto&){return true;});
+}
 bool compileLayerInstances(downwell::RunnerLayerInstances<4,16>& registry,downwell::RunnerLayers<4,16>& layers,
     unsigned layer,unsigned id,downwell::InstanceHandle handle,downwell::RunnerDepthService::Instance& state){
     return registry.reserve(layers,layer,id)&&registry.attach(layers,layer,id,handle,state,false)&&registry.retire(layers,id,handle);

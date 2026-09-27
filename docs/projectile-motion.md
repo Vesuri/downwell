@@ -569,6 +569,24 @@ This registry does not yet load all non-instance room elements or replace live
 room startup. Persistent-room rebinding and full serialized metadata publication
 remain integration work.
 
+`PackedRoomLayerLoader` consumes the existing DWRM room/layer/membership tables
+into fresh `RunnerLayers` and `RunnerLayerInstances` owners. It preserves
+serialized layer order for equal-depth insertion, marks loaded layers fixed,
+publishes their metadata (including visibility) through a checked callback, and
+reserves instance elements in serialized order before any instance birth. It
+checks capacity, IDs and complete unique membership coverage; failure stops
+with the already-published prefix intact. Do not retry a failed owner in place.
+The DWRM tables omit non-instance element payloads, so this is explicitly an
+instance-membership loader, not complete background/tile/shader recovery.
+
+Room-pack tests connect this preparation to the actual `PackedRoomLoader`
+creation path through its lifecycle binding and verify layer attachment before
+the first instance event. The generated-pack case checks all 25 rooms, 132
+layers and 5,186 membership entries, including reversed placeholder order.
+The live startup/native adapters still need to own these structures, retain
+visibility/state publication, coordinate persistence and retire queued depth
+identities before reuse; the connected test does not enable a live Draw switch.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;
