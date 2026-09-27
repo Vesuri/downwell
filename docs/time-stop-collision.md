@@ -52,6 +52,19 @@ not permission to continue with the old store identity and a changed owner.
 
 ## Player and shard inputs
 
+`make verify-live-collision-lifecycle` attaches the real object-family graph,
+sprite collision metadata and spatial owner to the stored runtime's natural
+seed-2 gameplay tape. It checks published player/terrain/enemy positions and
+activation flags against live records without rebuilding the index or issuing
+per-frame diagnostic queries. After the tape it runs precise `instance_place`
+queries over generated walls, resolves results through live generation-checked
+ownership, checks temporary player-position restoration, then resets the room.
+The query adapter accepts a read-only `resolve(handle)` view instead of requiring
+a copied or publicly exposed instance container. This test is not an original
+traversal-order oracle: queries occur after the tape, not at source event
+boundaries, and do not yet drive gameplay decisions. Native resource-backed
+world registration and all collision-family scheduling remain required.
+
 The source player object 35 uses sprite 31 as its explicit collision mask,
 independent of the visible animation sprite. Shard object 238 uses sprite 91
 and has no explicit replacement mask. Both sprites have origin (12,12), a

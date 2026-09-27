@@ -85,8 +85,10 @@ struct StoredCollisionLifecycle {
     // store order here: the runner's preparation/index history selects hits.
     // Bounds and mask callbacks resolve generation-checked handles each time;
     // an orphaned/mismatched candidate is a failure, not a skipped collision.
-    template<class InverseTrig>
-    bool placeVm(const InstanceStore<Capacity>& records,InstanceHandle self,int object,
+    // Records is a read-only resolve(handle) view. It must honor generations;
+    // it need not expose or copy the world's underlying storage container.
+    template<class Records,class InverseTrig>
+    bool placeVm(const Records& records,InstanceHandle self,int object,
                  MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,
                  const RunnerMaskDispatch& dispatch,InverseTrig inverseTrig,
                  typename Owner::Result& result){

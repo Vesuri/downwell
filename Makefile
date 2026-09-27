@@ -2006,6 +2006,15 @@ build/profile-sdl-game: tools/profile-sdl-game.cpp $(filter-out src/main.cpp,$(S
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -DDOWNWELL_SKIP_TO_GAME -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
 
+build/live-collision-lifecycle-test: tests/core/LiveCollisionLifecycleTest.cpp $(filter-out tests/core/StartupRuntimeTest.cpp,$(STARTUP_TEST_SOURCES)) $(HOST_CHECK_HEADERS) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
+
+.PHONY: verify-live-collision-lifecycle
+test: verify-live-collision-lifecycle
+verify-live-collision-lifecycle: generate-room-pack generate-object-pack generate-sprite-pack generate-collision-masks generate-builder-pattern-pack build/live-collision-lifecycle-test
+	./build/live-collision-lifecycle-test
+
 build/capture-projectile-art: tools/capture-projectile-art.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
