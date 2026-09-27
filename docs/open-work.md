@@ -33,6 +33,12 @@ behavior, both backend integrations and relevant original-game verification.
   gameplay queries; register the remaining native field, effect and projectile
   lifetimes in the resource-backed owner before replacing its unindexed
   collision adapters. Complete original room creation order across families.
+- Correct first-level entrance-field destruction before registering native
+  object 371: SDL currently erases it inside Create. The source marks it after
+  both scale writes and radius RNG, retains its lifetime through the event,
+  then retires it at the room/Draw cleanup boundary. Cover intervening births,
+  immediate query exclusion, cleanup order and failure propagation on both
+  platforms; do not copy the eager SDL erase into native ownership.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding

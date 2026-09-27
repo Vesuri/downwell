@@ -383,9 +383,9 @@ scheduler integration remain separate work.
 
 The Amiga executable embeds the same generated `downwell-sprites.dwsc`
 metadata as the host and constructs `GameplayCollisionOwner` before its world.
-Player, enemy, breakable, terrain and ordinary time-field births/retirements publish through
+Player, enemy, breakable, terrain, ordinary and goal time-field births/retirements publish through
 that owner, including in-place Retry. Its storage is static, not on the task
-stack; the current 68000 layout consumes 1,389,708 bytes before the 26,700-byte
+stack; the current 68000 layout consumes 1,419,024 bytes before the 26,700-byte
 sprite metadata pack and the 511,580-byte original collision-mask pack. Mask
 bytes are borrowed directly from the executable's read-only data, not converted
 into Chip bitmaps or reconstructed from artwork alpha. This is an expanded-memory development configuration,
@@ -398,6 +398,18 @@ The registry binds the original sprite 597 and default properties before radius
 initialization. Runtime Create publishes birth before consuming its radius RNG;
 builder adoption preserves the already-consumed sample. Field Draw changes only
 radius, not the collision sprite or transform, so it does not rebuild bounds.
+
+Native object-255 exit fields use a separate 64-slot lifetime store after the
+ordinary-field keys. Each synchronous goal child publishes resource defaults,
+then scale X=2 and scale Y=2, before `RunSession` consumes radius RNG. Repeated
+exit creation retains earlier collision identities rather than rebinding the
+latest goal's slot. Room exit and Retry retire these records; Retry preserves
+the monotonic birth cursor and binding. Partial birth/scale/retirement failures
+are terminal and retain accepted mutations. This does not establish complete
+cross-family child order (room-end setters remain unregistered), add native
+entrance fields, or enable identity-bearing field selection. The existing
+single-goal presentation model also does not yet draw multiple overlapping
+goal fields from a deliberately repeated exit fixture.
 
 Room teardown retires fields in their own creation order before invalidating
 keys. A failed callback preserves completed retirements, retains the failed

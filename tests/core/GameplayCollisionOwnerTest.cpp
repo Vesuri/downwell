@@ -33,7 +33,48 @@ struct TerrainDestructionAudit:TerrainAudit {
         assert(store->find(h)==&r&&r.destroyRequested&&r.active);++activations;return !rejectActivation;
     }
 };
+struct GoalAudit {
+    GameplayWorld* world=nullptr;
+    unsigned reject=0;
+    std::uint64_t draws=0;
+    unsigned stage=0;
+    using Record=GameplayGoalFields::Record;
+    bool birth(InstanceHandle h,const Record& r){
+        assert(world->goalFieldInstances().find(h)==&r&&r.scaleX==1&&r.scaleY==1&&world->randomDrawCount()==draws);
+        stage=1;return reject!=stage;
+    }
+    bool transform(InstanceHandle h,const Record& r,RunnerTransformField field,RunnerImageValue value,RunnerImageValue,unsigned){
+        assert(world->goalFieldInstances().find(h)==&r&&world->randomDrawCount()==draws&&value.bits==0x40000000u);
+        assert(r.scaleY==1&&((stage==1&&field==RunnerTransformField::scaleX&&r.scaleX==1)||
+            (stage==2&&field==RunnerTransformField::scaleY&&r.scaleX==2)));
+        return ++stage!=reject;
+    }
+    bool retire(InstanceHandle h,const Record& r){
+        assert(world->goalFieldInstances().find(h)==&r&&r.scaleX==2&&r.scaleY==2);
+        stage=4;return reject!=stage;
+    }
+    bool activation(InstanceHandle,const Record&,bool){return true;}
+    bool membership(InstanceHandle,const Record&,bool){return true;}
+    bool move(InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue){return true;}
+    bool sprite(InstanceHandle,const Record&,int){return true;}
+    bool imageIndex(InstanceHandle,const Record&,RunnerImageValue){return true;}
+};
 int main(){
+    for(unsigned failure=1;failure<=4;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false);
+        GoalAudit audit{world.get(),failure,world->randomDrawCount(),0};
+        assert(world->bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindTransforms(audit)));
+        const bool created=world->registerLevelExit(700);
+        assert(created==(failure==4)&&audit.stage==(failure==4?3:failure));
+        const auto key=world->goalFieldInstances().handle(0);
+        const auto* record=world->goalFieldInstances().find(key);
+        assert(record&&record->scaleX==(failure<=2?1:2)&&record->scaleY==(failure==4?2:1));
+        assert(world->randomDrawCount()==audit.draws+(failure==4?1:0));
+        if(failure==4)assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::none&&audit.stage==4);
+        const auto draws=world->randomDrawCount();
+        assert(!world->effectsSucceeded()&&!world->registerLevelExit(800)&&world->randomDrawCount()==draws&&
+            world->goalFieldInstances().find(key)==record);
+    }
     {
         TerrainDestructionAudit lifecycle;
         struct RejectDamage {unsigned calls=0;bool changed(int x,int y,int before,int after){assert(x==32&&y==48&&before==51&&after==-1);++calls;return false;}} damage;
@@ -483,14 +524,34 @@ int main(){
         unsigned population=0;
         assert(fieldsOwner->population(82,population)&&population==1&&
             fieldsOwner->properties(fieldKey)->sprite.spriteId==597&&fieldWorld->randomDrawCount()==draws);
+        assert(fieldWorld->registerLevelExit(900));
+        const auto goalLocal=fieldWorld->goalFieldInstances().handle(0);
+        InstanceHandle goalKey;
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,goalLocal,goalKey));
+        const auto* goal=fieldsOwner->state(goalKey);
+        const auto* goalProperties=fieldsOwner->properties(goalKey);
+        assert(goal&&goalProperties&&goal->x.promoted().roundPixel(x)&&x==240&&
+            goal->y.promoted().roundPixel(y)&&y==932&&goalProperties->sprite.scaleX.bits==0x40000000u&&
+            goalProperties->sprite.scaleY.bits==0x40000000u&&fieldWorld->randomDrawCount()==draws+1);
+        assert(fieldWorld->registerLevelExit(910)&&fieldsOwner->population(255,population)&&population==2&&
+            fieldsOwner->state(goalKey)&&fieldWorld->randomDrawCount()==draws+2);
         assert(fieldWorld->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
         assert(fieldsOwner->valid()&&!fieldsOwner->state(fieldKey)&&
             !GameplayCollisionView(*fieldWorld).resolve(fieldKey,record)&&fieldsOwner->population(82,population)&&population==0);
+        assert(!fieldsOwner->state(goalKey)&&fieldsOwner->population(255,population)&&population==0);
+        assert(fieldWorld->registerLevelExit(920));
+        const auto nextGoal=fieldWorld->goalFieldInstances().handle(0);
+        assert(nextGoal.generation>goalLocal.generation&&fieldWorld->goalFieldInstances().find(nextGoal));
         assert(fieldWorld->createGeneratedInstance({82,256,600},objects,[](const auto&){return false;}));
         const auto next=fieldWorld->timeFields().identityAt(0);
         InstanceHandle nextKey;
         assert(next>identity&&GameplayCollisionView::encode(GameplayCollisionView::Kind::timeField,{0,next},nextKey)&&
             fieldsOwner->state(nextKey)&&!fieldsOwner->state(fieldKey));
+        assert(!fieldWorld->enterLevelClear(0,false)&&fieldsOwner->population(255,population)&&population==1);
+        assert(fieldWorld->registerLevelExit(176+fieldWorld->player().offsetY()));
+        for(unsigned i=0;i<100;++i)fieldWorld->step(0);
+        assert(fieldWorld->levelResultRequested()&&fieldWorld->enterLevelClear(0,false)&&
+            fieldsOwner->population(255,population)&&population==0);
     }
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     {

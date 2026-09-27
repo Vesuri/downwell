@@ -60,6 +60,7 @@ private:
         static int object(const Record& r){
             if constexpr(Kind==View::Kind::enemy||Kind==View::Kind::terrain)return r.objectId;
             if constexpr(Kind==View::Kind::timeField)return 82;
+            if constexpr(Kind==View::Kind::goalField)return 255;
             return Kind==View::Kind::player?35:92;
         }
         bool key(InstanceHandle local,const Record& r,InstanceHandle& out,bool birth=false){
@@ -75,12 +76,13 @@ private:
             else if constexpr(Kind==View::Kind::enemy)pointer=actual.enemy;
             else if constexpr(Kind==View::Kind::terrain)pointer=actual.terrain;
             else if constexpr(Kind==View::Kind::timeField)pointer=actual.timeField;
+            else if constexpr(Kind==View::Kind::goalField)pointer=actual.goalField;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
         bool birth(InstanceHandle local,const Record& r){
             InstanceHandle h;if(!key(local,r,h,true))return false;
-            constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField;
+            constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
             if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
             Owner::State state;
@@ -147,6 +149,7 @@ private:
     Binding<GameplayWorld::Breakable,View::Kind::breakable> boxes_{*this};
     Binding<GameplayTerrainInstances::Record,View::Kind::terrain> terrainBinding_{*this};
     Binding<OrdinaryTimeField,View::Kind::timeField> fields_{*this};
+    Binding<GameplayGoalFields::Record,View::Kind::goalField> goals_{*this};
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
@@ -167,6 +170,7 @@ public:
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
+        if(!world_&&!world.bindGoalFieldLifecycle(GameplayGoalFields::Binding::bindTransforms(goals_)))return check(false);
         world_=&world;
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary){
             return static_cast<GameplayCollisionOwner*>(context)->reconcileActivation();

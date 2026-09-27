@@ -16,6 +16,7 @@
 #include "core/MainCameraMotion.h"
 #include "core/PlayerDeathSequence.h"
 #include "core/RunSession.h"
+#include "core/GameplayGoalFields.h"
 #include "core/AreaOneBuilder.h"
 #include "core/EnemyCreateProfile.h"
 #include "core/ObjectPack.h"
@@ -468,7 +469,16 @@ public:
         run_.sideCameraLockers.collide(camera);
         return camera.pixelY() - 142;
     }
-    bool registerLevelExit(int y) { return run_.createLevelExit(480, y, enemyRandom_, cameraMotion_); }
+    const downwell::GameplayGoalFields& goalFieldInstances()const{return goalFieldInstances_;}
+    bool bindGoalFieldLifecycle(downwell::GameplayGoalFields::Binding binding){
+        return run_.effectsSucceeded=run_.effectsSucceeded&&goalFieldInstances_.bind(binding);
+    }
+    bool registerLevelExit(int y) {
+        return run_.createLevelExit(480,y,enemyRandom_,cameraMotion_,
+            [&](downwell::LevelExit::Effect effect,int x,int childY){
+                return effect!=downwell::LevelExit::Effect::goalTimeField||goalFieldInstances_.create(x,childY);
+            });
+    }
     bool levelExitPresent() const { return run_.levelExitPresent; }
     const downwell::LevelExit& levelExit() const { return run_.levelExit; }
     const downwell::GoalTimeField& goalField() const { return run_.goalField; }
@@ -481,6 +491,8 @@ public:
     // Scene owner must retire old DMA before entry; use this update path
     // instead of gameplay step until the next-room request is consumed.
     bool enterLevelClear(unsigned style, bool heartGoal) {
+        if(!run_.levelResultRequested||run_.levelClearActive)return false;
+        if(!run_.effectsSucceeded||!goalFieldInstances_.clear())return run_.effectsSucceeded=false;
         return run_.enterLevelClear(style, heartGoal, health_, player_, enemyRandom_);
     }
     template<class Emit>
@@ -587,6 +599,7 @@ private:
     unsigned invulnerability_;
     downwell::PlayerDeathSequence death_;
     downwell::RunSession run_;
+    downwell::GameplayGoalFields goalFieldInstances_;
     downwell::MachineGunEmitter emitter_;
     downwell::CurrencyAccount currencyAccount_;
     SolidResolver solidResolver_;
