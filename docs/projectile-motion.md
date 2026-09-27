@@ -710,6 +710,20 @@ retains its lifetime while the new instances fill those reservations.
 This is the type-2 instance projection only; non-instance serialized elements
 still need their own initialization, and live owners are not installed yet.
 
+The omitted serialized payload is bounded for this build. Run
+`make verify-room-layer-metadata` to export scalar metadata with pinned UTMT
+version/commit and the input hash, then cross-check every layer against raw
+ROOM records. There are 108 instance layers and 24 background layers, no other
+serialized types. All layer offsets/speeds are zero; effect names and property
+lists are absent. Six backgrounds reference sprite 740 (`Spr_YoYo_background`)
+in Steam-service rooms 0, 1, 2, 3, 5 and 6. The other 18 have sprite ID -1 and
+serialized black color. These are resource facts, not permission to omit their
+runtime elements: sprite-less background initialization/Draw and source element
+ID allocation still need integration. The ignored output is
+`generated/room-layer-metadata.json`; DWRM v2 remains an instance-membership
+projection and does not yet carry these background fields. No original asset
+payloads are included in the committed extraction tools.
+
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
 actor ranges unchanged. Records refer to stable `ScriptSpawnEffects` storage;

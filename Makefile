@@ -1531,6 +1531,11 @@ build/room-layer-catalog-test: $(ROOM_LAYER_CATALOG_SOURCES) $(wildcard src/core
 	@mkdir -p $(@D)
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(ROOM_LAYER_CATALOG_SOURCES)
 .PHONY: verify-room-layer-catalog
+.PHONY: verify-room-layer-metadata
+verify-room-layer-metadata:
+	bash tools/export-room-layer-metadata.sh
+	python3 tools/verify-room-layer-metadata.py
+
 verify-room-layer-catalog: build/room-layer-catalog-test generate-room-pack
 	./build/room-layer-catalog-test generated/downwell-rooms.dwrm
 test: verify-room-layer-catalog
