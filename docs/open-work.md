@@ -73,7 +73,9 @@ behavior, both backend integrations and relevant original-game verification.
   point-direction/lengthdir path and preserve its precision through player motion.
   Extend integer-only damage text formatting if live source paths require VM
   real formatting; verify fractional text placement against the original.
-- Implement remaining blood, corpse, debris and blast dependencies. Preserve
+- Connect debris to source-ordered natural breakable destruction and complete
+  its production scheduling, including the player's live time-stop state.
+- Implement remaining blood, corpse and blast dependencies. Preserve
   synchronous child Create, RNG consumption and mutation order before rewards
   and retirement.
 - Connect natural death/stomp/hit events to effect owners, including flash balls.

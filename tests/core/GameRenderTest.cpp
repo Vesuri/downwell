@@ -418,6 +418,23 @@ int main() {
             muzzles[0].x==110+244-world.mainCameraRenderViewX()&&
             muzzles[0].y==124-world.mainCameraRenderViewY(),
             "SDL draws owned muzzle effects newest-first at published room coordinates without mutation");
+        auto registration=world.debrisRegistration<2>();downwell::DebrisEffects<2> debris;
+        unsigned first=0,last=0;
+        require(world.spawnDebris(registration,debris,n(240),n(120),1,first)&&
+            world.spawnDebris(registration,debris,n(244),n(124),4,last),"register debris for live SDL drawing");
+        debris.get(1)->imageIndex.bits=0x40d80000u;debris.get(2)->imageIndex.bits=0x3f800000u;
+        RecordingRenderer particles;particles.recordTransforms=true;scene->render(particles);
+        unsigned particleCount=0;
+        for(const auto& item:particles.transforms)if(item.sprite==91||item.sprite==115){
+            require(item.sprite==(particleCount?115:91)&&item.frame==(particleCount?2u:1u)&&
+                item.x==110+(particleCount?240:244)-world.mainCameraRenderViewX()&&
+                item.y==(particleCount?120:124)-world.mainCameraRenderViewY(),"SDL debris follows room Draw order and frame selection");
+            ++particleCount;
+        }
+        require(scene->renderingSucceeded()&&particleCount==2,"SDL direct fallback draws both debris instances");
+        debris.get(2)->flash=1;RecordingRenderer hidden;scene->render(hidden);
+        require(std::find(hidden.spriteOrder.begin(),hidden.spriteOrder.end(),91)==hidden.spriteOrder.end(),"flashing debris omitted");
+        require(debris.clear(registration),"retire registered rendering fixtures before updating");
         scene->update({});scene->update({});RecordingRenderer retired;scene->render(retired);
         require(scene->simulationSucceeded()&&scene->renderingSucceeded()&&
             std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),602)==retired.spriteOrder.end()&&
@@ -535,12 +552,30 @@ int main() {
         const std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
         downwell::EffectMaskAssets assets;
         require(assets.bind(bytes.data(),bytes.size()),"live effect test binds offline art");
-        auto effectStorage = std::make_unique<downwell::Game>(&rooms,&objects,&builders,&assets);
+        const auto cb=read("generated/downwell-sprites.dwsc"),mb=read("generated/downwell-sprite-masks.dwsm");
+        downwell::SpriteCollisionPack sprites(cb.data(),cb.size());downwell::SpriteMaskPack masks(mb.data(),mb.size());
+        auto owner=std::make_unique<downwell::StoredWorldCollision>(objects,sprites,masks);
+        auto effectStorage = std::make_unique<downwell::Game>(&rooms,&objects,&builders,&assets,owner->binding());
+        require(owner->attach(effectStorage->startup()),"composited debris fixture attaches collision owner");
         auto& effectGame = *effectStorage;
         auto& runtime=const_cast<downwell::StartupRuntime&>(effectGame.startup());
         runtime.skipToGameForTesting();
         const auto x=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewX()+80);
         const auto y=downwell::MotionBinary64::fromInteger(runtime.mainCameraRenderViewY()+60);
+        auto registration=runtime.debrisRegistration<1>();downwell::DebrisEffects<1> debris;unsigned id=0;
+        require(runtime.spawnDebris(registration,debris,x,y,1,id),"register composited debris");
+        debris.get(1)->imageIndex.bits=0;
+        RecordingRenderer particle;effectGame.render(particle);
+        require(effectGame.renderingSucceeded()&&particle.effectWords&&
+            std::find(particle.spriteOrder.begin(),particle.spriteOrder.end(),115)==particle.spriteOrder.end(),
+            "registered debris reaches the controller without a duplicate direct draw");
+        debris.get(1)->flash=1;RecordingRenderer hidden;effectGame.render(hidden);
+        require(effectGame.renderingSucceeded()&&!hidden.effectWords,"flash gate removes composited debris coverage");
+        debris.get(1)->flash=0;RecordingRenderer returned;effectGame.render(returned);
+        require(effectGame.renderingSucceeded()&&returned.effectWords==particle.effectWords,"debris reappears after flash gate");
+        require(debris.clear(registration),"retire composited debris fixture");
+        RecordingRenderer retired;effectGame.render(retired);
+        require(effectGame.renderingSucceeded()&&!retired.effectWords,"retirement clears retained effect coverage");
         require(runtime.emitSmokeBurst(x,y) && runtime.emitFlashBurst(x,y),"live world emits overlapping effect owners");
         const auto draws=runtime.randomDrawCount();
         RecordingRenderer first,second;

@@ -215,7 +215,7 @@ public:
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
-                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect)return true;
+                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris)return true;
                 const auto* state=self.owner_.resolve(shared);
                 if(!state||!View(*self.world_).resolve(shared,record))return false;
                 if(state->flags&0x100003u)return true;
@@ -223,6 +223,7 @@ public:
                     case View::Kind::enemy:return visit(visitor,GameplayWorld::DrawActor::enemy,local,self.properties_[slot].depth);
                     case View::Kind::bullet:return visit(visitor,GameplayWorld::DrawActor::bullet,local,self.properties_[slot].depth);
                     case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,self.properties_[slot].depth);
+                    case View::Kind::debris:return visit(visitor,GameplayWorld::DrawActor::debris,local,self.properties_[slot].depth);
                     default:return true;
                 }
             });

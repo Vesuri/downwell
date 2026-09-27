@@ -297,7 +297,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris };
     using DrawActorVisitor=bool (*)(void*,DrawActor,downwell::InstanceHandle,downwell::RunnerImageValue);
     using RoomActorDraw=bool (*)(const void*,DrawActorVisitor,void*);
     // Borrowed owner traversal, not a snapshot or a family-local birth sort.
@@ -307,6 +307,14 @@ public:
     template<class Visit> bool visitRoomActors(Visit visit)const{
         return roomActorDraw_&&roomActorDraw_(roomActorDrawContext_,
             [](void* p,DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){return (*static_cast<Visit*>(p))(kind,key,depth);},&visit);
+    }
+    template<class Visit> bool visitDebrisDraw(Visit visit)const{
+        if(!debrisInstances_||!debrisInstances_->size())return true;
+        return visitRoomActors([&](DrawActor kind,downwell::InstanceHandle key,auto){
+            if(kind!=DrawActor::debris)return true;
+            const auto* record=debrisInstances_->find(key);
+            return record&&record->effect&&visit(*record->effect);
+        });
     }
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);

@@ -42,6 +42,12 @@ public:
     StoredDebrisRegistration(const StoredDebrisRegistration&)=delete;
     StoredDebrisRegistration& operator=(const StoredDebrisRegistration&)=delete;
     bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    const DebrisAnimation* drawEffect(InstanceHandle key,const InstanceRecord& r)const{
+        if(!succeeded_||records_.resolve(key)!=&r||r.objectId!=370)return nullptr;
+        for(const auto& e:entries_)if(e.local&&e.id==r.instanceId&&
+            e.key.slot==key.slot&&e.key.generation==key.generation)return e.effect;
+        return nullptr;
+    }
     unsigned sourceId(unsigned local){auto* e=entry(local);return succeeded_&&e&&record(*e)?e->id:0;}
     bool birth(unsigned local,const DebrisAnimation& effect){
         if(!succeeded_)return false;

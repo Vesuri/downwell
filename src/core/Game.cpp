@@ -279,13 +279,17 @@ void Game::renderMain(Renderer& renderer) const {
             Real::fromInteger(160),Real::fromInteger(284)};
         CurrencySmokeComposition::Settings settings;
         settings.noControl = startup_.shops().noControl;
-        renderingSucceeded_ = effects_.prepare([&](auto emit) {
+        renderingSucceeded_ = effects_.prepareWithLateEffects([&](auto emit) {
             for (std::size_t i = startup_.mainCurrencyCount(); i; --i) {
                 const auto& gem = startup_.mainCurrencyAt(i-1);
                 if (gem.motion.lifetime.visible())
                     emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(int(gem.x)),Real::fromInteger(int(gem.y)));
             }
         }, startup_.smokeEffects(), *effectAssets_, view, settings, [&](auto emit) {
+            return startup_.visitDebrisDraw([&](const DebrisAnimation& effect){
+                return DebrisDraw::surface(effect,*effectAssets_,view,emit);
+            });
+        }, [&](auto emit) {
             for (std::size_t i=0;i<startup_.activeInstanceCount();++i) {
                 const auto& instance=startup_.instanceAt(i);
                 if (instance.active && enemyPresentationSprite(instance.objectId,instance.grounded,instance.auxiliaryState)>=0)
@@ -421,6 +425,18 @@ void Game::renderMain(Renderer& renderer) const {
     renderingSucceeded_=startup_.visitDrawChecked([&](InstanceHandle key,const InstanceRecord& instance){
         if(!instance.active||instance.destroyRequested)return true;
         if(instance.depth < -1000&&!drawForeground())return false;
+        if(instance.objectId==370){
+            if(composite)return true;
+            const auto* effect=startup_.debrisForDraw(key,instance);
+            DebrisDraw::Command command;unsigned frame;
+            const EffectSurfacePlacement::View view{};
+            if(!effect||!DebrisDraw::prepare(*effect,view,true,false,false,command))return false;
+            if(command.placement.target==EffectSurfacePlacement::hidden)return true;
+            if(!DebrisDraw::frame(command.sprite,command.imageIndex,frame))return false;
+            float x,y;std::memcpy(&x,&effect->x.bits,4);std::memcpy(&y,&effect->y.bits,4);
+            renderer.drawSpriteTransformed(command.sprite,frame,x-viewX,y-viewY,1,1,0);
+            return true;
+        }
         if(instance.objectId==261){
             for(unsigned i=0;i<startup_.mainBulletCount();++i){
                 const auto& bullet=startup_.mainBulletAt(i);

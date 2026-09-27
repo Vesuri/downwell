@@ -12,6 +12,10 @@ for start, end, digest in (
     (0x537e6a, 0x537e7d, "a422ad160b6b892d09e457d12fdfdd3489baec0016006068db3042e5aceb25a2"),
     (0x531350, 0x5313fc, "b8cf9a8f80aa2033136c0afde7cfd3ac7eafb951ee683ee481372ba229286e91"),
     (0x4af6f0, 0x4afb39, "1ff9fd1c67981466e9140eff8ef2662811e4432e76ae64844acb9618915bdab4"),
+    # Bitmap subimage floor helper's SSE positive finite path. At 0x4af747
+    # the stored float is promoted, floored, narrowed and truncated, then
+    # reduced modulo sprite count. Debris uses only nonnegative indices 0..7.
+    (0x72fdf0, 0x72fe48, "6fa9ba6bef668b0bea867c7f04057f4329ba007bda86e6b5ff604bc0bcc5babc"),
     # Default instance Draw, its float field loads and bitmap dispatch.
     (0x490f65, 0x490f8f, "3783cce0945cc6cb59ba7d5c21935af793514678d2d2e9bff7ec752ea2b604c1"),
     (0x4afb94, 0x4afbf8, "9047e6d4c53e34dad8a92b773152611146b1f9e1c96d0adefcaba2f66246454e"),

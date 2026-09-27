@@ -232,7 +232,7 @@ public:
         if(debrisEventDispatch_||!registration.belongsTo(instances_)||!effects.valid())return run_.effectsSucceeded=false;
         if(debrisBinding_.effects!=&effects||debrisBinding_.registry!=&registration){
             if(hasDebrisRecords())return run_.effectsSucceeded=false;
-            debrisBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registration);
+            bindDebrisDraw(effects,registration);
         }
         auto dispatch=[&](const InstanceRecord& record,StepEvent event){
             if(event.phase==StepEventPhase::alarm)return registration.dispatchAlarmEvent(record,effects,event.subtype);
@@ -343,7 +343,7 @@ public:
         if(!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
         if(debrisBinding_.effects!=&effects||debrisBinding_.registry!=&registration){
             if(hasDebrisRecords())return run_.effectsSucceeded=false;
-            debrisBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registration);
+            bindDebrisDraw(effects,registration);
         }
         const auto local=effects.createRegistered(x,y,area,random_,registration);
         if(!local)return run_.effectsSucceeded=false;
@@ -356,6 +356,16 @@ public:
         const auto* record=instances_.resolve(key);
         return run_.effectsSucceeded=registration.belongsTo(instances_)&&record&&
             registration.dispatchStep(key,*record,effects,phase,random_,stopped);
+    }
+    const DebrisAnimation* debrisForDraw(InstanceHandle key,const InstanceRecord& record)const{
+        return debrisBinding_.registry&&debrisLookup_?debrisLookup_(debrisBinding_.registry,key,record):nullptr;
+    }
+    template<class Visit> bool visitDebrisDraw(Visit visit)const{
+        if(!debrisBinding_.registry)return true;
+        return visitDrawChecked([&](InstanceHandle key,const InstanceRecord& record){
+            if(record.objectId!=370||!record.active||record.destroyRequested)return true;
+            const auto* effect=debrisForDraw(key,record);return effect&&visit(*effect);
+        });
     }
     // Read the source player's pTimeStop at the particle's Step boundary;
     // neither goalStopped nor a shop control lock is a substitute.
@@ -793,6 +803,13 @@ private:
     InstanceLifecycleBinding lifecycle_;
     ScriptEffectRuntimeBinding scriptEffectsBinding_;
     ScriptEffectRuntimeBinding debrisBinding_;
+    const DebrisAnimation* (*debrisLookup_)(const void*,InstanceHandle,const InstanceRecord&)=nullptr;
+    template<class Effects,class Registry> void bindDebrisDraw(Effects& effects,Registry& registry){
+        debrisBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registry);
+        debrisLookup_=[](const void* p,InstanceHandle key,const InstanceRecord& record){
+            return static_cast<const Registry*>(p)->drawEffect(key,record);
+        };
+    }
     bool timeStopRoomWidth(int& width);
     bool hasDebrisRecords()const{
         for(std::size_t i=0;i<instances_.size();++i)if(instances_.at(i).objectId==370)return true;

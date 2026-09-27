@@ -4,6 +4,7 @@
 #include "core/GameMakerRounding.h"
 #include "core/DamageNumberText.h"
 #include "core/RunnerSpatialSplit.h"
+#include "core/DebrisDraw.h"
 
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
@@ -109,6 +110,22 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
                 return bullet&&(!bullet->active||append(downwell::machineGunProfile(bullet->gemHigh).sprite,
                     768+bullet->animation.frame(),downwellPlayfieldX+80+bullet->x-port.cameraOffsetX(),
                     playerStartY+bullet->y-port.cameraOffsetY(),0));
+            }
+            if(kind==GameplayWorld::DrawActor::debris){
+                if(compositeCurrency)return true; // Published by surfaceFx, not a second world draw.
+                const auto* record=port.debrisInstances()?port.debrisInstances()->find(key):nullptr;
+                downwell::DebrisDraw::Command command;unsigned frame;std::int32_t x,y;
+                using Real=downwell::MotionBinary64;
+                const downwell::EffectSurfacePlacement::View view{};
+                if(!record||!record->effect||!downwell::DebrisDraw::prepare(*record->effect,view,true,false,false,command))return false;
+                if(command.placement.target==downwell::EffectSurfacePlacement::hidden)return true;
+                failedSprite=command.sprite;
+                if(!downwell::DebrisDraw::frame(command.sprite,command.imageIndex,frame)||
+                   !downwell::EffectSurfacePlacement::relative(command.placement.x,Real::fromInteger(worldViewX),command.placement.x)||
+                   !downwell::EffectSurfacePlacement::relative(command.placement.y,Real::fromInteger(worldViewY),command.placement.y)||
+                   !command.placement.x.roundPixel(x)||!command.placement.y.roundPixel(y))return false;
+                failedSprite=0;
+                return append(command.sprite,frame,downwellPlayfieldX+x,y,0);
             }
             const auto* record=port.scriptSpawnInstances()?port.scriptSpawnInstances()->find(key):nullptr;
             if(!record||!record->effect)return false;

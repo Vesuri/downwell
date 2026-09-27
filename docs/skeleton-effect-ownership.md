@@ -494,6 +494,32 @@ fractional preservation and failure publication. It does not establish original
 GPU sampling or live cross-family ordering. All fourteen debris artwork frames
 are available offline through checked `EffectMaskAssets::debris` views.
 
+Registered debris now participates in the native room actor Draw visitor and
+SDL's stored room Draw traversal. Both controller producers enumerate that
+order, resolve the original flash gate and append offline debris colors before
+shade subtraction. Death/direct fallback draws at the room actor boundary,
+without publishing the same particle again through the controller. The SDL
+borrowed lookup checks the stored generation and source ID before returning
+the shared particle; the native visitor resolves its lifetime-backed record.
+No coordinate or RNG update occurs during this traversal.
+
+`DebrisDraw::frame` admits the nonnegative 0..7 indices produced by Create and
+sequence animation. The ordinary bitmap runner at `0x4af747..0x4af78b` promotes
+the float subimage, floors it, narrows/truncates and applies frame-count modulo.
+The positive finite SSE helper path is pinned in the sprite-vertex verifier.
+Both backends use this selector, including pre-animation values beyond the
+artwork's frame count. Unsupported state fails rather than indexing other
+offline assets. Tests cover all fourteen frames through the compositor and
+registered native/SDL drawing, flash changes, cleanup and direct fallback.
+
+This does not enable natural box/death births, settle equal-depth ordering with
+the separately owned foreground effects, or prove fractional GPU sampling.
+Controller coverage and native direct drawing currently use the existing
+nearest-pixel backend policy; SDL direct drawing retains its floating anchor.
+Original-game fractional raster comparison remains required. Neither an
+injected-particle rendering test nor the normal camera replay proves natural
+combat effects are complete.
+
 `SkeletonEffectBursts.h` now implements the skeleton's smoke/flash count and
 birth-coordinate arithmetic, calling the child creator synchronously per birth.
 The scope is exactly the skeleton's (5,1) smoke and (6,2,10) flash parameters;

@@ -13,6 +13,15 @@ int main(){
     effect.imageIndex.bits=0x40d80000u; // 6.75, including a pre-animation write.
     const EffectSurfacePlacement::View view{integer(10),integer(20),integer(160),integer(284)};
     unsigned cases=0;
+    for(unsigned sprite:{91u,115u,116u})for(unsigned quarter=0;quarter<=28;++quarter){
+        RunnerImageValue index;auto n=integer(quarter);n.high-=2u<<20; // quarter/4, except zero
+        if(!quarter)n={};
+        assert(index.assign(n));unsigned frame=99;
+        assert(DebrisDraw::frame(sprite,index,frame)&&frame==(quarter/4)%(sprite==91?6:4));
+    }
+    for(auto bad:{0xbf000000u,0x41000000u,0x7f800000u,0x7fc00000u,1u}){
+        unsigned frame=99;assert(!DebrisDraw::frame(115,{bad},frame)&&frame==99);
+    }
     for(int area:{1,2,4})for(int x:{9,10,11,169,170,171})
     for(int y:{19,20,21,303,304,305})for(unsigned flags=0;flags<8;++flags)
     for(int flash:{-1,0,1})for(bool destroyed:{false,true}){

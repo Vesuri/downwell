@@ -2,6 +2,7 @@
 #include "core/ShopFixtures.h"
 #include "core/GameMakerRounding.h"
 #include "core/GameplayCollisionOwner.h"
+#include "core/CurrencySmokeComposition.h"
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -60,6 +61,41 @@ int main() {
         }
         assert(owner->prepareDraw()&&list.collect(*scene,pack,pack+8,160,34));
         for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=101);
+        downwell::DebrisEffects<2> debris;downwell::InstanceHandle first,last;
+        assert(scene->spawnDebris(debris,n(240),n(120),1,first)&&
+            scene->spawnDebris(debris,n(244),n(124),4,last));
+        debris.get(first.generation)->imageIndex.bits=0x40d80000u; // 6.75 -> frame 2
+        debris.get(last.generation)->imageIndex.bits=0x3f800000u;
+        unsigned ordered=0;
+        assert(scene->visitDebrisDraw([&](const auto& effect){
+            assert(&effect==debris.retained(ordered?first.generation:last.generation));++ordered;return true;
+        })&&ordered==2);
+        const auto pixels=read("generated/amiga-game.dwap");downwell::EffectMaskAssets assets;
+        assert(assets.bind(pixels.data(),pixels.size()));
+        downwell::CurrencySmokeComposition composed;
+        const downwell::EffectSurfacePlacement::View view{n(160),n(34),n(160),n(284)};
+        auto compose=[&](){return composed.prepareWithLateEffects([](auto){},scene->smokeEffects(),assets,view,{},
+            [&](auto emit){return scene->visitDebrisDraw([&](const auto& effect){
+                return downwell::DebrisDraw::surface(effect,assets,view,emit);
+            });},[](auto){},[](auto coordinate,std::int32_t& pixel){return coordinate.roundPixel(pixel);});};
+        const auto beforeDraw=scene->checkpoint();
+        assert(compose()&&composed.visible()&&scene->checkpoint()==beforeDraw);
+        assert(list.collect(*scene,pack,pack+8,160,34,false));
+        unsigned particles=0;
+        for(unsigned i=0;i<list.count;++i){const auto& actor=list.actors[i];
+            if(actor.sprite==91||actor.sprite==115){
+                assert(actor.sprite==(particles?115:91)&&actor.frame==(particles?2:1)&&
+                    actor.x==(particles?190:194)&&actor.y==(particles?86:90));++particles;
+            }
+        }
+        assert(particles==2);
+        assert(list.collect(*scene,pack,pack+8,160,34,true));
+        for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=91&&list.actors[i].sprite!=115);
+        debris.get(last.generation)->flash=1;
+        assert(list.collect(*scene,pack,pack+8,160,34,false));
+        for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=91);
+        assert(debris.clear(owner->debris()));
+        assert(compose()&&!composed.visible());
         assert(scene->spawnScriptEffect(n(248),n(128),101,{0x3fe00000u,0},n(1),{},frames,impact));
         assert(!list.collect(*scene,pack,pack+8,160,34)&&list.failedSprite==101);
         // Unknown fractional anchors must not be rounded into a proven variant.

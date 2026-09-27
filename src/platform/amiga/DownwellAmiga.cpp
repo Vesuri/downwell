@@ -2861,13 +2861,17 @@ __attribute__((noinline)) static int runDownwell(void) {
                     Real::fromInteger(160),Real::fromInteger(284)};
                 downwell::CurrencySmokeComposition::Settings settings;
                 settings.noControl = port.shops().noControl;
-                if (!controllerEffects.prepare([&](auto emit) {
+                if (!controllerEffects.prepareWithLateEffects([&](auto emit) {
                     for(unsigned i=port.gemSlotEnd();i;--i) {
                         const auto& gem=port.gemAt(i-1);
                         if(gem.active && gem.motion.lifetime.visible())
                             emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(240+gem.x),Real::fromInteger(176+gem.y));
                     }
                 },port.smokeEffects(),effectAssets,view,settings,[&](auto emit) {
+                    return port.visitDebrisDraw([&](const downwell::DebrisAnimation& effect){
+                        return downwell::DebrisDraw::surface(effect,effectAssets,view,emit);
+                    });
+                },[&](auto emit) {
                     for(unsigned i=0;i<port.enemyCount();++i) {
                         const auto& enemy=port.enemyAt(i);
                         if(enemy.active && enemy.awake)
