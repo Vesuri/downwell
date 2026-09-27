@@ -781,6 +781,14 @@ void testDecodedSceneParity(const char* roomPath, const char* objectPath,
             compareInitialGameplay(imported, entry);
             if (imported.cameraSideLocked()) sawLock = true;
             if (sawLock && !imported.cameraSideLocked()) sawRelease = true;
+            if(imported.randomDrawCount()!=entry.randomDrawCount()){
+                std::cerr<<"ENTRY RNG seed="<<seed<<" tick="<<tick<<" native="<<imported.randomDrawCount()
+                    <<" host="<<entry.randomDrawCount()<<'\n';
+                for(unsigned i=0;i<imported.enemyCount();++i){const auto& e=imported.enemyAt(i);
+                    std::cerr<<" N "<<e.objectId<<' '<<e.x<<','<<e.y<<" active="<<e.active<<" alarms="<<e.alarm0<<','<<e.alarm1<<'\n';}
+                for(unsigned i=0;i<entry.activeInstanceCount();++i){const auto& e=entry.instanceAt(i);
+                    if(e.objectId>=111&&e.objectId<=119)std::cerr<<" H "<<e.objectId<<' '<<e.x-240<<','<<e.y-176<<" active="<<e.active<<" alarms="<<e.alarms.get(0)<<','<<e.alarms.get(1)<<'\n';}
+            }
             require(imported.randomDrawCount() == entry.randomDrawCount() &&
                     imported.randomState().stateIndex() == entry.randomState().stateIndex(),
                     "room-entry RNG cursor remains exact across seeds");

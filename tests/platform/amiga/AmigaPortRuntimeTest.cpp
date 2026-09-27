@@ -50,7 +50,7 @@ struct GenerationOrderProbe {
         require(bottom >= 318, "generation receives world-space viewport bottom");
         if (probe.calls == 1) {
             require(bottom == 323,
-                    "builder sees entry camera before the camera Step advances it");
+                    "builder sees the previous published view despite earlier camera Step");
             probe.expected.irandomSmall(180); // Existing turtle alarm fires first.
             require(random.drawCount() == probe.expected.drawCount(),
                     "existing enemy alarm RNG precedes generation");
@@ -1718,8 +1718,11 @@ int main() {
     require(sideCamera.cameraSideLocked() && sideCamera.cameraOffsetY() == 80 &&
         sideFrame.scrollDelta == 80 - beforeLockY && sideCamera.ringOrigin() == 60,
         "collision-phase camera snap reaches the same frame's circular-buffer delta");
+    require(sideCamera.findBreakable({0,1}),
+        "box End Step uses the published pre-collision view, not the camera snap");
+    sideCamera.step(downwell::packReplayInput(walkRight));
     require(!sideCamera.findBreakable({0,1}),
-        "box End Step retirement observes this frame's camera collision snap");
+        "box retires on the next update after Draw publishes the snapped view");
     downwell::Input leaveSide; leaveSide.left = true;
     for (unsigned frame = 0; frame < 180 &&
             (sideCamera.cameraOffsetX() != 0 || sideCamera.cameraSideLocked()); ++frame)

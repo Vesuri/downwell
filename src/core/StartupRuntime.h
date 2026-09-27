@@ -600,7 +600,7 @@ private:
     void spawnMainCurrency(float x, float y, std::int32_t amount,
                            bool attracted = false);
     void updateMainCurrency();
-    void updateMainLifecycle(bool endStep);
+    void updateMainLifecycle(bool endStep, long publishedViewTopQ12);
     void updateMainEnemies();
     void updateCrawler(InstanceRecord& enemy, bool alarm);
     void updateMainEnemyInteractions();
@@ -769,6 +769,7 @@ private:
     bool mainCameraInitialized_ = false;
     float mainCameraX_ = 240.0F;
     MainCameraMotion mainCameraMotion_;
+    long ordinaryStepViewTopQ12_ = 34L * 4096;
     float mainCameraY_ = 176.0F;
     float mainCameraTargetY_ = 176.0F;
 };

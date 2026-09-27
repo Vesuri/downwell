@@ -2097,6 +2097,10 @@ build/profile-sdl-game: tools/profile-sdl-game.cpp $(filter-out src/main.cpp,$(S
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -DDOWNWELL_SKIP_TO_GAME -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)
 
+.PHONY: verify-runner-camera-view
+verify-runner-camera-view:
+	python3 tools/verify-runner-camera-view.py
+
 .PHONY: verify-sdl-sprite-visibility
 test: verify-sdl-sprite-visibility
 verify-sdl-sprite-visibility:

@@ -1040,8 +1040,11 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
             snap.step(releasedMain,false);
             require(snap.effectsSucceeded()&&snap.mainCameraViewY()==oldView+80,
                 "host camera collision publishes the new view in this frame");
-            require(!snap.hasInstance(boxId),
-                "host box End Step lifetime sees the post-collision view");
+            require(snap.hasInstance(boxId),
+                "host box End Step lifetime retains the pre-collision published view");
+            snap.step(releasedMain,false);
+            require(snap.effectsSucceeded()&&!snap.hasInstance(boxId),
+                "host box retires on the next update after Draw publishes the snap");
         }
         bool retainedOldStone = false;
         for (std::size_t index = 0; index < runtime.activeInstanceCount(); ++index) {
@@ -1122,6 +1125,7 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                 }
             }
             require(target != nullptr, "controlled encounter reuses a generated enemy instance");
+            const auto targetId = target->instanceId;
             const auto bullet = combat.mainBulletAt(0);
             target->objectId = 111; target->spriteId = 163; target->reward = 6;
             target->scaleX = target->scaleY = 1;
@@ -1170,7 +1174,8 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
                     "decoded bat Alarm 0 restores normal SDL presentation");
             const auto kills = combat.mainEnemiesDefeated();
             combat.step(releasedMain, false);
-            require(combat.mainEnemiesDefeated() == kills + 1 && !combat.instanceAt(targetIndex).active &&
+            const auto* defeated = combat.instance(targetId);
+            require(combat.mainEnemiesDefeated() == kills + 1 && (!defeated || !defeated->active) &&
                         combat.mainCurrencyCount() > 0,
                     "a usual bullet defeats a five-health snake and spawns physical gems");
         }

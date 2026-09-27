@@ -35,10 +35,6 @@ behavior, both backend integrations and relevant original-game verification.
   collision adapters. Complete original room creation order across families.
 - Verify collision-family ordering, same-object traversal and cross-family
   painter order against the original runner, not storage-slot order.
-- Resolve the room-entry RNG divergence reported by `amiga-scene-runtime-test`
-  at parity frame 55. It reproduces on baseline `ee558f1` as well as the
-  camera/lifetime phase correction. Trace the original event/RNG order; do not
-  weaken the paired check or treat the separate runtime suites as parity proof.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding
   assumptions, including rotated masks required by blood time-field contacts.
 
@@ -114,6 +110,9 @@ Reference: [area-two recovery](area-two-recovery.md).
   effects and rewards. Rebuild checkpoints after source-backed corrections.
 - Audit remaining event ordering, fractional collisions, activation boundaries,
   time-stop/feedback, special camera modes and overlapping camera lockers.
+  Complete phase-aware published-view reads beyond builder/lifetime checks,
+  including camera dirty setters and initial room publication; see
+  [runner camera view](runner-camera-view.md).
 - Replace approximate live animation where original float/sequence behavior
   changes observable frames or event timing. Cover relevant sprite/index writes;
   a legacy animation helper is not the selected GMS2 sequence path.

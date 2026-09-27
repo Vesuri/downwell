@@ -292,6 +292,9 @@ void StartupRuntime::stepInternal(bool advancePressed,
                                   bool anyInput) {
     if (run_.levelClearActive || !run_.effectsSucceeded ||
         !roomLoadSucceeded_ || !deferredCommandsSucceeded_) return; // Result owner uses stepLevelClear.
+    // Previous Draw's follow publication remains visible throughout ordinary
+    // Step, even after camMain's own Step changes the followed instance.
+    ordinaryStepViewTopQ12_ = mainCameraMotion_.viewTopQ12();
     if(roomId_==mainRoomId)
         run_.advanceFlashAnimation();
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
@@ -437,10 +440,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
         updateMainCurrency();
         if(!run_.effectsSucceeded)return;
-        updateMainLifecycle(false);
+        updateMainLifecycle(false, ordinaryStepViewTopQ12_);
         if(!run_.effectsSucceeded)return;
-        // Scattered16's Step lifetime check sees the pre-collision view.
-        // Actor End Step lifetime checks see the camera's collision snap.
+        // The post-Step runner update is dirty-only. Moving camMain does not
+        // dirty the camera cache; normal following happens before Draw.
         run_.sideCameraLockers.collide(mainCameraMotion_);
         mainCameraX_ = mainCameraMotion_.x / 4096.0F;
         mainCameraY_ = mainCameraMotion_.y / 4096.0F;
@@ -452,7 +455,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
                 camera.y = mainCameraMotion_.pixelY();
             }
         }
-        updateMainLifecycle(true);
+        updateMainLifecycle(true, ordinaryStepViewTopQ12_);
         if(!run_.effectsSucceeded)return;
         run_.shops.endStep(mainCameraRenderViewY());
         run_.ammoHud.step(mainShotsFired_, mainPlayerMotion_.recharges());
@@ -1060,14 +1063,14 @@ void StartupRuntime::updateMainEnemyInteractions() {
         },[this](const InstanceRecord& enemy){return publishMainInactivation(enemy);}))return;
 }
 
-void StartupRuntime::updateMainLifecycle(bool endStep) {
+void StartupRuntime::updateMainLifecycle(bool endStep, long publishedViewTopQ12) {
     // scrOutofview destroys, rather than deactivates, the instance. Erasure
     // compacts records but preserves survivor handles/order. Translate the
     // original traversal index after each removal so adjacent deaths are not
     // skipped. No game callbacks run during this currently supported sweep.
     unsigned removed = 0;
     const bool succeeded=retireMainRoomObjectsChecked(static_cast<unsigned>(instances_.size()), roomId_, 1,
-        mainCameraMotion_.viewTopQ12(),
+        publishedViewTopQ12,
         [this, &removed](unsigned i) {
             const auto& instance = instances_.at(i - removed);
             return LifetimeInstance{instance.objectId, instance.y, instance.active};
@@ -1116,7 +1119,7 @@ void StartupRuntime::updateMainBuilder(InstanceRecord& instance) {
     // first boot, genCount -30..-2 selects a two-line empty pattern. Adjacent
     // patterns share their last row, so each call advances one 16-pixel row
     // and creates the two boundary pillars at the builder's current y.
-    const float viewBottom = mainCameraViewY() + surfaceHeight;
+    const float viewBottom = ordinaryStepViewTopQ12_ / 4096.0F + surfaceHeight;
     if (builderPatternPack_ == nullptr)
         return;
 

@@ -156,8 +156,11 @@ Y against view Y minus 160 / plus 3000, checks room 11, then calls
 records and invalidates their handles rather than leaving them searchable and
 occupying capacity. Its compacting traversal retains survivor order and visits
 adjacent retired records. Both live adapters test End Step families after the
-side-camera collision snap; Scattered16 (289) tests its ordinary-Step view
-before that snap. The resource-ID/event audit is pinned by
+side-camera collision snap, but read the preceding published view: changing
+camMain does not dirty the camera cache. Scattered16 (289) tests that same
+published view in ordinary Step. See [runner camera view](runner-camera-view.md)
+for the conditional post-Step and normal pre-Draw publication paths.
+The resource-ID/event audit is pinned by
 `verify-main-room-lifetime.py`. Ground turtle 112 uses the generic helper;
 do not substitute the differently named, later-area turtle 129's margins.
 Host and native regression fixtures place a box between the pre/post-snap

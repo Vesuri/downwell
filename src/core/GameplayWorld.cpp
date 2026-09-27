@@ -723,9 +723,8 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
     if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_,wallContactResolver_);
     if (landingResolver_) configureLandingResolver(landingResolver_, landingResolverContext_);
-    // The reference dispatches the builder before the camera in rmMain's
-    // ordinary Step instance order. Generation observes the previous camera,
-    // not the camera position being prepared for this frame's display.
+    // camera_get_view_y reads the runner's published cache, not camMain.y.
+    // Normal following refreshes before Draw; post-Step refresh is dirty-only.
     const long generationCameraY = viewCameraYQ8();
     const int oldAmmo = player_.ammo();
     const int oldAmmoCapacity = player_.ammoCapacity();
@@ -875,7 +874,6 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(!captureEnemyStepOrder())return {};
     if (generationStep_ && generationSucceeded_) {
         DW_PROFILE_SCOPE(profileGeneration);
-        // Camera centre is 176 + cameraY_/256; view bottom is 142 below it.
         const long bottom = generationCameraY + 318L * 256L;
         const int bottomCeiling = bottom >= 0 ? (int)((bottom + 255) / 256)
                                               : -(int)((-bottom) / 256);
@@ -1210,7 +1208,9 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     run_.exitDither.step(cameraMotion_.pixelY() - 142, 284);
     run_.collideLevelExit(240 + downwell::roundGameMakerQ8(player_.offsetXFixed()),
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
-    // Collision camera snaps must precede End Step lifetime decisions.
+    // Moving the followed instance does not dirty the camera cache. End Step
+    // still reads the previous Draw's view, including after a Collision snap.
+    const long viewTop = 34L * 4096 + generationCameraY * 16;
     if(!reconcilePhase(PhaseBoundary::step))return {};
     if (followCamera_ && run_.sideCameraLockers.count) {
         run_.sideCameraLockers.collide(cameraMotion_);
@@ -1226,7 +1226,6 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         }
     }
     if(!reconcilePhase(PhaseBoundary::collision))return {};
-    const long viewTop = 34L * 4096 + viewCameraYQ8() * 16;
     unsigned retiredEnemies = 0;
     const bool enemiesRetired=downwell::retireMainRoomObjectsChecked(enemyCount_, 11, 1, viewTop,
         [this, &retiredEnemies](unsigned i) {
