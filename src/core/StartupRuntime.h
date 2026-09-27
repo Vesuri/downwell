@@ -22,6 +22,7 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredScriptSpawnRegistration.h"
+#include "StoredDebrisRegistration.h"
 #include "ScriptSpawnOperations.h"
 #include "EffectSpawnScript.h"
 #include "TimeChangeEffects.h"
@@ -310,6 +311,26 @@ public:
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
+    template<unsigned Capacity> StoredDebrisRegistration<instanceCapacity,Capacity> debrisRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity,unsigned Registered>
+    bool spawnDebris(StoredDebrisRegistration<instanceCapacity,Registered>& registration,DebrisEffects<Capacity>& effects,
+        MotionBinary64 x,MotionBinary64 y,int area,std::uint32_t& id){
+        if(!run_.effectsSucceeded)return false;
+        if(!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
+        const auto local=effects.createRegistered(x,y,area,random_,registration);
+        if(!local)return run_.effectsSucceeded=false;
+        id=registration.sourceId(local);return run_.effectsSucceeded=id!=0;
+    }
+    template<unsigned Capacity,unsigned Registered,class Stopped>
+    bool stepDebris(StoredDebrisRegistration<instanceCapacity,Registered>& registration,DebrisEffects<Capacity>& effects,
+        InstanceHandle key,typename DebrisEffects<Capacity>::Phase phase,Stopped stopped){
+        if(!run_.effectsSucceeded)return false;
+        const auto* record=instances_.resolve(key);
+        return run_.effectsSucceeded=registration.belongsTo(instances_)&&record&&
+            registration.dispatchStep(key,*record,effects,phase,random_,stopped);
+    }
     const ScriptSpawnEffects<scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
     template<class Frames> bool spawnScriptEffect(MotionBinary64 x,MotionBinary64 y,int sprite,
         MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
@@ -434,6 +455,14 @@ public:
     }
     // Explicit pre-Draw cleanup boundary. Other effect families supply their
     // own retirement dispatch; they must not be silently erased as plain records.
+    template<unsigned Capacity,unsigned Registered,class Other> bool cleanupDestroyed(
+        StoredDebrisRegistration<instanceCapacity,Registered>& registration,DebrisEffects<Capacity>& effects,Other other){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=registration.belongsTo(instances_)&&instances_.cleanupDestroyed(
+            [&](InstanceHandle key,const InstanceRecord& record){
+                return record.objectId==370?registration.retireMarked(key,record,effects):other(key,record);
+            });
+    }
     template<unsigned Capacity,unsigned Registered,class Other> bool cleanupDestroyed(
         StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,ScriptSpawnEffects<Capacity>& effects,
         Other other){

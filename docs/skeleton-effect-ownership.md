@@ -401,7 +401,7 @@ the world and retains the registry and monotonic identities. The native-owner
 tests cover all five area sprites, full birth RNG, fractional position writes,
 animation publication, marked-record retention and retry. This does not yet
 connect natural combat births, debris alarm/Step dispatch or
-Draw submission, nor the SDL stored-world owner. Those paths must be integrated
+Draw submission. Those paths must be integrated
 before enabling the effect in normal gameplay.
 
 `GameplayCollisionOwner::debrisPlaceMeeting` supplies the native registered
@@ -430,7 +430,21 @@ Step snapshot for 16 seeds and 40 frames, comparing full state/RNG with the
 source-motion component using independent rectangular terrain overlaps. It also
 checks newborn exclusion and terminal decision failure. This is not yet normal
 gameplay scheduling: cross-family alarm dispatch, live time-field decisions,
-SDL ownership and rendering remain required before natural birth admission.
+automatic SDL dispatch and rendering remain required before natural birth admission.
+
+`StoredDebrisRegistration` provides the SDL stored-world counterpart, retaining
+both the effect address and generation-checked `InstanceRecord` identity. It
+publishes completed Create fields at fractional `birthAt`, uses compatibility
+depth -1000, and forwards movement, animation, solid-family queries and destroy
+marks through the existing collision binding. `StartupRuntime::spawnDebris`
+and selected `stepDebris` consume the world's RNG, not a separate effect stream.
+Room cleanup retires through the particle owner before erasing the real record.
+The resource-backed fixture covers all five area variants, mirrored alarm
+refunds, collision exclusion and slot reuse. Keep the registration and effect
+owner alive until explicitly cleared; automatic room transition ownership is
+not installed yet. Do not run its `advanceAlarm` after the generic SDL scheduler
+has already decremented the record bank: the eventual event adapter must
+distinguish decrementing a timer from handling an already-fired alarm.
 
 `make verify-debris-effects` checks phase exclusion, per-instance freezing,
 newest-first local visitation, alarm destruction, callback order, failed

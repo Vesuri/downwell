@@ -928,6 +928,59 @@ int main(){
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,collision->binding());
         require(collision->attach(*world),"attach script-effect registration fixture");
         world->skipToGameForTesting();
+        for(int area=1;area<=5;++area){
+            auto debrisRegistration=world->debrisRegistration<1>();DebrisEffects<1> debris;
+            const auto cutoff=debris.beginPhase();auto expectedRandom=world->randomState();
+            DebrisAnimation expected;const MotionBinary64 x{0x406e0800u,0},y{0x40afff00u,0};
+            require(expected.create(x,y,area,expectedRandom),"reference debris Create");
+            unsigned id=0;const auto next=world->nextRuntimeInstanceId();
+            require(world->spawnDebris(debrisRegistration,debris,x,y,area,id)&&id==next,
+                "stored debris uses world IDs and RNG");
+            const auto* record=world->instance(id);
+            require(record&&record->objectId==370&&record->depth==-1000&&record->spriteId==expected.spriteId&&
+                record->preciseX==240.25F&&record->preciseY==4095.5F&&record->alarms.get(0)==30,
+                "stored debris retains source coordinates, area sprite, depth and alarms");
+            require(world->randomState().stateIndex()==expectedRandom.stateIndex()&&world->randomDrawCount()==expectedRandom.drawCount(),
+                "stored debris birth RNG position");
+            for(unsigned i=0;i<16;++i)require(world->randomState().stateWord(i)==expectedRandom.stateWord(i),"stored debris birth RNG words");
+            InstancePlaceResult selected;
+            require(collision->collisionPoint({},370,x,y,false,false,selected)&&selected.id==int(id),
+                "stored debris has real collision membership");
+            const auto key=selected.handle;
+            require(debrisRegistration.dispatchAnimation(key,*record,debris,cutoff),"debris animation excludes newer births");
+            const auto phase=debris.beginPhase();require(expected.advanceImage(),"reference debris animation");
+            require(debrisRegistration.dispatchAnimation(key,*record,debris,phase)&&
+                debris.get(1)->imageIndex.bits==expected.imageIndex.bits,"stored debris publishes shared animation");
+            for(bool frozen:{true,false}){
+                require(expected.step(frozen,expectedRandom,[&](auto px,auto py,bool& hit){
+                    return collision->placeMeeting(key,*record,56,px,py,hit);
+                }),"reference motion uses stored collision owner");
+                require(world->stepDebris(debrisRegistration,debris,key,phase,
+                    [&](InstanceHandle h,const auto&,bool& stop){
+                        require(h.slot==key.slot&&h.generation==key.generation,"stored Step keeps lifetime identity");
+                        stop=frozen;return true;
+                    }),"stored debris Step uses shared motion and world RNG");
+                const auto* effect=debris.retained(1);RunnerImageValue px,py,speed;
+                std::memcpy(&px.bits,&record->preciseX,4);std::memcpy(&py.bits,&record->preciseY,4);
+                std::memcpy(&speed.bits,&record->imageSpeed,4);
+                require(effect&&px.bits==expected.x.bits&&py.bits==expected.y.bits&&speed.bits==expected.imageSpeed.bits&&
+                    effect->xsp.high==expected.xsp.high&&effect->xsp.low==expected.xsp.low&&
+                    effect->ysp.high==expected.ysp.high&&effect->ysp.low==expected.ysp.low,"stored debris publishes exact shared motion");
+                for(unsigned a=0;a<3;++a)require(record->alarms.get(a)==expected.alarms.get(a),"stored freeze refunds mirrored alarms");
+                for(unsigned i=0;i<16;++i)require(world->randomState().stateWord(i)==expectedRandom.stateWord(i),"stored Step RNG words");
+            }
+            require(debris.get(1)!=nullptr,"fixture debris remains alive before explicit expiry");
+            debris.get(1)->alarms.set(0,1);
+            require(debrisRegistration.advanceAlarm(key,*record,debris,phase,0)&&record->destroyRequested&&
+                collision->resolve(key)==record,"stored alarm marks without early erase");
+            require(collision->collisionPoint({},370,x,y,false,false,selected)&&selected.id==-4,
+                "marked debris is excluded from stored collisions");
+            require(world->cleanupDestroyed(debrisRegistration,debris,[](auto,const auto&){return false;})&&
+                !world->instance(id)&&!collision->resolve(key)&&!debris.retained(1),"stored room cleanup retires debris through its owner");
+            require(world->spawnDebris(debrisRegistration,debris,x,y,area,id)&&id>next&&debris.retained(2)&&
+                !collision->resolve(key),"stored debris slot reuse cannot revive a stale key");
+            require(debris.clear(debrisRegistration),"clear borrowed debris before registry teardown");
+        }
         auto registration=world->scriptSpawnRegistration<2>();ScriptSpawnEffects<2> effects;
         unsigned callerId=0;
         auto frames=[&](int id,unsigned& count){
