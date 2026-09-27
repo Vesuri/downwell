@@ -7,6 +7,8 @@
 // accelerated backend is representative; SDL's dummy/software backend is not.
 // DOWNWELL_PROFILE_DRAW_EVERY=N samples rendering every Nth simulation tick,
 // allowing a deeper replay within the deadline without changing its inputs.
+// DOWNWELL_PROFILE_FIRE_PHASE=0..9 selects a repeatable firing sequence;
+// different sequences reach different depths without altering game state.
 #include "core/Game.h"
 #include "core/RoomPack.h"
 #include "core/GameplayContactProfileInput.h"
@@ -29,6 +31,12 @@ static std::vector<std::uint8_t> read(const char* path) {
 int main(int argc,char** argv) {
     unsigned frames=downwell::gameplayContactProfileFrames;
     unsigned drawEvery=1;
+    unsigned firePhase=downwell::gameplayContactProfilePhase;
+    if(const char* value=std::getenv("DOWNWELL_PROFILE_FIRE_PHASE")){
+        char* end=nullptr;const auto parsed=std::strtoul(value,&end,10);
+        if(!*value || *end || parsed>9)return 2;
+        firePhase=static_cast<unsigned>(parsed);
+    }
     if(const char* value=std::getenv("DOWNWELL_PROFILE_DRAW_EVERY")){
         char* end=nullptr;const auto parsed=std::strtoul(value,&end,10);
         if(!*value || *end || parsed<1 || parsed>6000)return 2;
@@ -77,7 +85,7 @@ int main(int argc,char** argv) {
         if(Clock::now()>deadline) return 21;
         if(platform.pollInput().quit) return 0;
         const auto& state=game.startup();
-        const auto input=downwell::gameplayContactProfileInput(tick,state.mainPlayerX(),state.mainPlayerY());
+        const auto input=downwell::gameplayContactProfileInput(tick,state.mainPlayerX(),state.mainPlayerY(),firePhase);
         const auto a=Clock::now();game.update(input);const auto b=Clock::now();
         const bool render=tick%drawEvery==0 || tick+1==frames;
         if(render)game.render(platform);const auto c=Clock::now();
