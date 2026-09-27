@@ -40,12 +40,24 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     const auto motion = player.step(input,
         controlsLocked || run.shops.noControl || run.exitControlsLocked,
         death.movementDead(), run.shops.interactable, run.goalStopped, run.gemHigh);
+    // Both callbacks point into this invocation and are only used by motion.
+    // Clear them before any later checked operation can return early.
+    player.configureComboCompletion(nullptr,nullptr);
+    player.configureMovementBoundary(nullptr,nullptr);
     if(!player.motionSucceeded()){
-        player.configureComboCompletion(nullptr,nullptr);
-        player.configureMovementBoundary(nullptr,nullptr);
         run.effectsSucceeded=false;
         return motion;
     }
+    // objPlayer_n Begin Step [11..18] skips the collision call itself when
+    // goalStop/death suppress accounting, not only the eventual increment.
+    // It queries the old published x/y before shop/interactable processing.
+    bool inGoalField=false;
+    if(!run.goalStopped && !death.active && !run.playerGoalContact(
+        MotionBinary64::fromInteger(originX + roundGameMakerQ8(player.frameStartXFixed())),
+        MotionBinary64::fromInteger(originY + roundGameMakerQ8(player.frameStartYFixed())),
+        player.facing(),inGoalField))return motion;
+    // Boss completion is outside the implemented area-one scope.
+    run.clock.advance(true, death.active, run.goalStopped, false, inGoalField);
     DW_PROFILE_PHASE(profilePlayerShops);
     const int shopPlayerX = originX + roundGameMakerQ8(player.offsetXFixed());
     const int shopPlayerY = originY + roundGameMakerQ8(player.offsetYFixed());
@@ -63,19 +75,6 @@ inline PlayerMotionDelta stepGameplayPlayer(PlayerMotion& player,
     run.shops.advanceKeepers(shopPlayerX, false, run.stage.area, shopRandom);
     run.shops.advancePresentation();
     DW_PROFILE_PHASE(profilePlayer);
-    // These callbacks point into this invocation, never retain them in a
-    // copied world or in the next frame's movement.
-    player.configureComboCompletion(nullptr, nullptr);
-    player.configureMovementBoundary(nullptr, nullptr);
-    // Begin Step checks the old published x/y before x=round(xx), y=round(yy).
-    // Do not substitute the newly moved shop coordinates or Draw's radius.
-    bool inGoalField=false;
-    if(!run.playerGoalContact(
-        MotionBinary64::fromInteger(originX + roundGameMakerQ8(player.frameStartXFixed())),
-        MotionBinary64::fromInteger(originY + roundGameMakerQ8(player.frameStartYFixed())),
-        player.facing(),inGoalField))return motion;
-    // Boss completion is outside the implemented area-one scope.
-    run.clock.advance(true, death.active, run.goalStopped, false, inGoalField);
     run.advanceLevelExitAlarms(viewX, viewY);
     death.publishHealth(health);
     death.advanceAlarms(player.grounded());

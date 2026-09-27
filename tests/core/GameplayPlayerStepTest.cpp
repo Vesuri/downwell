@@ -25,6 +25,19 @@ struct Fixture {
 }
 
 int main() {
+    for(unsigned guard:{0u,1u,2u}){
+        Fixture f;
+        // An unsupported field makes an accidentally evaluated query fail.
+        f.run.levelExitPresent=true;f.run.goalField.x=2147483647;
+        f.run.goalStopped=guard==1;f.death.active=guard==2;
+        downwell::Input right;right.right=true;
+        f.step(right);
+        require(f.run.effectsSucceeded==(guard!=0),"clock guards skip the field query itself");
+        require(f.run.clock.ticks==0,"guarded or failed clock query never increments time");
+        require(f.run.shops.previous.right==(guard!=0),
+                "failed clock query stops before shop input processing; guarded clock still permits it");
+        require(f.random.drawCount()==0,"clock guard and failure do not consume RNG");
+    }
     {
         Fixture failed;
         failed.player.configureSolidResolver([](void*,int,int y){return y<=-12;},nullptr,-60,60);

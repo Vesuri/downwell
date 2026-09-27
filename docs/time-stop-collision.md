@@ -951,7 +951,13 @@ replace the independently ordered identity lookup above. The goal-only clock
 query remains separate; an ordinary field must not implicitly stop the run clock.
 
 In `objPlayer_n` Begin Step, `scrPlMovement` precedes clock accounting. The
-source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.
+`goalStop` and published-death guards bypass the field collision call itself,
+not merely the counter increment. The shared player phase applies those guards
+and completes clock accounting before shop input/keeper processing. A failed
+field query stops before those later mutations; movement already performed is
+retained. The current motion helper still combines collision, integration and
+pose work, so this does not establish full source phase equivalence.
+The source then applies wrap mode and publishes `x=round(xx)`, `y=round(yy)`.
 Camera/interactable queries follow, then the time-stop transition query uses
 private `xx/yy`. `scrTimeShard` performs its own field lookup using the newly
 published `x/y`. These are different positions at the same event boundary.
