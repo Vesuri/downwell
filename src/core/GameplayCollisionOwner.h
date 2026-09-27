@@ -3,6 +3,7 @@
 #include "GameplayCollisionView.h"
 #include "RunnerSpatialInstances.h"
 #include "RunnerObjectFamilies.h"
+#include "RunnerRoomMembership.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 namespace downwell {
@@ -15,6 +16,8 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
 private:
     Owner owner_;
+    RunnerRoomMembership<View::capacity> room_;
+    InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
@@ -67,6 +70,8 @@ private:
                 parent.objects_,parent.sprites_,parent.families_,false)))return false;
             PackedObject definition;
             if(!parent.objects_.findObject(object(r),definition)||!real(definition.creationDepth,p.depth))return parent.check(false);
+            if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
+            parent.roomKeys_[h.slot]=h;
             if constexpr(Kind==View::Kind::enemy){
                 p.sprite.spriteId=r.spriteId;p.sprite.maskId=r.maskId;
                 if(!real(r.objectId==117?r.motionState:r.facing,p.sprite.scaleX)||
@@ -84,7 +89,10 @@ private:
             return true;
         }
         bool retire(InstanceHandle local,const Record& r){InstanceHandle h;
-            return key(local,r,h)&&parent.check(parent.owner_.retire(h));}
+            if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
+            if(!parent.check(parent.owner_.retire(h)))return false;
+            parent.roomKeys_[h.slot]={};
+            return parent.check(parent.room_.remove(h.slot));}
         bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h))return false;
             const auto* state=parent.owner_.resolve(h);
@@ -133,6 +141,32 @@ public:
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
     const Owner::Properties* properties(InstanceHandle key)const{return state(key)?&properties_[key.slot]:nullptr;}
     bool population(int object,unsigned& count)const{return valid()&&owner_.instanceNumber(object,families_,count);}
+    bool reconcileActivation(){
+        if(!valid()||!world_)return check(false);
+        const bool result=room_.reconcileChecked([&](unsigned slot){
+            const auto* state=owner_.resolve(roomKeys_[slot]);
+            if(!state){good_=false;return true;}
+            return (state->flags&2u)!=0;
+        },[&](unsigned slot,bool registered){
+            return good_&&owner_.registerObject(roomKeys_[slot],registered);
+        });
+        return check(result&&good_);
+    }
+    // Source room cleanup visits active entries before inactive entries.
+    // Retire may remove only the supplied lifetime, never create/rebind; it
+    // must dispatch to the corresponding typed store before this call returns.
+    template<class Retire> bool cleanupDestroyed(Retire retire){
+        if(!valid()||!world_)return check(false);
+        return check(room_.visitCleanupChecked([&](unsigned slot){
+            const auto h=roomKeys_[slot];const auto* state=owner_.resolve(h);
+            View::Record record;
+            if(!state||!View(*world_).resolve(h,record))return false;
+            if(!(state->flags&1u))return true;
+            if(!retire(h,record)||!valid()||owner_.resolve(h))return false;
+            View::Record remaining;
+            return !View(*world_).resolve(h,remaining);
+        }));
+    }
 };
 }
 #endif

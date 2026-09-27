@@ -1186,8 +1186,19 @@ slots receive fresh monotonically increasing lifetime IDs. A compact slot-order
 array costs 8 KiB at capacity 2048; it is not a room traversal oracle. Failed
 retirement leaves its record available, while successful room-clear prefixes
 are removed from the reported population even if a later callback fails.
-The world cleanup traversal and activation-membership reconciliation are still
-required before live wall dispatch; these APIs do not choose those boundaries.
+`GameplayCollisionOwner` also retains room memberships for its registered
+player, enemy, breakable and terrain lifetimes, using recovered creation depths
+and the shared `RunnerRoomMembership` algorithms. Explicit reconciliation scans
+inactive then active room lists and publishes object-family membership changes;
+activation flags change earlier at the request. Explicit cleanup scans active
+then inactive entries and dispatches each marked lifetime to the supplied typed
+retirement callback. A callback that reports success without retiring the
+record is a terminal error. Successful earlier retirements survive failure.
+These callbacks are not yet installed at the live native scheduler boundaries,
+and missing object families/creation ordering still preclude full runner order.
+Dynamic depth writes also need publication when those live paths are added.
+The room entries and keys add bounded storage proportional to native capacity;
+expanded-emulator memory fit is not stock A500 fit.
 Generated records have no authored ID. Their local lifetime keys remain separate
 from source IDs. Unsupported room transforms/pre-create properties are rejected
 when identity tracking is installed, not silently flattened. A room-load guard

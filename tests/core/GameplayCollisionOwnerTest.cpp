@@ -75,6 +75,38 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    for(bool reject:{false,true}){
+        auto ordered=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,ordered->enemyBinding(),
+            ordered->breakableBinding(),ordered->playerBinding(),&ordered->terrain());
+        assert(ordered->attach(*scene));
+        InstanceHandle h[3];
+        for(unsigned i=0;i<3;++i){
+            assert(scene->createGeneratedInstance({60,240,int(512+i*16)},objects,[](const auto&){return true;}));
+            h[i]=ordered->terrain().handle(i);
+        }
+        assert(ordered->terrain().activation(h[1],false)&&ordered->reconcileActivation());
+        unsigned population=0;assert(ordered->population(60,population)&&population==2);
+        for(auto key:h)assert(ordered->terrain().requestDestroy(key));
+        std::vector<unsigned> order;
+        const bool cleaned=ordered->cleanupDestroyed([&](InstanceHandle shared,const GameplayCollisionView::Record& record){
+            GameplayCollisionView::Kind kind;InstanceHandle local;
+            assert(GameplayCollisionView::decode(shared,kind,local)&&kind==GameplayCollisionView::Kind::terrain&&
+                record.terrain==ordered->terrain().find(local));
+            order.push_back(local.slot);
+            if(reject&&order.size()==2)return true; // A lying success must not acknowledge cleanup.
+            return ordered->terrain().retireMarked(local);
+        });
+        assert(cleaned==!reject&&order[0]==h[0].slot&&order[1]==h[2].slot);
+        if(reject){
+            assert(!ordered->valid()&&order.size()==2&&ordered->terrain().size()==2&&
+                !ordered->terrain().find(h[0])&&ordered->terrain().find(h[2]));
+            assert(!ordered->cleanupDestroyed([](auto,const auto&){assert(false);return true;}));
+        }else{
+            assert(order.size()==3&&order[2]==h[1].slot&&ordered->terrain().size()==0&&ordered->valid());
+            assert(ordered->population(60,population)&&population==0);
+        }
+    }
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
