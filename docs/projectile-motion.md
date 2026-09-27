@@ -156,6 +156,16 @@ destruction. Owners must exclude Step-born effects from the already-started
 animation phase; a two-tick state machine alone does not establish that global
 ordering or the effect's Draw order.
 
+`ScriptSpawnEffects` specializes the same heap-free `NonLoopEffects` owner
+used by corpse-expiry children. Its records start with object-219 defaults,
+then receive the script's setters separately. Birth hooks see those defaults;
+animation uses a captured lifetime cutoff, and retirement never reuses a key.
+The keys are owner-local, not VM instance IDs. Production adapters still need
+the world's identity allocation, collision registration and source painter
+order; the script caller's `myFx` must retain its assigned source ID even after
+the referenced effect dies. Failed publications latch the owner rather than
+silently skipping an effect or rolling back prior writes.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

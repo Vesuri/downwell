@@ -3,6 +3,18 @@ inline void* operator new(__SIZE_TYPE__,void* address) noexcept{return address;}
 #include "core/CorpseExpiryEffect.h"
 #include "core/CorpseExpiryEffects.h"
 #include "core/RunSession.h"
+#include "core/ScriptSpawnEffect.h"
+bool compileScriptSpawnOwner(downwell::ScriptSpawnEffects<4>& owner){
+    struct Hooks {
+        bool birth(unsigned,const downwell::ScriptSpawnEffect&){return true;}
+        bool retire(unsigned,const downwell::ScriptSpawnEffect&){return true;}
+        bool sprite(unsigned,const downwell::ScriptSpawnEffect&){return true;}
+    } hooks;
+    const auto phase=owner.beginPhase();const auto h=owner.create({},{},hooks);
+    return h&&owner.setSprite(h,603,1,hooks)&&owner.mutate(h,[](auto& effect){
+        return effect.setValue(effect.imageSpeed,{0x3fe00000u,0},[](const auto&){return true;});
+    })&&owner.advanceAnimation(phase,hooks)&&owner.clear(hooks);
+}
 bool compileSessionCorpseAlarm(downwell::RunSession& session,downwell::CorpseLifecycle& corpse){
     return session.advanceCorpseAlarm(corpse,0,[](int id){return id==102?12u:0u;},[](){});
 }

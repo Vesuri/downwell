@@ -485,9 +485,13 @@ verify-runner-step-order:
 .PHONY: verify-smoke-direction
 test: verify-machine-gun-source-motion verify-effect-spawn
 .PHONY: verify-effect-spawn
-verify-effect-spawn: build/effect-spawn-script-test
+verify-effect-spawn: build/effect-spawn-script-test build/script-spawn-effects-test
 	python3 tools/verify-effect-spawn.py
 	./build/effect-spawn-script-test
+	./build/script-spawn-effects-test
+build/script-spawn-effects-test: tests/core/ScriptSpawnEffectsTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 build/effect-spawn-script-test: tests/core/EffectSpawnScriptTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
