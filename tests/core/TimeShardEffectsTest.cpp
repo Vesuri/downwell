@@ -42,9 +42,25 @@ int main(){
             [&](auto,const auto& s,bool& retire){++outsideCalls;assert(s.destroyRequested&&world.destroys==1);
                 retire=true;return true;});
         assert(ok!=reject&&world.destroys==1);
-        assert(outsideCalls==(reject?0u:1u)&&world.retires==(reject?0u:1u));
+        assert(outsideCalls==(reject?0u:1u)&&world.retires==0);
         if(reject)assert(!effects.succeeded()&&!effects.clear());
-        else assert(!effects.get(h));
+        else {
+            assert(!effects.get(h)&&effects.sourceId(h)==105186);
+            assert(effects.retireRequested()&&world.retires==1&&effects.sourceId(h)==0);
+        }
+    }
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
+        assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);
+        effects.get(h)->alarm0=1;effects.advanceAlarm(effects.beginPhase(),0);
+        assert(effects.succeeded()&&effects.size()==0&&world.destroys==1&&world.retires==0);
+        const auto draws=random.drawCount();
+        assert(!effects.create({}, {},false,random)&&random.drawCount()==draws&&world.births==1);
+        assert(effects.advanceAnimation(effects.beginPhase())&&world.animations==0);
+        effects.advanceAlarm(effects.beginPhase(),2);assert(world.destroys==1&&world.retires==0);
+        assert(effects.retireRequested()&&world.retires==1);
+        const auto fresh=effects.create({}, {},false,random);assert(fresh>h&&effects.sourceId(fresh)==105187);
+        assert(effects.clear());
     }
     for(unsigned failure:{4u,5u,6u}){
         GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;

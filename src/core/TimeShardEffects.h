@@ -32,6 +32,7 @@ public:
     bool succeeded()const{return succeeded_;}
     template<class World> bool bindPhases(World& world){
         if(!bind(world))return false;
+        deferCleanup_=true;
         animation_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
             return static_cast<World*>(p)->publishAnimation(h,id,effect);
         };
@@ -71,7 +72,7 @@ public:
         return retireRequested();
     }
     template<class Random> Handle create(MotionBinary64 x,MotionBinary64 y,bool lowSpec,Random& random){
-        if(!retireRequested())return 0;
+        if(!succeeded_||(!deferCleanup_&&!retireRequested()))return 0;
         if(!next_ || count_==Capacity)return 0;
         for(unsigned index=0;index<Capacity;++index)if(!slots_[index].handle){
             TimeShardAnimation initial;
@@ -109,7 +110,7 @@ public:
                 }
             }
         }
-        retireRequested();
+        if(!deferCleanup_)retireRequested();
     }
     bool advanceAnimation(Phase phase){
         if(!succeeded_)return false;
@@ -137,7 +138,7 @@ public:
                 succeeded_=false;return false;
             }
         }
-        return retireRequested();
+        return deferCleanup_||retireRequested();
     }
     template<class Random> bool playerContact(Handle handle,MotionBinary64 xsp,MotionBinary64 ysp,Random& random){
         if(!succeeded_)return false;
@@ -171,6 +172,9 @@ public:
 private:
     Slot slots_[Capacity];unsigned order_[Capacity]{},count_=0;Handle next_=1;
     bool succeeded_=true;
+    // Source frame cleanup is explicit (normally Draw entry), not each phase
+    // or the next Create. Unbound component fixtures retain eager cleanup.
+    bool deferCleanup_=false;
     void* context_=nullptr;
     bool (*birth_)(void*,Handle,const TimeShardAnimation&,std::uint32_t&)=nullptr;
     bool (*created_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;

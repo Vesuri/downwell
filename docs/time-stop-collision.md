@@ -16,11 +16,29 @@ it is not runtime proof of generic destruction or managed/delayed branches.
 Shard Step therefore publishes a destroy mark before its later population and
 out-of-view work, while continuing the current event's final rounded x/y
 setters. The stored record and generation remain valid for that continuation;
-physical retirement still happens at the owner cleanup boundary. A second
+physical retirement still happens at the explicit cleanup boundary. A second
 destroy request in the same event does not republish it. Failed marking is
-terminal. The full runner cleanup schedule and cross-family interleaving remain
-to be integrated; marking must not be confused with eager spatial removal or
-ordinary activation changes.
+terminal. Marking must not be confused with eager spatial removal or ordinary
+activation changes.
+
+The normal Draw callback (`0x50da30`, labelled `Draw`) invokes the marked-record
+sweep `0x48bbb0` at `0x50da4a`, before drawing. The sweep scans the active room
+list first, then the inactive room list, testing flag bit 1; it removes the
+numeric-ID lookup and unlinks/releases marked records. In contrast, the
+inter-phase reconciliation function `0x5108d0` handles activation, rebinding,
+depth queues and other reconciliation; it does not call this sweep. The Update
+function `0x50db60` has two additional cleanup calls only on its conditional
+pre-update event path. Room transitions also force sweeps. These reviewed byte
+ranges are pinned by the same verifier.
+
+Phase-bound `TimeShardEffects` consequently retains marked storage through
+alarms, Step and subsequent births until `retireRequested()` is called at an
+explicit sweep boundary (or `clear()` for teardown). Marked entries no longer
+count, animate, receive Step or draw, but cannot be reused just because the
+next Create needs a slot. Unbound component fixtures retain eager cleanup;
+production phase bindings always select deferred cleanup. The full frame loop
+must still merge cleanup across object families in room-list order; a per-family
+sweep does not establish that global ordering.
 
 ## Shard registration contract
 

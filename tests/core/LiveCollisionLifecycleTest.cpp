@@ -211,8 +211,9 @@ int main(){
                     retire=true; // Repeated source Destroy must be idempotent.
                 }
                 return true;
-            })&&observedDestroy&&!world->instance(first+2)&&shards.size()==2,
-            "Destroy excludes immediately, continues outOfView, then releases storage");
+            })&&observedDestroy&&world->instance(first+2)&&world->instance(first+2)->destroyRequested&&shards.size()==2,
+            "Destroy excludes immediately and continues outOfView without phase-local storage release");
+        require(shards.retireRequested()&&!world->instance(first+2),"explicit cleanup releases marked world storage");
         require(shards.clear()&&world->activeInstanceCount()==count&&shardOwner->valid(),"world retirement removes every shard record");
         for(unsigned i=0;i<3;++i)require(!world->instance(first+i),"retired source ID no longer resolves");
         world->step({},false);require(world->effectsSucceeded(),"world continues after registered burst retirement");
