@@ -25,16 +25,25 @@ inline bool usesMainRoomOutOfView(int objectId, int area) {
 // accumulator. Inactive instances do not receive End Step.
 // Storage adapters only expose records and apply the resulting retirement.
 template<class Read, class Retire>
-void retireMainRoomObjects(unsigned count, int roomId, int area, long viewTopQ12,
+bool retireMainRoomObjectsChecked(unsigned count, int roomId, int area, long viewTopQ12,
                           Read read, Retire retire) {
-    if (roomId != 11) return;
+    if (roomId != 11) return true;
     for (unsigned i = 0; i < count; ++i) {
         const LifetimeInstance instance = read(i);
         if (!instance.active || !usesMainRoomOutOfView(instance.objectId, area)) continue;
         const long y = instance.y * 4096L;
         if (y < viewTopQ12 - 160L * 4096 || y > viewTopQ12 + 3000L * 4096)
-            retire(i);
+            if (!retire(i)) return false;
     }
+    return true;
+}
+// Compatibility for infallible adapters. Checked callers must latch a failure:
+// previous retirements are committed and the partial sweep must not be retried.
+template<class Read, class Retire>
+void retireMainRoomObjects(unsigned count, int roomId, int area, long viewTopQ12,
+                          Read read, Retire retire) {
+    retireMainRoomObjectsChecked(count,roomId,area,viewTopQ12,read,
+        [&](unsigned i){retire(i);return true;});
 }
 } // namespace downwell
 #endif

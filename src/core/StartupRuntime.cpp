@@ -408,7 +408,9 @@ void StartupRuntime::stepInternal(bool advancePressed,
         run_.collideLevelExit(roundGameMakerCoordinate(mainPlayerX_),
             roundGameMakerCoordinate(mainPlayerY_), mainDeath_.active);
         updateMainCurrency();
+        if(!run_.effectsSucceeded)return;
         updateMainLifecycle();
+        if(!run_.effectsSucceeded)return;
         // Camera Collision follows ordinary Step/retirement, before shop End
         // Step and Draw. Earlier actors/generation keep their Step-time view.
         run_.sideCameraLockers.collide(mainCameraMotion_);
@@ -955,7 +957,7 @@ void StartupRuntime::updateMainLifecycle() {
     // original traversal index after each removal so adjacent deaths are not
     // skipped. No game callbacks run during this currently supported sweep.
     unsigned removed = 0;
-    retireMainRoomObjects(static_cast<unsigned>(instances_.size()), roomId_, 1,
+    const bool succeeded=retireMainRoomObjectsChecked(static_cast<unsigned>(instances_.size()), roomId_, 1,
         mainCameraMotion_.viewTopQ12(),
         [this, &removed](unsigned i) {
             const auto& instance = instances_.at(i - removed);
@@ -963,11 +965,12 @@ void StartupRuntime::updateMainLifecycle() {
         },
         [this, &removed](unsigned i) {
             const auto id = instances_.at(i - removed).instanceId;
-            if (instances_.erase(id)) {
-                ++removed;
-                ++mainInstancesRetired_;
-            }
+            if (!instances_.erase(id)) return false;
+            ++removed;
+            ++mainInstancesRetired_;
+            return true;
         });
+    if(!succeeded)run_.effectsSucceeded=false;
 }
 
 void StartupRuntime::syncMainBuilderState() {

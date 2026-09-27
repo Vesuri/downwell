@@ -951,7 +951,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         176 + downwell::roundGameMakerQ8(player_.offsetYFixed()), death_.active);
     const long viewTop = 34L * 4096 + viewCameraYQ8() * 16;
     unsigned retiredEnemies = 0;
-    downwell::retireMainRoomObjects(enemyCount_, 11, 1, viewTop,
+    const bool enemiesRetired=downwell::retireMainRoomObjectsChecked(enemyCount_, 11, 1, viewTop,
         [this, &retiredEnemies](unsigned i) {
             const auto& enemy = enemies_[i - retiredEnemies];
             return downwell::LifetimeInstance{enemy.objectId, enemy.y + 176, enemy.active};
@@ -962,13 +962,16 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 enemies_[next - 1] = enemies_[next];
             --enemyCount_;
             ++retiredEnemies;
+            return true;
         });
-    downwell::retireMainRoomObjects(breakableCount_, 11, 1, viewTop,
+    if(!enemiesRetired){run_.effectsSucceeded=false;return {};}
+    const bool boxesRetired=downwell::retireMainRoomObjectsChecked(breakableCount_, 11, 1, viewTop,
         [this](unsigned i) {
             const auto& box = breakables_[i];
             return downwell::LifetimeInstance{92, box.y + 176, box.active};
         },
-        [this](unsigned i) { breakables_[i].active = false; });
+        [this](unsigned i) { breakables_[i].active = false; return true; });
+    if(!boxesRetired){run_.effectsSucceeded=false;return {};}
 
     // Collision phase follows ordinary actor/generation/retirement work.
     // Its snap contributes to this frame's final display delta, not the view

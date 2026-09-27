@@ -244,6 +244,25 @@ int main() {
         require(retired(11, 5, 0) == ((1u << 2) | (1u << 3) | (1u << 4) | (1u << 5)),
                 "stone retirement is restricted to the original area-five guard");
         require(retired(10, 1, 0) == 0, "scrOutofview does not destroy outside rmMain");
+        const unsigned candidates[]={2,3,5};
+        for(unsigned failure=0;failure<3;++failure) {
+            unsigned reads=0,calls=0,committed=0;
+            const bool ok=downwell::retireMainRoomObjectsChecked(8,11,1,0,
+                [&](unsigned i){++reads;return instances[i];},
+                [&](unsigned i){
+                    require(i==candidates[calls],"checked retirement preserves candidate order");
+                    if(calls++==failure)return false;
+                    committed|=1u<<i;return true;
+                });
+            unsigned expected=0;
+            for(unsigned i=0;i<failure;++i)expected|=1u<<candidates[i];
+            require(!ok && calls==failure+1 && reads==candidates[failure]+1 && committed==expected,
+                    "retirement failure stops reads and removals without rolling back completed work");
+        }
+        require(downwell::retireMainRoomObjectsChecked(8,10,1,0,
+            [&](unsigned){require(false,"other room must not read records");return instances[0];},
+            [&](unsigned){require(false,"other room must not retire records");return false;}),
+            "checked out-of-room retirement is a successful no-op");
     }
     lifecycle.step(0);
     require(!lifecycle.findEnemy(lifecycleKeys[0]) && !lifecycle.findEnemy(lifecycleKeys[2]),
