@@ -729,10 +729,15 @@ replace registration and synchronous retirement in the shared collision owner.
 The shared immediate bullet/stomp response adapters provide a checked retirement
 callback after rewards and before clearing the active flag or publishing defeat
 and bounce effects. Failure retains earlier damage/reward mutations and stops
-contact traversal; callers must latch it rather than retry. Default callbacks
-are empty until collision ownership is installed. This boundary is not evidence
+contact traversal; callers must latch it rather than retry. The host scheduler
+routes fatal bullet/stomp responses and snail expiry to its checked activation
+binding with `false` before clearing the record's active flag. This removes
+collision visibility while retaining the stored lifetime until ordinary erasure;
+it does not set `activationPending` as a dormant deactivation request would.
+The default binding and native contact callbacks remain empty until their owner
+is installed. This boundary is not evidence
 that the current immediate death response matches the runner's deferred enemy
-death events, nor does it cover snail expiry or room-clear retirement.
+death events. Native expiry and room-clear ownership still need integration.
 
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty

@@ -658,6 +658,19 @@ void StartupRuntime::syncMainPlayerState() {
     mainShotsFired_ = mainPlayerMotion_.shots();
 }
 
+bool StartupRuntime::publishMainEnemyInactivation(const InstanceRecord& enemy) {
+    // Keep the stored lifetime until its normal erase boundary, but remove
+    // collision visibility before the response clears active. Do not use a
+    // dormant activation request: dead actors must not become activationPending.
+    for (std::size_t i=0;i<instances_.size();++i) {
+        if (&instances_.at(i)!=&enemy) continue;
+        if (lifecycle_.activation(instances_.handleAt(i),enemy,false)) return true;
+        break;
+    }
+    run_.effectsSucceeded=false;
+    return false;
+}
+
 void StartupRuntime::updateMainBullets() {
     std::size_t write = 0;
     for (std::size_t index = 0; index < mainBulletCount_; ++index) {
@@ -674,7 +687,8 @@ void StartupRuntime::updateMainBullets() {
                                           static_cast<float>(enemy->y),
                                           enemy->reward);
                         return run_.effectsSucceeded;
-                    }, bullet.gemHigh, bullet.trajectory.direction);
+                    }, bullet.gemHigh, bullet.trajectory.direction,
+                    [this](const InstanceRecord& record){return publishMainEnemyInactivation(record);});
                 if (impact.kind == BulletImpactKind::ignored) return false;
                 if (impact.kind == BulletImpactKind::failed) return true;
                 ++soundPlayRequests_;
@@ -897,7 +911,9 @@ void StartupRuntime::updateMainEnemies() {
             }
             if (!enemy.snail.initialized)
                 enemy.snail.initialize(enemy.x, enemy.y, enemy.velocityY >= 0);
-            enemy.active = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); });
+            const bool alive = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); });
+            if (!alive && !publishMainEnemyInactivation(enemy)) return;
+            enemy.active = alive;
             if (enemy.active) {
                 enemy.preciseX = enemy.snail.x / 1280.0F;
                 enemy.preciseY = enemy.snail.y / 1280.0F;
@@ -953,7 +969,7 @@ void StartupRuntime::updateMainEnemyInteractions() {
         [this](int x,int y) {
             return run_.contactDamageNumber(mainPlayerMotion_.frameStartXFixed(),
                 mainPlayerMotion_.frameStartYFixed(),x,y,mainPlayerOriginX_,mainPlayerOriginY_);
-        }))return;
+        },[this](const InstanceRecord& enemy){return publishMainEnemyInactivation(enemy);}))return;
 }
 
 void StartupRuntime::updateMainLifecycle() {

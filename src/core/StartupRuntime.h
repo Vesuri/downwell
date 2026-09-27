@@ -337,6 +337,7 @@ private:
     bool mainSolidAt(float x, float y) const;
     void emitMainBullet(const InstanceRecord& instance);
     void updateMainBullets();
+    bool publishMainEnemyInactivation(const InstanceRecord& enemy);
     void spawnMainCurrency(float x, float y, std::int32_t amount,
                            bool attracted = false);
     void updateMainCurrency();

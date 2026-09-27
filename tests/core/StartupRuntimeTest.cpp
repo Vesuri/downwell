@@ -27,7 +27,7 @@ void stepMany(downwell::StartupRuntime& runtime, int count) {
 struct LifecycleAudit {
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
-    unsigned births=0,retires=0,activations=0,memberships=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,calls=0,fail=0;
     bool matches(downwell::InstanceHandle h,const downwell::InstanceRecord& r)const{
         return h.slot<entries.size()&&entries[h.slot].live&&entries[h.slot].generation==h.generation&&entries[h.slot].id==r.instanceId;
     }
@@ -43,9 +43,13 @@ struct LifecycleAudit {
         entries[h.slot].live=false;++retires;return true;
     }
     bool activation(downwell::InstanceHandle h,const downwell::InstanceRecord& r,bool active){
-        ++calls;require(matches(h,r)&&active&&!r.active,"activation sees the existing dormant record before its flag changes");
-        if(fail==3)return false;
-        ++activations;return true;
+        ++calls;require(matches(h,r)&&active!=r.active,"activation publication sees the old live flag");
+        if(fail==(active?3u:5u))return false;
+        if(active)++activations;else {
+            require(!r.activationPending,"dead actor removal must not queue dormant reactivation");
+            ++inactivations;
+        }
+        return true;
     }
     bool membership(downwell::InstanceHandle h,const downwell::InstanceRecord& r,bool){
         ++calls;require(matches(h,r),"reconciliation publishes a live generation");
@@ -78,12 +82,13 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         audit.verify(*indexed);
     }
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
-              << " activations=" << audit.activations << " memberships=" << audit.memberships << '\n';
-    require(audit.births>100&&audit.retires>2&&audit.memberships>0,
-            "natural gameplay covers dynamic births, retirement and reconciliation");
+              << " activations=" << audit.activations << " inactivations=" << audit.inactivations
+              << " memberships=" << audit.memberships << '\n';
+    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0,
+            "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
-    for(unsigned failure=0;failure<=4;++failure){
+    for(unsigned failure=0;failure<=5;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
             downwell::InstanceLifecycleBinding::bind(failing));
