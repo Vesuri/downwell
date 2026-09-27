@@ -84,6 +84,14 @@ public:
         return b;
     }
     bool hasPlaceMeeting()const{return placeMeeting_!=nullptr;}
+    template<class Owner> static RecordLifecycleBinding bindFrameSnapshots(Owner& owner){
+        auto b=bindPositionedBirths(owner);
+        b.previous_=[](void* p,InstanceHandle h,const Record& r){return static_cast<Owner*>(p)->capturePrevious(h,r);};
+        return b;
+    }
+    bool capturePrevious(InstanceHandle h,const Record& r)const{
+        return !previous_||previous_(context_,h,r);
+    }
     template<class Owner> static RecordLifecycleBinding bindPositionedBirths(Owner& owner){
         auto b=bindInstanceQueries(owner);
         b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
@@ -162,6 +170,7 @@ private:
     bool (*birthAt_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
     bool (*destroyed_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*number_)(void*,int,unsigned&)=nullptr;
+    bool (*previous_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*retire_)(void*,InstanceHandle,const Record&)=nullptr;
     bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;

@@ -26,6 +26,21 @@ struct Graph {
 int main(){
     using Owner=RunnerSpatialInstances<64,64>;
     {
+        Owner owner;Owner::State state;state.x={0x43704000};state.y={0x43308000};
+        const InstanceHandle h{0,1};assert(owner.attach(h,0,state));
+        assert(owner.resolve(h)->previous.x.bits==state.x.bits&&owner.resolve(h)->previous.y.bits==state.y.bits);
+        assert(owner.move(h,{0x43708000},{0x4330c000},0x18));
+        assert(owner.resolve(h)->previous.x.bits==state.x.bits);
+        assert(owner.setExclusions(h,3)); // Still in active room list until reconciliation.
+        const auto spatial=owner.pendingSpatial(),collision=owner.pendingCollision();
+        assert(owner.capturePrevious(h)&&owner.resolve(h)->previous.x.bits==0x43708000&&
+            owner.resolve(h)->previous.y.bits==0x4330c000);
+        assert(owner.pendingSpatial()==spatial&&owner.pendingCollision()==collision);
+        assert(!owner.capturePrevious({0,2}));
+        assert(owner.retire(h)&&owner.attach({0,2},0,state));
+        assert(owner.resolve({0,2})->previous.x.bits==state.x.bits);
+    }
+    {
         Owner owner;RunnerCollisionPairs<64,1> pairs;
         const InstanceHandle h{0,1};assert(owner.attach(h,0,{}));
         assert(owner.queueCollision(h,0x10)&&owner.pendingCollision()==0);

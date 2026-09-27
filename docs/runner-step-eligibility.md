@@ -44,9 +44,22 @@ The post-collision preparation call `0x462820` concerns paths; it is not the
 friction/gravity routine `0x462dd0` used earlier in the frame. The pinned data's
 PATH chunk contains zero resources, and recovered assembly currently contains
 no path API or engine hspeed/vspeed references. Do not map the port's custom
-actor velocity fields onto these engine fields. Capturing previous coordinates
-at the runner's exact frame boundary and integrating this state with both live
-worlds remain required; the helper does not infer snapshots from rendered frames.
+actor velocity fields onto these engine fields.
+
+The previous-position snapshot is at `0x50dbf8..0x50dc0a`, immediately before
+the same instance's animation call `0x50dc25`, in active-room traversal order.
+It does not add the Step exclusion-mask check. Path progress is also copied
+to its previous field when a path state exists. Birth initializes previous
+coordinates from its initial position (`0x461957`/`0x46197d`).
+
+The maintained spatial owner now initializes this snapshot at birth and exposes
+a checked snapshot operation. The host calls it from the existing room-list
+animation traversal before animation and Begin Step, using authoritative
+binary32 position rather than rounded drawing coordinates. This adds eight
+bytes per owner slot (16 KiB for 2,048 slots), without allocating per frame or
+dirtying spatial/collision queues. Legacy bindings without an external owner
+remain unchanged. Native heterogeneous-world snapshot integration, path state
+and actual collision rollback publication to actor state remain open.
 
 `RunnerCollisionEventContext` specializes dispatcher `0x4449e0` for event 4.
 No current room (`0x4449e6`) or a pending room change (`0x4449f8`) suppresses

@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_RUNNER_SPATIAL_INSTANCES_H
 #include "InstanceHandle.h"
 #include "RunnerCollisionPairs.h"
+#include "RunnerCollisionMotion.h"
 #include "RunnerTransformField.h"
 #include "RunnerObjectMembership.h"
 #include "RunnerSpatialIndex.h"
@@ -31,6 +32,7 @@ public:
         std::uint32_t flags=8;
         unsigned kind=1;
         bool special=false;
+        RunnerCollisionMotion::Previous previous{};
     };
     struct Result {bool found=false;InstanceHandle handle{};};
     struct Sprite {
@@ -124,8 +126,15 @@ public:
         if(!valid() || h.slot>=Capacity || !h.generation || object<0 ||
             entries_[h.slot].object>=0 || h.generation<=entries_[h.slot].generation ||
             (state.flags&0x8000u) || !Math::valid(state.x)||!Math::valid(state.y))return false;
-        auto& e=entries_[h.slot];e.state=state;e.object=object;e.generation=h.generation;
+        auto& e=entries_[h.slot];e.state=state;e.state.previous={state.x,state.y};
+        e.object=object;e.generation=h.generation;
         return membership_.bind(h.slot,object,h.generation);
+    }
+    // 0x50dbf8..0x50dc0a, before this instance's animation in active-room
+    // traversal. Do not filter flags here or dirty either spatial queue.
+    bool capturePrevious(InstanceHandle h){
+        if(!valid()||!live(h))return false;
+        auto& s=entries_[h.slot].state;s.previous={s.x,s.y};return true;
     }
     // At source reconciliation boundaries, not when the active flag is written.
     bool registerObject(InstanceHandle h,bool registered){

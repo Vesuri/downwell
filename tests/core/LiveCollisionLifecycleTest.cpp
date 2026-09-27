@@ -269,6 +269,17 @@ int main(){
             preciseHits+=hit;
         }
         require(preciseHits>0,"live shard/player pairs exercise precise-mask overlap");
+        const auto tracked=pairs->at(0)->self;
+        const auto* beforeFrame=owner->resolve(tracked);
+        require(beforeFrame,"snapshot fixture lifetime resolves");
+        RunnerImageValue expectedX,expectedY;
+        std::memcpy(&expectedX.bits,&beforeFrame->preciseX,4);
+        std::memcpy(&expectedY.bits,&beforeFrame->preciseY,4);
+        world->step(Input{},false);
+        RunnerCollisionMotion::Previous previous;
+        require(world->effectsSucceeded()&&owner->collisionPreviousPosition(tracked,previous)&&
+            previous.x.bits==expectedX.bits&&previous.y.bits==expectedY.bits,
+            "ordinary live tick snapshots authoritative position before animation and Step");
         require(owner->collectCollisionPairs(*pairs,true)&&owner->valid(),
             "next collection resolves retained animated masks through real sprite resources");
     }

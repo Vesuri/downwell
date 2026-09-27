@@ -18,6 +18,9 @@ struct StoredCollisionLifecycle {
     Trig trig;
     Round round;
     bool allPrepared=false;
+    bool capturePrevious(InstanceHandle h,const InstanceRecord& record){
+        return matchingFlags(h,record)&&owner.capturePrevious(h);
+    }
     template<unsigned Pairs,class Registry>
     bool collectCollisionPairs(const Registry& registry,RunnerCollisionPairs<Capacity,Pairs>& pairs,
                                bool indexAvailable){

@@ -44,7 +44,15 @@ public:
         if(!valid()||(runtime_&&runtime_!=&runtime))return false;
         runtime_=&runtime;return true;
     }
-    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindPositionedBirths(*this);}
+    InstanceLifecycleBinding binding(){return InstanceLifecycleBinding::bindFrameSnapshots(*this);}
+    bool capturePrevious(InstanceHandle h,const InstanceRecord& r){
+        return resolve(h)==&r&&adapter_.capturePrevious(h,r);
+    }
+    bool collisionPreviousPosition(InstanceHandle h,RunnerCollisionMotion::Previous& previous)const{
+        if(!valid()||!resolve(h))return false;
+        const auto* state=owner_.resolve(h);if(!state)return false;
+        previous=state->previous;return true;
+    }
     const InstanceRecord* resolve(InstanceHandle h)const{
         if(!runtime_||!owner_.resolve(h))return nullptr;
         const auto* record=runtime_->instance(ids_[h.slot]);

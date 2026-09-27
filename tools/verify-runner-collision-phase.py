@@ -7,6 +7,7 @@ import runpy
 review = runpy.run_path(str(Path(__file__).with_name("verify-runner-choose.py")))
 region = review["region"]
 for start, size, digest in (
+    (0x50DBF0, 0x9E, "5e66722bf37cc0a1b50db9838594c5a7ecf32f5f04df901d572d819e1cd00b36"),
     (0x4449E0, 0x128, "2302611b8d9106620281531bdb6b0b3c8df76060faf5489a42d847c69cf8baa2"),
     (0x5030D0, 0x200, "59a68f082497c0c2ed134b237e01ffe0be43e3355d5b12a0a23daa5f73be5015"),
     (0x501EF0, 0x7F, "e1929af99fd7ef2ae676ad677567236da7a1acbf410a363640afb1ffabd545c6"),
