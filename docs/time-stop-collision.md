@@ -756,9 +756,21 @@ snail Step VM code explicitly stores `round(xx)` into `x`, then `round(yy)` into
 publication helper is restricted to that representation, with no conversion work
 for an empty binding. A rejected update latches failure before later actors.
 This is not a query-time synchronization pass, and does not yet cover player,
-other effect families, resource/transform assignments or original scheduling
+other effect families, mask/transform assignments or original scheduling
 differences in the adapted enemy steps. Those remain prerequisites to installing
 the full live query owner.
+
+`bindSpriteChanges` extends that binding with the current enemy Step's sprite
+selection, before updating the stored sprite ID and final image index. The
+resource-backed adapter uses the existing sprite setter's frame-count lookup,
+timeline/index reset and dirty-queue rules; assigning the same ID is a no-op in
+that owner. Failed publication stops later handlers without rolling back earlier
+motion. The natural seed-2 tape currently exercises same-ID publications only;
+changed-ID coverage comes from explicit setter fixtures and real resource-pack
+tests, not a claim of natural pose coverage. A wall-less snail must stop after
+inactivation, without publishing later positions or sprite selection. Animation
+index writes, other sprite assignment sites and exact source setter scheduling
+remain required before full query installation.
 
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty

@@ -938,11 +938,15 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         enemy.x=publishedX;enemy.y=publishedY;
         if (enemy.speedX != 0)
             enemy.facing = enemy.speedX < 0 ? -1 : 1;
-        enemy.spriteId = downwell::finishEnemyPresentation(
+        const auto nextSprite = downwell::finishEnemyPresentation(
             {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.speedY < 0,
              enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
             enemy.frogPresentation, enemy.batActivity, enemy.batHit,
             enemy.imagePhase, enemy.imageRemainder);
+        if(!enemyLifecycle_.sprite({enemy.identitySlot,enemy.lifetimeId},enemy,nextSprite)) {
+            run_.effectsSucceeded=false;return {};
+        }
+        enemy.spriteId=nextSprite;
         enemy.imageFrame = enemy.imagePhase >> 8;
     }
 

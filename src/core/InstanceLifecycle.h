@@ -37,6 +37,13 @@ public:
         };
         return b;
     }
+    template<class Owner> static RecordLifecycleBinding bindSpriteChanges(Owner& owner) {
+        auto b=bindMovement(owner);
+        b.sprite_=[](void* p,InstanceHandle h,const Record& r,int sprite){
+            return static_cast<Owner*>(p)->sprite(h,r,sprite);
+        };
+        return b;
+    }
     // For explicit rounded x/y assignments in the supported enemy scripts,
     // not xx/yy motion accumulators or a query-time synchronization pass.
     bool integerPosition(InstanceHandle h,const Record& r,std::int32_t x,std::int32_t y)const {
@@ -49,6 +56,7 @@ public:
     bool retire(InstanceHandle h,const Record& r)const{return !retire_||retire_(context_,h,r);}
     bool activation(InstanceHandle h,const Record& r,bool v)const{return !activation_||activation_(context_,h,r,v);}
     bool membership(InstanceHandle h,const Record& r,bool v)const{return !membership_||membership_(context_,h,r,v);}
+    bool sprite(InstanceHandle h,const Record& r,int next)const{return !sprite_||sprite_(context_,h,r,next);}
 private:
     void* context_=nullptr;
     bool (*birth_)(void*,InstanceHandle,const Record&)=nullptr;
@@ -56,6 +64,7 @@ private:
     bool (*activation_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*membership_)(void*,InstanceHandle,const Record&,bool)=nullptr;
     bool (*move_)(void*,InstanceHandle,const Record&,RunnerImageValue,RunnerImageValue)=nullptr;
+    bool (*sprite_)(void*,InstanceHandle,const Record&,int)=nullptr;
 };
 using InstanceLifecycleBinding = RecordLifecycleBinding<InstanceRecord>;
 

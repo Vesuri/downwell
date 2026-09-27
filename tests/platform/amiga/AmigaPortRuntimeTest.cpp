@@ -71,7 +71,13 @@ struct GenerationOrderProbe {
 struct NativeEnemyLifecycleAudit {
     using Enemy=GameplayWorld::EnemyState;
     struct Entry { unsigned generation=0;bool live=false,active=false; } entries[GameplayWorld::enemyCapacity]{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,calls=0,fail=0;
+    bool sprite(downwell::InstanceHandle h,const Enemy& e,int){
+        ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active,
+                        "native sprite assignment resolves live identity");
+        if(fail==6)return false;
+        ++sprites;return true;
+    }
     int lastX=0,lastY=0;
     bool move(downwell::InstanceHandle h,const Enemy& e,
               downwell::RunnerImageValue x,downwell::RunnerImageValue y){
@@ -109,7 +115,7 @@ struct NativeEnemyLifecycleAudit {
 void testNativeEnemyLifecycle(){
     using Binding=GameplayWorld::EnemyLifecycleBinding;
     NativeEnemyLifecycleAudit audit;
-    GameplayWorld world(300,true,0,false,Binding::bindMovement(audit));
+    GameplayWorld world(300,true,0,false,Binding::bindSpriteChanges(audit));
     world.configureSolidResolver(noSolid,nullptr);
     require(world.configureEnemy(0,111,163,100,-2000,0,0,5,6)&&
             world.configureEnemy(1,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false)&&
@@ -119,7 +125,7 @@ void testNativeEnemyLifecycle(){
     world.step(0);
     require(audit.retires==1&&world.findEnemy(survivor),"retirement precedes compaction without losing survivor");
     require(audit.activations==1,"native frontier publishes dormant activation");
-    require(audit.moves>0&&audit.lastX==world.enemyAt(1).x+240&&audit.lastY==world.enemyAt(1).y+176,
+    require(audit.moves>0&&audit.sprites==audit.moves&&audit.lastX==world.enemyAt(1).x+240&&audit.lastY==world.enemyAt(1).y+176,
             "native movement publishes world coordinates before storing the matching local position");
     world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
     require(audit.retires==3&&!world.findEnemy(survivor)&&
@@ -134,10 +140,10 @@ void testNativeEnemyLifecycle(){
     world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
     require(audit.calls==resetCalls,"failed clear cannot replay owner callbacks");
 
-    for(unsigned failure=0;failure<=5;++failure){
+    for(unsigned failure=0;failure<=6;++failure){
         NativeEnemyLifecycleAudit checked;
-        GameplayWorld runtime(300,true,0,false,Binding::bindMovement(checked));
-        if(failure==5)runtime.configureSolidResolver(noSolid,nullptr);
+        GameplayWorld runtime(300,true,0,false,Binding::bindSpriteChanges(checked));
+        if(failure>=5)runtime.configureSolidResolver(noSolid,nullptr);
         if(failure==1)checked.fail=1;
         const bool born=runtime.configureEnemy(0,111,163,0,failure==3?-168:5,0,0,5,6,0,0,-1,-1,0,0,failure!=3);
         require(born==(failure!=1),"birth callback failure is returned");

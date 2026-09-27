@@ -27,7 +27,12 @@ void stepMany(downwell::StartupRuntime& runtime, int count) {
 struct LifecycleAudit {
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,calls=0,fail=0;
+    bool sprite(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int next){
+        ++calls;require(matches(h,r)&&r.active,"sprite setter resolves an active published lifetime");
+        if(fail==7)return false;
+        ++sprites;if(next!=r.spriteId)++spriteChanges;return true;
+    }
     bool move(downwell::InstanceHandle h,const downwell::InstanceRecord& r,
               downwell::RunnerImageValue x,downwell::RunnerImageValue y){
         ++calls;require(matches(h,r)&&r.active,"movement resolves an active published lifetime");
@@ -79,7 +84,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
     LifecycleAudit audit;
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        downwell::InstanceLifecycleBinding::bindMovement(audit));
+        downwell::InstanceLifecycleBinding::bindSpriteChanges(audit));
     auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
     for(unsigned tick=0;tick<1800;++tick){
@@ -91,15 +96,53 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     }
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
               << " activations=" << audit.activations << " inactivations=" << audit.inactivations
-              << " memberships=" << audit.memberships << " moves=" << audit.moves << '\n';
-    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0,
+              << " memberships=" << audit.memberships << " moves=" << audit.moves
+              << " sprites=" << audit.sprites << " spriteChanges=" << audit.spriteChanges << '\n';
+    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&audit.sprites==audit.moves,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
-    for(unsigned failure=0;failure<=6;++failure){
+    {
+        LifecycleAudit changed;
+        auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            downwell::InstanceLifecycleBinding::bindSpriteChanges(changed));
+        runtime->skipToGameForTesting();
+        bool prepared=false;
+        for(unsigned tick=0;tick<600&&!prepared;++tick){
+            runtime->step(downwell::gameplayContactProfileInput(tick,runtime->mainPlayerX(),runtime->mainPlayerY()),false);
+            for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+                auto& record=const_cast<downwell::InstanceRecord&>(runtime->instanceAt(i));
+                if(!record.active||record.health<=0||
+                   (record.objectId!=111&&record.objectId!=112&&record.objectId!=113&&
+                    record.objectId!=116&&record.objectId!=117&&record.objectId!=119))continue;
+                // Controlled setter fixture, not original-game pose evidence.
+                record.spriteId=-1;prepared=true;break;
+            }
+        }
+        require(prepared,"sprite-change fixture contains a published enemy");
+        for(unsigned i=0;i<120&&!changed.spriteChanges;++i)runtime->step(false);
+        require(healthy(*runtime)&&changed.spriteChanges>0,"live setter reports old and proposed sprite before publication");
+        // Controlled wall-less snail fixture: an inactivated actor must not
+        // issue later geometry/resource publications in this same Step.
+        std::uint32_t snailId=0;
+        for(unsigned i=0;i<runtime->activeInstanceCount();++i){
+            auto& record=const_cast<downwell::InstanceRecord&>(runtime->instanceAt(i));
+            if(!record.active||record.health<=0||
+               (record.objectId!=111&&record.objectId!=112&&record.objectId!=113&&
+                record.objectId!=116&&record.objectId!=117&&record.objectId!=119))continue;
+            record.objectId=117;record.spriteId=177;record.x=240;record.y=5000;
+            record.motionInitialized=false;record.snail={};snailId=record.instanceId;break;
+        }
+        require(snailId!=0,"snail retirement fixture has an existing lifetime");
+        runtime->step(false);
+        const auto* snail=runtime->instance(snailId);
+        require(healthy(*runtime)&&snail&&!snail->active&&!snail->activationPending,
+                "wall-less snail stops before post-retirement movement and sprite publication");
+    }
+    for(unsigned failure=0;failure<=7;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindMovement(failing));
+            downwell::InstanceLifecycleBinding::bindSpriteChanges(failing));
         runtime->skipToGameForTesting();
         if(failure==0||failure==3){
             // Controlled lifecycle fixture, not a natural combat encounter:

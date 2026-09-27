@@ -914,6 +914,7 @@ void StartupRuntime::updateMainEnemies() {
             const bool alive = enemy.snail.step([this](int x, int y) { return mainSolidAt(x, y); });
             if (!alive && !publishMainEnemyInactivation(enemy)) return;
             enemy.active = alive;
+            if (!alive) continue;
             if (enemy.active) {
                 enemy.preciseX = enemy.snail.x / 1280.0F;
                 enemy.preciseY = enemy.snail.y / 1280.0F;
@@ -939,11 +940,15 @@ void StartupRuntime::updateMainEnemies() {
             run_.effectsSucceeded=false;return;
         }
         enemy.x=publishedX;enemy.y=publishedY;
-        enemy.spriteId = finishEnemyPresentation(
+        const auto nextSprite = finishEnemyPresentation(
             {enemy.objectId, enemy.auxiliaryState, enemy.grounded, enemy.velocityY < 0.0F,
              enemy.frogHit.remaining != 0, enemy.snailHit.stunned},
             enemy.frogPresentation, enemy.batActivity, enemy.batHit,
             enemy.enemyImagePhase, enemy.enemyImageRemainder);
+        if(!lifecycle_.sprite(instances_.handleAt(index),enemy,nextSprite)) {
+            run_.effectsSucceeded=false;return;
+        }
+        enemy.spriteId=nextSprite;
         enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
     }
 }

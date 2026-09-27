@@ -133,7 +133,7 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 "dormant dynamic birth leaves active object list");
         require(records.requestActivation(born,true,[&](auto h,const auto& record,bool active){return lifecycle.activation(h,record,active);}),
                 "activate dynamic birth through collision adapter");
-        const auto movement=downwell::InstanceLifecycleBinding::bindMovement(lifecycle);
+        const auto movement=downwell::InstanceLifecycleBinding::bindSpriteChanges(lifecycle);
         require(movement.integerPosition(born,records.at(0),-32,64)&&
                 storedOwner.resolve(born)->x.bits==0xc2000000u&&
                 storedOwner.resolve(born)->y.bits==0x42800000u&&records.at(0).x==30&&
@@ -150,14 +150,14 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         auto& animated=properties[born.slot];
         animated.sprite.imageIndex.bits=0x41000000u; // 8, beyond the one-frame skeleton sprite.
         animated.timeline.bits=0x41000000u;animated.cachedFrame.bits=0x40000000u;
-        require(lifecycle.sprite(born,records.at(0),205)&&animated.sprite.spriteId==205&&
+        require(movement.sprite(born,records.at(0),205)&&animated.sprite.spriteId==205&&
                 animated.sprite.imageIndex.bits==0&&animated.timeline.bits==0&&
                 animated.cachedFrame.bits==0xbf800000u&&(storedOwner.resolve(born)->flags&8u),
                 "stored sprite mutation applies resource-backed sequence resets and invalidation");
         require(storedOwner.flush([&](auto h,bool publish){return lifecycle.refresh(h,*records.resolve(h),publish);}),
                 "sprite mutation refreshes collision bounds through the same owner");
         animated.cachedFrame.bits=0x40000000u;
-        require(lifecycle.sprite(born,records.at(0),205)&&animated.cachedFrame.bits==0x40000000u&&
+        require(movement.sprite(born,records.at(0),205)&&animated.cachedFrame.bits==0x40000000u&&
                 !(storedOwner.resolve(born)->flags&8u)&&storedOwner.pendingSpatial()==0,
                 "same sprite preserves cached frame and clean bounds");
         auto wrong=records.at(0);wrong.objectId=35;
