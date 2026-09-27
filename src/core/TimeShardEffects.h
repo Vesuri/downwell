@@ -34,6 +34,9 @@ public:
         if(!bind(world))return false;
         deferCleanup_=true;
         population_=[](void* p,unsigned& count){return static_cast<World*>(p)->population(count);};
+        eligible_=[](void* p,Handle h,std::uint32_t id,bool& eligible){
+            return static_cast<World*>(p)->eventEligible(h,id,eligible);
+        };
         animation_=[](void* p,Handle h,std::uint32_t id,const TimeShardAnimation& effect){
             return static_cast<World*>(p)->publishAnimation(h,id,effect);
         };
@@ -102,6 +105,9 @@ public:
         if(!succeeded_)return;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle<=phase.newest&&!slot.effect.destroyRequested){
+                bool eligible=true;
+                if(!eventEligible(slot,eligible))return;
+                if(!eligible)continue;
                 slot.effect.advanceAlarm(index);
                 if(slot.effect.destroyRequested&&destroyed_&&!destroyed_(context_,slot.handle,slot.sourceId,slot.effect)){
                     succeeded_=false;return;
@@ -130,6 +136,9 @@ public:
         if(!succeeded_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest || slot.effect.destroyRequested)continue;
+            bool eligible=true;
+            if(!eventEligible(slot,eligible))return false;
+            if(!eligible)continue;
             if(!slot.effect.step(stopped,random,
                 [&](auto x,auto y,bool& hit){return meeting(slot.handle,static_cast<const TimeShardAnimation&>(slot.effect),x,y,hit);},
                 [&](){
@@ -190,6 +199,12 @@ public:
         }
     }
 private:
+    bool eventEligible(const Slot& slot,bool& eligible){
+        if(eligible_&&!eligible_(context_,slot.handle,slot.sourceId,eligible)){
+            succeeded_=false;return false;
+        }
+        return true;
+    }
     Slot slots_[Capacity];unsigned order_[Capacity]{},count_=0;Handle next_=1;
     bool succeeded_=true;
     // Source frame cleanup is explicit (normally Draw entry), not each phase
@@ -197,6 +212,7 @@ private:
     bool deferCleanup_=false;
     void* context_=nullptr;
     bool (*population_)(void*,unsigned&)=nullptr;
+    bool (*eligible_)(void*,Handle,std::uint32_t,bool&)=nullptr;
     bool (*birth_)(void*,Handle,const TimeShardAnimation&,std::uint32_t&)=nullptr;
     bool (*created_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;
     bool (*retire_)(void*,Handle,std::uint32_t,const TimeShardAnimation&)=nullptr;

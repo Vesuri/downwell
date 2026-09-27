@@ -59,6 +59,16 @@ and the remaining family dispatchers are not yet wired to it.
 
 ## Shard registration contract
 
+Registered shard alarm and Step dispatch check the generation-resolved world's
+active/destruction state before mutating timers, querying contacts or consuming
+RNG. An inactive lifetime stays allocated and can resume later; a failed lookup
+is terminal, not a successful inactive result. This implements the supported
+active/destruction parts of the runner's `0x100003` event filter. Animation
+eligibility is deliberately separate: the original pre-Begin-Step animation
+loop traverses room membership, which can differ from pending activation flags.
+That animation traversal still needs integration rather than applying the Step
+flag predicate blindly.
+
 Phase-bound shard Step obtains `instance_number(fxTimeShard)` from the world
 collision owner, not its private effect pool size. The object-resource query
 walks ancestor-inclusive registration and filters flags `0x140003`, matching

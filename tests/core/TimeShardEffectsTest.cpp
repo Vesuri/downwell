@@ -16,6 +16,8 @@ struct World {
     bool publishStep(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++steps;return fail!=5;}
     bool publishAlarm(std::uint32_t,std::uint32_t,const TimeShardAnimation&){return fail!=6;}
     unsigned destroys=0;
+    bool active=true;
+    bool eventEligible(unsigned,unsigned,bool& eligible){eligible=active;return fail!=9;}
     bool population(unsigned& count){count=creates-destroys;return fail!=8;}
     bool destroyed(std::uint32_t,std::uint32_t,const TimeShardAnimation&){++destroys;return fail!=7;}
     bool birth(std::uint32_t h,RunnerImageValue x,RunnerImageValue y,std::uint32_t& id){
@@ -35,6 +37,22 @@ struct World {
     }
 };
 int main(){
+    {
+        GameMakerRandom random(42);World world(random);TimeShardEffects<1> effects;
+        assert(effects.bindPhases(world));const auto h=effects.create({}, {},false,random);
+        auto* shard=effects.get(h);shard->alarm0=2;
+        const auto before=shard->xx;const auto draws=random.drawCount();
+        world.active=false;effects.advanceAlarm(effects.beginPhase(),0);
+        assert(effects.step(effects.beginPhase(),false,random,
+            [](auto,const auto&,auto,auto,bool&){assert(false);return false;},
+            [](auto,const auto&,bool&){assert(false);return false;}));
+        assert(shard->alarm0==2&&shard->xx.high==before.high&&shard->xx.low==before.low&&
+            random.drawCount()==draws&&world.steps==0);
+        world.active=true;effects.advanceAlarm(effects.beginPhase(),0);
+        assert(shard->alarm0==1&&effects.succeeded());
+        world.fail=9;effects.advanceAlarm(effects.beginPhase(),0);
+        assert(!effects.succeeded()&&shard->alarm0==1&&world.destroys==0);
+    }
     {
         GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
         assert(effects.bindPhases(world));
@@ -91,14 +109,14 @@ int main(){
         const auto fresh=effects.create({}, {},false,random);assert(fresh>h&&effects.sourceId(fresh)==105187);
         assert(effects.clear());
     }
-    for(unsigned failure:{4u,5u,6u,8u}){
+    for(unsigned failure:{4u,5u,6u,8u,9u}){
         GameMakerRandom random(42);World world(random);TimeShardEffects<3> effects;
         assert(effects.bindPhases(world)&&effects.phasesBoundTo(world));
         auto old=effects.beginPhase();assert(effects.create({}, {},false,random));
         assert(effects.advanceAnimation(old)&&world.animations==0);
         world.fail=failure;
         if(failure==4)assert(!effects.advanceAnimation(effects.beginPhase()));
-        else if(failure==5||failure==8)assert(!effects.step(effects.beginPhase(),true,random,
+        else if(failure==5||failure==8||failure==9)assert(!effects.step(effects.beginPhase(),true,random,
             [](auto,const auto&,auto,auto,bool& hit){hit=false;return true;},
             [](auto,const auto&,bool& retire){retire=false;return true;}));
         else effects.advanceAlarm(effects.beginPhase(),2);
