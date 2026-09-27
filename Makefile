@@ -2111,4 +2111,12 @@ verify-projectile-art: generate-sprite-pack build/capture-projectile-art
 	SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy SDL_RENDER_DRIVER=software ./build/capture-projectile-art "$$capture_dir" && \
 	python3 tests/projectile-raster-test.py "$$capture_dir"
 
+.PHONY: verify-runner-mask-point
+test: verify-runner-mask-point
+verify-runner-mask-point:
+	@mkdir -p build
+	python3 tools/verify-runner-mask-point.py
+	$(CXX) -Isrc $(CXXFLAGS) -o build/runner-mask-point-test tests/core/RunnerMaskPointTest.cpp
+	./build/runner-mask-point-test
+
 -include $(DEPS)

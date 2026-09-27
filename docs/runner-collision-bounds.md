@@ -312,6 +312,40 @@ trigonometric values. Explicit fixtures distinguish scan order and truncation
 from rounding. This is arithmetic/composition evidence, not proof of the
 original runtime FP mode, complete instance collision dispatch, or live wiring.
 
+## Ordinary point queries
+
+`position_meeting` is registered at `0x52cdaa` to wrapper `0x52b780`.
+The indexed path retains narrowed binary32 query coordinates for the precise
+test but truncates its broad-query coordinates toward zero in compatibility
+mode. Its candidate callback (`0x52d890`) filters suppressed/destroyed/inactive
+records, checks instance/object-family identity, then calls `0x465520` with
+precise testing enabled. These are not sprite-to-sprite queries.
+
+The ordinary precise-mask routine (`0x4ba850`) receives integer positions from
+the outer routine's x87 conversions. It normalizes the truncated image index
+against mask count, then computes each local delta as
+`float(point) - (float(instance) - 0.5f)`. For `abs(angle) < float(0.0001)` it
+divides the deltas directly by scale and adds the sprite origins. Equality
+takes the rotated branch. That branch computes inverse-angle radians with
+binary32 `-angle*pi/180`, narrows double sine/cosine, and evaluates
+`(dy*sin + dx*cos)/scaleX + originX` and
+`(dy*cos - dx*sin)/scaleY + originY`, rounding after each operation.
+
+The final samples are floored and tested against canvas dimensions. In
+particular, -0.5 is outside, not sample zero. This differs from the pair
+kernel's truncated scaled sampling, mirrored-position adjustment, reciprocal
+multiplication and rotation threshold. `RunnerMaskPoint` keeps this geometry
+separate and consumes an explicitly selected mask and rounded positions.
+Its inverse-trig callback makes the original math dependency explicit.
+
+`make verify-runner-mask-point` pins the reviewed Windows bytes/constants and
+compares 25,080 ordinary samples against an independent host binary32
+transcription, including mirrored scales and the exact angle threshold.
+Unsupported arithmetic leaves outputs unchanged. This does not establish
+the runtime's x87 rounding mode, skeletal/rotated-box resource gates, mask
+availability fallback, broad-query traversal or live point-query integration.
+Those outer operations must be connected before wall corner events can use it.
+
 ## Cross-target mutation tape
 
 `RunnerSpatialVerification.h` supplies the `SPATIAL` result in the host/native
