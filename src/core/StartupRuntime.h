@@ -24,6 +24,7 @@
 #include "TimeStopEffects.h"
 #include "TimeShardBurst.h"
 #include "RunnerCollisionEventContext.h"
+#include "TimeFieldWind.h"
 #include "SmokeDirection.h"
 #include "SmokeTrig.h"
 #include <array>
@@ -283,6 +284,21 @@ public:
         run_.effectsSucceeded=registration.dispatchContact(event.self,*self,shards,
             MotionBinary64::fromInteger(mainPlayerMotion_.speedXFixed()),
             MotionBinary64::fromInteger(mainPlayerMotion_.speedYFifths()),random_);
+        return run_.effectsSucceeded;
+    }
+    // Shared voice/channel state outlives room-local fields. Audio is checked
+    // and synchronous; event selection must retain the inherited binding.
+    template<class Audio> bool dispatchTimeFieldWind(const RunnerCollisionEventContext::Frame& event,
+        TimeFieldWind& wind,int& uiChannel,MotionBinary64 volume,Audio& audio){
+        if(!run_.effectsSucceeded)return false;
+        auto* self=instances_.resolve(event.self);const auto* other=instances_.resolve(event.other);
+        PackedObjectEvent binding{};bool found=false;
+        if(!self||!other||!objectPack_||event.type!=4||event.subtype!=other->objectId||
+            !objectPack_->collisionEvent(self->objectId,other->objectId,found,binding)||!found||
+            binding.ownerObjectId!=255||event.owner!=binding.ownerObjectId||event.code!=binding.codeId){
+            run_.effectsSucceeded=false;return false;
+        }
+        run_.effectsSucceeded=wind.contact(random_,self->windSound,uiChannel,volume,audio);
         return run_.effectsSucceeded;
     }
     template<unsigned Capacity,unsigned Registered> bool retireTimeShard(

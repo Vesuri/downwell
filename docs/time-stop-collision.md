@@ -21,8 +21,14 @@ interface. Per-instance sound and shared channel storage are supplied by the
 caller; its voice is shared across fields. Failures retain completed writes,
 RNG and audio effects and stop later work. Tests cover every operation's failure
 prefix, both sound-resource guards, unsuccessful playback and repeated contacts.
-This is not yet installed in the live field owners or either audio backend;
-inherited event admission and persistent voice ownership remain integration work.
+`StartupRuntime::dispatchTimeFieldWind` validates live self/other generations
+and the selected inherited binding before invoking it. `windsnd` is stored on
+the real instance and included in its digest once assigned; this adds four bytes
+per stored record (8 KiB at 2,048 slots). The voice/channel state is supplied by
+the caller and must survive field retirement/room transitions. Live tests cover
+exit fields, the start-field descendant, shared playing/expired voices and stale
+event rejection. Neither normal scheduler installs it automatically yet, and
+both actual audio backends and persistent global ownership remain open.
 
 Source: recovered `gml_Object_goalTimeField_Collision_objPlayer_n.asm`,
 `gml_GlobalScript_soundPlayOL.asm` and `gml_GlobalScript_scrGlobalStuff.asm`.

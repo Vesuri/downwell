@@ -10,7 +10,7 @@ public:
     int voice=-1;
     bool succeeded()const{return good_;}
     template<class Random,class Audio>
-    bool contact(Random& random,int& sound,int& channel,MotionBinary64 gameVolume,Audio& audio){
+    bool contact(Random& random,std::int32_t& sound,int& channel,MotionBinary64 gameVolume,Audio& audio){
         if(!good_)return false;
         bool playing=false;
         if(!check(audio.isPlaying(voice,playing)))return false;

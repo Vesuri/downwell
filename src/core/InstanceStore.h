@@ -56,6 +56,7 @@ struct InstanceRecord {
     float moveSpeed = 0.0F;
     std::int32_t motionState = 0;
     std::int32_t auxiliaryState = 0;
+    std::int32_t windSound = -1; // Dynamic self.windsnd, absent until assigned by its event.
     bool motionInitialized = false;
     bool grounded = false;
     bool frogLanded = true; // enmFrog Create; cleared by an airborne Step

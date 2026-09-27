@@ -758,6 +758,37 @@ int main(){
     require(production->effectsSucceeded()&&production->roomLoadSucceeded()&&production->deferredCommandsSucceeded(),
         "production collision owner survives room retirement and new generations");
     {
+        struct WindAudio {
+            bool playing=false;unsigned queries=0,plays=0,gains=0;
+            bool isPlaying(int id,bool& result){++queries;result=id==900&&playing;return true;}
+            bool stop(int){return false;}
+            bool play(int sound,int priority,bool loop,int& voice){
+                require(sound>=349&&sound<=355&&priority==90&&!loop,"live wind source play arguments");
+                ++plays;playing=true;voice=900;return true;
+            }
+            bool getGain(int id,MotionBinary64& gain){require(id==900,"live wind gain voice");gain=MotionBinary64::fromInteger(1);return true;}
+            bool setGain(int id,MotionBinary64,int duration){require(id==900&&duration==0,"live wind immediate gain");++gains;return true;}
+            bool setPitch(int id,MotionBinary64 pitch){return id==900&&pitch.high==0x3ff00000u&&pitch.low==0;}
+        } audio;
+        TimeFieldWind wind;int channel=-1;RunnerCollisionEventContext::Frame lastWindEvent;
+        auto dispatchWind=[&](InstanceHandle field){
+            auto candidates=std::make_unique<RunnerCollisionPairs<capacity,16384>>();
+            require(productionOwner->collectCollisionPairs(*candidates,true),"collect field/player wind candidates");
+            for(unsigned i=0;i<candidates->size();++i){
+                const auto pair=*candidates->at(i);
+                for(unsigned reverse=0;reverse<2;++reverse){
+                    const auto a=reverse?pair.other:pair.self,b=reverse?pair.self:pair.other;
+                    if(a.slot!=field.slot||a.generation!=field.generation||productionOwner->resolve(b)->objectId!=35)continue;
+                    RunnerCollisionEventContext context;unsigned called=0;
+                    require(productionOwner->dispatchCollisionEvent(context,a,b,{true,false},[&](const auto& event){
+                        ++called;lastWindEvent=event;
+                        return production->dispatchTimeFieldWind(event,wind,channel,MotionBinary64::fromInteger(1),audio);
+                    })&&called==1,"live field wind resolves inherited event and registered self/other");
+                    return;
+                }
+            }
+            require(false,"field/player candidate for live wind dispatch");
+        };
         const RunnerImageValue x{0x43700000u},y{0x43300000u}; // 240,176
         InstancePlaceResult selected;selected.id=17;
         require(production->playerTimeFieldInstance(x,y,selected)&&selected.id==-4,
@@ -772,6 +803,10 @@ int main(){
             selected.y.high==MotionBinary64::fromInteger(record->y).high&&
             selected.y.low==MotionBinary64::fromInteger(record->y).low,
             "selected field identity and published position refer to the same lifetime");
+        const auto beforeWind=production->randomDrawCount();dispatchWind(selected.handle);
+        require(production->randomDrawCount()==beforeWind+1&&record->windSound>=349&&record->windSound<=355&&
+            channel==record->windSound&&wind.voice==900&&audio.plays==1&&audio.gains==2,
+            "live exit-field collision publishes per-instance sound and shared voice with one choice draw");
         // Explicit setter fixture: query results must use the collision owner's
         // published binary32 position, not the legacy integer record snapshot.
         const RunnerImageValue fractionalX{0x43704000u},fractionalY{0x43508000u}; // 240.25,208.5
@@ -823,6 +858,20 @@ int main(){
             productionOwner->resolve(selected.handle)&&
             productionOwner->resolve(selected.handle)->objectId==371,
             "identity lookup resolves the later-level entrance descendant through parent family 82");
+        const auto entryDraws=production->randomDrawCount();const auto queries=audio.queries;
+        dispatchWind(selected.handle);
+        require(production->randomDrawCount()==entryDraws&&audio.queries==queries+1&&audio.plays==1&&
+            productionOwner->resolve(selected.handle)->windSound==-1,
+            "inherited entrance wind respects shared playing voice without assigning windsnd or consuming RNG");
+        audio.playing=false;
+        require(production->dispatchTimeFieldWind(lastWindEvent,wind,channel,MotionBinary64::fromInteger(1),audio)&&
+            production->randomDrawCount()==entryDraws+1&&audio.plays==2&&
+            productionOwner->resolve(selected.handle)->windSound==channel,
+            "expired shared voice permits inherited entrance handler to choose and store its own sound");
+        ++lastWindEvent.self.generation;const auto beforeInvalid=audio.queries;
+        require(!production->dispatchTimeFieldWind(lastWindEvent,wind,channel,MotionBinary64::fromInteger(1),audio)&&
+            !production->effectsSucceeded()&&audio.queries==beforeInvalid&&production->randomDrawCount()==entryDraws+1,
+            "stale wind event fails before audio queries or RNG");
     }
     // Resolve through actual world ownership, not a copied InstanceStore or a
     // rebuilt tree. Generation validation precedes looking up its instance ID.
