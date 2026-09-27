@@ -22,6 +22,24 @@ followed by another reconciliation. It does not yet enumerate collision pairs.
 Its tests cover phase placement, collision births, activation/destruction and
 failure cutoffs, not original collision ordering or backend integration.
 
+### Collision candidate collection evidence
+
+The spatial callback at `0x503000` rejects self and candidates whose instance
+stamp (`+0x184`) equals the current collision pass. It looks up event type 4
+first on the current instance's object for the candidate's object ID, and only
+if absent checks the reverse direction (`0x503030..0x503050`). A match in either
+direction appends `(current,candidate)`; it does not execute the handlers yet.
+After the current instance's spatial query, `0x502474` stamps that instance.
+`0x5025b6` snapshots the accumulated pair count and dispatches in append order.
+Thus reverse-pair suppression depends on outer traversal order, not sorted IDs.
+
+`RunnerCollisionPairs` models this collection for externally supplied ordered
+candidates, with checked capacity and generation-tagged deferred handles.
+It does not supply the dirty-list traversal, spatial queries, inherited event
+lookup, precise overlap, or solid response. Its completed-instance set models
+one pass; source counter overflow and concurrent mutation during collection
+are outside its contract. The runner evidence verifier pins these regions.
+
 ## Step creation cutoff
 
 Read-only inspection of the pinned Windows `Downwell.exe` establishes a
