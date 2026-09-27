@@ -197,6 +197,14 @@ including after clearing their records. Moving lifetime keys between registries
 is rejected before publication. The stored backend publishes a source numeric
 ID; the native backend publishes its checked local handle.
 
+`advanceScriptEffectAnimation` consumes a caller-captured phase cutoff and
+latches failures into each runtime. The owner publishes every evaluated image
+index, including the wrapped index, before requesting Animation End retirement.
+Publication failure retains the computed timeline/index but does not run
+retirement; later phase calls on the failed runtime do nothing. Integrators
+must still capture and dispatch that phase at the original global animation
+boundary rather than advancing effects immediately after a Step birth.
+
 Run `make verify-machine-gun-source-motion verify-smoke-direction
 verify-smoke-trig`. The source-motion test covers birth narrowing, raw RNG
 endpoints, ordinary/Laser Sight initialization, repeated coordinate writes,

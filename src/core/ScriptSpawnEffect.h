@@ -43,7 +43,8 @@ public:
         return bind(registry)&&Base::setSprite(h,sprite,count,registry);
     }
     template<class Registry> bool advanceAnimation(typename Base::Phase phase,Registry& registry){
-        return bind(registry)&&Base::advanceAnimation(phase,registry);
+        return bind(registry)&&Base::advanceAnimation(phase,registry,
+            [&](auto h,const auto& effect){return registry.image(h,effect);});
     }
     template<class Registry> bool clear(Registry& registry){return bind(registry)&&Base::clear(registry);}
 };

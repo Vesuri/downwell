@@ -223,6 +223,12 @@ public:
         },run_.effectsSucceeded);
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
+    template<unsigned Capacity>
+    bool advanceScriptEffectAnimation(downwell::ScriptSpawnEffects<Capacity>& effects,
+        typename downwell::ScriptSpawnEffects<Capacity>::Phase phase){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceAnimation(phase,*scriptSpawnInstances_);
+    }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
     using EnemyStepOrder=downwell::RunnerStepSnapshot<enemyCapacity>;
     void configureEnemyStepOrder(bool (*capture)(void*,EnemyStepOrder&),void* context){

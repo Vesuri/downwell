@@ -274,6 +274,12 @@ public:
         },run_.effectsSucceeded);
         return EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
+    template<unsigned Capacity,unsigned Registered>
+    bool advanceScriptEffectAnimation(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
+        ScriptSpawnEffects<Capacity>& effects,typename ScriptSpawnEffects<Capacity>::Phase phase){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=registration.belongsTo(instances_)&&effects.advanceAnimation(phase,registration);
+    }
     template<unsigned Capacity,unsigned Registered,class Pause> bool createTimeChange(
         StoredTimeChangeRegistration<instanceCapacity,Registered>& registration,TimeChangeEffects<Capacity>& changes,
         MotionBinary64 x,MotionBinary64 y,int& speed,Pause pause){

@@ -55,10 +55,15 @@ public:
         return true;
     }
     template<class Hooks> bool advanceAnimation(Phase phase,Hooks& hooks){
+        return advanceAnimation(phase,hooks,[](Handle,const Effect&){return true;});
+    }
+    template<class Hooks,class Publish> bool advanceAnimation(Phase phase,Hooks& hooks,Publish publish){
         if(!good_)return false;
         for(unsigned i=0;i<count_;++i){auto& slot=slots_[order_[i]];
             if(slot.handle>phase.newest)continue;
-            if(!slot.effect.advanceImage()){good_=false;return false;}
+            if(!slot.effect.advanceImage([&](const auto&){return publish(slot.handle,static_cast<const Effect&>(slot.effect));})){
+                good_=false;return false;
+            }
             if(slot.effect.destroyRequested){
                 if(!hooks.retire(slot.handle,static_cast<const Effect&>(slot.effect))){good_=false;return false;}
                 slot.handle=0;

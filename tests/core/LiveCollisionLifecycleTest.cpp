@@ -910,13 +910,12 @@ int main(){
         require(collision->collisionPoint({},219,{0x406e0800u,0},{0x40afff00u,0},false,false,result)&&result.id==int(before),
             "script child participates in resource-backed collision membership");
         const auto stale=result.handle;
-        require(effects.advanceAnimation(phase,registration)&&world->instance(before)->imageIndex==0,
+        require(world->advanceScriptEffectAnimation(registration,effects,phase)&&world->instance(before)->imageIndex==0,
             "captured animation cutoff excludes synchronous child birth");
-        require(effects.advanceAnimation(effects.beginPhase(),registration)&&
-            effects.visitNewest([&](unsigned h,const auto& e){require(registration.image(h,e),"publish effect animation index");}),
+        require(world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase()),
             "publish first child animation through source registry");
         require(world->instance(before)->imageIndex==0.5F,"source record retains fractional image index");
-        require(effects.advanceAnimation(effects.beginPhase(),registration)&&!world->instance(before)&&
+        require(world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase())&&!world->instance(before)&&
             !collision->resolve(stale)&&callerId==before&&world->effectsSucceeded(),
             "animation retirement removes generation-checked membership without clearing caller ID");
         unsigned lookups=0;
@@ -928,6 +927,8 @@ int main(){
         require(!world->spawnScriptEffect(registration,effects,{},{},603,{},{},{},rejectFrames,callerId)&&
             lookups==1&&world->nextRuntimeInstanceId()==next+1&&world->randomDrawCount()==random,
             "failed script creation cannot replay earlier side effects or consume RNG");
+        require(!world->advanceScriptEffectAnimation(registration,effects,effects.beginPhase())&&world->instance(next),
+            "failed world cannot advance or retire the partially created effect");
     }
     require(productionOwner->valid(),"production owner validates resource packs");
     auto production=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

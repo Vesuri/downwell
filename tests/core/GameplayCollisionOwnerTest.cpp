@@ -284,10 +284,10 @@ int main(){
         assert(effect&&state&&state->x.bits==effect->x.bits&&state->y.bits==effect->y.bits);
         assert(collision->properties(key)->sprite.spriteId==603&&collision->properties(key)->sprite.angle.bits==0x43870000u);
         unsigned count=0;assert(collision->population(219,count)&&count==1);
-        assert(effects.advanceAnimation(phase,registration)&&effects.get(first)->imageIndex.bits==0);
-        assert(effects.advanceAnimation(effects.beginPhase(),registration)&&registration.image(first,*effects.get(first)));
+        assert(scene->advanceScriptEffectAnimation(effects,phase)&&effects.get(first)->imageIndex.bits==0);
+        assert(scene->advanceScriptEffectAnimation(effects,effects.beginPhase()));
         assert(collision->properties(key)->sprite.imageIndex.bits==0x3f000000u);
-        assert(effects.advanceAnimation(effects.beginPhase(),registration)&&!collision->state(key)&&registration.size()==0);
+        assert(scene->advanceScriptEffectAnimation(effects,effects.beginPhase())&&!collision->state(key)&&registration.size()==0);
         assert(collision->population(219,count)&&count==0);
         assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none&&
             scene->scriptSpawnInstances()==&registration);
@@ -301,6 +301,7 @@ int main(){
         assert(!scene->effectsSucceeded()&&registration.find(caller)&&effects.size()==1&&lookups==1);
         assert(!scene->spawnScriptEffect(effects,{},{},603,{},{},{},rejectFrames,caller)&&lookups==1&&
             scene->randomDrawCount()==draws);
+        assert(!scene->advanceScriptEffectAnimation(effects,effects.beginPhase())&&effects.size()==1);
     }
     assert(masks.valid());
     {

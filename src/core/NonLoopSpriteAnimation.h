@@ -26,14 +26,18 @@ struct NonLoopSpriteAnimation {
         if(change.resetTimeline)timeline={};
         valid=publish(*this);return valid;
     }
-    bool advanceImage(){
+    template<class Publish> bool advanceImage(Publish publish){
         if(!valid)return false;
         if(destroyRequested)return true;
         bool crossed=false;
         valid=UnitSequenceFrames::advance(timeline,imageSpeed,frames,imageIndex,crossed);
+        // Publish the evaluated (possibly wrapped) index before Other 7.
+        // A failed publication preserves the advance but cannot retire it.
+        if(valid)valid=publish(*this);
         if(valid&&crossed)destroyRequested=true;
         return valid;
     }
+    bool advanceImage(){return advanceImage([](const auto&){return true;});}
     unsigned drawFrame()const{
         const unsigned exponent=(imageIndex.bits>>23)&255u;
         return exponent<127?0:((imageIndex.bits&0x7fffffu)|0x800000u)>>(150u-exponent);

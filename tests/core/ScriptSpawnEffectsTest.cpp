@@ -5,12 +5,21 @@
 using namespace downwell;
 struct Hooks {
     unsigned births=0,sprites=0,retires=0;bool reject=false;
+    unsigned images=0,rejectImage=0;
+    unsigned lastImage=0,lastImageHandle=0;
+    bool image(unsigned h,const ScriptSpawnEffect& e){
+        assert(!e.destroyRequested);lastImage=e.imageIndex.bits;lastImageHandle=h;
+        return ++images!=rejectImage;
+    }
     bool birth(unsigned h,const ScriptSpawnEffect& e){
         assert(h&&e.spriteId==-1&&!e.frames&&e.imageSpeed.bits==0x3f800000u&&
             !e.angle.bits&&!e.depth.bits&&!e.destroyRequested);++births;return true;
     }
     bool sprite(unsigned,const ScriptSpawnEffect& e){assert(e.frames==1);++sprites;return true;}
-    bool retire(unsigned,const ScriptSpawnEffect&){++retires;return !reject;}
+    bool retire(unsigned h,const ScriptSpawnEffect& e){
+        if(e.destroyRequested)assert(lastImageHandle==h&&lastImage==e.imageIndex.bits);
+        ++retires;return !reject;
+    }
 };
 struct Ops {
     using Handle=unsigned;
@@ -27,6 +36,18 @@ struct Ops {
         id,{0x3fe00000u,0},MotionBinary64::fromInteger(270),{});}
 };
 int main(){
+    for(unsigned failure=1;failure<=2;++failure){
+        ScriptSpawnEffects<2> effects;Hooks hooks;Ops ops{effects,hooks};
+        assert(ops.spawn(603));hooks.rejectImage=failure;
+        const auto* retained=effects.get(ops.callerMyFx);
+        if(failure==2)assert(effects.advanceAnimation(effects.beginPhase(),hooks));
+        assert(!effects.advanceAnimation(effects.beginPhase(),hooks)&&!effects.valid()&&
+            hooks.images==failure&&hooks.retires==0);
+        assert(retained&&!retained->destroyRequested&&!retained->valid&&
+            retained->imageIndex.bits==(failure==1?0x3f000000u:0u));
+        assert(!effects.advanceAnimation(effects.beginPhase(),hooks)&&hooks.images==failure);
+        assert(effects.clear(hooks)&&hooks.retires==1);
+    }
     {
         ScriptSpawnEffects<2> bound;Hooks first,other;
         const auto h=bound.create({},{},first);assert(h);

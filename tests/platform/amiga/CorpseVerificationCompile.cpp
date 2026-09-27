@@ -9,6 +9,7 @@ bool compileScriptSpawnOwner(downwell::ScriptSpawnEffects<4>& owner){
         bool birth(unsigned,const downwell::ScriptSpawnEffect&){return true;}
         bool retire(unsigned,const downwell::ScriptSpawnEffect&){return true;}
         bool sprite(unsigned,const downwell::ScriptSpawnEffect&){return true;}
+        bool image(unsigned,const downwell::ScriptSpawnEffect&){return true;}
     } hooks;
     const auto phase=owner.beginPhase();const auto h=owner.create({},{},hooks);
     return h&&owner.setSprite(h,603,1,hooks)&&owner.mutate(h,[](auto& effect){
