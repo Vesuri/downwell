@@ -235,6 +235,11 @@ GameplayWorld::gemAt(unsigned index) const
     return gems_[index < gemCapacity ? index : 0];
 }
 
+bool GameplayWorld::publishEnemyImage(const EnemyState& enemy,unsigned phase) {
+    if(enemyLifecycle_.phaseIndex({enemy.identitySlot,enemy.lifetimeId},enemy,phase))return true;
+    run_.effectsSucceeded=false;return false;
+}
+
 bool GameplayWorld::publishEnemyActivation(const EnemyState& enemy, bool active) {
     if (enemyLifecycle_.activation({enemy.identitySlot,enemy.lifetimeId},enemy,active)) return true;
     run_.effectsSucceeded=false;
@@ -566,9 +571,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(!run_.effectsSucceeded)return {};
     // Runner advances existing instances' animation before Begin Step/alarms.
     // In particular, an Alarm/Step frame reset must not then be advanced again.
-    for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active)
+    for (unsigned i=0;i<enemyCount_;++i) if (enemies_[i].active) {
         downwell::advanceEnemyImageQ8(enemies_[i].imagePhase,enemies_[i].imageRemainder,
                                      enemies_[i].imageSpeed);
+        if(!publishEnemyImage(enemies_[i],enemies_[i].imagePhase))return {};
+    }
     DW_PROFILE_PHASE(profilePlayer);
     // Wrappers own a runtime pointer; rebind after any host-side runtime copy.
     if (solidResolver_) configureSolidResolver(solidResolver_, solidResolverContext_, segmentResolver_, maskResolver_,wallContactResolver_);
@@ -854,6 +861,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 });
             if (effects.hit) {
                 enemy.alarm0 = 3;
+                if(!publishEnemyImage(enemy,0))return {};
                 enemy.imagePhase = 0;
                 enemy.imageRemainder = 0;
             }
@@ -881,6 +889,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 enemy.alarm0 = 0;
                 enemy.alarm1 = 60;
                 enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
+                if(!publishEnemyImage(enemy,0))return {};
                 enemy.imagePhase = 0;
                 enemy.imageRemainder = 0;
             }
@@ -898,6 +907,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         } else if (enemy.objectId == 117) {
             const int hitAlarm = enemy.snailHit.consume(enemyRandom_);
             if (hitAlarm >= 0) {
+                if(!publishEnemyImage(enemy,0))return {};
                 enemy.imagePhase = 0; enemy.imageRemainder = 0;
                 enemy.alarm0 = 0; enemy.alarm1 = hitAlarm;
             }
@@ -947,6 +957,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             run_.effectsSucceeded=false;return {};
         }
         enemy.spriteId=nextSprite;
+        if(!publishEnemyImage(enemy,enemy.imagePhase))return {};
         enemy.imageFrame = enemy.imagePhase >> 8;
     }
 

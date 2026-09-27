@@ -316,6 +316,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
             }
             advanceEnemyImageQ8(instance.enemyImagePhase,instance.enemyImageRemainder,
                                static_cast<unsigned>(std::lround(instance.imageSpeed*20)));
+            if(!publishMainEnemyImage(i,instance.enemyImagePhase))return;
             instance.imageIndex=instance.enemyImagePhase/256.0F;
         }
         if (instance.active && instance.objectId == 113) instance.frogHit.advanceFrame();
@@ -658,6 +659,11 @@ void StartupRuntime::syncMainPlayerState() {
     mainShotsFired_ = mainPlayerMotion_.shots();
 }
 
+bool StartupRuntime::publishMainEnemyImage(std::size_t index,unsigned phase) {
+    if(lifecycle_.phaseIndex(instances_.handleAt(index),instances_.at(index),phase))return true;
+    run_.effectsSucceeded=false;return false;
+}
+
 bool StartupRuntime::publishMainEnemyInactivation(const InstanceRecord& enemy) {
     // Keep the stored lifetime until its normal erase boundary, but remove
     // collision visibility before the response clears active. Do not use a
@@ -855,6 +861,7 @@ void StartupRuntime::updateMainEnemies() {
                 enemy.alarms.set(0, 0);
                 enemy.alarms.set(1, 60);
                 enemy.velocityX = enemy.frogHorizontal.velocity / 65536.0F;
+                if(!publishMainEnemyImage(index,0))return;
                 enemy.imageIndex = 0;
                 enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
                 ++soundPlayRequests_;
@@ -888,6 +895,7 @@ void StartupRuntime::updateMainEnemies() {
                 [this](int x, int y) { return mainSolidAt(x, y); });
             if (effects.hit) {
                 enemy.alarms.set(0, 3);
+                if(!publishMainEnemyImage(index,0))return;
                 enemy.imageIndex = 0;
                 enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
                 ++soundPlayRequests_;
@@ -904,6 +912,7 @@ void StartupRuntime::updateMainEnemies() {
         } else if (enemy.objectId == 117) {
             const int hitAlarm = enemy.snailHit.consume(random_);
             if (hitAlarm >= 0) {
+                if(!publishMainEnemyImage(index,0))return;
                 enemy.imageIndex = 0;
                 enemy.enemyImagePhase = 0; enemy.enemyImageRemainder = 0;
                 enemy.alarms.set(0, 0); enemy.alarms.set(1, hitAlarm);
@@ -949,6 +958,7 @@ void StartupRuntime::updateMainEnemies() {
             run_.effectsSucceeded=false;return;
         }
         enemy.spriteId=nextSprite;
+        if(!publishMainEnemyImage(index,enemy.enemyImagePhase))return;
         enemy.imageIndex = enemy.enemyImagePhase / 256.0F;
     }
 }

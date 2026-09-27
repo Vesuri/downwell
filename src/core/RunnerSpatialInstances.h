@@ -40,6 +40,13 @@ public:
         Real depth{},timeline{},cachedFrame{0xbf800000u};
     };
     enum class TransformField {scaleX,scaleY,angle};
+    // 0x432170 stores only the narrowed image_index. Sequence reconciliation
+    // belongs to animation; do not invent bounds dirtiness or reset timeline.
+    bool writeImageIndex(InstanceHandle h,Sprite& sprite,Real value){
+        if(!valid()||!live(h))return false;
+        if(!checked(Math::valid(value)))return false;
+        sprite.imageIndex=value;return true;
+    }
     // Already-narrowed fields from 0x46b6d0/0x46b780/0x46b560. Appearance
     // inputs are explicit because source fast-draw flag 0x4000 also depends on
     // alpha and blend. No angle wrapping. Equal signed zeros are a no-op.

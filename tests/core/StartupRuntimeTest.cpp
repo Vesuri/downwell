@@ -27,7 +27,12 @@ void stepMany(downwell::StartupRuntime& runtime, int count) {
 struct LifecycleAudit {
     struct Entry {std::uint32_t generation=0,id=0;bool live=false;};
     std::array<Entry,downwell::StartupRuntime::instanceCapacity> entries{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,memberships=0,moves=0,sprites=0,spriteChanges=0,indices=0,calls=0,fail=0;
+    bool imageIndex(downwell::InstanceHandle h,const downwell::InstanceRecord& r,downwell::RunnerImageValue value){
+        ++calls;require(matches(h,r)&&r.active&&value.promoted().valid(),"animation publication resolves a live actor");
+        if(fail==8)return false;
+        ++indices;return true;
+    }
     bool sprite(downwell::InstanceHandle h,const downwell::InstanceRecord& r,int next){
         ++calls;require(matches(h,r)&&r.active,"sprite setter resolves an active published lifetime");
         if(fail==7)return false;
@@ -84,7 +89,7 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     const auto healthy=[](const Runtime& r){return r.effectsSucceeded()&&r.roomLoadSucceeded()&&r.deferredCommandsSucceeded();};
     LifecycleAudit audit;
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-        downwell::InstanceLifecycleBinding::bindSpriteChanges(audit));
+        downwell::InstanceLifecycleBinding::bindAnimation(audit));
     auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
     for(unsigned tick=0;tick<1800;++tick){
@@ -97,15 +102,15 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     std::cout << "Live lifecycle births=" << audit.births << " retires=" << audit.retires
               << " activations=" << audit.activations << " inactivations=" << audit.inactivations
               << " memberships=" << audit.memberships << " moves=" << audit.moves
-              << " sprites=" << audit.sprites << " spriteChanges=" << audit.spriteChanges << '\n';
-    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&audit.sprites==audit.moves,
+              << " sprites=" << audit.sprites << " spriteChanges=" << audit.spriteChanges << " indices=" << audit.indices << '\n';
+    require(audit.births>100&&audit.retires>2&&audit.memberships>0&&audit.inactivations>0&&audit.moves>0&&audit.sprites==audit.moves&&audit.indices>audit.sprites,
             "natural gameplay covers dynamic births, contact inactivation, retirement and reconciliation");
     indexed->reset(downwell::PlatformProfile::nonDesktop);audit.verify(*indexed);
     require(healthy(*indexed),"reset retires old lifetimes before creating a fresh room");
     {
         LifecycleAudit changed;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindSpriteChanges(changed));
+            downwell::InstanceLifecycleBinding::bindAnimation(changed));
         runtime->skipToGameForTesting();
         bool prepared=false;
         for(unsigned tick=0;tick<600&&!prepared;++tick){
@@ -139,10 +144,10 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         require(healthy(*runtime)&&snail&&!snail->active&&!snail->activationPending,
                 "wall-less snail stops before post-retirement movement and sprite publication");
     }
-    for(unsigned failure=0;failure<=7;++failure){
+    for(unsigned failure=0;failure<=8;++failure){
         LifecycleAudit failing;
         auto runtime=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
-            downwell::InstanceLifecycleBinding::bindSpriteChanges(failing));
+            downwell::InstanceLifecycleBinding::bindAnimation(failing));
         runtime->skipToGameForTesting();
         if(failure==0||failure==3){
             // Controlled lifecycle fixture, not a natural combat encounter:

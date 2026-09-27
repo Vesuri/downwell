@@ -133,7 +133,7 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 "dormant dynamic birth leaves active object list");
         require(records.requestActivation(born,true,[&](auto h,const auto& record,bool active){return lifecycle.activation(h,record,active);}),
                 "activate dynamic birth through collision adapter");
-        const auto movement=downwell::InstanceLifecycleBinding::bindSpriteChanges(lifecycle);
+        const auto movement=downwell::InstanceLifecycleBinding::bindAnimation(lifecycle);
         require(movement.integerPosition(born,records.at(0),-32,64)&&
                 storedOwner.resolve(born)->x.bits==0xc2000000u&&
                 storedOwner.resolve(born)->y.bits==0x42800000u&&records.at(0).x==30&&
@@ -160,6 +160,20 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         require(movement.sprite(born,records.at(0),205)&&animated.cachedFrame.bits==0x40000000u&&
                 !(storedOwner.resolve(born)->flags&8u)&&storedOwner.pendingSpatial()==0,
                 "same sprite preserves cached frame and clean bounds");
+        const auto flagsBeforeIndex=storedOwner.resolve(born)->flags;
+        const auto timelineBeforeIndex=animated.timeline.bits;
+        for(unsigned phase : {0u,1u,127u,128u,255u,256u,639u,640u,65535u,0x7fffffffu}) {
+            const float expected=static_cast<float>(phase)/256.0f;
+            std::uint32_t bits;std::memcpy(&bits,&expected,sizeof(bits));
+            require(movement.phaseIndex(born,records.at(0),phase)&&animated.sprite.imageIndex.bits==bits&&
+                    storedOwner.resolve(born)->flags==flagsBeforeIndex&&storedOwner.pendingSpatial()==0&&
+                    animated.timeline.bits==timelineBeforeIndex&&animated.cachedFrame.bits==0x40000000u,
+                    "phase publication narrows index without dirtying bounds or resetting sequence state");
+        }
+        const auto savedIndex=animated.sprite.imageIndex.bits;
+        require(!movement.phaseIndex(born,records.at(0),0x80000000u)&&
+                !movement.phaseIndex(old,records.at(0),0)&&animated.sprite.imageIndex.bits==savedIndex,
+                "unsupported phase and stale lifetime cannot overwrite index");
         auto wrong=records.at(0);wrong.objectId=35;
         require(!lifecycle.move(born,wrong,{}, {})&&!lifecycle.refresh(old,records.at(0),true)&&
                 !lifecycle.sprite(born,wrong,206)&&!lifecycle.sprite(old,records.at(0),206)&&

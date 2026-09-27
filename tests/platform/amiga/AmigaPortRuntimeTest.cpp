@@ -71,7 +71,13 @@ struct GenerationOrderProbe {
 struct NativeEnemyLifecycleAudit {
     using Enemy=GameplayWorld::EnemyState;
     struct Entry { unsigned generation=0;bool live=false,active=false; } entries[GameplayWorld::enemyCapacity]{};
-    unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,calls=0,fail=0;
+    unsigned births=0,retires=0,activations=0,inactivations=0,moves=0,sprites=0,indices=0,zeroIndices=0,calls=0,fail=0;
+    bool imageIndex(downwell::InstanceHandle h,const Enemy& e,downwell::RunnerImageValue value){
+        ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active&&value.promoted().valid(),
+                        "native animation publication resolves a live actor");
+        if(fail==7)return false;
+        ++indices;if(!(value.bits&0x7fffffffu))++zeroIndices;return true;
+    }
     bool sprite(downwell::InstanceHandle h,const Enemy& e,int){
         ++calls;require(entries[h.slot].live&&entries[h.slot].generation==h.generation&&e.active,
                         "native sprite assignment resolves live identity");
@@ -115,7 +121,7 @@ struct NativeEnemyLifecycleAudit {
 void testNativeEnemyLifecycle(){
     using Binding=GameplayWorld::EnemyLifecycleBinding;
     NativeEnemyLifecycleAudit audit;
-    GameplayWorld world(300,true,0,false,Binding::bindSpriteChanges(audit));
+    GameplayWorld world(300,true,0,false,Binding::bindAnimation(audit));
     world.configureSolidResolver(noSolid,nullptr);
     require(world.configureEnemy(0,111,163,100,-2000,0,0,5,6)&&
             world.configureEnemy(1,116,153,40,500,0,0,15,12,0,0,-1,-1,180,320,false)&&
@@ -125,7 +131,7 @@ void testNativeEnemyLifecycle(){
     world.step(0);
     require(audit.retires==1&&world.findEnemy(survivor),"retirement precedes compaction without losing survivor");
     require(audit.activations==1,"native frontier publishes dormant activation");
-    require(audit.moves>0&&audit.sprites==audit.moves&&audit.lastX==world.enemyAt(1).x+240&&audit.lastY==world.enemyAt(1).y+176,
+    require(audit.moves>0&&audit.indices>audit.sprites&&audit.sprites==audit.moves&&audit.lastX==world.enemyAt(1).x+240&&audit.lastY==world.enemyAt(1).y+176,
             "native movement publishes world coordinates before storing the matching local position");
     world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
     require(audit.retires==3&&!world.findEnemy(survivor)&&
@@ -140,9 +146,9 @@ void testNativeEnemyLifecycle(){
     world.restartFromResults(downwell::DeathMenuSequence::Action::Retry,42,300);
     require(audit.calls==resetCalls,"failed clear cannot replay owner callbacks");
 
-    for(unsigned failure=0;failure<=6;++failure){
+    for(unsigned failure=0;failure<=7;++failure){
         NativeEnemyLifecycleAudit checked;
-        GameplayWorld runtime(300,true,0,false,Binding::bindSpriteChanges(checked));
+        GameplayWorld runtime(300,true,0,false,Binding::bindAnimation(checked));
         if(failure>=5)runtime.configureSolidResolver(noSolid,nullptr);
         if(failure==1)checked.fail=1;
         const bool born=runtime.configureEnemy(0,111,163,0,failure==3?-168:5,0,0,5,6,0,0,-1,-1,0,0,failure!=3);
@@ -988,7 +994,9 @@ int main() {
     retiredBox.step(0);
     require(!retiredBox.breakableActiveAt(0, -512) && retiredBox.blocksDestroyed() == 0,
             "native offscreen box retires without counting as a destroyed block");
-    AmigaPortRuntime hitBat(300, false, 1000);
+    NativeEnemyLifecycleAudit hitBatAudit;
+    AmigaPortRuntime hitBat(300, false, 1000, false,
+        GameplayWorld::EnemyLifecycleBinding::bindAnimation(hitBatAudit));
     hitBat.configureSolidResolver(noSolid, nullptr);
     require(hitBat.configureEnemy(0, 116, 153, 0, 12, 0, 0, 15, 12,
                 0, 0, -1, -1, 270, 256, true, false, true),
@@ -998,7 +1006,10 @@ int main() {
             "surviving bat hit queues its recovered response");
     const long batX = hitBat.enemyAt(0).preciseX, batY = hitBat.enemyAt(0).preciseY;
     for (int frame = 0; frame < 3; ++frame) {
+        const auto oldIndices=hitBatAudit.indices,oldZeros=hitBatAudit.zeroIndices;
         hitBat.step(0);
+        if(frame==0)require(hitBatAudit.indices==oldIndices+3&&hitBatAudit.zeroIndices>=oldZeros+2,
+                "bat hit publishes automatic advance, explicit zero reset and final frame separately");
         require(hitBat.enemyAt(0).spriteId == 154 && hitBat.enemyAt(0).alarm0 == 3 - frame &&
                 hitBat.enemyAt(0).preciseX == batX && hitBat.enemyAt(0).preciseY == batY,
                 "bat hit artwork remains stationary for three ticks");

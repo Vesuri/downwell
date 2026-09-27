@@ -769,8 +769,18 @@ motion. The natural seed-2 tape currently exercises same-ID publications only;
 changed-ID coverage comes from explicit setter fixtures and real resource-pack
 tests, not a claim of natural pose coverage. A wall-less snail must stop after
 inactivation, without publishing later positions or sprite selection. Animation
-index writes, other sprite assignment sites and exact source setter scheduling
-remain required before full query installation.
+index writes outside the supported enemy adapter, other sprite assignment sites
+and exact source setter scheduling remain required before full query installation.
+
+`bindAnimation` also forwards the current enemy Q8 image phase after pre-Begin
+Step advancement, at explicit bat/frog/snail hit resets, and after final Step
+sprite/frame selection. Its conversion narrows the nonnegative integer phase to
+binary32 then adjusts the exponent by eight, retaining fractional mask frames
+without a target floating-point division. This publishes the existing rational
+animation approximation, not recovered runner sequence timing. The owner setter
+corresponds to the reviewed `0x432170` store: it changes only `imageIndex`, leaving
+bounds flags, dirty queues, cached frame and sequence timeline untouched. The
+later animation owner remains responsible for sequence reconciliation.
 
 Smoke, blood and flash owners preserve their birth counters when cleared.
 In-place world reconstruction for Retry transfers these counters into empty

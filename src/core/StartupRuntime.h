@@ -338,6 +338,7 @@ private:
     void emitMainBullet(const InstanceRecord& instance);
     void updateMainBullets();
     bool publishMainEnemyInactivation(const InstanceRecord& enemy);
+    bool publishMainEnemyImage(std::size_t index,unsigned phase);
     void spawnMainCurrency(float x, float y, std::int32_t amount,
                            bool attracted = false);
     void updateMainCurrency();
