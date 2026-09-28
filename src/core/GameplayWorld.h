@@ -201,6 +201,7 @@ public:
         std::uint32_t lifetimeId;
         bool destroyRequested=false;
         downwell::BreakableState state{};
+        std::int32_t alarm0=-1;
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     struct PlayerInstance {
@@ -366,6 +367,7 @@ public:
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
+    bool advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     void configureRoomAlarms(bool (*callback)(void*),void* context){roomAlarms_=callback;roomAlarmsContext_=context;}
     bool advanceBulletRoomAnimation(downwell::InstanceHandle key);
     bool advanceScriptRoomAnimation(downwell::InstanceHandle key){
@@ -450,6 +452,10 @@ public:
     bool publishBoxHealth(downwell::InstanceHandle h,downwell::MotionBinary64 health){
         if(!run_.effectsSucceeded||!findBreakable(h)||!health.valid())return run_.effectsSucceeded=false;
         breakables_[h.slot].state.wallHp=health;return true;
+    }
+    bool publishBoxAlarm0(downwell::InstanceHandle h,std::int32_t value){
+        if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+        breakables_[h.slot].alarm0=value;return true;
     }
     bool publishBoxHit(downwell::InstanceHandle h){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;

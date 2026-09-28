@@ -23,7 +23,7 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
 private:
     Owner owner_;
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayDebrisInstances::capacity> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity> combatAlarmPhase_;
     RunnerRoomMembership<View::capacity> room_;
     InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
@@ -332,11 +332,12 @@ public:
             };
             // Only implemented families are admitted. Avoid scanning every
             // terrain record for this partial combat alarm traversal.
-            if(!self.check(self.owner_.visitRegistrationRange(View::enemyBase,View::breakableBase,capture)&&
+            if(!self.check(self.owner_.visitRegistrationRange(View::enemyBase,View::terrainBase,capture)&&
                 self.owner_.visitRegistrationRange(View::debrisBase,View::capacity,capture)))return false;
             return self.dispatchCapturedAlarms(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
                 return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
+                    kind==View::Kind::breakable?self.world_->advanceBoxRoomAlarm(local,alarm):
                     kind==View::Kind::debris&&self.world_->advanceBoundDebrisRoomAlarm(local,alarm);
             });
         },this);

@@ -1926,6 +1926,40 @@ int main(){
         assert(!full->createGeneratedInstance({60,0,0},objects,backend)&&calls==GameplayTerrainInstances::capacity+1);
         full->step(0);assert(!full->effectsSucceeded());
     }
+    for(bool registered:{false,true}){
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,
+            registered?owner->enemyBinding():GameplayWorld::EnemyLifecycleBinding{},
+            registered?owner->breakableBinding():GameplayWorld::BreakableLifecycleBinding{},
+            registered?owner->playerBinding():GameplayWorld::PlayerLifecycleBinding{});
+        if(registered)assert(owner->attach(*world));
+        const int x=64,y=512;
+        assert(world->appendBreakables(&x,&y,1));
+        const InstanceHandle key{0,1};
+        assert(world->publishBoxAlarm0(key,2));
+        world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==1&&
+            world->findBreakable(key)->state.wallHp.high==0x3ff00000u);
+        world->step(0);
+        const auto* box=world->findBreakable(key);
+        assert(world->effectsSucceeded()&&box&&box->alarm0==0&&box->state.wallHp.zero()&&
+            box->active&&!box->destroyRequested);
+        // Zero retires to -1 without dispatching a second event.
+        assert(world->publishBoxHealth(key,MotionBinary64::fromInteger(3)));
+        world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==-1&&
+            world->findBreakable(key)->state.wallHp.high==0x40080000u);
+        assert(world->publishBoxAlarm0(key,-2));world->step(0);
+        assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==-2);
+        if(registered){
+            assert(world->publishBoxAlarm0(key,1)&&world->markBreakableDestroyed(key));
+            world->step(0);
+            assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==1&&
+                world->findBreakable(key)->state.wallHp.high==0x40080000u);
+        }
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none);
+        assert(!world->publishBoxAlarm0(key,1)&&!world->effectsSucceeded());
+    }
     std::puts("Native collision owner: actor/terrain births, dormant flags, movement, compaction, retirement, Retry and terminal failure passed");
 }
 #endif

@@ -59,6 +59,17 @@ check, not natural destruction admission: persistent debris scheduling and the
 live player time-stop dependency of `alarmStop(0)` remain required before the
 normal box Step can invoke the complete sequence.
 
+Box Alarm 0 is dispatched by both normal schedulers: the shared event body
+sets `wallHp` to zero, without emitting effects or retiring the box. Native
+storage keeps one 32-bit countdown per box; it does not allocate twelve slots
+for this one-event object. The mixed native alarm snapshot includes registered
+boxes in object-ID/registration order, costing an additional 8 KiB of resident
+snapshot capacity plus 2 KiB of countdowns at the 512-box limit, not task stack.
+Host tests cover countdown, zero retirement without a second dispatch, negative
+values and stale/destroy-marked lifetimes; the bounded native reentry tape also
+arms a box through ordinary ticks. This does not enable Gunpowder Blocks or
+the still-incomplete natural box Step and its `alarmStop(0)` dependency.
+
 Debris lifetime sequences can be carried across owner reconstruction without
 reusing retired handles or admitting new children to old phase cutoffs.
 Restoration requires successful cleanup of all registered children, including
@@ -79,7 +90,7 @@ bank through the ordinary room scheduler using an explicit checked time-stop
 callback. Its test covers animation, alarm countdown/refund, five frozen frames,
 motion and cleanup at expiry. The native owned-bank per-instance alarm/Step
 hooks have corresponding freeze/motion/expiry checks. Native alarms now run
-alongside registered enemies in the ordinary frame's ordered alarm phase;
+alongside registered boxes and enemies in the ordinary frame's ordered alarm phase;
 native `stepWithOwnedDebris` additionally captures registered debris at Step
 entry and runs motion before the existing Step reconciliation. Its checked
 time-stop and terrain callbacks are scoped to that tick, never retained on

@@ -651,6 +651,7 @@ bool GameplayWorld::appendBreakables(const int* x, const int* y, unsigned count,
         breakables_[index].active = true;
         breakables_[index].destroyRequested = false;
         breakables_[index].state=creation?creation[source]:downwell::BreakableState{};
+        breakables_[index].alarm0=-1;
         breakables_[index].lifetimeId = nextBreakableLifetimeId_++;
         if(!breakableLifecycle_.birth({index,breakables_[index].lifetimeId},breakables_[index])) {
             run_.effectsSucceeded=false;return false;
@@ -735,11 +736,22 @@ void GameplayWorld::advanceEnemyAlarms()
     // Match the runner's global alarm-index order. Dispatch each event before
     // counting down later slots: frog Alarm 0 writes Alarm 1, for example.
     for (unsigned alarm = 0; alarm < 2; ++alarm) {
+      if(alarm==0)for(unsigned i=0;i<breakableCount_;++i)
+        if(breakables_[i].lifetimeId&&!advanceBoxRoomAlarm({i,breakables_[i].lifetimeId},alarm))return;
       for (unsigned i=0;i<enemyStepOrder_.size();++i) {
         if(!resolveEnemyLifetime(enemyStepOrder_.handle(i)))continue;
         if(!advanceEnemyRoomAlarm(enemyStepOrder_.handle(i),alarm))return;
       }
     }
+}
+
+bool GameplayWorld::advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm){
+    if(!run_.effectsSucceeded||!findBreakable(key)||alarm>=downwell::AlarmBank::count)
+        return run_.effectsSucceeded=false;
+    auto& box=breakables_[key.slot];
+    if(!box.active||box.destroyRequested||alarm!=0)return true;
+    if(downwell::AlarmBank::advanceValue(box.alarm0))box.state.alarmZero();
+    return true;
 }
 
 bool GameplayWorld::advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm){

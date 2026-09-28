@@ -176,6 +176,11 @@ public:
             return run_.effectsSucceeded=false;
         r->box.wallHp=health;return true;
     }
+    bool publishBoxAlarm0(InstanceHandle h,std::int32_t value){
+        auto* record=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!record||record->objectId!=92)return run_.effectsSucceeded=false;
+        record->alarms.set(0,value);return true;
+    }
     bool publishBoxHit(InstanceHandle h){
         auto* r=instances_.resolve(h);
         if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;

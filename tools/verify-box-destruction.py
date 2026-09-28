@@ -10,6 +10,13 @@ manifest = json.loads((export / "manifest.json").read_text())
 assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
+box = manifest["resources"]["objects"][92]
+alarm = next(e for e in box["events"] if e["eventType"] == 2 and e["eventSubtype"] == 0)
+assert alarm["actions"] == [{"codeId": 1086, "codeName": "gml_Object_objBox_n_Alarm_0"}]
+alarm_code = (export / "Assembly/gml_Object_objBox_n_Alarm_0.asm").read_bytes()
+assert sha256(alarm_code).hexdigest() == "90d5b07213e419eaa3ae011b322413c12bb71b07ff73e106f575ed6d3cc35d98"
+assert [line for line in alarm_code.decode().splitlines() if line.startswith(("push", "pop", "call"))] == [
+    "pushi.e 0", "pop.v.i self.wallHp"]
 for name, digest in (
     ("scrSmokefx", "0716085dba28d96bd72012e69c700d6d3b3c789c1895c5a89ad8b9fa1d960bcc"),
     ("scrFlashballfx", "5947c017e6edcbd4f0c32c0a764da4d704e1778692100cb2e39d9764129af9f9"),

@@ -68,7 +68,7 @@ countdown. Tests mix real box/enemy/debris registrations, preserve same-object
 registration order, modify a later debris alarm in the same phase, exclude
 newborns from the snapshot, suppress a destroyed later lifetime, and stop after
 callback failure. The ordinary native world now uses the same dispatch body
-for registered enemies and debris, with a caller-resident snapshot restricted
+for registered boxes, enemies and debris, with a caller-resident snapshot restricted
 to those supported families. Unbound component worlds retain their enemy-only
 fallback. Actor alarm bodies are shared between both routes; Retry preserves
 the bound phase callback. A normal-frame test covers debris's thirty-tick

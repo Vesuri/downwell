@@ -317,6 +317,24 @@ int main(){
         int parent=-123;MotionBinary64 hp;
         require(owner->projectileWallParent(selected,parent)&&parent==84&&owner->projectileBoxHealth(selected,hp)&&
             hp.high==0x3ff00000u&&!hp.low,"box target resolves direct parent and Create health");
+        RunnerImageValue distantX,distantY;
+        require(distantX.assign(MotionBinary64::fromInteger(1000))&&
+            distantY.assign(MotionBinary64::fromInteger(world->mainPlayerY()+128)),"encode isolated box position");
+        require(world->publishCollisionPosition(selected,distantX,distantY)&&world->publishBoxAlarm0(selected,2),
+            "arm retained box outside player contacts");
+        world->step({},false);
+        require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==1&&
+            owner->resolve(selected)->box.wallHp.high==0x3ff00000u,"box alarm counts down without early damage");
+        world->step({},false);
+        require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==0&&
+            owner->resolve(selected)->box.wallHp.zero()&&owner->resolve(selected)->active&&
+            !owner->resolve(selected)->destroyRequested,"box Alarm 0 changes health without retiring its lifetime");
+        require(world->publishBoxHealth(selected,MotionBinary64::fromInteger(3)),"restore box health to detect duplicate dispatch");
+        world->step({},false);
+        require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==-1&&
+            owner->resolve(selected)->box.wallHp.high==0x40080000u,"zero alarm retires without re-firing");
+        require(world->publishBoxAlarm0(selected,-2),"negative box alarm is inactive");world->step({},false);
+        require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==-2,"negative box alarm stays untouched");
         const auto draws=world->randomDrawCount();const auto* box=owner->resolve(selected);
         const auto active=box->active,destroyed=box->destroyRequested;
         const MotionBinary64 fractional{0xbfe00000u,0};

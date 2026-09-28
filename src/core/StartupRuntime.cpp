@@ -1755,6 +1755,10 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1047: // gml_Object_Spawner_Create_0 / spawnerInit
         ++implementedCodeCalls_;
         return;
+    case 1086: // gml_Object_objBox_n_Alarm_0
+        ++implementedCodeCalls_;
+        if(instance!=nullptr)instance->box.alarmZero();
+        return;
     case 1085: // gml_Object_objBox_n_Create_0
         ++implementedCodeCalls_;
         if (instance != nullptr)

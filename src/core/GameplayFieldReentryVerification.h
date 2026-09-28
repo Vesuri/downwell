@@ -83,7 +83,12 @@ struct GameplayFieldReentryVerification {
         checks|=8;
 
         stage=5;
+        const int boxX=64,boxY=1200;
+        const InstanceHandle box{0,1};
+        if(!world.appendBreakables(&boxX,&boxY,1)||!world.publishBoxAlarm0(box,2))return false;
         for(unsigned i=0;i<8;++i){world.step(0);++gameSteps;if(!world.effectsSucceeded())return false;}
+        const auto* liveBox=world.findBreakable(box);
+        if(!liveBox||liveBox->alarm0!=-1||!liveBox->state.wallHp.zero()||!liveBox->active||liveBox->destroyRequested)return false;
         if(!world.goalFieldInstances().find(local)||!owner.state(key)||!world.startTimeField()||
             !owner.population(371,population)||population!=1)return false;
         checks|=16;

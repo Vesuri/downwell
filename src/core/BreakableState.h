@@ -10,6 +10,9 @@ struct BreakableState {
     unsigned short breakSound=171;
     unsigned char haveGem=0;
     bool hit=false,drilled=false,autoTile=false,checked=false;
+    // gml_Object_objBox_n_Alarm_0: no effects or retirement here. The ordinary
+    // Step observes zero health and owns the destruction sequence.
+    void alarmZero(){wallHp={};}
 };
 }
 #endif
