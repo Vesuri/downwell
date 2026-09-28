@@ -446,7 +446,12 @@ the retained painter, with changed-wall notifications routed to sparse row
 damage. No broad collision-parity or frame-budget claim follows from this.
 
 Wall activation and destruction marks publish occupancy changes immediately,
-separately from coalesced presentation damage. The native gameplay Draw entry
+separately from coalesced presentation damage. Room insertion uses the original stable upper bound
+of the binary32 depth key. Searching inward from both list ends avoids walking
+all retained terrain for foreground births, without changing equal-depth order
+or allocating another index. Negative depths, fractional keys, signed-zero ties
+and extreme finite keys are compared against the full ordered-list oracle.
+The native gameplay Draw entry
 calls the owner's checked cleanup: marked terrain, enemy and box identities survive all phase
 reconciliation, then retire in active-room order followed by inactive-room
 order. A pending-mark flag avoids scanning unchanged rooms. Mark publication

@@ -249,7 +249,7 @@ void testRoomMembershipCycles() {
     constexpr unsigned capacity=16;
     downwell::RunnerRoomMembership<capacity> rooms;
     std::vector<unsigned> active,inactive;
-    unsigned depths[capacity]{};
+    int depths[capacity]{};
     bool dormant[capacity]{};
     std::uint32_t rng=17;
     auto next=[&](){rng=rng*1664525u+1013904223u;return rng;};
@@ -265,7 +265,7 @@ void testRoomMembershipCycles() {
         unsigned slot=(next()>>16)%capacity,op=(next()>>16)%5;
         if(op==0){
             remove(active,slot);remove(inactive,slot);
-            depths[slot]=(next()>>16)%4; // Frequent equal-depth insertion ties.
+            depths[slot]=int((next()>>16)%9)-4; // Negative/positive depths and frequent ties.
             downwell::RunnerImageValue key;
             require(key.assign(downwell::MotionBinary64::fromInteger(depths[slot])),"depth is representable");
             require(rooms.bind(slot,key),"bind room member");insert(slot);

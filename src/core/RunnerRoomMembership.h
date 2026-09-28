@@ -153,8 +153,17 @@ private:
     void insertActive(unsigned slot){
         ++revision_;
         auto& e=entries_[slot];unsigned previous=tail_[0];
-        while(previous!=End && RunnerSpatialSplit::less(e.key,entries_[previous].key))
+        unsigned forward=head_[0];
+        // Find the same upper-bound position as the source tail scan, but
+        // approach it from both ends. Equal keys stay BEFORE the new entry.
+        // Foreground births must not walk past every retained terrain entry.
+        while(previous!=End && RunnerSpatialSplit::less(e.key,entries_[previous].key)){
+            if(RunnerSpatialSplit::less(e.key,entries_[forward].key)){
+                previous=entries_[forward].previous;break;
+            }
+            forward=entries_[forward].next;
             previous=entries_[previous].previous;
+        }
         e.list=0;e.previous=previous;e.next=previous==End?head_[0]:entries_[previous].next;
         if(e.next==End)tail_[0]=slot;else entries_[e.next].previous=slot;
         if(previous==End)head_[0]=slot;else entries_[previous].next=slot;
