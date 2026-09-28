@@ -91,24 +91,11 @@ private:
             if constexpr(Kind!=View::Kind::timeField)
                 if(local.generation!=r.lifetimeId)return parent.check(false);
             if(birth&&!parent.world_)return parent.check(Kind==View::Kind::player);
-            View::Record actual;
-            if(!parent.world_||!View(*parent.world_).resolve(out,actual)||
+            if(!parent.world_)return parent.check(false);
+            const auto* actual=View(*parent.world_).template resolveLocal<Kind>(local);
+            if(!actual||
                 (!birth&&(!parent.owner_.resolve(out)||parent.owner_.objectId(out)!=object(r))))return parent.check(false);
-            const void* pointer;
-            if constexpr(Kind==View::Kind::player)pointer=actual.player;
-            else if constexpr(Kind==View::Kind::enemy)pointer=actual.enemy;
-            else if constexpr(Kind==View::Kind::terrain)pointer=actual.terrain;
-            else if constexpr(Kind==View::Kind::timeField)pointer=actual.timeField;
-            else if constexpr(Kind==View::Kind::goalField)pointer=actual.goalField;
-            else if constexpr(Kind==View::Kind::exitController)pointer=actual.exitController;
-            else if constexpr(Kind==View::Kind::bullet)pointer=actual.bullet;
-            else if constexpr(Kind==View::Kind::scriptEffect)pointer=actual.scriptEffect;
-            else if constexpr(Kind==View::Kind::debris)pointer=actual.debris;
-            else if constexpr(Kind==View::Kind::timeChange)pointer=actual.timeChange;
-            else if constexpr(Kind==View::Kind::entryDither)pointer=actual.entryDither;
-            else if constexpr(Kind==View::Kind::drone)pointer=actual.drone;
-            else pointer=actual.breakable;
-            return parent.check(pointer==&r);
+            return parent.check(actual==&r);
         }
         bool birth(InstanceHandle local,const Record& r){
             DW_PROFILE_SCOPE(profileInstanceBirth);

@@ -207,8 +207,31 @@ struct BulletAudit {
     bool membership(InstanceHandle,const Record&,bool){return true;}
     bool mask(InstanceHandle,const Record&,int){return true;}
 };
+static void checkTypedCollisionView(const GameplayCollisionView& view,GameplayCollisionView::Kind kind,InstanceHandle local){
+    using K=GameplayCollisionView::Kind;
+    InstanceHandle shared;GameplayCollisionView::Record reference;
+    if(GameplayCollisionView::encode(kind,local,shared))view.resolve(shared,reference);
+    switch(kind){
+        case K::player:assert(view.resolveLocal<K::player>(local)==reference.player);break;
+        case K::enemy:assert(view.resolveLocal<K::enemy>(local)==reference.enemy);break;
+        case K::breakable:assert(view.resolveLocal<K::breakable>(local)==reference.breakable);break;
+        case K::terrain:assert(view.resolveLocal<K::terrain>(local)==reference.terrain);break;
+        case K::timeField:assert(view.resolveLocal<K::timeField>(local)==reference.timeField);break;
+        case K::goalField:assert(view.resolveLocal<K::goalField>(local)==reference.goalField);break;
+        case K::exitController:assert(view.resolveLocal<K::exitController>(local)==reference.exitController);break;
+        case K::bullet:assert(view.resolveLocal<K::bullet>(local)==reference.bullet);break;
+        case K::scriptEffect:assert(view.resolveLocal<K::scriptEffect>(local)==reference.scriptEffect);break;
+        case K::debris:assert(view.resolveLocal<K::debris>(local)==reference.debris);break;
+        case K::timeChange:assert(view.resolveLocal<K::timeChange>(local)==reference.timeChange);break;
+        case K::entryDither:assert(view.resolveLocal<K::entryDither>(local)==reference.entryDither);break;
+        case K::drone:assert(view.resolveLocal<K::drone>(local)==reference.drone);break;
+    }
+}
 static void checkCollisionViewMembership(const GameplayWorld& world){
     const GameplayCollisionView view(world);
+    for(unsigned family=0;family<=unsigned(GameplayCollisionView::Kind::drone);++family)
+        for(auto local:{InstanceHandle{0,0},InstanceHandle{0xffffffffu,1},InstanceHandle{GameplayCollisionView::capacity,1}})
+            checkTypedCollisionView(view,GameplayCollisionView::Kind(family),local);
     for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
         for(unsigned generation:{0u,1u,2u,3u,0xffffffffu}){
             GameplayCollisionView::Record record;
@@ -222,6 +245,7 @@ static void checkCollisionViewMembership(const GameplayWorld& world){
                 InstanceHandle encoded;
                 assert(GameplayCollisionView::encode(kind,local,encoded));
                 assert(encoded.slot==h.slot&&encoded.generation==h.generation);
+                checkTypedCollisionView(view,kind,local);
             }else assert(kind==GameplayCollisionView::Kind::debris&&local.slot==0xffffffffu&&local.generation==0xffffffffu);
         }
     }

@@ -446,7 +446,14 @@ the retained painter, with changed-wall notifications routed to sparse row
 damage. No broad collision-parity or frame-budget claim follows from this.
 
 Wall activation and destruction marks publish occupancy changes immediately,
-separately from coalesced presentation damage. Room insertion uses the original stable upper bound
+with typed bindings validating local bounds, generation, object identity and
+the current typed-store pointer on each call. `GameplayCollisionView::resolveLocal`
+avoids materializing the generic thirteen-pointer result when the family is
+already known; it does not cache pointers across compaction or mutations.
+Tests compare typed lookup against the retained generic resolver for every
+family, missing stores, invalid keys and reused lifetimes.
+Wall occupancy publication remains separate from coalesced presentation damage.
+Room insertion uses the original stable upper bound
 of the binary32 depth key. Searching inward from both list ends avoids walking
 all retained terrain for foreground births, without changing equal-depth order
 or allocating another index. Negative depths, fractional keys, signed-zero ties

@@ -75,6 +75,31 @@ public:
     // The same typed-store/generation validation without constructing a wide
     // borrowed-record result when a caller only needs lifetime membership.
     bool contains(InstanceHandle key)const{return resolveImpl<false>(key,nullptr);}
+    // Typed bindings already know their family. Resolve the same local
+    // lifetime without constructing the thirteen-pointer generic record.
+    // Nothing is cached across mutation or enemy-store compaction.
+    template<Kind Family> auto resolveLocal(InstanceHandle local)const{
+        auto lookup=[&](){
+            if constexpr(Family==Kind::player)return world_.findPlayer(local);
+            else if constexpr(Family==Kind::enemy)return world_.resolveEnemyLifetime(local);
+            else if constexpr(Family==Kind::breakable)return world_.findBreakable(local);
+            else if constexpr(Family==Kind::terrain)return world_.terrainInstances()?world_.terrainInstances()->find(local):nullptr;
+            else if constexpr(Family==Kind::timeField)return world_.timeFields().identityAt(local.slot)==local.generation?
+                world_.timeFields().at(local.slot):nullptr;
+            else if constexpr(Family==Kind::goalField)return world_.goalFieldInstances().find(local);
+            else if constexpr(Family==Kind::exitController)return world_.exitControllers().find(local);
+            else if constexpr(Family==Kind::bullet)return world_.resolveBulletLifetime(local);
+            else if constexpr(Family==Kind::scriptEffect)return world_.scriptSpawnInstances()?world_.scriptSpawnInstances()->find(local):nullptr;
+            else if constexpr(Family==Kind::debris)return world_.debrisInstances()?world_.debrisInstances()->find(local):nullptr;
+            else if constexpr(Family==Kind::timeChange)return world_.timeChangeInstances()?world_.timeChangeInstances()->find(local):nullptr;
+            else if constexpr(Family==Kind::entryDither)return world_.entryDithers()?world_.entryDithers()->find(local):nullptr;
+            else {static_assert(Family==Kind::drone,"Unknown collision family");
+                return world_.droneBullets()?world_.droneBullets()->find(local):nullptr;}
+        };
+        using Pointer=decltype(lookup());
+        InstanceHandle shared;
+        return encode(Family,local,shared)?lookup():Pointer(nullptr);
+    }
 private:
     template<bool Publish> bool resolveImpl(InstanceHandle key,Record* record)const{
         Kind kind;InstanceHandle local;
