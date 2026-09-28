@@ -24,6 +24,17 @@ still validates each terrain lifetime and captures previous coordinates in
 room order. Activation and retirement must remain observable, including the
 source rule that an inactive element terminates its layer's Draw walk.
 
+`terrainPlaceMeeting` is an important exception to stationary collision state:
+`RunnerSpatialInstances::place` temporarily moves the caller for its query.
+`RunnerPlaceQuery` restores through the position setter, preserving dirty-queue
+side effects; only its spatial branch also restores cached bounds. Neither
+move changes `previous`. The spatial-owner tests retain a distinct earlier
+snapshot during both list and spatial queries, including fractional query
+coordinates. The gameplay-owner tests additionally exercise repeated queries
+from all three terrain object types and verify authoritative coordinates and
+previous coordinates after each query. These tests cover successful restoration,
+not every failure path or external original-game writer.
+
 These facts do not justify skipping all terrain updates or treating terrain
 presentation as permanently immutable. Before eliminating the repeated
 snapshot operation, audit external `with`/dynamic setters and every coordinate

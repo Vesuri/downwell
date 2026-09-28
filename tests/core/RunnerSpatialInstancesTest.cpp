@@ -255,6 +255,11 @@ int main(){
         Owner queries;Graph graph;
         const InstanceHandle self{0,1},candidate{1,1};
         assert(queries.attach(self,3,{})&&queries.attach(candidate,1,{}));
+        // Keep a real earlier snapshot distinct from both the current and
+        // temporary query positions, without mutating private test state.
+        const RunnerImageValue previousX{0xc1800000u},previousY{0xc2000000u}; // -16, -32
+        assert(queries.move(self,previousX,previousY,*graph.flags(3))&&queries.capturePrevious(self));
+        assert(queries.move(self,{},{},*graph.flags(3)));
         auto refresh=[&](InstanceHandle h,bool publish){
             const auto* s=queries.resolve(h);assert(s);
             Owner::Box box{s->x,s->y,s->x,s->y};
@@ -277,10 +282,14 @@ int main(){
                 ++calls;assert(q.slot==self.slot&&c.slot==candidate.slot);
                 assert(publish==listPath);
                 assert(queries.resolve(q)->x.bits==bx&&queries.resolve(q)->y.bits==by);
+                assert(queries.resolve(q)->previous.x.bits==previousX.bits&&
+                    queries.resolve(q)->previous.y.bits==previousY.bits);
                 hit=true;return true;
             },result));
         assert(calls==1&&result.found&&result.handle.slot==candidate.slot);
         assert(!queries.resolve(self)->x.bits&&!queries.resolve(self)->y.bits);
+        assert(queries.resolve(self)->previous.x.bits==previousX.bits&&
+            queries.resolve(self)->previous.y.bits==previousY.bits);
     }
     for(bool badY:{false,true})for(MotionBinary64 invalid:{MotionBinary64{0x7ff00000u,0},
             MotionBinary64{0x7ff80000u,1},MotionBinary64{0x47f00000u,0},MotionBinary64{0,1}}){

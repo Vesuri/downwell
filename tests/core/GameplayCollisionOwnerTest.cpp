@@ -1026,6 +1026,9 @@ int main(){
         for(auto p:{DeferredCreateInstance{0,256,512},DeferredCreateInstance{0,240,528},DeferredCreateInstance{1,240,512},DeferredCreateInstance{1,224,512}}){
             bool hit=false;
             assert(queries->terrainPlaceMeeting(self,60,MotionBinary64::fromInteger(p.x),MotionBinary64::fromInteger(p.y),masks,hit)&&hit==(p.objectId==0));
+            const auto* restored=queries->state(shared);
+            assert(restored&&restored->x.bits==before.x.bits&&restored->y.bits==before.y.bits);
+            assert(restored->previous.x.bits==before.previous.x.bits&&restored->previous.y.bits==before.previous.y.bits);
         }
         const auto after=*queries->state(shared);
         assert(before.x.bits==after.x.bits&&before.y.bits==after.y.bits&&scene->effectsSucceeded());
@@ -1039,6 +1042,29 @@ int main(){
         const auto marker=queries->terrain().handle(3);
         assert(queries->terrain().find(marker)->spriteId==46&&queries->terrain().find(marker)->imageSpeed==1);
         assert(queries->terrainPositionMeeting(60,MotionBinary64::fromInteger(400),MotionBinary64::fromInteger(800),masks,hit)&&hit);
+        assert(scene->createGeneratedInstance({93,432,800},objects,[](const auto&){return true;}));
+        // All supported terrain identities can be the temporary query caller.
+        // A fractional query must neither move its authoritative record nor
+        // overwrite the pre-animation snapshot, on hits or misses. Repeated
+        // queries also exercise flushing the preceding restoration's queues.
+        for(auto caller:{self,marker,queries->terrain().handle(4)}){
+            InstanceHandle callerKey;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::terrain,caller,callerKey));
+            const auto original=*queries->state(callerKey);
+            const auto record=*queries->terrain().find(caller);
+            for(int repeat=0;repeat<3;++repeat)for(int targetX:{240,256,400,432,1000}){
+                auto x=MotionBinary64::fromInteger(targetX);
+                auto y=MotionBinary64::fromInteger(targetX<400?512:800);
+                assert(x.add({0x3fd00000u,0})&&y.add({0xbfd00000u,0})); // +1/4, -1/4
+                bool found=false;
+                assert(queries->terrainPlaceMeeting(caller,60,x,y,masks,found));
+                const auto* restored=queries->state(callerKey);
+                const auto* terrain=queries->terrain().find(caller);
+                assert(restored&&terrain&&restored->x.bits==original.x.bits&&restored->y.bits==original.y.bits);
+                assert(restored->previous.x.bits==original.previous.x.bits&&restored->previous.y.bits==original.previous.y.bits);
+                assert(terrain->x==record.x&&terrain->y==record.y&&terrain->lifetimeId==record.lifetimeId);
+            }
+        }
         hit=true;assert(!queries->terrainPositionMeeting(82,{},{},masks,hit)&&hit&&!queries->valid());
     }
     {
