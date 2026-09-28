@@ -1042,6 +1042,9 @@ int main(){
                 return true; // This tape tests phase routing, not solid collision.
             };
             for(unsigned tick=1;tick<=16;++tick){
+                RunnerImageValue centre;require(centre.assign(MotionBinary64::fromInteger(world->mainCameraRenderViewY()+142)),"drone centre");
+                require(drone.dispatch(local,[&](auto&,auto& publish,bool&){return publish.publishPosition(x,centre);}),
+                    "keep phase-routing fixture within the published view");
                 require(world->stepWithDroneBullets(drone,{},event),"drone joins stored room scheduler");
                 const auto* state=drone.instances().find(local);
                 const auto* stored=world->instance(id);
@@ -1049,7 +1052,7 @@ int main(){
                     stored->alarms.get(0)==16-int(tick),
                     "global alarm decrements once and is not restored by Step publication");
             }
-            require(droneSteps==16&&droneEnds==16,"drone Step and End Step each dispatch once per tick");
+            require(droneSteps==16&&droneEnds==0,"drone Step callback and built-in End Step have distinct ownership");
             require(drone.dispatch(local,[](auto&,auto& publish,bool&){
                 return publish.destroySelf()&&publish.publishPosition({0x43708000u},{0x4330c000u});
             })&&world->instance(id)->destroyRequested&&
@@ -1065,8 +1068,16 @@ int main(){
             require(drone.dispatch(replacement,[](auto& state,auto&,bool&){
                 state.imageSpeed={0x3f000000u};state.timeline={0x40b00000u};return true;
             })&&world->stepWithDroneBullets(drone,{},event)&&
-                drone.instances().find(replacement)->destroyRequested&&droneSteps==16&&droneEnds==16&&drone.clear(),
+                drone.instances().find(replacement)->destroyRequested&&droneSteps==16&&droneEnds==0&&drone.clear(),
                 "room animation destroys drone before same-tick alarm and Step dispatch");
+            InstanceHandle edge;
+            require(drone.create(x.promoted(),MotionBinary64::fromInteger(world->mainCameraRenderViewY()+316),edge)&&
+                world->stepWithDroneBullets(drone,{},event)&&!drone.instances().find(edge)->destroyRequested,
+                "stored End Step keeps exact published bottom boundary");
+            RunnerImageValue below;require(below.assign(MotionBinary64::fromInteger(world->mainCameraRenderViewY()+317)),"drone lower edge");
+            require(drone.dispatch(edge,[&](auto&,auto& publish,bool&){return publish.publishPosition(x,below);})&&
+                world->stepWithDroneBullets(drone,{},event)&&drone.instances().find(edge)->destroyRequested&&drone.clear(),
+                "stored End Step retires below old published view despite current camera movement");
         }
     }
     {

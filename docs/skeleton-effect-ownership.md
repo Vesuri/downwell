@@ -1061,7 +1061,7 @@ position publication, retirement and slot reuse. Host scheduler tests also
 exercise the actual room alarm/animation callbacks and Retry. These are injected
 lifecycle checks, not original-game visual comparison or a stock-memory fit test.
 
-Natural births remain disabled: full Step/End Step collision adapters, enemy
+Natural births remain disabled: full Step collision adapters, enemy
 damage, native numeric-ID allocation, projected layer drawing/offline angle
 artwork and source-ordered box admission still need integration.
 The 32-slot bound is an implementation limit, not a recovered original limit.
@@ -1077,7 +1077,7 @@ Step and End Step phases. The global stored-world alarm countdown is imported
 before shared dispatch; copying an older shared countdown back would undo that
 tick. Animation-end destruction excludes the subsequent alarm/Step dispatch.
 Missing dispatch ownership and stale registrations fail rather than silently
-running an incomplete projectile. The caller still supplies Step/End Step
+running an incomplete projectile. The caller still supplies Step
 operations and explicit pre-Draw retirement. No natural source births use this
 entry point yet. Stored-world regression tests exercise these phase and lifetime
 boundaries with injected projectiles; the phase-routing fixture does not claim
@@ -1094,7 +1094,18 @@ view fields again rather than reusing a pre-destruction snapshot.
 The shared host/68000 tape checks strict boundaries, both room branches,
 repeated destruction after a synchronous position mutation and every callback
 failure prefix. The two source-script hashes are pinned alongside the drone
-events. `endStepWithView` exposes this composed path; admission still requires
-each world adapter to supply the correct phase-published camera fields and
-retained instance reads. It does not make the current approximate camera
-adapters authoritative or enable natural projectile births by itself.
+events. Both normal-main-room adapters invoke this composed End Step path with
+the preceding published view, not the camera's newly followed position. The
+native adapter preserves the Q12 snapshot when converting it to binary64 and
+skips traversal/conversion when the store is empty. The SDL scoped scheduler
+owns End Step internally rather than asking the external Step callback to
+implement it. Other SDL rooms are rejected pending their view adapter.
+Both use retained projectile positions and mark destruction for later cleanup.
+
+Host tests place projectiles on and one pixel beyond the published lower edge;
+the 68000 room-lifecycle tape also verifies an injected out-of-view projectile
+is marked by the actual world update. Explicit camera setters, dirty-camera
+transitions, external writes outside the admitted position publisher and full
+cross-family End Step ordering remain outside this path's evidence. This does
+not make the approximate camera-motion adapters authoritative or enable
+natural projectile births by itself.

@@ -73,6 +73,10 @@ public:
     bool advanceAnimation(InstanceHandle key){
         return dispatch(key,[](auto& state,auto& publisher,bool& good){return state.advanceAnimation(publisher,good);});
     }
+    bool endStep(InstanceHandle key,MotionBinary64 top,MotionBinary64 height,bool main){
+        if(!good_)return false;
+        return store_.endStep(key,top,height,main)||fail();
+    }
     bool activate(InstanceHandle key,bool active){return good_&&(store_.activate(key,active)||fail());}
     bool mark(InstanceHandle key){return good_&&(store_.markDestroyed(key)||fail());}
     bool retire(InstanceHandle key){return good_&&(store_.retire(key)||fail());}

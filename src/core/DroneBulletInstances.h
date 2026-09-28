@@ -109,6 +109,20 @@ public:
     bool advanceAnimation(InstanceHandle key){
         return dispatch(key,[](auto& state,auto& publisher,bool& good){return state.advanceAnimation(publisher,good);});
     }
+    bool endStep(InstanceHandle key,MotionBinary64 viewY,MotionBinary64 height,bool mainRoom){
+        return dispatch(key,[&](auto& state,auto& publisher,bool& good){
+            struct Ops {
+                DroneBulletInstances& store;InstanceHandle key;Publisher& publisher;
+                MotionBinary64 top,height;bool main;
+                bool readY(MotionBinary64& out){const auto* r=store.find(key);if(!r)return false;out=r->y.promoted();return true;}
+                bool viewY(MotionBinary64& out){out=top;return true;}
+                bool viewHeight(MotionBinary64& out){out=height;return true;}
+                bool mainRoom(bool& out){out=main;return true;}
+                bool destroySelf(){return publisher.destroySelf();}
+            } ops{*this,key,publisher,viewY,height,mainRoom};
+            return state.endStepWithView(ops,good);
+        });
+    }
     bool retire(InstanceHandle key){
         auto* r=resolve(key);
         if(!r||!r->destroyRequested||same(key,executing_)||!binding_.retire(key,*r))return fail();

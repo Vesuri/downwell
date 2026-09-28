@@ -1946,9 +1946,11 @@ int main(){
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
         auto& drones=owner->droneBullets();InstanceHandle local,shared;
-        assert(drones.create(105190,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(1200),local)&&
+        assert(drones.create(105190,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(176),local)&&
             GameplayCollisionView::encode(GameplayCollisionView::Kind::drone,local,shared));
         for(unsigned tick=1;tick<=16;++tick){
+            RunnerImageValue centre;assert(centre.assign(MotionBinary64::fromInteger(world->cameraOffsetY()+176)));
+            assert(drones.dispatch(local,[&](auto&,auto& publish,bool&){return publish.publishPosition({0x43700000u},centre);}));
             world->step(0);
             const auto* record=drones.find(local);
             assert(world->effectsSucceeded()&&record&&record->state.decelerate==(tick==16));
@@ -1961,6 +1963,15 @@ int main(){
         }));
         world->step(0);
         assert(world->effectsSucceeded()&&owner->prepareDraw()&&!drones.find(local)&&!owner->state(shared));
+        InstanceHandle edge;
+        assert(drones.create(105193,MotionBinary64::fromInteger(240),
+            MotionBinary64::fromInteger(world->cameraOffsetY()+34+316),edge));
+        world->step(0);
+        assert(world->effectsSucceeded()&&drones.find(edge)&&!drones.find(edge)->destroyRequested);
+        RunnerImageValue below;assert(below.assign(MotionBinary64::fromInteger(world->cameraOffsetY()+34+317)));
+        assert(drones.dispatch(edge,[&](auto&,auto& publish,bool&){return publish.publishPosition({0x43700000u},below);}));
+        world->step(0);
+        assert(world->effectsSucceeded()&&owner->prepareDraw()&&!drones.find(edge));
         InstanceHandle retained;
         assert(drones.create(105191,{},{},retained));
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);

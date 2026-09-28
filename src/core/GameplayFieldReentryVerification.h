@@ -77,7 +77,15 @@ struct GameplayFieldReentryVerification {
             !GameplayCollisionView::encode(GameplayCollisionView::Kind::exitController,setter,setterKey)||
             !owner.state(triggerKey)||!owner.state(setterKey)||
             !owner.population(306,population)||population!=1||!owner.population(74,population)||population!=1)return false;
-        for(unsigned i=0;i<100;++i){world.step(0);++gameSteps;if(!world.effectsSucceeded())return false;}
+        InstanceHandle outsideDrone;
+        if(!owner.droneBullets().create(105192,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(-1000),outsideDrone))return false;
+        for(unsigned i=0;i<100;++i){
+            world.step(0);++gameSteps;if(!world.effectsSucceeded())return false;
+            if(!i){
+                const auto* drone=owner.droneBullets().find(outsideDrone);
+                if(!drone||!drone->destroyRequested||!owner.droneBullets().retire(outsideDrone))return false;
+            }
+        }
         if(!world.levelResultRequested()||!world.goalStopped())return false;
         checks|=2;
 

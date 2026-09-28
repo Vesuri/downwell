@@ -317,7 +317,7 @@ public:
     struct NoCollisionPass {bool operator()()const{return true;}};
     enum class DronePhase {animation,alarm,step,endStep};
     // Scoped dispatch joins the actual room phases. The event adapter must
-    // supply Step/End Step behavior; storage registration is not a substitute.
+    // supply Step behavior; main-room End Step uses the phase-published view.
     template<unsigned Capacity,class Execute>
     bool stepWithDroneBullets(StoredDroneBulletRegistration<instanceCapacity,Capacity>& registration,
         const Input& input,Execute execute,bool advancePressed=false){
@@ -328,6 +328,13 @@ public:
             const auto key=registration.handle(record);if(!key.generation)return false;
             if(phase==DronePhase::animation)return registration.advanceAnimation(key);
             if(phase==DronePhase::alarm)return registration.alarm(record);
+            if(phase==DronePhase::endStep){
+                // Other rooms and dirty-camera setters need their own published
+                // view adapter; do not substitute a main-room follow position.
+                if(roomId_!=mainRoomId)return false;
+                return registration.endStep(key,MotionBinary64::fromInteger(ordinaryStepViewTopQ12_/4096),
+                    MotionBinary64::fromInteger(surfaceHeight),true);
+            }
             return registration.dispatch(key,[&](auto& state,auto& publisher,bool& good){
                 return execute(state,publisher,phase,random_,good);
             });

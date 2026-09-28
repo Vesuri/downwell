@@ -58,6 +58,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto droneBullets=droneBullets_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
+    const auto droneEndStep=droneEndStep_;void* const droneEndStepContext=droneEndStepContext_;
     const auto roomAlarms=roomAlarms_;void* const roomAlarmsContext=roomAlarmsContext_;
     void* const roomAnimationContext=roomAnimationContext_;
     const auto roomActorDraw=roomActorDraw_;
@@ -100,6 +101,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     droneBullets_=droneBullets;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
+    configureDroneEndStep(droneEndStep,droneEndStepContext);
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
     configureRoomActorDraw(roomActorDraw,roomActorDrawContext);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
@@ -1515,6 +1517,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         },
         [this](unsigned i) { return retireBreakable(i); });
     if(!boxesRetired){run_.effectsSucceeded=false;return {};}
+    if(droneEndStep_&&!droneEndStep_(droneEndStepContext_,viewTop)){run_.effectsSucceeded=false;return {};}
 
 #if !defined(DOWNWELL_PLATFORM_AMIGA) || defined(DOWNWELL_REPLAY_VERIFY) || defined(DOWNWELL_SCENE_VERIFY)
     const bool firstBulletActive = bulletActive();

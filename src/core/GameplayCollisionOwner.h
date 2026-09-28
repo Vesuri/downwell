@@ -263,6 +263,20 @@ public:
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
         if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         world_=&world;
+        world.configureDroneEndStep([](void* context,long topQ12){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid())return false;
+            if(!self.drones_.size())return true;
+            MotionBinary64 top;
+            if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
+            return self.check(self.owner_.visitRegistrationRange(View::droneBase,View::capacity,
+                [&](InstanceHandle shared,int object,const Owner::State& state){
+                    if(state.flags&0x100003u)return true;
+                    View::Kind kind;InstanceHandle local;
+                    return object==266&&View::decode(shared,kind,local)&&kind==View::Kind::drone&&
+                        self.drones_.endStep(local,top,MotionBinary64::fromInteger(284),true);
+                }));
+        },this);
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
             if(!self.valid())return false;

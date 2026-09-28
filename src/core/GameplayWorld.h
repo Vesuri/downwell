@@ -420,6 +420,7 @@ public:
         });
     }
     void configureRoomAnimation(bool (*callback)(void*),void* context){roomAnimation_=callback;roomAnimationContext_=context;}
+    void configureDroneEndStep(bool (*callback)(void*,long),void* context){droneEndStep_=callback;droneEndStepContext_=context;}
     bool advanceEnemyRoomAnimation(downwell::InstanceHandle key);
     bool advanceEnemyRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
     bool advanceBoxRoomAlarm(downwell::InstanceHandle key,unsigned alarm);
@@ -893,6 +894,8 @@ private:
     }
     bool (*roomAnimation_)(void*)=nullptr;
     void* roomAnimationContext_=nullptr;
+    bool (*droneEndStep_)(void*,long)=nullptr;
+    void* droneEndStepContext_=nullptr;
     RoomActorDraw roomActorDraw_=nullptr;
     const void* roomActorDrawContext_=nullptr;
     bool (*scriptAnimation_)(void*,downwell::InstanceHandle)=nullptr;
