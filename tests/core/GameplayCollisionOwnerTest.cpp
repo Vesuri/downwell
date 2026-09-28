@@ -5,6 +5,11 @@ bool nativePlayerTimeField(downwell::GameplayCollisionOwner& owner,downwell::Mot
     downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
     return owner.playerTimeFieldMeeting(x,y,masks,hit);
 }
+bool nativePlayerTimeFieldSelection(downwell::GameplayCollisionOwner& owner,downwell::MotionBinary64 x,
+    downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,
+    downwell::GameplayCollisionOwner::RegisteredFieldContact& result){
+    return owner.playerTimeFieldSelection(x,y,masks,result);
+}
 bool nativeOwnedDebrisTick(GameplayWorld& world){
     return world.stepWithOwnedDebris(0,[](auto,const auto&,bool& frozen){frozen=false;return true;},
         [](auto,const auto&,auto,auto,bool& hit){hit=false;return true;});
@@ -783,6 +788,20 @@ int main(){
             assert(collision->playerTimeFieldMeeting(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(10000),masks,hit)&&!hit);
         }
         assert(hits&&misses);
+        GameplayCollisionOwner::RegisteredFieldContact selected;
+        assert(collision->playerTimeFieldSelection(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),masks,selected));
+        assert(selected.found&&selected.x.bits==0x43700000u&&selected.y.bits==0x44000000u);
+        const auto first=selected.handle;
+        assert(scene->createGeneratedInstance({82,241,512},objects,[](const auto&){return false;}));
+        assert(collision->playerTimeFieldSelection(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),masks,selected));
+        assert(selected.found&&selected.handle.slot==first.slot&&selected.handle.generation==first.generation);
+        const auto fieldBinding=scene->timeFields().lifecycle();
+        const auto* firstField=scene->timeFields().at(0);assert(firstField);
+        assert(fieldBinding.activation({0,scene->timeFields().identityAt(0)},*firstField,false)&&collision->reconcileActivation());
+        assert(collision->playerTimeFieldSelection(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(512),masks,selected));
+        assert(selected.found&&selected.handle.slot!=first.slot&&selected.x.bits==0x43710000u);
+        assert(collision->playerTimeFieldSelection(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(10000),masks,selected));
+        assert(!selected.found&&!selected.handle.generation&&selected.x.bits==0&&selected.y.bits==0);
         SpriteMaskPack absent(nullptr,0);bool sentinel=true;
         assert(!collision->playerTimeFieldMeeting({},{},absent,sentinel)&&sentinel&&!collision->valid());
     }

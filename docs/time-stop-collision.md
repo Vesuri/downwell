@@ -13,6 +13,16 @@ movement. Missing mask resources fail without overwriting the caller's result.
 This query alone does not connect player transitions, shard identity lookup,
 their effects, or audio to the native Begin Step scheduler.
 
+`playerTimeFieldSelection` uses the same registered query and returns a
+`RegisteredFieldContact`: a generation-safe internal handle and copied
+published coordinates, or an empty result on a miss. Overlapping-field tests
+cover first eligible selection, activation exclusion and clearing a prior hit.
+This is deliberately not `InstancePlaceResult`: native field records still
+lack the source-style global numeric instance IDs. Passing a slot/generation
+as the VM-visible `field` value would be incorrect. The numeric-ID allocation
+and synchronous cross-family creation-order work remains necessary before
+feeding this selection into live `scrTimeShard` caller state.
+
 ## Field wind audio ordering
 
 `goalTimeField`'s player collision checks `global.voidWind` first. If it is not

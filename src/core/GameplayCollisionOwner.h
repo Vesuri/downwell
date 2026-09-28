@@ -489,6 +489,26 @@ public:
             !View::encode(View::Kind::player,world_->playerHandle(),self)||!resolves(self))return check(false);
         return registeredPlaceMeeting(self,82,x,y,masks,hit);
     }
+    struct RegisteredFieldContact {
+        bool found=false;
+        InstanceHandle handle{}; // Internal generation key, NOT a VM instance ID.
+        RunnerImageValue x{},y{};
+    };
+    bool playerTimeFieldSelection(MotionBinary64 x,MotionBinary64 y,const SpriteMaskPack& masks,
+        RegisteredFieldContact& result){
+        InstanceHandle self;
+        if(!valid()||!world_||!masks.valid()||
+            !View::encode(View::Kind::player,world_->playerHandle(),self)||!resolves(self))return check(false);
+        Owner::Result selected;
+        if(!registeredPlaceSelection(self,82,x,y,masks,selected))return false;
+        RegisteredFieldContact next;
+        if(selected.found){
+            const auto* state=owner_.resolve(selected.handle);
+            if(!state||!resolves(selected.handle))return check(false);
+            next={true,selected.handle,state->x,state->y};
+        }
+        result=next;return true;
+    }
     // Selected global Step entry, not a pool-local sweep. The caller supplies
     // the original per-instance TimeStopBound result through a checked adapter.
     template<unsigned Capacity,class Stopped>
@@ -505,6 +525,11 @@ private:
     bool registeredPlaceMeeting(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
         const SpriteMaskPack& masks,bool& hit){
         Owner::Result result;
+        if(!registeredPlaceSelection(self,object,x,y,masks,result))return false;
+        hit=result.found;return true;
+    }
+    bool registeredPlaceSelection(InstanceHandle self,int object,MotionBinary64 x,MotionBinary64 y,
+        const SpriteMaskPack& masks,Owner::Result& result){
         auto update=[&](InstanceHandle h,bool publish){return resolves(h)&&refresh(h,publish);};
         if(!owner_.placeVm(self,object,x,y,false,families_,update,
             [&](InstanceHandle a,InstanceHandle b,bool publish,bool& found){
@@ -512,7 +537,7 @@ private:
                     properties_[a.slot].sprite,properties_[b.slot].sprite,sprites_,masks,
                     RunnerMaskDispatch{},publish,update,inverseTrig,roundPixel,found);
             },result))return check(false);
-        hit=result.found;return true;
+        return true;
     }
 public:
     // self is a shared collision handle, not a terrain-local storage slot.
