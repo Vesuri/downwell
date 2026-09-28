@@ -75,8 +75,7 @@ private:
     }
     static bool add(Real a,Real b,Real& out){return Math::sub(a,Math::negate(b),out);}
     static bool mul(Real a,Real b,Real& out){
-        MotionBinary64 product;
-        return multiplyBinary64(a.promoted(),b.promoted(),product)&&out.assign(product);
+        return multiplyBinary32(a,b,out);
     }
     template<class Round> static bool axis(Real low,Real high,int origin,Real position,
         Real scale,bool compatibility,Round& round,Real& near,Real& far){
