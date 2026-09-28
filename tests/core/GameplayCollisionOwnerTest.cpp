@@ -608,6 +608,28 @@ int main(){
         assert(!scene->debrisEffects().size()&&!collision->debris().find(first));
         assert(scene->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(300),1,second));
         assert(second.generation>first.generation&&scene->debrisEffects().retained(second.generation));
+        auto expected=*scene->debrisEffects().retained(second.generation);auto random=scene->randomState();
+        for(unsigned tick=0;tick<35;++tick){
+            const auto phase=scene->debrisEffects().beginPhase();
+            for(unsigned a=0;a<3;++a){
+                expected.advanceAlarm(a);
+                assert(scene->advanceOwnedDebrisRoomAlarm(second,phase,a));
+            }
+            if(expected.destroyRequested){
+                assert(collision->prepareDraw()&&!scene->debrisEffects().retained(second.generation));
+                break;
+            }
+            const bool frozen=tick<5;
+            assert(expected.step(frozen,random,[](auto,auto,bool& hit){hit=false;return true;}));
+            assert(scene->stepOwnedDebrisRoomEffect(second,phase,
+                [&](InstanceHandle,const auto&,bool& stop){stop=frozen;return true;},
+                [](InstanceHandle,const auto&,auto,auto,bool& hit){hit=false;return true;}));
+            const auto* actual=scene->debrisEffects().retained(second.generation);assert(actual);
+            assert(actual->x.bits==expected.x.bits&&actual->y.bits==expected.y.bits&&
+                actual->imageSpeed.bits==expected.imageSpeed.bits&&actual->flash==expected.flash);
+            for(unsigned a=0;a<3;++a)assert(actual->alarms.get(a)==expected.alarms.get(a));
+        }
+        assert(expected.destroyRequested&&!scene->debrisEffects().size());
         assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
     }
     for(int area=1;area<=5;++area){

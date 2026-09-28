@@ -70,9 +70,14 @@ registered lifecycle bridge. Retry clears registered particles before room
 teardown; native placement-new reconstruction preserves the bank's birth
 sequence. Real collision-owner tests cover creation, cleanup and rebirth in
 both worlds. Borrowed banks remain available for isolated tests, but cannot be
-mixed with a populated production bank. Normal source alarm/Step scheduling,
-player time-stop and natural destruction admission remain unfinished; owning
-storage alone does not establish a complete live debris feature.
+mixed with a populated production bank. `stepWithOwnedDebris` routes the stored
+bank through the ordinary room scheduler using an explicit checked time-stop
+callback. Its test covers animation, alarm countdown/refund, five frozen frames,
+motion and cleanup at expiry. The native owned-bank per-instance alarm/Step
+hooks have corresponding freeze/motion/expiry checks, but are not yet admitted
+to a complete mixed-actor source event traversal. Live player time-stop and
+natural destruction admission remain unfinished; these dispatch adapters do
+not establish a complete live debris feature.
 
 The current shared cavern stomp adapter checks reward success before its
 immediate enemy retirement, defeat count and player bounce. A failed reward

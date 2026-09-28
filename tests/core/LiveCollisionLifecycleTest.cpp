@@ -168,6 +168,31 @@ int main(){
         require(second>first&&world->debrisEffects().retained(next),"owned debris monotonic identities");
         require(world->restartFromResults(DeathMenuSequence::Action::Retry,42),"owned debris fixture cleanup");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach owned debris scheduling fixture");world->skipToGameForTesting();
+        unsigned id=0;
+        require(world->spawnDebris(MotionBinary64::fromInteger(20000),MotionBinary64::fromInteger(20000),1,id),"owned scheduled birth");
+        auto expected=*world->debrisEffects().retained(1);auto random=world->randomState();unsigned stops=0;
+        for(unsigned tick=0;tick<40;++tick){
+            const bool frozen=tick<5;
+            require(expected.advanceImage(),"owned reference animation");
+            for(unsigned a=0;a<3;++a)expected.advanceAlarm(a);
+            require(expected.step(frozen,random,[](auto,auto,bool& hit){hit=false;return true;}),"owned reference Step");
+            require(world->stepWithOwnedDebris({},[&](InstanceHandle,const auto&,bool& stop){++stops;stop=frozen;return true;}),
+                "owned effects use normal stored room scheduler");
+            const auto* actual=world->debrisEffects().retained(1);const auto* record=world->instance(id);
+            if(expected.destroyRequested){require(!actual&&!record,"owned cleanup after Alarm expiry");continue;}
+            require(actual&&record&&actual->x.bits==expected.x.bits&&actual->y.bits==expected.y.bits&&
+                actual->imageIndex.bits==expected.imageIndex.bits&&actual->imageSpeed.bits==expected.imageSpeed.bits&&
+                actual->noTouch==expected.noTouch&&actual->disappearing==expected.disappearing&&actual->flash==expected.flash,
+                "owned scheduled motion and presentation match source primitives");
+            for(unsigned a=0;a<3;++a)require(actual->alarms.get(a)==expected.alarms.get(a)&&
+                record->alarms.get(a)==expected.alarms.get(a),"owned alarms decremented once");
+        }
+        require(stops==34,"owned freeze extends lifetime and no Step occurs after destruction");
+    }
     for(bool failSmoke:{false,true}){
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
         checkBoxBurstWorld(*world,failSmoke);

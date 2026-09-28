@@ -275,6 +275,10 @@ public:
         return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;
     }
     struct NoCollisionPass {bool operator()()const{return true;}};
+    template<class Stopped,class Collisions=NoCollisionPass>
+    bool stepWithOwnedDebris(const Input& input,Stopped stopped,bool advancePressed=false,Collisions collisions={}){
+        return stepWithDebris(ownedDebrisRegistration_,ownedDebrisEffects_,input,stopped,advancePressed,collisions);
+    }
     template<unsigned Capacity,unsigned Registered,class Stopped,class Collisions=NoCollisionPass>
     bool stepWithDebris(StoredDebrisRegistration<instanceCapacity,Registered>& registration,DebrisEffects<Capacity>& effects,
         const Input& input,Stopped stopped,bool advancePressed=false,Collisions collisions={}){

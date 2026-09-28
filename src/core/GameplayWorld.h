@@ -255,6 +255,15 @@ public:
         const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
         return run_.effectsSucceeded=run_.effectsSucceeded&&record&&debrisBinding_.retire(key,record);
     }
+    bool advanceOwnedDebrisRoomAlarm(downwell::InstanceHandle key,
+        downwell::DebrisEffects<downwell::debrisEffectCapacity>::Phase phase,unsigned index){
+        return advanceDebrisRoomAlarm(ownedDebrisEffects_,key,phase,index);
+    }
+    template<class Stopped,class Meeting>
+    bool stepOwnedDebrisRoomEffect(downwell::InstanceHandle key,
+        downwell::DebrisEffects<downwell::debrisEffectCapacity>::Phase phase,Stopped stopped,Meeting meeting){
+        return stepDebrisRoomEffect(ownedDebrisEffects_,key,phase,stopped,meeting);
+    }
     template<unsigned Capacity>
     bool advanceDebrisRoomAlarm(downwell::DebrisEffects<Capacity>& effects,downwell::InstanceHandle key,
         typename downwell::DebrisEffects<Capacity>::Phase phase,unsigned index){
