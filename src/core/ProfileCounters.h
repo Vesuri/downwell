@@ -12,6 +12,8 @@ enum DownwellProfileCounter {
     counterSnapshotEqualMoves, counterSnapshotChangedMoves,
     counterSpatialFirstPublication, counterSpatialEqualRepublication,
     counterSpatialChangedRepublication,
+    counterSpatialBoxQuery, counterSpatialLineQuery,
+    counterSpatialHeightRead, counterSpatialNodeCountRead,
     profileCounterCount
 };
 #ifdef DOWNWELL_PROBES

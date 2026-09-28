@@ -3,6 +3,7 @@
 #include "RunnerSpatialNode.h"
 #include "RunnerSpatialLine.h"
 #include "Profile.h"
+#include "ProfileCounters.h"
 namespace downwell {
 // Source-ordered spatial owner. It does not select eligible instances or
 // maintain the runner's dirty queue.
@@ -36,8 +37,8 @@ public:
         nodes_[0].count=0;nodes_[0].level=0;
     }
     bool valid()const{return good_;}
-    unsigned nodeCount()const{return live_;}
-    int height()const{return nodes_[root_].level;}
+    unsigned nodeCount()const{DW_PROFILE_COUNT(counterSpatialNodeCountRead);return live_;}
+    int height()const{DW_PROFILE_COUNT(counterSpatialHeightRead);return nodes_[root_].level;}
     bool insert(Box box,std::uint32_t instance){
         DW_PROFILE_SCOPE(profileSpatialInsert);
         if(!good_)return false;
@@ -76,12 +77,14 @@ public:
     // False means invalid query/index, not an early-stop callback. A callback
     // returning false stops all traversal after that hit, just like the runner.
     template<class Visit> bool query(Box box,Visit visit)const{
+        DW_PROFILE_COUNT(counterSpatialBoxQuery);
         if(!good_ || !Math::valid(box))return false;
         visitAt(root_,Search(box,pixelMode_),visit);return true;
     }
     // 0x500860 walks entries in their stored order at every tree level. It
     // does not clip the line passed to children or sort leaves by hit distance.
     template<class Visit> bool queryLine(const RunnerLineArguments& args,Visit visit)const{
+        DW_PROFILE_COUNT(counterSpatialLineQuery);
         RunnerSpatialLine line;
         if(!good_||!line.assign(args))return false;
         bool good=true;visitLineAt(root_,line,visit,good);return good;

@@ -108,6 +108,14 @@ path in the measured tape; it is not proof that every collision consumer is
 inactive. Compare it with spatial publication counters before changing query
 data structures or introducing retained population counts.
 
+`Spatial reads` counts calls at the tree's public box-query, line-query,
+height and node-count entry points (including rejected query requests). These
+are root calls, not visits to individual nodes. They cover collision-pair tree
+queries as well as selector queries, but not direct membership-list traversal
+or the independent native terrain grid. Like publication counters, their
+window starts with the measured scene; zero reads cannot establish that the
+tree was unused before that window or will remain unused later in the level.
+
 The shared element links maintain a two-level free-slot bitmap. Allocation
 uses it to reproduce the lowest-unowned-element scan, then still checks the
 instance registry's presence flag. All element owners update the same map;
