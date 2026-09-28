@@ -116,6 +116,25 @@ struct RunnerSpatialVerification {
         result.check(assign(boxes[1],0,0,4097,4096));actual=99;
         result.check(!RunnerSpatialSplit::choosePixelChild(boxes,2,incoming,actual)&&actual==99);
     }
+    {
+        using Math=RunnerSpatialSplit;
+        const Math::Box a{{0xbf800000u},{0xc0000000u},{0x40000000u},{0x40400000u}};
+        const Math::Box b{{0},{0xc0400000u},{0x40800000u},{0x40000000u}};
+        auto same=[](const auto& x,const auto& y){return x.left.bits==y.left.bits&&
+            x.top.bits==y.top.bits&&x.right.bits==y.right.bits&&x.bottom.bits==y.bottom.bits;};
+        const Math::Box expected{{0xbf800000u},{0xc0400000u},{0x40800000u},{0x40400000u}};
+        auto first=a,second=b;
+        first=Math::unite(first,b);second=Math::unite(a,second);
+        result.check(same(first,expected)&&same(second,expected));
+        result.check(Math::overlaps(a,b)&&Math::valid(a)&&Math::valid(b));
+        for(unsigned edge=0;edge<4;++edge){
+            auto box=a;
+            auto& out=edge==0?box.left:edge==1?box.top:edge==2?box.right:box.bottom;
+            result.check(Math::area(box,out)&&out.bits==0x41700000u); // 3 * 5 = 15.
+        }
+        auto invalid=a;invalid.left.bits=0x7fc00000u;
+        result.check(!Math::area(invalid,invalid.left)&&invalid.left.bits==0x7fc00000u);
+    }
     return result;
 }
 }

@@ -185,10 +185,10 @@ private:
     }
 public:
     // Closed bounds: touching edges survive broad-phase pruning.
-    static bool overlaps(Box a,Box b){return !less(a.right,b.left)&&!less(b.right,a.left)&&
+    static bool overlaps(const Box& a,const Box& b){return !less(a.right,b.left)&&!less(b.right,a.left)&&
         !less(a.bottom,b.top)&&!less(b.bottom,a.top);}
     static bool valid(Real x){const unsigned e=(x.bits>>23)&255;return e!=255 && (e || !(x.bits&0x7fffffff));}
-    static bool valid(Box b){return valid(b.left)&&valid(b.top)&&valid(b.right)&&valid(b.bottom)&&!less(b.right,b.left)&&!less(b.bottom,b.top);}
+    static bool valid(const Box& b){return valid(b.left)&&valid(b.top)&&valid(b.right)&&valid(b.bottom)&&!less(b.right,b.left)&&!less(b.bottom,b.top);}
     static bool equal(Real a,Real b){return a.bits==b.bits || (!(a.bits&0x7fffffff)&&!(b.bits&0x7fffffff));}
     static bool less(Real a,Real b){
         if(equal(a,b))return false;
@@ -197,9 +197,9 @@ public:
     }
     static Real negate(Real a){a.bits^=0x80000000u;return a;}
     static bool sub(Real a,Real b,Real& out){return subtractBinary32(a,b,out);}
-    static Box unite(Box a,Box b){return {less(a.left,b.left)?a.left:b.left,less(a.top,b.top)?a.top:b.top,
+    static Box unite(const Box& a,const Box& b){return {less(a.left,b.left)?a.left:b.left,less(a.top,b.top)?a.top:b.top,
         less(b.right,a.right)?a.right:b.right,less(b.bottom,a.bottom)?a.bottom:b.bottom};}
-    static bool area(Box b,Real& out){
+    static bool area(const Box& b,Real& out){
         Real w,h;
         return sub(b.right,b.left,w)&&sub(b.bottom,b.top,h)&&
             multiplyBinary32(w,h,out);
