@@ -1082,3 +1082,19 @@ operations and explicit pre-Draw retirement. No natural source births use this
 entry point yet. Stored-world regression tests exercise these phase and lifetime
 boundaries with injected projectiles; the phase-routing fixture does not claim
 to implement or verify the missing live solid/enemy collision adapter.
+
+`ProjectileViewRetirement` implements the drone End Step's two source scripts
+in order. `scrOutofview` checks y against view y minus 160 and plus 3000,
+destroying only in room 11. `scrBulletOov` then independently checks below
+view y plus view height plus 32 and above view y minus 100, in every room.
+All comparisons use the runner real-comparison contract. Destruction does not
+short-circuit the remaining script, and later expressions read published y and
+view fields again rather than reusing a pre-destruction snapshot.
+
+The shared host/68000 tape checks strict boundaries, both room branches,
+repeated destruction after a synchronous position mutation and every callback
+failure prefix. The two source-script hashes are pinned alongside the drone
+events. `endStepWithView` exposes this composed path; admission still requires
+each world adapter to supply the correct phase-published camera fields and
+retained instance reads. It does not make the current approximate camera
+adapters authoritative or enable natural projectile births by itself.

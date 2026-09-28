@@ -1,6 +1,7 @@
 #include "core/DroneBulletVerification.h"
 #include "core/DroneBulletSolidVerification.h"
 #include "core/DroneBulletInstancesVerification.h"
+#include "core/ProjectileViewRetirementVerification.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cmath>
@@ -20,6 +21,7 @@ struct Scalar {
 };
 static double snap(float value){double integral;const float fraction=float(std::modf(double(value),&integral));return std::abs(fraction)<0.0001f?integral:double(value);}
 int main(){
+    assert(ProjectileViewRetirementVerification::run());
     assert(DroneBulletVerification::run());
     assert(DroneBulletVerification::lifetime(1)&&DroneBulletVerification::lifetime(2));
     assert(DroneBulletSolidVerification::run(true));

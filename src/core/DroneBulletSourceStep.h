@@ -5,6 +5,7 @@
 #include "BulletSolidScript.h"
 #include "AlarmBank.h"
 #include "UnitSequenceFrames.h"
+#include "ProjectileViewRetirement.h"
 namespace downwell {
 // Object 266 (also spawned by Gunpowder Blocks), not bulletExplosion.
 // Shared event arithmetic; room identity, inherited hit-memory storage,
@@ -100,6 +101,9 @@ struct DroneBulletSourceStep {
         if(!good)return false;
         if(!ops.outOfView()||!good)return good=false;
         const bool ok=ops.bulletOutOfView();return good=good&&ok;
+    }
+    template<class Ops> bool endStepWithView(Ops& ops,bool& good){
+        return ProjectileViewRetirement::run(ops,good);
     }
     template<class Ops> bool animationEnd(Ops& ops,bool& good){
         if(!good)return false;

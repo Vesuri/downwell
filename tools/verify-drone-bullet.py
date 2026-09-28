@@ -37,4 +37,12 @@ assert [s for s in step.splitlines() if s.startswith("call.i")] == [
     "call.i random_range(argc=2)", "call.i lengthdir_x(argc=2)", "call.i lengthdir_y(argc=2)",
     "call.i lengthdir_x(argc=2)", "call.i lengthdir_y(argc=2)", "call.i gml_Script_scrBulCheckSolid(argc=0)"]
 assert step.index("call.i gml_Script_scrBulCheckSolid") < step.index("pop.v.v self.x\n") < step.index("pop.v.v self.y\n")
+for name, digest in {
+    "scrOutofview": "e06b55bcc8952fd6eb918461ffce8196a41cff92c7f7dfe97060160468a2fcff",
+    "scrBulletOov": "1b393802ddd4cc84545f3571f4a244d0baf692d7ddc1ae49a3b8c9aefeb1f022",
+}.items():
+    assert sha256((export / "Assembly" / f"gml_GlobalScript_{name}.asm").read_bytes()).hexdigest() == digest
+end_step = (export / "Assembly/gml_Object_bulletDrone_Step_2.asm").read_text()
+assert [s for s in end_step.splitlines() if s.startswith("call.i")] == [
+    "call.i gml_Script_scrOutofview(argc=0)", "call.i gml_Script_scrBulletOov(argc=0)"]
 print("Pinned bulletDrone 266: first-Step RNG, Alarm deceleration, solid-before-position and draw/expiry gates")
