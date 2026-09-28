@@ -335,6 +335,28 @@ int main(){
             owner->resolve(selected)->box.wallHp.high==0x40080000u,"zero alarm retires without re-firing");
         require(world->publishBoxAlarm0(selected,-2),"negative box alarm is inactive");world->step({},false);
         require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==-2,"negative box alarm stays untouched");
+        RunnerImageValue insideX,insideY;
+        require(insideX.assign(MotionBinary64::fromInteger(240))&&
+            insideY.assign(MotionBinary64::fromInteger(20000)),"encode time-bound query fixture");
+        require(world->publishCollisionPosition(selected,insideX,insideY)&&world->publishBoxAlarm0(selected,1),
+            "arm time-bound box away from fields without running retirement");
+        const auto stopDraws=world->randomDrawCount();
+        require(owner->stopBoxAlarm0(*world,selected,true,480)&&owner->resolve(selected)->alarms.get(0)==2&&
+            owner->resolve(selected)->box.scriptIndex==1&&world->randomDrawCount()==stopDraws,
+            "frozen box refunds positive alarm without RNG");
+        require(owner->stopBoxAlarm0(*world,selected,false,480)&&owner->resolve(selected)->alarms.get(0)==2,
+            "running player time leaves box alarm untouched");
+        for(int value:{-2,-1,0}){
+            require(world->publishBoxAlarm0(selected,value)&&owner->stopBoxAlarm0(*world,selected,true,480)&&
+                owner->resolve(selected)->alarms.get(0)==value,"frozen box does not revive fired or inactive alarms");
+        }
+        for(int quarter:{639,640,1280,1281}){
+            auto q=MotionBinary64::fromInteger(quarter);q.high-=2u<<20;RunnerImageValue px;require(px.assign(q),"encode fractional side");
+            require(world->publishCollisionPosition(selected,px,insideY)&&world->publishBoxAlarm0(selected,1)&&
+                owner->stopBoxAlarm0(*world,selected,true,480)&&
+                owner->resolve(selected)->alarms.get(0)==(quarter>=640&&quarter<=1280?2:1),
+                "alarmStop uses fractional published coordinates at strict side boundaries");
+        }
         const auto draws=world->randomDrawCount();const auto* box=owner->resolve(selected);
         const auto active=box->active,destroyed=box->destroyRequested;
         const MotionBinary64 fractional{0xbfe00000u,0};

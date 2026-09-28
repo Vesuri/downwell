@@ -5,6 +5,10 @@ bool nativePlayerTimeField(downwell::GameplayCollisionOwner& owner,downwell::Mot
     downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,bool& hit){
     return owner.playerTimeFieldMeeting(x,y,masks,hit);
 }
+bool nativeBoxAlarmStop(downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle box,
+    const downwell::SpriteMaskPack& masks,bool stopped,int width){
+    return owner.stopBoxAlarm0(box,stopped,width,masks);
+}
 bool nativePlayerTimeFieldSelection(downwell::GameplayCollisionOwner& owner,downwell::MotionBinary64 x,
     downwell::MotionBinary64 y,const downwell::SpriteMaskPack& masks,
     downwell::GameplayCollisionOwner::RegisteredFieldContact& result){
@@ -1936,6 +1940,31 @@ int main(){
         const int x=64,y=512;
         assert(world->appendBreakables(&x,&y,1));
         const InstanceHandle key{0,1};
+        if(registered){
+            assert(world->publishBoxAlarm0(key,1));
+            const auto draws=world->randomDrawCount();
+            // Box is inside strict room sides, but well below any field.
+            assert(owner->stopBoxAlarm0(key,true,480,masks)&&world->findBreakable(key)->alarm0==2&&
+                world->findBreakable(key)->state.scriptIndex==1&&world->randomDrawCount()==draws);
+            SpriteMaskPack absent(nullptr,0);
+            assert(owner->stopBoxAlarm0(key,false,480,absent)&&world->findBreakable(key)->alarm0==2);
+            for(int value:{-2,-1,0}){
+                assert(world->publishBoxAlarm0(key,value)&&owner->stopBoxAlarm0(key,true,480,masks)&&
+                    world->findBreakable(key)->alarm0==value);
+            }
+            RunnerImageValue py;assert(py.assign(MotionBinary64::fromInteger(20000)));
+            for(int quarter:{639,640,1280,1281}){
+                auto q=MotionBinary64::fromInteger(quarter);q.high-=2u<<20;RunnerImageValue px;assert(px.assign(q));
+                assert(owner->breakableBinding().publishedPosition(key,*world->findBreakable(key),px,py)&&
+                    world->publishBoxAlarm0(key,1)&&owner->stopBoxAlarm0(key,true,480,masks));
+                assert(world->findBreakable(key)->alarm0==(quarter>=640&&quarter<=1280?2:1));
+            }
+            RunnerImageValue px;assert(px.assign(MotionBinary64::fromInteger(x+240))&&py.assign(MotionBinary64::fromInteger(y+176)));
+            assert(owner->breakableBinding().publishedPosition(key,*world->findBreakable(key),px,py));
+            assert(world->createGeneratedInstance({82,x+240,y+176},objects,[](const auto&){return true;}));
+            assert(world->publishBoxAlarm0(key,1)&&owner->stopBoxAlarm0(key,true,480,masks)&&
+                world->findBreakable(key)->alarm0==1);
+        }
         assert(world->publishBoxAlarm0(key,2));
         world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==1&&
@@ -1953,11 +1982,20 @@ int main(){
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==-2);
         if(registered){
             assert(world->publishBoxAlarm0(key,1)&&world->markBreakableDestroyed(key));
+            // The event continues, but compatibility collision rejects the
+            // destroyed self (flag 1), even while it overlaps a live field.
+            assert(owner->stopBoxAlarm0(key,true,480,masks)&&world->findBreakable(key)->alarm0==2);
             world->step(0);
-            assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==1&&
+            assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==2&&
                 world->findBreakable(key)->state.wallHp.high==0x40080000u);
         }
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none);
+        assert(world->appendBreakables(&x,&y,1));
+        const InstanceHandle fresh{0,2};unsigned queries=0;
+        assert(world->publishBoxAlarm0(fresh,5));
+        assert(!world->stopBoxAlarm0(fresh,[&](bool&){++queries;return false;})&&queries==1&&
+            world->findBreakable(fresh)->alarm0==5&&world->findBreakable(fresh)->state.scriptIndex==0);
+        assert(!world->stopBoxAlarm0(fresh,[&](bool&){++queries;return true;})&&queries==1);
         assert(!world->publishBoxAlarm0(key,1)&&!world->effectsSucceeded());
     }
     std::puts("Native collision owner: actor/terrain births, dormant flags, movement, compaction, retirement, Retry and terminal failure passed");

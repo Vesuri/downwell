@@ -86,7 +86,13 @@ struct GameplayFieldReentryVerification {
         const int boxX=64,boxY=1200;
         const InstanceHandle box{0,1};
         if(!world.appendBreakables(&boxX,&boxY,1)||!world.publishBoxAlarm0(box,2))return false;
-        for(unsigned i=0;i<8;++i){world.step(0);++gameSteps;if(!world.effectsSucceeded())return false;}
+        for(unsigned i=0;i<8;++i){
+            world.step(0);++gameSteps;if(!world.effectsSucceeded())return false;
+            // Controlled frozen-instance input, not a substitute for the live
+            // player's still-unconnected time-stop transition/effect owner.
+            if(i<2&&(!world.stopBoxAlarm0(box,[](bool& allowed){allowed=false;return true;})||
+                world.findBreakable(box)->alarm0!=2))return false;
+        }
         const auto* liveBox=world.findBreakable(box);
         if(!liveBox||liveBox->alarm0!=-1||!liveBox->state.wallHp.zero()||!liveBox->active||liveBox->destroyRequested)return false;
         if(!world.goalFieldInstances().find(local)||!owner.state(key)||!world.startTimeField()||

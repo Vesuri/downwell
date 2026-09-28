@@ -181,6 +181,17 @@ public:
         if(!run_.effectsSucceeded||!record||record->objectId!=92)return run_.effectsSucceeded=false;
         record->alarms.set(0,value);return true;
     }
+    template<class Query> bool stopBoxAlarm0(InstanceHandle h,Query timeBound){
+        if(!run_.effectsSucceeded)return false;
+        auto* record=instances_.resolve(h);
+        if(!record||record->objectId!=92)return run_.effectsSucceeded=false;
+        bool allowed=false;
+        if(!timeBound(allowed))return run_.effectsSucceeded=false;
+        auto alarm=record->alarms.get(0);
+        run_.effectsSucceeded=record->box.stopAlarmZero(allowed,alarm);
+        if(run_.effectsSucceeded)record->alarms.set(0,alarm);
+        return run_.effectsSucceeded;
+    }
     bool publishBoxHit(InstanceHandle h){
         auto* r=instances_.resolve(h);
         if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;

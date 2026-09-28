@@ -457,6 +457,13 @@ public:
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         breakables_[h.slot].alarm0=value;return true;
     }
+    template<class Query> bool stopBoxAlarm0(downwell::InstanceHandle h,Query timeBound){
+        if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+        bool timeAllowed=false;
+        if(!timeBound(timeAllowed))return run_.effectsSucceeded=false;
+        auto& box=breakables_[h.slot];
+        return run_.effectsSucceeded=box.state.stopAlarmZero(timeAllowed,box.alarm0);
+    }
     bool publishBoxHit(downwell::InstanceHandle h){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         breakables_[h.slot].state.hit=true;return true;

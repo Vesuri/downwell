@@ -73,6 +73,13 @@ struct Ops {
     bool alarmStop(int a){assert(a==0);return event(Stop);}
 };
 int main(){
+    for(int value:{-2,-1,0,1,5})for(bool allowed:{false,true}){
+        BreakableState state;state.scriptIndex=17;auto alarm=value;
+        assert(state.stopAlarmZero(allowed,alarm));
+        assert(alarm==value+(!allowed&&value>0?1:0)&&state.scriptIndex==(allowed?17:1));
+    }
+    {BreakableState state;state.scriptIndex=17;std::int32_t alarm=0x7fffffff;
+        assert(!state.stopAlarmZero(false,alarm)&&alarm==0x7fffffff&&state.scriptIndex==0);}
     const auto x=MotionBinary64::fromInteger(240);
     auto y=MotionBinary64::fromInteger(512);assert(y.add({0x3fd00000u,0}));
     unsigned routes=0,failures=0;

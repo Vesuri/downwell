@@ -70,6 +70,26 @@ values and stale/destroy-marked lifetimes; the bounded native reentry tape also
 arms a box through ordinary ticks. This does not enable Gunpowder Blocks or
 the still-incomplete natural box Step and its `alarmStop(0)` dependency.
 
+The checked `stopBoxAlarm0` adapters now provide that script operation for an
+explicit Step-boundary call. They query `TimeStopBound` with the box's registered
+published coordinates and mask, including fractional side-boundary positions.
+Allowed time leaves both the alarm and `self.i` untouched; frozen time writes
+`i=0`, increments only a positive countdown, then writes `i=1`. Zero and negative
+alarms are not revived. Failed queries leave those fields untouched and latch
+failure. An unrepresentable increment of INT32_MAX is rejected rather than
+overflowing native signed arithmetic; normal source delays are small.
+This adds four bytes of script-index storage per retained box-state record.
+Both host world adapters have real-mask/boundary tests; the 68000 reentry tape
+tests two controlled refund ticks before expiry. The native query adapter is
+also cross-compiled. Neither adapter is automatically called by normal box Step
+yet: the real player time-stop owner and complete destruction sequence remain
+required before that admission.
+The post-destroy event tail retains the record but not its collision eligibility:
+compatibility collision rejects flag 1 on either participant. Consequently a
+destroy-marked box inside the room sides can receive a refund despite overlapping
+a field. A retained-lifetime test covers this distinction; do not bypass the
+original collision guard just because the event has not returned yet.
+
 Debris lifetime sequences can be carried across owner reconstruction without
 reusing retired handles or admitting new children to old phase cutoffs.
 Restoration requires successful cleanup of all registered children, including
