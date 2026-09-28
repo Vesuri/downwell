@@ -40,6 +40,18 @@ int main() {
     std::ifstream file("generated/downwell-sprites.dwsc",std::ios::binary);
     std::vector<unsigned char> bytes{std::istreambuf_iterator<char>(file),{}};
     downwell::SpriteCollisionPack pack(bytes.data(),bytes.size());
+    require(pack.valid(),"original collision pack validates");
+    for(std::uint32_t id=0;id<pack.spriteCount();++id){
+        downwell::PackedSpriteCollision resource;
+        std::uint32_t frames=0xffffffffu;
+        require(pack.sprite(id,resource)&&pack.frameCount(id,frames)&&frames==resource.frameCount,
+            "direct frame count agrees with complete decoding for every original sprite");
+    }
+    std::uint32_t untouched=123;
+    require(!pack.frameCount(pack.spriteCount(),untouched)&&untouched==123&&
+            !pack.frameCount(0xffffffffu,untouched)&&untouched==123&&
+            !downwell::SpriteCollisionPack(nullptr,0).frameCount(0,untouched)&&untouched==123,
+        "missing sprite and invalid pack leave frame-count output untouched");
     for(auto id:{31u,585u}){
         downwell::PackedSpriteCollision resource;
         require(pack.sprite(id,resource),"original collision metadata available");

@@ -23,6 +23,13 @@ public:
     }
     bool valid()const{return valid_;}
     std::uint32_t spriteCount()const{return count_;}
+    // Sprite changes need only the frame count, not collision bounds. Decode
+    // that field directly rather than unpacking nine words into a temporary.
+    bool frameCount(std::uint32_t id,std::uint32_t& out)const{
+        if(!valid_||id>=count_)return false;
+        out=u32(bytes_+headerSize+std::size_t(id)*recordSize+32);
+        return true;
+    }
     bool sprite(std::uint32_t id,PackedSpriteCollision& out)const{
         if(!valid_||id>=count_)return false;
         const auto* p=bytes_+headerSize+std::size_t(id)*recordSize;

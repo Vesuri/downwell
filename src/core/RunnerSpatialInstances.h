@@ -289,8 +289,8 @@ public:
         if(!valid()||!live(h))return false;
         if(sprite.spriteId==next)return true; // Source no-op performs no lookup.
         if(!pack.valid())return checked(false);
-        PackedSpriteCollision resource;
-        const unsigned frames=next>=0&&pack.sprite(unsigned(next),resource)?resource.frameCount:0;
+        std::uint32_t frames=0;
+        if(next>=0)pack.frameCount(unsigned(next),frames);
         return changeSprite(h,sprite,timeline,cachedFrame,next,frames,objectFlags);
     }
     bool refresh(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
