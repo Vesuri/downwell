@@ -117,17 +117,17 @@ void cleanupProjection(){
         // extreme normal values must preserve the source's tail-scan order.
         const std::uint32_t bits[]={0,0x80000000u,0x3f000000u,0xbf000000u,
             0x00800000u,0x80800000u,0x7f7fffffu,0xff7fffffu};
-        for(unsigned rotation=0;rotation<8;++rotation){
+        for(unsigned rotation=0;rotation<8;++rotation)for(unsigned burst:{1u,4u,16u}){
             RunnerRoomMembership<64> ordered;RunnerImageValue keys[64];
             std::vector<unsigned> expected,actual;
             for(unsigned i=0;i<64;++i){
-                keys[i].bits=bits[(i*5+rotation)%8];
+                keys[i].bits=bits[((i/burst)*5+rotation)%8];
                 auto pos=expected.begin();
                 while(pos!=expected.end()&&!RunnerSpatialSplit::less(keys[i],keys[*pos]))++pos;
                 expected.insert(pos,i);
                 require(ordered.bind(i,keys[i]),"mixed binary32 room depth");actual.clear();
                 require(ordered.visitAnimationChecked([&](unsigned s){actual.push_back(s);return true;})&&actual==expected,
-                    "two-ended insertion equals stable upper bound");
+                    "repeated-depth insertion equals stable upper bound");
             }
         }
     }
