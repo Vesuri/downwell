@@ -11,6 +11,50 @@
 #include <memory>
 using Split=downwell::RunnerSpatialSplit;
 using Box=std::array<float,4>;
+struct CountedBounds {
+    unsigned value=0;
+    inline static unsigned copies=0;
+    CountedBounds()=default;
+    CountedBounds(const CountedBounds& other):value(other.value){++copies;}
+    CountedBounds& operator=(const CountedBounds& other){value=other.value;++copies;return *this;}
+};
+static void splitCopyWork(){
+    using Node=downwell::RunnerSpatialNodeStorage<CountedBounds>;
+    for(unsigned mask=1;mask<127;++mask){
+        Node source,sibling;
+        for(unsigned i=0;i<6;++i){
+            Node::Entry a,b;a.bounds.value=i+1;b.bounds.value=100+i;
+            assert(source.append(a)&&sibling.append(b));
+        }
+        Node::Entry incoming;incoming.bounds.value=7;
+        unsigned moves=0,zero=0;
+        for(unsigned i=0;i<6;++i){
+            if(mask&(1u<<i))++moves;
+            else {if(zero!=i)++moves;++zero;}
+        }
+        CountedBounds::copies=0;
+        assert(source.splitUsing(incoming,sibling,[&](const auto& boxes,Split::Result& groups){
+            for(unsigned i=0;i<7;++i){
+                assert(boxes[i].value==i+1);
+                groups.group[i]=(mask>>i)&1u;
+                ++groups.count[groups.group[i]];
+            }
+            return true;
+        }));
+        // Seven partition inputs, one alias-safe incoming copy, one incoming
+        // output, and only entries that actually need to move. No tail clears.
+        assert(CountedBounds::copies==9+moves);
+        unsigned positions[2]{};
+        for(unsigned i=0;i<7;++i){
+            const unsigned group=(mask>>i)&1u;
+            const auto& output=group?sibling:source;
+            assert(output.entries[positions[group]++].bounds.value==i+1);
+        }
+        assert(source.count==positions[0]&&sibling.count==positions[1]);
+        for(unsigned i=source.count;i<6;++i)assert(source.entries[i].bounds.value==i+1);
+        for(unsigned i=sibling.count;i<6;++i)assert(sibling.entries[i].bounds.value==100+i);
+    }
+}
 static Box merge(Box a,Box b){return {std::min(a[0],b[0]),std::min(a[1],b[1]),std::max(a[2],b[2]),std::max(a[3],b[3])};}
 static float area(Box b){return (b[2]-b[0])*(b[3]-b[1]);}
 // Native binary32 scalar oracle, structurally separate from integer arithmetic.
@@ -126,6 +170,7 @@ static void check(const Box (&boxes)[7]){
     assert(counts[0]>=2 && counts[1]>=2 && counts[0]+counts[1]==7);
 }
 int main(){
+    splitCopyWork();
     {
         std::uint32_t seed=0x473bed2u;
         for(unsigned i=0;i<100000;++i){

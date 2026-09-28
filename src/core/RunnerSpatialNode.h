@@ -47,13 +47,13 @@ template<class Box> struct RunnerSpatialNodeStorage {
         const Entry last=incoming;
         sibling.level=level;sibling.count=0;count=0;
         for(unsigned i=0;i<6;++i){
-            const Entry value=entries[i];
-            if(groups.group[i])sibling.append(value);
-            else append(value);
+            if(groups.group[i])sibling.append(entries[i]);
+            else if(count==i)++count; // This entry is already in its final slot.
+            else append(entries[i]); // Compaction writes strictly behind i.
         }
         if(groups.group[6])sibling.append(last);else append(last);
-        for(unsigned i=count;i<6;++i)entries[i]=Entry{};
-        for(unsigned i=sibling.count;i<6;++i)sibling.entries[i]=Entry{};
+        // Only [0,count) is live. Future append overwrites its destination;
+        // readers/conversion must not inspect or require cleared tail slots.
         return true;
     }
 };
