@@ -1,5 +1,6 @@
 #include "core/DroneBulletVerification.h"
 #include "core/DroneBulletSolidVerification.h"
+#include "core/DroneBulletInstancesVerification.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cmath>
@@ -22,6 +23,7 @@ int main(){
     assert(DroneBulletVerification::run());
     assert(DroneBulletVerification::lifetime(1)&&DroneBulletVerification::lifetime(2));
     assert(DroneBulletSolidVerification::run(true));
+    assert(DroneBulletInstancesVerification::run());
     unsigned steps=0;
     for(int degrees:{0,45,90,180,270,359})for(unsigned alarm:{0u,1u,16u}){
         DroneBulletSourceStep shot;GameMakerRandom random(9),oracle(9);bool good=true;

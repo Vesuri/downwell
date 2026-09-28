@@ -7,6 +7,7 @@
 #include "CurrencySpawnVerification.h"
 #include "DroneBulletVerification.h"
 #include "DroneBulletSolidVerification.h"
+#include "DroneBulletInstancesVerification.h"
 namespace downwell {
 // Test-only lifecycle tape, shared by host tests and the 68000 debugger gate.
 // The exit is deliberately placed at the player; this is not evidence for a
@@ -30,6 +31,7 @@ struct GameplayFieldReentryVerification {
         if(!CurrencySpawnVerification::run())return false;
         if(!DroneBulletVerification::run())return false;
         if(!DroneBulletSolidVerification::run())return false;
+        if(!DroneBulletInstancesVerification::run())return false;
         // Controlled explicit source IDs exercise registration; this does not
         // supply the unrecovered global birth stream of a natural run.
         if(!owner.createTimeChangeWithSourceId(timeChanges,105187,

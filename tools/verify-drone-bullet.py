@@ -12,6 +12,10 @@ assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
 obj = manifest["resources"]["objects"][266]
 assert (obj["name"], obj["parentId"], obj["spriteId"]) == ("bulletDrone", 89, 458)
+parent = manifest["resources"]["objects"][89]
+assert parent["name"] == "parentPBullet" and parent["parentId"] == -1
+assert sha256((export / "Assembly/gml_Object_parentPBullet_Create_0.asm").read_bytes()).hexdigest() == \
+    "2a8a1682f62d2b8a80b389ce6bd90baa2e1165b9c1d9b54fc2a0c82f5bfd49c6"
 sprite = manifest["resources"]["sprites"][459]
 assert len(sprite["frames"]) == 6 and (sprite["originX"], sprite["originY"]) == (8, 8)
 events = {

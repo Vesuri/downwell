@@ -141,6 +141,21 @@ failed destruction callback cannot be retried by continuing the same tape.
 Owners must still supply active-room, birth-cutoff and destruction eligibility;
 the standalone state does not invent a separate family-wide scheduling pass.
 
+`DroneBulletInstances` supplies shared fixed storage and lifecycle publication.
+Room-provided source IDs are independent of monotonically increasing local
+generations. Constructor membership publishes sprite 458 and image speed 1
+before Create sets speed zero and changes the sprite to 459; completed Create
+then exposes speed 7, damage 4 and alarm 16. A partial birth is retained when
+publication fails. Publishers continue resolving the same marked generation
+through the remaining event, including final position writes. Retirement is
+deferred and cannot reuse an executing record. Explicit teardown can release
+partial births without resetting generations. The ownership tape exercises
+inactive/destroyed eligibility, post-destroy movement, reuse, stale handles,
+capacity/duplicate-ID rejection and failure cleanup on host and 68000. The
+live world adapters still need to register this family with resource-backed
+collision/layer ownership and their shared phase ordering; no natural births
+are enabled by the store alone.
+
 The final box `alarmStop(0)` adapter also resolves its caller again after the
 time-bound query. A callback which retires the caller cannot publish into its
 old storage, and a nested ownership failure remains terminal even if the
