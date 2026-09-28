@@ -101,8 +101,8 @@ AMIGA_SPLASH_FRAME_SHA256 := b82d3f72e70a9788a16bdeb5f681fc675d831562d407bfeac31
 AMIGA_CONTROLS_FRAME_SHA256 := ee3f455e6c9192d08f64ea26cf6b56338badf0dadeee56acf85ae2cd2838560a
 AMIGA_CREDITS_FRAME_SHA256 := 9e7137cae00e1925f0a61c045f23ed1571358e9e02451b2acf9db036453d3af1
 AMIGA_MENU_WAKE_FRAME_SHA256 := d616f4469720f60a3f18bdbc55a8851422b923e62ec7c75547edcce08fe8b449
-AMIGA_MENU_TITLE_FRAME_SHA256 := d9fcc0c40f37e61e239593aa8520a47415c054439283d7992264c40b63b39f2a
-AMIGA_MENU_ENTRY_FRAME_SHA256 := f734aa6e16f4014ddbba20d84a4ba871aa8eaa339f4bdf383bb0a25f33e20d2b
+AMIGA_MENU_TITLE_FRAME_SHA256 := 5b1a054fc5edb1a8adf96a81cc07942bf5ef863e6cbbfbbfedd5bdf4304c0791
+AMIGA_MENU_ENTRY_FRAME_SHA256 := 21e58d135d92be921bbfa40245e7d074505fecf0b1d7b1c0fb47f92ef0fa61fe
 AMIGA_GAMEPLAY_FRAME_SHA256 := 8a94f47718ac0e5685d37da5c9413921a3d1f7e708f1c7ec506e36ee60a9d78b
 AMIGA_GAMEPLAY_ACTIVE_FRAME_SHA256 := 99df9f0d8470151c8499d741b544e804571b918a9d95d9ebbebfdd15efba24f2
 AREA_ONE_TRACE_TARGET := build/trace-area-one
@@ -2063,19 +2063,20 @@ verify-amiga-menu-wake-frame: $(AMIGA_MENU_TEST_TARGET)
 	printf '%s  %s\n' '$(AMIGA_MENU_WAKE_FRAME_SHA256)' 'amiga/.run/menu-wake-frame.bin' | shasum -a 256 -c -
 	python3 tools/decode-amiga-menu-frame.py amiga/.run/menu-wake-frame.bin build/amiga-menu-wake-frame.png
 
-verify-amiga-menu-title-frame:
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1'
-	bash -c '. amiga/env.sh && GDB_SOURCE=verify_menu_title_frame.gdb READY_MARKER=DOWNWELL_MENU_TITLE_FRAME_READY READY_DESCRIPTION="fully revealed Downwell title frame" amiga/verify_startup.sh'
-	printf '%s  %s\n' '$(AMIGA_MENU_TITLE_FRAME_SHA256)' 'amiga/.run/menu-title-frame.bin' | shasum -a 256 -c -
-	python3 tools/decode-amiga-menu-frame.py amiga/.run/menu-title-frame.bin build/amiga-menu-title-frame.png
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
+.PHONY: verify-amiga-garden-frames
+verify-amiga-menu-title-frame verify-amiga-menu-entry-frame: verify-amiga-garden-frames
 
-verify-amiga-menu-entry-frame:
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1'
-	bash -c '. amiga/env.sh && GDB_SOURCE=verify_menu_entry_frame.gdb READY_MARKER=DOWNWELL_MENU_ENTRY_FRAME_READY READY_DESCRIPTION="first hardware-scrolled well-entry frame" amiga/verify_startup.sh'
+verify-amiga-garden-frames: $(AMIGA_MENU_TEST_TARGET)
+	bash amiga/verify_menu_wake_frame.sh all
+	python3 tools/verify-amiga-garden-cache.py amiga/.run/menu-wake-frame.bin
+	python3 tools/verify-amiga-garden-cache.py --scene title amiga/.run/menu-title-frame.bin
+	python3 tools/verify-amiga-garden-cache.py --scene entry amiga/.run/menu-entry-frame.bin
+	printf '%s  %s\n' '$(AMIGA_MENU_WAKE_FRAME_SHA256)' 'amiga/.run/menu-wake-frame.bin' | shasum -a 256 -c -
+	printf '%s  %s\n' '$(AMIGA_MENU_TITLE_FRAME_SHA256)' 'amiga/.run/menu-title-frame.bin' | shasum -a 256 -c -
 	printf '%s  %s\n' '$(AMIGA_MENU_ENTRY_FRAME_SHA256)' 'amiga/.run/menu-entry-frame.bin' | shasum -a 256 -c -
+	python3 tools/decode-amiga-menu-frame.py amiga/.run/menu-wake-frame.bin build/amiga-menu-wake-frame.png
+	python3 tools/decode-amiga-menu-frame.py amiga/.run/menu-title-frame.bin build/amiga-menu-title-frame.png
 	python3 tools/verify-amiga-entry-continuity.py
-	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga'
 
 verify-amiga-gameplay-frame: build/capture-sdl-game
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga SCENE_VERIFY=1 SKIP_TO_GAME=1'

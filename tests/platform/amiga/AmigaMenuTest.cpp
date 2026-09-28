@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
         for(unsigned i=0;i<list.count;++i){
             const auto& item=list.items[i];
             std::cout<<"SCENERY "<<item.instanceId<<' '<<item.objectId<<' '
-                <<item.spriteId<<' '<<item.frame<<' '<<item.x<<' '<<item.y<<'\n';
+                <<item.spriteId<<' '<<item.frame<<' '<<item.x<<' '<<item.y<<' '<<item.depth<<'\n';
         }
 
     std::cout << "Amiga menu reconstruction tests passed\n";

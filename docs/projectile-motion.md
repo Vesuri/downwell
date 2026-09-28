@@ -880,7 +880,14 @@ or second cache-sized allocation, and does not change hardware scrolling.
 against original RGBA atlas pixels at source placements, independently of the
 planar encoder and blitter. The host placement test first checks VM-derived
 Create choices and exact source membership order. The raster check covers the
-waking caches, not complete dynamic title animation or gameplay layering.
+waking caches. `verify-amiga-garden-frames` captures wake, final title and first
+well-entry frames in one bounded run, checking both garden planes and the tall
+entry cache against source atlas pixels. Title placement uses objWell Create
+and objTitle Step's final-frame offset, at the dynamic depth-zero boundary.
+The continuity check also requires identical foreground world pixels across
+the cache switch and a still-visible parallax background. Neither check proves
+the entire title animation, omitted particles or gameplay layering. All these
+capture runs restore the ordinary native build even after verification fails.
 
 Native registration uses `GameplayScriptSpawnInstances`, borrowed by the world
 and owned by its collision backend. Its appended handle range leaves existing
