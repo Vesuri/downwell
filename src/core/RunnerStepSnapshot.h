@@ -16,12 +16,17 @@ template<unsigned Capacity> class RunnerStepSnapshot {
     }
     void swap(unsigned a,unsigned b){const auto value=entries_[a];entries_[a]=entries_[b];entries_[b]=value;}
     void sift(unsigned root,unsigned size){
+        const unsigned original=root;
+        const Entry value=entries_[root];
         while(root<size/2){
             unsigned child=root*2+1;
             if(child+1<size&&less(entries_[child],entries_[child+1]))++child;
-            if(!less(entries_[root],entries_[child]))break;
-            swap(root,child);root=child;
+            if(!less(value,entries_[child]))break;
+            // Move the hole down rather than exchanging two complete entries
+            // at each level. The saved root is written only at its final slot.
+            entries_[root]=entries_[child];root=child;
         }
+        if(root!=original)entries_[root]=value;
     }
 public:
     void clear(){count_=0;}
