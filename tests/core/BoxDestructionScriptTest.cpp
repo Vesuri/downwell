@@ -73,6 +73,17 @@ struct Ops {
     bool alarmStop(int a){assert(a==0);return event(Stop);}
 };
 int main(){
+    for(int damage:{9,15}){
+        BreakableState state;bool applied=false;
+        assert(state.bulletHit(MotionBinary64::fromInteger(damage),applied)&&applied&&state.hit&&state.exhausted());
+        const auto expected=MotionBinary64::fromInteger(1-damage);
+        assert(state.wallHp.high==expected.high&&state.wallHp.low==expected.low);
+        assert(state.bulletHit(MotionBinary64::fromInteger(damage),applied)&&!applied&&state.wallHp.high==expected.high);
+    }
+    {BreakableState state;bool applied=false;state.wallHp={0x3fe00000u,0};
+        assert(state.bulletHit({0x3fd00000u,0},applied)&&applied&&!state.exhausted()&&state.wallHp.high==0x3fd00000u);
+        const auto before=state.wallHp;
+        assert(!state.bulletHit({0x7ff00000u,0},applied)&&state.wallHp.high==before.high&&state.wallHp.low==before.low);}
     for(int value:{-2,-1,0,1,5})for(bool allowed:{false,true}){
         BreakableState state;state.scriptIndex=17;auto alarm=value;
         assert(state.stopAlarmZero(allowed,alarm));

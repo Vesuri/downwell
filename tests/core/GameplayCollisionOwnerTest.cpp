@@ -2199,12 +2199,8 @@ int main(){
         world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==1&&
             world->findBreakable(key)->state.wallHp.high==0x3ff00000u);
-        world->step(0);
-        const auto* box=world->findBreakable(key);
-        assert(world->effectsSucceeded()&&box&&box->alarm0==0&&box->state.wallHp.zero()&&
-            box->active&&!box->destroyRequested);
         // Zero retires to -1 without dispatching a second event.
-        assert(world->publishBoxHealth(key,MotionBinary64::fromInteger(3)));
+        assert(world->publishBoxAlarm0(key,0)&&world->publishBoxHealth(key,MotionBinary64::fromInteger(3)));
         world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==-1&&
             world->findBreakable(key)->state.wallHp.high==0x40080000u);

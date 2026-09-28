@@ -124,6 +124,9 @@ struct GameplayFieldReentryVerification {
         const int boxX=64,boxY=1200;
         const InstanceHandle box{0,1};
         if(!world.appendBreakables(&boxX,&boxY,1)||!world.publishBoxAlarm0(box,2))return false;
+        const auto* liveBox=world.findBreakable(box);
+        if(!liveBox||!BoxSoundVerification::run(world,box,liveBox->state.breakSound,
+            [&](){return &world.findBreakable(box)->sound;}))return false;
         for(unsigned i=0;i<8;++i){
             world.step(0);++gameSteps;if(!world.effectsSucceeded())return false;
             // Controlled frozen-instance input, not a substitute for the live
@@ -131,10 +134,11 @@ struct GameplayFieldReentryVerification {
             if(i<2&&(!world.stopBoxAlarm0(box,[](bool& allowed){allowed=false;return true;})||
                 world.findBreakable(box)->alarm0!=2))return false;
         }
-        const auto* liveBox=world.findBreakable(box);
-        if(!liveBox||liveBox->alarm0!=-1||!liveBox->state.wallHp.zero()||!liveBox->active||liveBox->destroyRequested)return false;
-        if(!BoxSoundVerification::run(world,box,liveBox->state.breakSound,[&](){return &world.findBreakable(box)->sound;}))return false;
-        if(!world.breakableActiveAt(boxX,boxY)||!world.markBreakableDestroyed(box)||
+        liveBox=world.findBreakable(box);
+        // Alarm expires on the fourth tick (the first two were refunded).
+        // Its ordinary Step marks destruction; subsequent ticks exclude it.
+        if(!liveBox||liveBox->alarm0!=0||!liveBox->state.wallHp.zero()||!liveBox->active||!liveBox->destroyRequested)return false;
+        if(world.breakableActiveAt(boxX,boxY)||!world.markBreakableDestroyed(box)||
             world.breakableActiveAt(boxX,boxY)||!world.findBreakable(box)||
             !owner.prepareDraw()||world.findBreakable(box))return false;
         if(!world.goalFieldInstances().find(local)||!owner.state(key)||!world.startTimeField()||

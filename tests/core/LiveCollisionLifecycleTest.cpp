@@ -330,6 +330,24 @@ int main(){
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach natural box alarm world");world->skipToGameForTesting();
+        InstanceHandle box;
+        for(unsigned tick=0;tick<1000&&!box.generation;++tick){
+            for(unsigned i=0;i<world->activeInstanceCount();++i)
+                if(world->instanceAt(i).objectId==92&&world->instanceAt(i).active){box=world->instanceHandleAt(i);break;}
+            if(!box.generation)world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+        }
+        require(box.generation&&world->publishBoxAlarm0(box,1),"arm naturally generated box");
+        bool retained=false;
+        require(world->stepWithCollisionPass({},false,[&]{
+            const auto* r=owner->resolve(box);
+            retained=r&&r->active&&r->destroyRequested&&r->box.wallHp.zero()&&r->alarms.get(0)==0;
+            return retained;
+        })&&retained&&!owner->resolve(box),"Alarm expiry reaches box Step, then collision retention and pre-Draw cleanup");
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach box field world");world->skipToGameForTesting();
         InstanceHandle selected{};
         for(unsigned tick=0;tick<600&&!selected.generation;++tick){
@@ -355,11 +373,9 @@ int main(){
         world->step({},false);
         require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==1&&
             owner->resolve(selected)->box.wallHp.high==0x3ff00000u,"box alarm counts down without early damage");
-        world->step({},false);
-        require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==0&&
-            owner->resolve(selected)->box.wallHp.zero()&&owner->resolve(selected)->active&&
-            !owner->resolve(selected)->destroyRequested,"box Alarm 0 changes health without retiring its lifetime");
-        require(world->publishBoxHealth(selected,MotionBinary64::fromInteger(3)),"restore box health to detect duplicate dispatch");
+        // Test an already-fired alarm independently of its destruction Step.
+        require(world->publishBoxAlarm0(selected,0)&&world->publishBoxHealth(selected,MotionBinary64::fromInteger(3)),
+            "prepare retained box with an already-fired alarm");
         world->step({},false);
         require(world->effectsSucceeded()&&owner->resolve(selected)->alarms.get(0)==-1&&
             owner->resolve(selected)->box.wallHp.high==0x40080000u,"zero alarm retires without re-firing");

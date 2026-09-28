@@ -620,14 +620,6 @@ void GameplayWorld::configureBreakables(const int* x, const int* y,
     if(!appendBreakables(x, y, count))run_.effectsSucceeded=false;
 }
 
-bool GameplayWorld::inactivateBreakable(unsigned index) {
-    auto& box=breakables_[index];
-    if(!breakableLifecycle_.activation({index,box.lifetimeId},box,false)) {
-        run_.effectsSucceeded=false;return false;
-    }
-    box.active=false;return true;
-}
-
 bool GameplayWorld::retireBreakable(unsigned index) {
     auto& box=breakables_[index];
     if(!box.lifetimeId)return true;
@@ -649,7 +641,7 @@ bool GameplayWorld::markBreakableDestroyed(downwell::InstanceHandle handle) {
     auto* box=const_cast<Breakable*>(findBreakable(handle));
     if(!run_.effectsSucceeded||!box){run_.effectsSucceeded=false;return false;}
     if(box->destroyRequested)return true;
-    if(!breakableLifecycle_.markDestroyed(handle,*box)){run_.effectsSucceeded=false;return false;}
+    if(breakableLifecycle_.hasOwner()&&!breakableLifecycle_.markDestroyed(handle,*box)){run_.effectsSucceeded=false;return false;}
     box->destroyRequested=true;return true;
 }
 
@@ -958,8 +950,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const int muzzleY = (int)downwell::roundGameMakerQ8(player_.offsetYFixed()) + 4;
     struct HeadBreakContext {
         GameplayWorld* runtime;
-        int index;
-    } headBreak = {this, -1};
+    } headBreak = {this};
     player_.configureBreakBoxResolver([](void* opaque, long x, long y, bool& found) {
         auto& context = *static_cast<HeadBreakContext*>(opaque);
         auto& runtime = *context.runtime;
@@ -971,9 +962,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             bool hit=false;
             if(!downwell::PlayerBoxContact::testPrepared(bounds,box.x+240,box.y+176,hit))return false;
             if (hit) {
-                if(!runtime.inactivateBreakable(i))return false;
-                ++runtime.blocksDestroyed_;
-                context.index = (int)i;
+                box.state.wallHp={}; // scrWallCol leaves destruction to Step.
                 found=true;
                 return true;
             }
@@ -996,11 +985,6 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         });
     player_.configureBreakBoxResolver(nullptr, nullptr);
     if(!run_.effectsSucceeded)return {};
-    if (headBreak.index >= 0) {
-        const Breakable& box = breakables_[headBreak.index];
-        destroyedBlockX[destroyedBlockCount] = box.x;
-        destroyedBlockY[destroyedBlockCount++] = box.y;
-    }
     if (player_.shots() != oldShots) {
         const int muzzleOffset = emitter_.nextOffset();
         // Marked records remain resolvable until Draw cleanup; never compact
@@ -1117,6 +1101,19 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if (!generationSucceeded_) return {};
     }
 
+    // objBox_n (92) observes health after player Begin Step and before bullet
+    // Step (261). Full destruction effects/rewards remain separate integration
+    // work; do not remove collision membership inside the contact query.
+    for(unsigned i=0;i<breakableCount_;++i){
+        auto& box=breakables_[i];
+        if(!box.lifetimeId||!box.active||box.destroyRequested||!box.state.exhausted())continue;
+        if(destroyedBlockCount==destroyedCapacity){run_.effectsSucceeded=false;return {};}
+        if(!markBreakableDestroyed({i,box.lifetimeId}))return {};
+        destroyedBlockX[destroyedBlockCount]=box.x;
+        destroyedBlockY[destroyedBlockCount++]=box.y;
+        ++blocksDestroyed_;
+    }
+
     /*
      * The adapted default bullet receives its Step later in the phase in
      * which objPlayer_n creates it. Existing and newly-created shots therefore
@@ -1152,7 +1149,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                         return impact.kind != downwell::BulletImpactKind::ignored;
                     }
                     return false;
-                }, [this, &destroyedBlockCount, &destroyedBlockX, &destroyedBlockY]
+                }, [this, &bullet]
                    (const downwell::ProjectileSegment& path) {
                     unsigned firstBlock = 0, endBlock = breakableCount_;
                     if (breakableIndexReady_) {
@@ -1180,14 +1177,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                         // Indexed selection already proved this exact hit.
                         if (block.active && !block.destroyRequested && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
                                                            block.y - 8, block.y + 8))) {
-                            if(!inactivateBreakable(blockIndex))return true;
-                            if (destroyedBlockCount < destroyedCapacity) {
-                                destroyedBlockX[destroyedBlockCount] = block.x;
-                                destroyedBlockY[destroyedBlockCount] = block.y;
-                                ++destroyedBlockCount;
+                            bool applied=false;
+                            if(!block.state.bulletHit(downwell::MotionBinary64::fromInteger(
+                                downwell::machineGunProfile(bullet.gemHigh).damage),applied)){
+                                run_.effectsSucceeded=false;return true;
                             }
-                            ++blocksDestroyed_;
-                            return true;
+                            return applied;
                         }
                     }
                     // An ordinary, non-wave bullet also stops at unbreakable walls.

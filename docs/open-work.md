@@ -93,6 +93,8 @@ behavior, both backend integrations and relevant original-game verification.
   real formatting; verify fractional text placement against the original.
 - Connect debris to source-ordered natural breakable destruction and complete
   its production scheduling, including the player's live time-stop state.
+  Replace the removal-only box Step with the full ordered audio, smoke, flash,
+  impact, chain-reaction, debris and reward sequence before lifetime retirement.
 - Implement remaining blood, corpse and blast dependencies. Preserve
   synchronous child Create, RNG consumption and mutation order before rewards
   and retirement.

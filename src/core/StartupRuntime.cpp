@@ -811,16 +811,15 @@ void StartupRuntime::updateMainBullets() {
                 return true;
             }
             return false;
-          }, [this](const ProjectileSegment& path) {
+          }, [this,&bullet](const ProjectileSegment& path) {
             InstanceRecord* wall = mainBulletCollision(path);
             if (wall != nullptr) {
                 if (wall->objectId == 92) {
-                    // objBox_n starts with wallHp = 1. The usual gun's bdmg
-                    // exhausts it on contact; its Step event destroys it.
-                    if (!publishMainInactivation(*wall)) return true;
-                    wall->active = false;
-                    ++mainBlocksDestroyed_;
-                    ++soundPlayRequests_;
+                    bool applied=false;
+                    if(!wall->box.bulletHit(MotionBinary64::fromInteger(machineGunProfile(bullet.gemHigh).damage),applied)){
+                        run_.effectsSucceeded=false;return true;
+                    }
+                    return applied;
                 }
                 return true;
             }
@@ -1408,10 +1407,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
             bool hit=false;
             if(!PlayerBoxContact::testPrepared(bounds,box.x,box.y,hit))return false;
             if (hit) {
-                if (!runtime.publishMainInactivation(box)) return false;
-                box.active = false;
-                ++runtime.mainBlocksDestroyed_;
-                ++runtime.soundPlayRequests_;
+                box.box.wallHp={}; // scrWallCol writes health, not inactivity.
                 found=true;
                 return true;
             }
@@ -1859,6 +1855,16 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
     case 1086: // gml_Object_objBox_n_Alarm_0
         ++implementedCodeCalls_;
         if(instance!=nullptr)instance->box.alarmZero();
+        return;
+    case 1088: // gml_Object_objBox_n_Step_0: destruction boundary only.
+        ++implementedCodeCalls_;
+        // Full BoxDestructionScript child effects/rewards and alarmStop remain
+        // integration work. Keep removal at the source event, not in queries.
+        if(instance&&instance->box.exhausted()){
+            const auto key=instances_.handleAt(unsigned(instance-&instances_.at(0)));
+            if(!markBoxDestroyed(key))return;
+            ++mainBlocksDestroyed_;++soundPlayRequests_;
+        }
         return;
     case 1085: // gml_Object_objBox_n_Create_0
         ++implementedCodeCalls_;

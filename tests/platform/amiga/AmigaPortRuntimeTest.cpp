@@ -293,13 +293,21 @@ struct NativeBoxAudit {
         ++removals;return fail!=3;
     }
     bool membership(downwell::InstanceHandle,const GameplayWorld::Breakable&,bool){return true;}
+    template<class... A> bool move(A...){return true;}
+    template<class... A> bool sprite(A...){return true;}
+    template<class... A> bool imageIndex(A...){return true;}
+    bool markDestroyed(downwell::InstanceHandle h,const GameplayWorld::Breakable& b){
+        ++calls;require(b.active&&!b.destroyRequested&&h.generation==b.lifetimeId&&b.state.exhausted(),
+            "box Step publishes destruction after health exhaustion");
+        ++removals;return fail!=3;
+    }
 };
 
 void testNativeBoxLifecycle(){
     using Binding=GameplayWorld::BreakableLifecycleBinding;
     for(bool head:{false,true})for(unsigned fail:{0u,3u}){
         NativeBoxAudit audit;audit.fail=fail;
-        GameplayWorld world(0,head,head?0:1000,false,{},Binding::bind(audit));
+        GameplayWorld world(0,head,head?0:1000,false,{},Binding::bindDestruction(audit));
         const int x=0,y=head?-24:12;
         world.configureBreakables(&x,&y,1);
         const auto handle=audit.last;
@@ -307,10 +315,21 @@ void testNativeBoxLifecycle(){
             return static_cast<GameplayWorld*>(p)->breakableActiveAt(0,-24)&&
                    x>=-8&&x<=7&&y>=-32&&y<=-17;
         },&world);
-        for(unsigned i=0;i<6&&world.effectsSucceeded()&&!audit.removals;++i)world.step(4);
+        bool pending=false;
+        for(unsigned i=0;i<6&&world.effectsSucceeded()&&!audit.removals;++i){
+            world.step(4);
+            const auto* box=world.findBreakable(handle);
+            if(!head&&box&&box->state.exhausted()&&!audit.removals){
+                require(box->state.hit&&box->active&&!box->destroyRequested&&world.blocksDestroyed()==0,
+                    "bullet writes damage without removing the box during its own Step");
+                pending=true;
+            }
+        }
+        require(head||pending,"bullet damage is retained until the next box Step");
         require(audit.removals==1&&world.effectsSucceeded()==(fail==0),"both box contact paths check publication");
-        require(world.findBreakable(handle)&&world.findBreakable(handle)->active==(fail!=0)&&
-                world.blocksDestroyed()==(fail?0u:1u),"contact retains identity and changes active/count only on success");
+        require(world.findBreakable(handle)&&world.findBreakable(handle)->active&&
+                world.findBreakable(handle)->destroyRequested==(fail==0)&&world.blocksDestroyed()==(fail?0u:1u),
+                "box Step retains identity and marks/counts only on successful publication");
         if(fail){
             const auto calls=audit.calls;world.step(4);
             require(audit.calls==calls,"failed box contact stays latched");

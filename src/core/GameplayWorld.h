@@ -917,7 +917,6 @@ private:
     bool birthPlayerOwnership();
     bool retirePlayerOwnership();
     bool publishPlayerPosition(int x,int y);
-    bool inactivateBreakable(unsigned index);
     bool retireBreakable(unsigned index);
     bool clearBreakableOwnership();
     std::uint32_t nextBreakableLifetimeId_ = 1;

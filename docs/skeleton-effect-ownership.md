@@ -69,6 +69,25 @@ further effect work. Resource-backed tests cover fractional placement, setter
 ordering, unchanged RNG and the partial-failure prefix in both worlds. This
 entry point is not yet admission of the complete natural box destruction Step.
 
+Both live adapters retain the usual bullet's box damage until objBox_n Step:
+`scrBulCheckSolid` blocks 11–13 subtract the birth profile's damage from positive
+`wallHp`, set `hit`, and consume the non-consistent bullet. Already exhausted
+health does not receive another subtraction or consume that bullet. A head hit
+instead writes zero health (`scrWallCol` block 34). Neither query inactivates
+the box. The current removal subset runs at object-92 ordinary Step, before
+object-261 bullet Step: head hits and expired alarms remove the box that tick,
+while bullet damage waits until the next box Step. Destruction is marked before
+Draw cleanup retires the lifetime. Native terrain damage is emitted at that
+same removal boundary, not when the projectile query first hits.
+
+This corrects the existing removal timing; it is not the complete source event.
+The full ordered audio/smoke/flash/impact/chain/debris/reward sequence and live
+`alarmStop` still need to replace the removal subset using `BoxDestructionScript`.
+Do not treat the lack of new particles or RNG consumption here as source parity.
+The host/native lifecycle tape checks expiry, retained destruction and cleanup;
+native contact tests additionally check the intervening live damaged-box frame
+and failure of destruction publication.
+
 `SoundPlayScript` models the original plain and overlap-aware audio scripts,
 including caller scratch fields and partial-failure ordering. The overlap
 channels are footsteps/gunshot/gunwall/merchant/enemymove/music/waterEnemy/
