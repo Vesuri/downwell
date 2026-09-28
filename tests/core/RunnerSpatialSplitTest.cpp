@@ -142,10 +142,25 @@ int main(){
     const std::uint32_t productEdges[]={0,0x80000000,1,0x800000,0x00800001,0x3f800000,
         0x3f800001,0x3fc00000,0x7f7fffff,0x7f800000,0x7fc00000,0xffffffff};
     for(auto a:productEdges)for(auto b:productEdges)productCheck(a,b);
+    auto subtractCheck=[](std::uint32_t a,std::uint32_t b){
+        Split::Real left{a},right{b},actual{0x12345678},expected=actual;
+        auto wide=left.promoted();
+        const bool ok=wide.add(Split::negate(right).promoted())&&expected.assign(wide);
+        assert(Split::sub(left,right,actual)==ok&&actual.bits==expected.bits);
+        auto aliasLeft=left,aliasRight=right;
+        assert(Split::sub(aliasLeft,right,aliasLeft)==ok);
+        assert(aliasLeft.bits==(ok?expected.bits:left.bits));
+        assert(Split::sub(left,aliasRight,aliasRight)==ok);
+        assert(aliasRight.bits==(ok?expected.bits:right.bits));
+    };
+    for(auto a:productEdges)for(auto b:productEdges)subtractCheck(a,b);
     std::uint32_t seed=0x612de529;
     for(unsigned i=0;i<1000000;++i){
         seed=seed*1664525u+1013904223u;const auto a=seed;
         seed=seed*1664525u+1013904223u;productCheck(a,seed);
+        subtractCheck(a,seed);subtractCheck(a,a);
+        subtractCheck(a,0);subtractCheck(a,0x80000000u);
+        subtractCheck(0,a);subtractCheck(0x80000000u,a);
     }
     using Node=downwell::RunnerSpatialNode;
     for(unsigned removed=0;removed<6;++removed){
