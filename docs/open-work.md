@@ -50,7 +50,8 @@ behavior, both backend integrations and relevant original-game verification.
   Keep layer Draw order separate from room animation order; audit existing
   room-list-based Draw adapters against the selected runner branch. See the
   [depth-update audit](projectile-motion.md#selected-depth-update-path).
-  Connect fixed-layer ownership to the native gameplay adapter; complete live
+  Complete native ownership for omitted room/controller instances and mixed
+  composition across retained terrain, fields and separate effect passes; complete live
   depth-setter publication, activation ordering and Draw-time structural
   mutation handling; preserve inactive-instance termination of each layer walk.
 - Resolve remaining precise-mask sampling and original runtime FP-mode/rounding

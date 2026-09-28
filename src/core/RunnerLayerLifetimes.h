@@ -29,13 +29,19 @@ public:
     // saved layer ID. The room owner supplies fields after source teardown.
     // Pending depth requests belong to that owner too, not to this snapshot.
     bool adopt(const State& state){
+        if(!state.sourceId)return fail();
+        return adoptState(state);
+    }
+private:
+    bool adoptState(const State& state){
         const auto h=state.handle;
         if(!succeeded()||h.slot>=I||!h.generation||states_[h.slot].handle.generation||
             !RunnerSpatialSplit::valid(state.depth.depth))return fail();
         for(unsigned i=0;i<I;++i)
-            if(states_[i].handle.generation&&states_[i].sourceId==state.sourceId)return fail();
+            if(state.sourceId&&states_[i].handle.generation&&states_[i].sourceId==state.sourceId)return fail();
         states_[h.slot]=state;return true;
     }
+public:
     // Globals enumerates surviving handles in original global hash order.
     // Serialized bindings precede fallback and the one inactive-tail pass.
     // Other initializes owned non-instance elements (e.g. backgrounds).
@@ -61,7 +67,18 @@ public:
             },[&](int depth,unsigned& slot){return ids_.createDynamic(layers_,depth,slot);},other)||fail();
     }
     bool birth(InstanceHandle h,std::uint32_t sourceId,RunnerImageValue depth,bool inactive){
-        if(!adopt({h,sourceId,{depth,-1,false,false},inactive}))return false;
+        if(!sourceId)return fail();
+        return birthState(h,sourceId,depth,inactive);
+    }
+    // Native actors whose original global numeric ID is not recovered yet.
+    // Ownership/migration use handles; no synthetic source ID is allocated.
+    // Such lifetimes must be retired, never carried through room ID lookup.
+    bool birthUnnumbered(InstanceHandle h,RunnerImageValue depth,bool inactive){
+        return birthState(h,0,depth,inactive);
+    }
+private:
+    bool birthState(InstanceHandle h,std::uint32_t sourceId,RunnerImageValue depth,bool inactive){
+        if(!adoptState({h,sourceId,{depth,-1,false,false},inactive}))return false;
         auto& state=states_[h.slot];
         const auto reserved=registry_.find(sourceId);
         const bool ok=reserved!=Registry::End?
@@ -70,6 +87,7 @@ public:
                 [&](int value,unsigned& slot){return ids_.createDynamic(layers_,value,slot);});
         return ok||fail();
     }
+public:
     // Publish flags when source activation changes, but relink only at its
     // separate reconciliation phase (not at the flag-write boundary).
     bool publishInactive(InstanceHandle h,bool inactive){

@@ -8,6 +8,7 @@
 #include "SmokeTrig.h"
 #include "DebrisDraw.h"
 #include "TimeStopBound.h"
+#include "GameplayRoomLayers.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -26,6 +27,7 @@ private:
     RunnerObjectFamilies<386> families_;
     const ObjectPack& objects_;
     const SpriteCollisionPack& sprites_;
+    GameplayRoomLayers<View::capacity> layers_;
     GameplayWorld* world_=nullptr;
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
@@ -92,6 +94,7 @@ private:
         }
         bool birth(InstanceHandle local,const Record& r){
             InstanceHandle h;if(!key(local,r,h,true))return false;
+            if constexpr(Kind==View::Kind::player)if(!parent.check(parent.layers_.prepare()))return false;
             constexpr bool roomCoordinates=Kind==View::Kind::player||Kind==View::Kind::terrain||Kind==View::Kind::timeField||Kind==View::Kind::goalField||Kind==View::Kind::exitController;
             constexpr int ox=roomCoordinates?0:240,oy=roomCoordinates?0:176;
             Owner::State state;
@@ -132,6 +135,10 @@ private:
             }
             if(!parent.check(parent.owner_.publishBirth(h,parent.families_,
                 [&](InstanceHandle live,bool publish){return parent.refresh(live,publish);})))return false;
+            unsigned sourceId=0;
+            if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
+            if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
+            if(!parent.check(parent.layers_.birth(h,sourceId,p.depth,(state.flags&2u)!=0)))return false;
             if constexpr(Kind==View::Kind::player){
                 if(!parent.world_){parent.initialPlayer_=&r;parent.initialPlayerKey_=local;}
             }
@@ -141,7 +148,7 @@ private:
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
             if(!parent.check(parent.owner_.retire(h)))return false;
             parent.roomKeys_[h.slot]={};
-            return parent.check(parent.room_.remove(h.slot));}
+            return parent.check(parent.room_.remove(h.slot)&&parent.layers_.retire(h));}
         bool markDestroyed(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h))return false;
             const auto* state=parent.owner_.resolve(h);
@@ -151,6 +158,7 @@ private:
             return key(local,r,h)&&parent.check(parent.owner_.registerObject(h,member));}
         bool activation(InstanceHandle local,const Record& r,bool active){InstanceHandle h;
             if(!key(local,r,h)||!parent.check(parent.owner_.setActive(h,active,*parent.families_.flags(object(r)))))return false;
+            if(!parent.check(parent.layers_.activation(h,active)))return false;
             parent.activationPending_=true;return true;}
         bool move(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){InstanceHandle h;
             return key(local,r,h)&&parent.check(parent.owner_.move(h,x,y,*parent.families_.flags(object(r))));}
@@ -183,7 +191,8 @@ private:
     GameplayTerrainInstances terrain_;
 public:
     GameplayCollisionOwner(const ObjectPack& objects,const SpriteCollisionPack& sprites,
-        GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={}):objects_(objects),sprites_(sprites),
+        GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
+        const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
         good_=sprites.valid()&&families_.bindInstanceFlags(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
@@ -195,7 +204,7 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&layers_.valid();}
     bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
@@ -209,8 +218,8 @@ public:
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.room_.visitDrawChecked([&](unsigned slot){
-                const auto shared=self.roomKeys_[slot];View::Record record;
+            const auto draw=[&](InstanceHandle shared,RunnerImageValue depth){
+                View::Record record;
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
@@ -220,14 +229,29 @@ public:
                 if(!state||!View(*self.world_).resolve(shared,record))return false;
                 if(state->flags&0x100003u)return true;
                 switch(kind){
-                    case View::Kind::player:return visit(visitor,GameplayWorld::DrawActor::player,local,self.properties_[slot].depth);
-                    case View::Kind::enemy:return visit(visitor,GameplayWorld::DrawActor::enemy,local,self.properties_[slot].depth);
-                    case View::Kind::bullet:return visit(visitor,GameplayWorld::DrawActor::bullet,local,self.properties_[slot].depth);
-                    case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,self.properties_[slot].depth);
-                    case View::Kind::debris:return visit(visitor,GameplayWorld::DrawActor::debris,local,self.properties_[slot].depth);
+                    case View::Kind::player:return visit(visitor,GameplayWorld::DrawActor::player,local,depth);
+                    case View::Kind::enemy:return visit(visitor,GameplayWorld::DrawActor::enemy,local,depth);
+                    case View::Kind::bullet:return visit(visitor,GameplayWorld::DrawActor::bullet,local,depth);
+                    case View::Kind::scriptEffect:return visit(visitor,GameplayWorld::DrawActor::scriptEffect,local,depth);
+                    case View::Kind::debris:return visit(visitor,GameplayWorld::DrawActor::debris,local,depth);
                     default:return true;
                 }
-            });
+            };
+            if(self.layers_.enabled())return self.layers_.visit([&](InstanceHandle h,RunnerLayerDraw::Element& out){
+                const auto* state=self.owner_.resolve(h);if(!state)return false;
+                out.flags=state->flags;
+                View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
+                // Retained scenery/field passes own these draws. Preserve the
+                // inactive flag (which terminates a layer), but avoid event
+                // and sprite lookups for every terrain tile each frame.
+                if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
+                    kind!=View::Kind::debris&&kind!=View::Kind::player)return true;
+                PackedObject object;const int id=self.owner_.objectId(h);
+                out.object=self.objects_.findObject(id,object);
+                PackedObjectEvent event;out.drawEvent=out.object&&self.objects_.findEvent(id,8,0,event);
+                out.sprite=self.properties_[h.slot].sprite.spriteId>=0;return true;
+            },[&](InstanceHandle h,int depth){RunnerImageValue value;return real(depth,value)&&draw(h,value);});
+            return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.roomKeys_[slot],self.properties_[slot].depth);});
         },this);
         world.configureRoomAnimation([](void* context){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -248,7 +272,8 @@ public:
         },this);
         world.configurePhaseBoundary([](void* context,GameplayWorld::PhaseBoundary phase){
             auto& owner=*static_cast<GameplayCollisionOwner*>(context);
-            return owner.reconcileActivation()&&(phase!=GameplayWorld::PhaseBoundary::roomEntry||owner.prepareDraw());
+            return owner.reconcileActivation()&&owner.layers_.serviceDepths()&&
+                (phase!=GameplayWorld::PhaseBoundary::roomEntry||owner.prepareDraw());
         },this);
         world.configureEnemyStepOrder([](void* context,GameplayWorld::EnemyStepOrder& snapshot){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -444,7 +469,7 @@ public:
             if(!state){good_=false;return true;}
             return (state->flags&2u)!=0;
         },[&](unsigned slot,bool registered){
-            return good_&&owner_.registerObject(roomKeys_[slot],registered);
+            return good_&&owner_.registerObject(roomKeys_[slot],registered)&&layers_.reconcile(roomKeys_[slot]);
         });
         if(!check(result&&good_))return false;
         activationPending_=false;return true;

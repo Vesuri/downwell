@@ -1231,14 +1231,16 @@ __attribute__((noinline)) static int runDownwell(void) {
         (unsigned long)(amiga_collision_pack_end-amiga_collision_pack));
     const downwell::SpriteMaskPack collisionMasks(amiga_collision_masks,
         (unsigned long)(amiga_collision_masks_end-amiga_collision_masks));
-    if(!objects.valid()||!collisionSprites.valid()||!collisionMasks.valid())return 20;
+    const downwell::RoomPack rooms(amiga_room_pack,
+        (unsigned long)(amiga_room_pack_end-amiga_room_pack));
+    if(!objects.valid()||!collisionSprites.valid()||!collisionMasks.valid()||!rooms.valid())return 20;
     checkSceneStack(1);
     // Ownership precedes player construction and survives in-place run resets.
     // Keep these bounded tables off the AmigaDOS stack, like the world itself.
     alignas(downwell::GameplayCollisionOwner) static UBYTE collisionStorage[sizeof(downwell::GameplayCollisionOwner)];
     auto& collisionOwner=*new(collisionStorage) downwell::GameplayCollisionOwner(objects,collisionSprites,
         downwell::GameplayTerrainInstances::Presentation::bind(wallDamage),
-        downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision));
+        downwell::GameplayTerrainInstances::WallCollision::bind(wallCollision),&rooms);
     if(!collisionOwner.valid())return 20;
     checkSceneStack(2);
 #ifdef DOWNWELL_REPLAY_VERIFY
@@ -1366,9 +1368,6 @@ __attribute__((noinline)) static int runDownwell(void) {
         return 20; // AmigaDOS RETURN_FAIL; diagnostic reason remains available.
     }
     gDownwellStartupChipRemaining = AvailMem(MEMF_CHIP);
-    const downwell::RoomPack rooms(
-        amiga_room_pack,
-        (unsigned long)(amiga_room_pack_end - amiga_room_pack));
     const downwell::BuilderPatternPack builders(
         amiga_builder_pack,
         (unsigned long)(amiga_builder_pack_end - amiga_builder_pack));

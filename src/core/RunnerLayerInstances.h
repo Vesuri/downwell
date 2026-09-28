@@ -19,6 +19,7 @@ public:
     }
     const Entry* get(unsigned element)const{return element<ElementCapacity&&entries_[element].present?&entries_[element]:nullptr;}
     unsigned find(std::uint32_t sourceId)const{
+        if(!sourceId)return End; // Unnumbered native lifetimes have no ID lookup.
         for(unsigned i=0;i<ElementCapacity;++i)if(entries_[i].present&&entries_[i].sourceId==sourceId)return i;
         return End;
     }
@@ -32,7 +33,7 @@ public:
     // head, so final element order is reversed. No source element ID is
     // fabricated: element slots and source instance IDs are distinct concepts.
     bool reserve(Layers& layers,unsigned layer,std::uint32_t sourceId){
-        if(find(sourceId)!=End)return false;
+        if(!sourceId||find(sourceId)!=End)return false;
         const unsigned element=free(layers);
         if(element==End||!layers.attach(layer,element,true,false,[](unsigned){return false;}))return false;
         entries_[element]={sourceId,{},true};return true;
@@ -65,6 +66,9 @@ public:
         if(!layers.succeeded()||!get(element))return false;
         auto& entry=entries_[element];
         if(!entry.instance.generation)return true;
+        // An unnumbered lifetime cannot survive through the original global
+        // numeric-ID lookup. Its caller must retire it before room teardown.
+        if(!entry.sourceId)return false;
         if(entry.sourceId<=0x7fffffffu){
             InstanceHandle h;RunnerDepthService::Instance* state=nullptr;
             if(!lookup(entry.sourceId,h,state))return false;

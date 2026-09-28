@@ -1040,7 +1040,8 @@ int main(){
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
-        auto roomOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto roomOwner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
         auto roomWorld=std::make_unique<GameplayWorld>(300,true,0,false,roomOwner->enemyBinding(),
             roomOwner->breakableBinding(),roomOwner->playerBinding(),&roomOwner->terrain());
         assert(roomOwner->attach(*roomWorld));

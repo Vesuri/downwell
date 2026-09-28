@@ -18,10 +18,43 @@ int main() {
     {
         auto read=[](const char* path){std::ifstream f(path,std::ios::binary);
             return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(f),{});};
-        const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
+        const auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc"),rb=read("generated/downwell-rooms.dwrm");
+        downwell::RoomPack rooms(rb.data(),rb.size());
         downwell::ObjectPack objects(ob.data(),ob.size());
         downwell::SpriteCollisionPack sprites(sb.data(),sb.size());
-        auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites);
+        {
+            auto hiddenBytes=rb;downwell::PackedRoom room;
+            assert(rooms.findRoom(11,room));bool changed=false;
+            for(unsigned i=0;i<room.layerCount;++i){
+                downwell::PackedRoomLayer layer;assert(rooms.roomLayer(room,i,layer));
+                if(layer.depth!=-50000)continue;
+                unsigned id;assert(layer.membershipCount==1&&rooms.membership(layer.firstMembership,id)&&id==100855);
+                const auto offset=downwell::RoomPack::headerSize+rooms.roomCount()*downwell::RoomPack::roomRecordSize+
+                    rooms.instanceCount()*downwell::RoomPack::instanceRecordSize+(room.firstLayer+i)*downwell::RoomPack::layerRecordSize+8;
+                hiddenBytes[offset]&=0xfe;changed=true;
+            }
+            downwell::RoomPack hidden(hiddenBytes.data(),hiddenBytes.size());assert(changed&&hidden.valid());
+            auto layers=std::make_unique<downwell::GameplayRoomLayers<4>>(&hidden);
+            assert(layers->prepare()&&layers->playerSourceId()==100855);
+            downwell::RunnerImageValue depth;assert(depth.assign(downwell::MotionBinary64::fromInteger(-50000)));
+            assert(layers->birth({0,1},100855,depth,false)&&layers->birth({1,1},0,depth,false));
+            unsigned visited=0;
+            assert(layers->visit([](auto,auto& out){out.flags=0x10;out.object=out.sprite=true;return true;},
+                [&](auto h,int d){assert(h.slot==1&&d==-50000);++visited;return true;})&&visited==1);
+            assert(layers->retire({0,1})&&layers->retire({1,1})&&layers->prepare());
+            assert(layers->birth({0,2},100855,depth,false)&&!layers->retire({0,1}));
+
+            auto hiddenOwner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+                downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&hidden);
+            auto hiddenWorld=std::make_unique<GameplayWorld>(300,true,0,false,hiddenOwner->enemyBinding(),
+                hiddenOwner->breakableBinding(),hiddenOwner->playerBinding(),&hiddenOwner->terrain());
+            assert(hiddenOwner->attach(*hiddenWorld));
+            const_cast<downwell::UpgradeInventory&>(hiddenWorld->upgrades()).levels[12]=1;
+            UBYTE dummy[8]{};AmigaGameplayDrawList hiddenList;
+            assert(hiddenList.collect(*hiddenWorld,dummy,dummy+8,160,34)&&hiddenList.count==0&&!hiddenList.rayVisible);
+        }
+        auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+            downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->valid()&&owner->attach(*scene)&&scene->hasRoomActorDraw());

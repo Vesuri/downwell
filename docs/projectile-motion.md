@@ -380,6 +380,20 @@ checks both lifetime and source identity and publishes into that queue;
 it does not modify the legacy animation list. This is maintenance plumbing,
 not admission of nonzero combat-effect depths or complete runner phase coverage.
 
+The resource-backed native actor adapter uses the shared fixed/dynamic layer
+owner, while keeping its animation membership separate. It loads the room's
+reservations before the native player birth and attaches authored player and
+terrain IDs to those reservations. Dynamic actors without recovered Windows
+numeric IDs are explicitly unnumbered: their layer links use checked lifetime
+handles, numeric-ID lookup does not find them, and room uninitialization rejects
+them unless they have already retired. This does not establish original global
+instance lookup/creation order. Native room re-entry requires all registered
+native lifetimes to retire before rebuilding the room-owned layer resources;
+persistent native actors need a separately verified transfer path. The actor
+projection retains inactive-instance layer termination and layer visibility;
+retained terrain/background and independent effect passes are not yet a full
+mixed source Draw traversal.
+
 The selected handler first requires a room, instance and flag 0x400 (attached
 layer element), then resolves the layer through instance field 0x140. It
 truncates the requested float depth to an integer and leaves the layer alone
