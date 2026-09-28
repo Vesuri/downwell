@@ -8,6 +8,7 @@
 class AmigaGameplayScene {
     DownwellGameplayCopperList lists_[2];
     bool ready_[2] = {false, false};
+    bool coverReferenced_[2] = {false, false};
     int stagedX_ = -10000, stagedFirst_ = 0, stagedEnd_ = 0;
     int cachedFirst_ = 0, cachedEnd_ = 0;
 public:
@@ -62,6 +63,11 @@ public:
     // Borrow immutable Chip RAM until both displayed Copper slots retire it.
     // Validation failure leaves the slot unchanged. No conversion or repaint.
     bool entryMask(unsigned slot, const UBYTE* storage, unsigned bytes, int screenY);
+    // Both lists must be valid and detached. The caller must additionally
+    // cross VBlank after publication before overwriting the old DMA bank.
+    bool coverDetached()const{
+        return ready_[0]&&ready_[1]&&!coverReferenced_[0]&&!coverReferenced_[1];
+    }
     const DownwellGameplayCopperList& copper(unsigned slot) const { return lists_[slot]; }
 };
 #endif

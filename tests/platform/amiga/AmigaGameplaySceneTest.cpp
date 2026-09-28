@@ -33,6 +33,7 @@ int main() {
     Palette palette;
     UBYTE mask[8]{};
     AmigaGameplayScene scene(words[0],words[1],400);
+    assert(!scene.coverDetached());
     auto update=[&](unsigned slot) {
         return scene.update(slot,display[slot%2],hud,player,actors,2,overflow,palette,17);
     };
@@ -87,7 +88,13 @@ int main() {
     assert(!scene.entryMask(2,entry,sizeof(entry),0));
     assert(masks==oldMasks&&lastMask==oldMask&&builds==before);
     assert(scene.entryMask(0,entry,sizeof(entry),2147483647)&&lastMask==entry);
-    assert(scene.mask(0,nullptr)&&lastMask==nullptr); // explicit retirement
+    assert(!scene.coverDetached());
+    assert(scene.mask(0,nullptr)&&lastMask==nullptr&&!scene.coverDetached());
+    assert(scene.mask(1,nullptr)&&scene.coverDetached());
+    maskOK=false;
+    assert(!scene.mask(0,entry)&&!scene.coverDetached());
+    maskOK=true;
+    assert(update(0)&&scene.coverDetached());
     // Predict only a view being approached. Zero resolved speed includes
     // pressing against a wall, irrespective of the held input direction.
     const int none = AmigaGameplayScene::noStageColumn;

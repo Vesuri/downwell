@@ -94,9 +94,16 @@ display-mode patch; neither a copper rebuild nor bitmap conversion is needed.
 The caller must retain the bank until both displayed slots stop referencing it.
 Scene tests use copper-method doubles; pixel tests compare 917 viewports with
 the source sprite. `make verify-amiga-entry-wipe` additionally runs a native
-presentation fixture through 25 frames, covering the lowest supported position,
-the edge sweep and fully transparent padding. It checks both mask DMA pointers,
-six-plane mode and unchanged bank bytes before returning from the final VBlank.
+presentation fixture through 25 covered frames, covering the lowest supported
+position, the edge sweep and fully transparent padding, followed by two frames
+detaching the alternating copper slots. It checks both mask DMA pointers,
+six-plane mode and unchanged bank bytes, then four-plane mode and cleared mask
+pointers on each detached slot. `coverDetached()` requires both lists to be
+valid and unreferenced; failed updates cannot authorize reuse. This query does
+not itself establish a DMA fence: the caller must publish the detached list and
+cross VBlank before releasing the resident bank. The fixture verifies that
+shop-bank selection remains rejected before that fence, then replaces the bank
+with shop artwork and checks the copied bytes after it.
 The test uses the retired-garden overlay region, with a distinct resident-cover
 tag that prevents shop/results or the exit cover from overwriting an entry bank.
 It has a 45-second emulator deadline (configurable up to 60), stops its emulator,
@@ -104,7 +111,7 @@ and restores the normal build. The A500 test configuration has 512 KiB Chip and
 8 MiB Fast RAM; this is neither a stock-memory proof nor a frame-budget result.
 The immutable entry asset adds 31,104 bytes to executable data, with no new
 Chip allocation. Its bank-selection path is currently verification-only.
-Automatic native lifetime admission, release after both display slots retire,
+Automatic native lifetime admission, production ownership/release integration
 and production entry-wipe timing remain open.
 
 Currency is also a `drawFx` producer, not an independent direct sprite in the

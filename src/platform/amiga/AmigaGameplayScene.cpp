@@ -73,6 +73,7 @@ bool AmigaGameplayScene::build(unsigned slot, const Bitmap& game, const Bitmap& 
     const Sprite& overflow, const Palette& palette, unsigned origin) {
     if (slot >= 2) return false;
     ready_[slot] = lists_[slot].build(game, hud, player, actors, count, overflow, palette, origin);
+    if(ready_[slot])coverReferenced_[slot]=false;
     return ready_[slot];
 }
 
@@ -88,6 +89,7 @@ bool AmigaGameplayScene::update(unsigned slot, const Bitmap& game, const Bitmap&
 bool AmigaGameplayScene::mask(unsigned slot, const UBYTE* mask) {
     if (slot >= 2 || !ready_[slot]) return false;
     ready_[slot] = lists_[slot].updateExitMask(mask);
+    if(ready_[slot])coverReferenced_[slot]=mask!=nullptr;
     return ready_[slot];
 }
 

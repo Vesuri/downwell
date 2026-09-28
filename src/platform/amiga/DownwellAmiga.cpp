@@ -215,7 +215,7 @@ static unsigned overlayAssetCapacity;
 enum class ResidentCover {none,exit,entry};
 static ResidentCover residentCover;
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
-volatile ULONG gDownwellEntryWipeFrames,gDownwellEntryWipeFailures;
+volatile ULONG gDownwellEntryWipeFrames,gDownwellEntryWipeFailures,gDownwellEntryWipeReuses;
 __attribute__((noinline, used)) void downwellEntryWipeReady(){__asm__ volatile("" ::: "memory");}
 #endif
 #ifdef DOWNWELL_EXIT_WIPE_VERIFY
@@ -3010,19 +3010,26 @@ __attribute__((noinline)) static int runDownwell(void) {
             // Presentation-only fixture, independent of unfinished native
             // controller lifetimes. Retain one immutable bank across both slots.
             if(!selectEntryMaskBank()){exitCode=20;break;}
+            const bool entryAttached=gDownwellEntryWipeFrames<25;
             const int entryY=gDownwellEntryWipeFrames?320+int(gDownwellEntryWipeFrames-1)*16:-116;
-            unsigned entryOffset;
-            if(!AmigaEntryMask::offset(entryY,entryOffset)||
-               !gameplayScene.entryMask(back,overlayAssetStorage,AmigaEntryMask::bytes,entryY)){
+            unsigned entryOffset=0;
+            if(entryAttached?(!AmigaEntryMask::offset(entryY,entryOffset)||
+                !gameplayScene.entryMask(back,overlayAssetStorage,AmigaEntryMask::bytes,entryY)):
+                !gameplayScene.mask(back,nullptr)){
                 exitCode=20;break;
             }
             const auto& entryList=gameplayScene.copper(back);
             const UWORD* entryWords=entryList.data();
-            if(entryWords[entryList.moveOffset(0x100)+1]!=0x6401)++gDownwellEntryWipeFailures;
+            if(entryWords[entryList.moveOffset(0x100)+1]!=(entryAttached?0x6401:0x4401))++gDownwellEntryWipeFailures;
             for(unsigned reg=0xf0;reg<=0xf4;reg+=4){
                 const unsigned at=entryList.moveOffset(reg);
                 const ULONG pointer=(ULONG(entryWords[at+1])<<16)|entryWords[at+3];
-                if(pointer!=ULONG(overlayAssetStorage+entryOffset+downwellFetchCropBytes))++gDownwellEntryWipeFailures;
+                const ULONG expected=entryAttached?ULONG(overlayAssetStorage+entryOffset+downwellFetchCropBytes):0;
+                if(pointer!=expected)++gDownwellEntryWipeFailures;
+            }
+            if(!entryAttached){
+                if(gameplayScene.coverDetached()!=(gDownwellEntryWipeFrames==26))++gDownwellEntryWipeFailures;
+                if(selectOverlayAssetBank(true))++gDownwellEntryWipeFailures; // Not fenced yet.
             }
             for(unsigned i=0;i<AmigaEntryMask::bytes;++i)
                 if(overlayAssetStorage[i]!=amiga_entry_mask[i])++gDownwellEntryWipeFailures;
@@ -3040,7 +3047,16 @@ __attribute__((noinline)) static int runDownwell(void) {
             DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayScene.copper(back));
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
-            if(gDownwellEntryWipeFrames==25){platform.waitVblank();downwellEntryWipeReady();}
+            if(gDownwellEntryWipeFrames==27){
+                platform.waitVblank(); // Final detached list is now published.
+                if(!gameplayScene.coverDetached()){exitCode=20;break;}
+                residentCover=ResidentCover::none;
+                if(!selectOverlayAssetBank(true)){exitCode=20;break;}
+                for(unsigned i=0;i<gDownwellShopAssetBytes;++i)
+                    if(overlayAssetStorage[i]!=amiga_shop_pack[i])++gDownwellEntryWipeFailures;
+                ++gDownwellEntryWipeReuses;
+                downwellEntryWipeReady();
+            }
 #endif
 #ifdef DOWNWELL_NATURAL_VERIFY
             if (naturalRoute.done) { platform.waitVblank(); downwellNaturalReady(); }
