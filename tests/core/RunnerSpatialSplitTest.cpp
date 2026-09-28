@@ -154,6 +154,14 @@ int main(){
         assert(aliasRight.bits==(ok?expected.bits:right.bits));
     };
     for(auto a:productEdges)for(auto b:productEdges)subtractCheck(a,b);
+    for(unsigned a=1;a<255;++a)for(unsigned b=1;b<255;++b)
+        for(auto fraction:fractions)for(unsigned signs=0;signs<4;++signs){
+            subtractCheck((a<<23)|fraction|((signs&1u)<<31),
+                (b<<23)|(0x7fffff-fraction)|((signs&2u)<<30));
+            // Close cancellation, sticky tails and halfway rounding.
+            subtractCheck((a<<23)|fraction|((signs&1u)<<31),
+                (b<<23)|fraction|((signs&2u)<<30));
+        }
     std::uint32_t seed=0x612de529;
     for(unsigned i=0;i<1000000;++i){
         seed=seed*1664525u+1013904223u;const auto a=seed;

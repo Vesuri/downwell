@@ -3,6 +3,7 @@
 #include "RunnerImageValue.h"
 #include "MultiplyBinary64.h"
 #include "MultiplyBinary32.h"
+#include "SubtractBinary32.h"
 namespace downwell {
 // Runner 0x5010e0/0x4fc680/0x500490: partition six entries plus one new
 // entry. This is not a complete spatial index or an instance_place adapter.
@@ -86,7 +87,7 @@ struct RunnerSpatialSplit {
         return a.bits&0x80000000u?a.bits>b.bits:a.bits<b.bits;
     }
     static Real negate(Real a){a.bits^=0x80000000u;return a;}
-    static bool sub(Real a,Real b,Real& out){auto n=a.promoted();return n.add(negate(b).promoted())&&out.assign(n);}
+    static bool sub(Real a,Real b,Real& out){return subtractBinary32(a,b,out);}
     static Box unite(Box a,Box b){return {less(a.left,b.left)?a.left:b.left,less(a.top,b.top)?a.top:b.top,
         less(b.right,a.right)?a.right:b.right,less(b.bottom,a.bottom)?a.bottom:b.bottom};}
     static bool area(Box b,Real& out){
