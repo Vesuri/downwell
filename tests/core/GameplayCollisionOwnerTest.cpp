@@ -1,6 +1,10 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeAlarmDispatch(downwell::GameplayCollisionOwner& owner,downwell::RunnerStepSnapshot<16>& phase,
+    bool (*dispatch)(downwell::InstanceHandle,unsigned,const downwell::PackedObjectEvent&)){
+    return owner.dispatchAlarmPhase(phase,dispatch);
+}
 bool nativeDebrisOwnership(GameplayWorld& world,downwell::DebrisEffects<2>& effects,
     downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle& key){
     return world.spawnDebris(effects,{},{},1,key)&&owner.prepareDraw();
@@ -631,6 +635,69 @@ int main(){
         }
         assert(expected.destroyRequested&&!scene->debrisEffects().size());
         assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+    }
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));
+        // Deliberately create higher object IDs first; registration order is
+        // retained within object 370, not used to order different objects.
+        DebrisEffects<3> effects;InstanceHandle first,second,newborn;
+        assert(scene->spawnDebris(effects,{},{},1,first));
+        assert(scene->createGeneratedInstance({112,240,512},objects,[](const auto&){return true;}));
+        assert(scene->spawnDebris(effects,{},{},1,second));
+        assert(scene->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
+        effects.get(first.generation)->alarms.set(1,1);
+        effects.get(second.generation)->alarms.set(1,1);
+        const auto cutoff=effects.beginPhase();RunnerStepSnapshot<16> snapshot;
+        std::vector<unsigned> order,debrisOrder;unsigned bornVisits=0;
+        assert(collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
+            GameplayCollisionView::Kind kind;InstanceHandle local;
+            assert(GameplayCollisionView::decode(h,kind,local));
+            if(kind==GameplayCollisionView::Kind::breakable){
+                order.push_back(alarm*1000+92);
+                assert(scene->spawnDebris(effects,{},{},1,newborn));
+            }else if(kind==GameplayCollisionView::Kind::enemy){
+                order.push_back(alarm*1000+112);
+                // This earlier object's Alarm 1 changes a later object's
+                // countdown before it is touched in the same alarm index.
+                effects.get(second.generation)->alarms.set(1,2);
+            }else if(kind==GameplayCollisionView::Kind::debris){
+                order.push_back(alarm*1000+370);
+                bornVisits+=local.generation==newborn.generation;
+                debrisOrder.push_back(local.generation);
+                return scene->advanceDebrisRoomAlarm(effects,local,cutoff,alarm);
+            }
+            return true;
+        }));
+        assert((order==std::vector<unsigned>{92,370,370,1112,1370,1370,2370,2370}));
+        assert((debrisOrder==std::vector<unsigned>{first.generation,second.generation,
+            first.generation,second.generation,first.generation,second.generation}));
+        assert(!bornVisits&&effects.get(first.generation)->alarms.get(1)==0&&
+            effects.get(second.generation)->alarms.get(1)==1&&effects.get(newborn.generation)->alarms.get(0)==30);
+        // A previous callback may destroy a later captured lifetime. Recheck
+        // flags before every countdown, including later alarm indices.
+        unsigned secondVisits=0;const auto nextCutoff=effects.beginPhase();
+        assert(collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
+            GameplayCollisionView::Kind kind;InstanceHandle local;
+            assert(GameplayCollisionView::decode(h,kind,local));
+            if(kind!=GameplayCollisionView::Kind::debris)return true;
+            if(local.generation==first.generation&&alarm==0){
+                effects.get(second.generation)->alarms.set(0,1);
+                assert(scene->advanceDebrisRoomAlarm(effects,second,nextCutoff,0));
+            }
+            secondVisits+=local.generation==second.generation;
+            return scene->advanceDebrisRoomAlarm(effects,local,nextCutoff,alarm);
+        }));
+        assert(!secondVisits&&effects.retained(second.generation)->destroyRequested);
+        assert(collision->prepareDraw()&&!effects.retained(second.generation));
+        assert(effects.clear(collision->debris()));
+        unsigned calls=0;
+        assert(!collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle,unsigned,const PackedObjectEvent&){++calls;return false;}));
+        assert(calls==1&&!collision->valid());
+        assert(!collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle,unsigned,const PackedObjectEvent&){++calls;return true;}));
+        assert(calls==1);
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);

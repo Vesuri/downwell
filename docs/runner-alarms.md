@@ -59,6 +59,17 @@ do not infer that every object born during Alarm 0 may run Alarm 1, or that
 recapturing all lifetimes at every alarm index is equivalent. The verifier
 guards these alarm instructions and reuses the Step builder/list guards.
 
+`GameplayCollisionOwner::dispatchAlarmPhase` supplies a native mixed-family
+captured-lifetime traversal with this ordering, rechecking registered identity
+and active/destruction flags before each callback. Storage belongs to the
+caller, not the small target stack. The callback decrements its actor's alarm
+and dispatches immediately on zero; missing alarm events do not receive a
+countdown. Tests mix real box/enemy/debris registrations, preserve same-object
+registration order, modify a later debris alarm in the same phase, exclude
+newborns from the snapshot, suppress a destroyed later lifetime, and stop after
+callback failure. This dispatcher is not yet wired into the world's ordinary
+alarm loop and does not resolve the remaining original birth/mutation cases.
+
 ## Skeleton consequence
 
 Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same

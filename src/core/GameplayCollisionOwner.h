@@ -353,6 +353,31 @@ public:
         return true;
     }
     GameplayTerrainInstances& terrain(){return terrain_;}
+    // Caller-resident phase snapshot, shared by all twelve alarm indices.
+    // advanceAndDispatch owns the actor's alarm storage: decrement once and
+    // execute the selected event synchronously only on reaching zero. Objects
+    // without that alarm event are absent from the original event table.
+    // Like dispatchStepPhase, this is a captured-lifetime adapter; remaining
+    // original same-phase creation/list-mutation cases require separate proof.
+    template<unsigned Capacity,class AdvanceAndDispatch>
+    bool dispatchAlarmPhase(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch){
+        if(!valid()||!world_)return check(false);
+        snapshot.clear();
+        if(!check(owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
+            return resolves(h)&&((state.flags&0x100003u)||snapshot.append(h.slot,h.generation,object));
+        })))return false;
+        snapshot.sort();
+        const unsigned count=snapshot.size();
+        for(unsigned alarm=0;alarm<AlarmBank::count;++alarm)for(unsigned i=0;i<count;++i){
+            const auto h=snapshot.handle(i);const auto* current=owner_.resolve(h);
+            if(!current||(current->flags&0x100003u))continue;
+            if(!check(resolves(h)))return false;
+            PackedObjectEvent event;
+            if(!objects_.findEvent(owner_.objectId(h),2,int(alarm),event))continue;
+            if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;
+        }
+        return true;
+    }
     GameplayScriptSpawnInstances& scriptEffects(){return scriptEffects_;}
     GameplayDebrisInstances& debris(){return debris_;}
     const Owner::State* state(InstanceHandle key)const{return valid()?owner_.resolve(key):nullptr;}
