@@ -574,6 +574,13 @@ group-population and minimum-fill tie rules. Node distribution still follows
 original entry-array order, not assignment order. Fractional or oversized
 partitions retain the binary32 reference implementation.
 
+Within an admitted integer partition, candidate growth scores are cached only
+for the duration of that split. Assigning an entry changes one group's bounds
+and area, so only that group's scores are recomputed in the next candidate
+walk. Population-based tie decisions are still evaluated live, in original
+array order. This scratch does not persist in tree nodes or change seed choice,
+minimum fill, final redistribution order or the binary32 fallback.
+
 The fixed-point movement adapter (`FixedCollisionMath`, fifths of Q8) retains
 nearest-even rounding at 1280 units per pixel. Its nonnegative 32-bit magnitude
 uses `SmallUnsignedDivision` to obtain quotient and remainder together. The

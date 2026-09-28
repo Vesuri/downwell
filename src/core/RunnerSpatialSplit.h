@@ -165,12 +165,19 @@ public:
         PixelBox bounds[2]={values[first],values[second]};
         unsigned groupArea[2]={areas[first],areas[second]};
         next.group[first]=0;next.group[second]=1;next.count[0]=next.count[1]=1;
+        // Only the selected group's bounds change between assignments. Keep
+        // the other group's candidate growth values; preserve the original
+        // candidate/tie traversal below. Scratch is local to this split.
+        unsigned growth[2][7];
+        bool refresh[2]={true,true};
         unsigned assigned=2;
         while(assigned<7&&next.count[0]<5&&next.count[1]<5){
             int largest=-1;unsigned chosen=0,group=0;
             for(unsigned i=0;i<7;++i)if(next.group[i]==2){
-                const unsigned growth0=pixelArea(pixelUnion(bounds[0],values[i]))-groupArea[0];
-                const unsigned growth1=pixelArea(pixelUnion(bounds[1],values[i]))-groupArea[1];
+                if(refresh[0])growth[0][i]=pixelArea(pixelUnion(bounds[0],values[i]))-groupArea[0];
+                if(refresh[1])growth[1][i]=pixelArea(pixelUnion(bounds[1],values[i]))-groupArea[1];
+                const unsigned growth0=growth[0][i];
+                const unsigned growth1=growth[1][i];
                 const int difference=int(growth1)-int(growth0);
                 const unsigned preferred=difference<0?1:0;
                 const int magnitude=difference<0?-difference:difference;
@@ -180,6 +187,8 @@ public:
             }
             next.group[chosen]=group;++next.count[group];++assigned;
             bounds[group]=pixelUnion(bounds[group],values[chosen]);groupArea[group]=pixelArea(bounds[group]);
+            refresh[0]=refresh[1]=false;
+            refresh[group]=true;
         }
         const unsigned remainder=next.count[0]>=5?1:0;
         for(unsigned i=0;i<7;++i)if(next.group[i]==2){next.group[i]=remainder;++next.count[remainder];}
