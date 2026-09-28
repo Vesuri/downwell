@@ -1137,6 +1137,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             bool alive=false;
             if(!downwell::stepMachineGunProjectileChecked(bullet, enemyRandom_,
                 [this, &bullet](const downwell::ProjectileSegment& path) {
+                    DW_PROFILE_SCOPE(profileBulletEnemyQuery);
                     for (unsigned enemyIndex = 0; enemyIndex < enemyCount_; ++enemyIndex) {
                         EnemyState& enemy = enemies_[enemyIndex];
                         const downwell::ContactActor contact{
@@ -1157,6 +1158,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                     return false;
                 }, [this, &bullet]
                    (const downwell::ProjectileSegment& path) {
+                    DW_PROFILE_SCOPE(profileBulletSolidQuery);
                     unsigned firstBlock = 0, endBlock = breakableCount_;
                     if (breakableIndexReady_) {
                         int candidate = -1;
@@ -1206,6 +1208,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                     return false;
                 },alive,[this]{return run_.effectsSucceeded;},176,cameraCentreQ12-142L*4096,284,
                 [this,&bullet]{
+                    DW_PROFILE_SCOPE(profileBulletPublication);
                     if(!bulletLifecycle_.hasOwner())return true;
                     downwell::RunnerImageValue angle;
                     if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
@@ -1214,6 +1217,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                     return true;
                 }))return {};
             if(bulletLifecycle_.hasOwner()){
+                DW_PROFILE_SCOPE(profileBulletPublication);
                 const downwell::InstanceHandle h{bullet.identitySlot,bullet.lifetimeId};
                 downwell::RunnerImageValue x,y;
                 if(!downwell::ProjectilePublication::coordinate(bullet.trajectory.x,240,x)||

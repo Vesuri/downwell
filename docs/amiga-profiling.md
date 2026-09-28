@@ -158,6 +158,12 @@ and sorted room-list insertion from phase 82. Spatial bounds publication and
 layer attachment retain their existing separate brackets. These probes do not
 defer or reorder synchronous Create work, and compile away in ordinary builds.
 
+Bullet phases 100–102 isolate enemy queries/impacts, solid queries/impacts,
+and first-Step angle/per-Step position publication from phase 17. The remaining
+phase 17 includes motion, view checks and loop/retirement work. Query brackets
+include their existing hit callbacks; do not interpret them as pure geometry
+timings. Nested bounds/spatial probes remain exclusive.
+
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases
 for comparisons. The wrapper resets this option when restoring the build.

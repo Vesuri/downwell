@@ -31,6 +31,7 @@ printf "Actor animation: 91=enemy_bullet_script_debris_animation; excluded from 
 printf "Spatial publication: 92=insert 93=remove 94=partition 95=choose_child; exclusive nested costs, excluded from 88 where nested\n"
 printf "Draw entry: 96=destroyed_instance_cleanup; excluded from caller (4 in gameplay), includes only pending sweeps\n"
 printf "Birth breakdown: 97=owner_registration 98=resource_binding 99=room_order_insertion; excluded from 82\n"
+printf "Bullet breakdown: 100=enemy_query_and_impact 101=solid_query_and_impact 102=angle_position_publication; excluded from 17\n"
 printf "Damage number births: %lu (zero means this tape did not measure a damaging contact)\n", gDownwellProfileDamageBirths
 if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"
