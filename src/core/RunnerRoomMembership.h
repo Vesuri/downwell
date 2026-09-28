@@ -8,6 +8,12 @@ template<unsigned Capacity> class RunnerRoomMembership {
     struct Entry {unsigned next=Capacity,previous=Capacity;int list=-1;RunnerImageValue key;};
 public:
     static constexpr unsigned End=Capacity;
+    struct AnimationProjection {
+        static_assert(Capacity<65535,"Compact animation links require 16-bit slots");
+        std::uint16_t next[Capacity?Capacity:1]{};
+        const RunnerRoomMembership* owner=nullptr;
+        unsigned revision=0,first=0,last=0;
+    };
     bool contains(unsigned slot)const{return slot<Capacity && entries_[slot].list>=0;}
     bool active(unsigned slot)const{return slot<Capacity && entries_[slot].list==0;}
     // Animation's active-room traversal. Visitor may update instance fields,
@@ -15,6 +21,34 @@ public:
     template<class Visit> bool visitAnimationChecked(Visit visit)const{
         for(unsigned slot=head_[0];slot!=End;slot=entries_[slot].next)
             if(!visit(slot))return false;
+        return true;
+    }
+    // The omitted range only snapshots unchanged positions in the adapter.
+    // A coordinate-write observer sets dirty, including temporary query moves.
+    // Mid-dispatch writes resume the full list at the saved raw successor;
+    // already visited slots retain their old snapshot until the next frame.
+    template<class Visit> bool visitAnimationProjectedChecked(AnimationProjection& projection,
+        unsigned first,unsigned last,bool& dirty,Visit visit)const{
+        if(first>last||last>Capacity)return false;
+        bool full=dirty;dirty=false;
+        if(!full&&(projection.owner!=this||projection.revision!=revision_||
+            projection.first!=first||projection.last!=last)){
+            unsigned next=End;
+            for(unsigned slot=tail_[0];slot!=End;slot=entries_[slot].previous){
+                if(slot<first||slot>=last)next=slot;
+                projection.next[slot]=std::uint16_t(next);
+            }
+            projection.owner=this;projection.revision=revision_;
+            projection.first=first;projection.last=last;
+        }
+        for(unsigned slot=head_[0];slot!=End;){
+            if(dirty)full=true;
+            if(!full)slot=projection.next[slot];
+            if(slot==End)break;
+            const unsigned next=entries_[slot].next;
+            if(!visit(slot))return false;
+            slot=next;
+        }
         return true;
     }
     // Legacy room-list Draw walks the SAME active list in the opposite direction:
@@ -37,7 +71,7 @@ public:
         const auto e=entries_[slot];
         if(e.previous==End)head_[e.list]=e.next;else entries_[e.previous].next=e.next;
         if(e.next==End)tail_[e.list]=e.previous;else entries_[e.next].previous=e.previous;
-        entries_[slot].next=entries_[slot].previous=End;entries_[slot].list=-1;return true;
+        entries_[slot].next=entries_[slot].previous=End;entries_[slot].list=-1;++revision_;return true;
     }
     void clear(){for(unsigned list=0;list<2;++list)while(head_[list]!=End)remove(head_[list]);}
     // Marked-record cleanup (0x48bbb0) differs from activation reconciliation:
@@ -80,6 +114,7 @@ public:
     }
 private:
     void insertActive(unsigned slot){
+        ++revision_;
         auto& e=entries_[slot];unsigned previous=tail_[0];
         while(previous!=End && RunnerSpatialSplit::less(e.key,entries_[previous].key))
             previous=entries_[previous].previous;
@@ -94,6 +129,7 @@ private:
     }
     Entry entries_[Capacity?Capacity:1]{};
     unsigned head_[2]={End,End},tail_[2]={End,End};
+    unsigned revision_=0;
 };
 }
 #endif

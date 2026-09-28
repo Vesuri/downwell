@@ -200,8 +200,8 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   `SKIP_TO_GAME=1` sample does not cover the reported worst transition stall.
 - Remove unnecessary terrain recomposition and transfers. Preserve circular
   hardware scrolling, static terrain backing and incremental restoration.
-  Audit external coordinate writes before eliminating stationary terrain's
-  per-frame snapshots; local event evidence and its limits are recorded in
+  Keep external coordinate writes on the observed publication path used by
+  terrain's snapshot projection; local event evidence and its limits are in
   [terrain update constraints](terrain-update-contract.md).
   Reduce speculative side-view preparation for views the player never enters,
   and cache misses on late direction changes or generation invalidation. Check

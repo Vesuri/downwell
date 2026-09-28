@@ -27,6 +27,8 @@ private:
     Owner owner_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
     RunnerRoomMembership<View::capacity> room_;
+    RunnerRoomMembership<View::capacity>::AnimationProjection animationProjection_;
+    bool terrainSnapshotDirty_=true;
     InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
     RunnerObjectFamilies<386> families_;
@@ -317,14 +319,16 @@ public:
             },[&](InstanceHandle h,int depth){RunnerImageValue value;return real(depth,value)&&draw(h,value);});
             return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.roomKeys_[slot],self.properties_[slot].depth);});
         },this);
+        if(!owner_.watchSnapshotRange(View::terrainBase,View::timeFieldBase,terrainSnapshotDirty_))return check(false);
         world.configureRoomAnimation([](void* context){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.room_.visitAnimationChecked([&](unsigned slot){
+            return self.check(self.room_.visitAnimationProjectedChecked(self.animationProjection_,
+                View::terrainBase,View::timeFieldBase,self.terrainSnapshotDirty_,[&](unsigned slot){
                 const auto shared=self.roomKeys_[slot];
-                // Terrain has no animation dispatch in this adapter. Keep its
-                // typed lifetime check and source-position snapshot in the
-                // same room order, without passing through the actor decoder.
+                // The conservative dirty fallback keeps terrain snapshots in
+                // room order. Unchanged terrain has no animation dispatch in
+                // this adapter and already retains the identical snapshot.
                 if(shared.slot>=View::terrainBase&&shared.slot<View::timeFieldBase){
                     const auto* terrain=self.world_->terrainInstances();
                     return terrain&&terrain->find({shared.slot-View::terrainBase,shared.generation})&&
@@ -703,6 +707,9 @@ public:
             if(!state){good_=false;return true;}
             return (state->flags&2u)!=0;
         },[&](unsigned slot,bool registered){
+            // Writes while inactive may have been consumed by an intervening
+            // active-room pass. Promotion must refresh that retained snapshot.
+            if(registered&&slot>=View::terrainBase&&slot<View::timeFieldBase)terrainSnapshotDirty_=true;
             return good_&&owner_.registerObject(roomKeys_[slot],registered)&&layers_.reconcile(roomKeys_[slot]);
         });
         if(!check(result&&good_))return false;

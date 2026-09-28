@@ -19,10 +19,17 @@ it does not rule out external instance writes or implicit runner updates.
 
 The shared terrain store currently assigns coordinates at birth and exposes
 no subsequent position setter. Collision-owner attachment initializes previous
-coordinates from the birth position. Nevertheless, its room animation walk
-still validates each terrain lifetime and captures previous coordinates in
-room order. Activation and retirement must remain observable, including the
-source rule that an inactive element terminates its layer's Draw walk.
+coordinates from the birth position. Its room animation projection may omit
+terrain's identical snapshot copies, but does not assume external writes are
+impossible: every spatial-owner coordinate publication marks a conservative
+terrain-range dirty flag. A dirty pass uses the full room-order walk. A write
+during animation switches the remainder to the full walk at the raw successor
+and also requests a full next pass, preserving already-visited snapshots.
+Reactivation forces a refresh, since an inactive instance can retain an older
+snapshot. Membership mutations rebuild the projected links. Actor animation
+and terrain End Step are not omitted by this mechanism. Activation and
+retirement remain observable, including the source rule that an inactive
+element terminates its layer's Draw walk.
 
 `terrainPlaceMeeting` is an important exception to stationary collision state:
 `RunnerSpatialInstances::place` temporarily moves the caller for its query.
@@ -36,9 +43,13 @@ previous coordinates after each query. These tests cover successful restoration,
 not every failure path or external original-game writer.
 
 These facts do not justify skipping all terrain updates or treating terrain
-presentation as permanently immutable. Before eliminating the repeated
-snapshot operation, audit external `with`/dynamic setters and every coordinate
-publication path, including temporary collision queries. Before omitting marker
+presentation as permanently immutable. Spatial coordinates are private to
+`RunnerSpatialInstances`: attachment initializes both current and previous;
+subsequent writes, including temporary query movement/restoration, use its
+observed `move` publication. Future external `with`/dynamic setters must use
+that same publication boundary, not write around the observer. Tests cover
+dirty range fallback, writes before/after omitted slots, inactive promotion,
+slot reuse and temporary queries. Before omitting marker
 animation, establish the selected runner's one-frame sequence semantics rather
 than assuming invisibility makes its state irrelevant. Wall End Step behavior
 has a separate VM comparison in `verify-wall-end-step`; the local call whitelist

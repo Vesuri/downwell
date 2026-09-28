@@ -139,6 +139,13 @@ public:
         if(!valid()||!live(h))return false;
         auto& s=entries_[h.slot].state;s.previous={s.x,s.y};return true;
     }
+    // Optional room-animation optimization. The caller owns the flag for this
+    // owner's lifetime. Attach initializes previous=x/y; every later coordinate
+    // publication goes through move(), including place-query restoration.
+    bool watchSnapshotRange(unsigned first,unsigned last,bool& dirty){
+        if(first>last||last>Capacity)return false;
+        snapshotFirst_=first;snapshotLast_=last;snapshotDirty_=&dirty;dirty=true;return true;
+    }
     // At source reconciliation boundaries, not when the active flag is written.
     bool registerObject(InstanceHandle h,bool registered){
         if(!valid()||!live(h))return false;
@@ -218,6 +225,7 @@ public:
     }
     bool move(InstanceHandle h,Real x,Real y,std::uint32_t objectFlags){
         if(!valid()||!live(h))return false;
+        if(snapshotDirty_&&h.slot>=snapshotFirst_&&h.slot<snapshotLast_)*snapshotDirty_=true;
         auto& s=entries_[h.slot].state;
         return checked(RunnerSpatialPosition::assign(h.slot,s.x,s.y,s.flags,x,y,
             s.special,true,objectFlags,spatial_,collision_));
@@ -683,6 +691,8 @@ private:
     Queue spatial_,collision_;
     RunnerSpatialIndex<Nodes> index_;
     bool good_=true;
+    bool* snapshotDirty_=nullptr;
+    unsigned snapshotFirst_=0,snapshotLast_=0;
     bool checked(bool ok){if(!ok)good_=false;return ok;}
     void markSpatialChange(unsigned slot,std::uint32_t objectFlags){
         if(Queue::shouldQueue(true,objectFlags,entries_[slot].state.flags)){

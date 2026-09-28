@@ -111,5 +111,52 @@ void drawBirths(){
             "next Draw includes birth exactly once in link order");
     }
 }
+void animationProjection(){
+    RunnerRoomMembership<6> room;
+    RunnerRoomMembership<6>::AnimationProjection projection;
+    for(unsigned i=0;i<6;++i)require(room.bind(i,{}),"animation projection births");
+    bool dirty=false;std::vector<unsigned> trace;
+    auto run=[&](int writeAt=-1){
+        trace.clear();return room.visitAnimationProjectedChecked(projection,1,4,dirty,[&](unsigned slot){
+            trace.push_back(slot);if(int(slot)==writeAt)dirty=true;return true;
+        });
+    };
+    require(run()&&trace==std::vector<unsigned>({0,4,5}),"skip unchanged snapshot-only range");
+    dirty=true;require(run()&&trace==std::vector<unsigned>({0,1,2,3,4,5})&&!dirty,"dirty range full walk");
+    require(run(0)&&trace==std::vector<unsigned>({0,1,2,3,4,5})&&dirty,"early callback write restores raw successor");
+    require(run()&&trace.size()==6&&!dirty,"mid-walk write retained for next frame");
+    require(run(4)&&trace==std::vector<unsigned>({0,4,5})&&dirty,"later write cannot revisit earlier snapshots");
+    require(run()&&trace.size()==6,"earlier snapshot refreshed next frame");
+    require(room.reconcileChecked([](unsigned slot){return slot==4;},[](unsigned,bool){return true;}),"deactivate projected actor");
+    require(run()&&trace==std::vector<unsigned>({0,5}),"projection invalidated by deactivation");
+    require(room.reconcileChecked([](unsigned){return false;},[](unsigned,bool){return true;}),"reactivate actor");
+    require(run()&&trace==std::vector<unsigned>({0,5,4}),"reactivation preserves room insertion order");
+    require(room.remove(0)&&room.bind(0,{}),"reuse projection slot");
+    require(run()&&trace==std::vector<unsigned>({5,4,0}),"rebound room links invalidate projection");
+    trace.clear();require(!room.visitAnimationProjectedChecked(projection,1,4,dirty,[&](unsigned slot){
+        trace.push_back(slot);return false;
+    })&&trace==std::vector<unsigned>({5}),"projection callback failure is terminal");
+    room.clear();require(run()&&trace.empty(),"empty room resets projection");
+    for(unsigned i=0;i<6;++i)require(room.bind(i,{}),"snapshot differential births");
+    int current[2][6]{},previous[2][6]{};
+    dirty=false;
+    for(unsigned frame=0;frame<8;++frame){
+        auto visit=[&](unsigned side,unsigned slot){
+            previous[side][slot]=current[side][slot];
+            if(slot==0||slot==4){
+                // Writes both ahead of and behind the current position.
+                const unsigned target=1+(frame+slot)%3;
+                current[side][target]=int(100*frame+slot+1);
+                if(side==1)dirty=true;
+            }
+            return true;
+        };
+        require(room.visitAnimationChecked([&](unsigned slot){return visit(0,slot);})&&
+            room.visitAnimationProjectedChecked(projection,1,4,dirty,[&](unsigned slot){return visit(1,slot);}),
+            "snapshot differential walks");
+        for(unsigned i=0;i<6;++i)require(current[0][i]==current[1][i]&&previous[0][i]==previous[1][i],
+            "projected snapshot values match source-order full walk");
+    }
 }
-int main(){dispatch();traversal();roomActivation();drawBirths();std::cout<<"Selected layer Draw order, synchronous births and 1024 instance-dispatch cases verified\n";}
+}
+int main(){dispatch();traversal();roomActivation();drawBirths();animationProjection();std::cout<<"Selected layer Draw order, synchronous births, animation projection and 1024 instance-dispatch cases verified\n";}

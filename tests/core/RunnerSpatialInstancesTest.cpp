@@ -25,6 +25,20 @@ struct Graph {
 };
 int main(){
     {
+        RunnerSpatialInstances<8,16> owner;bool dirty=false;
+        assert(owner.watchSnapshotRange(2,4,dirty)&&dirty);dirty=false;
+        assert(owner.attach({2,1},0,{})&&owner.attach({4,1},0,{}));
+        assert(!dirty); // Birth already initializes the snapshot.
+        assert(owner.move({4,1},{0x3f800000},{},0)&&!dirty);
+        assert(owner.move({2,1},{0x3f800000},{},0)&&dirty);
+        dirty=false;assert(owner.capturePrevious({2,1})&&!dirty);
+        assert(owner.resolve({2,1})->previous.x.bits==0x3f800000);
+        assert(owner.move({2,1},{0x3f800000},{},0)&&dirty); // Equal writes are conservative.
+        dirty=false;assert(owner.retire({2,1})&&!owner.move({2,1},{},{},0)&&!dirty);
+        assert(owner.attach({2,2},0,{})&&!dirty);
+        assert(!owner.watchSnapshotRange(4,9,dirty));
+    }
+    {
         RunnerSpatialInstances<8,16> owner;
         assert(owner.attach({5,1},2,{})&&owner.attach({7,1},3,{})&&owner.attach({2,1},1,{}));
         const auto visit=[&](){
@@ -493,8 +507,11 @@ int main(){
         hit=RunnerSpatialSplit::equal(q->x,p->x)&&RunnerSpatialSplit::equal(q->y,p->y);
         return true;
     };
+    bool snapshotDirty=false;
+    assert(owner.watchSnapshotRange(self.slot,self.slot+1,snapshotDirty));snapshotDirty=false;
     Owner::Result result;
     assert(owner.place(self,0,{}, {},false,graph,refresh,precise,result));
+    assert(snapshotDirty); // Temporary caller movement/restoration uses the observer.
     assert(result.found&&result.handle.slot==a.slot&&result.handle.generation==a.generation);
     assert((refreshOrder==std::vector<unsigned>{a.slot,b.slot,c.slot,self.slot}));
     assert(modes.size()==1&&!modes[0]);
