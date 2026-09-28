@@ -126,6 +126,19 @@ int main(){
         for(unsigned i=0;i<16;++i)assert(queue.contains(i)==(std::find(expected.begin(),expected.end(),i)!=expected.end()));
     };
     std::uint32_t state=0x27d3ab49;
+    // Repeat the head mutation at every population, then remove interior/tail
+    // members: validate backlinks as well as the visible forward order.
+    for(unsigned population=1;population<=16;++population){
+        queue.clear();expected.clear();
+        for(unsigned slot=0;slot<population;++slot){
+            assert(queue.mark(slot));expected.insert(expected.begin(),slot);
+        }
+        for(unsigned repeat=0;repeat<32;++repeat){assert(queue.mark(queue.first()));check();}
+        for(unsigned slot=0;slot<population;++slot){
+            assert(queue.remove(slot));
+            expected.erase(std::find(expected.begin(),expected.end(),slot));check();
+        }
+    }
     for(unsigned i=0;i<65536;++i){
         state=state*1664525u+1013904223u;unsigned slot=(state>>16)%18;
         auto it=std::find(expected.begin(),expected.end(),slot);

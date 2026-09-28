@@ -17,6 +17,9 @@ public:
     void clear(){while(head_!=End)remove(head_);}
     bool mark(unsigned slot){
         if(slot>=Capacity)return false;
+        // Removing and prepending the current head leaves every link and the
+        // count unchanged. Consecutive setters need no queue writes here.
+        if(slot==head_)return true;
         remove(slot);
         auto& link=links_[slot];link.next=head_;link.previous=End;link.queued=true;
         if(head_!=End)links_[head_].previous=slot;
