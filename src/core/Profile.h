@@ -43,6 +43,7 @@ enum DownwellProfilePhase {
     profileBulletEnemyQuery, profileBulletSolidQuery, profileBulletPublication,
     profileProjectileCoordinate,
     profileSpatialPartitionFallback, profileSpatialChooseFallback,
+    profileAlarmCapture, profileAlarmSort, profileAlarmScan, profileAlarmCallback,
     profilePhaseCount
 };
 

@@ -183,6 +183,11 @@ Phases 104–105 isolate the binary32 fallback in spatial partition and child
 selection. Their time is excluded from phases 94–95. Compare fallback calls
 with their parent request counts before attributing spatial cost to software
 floating point: the exact-integer path may already handle the measured workload.
+Phases 106–109 separate alarm registration capture, snapshot sorting, live
+candidate scanning/metadata resolution and callback execution from phase 18.
+All are exclusive. Callback brackets count admitted countdown callbacks, not
+just alarms that fire; their instrumentation cost must not be treated as
+shipping overhead. Use the low-overhead FPS tape for end-to-end comparisons.
 
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases

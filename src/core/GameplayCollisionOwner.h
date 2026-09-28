@@ -374,6 +374,7 @@ public:
             }));
         },this);
         world.configureRoomAlarms([](void* context){
+            DW_PROFILE_SCOPE(profileAlarmCapture);
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
             auto& phase=self.combatAlarmPhase_;phase.clear();
@@ -445,6 +446,7 @@ public:
     // original same-phase creation/list-mutation cases require separate proof.
     template<unsigned Capacity,class AdvanceAndDispatch>
     bool dispatchAlarmPhase(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch){
+        DW_PROFILE_SCOPE(profileAlarmCapture);
         if(!valid()||!world_)return check(false);
         snapshot.clear();
         if(!check(owner_.visitRegistrations([&](InstanceHandle h,int object,const Owner::State& state){
@@ -455,7 +457,8 @@ public:
 private:
     template<unsigned Capacity,class AdvanceAndDispatch>
     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch){
-        snapshot.sort();
+        DW_PROFILE_SCOPE(profileAlarmScan);
+        {DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
           int cachedObject=-1;unsigned alarmMask=0;
@@ -479,7 +482,8 @@ private:
                 eventFound=objects_.findEvent(object,2,int(alarm),event);eventCached=true;
             }
             if(!eventFound)continue;
-            if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;
+            {DW_PROFILE_SCOPE(profileAlarmCallback);
+                if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;}
           }
         }
         return true;

@@ -34,6 +34,7 @@ printf "Birth breakdown: 97=owner_registration 98=resource_binding 99=room_order
 printf "Bullet breakdown: 100=enemy_query_and_impact 101=solid_query_and_impact 102=angle_position_publication; excluded from 17\n"
 printf "Projectile conversion: 103=coordinate_conversion; excluded from publication caller\n"
 printf "Spatial fallback: 104=partition_binary32 105=choose_binary32; excluded from 94/95, whose calls still count all requests\n"
+printf "Alarm detail: 106=capture 107=sort 108=scan_and_metadata 109=callback; exclusive, excluded from 18\n"
 printf "Damage number births: %lu (zero means this tape did not measure a damaging contact)\n", gDownwellProfileDamageBirths
 if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"
