@@ -49,12 +49,21 @@ autoScroll to false; the caller then enables freeCam for ground rooms 20–24
 and rooms 10/17, and explicitly clears autoScroll in room 11. Stored-state
 digests include these flags. Live menu/main-room tests cover their final values;
 this does not implement the remaining alternate-camera Step paths or prove
-the other rooms' full behavior. Entry-dither 73 and the full initializer's
-child births remain omitted. Native terrain loading retains the
+the other rooms' full behavior. Entry-dither 73 has stored-world ownership as
+described below; the full initializer's companion births remain omitted.
+Native terrain loading retains the
 authored player/wall IDs but is not complete cross-family room creation.
 Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room
 phase timing, initial view publication or rendered entry-mask parity.
+
+The native adapter's compatibility entry snapshot includes one camera Step.
+That update runs after successful player birth, not before its callback; the
+callback observes unadvanced camera offsets and the initial ring origin. Retry
+likewise restores the pre-Step state before publishing its real bound player
+lifetime, then prepares the same visible snapshot. A failed birth must not
+advance the camera or ring. This ordering does not create the omitted native
+camera/depth-meter instances or establish the startup numeric-ID stream.
 
 `EntryDither` expresses the shared Create/Step/Alarm behavior without owning
 room traversal or numeric IDs. Its ordered reader callbacks preserve the x

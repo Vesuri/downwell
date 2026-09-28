@@ -931,6 +931,7 @@ private:
     // Normal gameplay reads camMain's published pixel position. Preserve the
     // synthetic replay fixture's explicit camera track when following is off.
     long viewCameraYQ8() const { return followCamera_ ? cameraPixelY_ * 256L : cameraY_; }
+    void initializeMainCameraFrame();
     void applyFrogAlarm(EnemyState& enemy, const downwell::FrogAlarmEffect& effect);
     void advanceEnemyAlarms();
     void updateCrawler(EnemyState& enemy, bool alarm, int cameraX, long cameraYQ8);

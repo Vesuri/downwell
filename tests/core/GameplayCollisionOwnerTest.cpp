@@ -1665,12 +1665,13 @@ int main(){
     }
     {
         struct PlayerViewProbe {
-            GameplayWorld* world=nullptr;unsigned births=0;
+            GameplayWorld* world=nullptr;unsigned births=0;bool reject=false;
             bool birth(InstanceHandle,const GameplayWorld::PlayerInstance&){
                 const auto* view=world->roomEntryView();
                 assert(view&&view->enabled&&view->x.bits==0&&view->y.bits==0&&
                     view->width.bits==0x43200000u&&view->height.bits==0x438e0000u);
-                ++births;return true;
+                assert(world->cameraOffsetX()==0&&world->cameraOffsetY()==0&&world->ringOrigin()==300);
+                ++births;return !reject;
             }
             bool retire(InstanceHandle,const GameplayWorld::PlayerInstance&){return true;}
             bool activation(InstanceHandle,const GameplayWorld::PlayerInstance&,bool){return true;}
@@ -1682,15 +1683,19 @@ int main(){
         probe.world=static_cast<GameplayWorld*>(storage);
         std::unique_ptr<GameplayWorld> world(new(storage) GameplayWorld(300,false,1025,true,
             {},{},GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&rooms));
-        assert(world->effectsSucceeded()&&probe.births==1);
+        assert(world->effectsSucceeded()&&probe.births==1&&world->cameraOffsetY()==5&&world->ringOrigin()==305);
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
-        assert(world->effectsSucceeded()&&probe.births==2&&world->roomEntryView()->y.bits==0);
+        assert(world->effectsSucceeded()&&probe.births==2&&world->roomEntryView()->y.bits==0&&
+            world->cameraOffsetY()==5&&world->ringOrigin()==305);
         RoomPack invalid(nullptr,0);
         auto rejected=std::make_unique<GameplayWorld>(300,false,1025,true,
             GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
             GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&invalid);
         assert(!rejected->effectsSucceeded()&&!rejected->roomEntryView()&&
             !rejected->playerHandle().generation&&probe.births==2);
+        probe.reject=true;
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::none);
+        assert(!world->effectsSucceeded()&&probe.births==3&&world->cameraOffsetY()==0&&world->ringOrigin()==300);
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,

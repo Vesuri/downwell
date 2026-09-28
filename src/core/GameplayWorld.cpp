@@ -124,7 +124,13 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(!ownedDebrisEffects_.restoreEmptyBirthSequence(debrisBirths))run_.effectsSucceeded=false;
     run_.nextForegroundBirth=foregroundBirth;
     enemyRandom_.setSeed(seed);
+    // The temporary owner-free construction prepared a presentation frame.
+    // Restore pre-Step camera state before publishing the real room birth.
+    cameraMotion_.reset(240,176);
+    cameraY_=cameraPixelY_=cameraPixelX_=0;
+    ringOrigin_=initialRingOrigin%ringHeight;
     if(!birthPlayerOwnership())return downwell::ResultsDestination::none;
+    initializeMainCameraFrame();
     return destination;
 }
 
@@ -232,17 +238,6 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
     }
     run_.stage.advance(1); // This runtime starts at the confirmed scrNextLevel(1) entry.
     currencyAccount_.playerCreated();
-    if (followCamera_) {
-        /*
-         * camMain receives one Step on rmMain's creation frame, before the
-         * player receives movement. Its recovered +24 target and /5 easing
-         * therefore establish the first visible camera/ring position here.
-         */
-        cameraMotion_.step(240 * 256L, 176 * 256L);
-        cameraY_ = (cameraMotion_.y - 176L * 4096) / 16;
-        cameraPixelY_ = cameraMotion_.pixelY() - 176;
-        ringOrigin_ = (ringOrigin_ + (unsigned)cameraPixelY_) % ringHeight;
-    }
     for (index = 0; index < bulletCapacity; ++index) {
         bullets_[index].x = 0;
         bullets_[index].y = 0;
@@ -291,7 +286,17 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
         gems_[index].attracted = false;
         gems_[index].active = false;
     }
-    birthPlayerOwnership();
+    if(birthPlayerOwnership())initializeMainCameraFrame();
+}
+
+void GameplayWorld::initializeMainCameraFrame(){
+    if(!followCamera_)return;
+    // Compatibility entry snapshot includes camMain's first ordinary Step,
+    // but creation callbacks must observe the preceding, unadvanced state.
+    cameraMotion_.step(240 * 256L,176 * 256L);
+    cameraY_=(cameraMotion_.y-176L*4096)/16;
+    cameraPixelY_=cameraMotion_.pixelY()-176;
+    ringOrigin_=(ringOrigin_+(unsigned)cameraPixelY_)%ringHeight;
 }
 
 bool GameplayWorld::birthPlayerOwnership() {
