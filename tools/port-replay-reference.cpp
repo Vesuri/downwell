@@ -13,8 +13,11 @@
 
 #include <cinttypes>
 #include <cstdio>
+#include <cstring>
 
-int main() {
+int main(int argc,char** argv) {
+    if(argc>2||(argc==2&&std::strcmp(argv[1],"--no-frame-trace")))return 20;
+    const bool frameTrace=argc==1;
     const downwell::ReplayReader replay(downwell::portReplayBytes,
                                         downwell::portReplaySize);
     if (!replay.valid()||replay.frameCount()>downwell::ReplayFrameTrace::capacity)
@@ -26,11 +29,13 @@ int main() {
         if (!replay.frame(frame, input))
             return 2;
         runtime.step(downwell::packReplayInput(input));
-        std::uint32_t trace[downwell::ReplayFrameTrace::words];
-        downwell::ReplayFrameTrace::capture(runtime,trace);
-        std::printf("FRAME %u",unsigned(frame+1));
-        for(auto word:trace)std::printf(" %08" PRIx32,word);
-        std::putchar('\n');
+        if(frameTrace){
+            std::uint32_t trace[downwell::ReplayFrameTrace::words];
+            downwell::ReplayFrameTrace::capture(runtime,trace);
+            std::printf("FRAME %u",unsigned(frame+1));
+            for(auto word:trace)std::printf(" %08" PRIx32,word);
+            std::putchar('\n');
+        }
     }
 
     const std::uint64_t digest = runtime.trajectoryDigest();

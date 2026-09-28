@@ -21,7 +21,11 @@ fi
 [ -f out/Downwell.exe ] || { echo "verification build not found"; exit 1; }
 [ -f "$ROM" ] || { echo "Kickstart ROM not found: $ROM"; exit 1; }
 
-EXPECTED="$("$REFERENCE")"
+case "${REPLAY_FRAME_TRACE:-1}" in
+  1) EXPECTED="$("$REFERENCE")" ;;
+  0) EXPECTED="$("$REFERENCE" --no-frame-trace)" ;;
+  *) echo "REPLAY_FRAME_TRACE must be 0 or 1"; exit 1 ;;
+esac
 mkdir -p "$DH0/s" "$DH1" "$RUN/state" "$GDBHOME"
 printf 'Stack 8192\ncd dh1:\nDownwell\n' > "$DH0/s/startup-sequence"
 cp -f out/Downwell.exe "$DH1/Downwell"
@@ -74,6 +78,7 @@ lsof -nP -iTCP:"$DEBUG_PORT" -sTCP:LISTEN >/dev/null 2>&1 || {
 env HOME="$GDBHOME" XDG_CACHE_HOME="$GDBHOME" \
   "$GDB" -q -batch \
   -ex "target remote 127.0.0.1:$DEBUG_PORT" \
+  -ex "set \$replay_frame_trace = ${REPLAY_FRAME_TRACE:-1}" \
   -x replay_verify.gdb out/Downwell.elf > "$RUN/gdb-out.log" 2>&1 &
 GDB_PID=$!
 

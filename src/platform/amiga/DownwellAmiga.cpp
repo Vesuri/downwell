@@ -324,7 +324,9 @@ static inline void checkSceneStack(ULONG){}
 #include "core/PlayerPreciseVerification.h"
 #include "core/ReplayFrameTrace.h"
 extern "C" {
+#ifdef DOWNWELL_REPLAY_FRAME_TRACE
 volatile std::uint32_t gReplayTrace[downwell::ReplayFrameTrace::capacity][downwell::ReplayFrameTrace::words];
+#endif
 volatile ULONG gReplayComplete;
 volatile ULONG gReplayFrames;
 volatile ULONG gReplayDigestHigh;
@@ -3404,8 +3406,10 @@ __attribute__((noinline)) static int runDownwell(void) {
         }
         lastPortCheckpoint = port.trajectoryDigest();
 #ifdef DOWNWELL_REPLAY_VERIFY
+#ifdef DOWNWELL_REPLAY_FRAME_TRACE
         if(port.tick()&&port.tick()<=downwell::ReplayFrameTrace::capacity)
             downwell::ReplayFrameTrace::capture(port,gReplayTrace[port.tick()-1]);
+#endif
         if (port.tick() == verificationReplay.frameCount()) {
             gReplayFrames = port.tick();
             gReplayDigestHigh = (ULONG)(lastPortCheckpoint >> 32);

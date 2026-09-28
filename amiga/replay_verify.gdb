@@ -23,7 +23,7 @@ while $guard_word < 64
 end
 printf "Replay task stack retained its 256-byte safety margin\n"
 set $frame = 0
-while $frame < gReplayFrames
+while $replay_frame_trace && $frame < gReplayFrames
     printf "DOWNWELL_REPLAY_RESULT FRAME %u", $frame + 1
     set $word = 0
     while $word < 12

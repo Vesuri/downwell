@@ -143,3 +143,11 @@ ELF symbols, debugger output, expected/actual output and SHA-256 hashes in a
 fresh ignored `amiga/.run/replay-failure.*` directory before normal-build
 restoration can overwrite the image. Passing diagnostic builds do not alone
 resolve a mismatch observed in another build.
+
+To check whether collecting the trace changes a failure, build the native gate
+with `REPLAY_VERIFY=1 REPLAY_FRAME_TRACE=0` and run `amiga/verify_replay.sh`
+with `REPLAY_FRAME_TRACE=0` in its environment. This removes native per-frame
+capture and storage, but retains every aggregate and component check. The host
+runner's matching switch is `--no-frame-trace`. The build and verification
+settings must agree; tracing defaults to enabled. Neither mode changes normal
+game builds.
