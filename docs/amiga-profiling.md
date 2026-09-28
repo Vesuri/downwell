@@ -100,6 +100,20 @@ lookup only applies to numbered lifetimes: generated terrain currently has zero
 source IDs, unlike authored room terrain. A faster numeric-ID search therefore
 does not imply faster generated-terrain registration.
 
+The shared element links maintain a two-level free-slot bitmap. Allocation
+uses it to reproduce the lowest-unowned-element scan, then still checks the
+instance registry's presence flag. All element owners update the same map;
+releasing a non-instance element cannot leave a stale instance-only hint.
+Detach/reinsert changes occupancy, while a layer concatenation does not.
+The lowest free slot is retained and updated at occupancy changes, so sequential
+allocation normally needs no bitmap search. The 3,323-element gameplay pool
+uses 436 bytes for this map and no longer needs
+the registry's 12-byte native cursor/revision hint or the links owner's 4-byte
+vacancy revision (420 bytes net additional storage). This is CPU-side storage;
+it does not allocate Chip RAM or change Copper/bitplane ownership.
+Boundary and mixed-owner tests compare selections with the original linear
+scan, including full pools, reset, rebind release and non-word-sized capacities.
+
 Phases 87 (sprite bounds geometry) and 88 (bounds-cache update and spatial-index
 publication) further split refresh. Publication includes the source no-resource
 branch, which updates the cache without inserting into the index. When nested

@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_RUNNER_LAYER_ELEMENTS_H
 #define DOWNWELL_CORE_RUNNER_LAYER_ELEMENTS_H
+#include "LowestFreeSlotMap.h"
 namespace downwell {
 // Selected GMS2 layer element links, independent of the room animation list.
 // Slots are borrowed identities: their owner must detach before reuse. This
@@ -10,7 +11,8 @@ template<unsigned Layers,unsigned Elements> class RunnerLayerElements {
 public:
     static constexpr unsigned End=Elements,NoLayer=Layers;
     // Storage disposal only; caller has already unpublished all payloads.
-    void clear(){for(auto& link:links_)link=Links{};for(auto& layer:layers_)layer=Layer{};}
+    void clear(){for(auto& link:links_)link=Links{};for(auto& layer:layers_)layer=Layer{};free_.clear();}
+    unsigned firstFree(unsigned start=0)const{return free_.first(start);}
     unsigned owner(unsigned element)const{return element<Elements?links_[element].layer:NoLayer;}
     unsigned count(unsigned layer)const{return layer<Layers?layers_[layer].count:0;}
     unsigned first(unsigned layer)const{return layer<Layers?layers_[layer].head:End;}
@@ -35,7 +37,7 @@ public:
         const Links e=links_[element];auto& layer=layers_[e.layer];
         if(e.previous==End)layer.head=e.next;else links_[e.previous].next=e.next;
         if(e.next==End)layer.tail=e.previous;else links_[e.next].previous=e.previous;
-        --layer.count;links_[element]=Links{};return true;
+        --layer.count;links_[element]=Links{};free_.release(element);return true;
     }
     // 0x41487f: append the whole source chain, preserving its order and
     // updating element ownership. Source layer disposal belongs to the caller.
@@ -86,6 +88,7 @@ public:
     }
 private:
     void insertAfter(unsigned layer,unsigned element,unsigned previous){
+        free_.occupy(element);
         auto& l=layers_[layer];auto& e=links_[element];
         e.layer=layer;e.previous=previous;e.next=previous==End?l.head:links_[previous].next;
         if(e.next==End)l.tail=element;else links_[e.next].previous=element;
@@ -94,6 +97,7 @@ private:
     }
     Links links_[Elements?Elements:1]{};
     Layer layers_[Layers?Layers:1]{};
+    LowestFreeSlotMap<Elements> free_;
 };
 }
 #endif

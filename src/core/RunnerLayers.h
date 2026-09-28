@@ -16,12 +16,10 @@ public:
     };
     const Layer* get(unsigned slot)const{return slot<Capacity&&layers_[slot].present?&layers_[slot]:nullptr;}
     bool succeeded()const{return !failed_;}
-    // Allocation hints must be invalidated when another owner releases a slot.
-    std::uint32_t vacancyRevision()const{return vacancyRevision_;}
     bool discardUninitialized(){
         if(failed_)return false;
         for(auto& layer:layers_)layer=Layer{};
-        elements_.clear();head_=tail_=End;releasedSlot();return true;
+        elements_.clear();head_=tail_=End;return true;
     }
     unsigned find(std::int32_t id)const{
         for(unsigned i=head_;i!=End;i=layers_[i].next)if(layers_[i].id==id)return i;
@@ -45,6 +43,7 @@ public:
         layers_[free]={id,depth,End,End,dynamic,true};linkAfter(free,previous);slot=free;return true;
     }
     unsigned elementOwner(unsigned element)const{return elements_.owner(element);}
+    unsigned firstFreeElement(unsigned start=0)const{return elements_.firstFree(start);}
     unsigned elementCount(unsigned layer)const{return elements_.count(layer);}
     template<class Active> bool attach(unsigned layer,unsigned element,bool instance,bool append,Active active){
         return !failed_&&get(layer)&&elements_.insert(layer,element,instance,append,active);
@@ -65,7 +64,6 @@ public:
         if(failed_)return false;
         const unsigned layer=elements_.owner(element);
         if(!get(layer)||!elements_.remove(element))return false;
-        releasedSlot();
         if(layers_[layer].dynamic&&!elements_.count(layer))eraseEmpty(layer);
         return true;
     }
@@ -74,7 +72,7 @@ public:
     // pending-depth state are deliberately not part of this operation.
     bool detachForRebind(unsigned element){
         if(failed_||!get(elements_.owner(element))||!elements_.remove(element))return false;
-        releasedSlot();return true;
+        return true;
     }
     // Room initialization (0x41363e): forward layer traversal, then the same
     // backward inactive-to-tail pass used after merging. Invoke once after
@@ -139,8 +137,6 @@ public:
         return get(layer)&&elements_.visitBackward(layer,visit);
     }
 private:
-    // Saturation avoids a wrapped revision making an ancient hint look valid.
-    void releasedSlot(){if(vacancyRevision_!=0xffffffffu)++vacancyRevision_;}
     void eraseEmpty(unsigned slot){unlink(slot);layers_[slot]=Layer{};}
     void unlink(unsigned slot){
         const auto& l=layers_[slot];
@@ -156,7 +152,6 @@ private:
     RunnerLayerElements<Capacity,Elements> elements_;
     unsigned head_=End,tail_=End;
     bool failed_=false;
-    std::uint32_t vacancyRevision_=0;
 };
 }
 #endif

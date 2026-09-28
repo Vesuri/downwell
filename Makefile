@@ -377,11 +377,11 @@ verify-runner-depth-changes: build/runner-layer-elements-test build/runner-layer
 	./build/runner-layer-instances-test
 test: verify-runner-depth-changes
 
-build/runner-layer-elements-test: tests/core/RunnerLayerElementsTest.cpp src/core/RunnerLayerElements.h
+build/runner-layer-elements-test: tests/core/RunnerLayerElementsTest.cpp src/core/RunnerLayerElements.h src/core/LowestFreeSlotMap.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
-build/runner-layers-test: tests/core/RunnerLayersTest.cpp src/core/RunnerLayers.h src/core/RunnerLayerElements.h
+build/runner-layers-test: tests/core/RunnerLayersTest.cpp src/core/RunnerLayers.h src/core/RunnerLayerElements.h src/core/LowestFreeSlotMap.h
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 

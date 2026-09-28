@@ -15,6 +15,11 @@ void check(const Owner& owner,unsigned layer,const std::vector<unsigned>& expect
     require(forward==expected && owner.count(layer)==expected.size(),"forward order/count");
     std::reverse(backward.begin(),backward.end());require(backward==expected,"back links");
     for(unsigned i:expected)require(owner.owner(i)==layer,"element ownership");
+    for(unsigned start=0;start<=8;++start){
+        unsigned free=start;
+        while(free<8&&owner.owner(free)!=Owner::NoLayer)++free;
+        require(owner.firstFree(start)==free,"free map agrees with links after mutation");
+    }
 }
 void insertion(){
     Owner owner;

@@ -1,9 +1,11 @@
 #ifndef DOWNWELL_RUNNER_LAYER_ALLOCATION_VERIFICATION_H
 #define DOWNWELL_RUNNER_LAYER_ALLOCATION_VERIFICATION_H
 #include "RunnerLayerInstances.h"
+#include "LowestFreeSlotVerification.h"
 namespace downwell {
 struct RunnerLayerAllocationVerification {
     static bool run(unsigned steps=512){
+        if(!LowestFreeSlotVerification::run())return false;
         using Registry=RunnerLayerInstances<1,96>;
         Registry registry;Registry::Layers layers;
         unsigned layer;std::uint32_t random=0x481fe012u;
@@ -36,6 +38,10 @@ struct RunnerLayerAllocationVerification {
                     !layers.attach(layer,slot,false,false,[](unsigned){return false;}))return false;
                 break;
             }
+            const unsigned start=(random>>24)%Registry::End;
+            unsigned expected=start;
+            while(expected<Registry::End&&layers.elementOwner(expected)!=Registry::Layers::End)++expected;
+            if(layers.firstFreeElement(start)!=expected)return false;
         }
         return true;
     }
