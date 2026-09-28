@@ -19,6 +19,9 @@ template<unsigned I> class GameplayRoomLayers {
     RunnerLayerLifetimes<L,E,I> lifetimes_{layers_,registry_,ids_};
     const RoomPack* rooms_=nullptr;
     bool visible_[L]{};
+    // Actor projection only. Nonprojected scenery/fields still occupy their
+    // original elements and can terminate a layer when inactive.
+    std::uint8_t projected_[(I+7)/8]{};
     unsigned live_=0,playerId_=0;
     bool good_=true,prepared_=false;
     bool fail(){good_=false;return false;}
@@ -50,15 +53,19 @@ public:
         prepared_=true;return true;
     }
     unsigned playerSourceId()const{return playerId_;}
-    bool birth(InstanceHandle h,unsigned sourceId,RunnerImageValue depth,bool inactive){
+    bool birth(InstanceHandle h,unsigned sourceId,RunnerImageValue depth,bool inactive,bool projected=true){
         if(!enabled())return true;
         if(!valid()||!prepared_||!(sourceId?lifetimes_.birth(h,sourceId,depth,inactive):
             lifetimes_.birthUnnumbered(h,depth,inactive)))return fail();
+        const unsigned bit=1u<<(h.slot&7);
+        if(projected)projected_[h.slot>>3]|=bit;
+        else projected_[h.slot>>3]&=~bit;
         ++live_;return true;
     }
     bool retire(InstanceHandle h){
         if(!enabled())return true;
         if(!valid()||!live_||!lifetimes_.retire(h))return fail();
+        projected_[h.slot>>3]&=~(1u<<(h.slot&7));
         --live_;return true;
     }
     bool activation(InstanceHandle h,bool active){return !enabled()||(valid()&&lifetimes_.publishInactive(h,!active));}
@@ -72,7 +79,14 @@ public:
                 if(!entry){out.type=1;return backgrounds_.get(e)!=nullptr;}
                 out.type=2;if(!entry->instance.generation)return true;
                 const auto* live=lifetimes_.resolve(entry->instance);
-                if(!live||!live->depth.attached||live->sourceId!=entry->sourceId||!lookup(entry->instance,out))return false;
+                if(!live||!live->depth.attached||live->sourceId!=entry->sourceId)return false;
+                if(!(projected_[entry->instance.slot>>3]&(1u<<(entry->instance.slot&7)))){
+                    // With object=false only the inactive flag affects the
+                    // shared dispatch decision. Keep that flag live, including
+                    // the interval before activation relinks this element.
+                    out.instance=true;out.flags=live->inactive?2u:0u;return true;
+                }
+                if(!lookup(entry->instance,out))return false;
                 out.type=2;out.instance=true;return true;
             },[&](unsigned slot,unsigned e,auto){
                 const auto* entry=registry_.get(e);

@@ -23,6 +23,37 @@ int main() {
         downwell::ObjectPack objects(ob.data(),ob.size());
         downwell::SpriteCollisionPack sprites(sb.data(),sb.size());
         {
+            auto layers=std::make_unique<downwell::GameplayRoomLayers<4>>(&rooms);
+            assert(layers->prepare());
+            downwell::RunnerImageValue zero,back;
+            assert(back.assign(downwell::MotionBinary64::fromInteger(1000)));
+            assert(layers->birth({0,1},0,zero,false)&&
+                layers->birth({1,1},0,zero,false,false)&&layers->birth({2,1},0,back,false));
+            bool reused=false;
+            const auto visit=[&](){
+                std::vector<unsigned> seen;
+                assert(layers->visit([&](auto h,auto& out){
+                    assert(h.slot!=1||reused); // Scenery needs no actor lookup.
+                    out.flags=0x10;out.object=out.sprite=true;return true;
+                },[&](auto h,int){seen.push_back(h.slot);return true;}));
+                return seen;
+            };
+            assert((visit()==std::vector<unsigned>{2,0}));
+            // Flag publication precedes relinking. The unprojected head must
+            // terminate its layer, without hiding a different layer's actor.
+            assert(layers->activation({1,1},false));
+            assert((visit()==std::vector<unsigned>{2}));
+            assert(layers->reconcile({1,1}));
+            assert((visit()==std::vector<unsigned>{2,0}));
+            assert(layers->activation({1,1},true)&&layers->reconcile({1,1}));
+            assert((visit()==std::vector<unsigned>{2,0}));
+            assert(layers->retire({1,1})&&layers->birth({1,2},0,zero,false));reused=true;
+            assert((visit()==std::vector<unsigned>{2,1,0}));
+            assert(layers->retire({0,1})&&layers->retire({1,2})&&layers->retire({2,1})&&layers->prepare());
+            assert(layers->birth({1,3},0,zero,false,false));reused=false;
+            assert(visit().empty());
+        }
+        {
             auto hiddenBytes=rb;downwell::PackedRoom room;
             assert(rooms.findRoom(11,room));bool changed=false;
             for(unsigned i=0;i<room.layerCount;++i){

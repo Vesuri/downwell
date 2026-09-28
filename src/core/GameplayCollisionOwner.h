@@ -140,7 +140,9 @@ private:
             unsigned sourceId=0;
             if constexpr(Kind==View::Kind::terrain)sourceId=r.sourceInstanceId;
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
-            if(!parent.check(parent.layers_.birth(h,sourceId,p.depth,(state.flags&2u)!=0)))return false;
+            constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
+                Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris;
+            if(!parent.check(parent.layers_.birth(h,sourceId,p.depth,(state.flags&2u)!=0,projected)))return false;
             if constexpr(Kind==View::Kind::player){
                 if(!parent.world_){parent.initialPlayer_=&r;parent.initialPlayerKey_=local;}
             }
