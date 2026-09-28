@@ -912,7 +912,7 @@ void StartupRuntime::spawnMainCurrency(float x, float y, std::int32_t amount,
         gem.motion = birth.motion;
         gem.speedX = gem.motion.vx / 12800.0F;
         gem.speedY = gem.motion.vy / 12800.0F;
-    }, run_.upgrades.levels[10] != 0);
+    }, run_.upgrades.levels[10] != 0,run_.stage.area);
     if(!reward.complete)run_.effectsSucceeded=false;
 }
 

@@ -353,7 +353,7 @@ void GameplayWorld::spawnReward(const EnemyState& enemy, bool attracted)
         gem.speedY = downwell::GemMotion::q8(gem.motion.vy);
         gem.attracted = attracted;
         gem.active = true;
-    }, run_.upgrades.levels[10] != 0);
+    }, run_.upgrades.levels[10] != 0,run_.stage.area);
     gemSlotEnd_ = next;
     if(!reward.complete)run_.effectsSucceeded=false;
 }

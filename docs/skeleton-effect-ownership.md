@@ -166,6 +166,16 @@ remains approximate: registered currency ownership, reward-script caller
 writes and the exact Step/animation path still need integration before this
 Create event replaces it. These tests are not proof of complete live rewards.
 
+The shared live reward wrapper now supplies the run's area to `GemMotion`.
+Its fixed-point adapter preserves the area-5 extra RNG draw after both ordinary
+velocity draws, and areas 3/4 use gravity 112/12800 and cap 6400/12800. As in
+the VM Step, a velocity just below the cap can overshoot for one update before
+the following update clamps it. These constants are captured at birth and
+reset when a motion record is reused. The shared native tape compares full
+Create RNG state across all five areas; host tests also check the velocity
+projection against VM random expressions. This does not remove fixed-point
+motion, implement embedded-wall relocation or enable later-area generation.
+
 `CurrencySpawnScript` preserves `scrCurrencySpawn`'s caller fields and its two
 distinct denomination loops. `atrState` is set only when the caller's direct
 parent is 83 and `stomped` compares equal to one. Each object-248 Create runs

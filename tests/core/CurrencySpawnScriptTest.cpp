@@ -55,6 +55,19 @@ struct Ops {
 };
 int main(){
     assert(CurrencySpawnVerification::run());
+    for(unsigned seed=0;seed<256;++seed)for(int area=1;area<=5;++area){
+        GameMakerRandom random(seed),oracle(seed);GemMotion motion;
+        motion.initialize(12,-3,false,random,false,area);
+        // Compare the existing fixed-point projection to independent VM
+        // random_range/random expressions, including the discarded y draw.
+        const long vx=long(oracle.random(4)*12800)-25600;
+        long vy=long(oracle.random(4)*12800)-25600;
+        if(area==5)vy=-long(oracle.random(3)*12800);
+        assert(motion.vx==vx&&motion.vy==vy);
+        oracle.chooseIndexSmall(4);oracle.irandomSmall(70);oracle.irandomSmall(70);oracle.chooseIndexSmall(2);
+        assert(random.drawCount()==oracle.drawCount()&&random.stateIndex()==oracle.stateIndex());
+        for(unsigned i=0;i<16;++i)assert(random.stateWord(i)==oracle.stateWord(i));
+    }
     unsigned cases=0,prefixes=0;
     for(unsigned seed=0;seed<16;++seed)for(int parent:{83,92})for(int area:{1,5})
     for(bool upgrade:{false,true})for(int stomp:{0,1,2})for(double amount:{-1.,0.,.25,1.,3.,9.75,10.,10.25,21.,35.}){

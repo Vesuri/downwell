@@ -10,6 +10,7 @@ namespace downwell {
 // Terrain probes remain provisional, not the source sprite-mask solver.
 struct GemMotion {
     long x = 0, y = 0, vx = 0, vy = 0;
+    long gravity = 448, maximumGravity = 4 * 12800L;
     GemHoming homing;
     GemLifetime lifetime;
     GemAnimation animation;
@@ -34,13 +35,18 @@ struct GemMotion {
             player.top < gem.bottom && gem.top < player.bottom;
     }
     template<class Random>
-    void initialize(int px, int py, bool attract, Random& random, bool attractor = false) {
+    void initialize(int px, int py, bool attract, Random& random, bool attractor = false, int area = 1) {
         lifetime = {};
         sound = {};
         attractorAtBirth = attractor;
         x = px * 12800L; y = py * 12800L; attracted = attract;
         vx = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
         vy = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
+        // objCurrency Create consumes both ordinary velocity draws before
+        // area 5 replaces ysp. Do not skip the discarded second draw.
+        if(area==5)vy=-static_cast<long>(random.randomIntegerSmall(38400));
+        gravity=(area==3||area==4)?112:448;
+        maximumGravity=(area==3||area==4)?6400:4*12800L;
         animation.initialize(random);
         homing.initialize(random);
     }
@@ -59,8 +65,8 @@ struct GemMotion {
             x += vx; y += vy;
             return true;
         }
-        if (vy < 4 * 12800L) vy += 448;
-        else vy = 4 * 12800L;
+        if (vy < maximumGravity) vy += gravity;
+        else vy = maximumGravity;
         if (solid(pixel(x + vx), pixel(y))) vx = -vx * 7 / 10;
         else x += vx;
         if (vy > 0 && solid(pixel(x), pixel(y + vy) + 4)) {
