@@ -42,6 +42,7 @@ enum DownwellProfilePhase {
     profileBirthRegistration, profileBirthMetadata, profileBirthRoomOrder,
     profileBulletEnemyQuery, profileBulletSolidQuery, profileBulletPublication,
     profileProjectileCoordinate,
+    profileSpatialPartitionFallback, profileSpatialChooseFallback,
     profilePhaseCount
 };
 

@@ -19,6 +19,7 @@ struct RunnerSpatialSplit {
         return partitionBinary32(boxes,output);
     }
     static bool partitionBinary32(const Box (&boxes)[7],Result& output){
+        DW_PROFILE_SCOPE(profileSpatialPartitionFallback);
         Real areas[7];Box all=boxes[0];
         for(unsigned i=0;i<7;++i){
             if(!valid(boxes[i]) || !area(boxes[i],areas[i]))return false;
@@ -76,6 +77,7 @@ struct RunnerSpatialSplit {
     // Retained reference/fallback. Do not change rounding or tie ordering when
     // widening the eligibility of the integer path below.
     static bool chooseBinary32Child(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
+        DW_PROFILE_SCOPE(profileSpatialChooseFallback);
         if(!count || count>6 || !valid(incoming))return false;
         unsigned best=0;Real bestGrowth{},bestArea{};
         for(unsigned i=0;i<count;++i){

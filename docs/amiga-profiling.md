@@ -179,6 +179,10 @@ include their existing hit callbacks; do not interpret them as pure geometry
 timings. Nested bounds/spatial probes remain exclusive.
 Phase 103 isolates split-coordinate conversion from its publication caller;
 compare it separately from lifetime lookup, setter and bounds-update costs.
+Phases 104–105 isolate the binary32 fallback in spatial partition and child
+selection. Their time is excluded from phases 94–95. Compare fallback calls
+with their parent request counts before attributing spatial cost to software
+floating point: the exact-integer path may already handle the measured workload.
 
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases
