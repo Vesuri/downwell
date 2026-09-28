@@ -23,6 +23,46 @@ int main() {
         downwell::ObjectPack objects(ob.data(),ob.size());
         downwell::SpriteCollisionPack sprites(sb.data(),sb.size());
         {
+            auto owner=std::make_unique<downwell::GameplayCollisionOwner>(objects,sprites,
+                downwell::GameplayTerrainInstances::Presentation{},downwell::GameplayTerrainInstances::WallCollision{},&rooms);
+            auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+                owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+            assert(owner->attach(*world));auto& entries=owner->entryDithers();
+            UBYTE pack[8]{};AmigaGameplayDrawList list;
+            assert(list.collect(*world,pack,pack+8,160,34)&&!list.entryCoverVisible);
+            const unsigned bobs=list.count;unsigned sourceId=400001;
+            auto create=[&](int x,int y){
+                downwell::InstanceHandle key;
+                return entries.create(sourceId++,
+                    [&](auto& value){value=downwell::MotionBinary64::fromInteger(x);return true;},
+                    [&](auto& value){value=downwell::MotionBinary64::fromInteger(y);return true;},key);
+            };
+            for(int y:{-116,320,400,683,684,800}){
+                assert(entries.clear()&&create(240,y+34));
+                const auto checkpoint=world->checkpoint();
+                assert(list.collect(*world,pack,pack+8,160,34)&&list.entryCoverVisible&&list.entryCover.y==y);
+                unsigned offset;assert(downwell::EntryDitherMask::offset(y,offset)&&list.entryCover.offset==offset);
+                assert(list.count==bobs&&world->checkpoint()==checkpoint); // No BOB and no simulation mutation.
+            }
+            bool hardware=false;
+            assert(list.entryCoverHardwareEligible(*world,160,34,hardware)&&hardware);
+            assert(world->configureEnemy(0,112,163,0,0,0,0,5,14,0,0,-1,-1,0,0,true,true,true));
+            assert(list.entryCoverHardwareEligible(*world,160,34,hardware)&&!hardware);
+            assert(world->configureEnemy(0,112,163,0,1000,0,0,5,14,0,0,-1,-1,0,0,true,true,true));
+            assert(list.entryCoverHardwareEligible(*world,160,34,hardware)&&hardware);
+            assert(entries.clear()&&create(241,400)); // Off-center is not silently cropped.
+            assert(!list.collect(*world,pack,pack+8,160,34));
+            assert(entries.clear()&&create(240,-83)); // Finite bottom would be on screen.
+            assert(!list.collect(*world,pack,pack+8,160,34));
+            assert(entries.clear()&&create(240,400)&&create(240,400));
+            assert(!list.collect(*world,pack,pack+8,160,34)); // No lossy cover coalescing.
+            assert(entries.clear()&&list.collect(*world,pack,pack+8,160,34)&&!list.entryCoverVisible);
+            downwell::EntryDitherPlacement untouched{17,23};
+            assert(!downwell::EntryDitherPlacement::resolve({0x43708000u},{0},
+                downwell::MotionBinary64::fromInteger(160),{},untouched));
+            assert(untouched.y==17&&untouched.offset==23); // x=240.5 is not 240.
+        }
+        {
             auto layers=std::make_unique<downwell::GameplayRoomLayers<4>>(&rooms);
             assert(layers->prepare());
             downwell::RunnerImageValue zero,back;

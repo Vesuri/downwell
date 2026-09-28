@@ -6,10 +6,28 @@
 #include "core/RunnerSpatialSplit.h"
 #include "core/DebrisDraw.h"
 
+bool AmigaGameplayDrawList::entryCoverHardwareEligible(const GameplayWorld& world,int viewX,int viewY,bool& eligible)const{
+    eligible=false;
+    if(!entryCoverVisible)return true;
+    using Real=downwell::MotionBinary64;
+    const downwell::EffectSurfacePlacement::View view{Real::fromInteger(viewX),Real::fromInteger(viewY),
+        Real::fromInteger(160),Real::fromInteger(284)};
+    if(!world.shops().noControl)for(unsigned i=0;i<world.enemyCount();++i){
+        const auto& enemy=world.enemyAt(i);
+        if(!enemy.active||!enemy.awake)continue;
+        downwell::EffectSurfacePlacement::Draw shade;
+        if(!downwell::EffectSurfacePlacement::enemyShade(Real::fromInteger(240+enemy.x),
+            Real::fromInteger(176+enemy.y),view,false,false,true,shade))return false;
+        if(shade.target==downwell::EffectSurfacePlacement::shade)return true;
+    }
+    eligible=true;return true;
+}
+
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
     count = 0; failedSprite = failedFrame = 0;
     rayLine = {};rayVisible=false;
+    entryCoverVisible=false;entryCover={};
 #ifdef DOWNWELL_REPLAY_VERIFY
     (void)compositeCurrency;
 #endif
@@ -122,10 +140,15 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
-            // This surface producer requires the immutable cover compositor,
-            // not a BOB or the script-effect fallback below. Until production
-            // admission supplies that path, reject rather than omit its Draw.
-            if(kind==GameplayWorld::DrawActor::entryDither)return false;
+            if(kind==GameplayWorld::DrawActor::entryDither){
+                const auto* record=port.entryDithers()?port.entryDithers()->find(key):nullptr;
+                std::int32_t sourceDepth;
+                if(!record||entryCoverVisible||!depth.promoted().roundPixel(sourceDepth)||sourceDepth!=-200000||
+                   !downwell::EntryDitherPlacement::resolve(record->x,record->y,
+                       downwell::MotionBinary64::fromInteger(worldViewX),
+                       downwell::MotionBinary64::fromInteger(worldViewY),entryCover))return false;
+                entryCoverVisible=true;return true; // Immutable cover, never a BOB.
+            }
             if(kind==GameplayWorld::DrawActor::enemy){
 #ifndef DOWNWELL_REPLAY_VERIFY
                 const auto* enemy=port.resolveEnemyLifetime(key);

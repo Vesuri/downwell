@@ -110,9 +110,12 @@ It has a 45-second emulator deadline (configurable up to 60), stops its emulator
 and restores the normal build. The A500 test configuration has 512 KiB Chip and
 8 MiB Fast RAM; this is neither a stock-memory proof nor a frame-budget result.
 The immutable entry asset adds 31,104 bytes to executable data, with no new
-Chip allocation. Its bank-selection path is currently verification-only.
-Automatic native lifetime admission, production ownership/release integration
-and production entry-wipe timing remain open.
+Chip allocation. Registered entry Draw records now select that bank through
+the ordinary renderer. When both copper slots are detached, the next frame's
+VBlank releases its resident tag before other overlays may claim the storage.
+Automatic native lifetime admission and production entry-wipe timing remain
+open, as does support for simultaneously required entry/exit covers or overlay
+banks; these combinations fail rather than overwrite active DMA storage.
 
 `GameplayEntryDithers` now supplies native typed lifetimes using the same
 `EntryDither` Create/Step/Alarm implementation as the stored adapter. Its two
@@ -125,13 +128,28 @@ retirement at Draw cleanup; retry and next-level teardown clear the owner too.
 The layer visitor retains the original -200000 depth and does not origin-cull
 the effect. This is not automatic production creation/Step scheduling: callers
 still must provide source-ordered numeric allocation and camera reads. The BOB
-draw list explicitly rejects this surface producer until its live cover path
-is supplied, rather than interpreting its handle as a script effect.
+draw list extracts a separate cover command rather than producing a BOB.
+`EntryDitherPlacement` shares centered/integral placement validation between
+SDL and Amiga. Multiple covers, unsupported positions and non-default depth
+are rejected rather than flattened into a different picture.
+
+The immutable hardware path is eligible only when no admitted enemy shade is
+visible (or noControl suppresses shade). Otherwise the native renderer adds
+the black entry mask to the same shared surface compositor as SDL, before
+shade subtraction, and publishes its changed coverage through the existing
+effect renderer. Death does not suppress the entry producer or shade holes.
+This fallback preserves the currently implemented alpha contract; it is not a
+20 ms performance claim or full original-GPU raster verification. Tests check
+hardware eligibility at visible/offscreen enemy positions and black-cover
+shade subtraction with normal, noControl and death settings.
 
 Resource-backed tests exercise 120 alarm updates, 119 Steps, activation,
 offscreen Draw eligibility, cleanup, generation-safe reuse, retry and failed
 Create prefixes. The bounded entry-wipe verifier also runs an explicit-ID
 native lifetime fixture and retires it before testing the cover presentation.
+The presentation sweep now supplies registered records at fixture positions
+and exercises normal cover-command extraction and copper publication; the
+verifier does not patch its own alternative mask into the display list.
 That fixture does not establish natural event ordering or entry-wipe timing.
 
 Currency is also a `drawFx` producer, not an independent direct sprite in the

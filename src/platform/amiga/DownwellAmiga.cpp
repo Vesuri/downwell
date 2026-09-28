@@ -277,7 +277,6 @@ static bool selectExitMaskBank() {
     residentCover = ResidentCover::exit;
     return true;
 }
-#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
 static bool selectEntryMaskBank(){
     if(residentCover==ResidentCover::entry)return true;
     if(residentCover!=ResidentCover::none||!overlayAssetStorage||AmigaEntryMask::bytes>overlayAssetCapacity||
@@ -288,7 +287,6 @@ static bool selectEntryMaskBank(){
     gDownwellResultsAssetBytes=gDownwellShopAssetBytes=0;
     residentCover=ResidentCover::entry;return true;
 }
-#endif
 volatile ULONG gDownwellResultsAssetFailures;
 volatile ULONG gDownwellResultsBackdropFailures;
 volatile ULONG gDownwellResultsBackdropChecks;
@@ -1526,7 +1524,8 @@ __attribute__((noinline)) static int runDownwell(void) {
     static downwell::EffectMaskAssets effectAssets;
     alignas(downwell::CurrencySmokeComposition) static UBYTE effectStorage[sizeof(downwell::CurrencySmokeComposition)];
     auto& controllerEffects = *new (effectStorage) downwell::CurrencySmokeComposition;
-    if (!effectAssets.bind(activeGamePack,gamePackBytes)) {
+    if (!effectAssets.bind(activeGamePack,gamePackBytes)||
+        !effectAssets.bindEntryMask(amiga_entry_mask,amiga_entry_mask_end-amiga_entry_mask)) {
         platform.restore();
         FreeMem(startupCopperWords,4*sizeof(UWORD));
         memory.release();
@@ -1779,6 +1778,10 @@ __attribute__((noinline)) static int runDownwell(void) {
         int destroyedBlockY[AmigaPortRuntime::destroyedCapacity] = {0};
         DW_PROFILE_PHASE(profileWait);
         platform.waitVblank();
+        // The preceding detached list has crossed the publication boundary.
+        // Only now may another overlay overwrite an entry cover's DMA bank.
+        if(residentCover==ResidentCover::entry&&gameplayScene.coverDetached())
+            residentCover=ResidentCover::none;
         DW_PROFILE_PHASE(profileInput);
 #ifdef DOWNWELL_SCENE_VERIFY
         // Check AFTER the preceding iteration completed, not at its first
@@ -2892,34 +2895,22 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
             compositeCurrency = false;
 #endif
-            if (compositeCurrency) {
-                DW_PROFILE_SCOPE(profileControllerComposition);
-                using Real = downwell::MotionBinary64;
-                const downwell::EffectSurfacePlacement::View view{Real::fromInteger(worldViewX),Real::fromInteger(worldViewY),
-                    Real::fromInteger(160),Real::fromInteger(284)};
-                downwell::CurrencySmokeComposition::Settings settings;
-                settings.noControl = port.shops().noControl;
-                if (!controllerEffects.prepareWithLateEffects([&](auto emit) {
-                    for(unsigned i=port.gemSlotEnd();i;--i) {
-                        const auto& gem=port.gemAt(i-1);
-                        if(gem.active && gem.motion.lifetime.visible())
-                            emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(240+gem.x),Real::fromInteger(176+gem.y));
-                    }
-                },port.smokeEffects(),effectAssets,view,settings,[&](auto emit) {
-                    return port.visitDebrisDraw([&](const downwell::DebrisAnimation& effect){
-                        return downwell::DebrisDraw::surface(effect,effectAssets,view,emit);
-                    });
-                },[&](auto emit) {
-                    for(unsigned i=0;i<port.enemyCount();++i) {
-                        const auto& enemy=port.enemyAt(i);
-                        if(enemy.active && enemy.awake)
-                            emit(Real::fromInteger(240+enemy.x),Real::fromInteger(176+enemy.y));
-                    }
-                },[](Real n,std::int32_t& out){return n.roundPixel(out);})) {
+            static AmigaGameplayDrawList actorList{};
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+            // Presentation sweep through real registered Draw records. This
+            // deliberately supplies fixture positions, not natural Step timing.
+            auto& entryFixture=collisionOwner.entryDithers();
+            if(!entryFixture.clear()){exitCode=20;break;}
+            if(gDownwellEntryWipeFrames<25){
+                downwell::InstanceHandle key;
+                const int screenY=gDownwellEntryWipeFrames?320+int(gDownwellEntryWipeFrames-1)*16:-116;
+                if(!entryFixture.create(400100+gDownwellEntryWipeFrames,
+                    [&](downwell::MotionBinary64& value){value=downwell::MotionBinary64::fromInteger(worldViewX+80);return true;},
+                    [&](downwell::MotionBinary64& value){value=downwell::MotionBinary64::fromInteger(worldViewY+screenY);return true;},key)){
                     exitCode=20;break;
                 }
             }
-            static AmigaGameplayDrawList actorList{};
+#endif
             static_assert(gameplayPlayerStartY == AmigaGameplayDrawList::playerStartY &&
                           gameplayPlayerGroundY == AmigaGameplayDrawList::replayGroundY,
                           "Actor and gameplay camera anchors must agree");
@@ -2927,6 +2918,43 @@ __attribute__((noinline)) static int runDownwell(void) {
                 gDownwellActorFailureSprite = actorList.failedSprite;
                 gDownwellActorFailureFrame = actorList.failedFrame;
                 frameReady = false;
+            }
+            using Real = downwell::MotionBinary64;
+            const downwell::EffectSurfacePlacement::View effectView{Real::fromInteger(worldViewX),Real::fromInteger(worldViewY),
+                Real::fromInteger(160),Real::fromInteger(284)};
+            bool hardwareEntryCover=false;
+            // Immutable cover DMA cannot reproduce shade-subtracted alpha.
+            if(!actorList.entryCoverHardwareEligible(port,worldViewX,worldViewY,hardwareEntryCover)){
+                exitCode=20;break;
+            }
+            const bool compositeEffects=compositeCurrency||(actorList.entryCoverVisible&&!hardwareEntryCover);
+            if(compositeEffects){
+                DW_PROFILE_SCOPE(profileControllerComposition);
+                downwell::CurrencySmokeComposition::Settings settings;
+                settings.noControl=port.shops().noControl;settings.death=!compositeCurrency;
+                if(!controllerEffects.prepareWithSurfaceProducers([&](auto emit){
+                    for(unsigned i=port.gemSlotEnd();i;--i){
+                        const auto& gem=port.gemAt(i-1);
+                        if(gem.active&&gem.motion.lifetime.visible())
+                            emit(gem.large,gem.motion.animation.frame(),Real::fromInteger(240+gem.x),Real::fromInteger(176+gem.y));
+                    }
+                },port.smokeEffects(),effectAssets,effectView,settings,[&](auto emit){
+                    return port.visitDebrisDraw([&](const downwell::DebrisAnimation& effect){
+                        return downwell::DebrisDraw::surface(effect,effectAssets,effectView,emit);
+                    });
+                },[&](auto emit){
+                    if(!actorList.entryCoverVisible||hardwareEntryCover)return true;
+                    downwell::EffectMaskAssets::Asset mask;
+                    return effectAssets.entryDither(80,actorList.entryCover.y,mask)&&emit(mask,effectView.x,effectView.y);
+                },[&](auto emit){
+                    for(unsigned i=0;i<port.enemyCount();++i){
+                        const auto& enemy=port.enemyAt(i);
+                        if(enemy.active&&enemy.awake)
+                            emit(Real::fromInteger(240+enemy.x),Real::fromInteger(176+enemy.y));
+                    }
+                },[](Real n,std::int32_t& out){return n.roundPixel(out);})){
+                    exitCode=20;break;
+                }
             }
             const GameplayBob* actors = actorList.actors;
             const unsigned actorCount = actorList.count;
@@ -2944,7 +2972,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #else
                 8
 #endif
-                , compositeCurrency && controllerEffects.visible() ? &controllerEffects.surface() : nullptr
+                , compositeEffects && controllerEffects.visible() ? &controllerEffects.surface() : nullptr
             );
             const unsigned bobCount = assignment.bobCount;
             if (!assignment.ready) {
@@ -3008,7 +3036,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                 AmigaGameplayActors::draw(renderer, gameDisplay[back], back, port.ringOrigin(), actors, bobCount,
                     activeGamePack, activeGamePackEnd, gameplayRows, gameplayRays[back],
                     rayVisible ? &rayLine : nullptr);
-            if (compositeCurrency)
+            if (compositeEffects)
                 AmigaGameplayEffects::draw(renderer,gameDisplay[back],back,port.ringOrigin(),
                     controllerEffects.surface(),gameplayRows);
             if (frameReady &&
@@ -3024,16 +3052,29 @@ __attribute__((noinline)) static int runDownwell(void) {
                 downwellGameplayRenderFailure();
                 break;
             }
+            const UBYTE* exitMask = nullptr;
+            if(actorList.entryCoverVisible&&port.exitDither().active){exitCode=20;break;}
+            if(hardwareEntryCover){
+                // Two different cover lifetimes cannot share one DMA bank.
+                if(port.exitDither().active||!selectEntryMaskBank()||
+                   !gameplayScene.entryMask(back,overlayAssetStorage,AmigaEntryMask::bytes,actorList.entryCover.y)){
+                    exitCode=20;break;
+                }
+            }else{
+                if(port.exitDither().active){
+                    if(!selectExitMaskBank()){exitCode=20;break;}
+                    exitMask=overlayAssetStorage+AmigaExitMask::offset(
+                        port.exitDither().y-(mainInitialViewY+port.cameraOffsetY()));
+                }
+                if(!gameplayScene.mask(back,exitMask)){exitCode=20;break;}
+            }
 #ifdef DOWNWELL_ENTRY_WIPE_VERIFY
-            // Presentation-only fixture, independent of unfinished native
-            // controller lifetimes. Retain one immutable bank across both slots.
-            if(!selectEntryMaskBank()){exitCode=20;break;}
             const bool entryAttached=gDownwellEntryWipeFrames<25;
             const int entryY=gDownwellEntryWipeFrames?320+int(gDownwellEntryWipeFrames-1)*16:-116;
             unsigned entryOffset=0;
-            if(entryAttached?(!AmigaEntryMask::offset(entryY,entryOffset)||
-                !gameplayScene.entryMask(back,overlayAssetStorage,AmigaEntryMask::bytes,entryY)):
-                !gameplayScene.mask(back,nullptr)){
+            if(actorList.entryCoverVisible!=entryAttached||
+                (entryAttached&&(!AmigaEntryMask::offset(entryY,entryOffset)||
+                    actorList.entryCover.y!=entryY||actorList.entryCover.offset!=entryOffset))){
                 exitCode=20;break;
             }
             const auto& entryList=gameplayScene.copper(back);
@@ -3052,14 +3093,6 @@ __attribute__((noinline)) static int runDownwell(void) {
             for(unsigned i=0;i<AmigaEntryMask::bytes;++i)
                 if(overlayAssetStorage[i]!=amiga_entry_mask[i])++gDownwellEntryWipeFailures;
             ++gDownwellEntryWipeFrames;
-#else
-            const UBYTE* exitMask = nullptr;
-            if (port.exitDither().active) {
-                if (!selectExitMaskBank()) { exitCode = 20; break; }
-                exitMask = overlayAssetStorage + AmigaExitMask::offset(
-                    port.exitDither().y - (mainInitialViewY + port.cameraOffsetY()));
-            }
-            if (!gameplayScene.mask(back, exitMask)) { exitCode = 20; break; }
 #endif
             /* AmigaPlatform makes the published list live at next VBlank. */
             DW_PROFILE_PHASE(profilePublish);

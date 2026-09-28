@@ -1,4 +1,5 @@
 #include "Game.h"
+#include "EntryDitherPlacement.h"
 #include "WallDrawLookup.h"
 #include "WallPresentation.h"
 #include "TimeFieldOutlines.h"
@@ -298,17 +299,10 @@ void Game::renderMain(Renderer& renderer) const {
                 if(depth!=-200000||record.spriteId!=129||record.scaleX!=1||record.scaleY!=1||record.rotation!=0)
                     return false;
                 RunnerImageValue x,y;std::memcpy(&x.bits,&record.preciseX,4);std::memcpy(&y.bits,&record.preciseY,4);
-                if(!SequenceTimeline::valid(x)||!SequenceTimeline::valid(y))return false;
-                Real dx,dy;int px,py;
-                const auto integer=[](Real n,int& out){
-                    if(!n.roundPixel(out))return false;
-                    const auto exact=Real::fromInteger(out);
-                    return n.low==exact.low&&((n.high==exact.high)||(!out&&!(n.high&0x7fffffffu)));
-                };
-                if(!EffectSurfacePlacement::relative(x.promoted(),view.x,dx)||
-                   !EffectSurfacePlacement::relative(y.promoted(),view.y,dy)||!integer(dx,px)||!integer(dy,py))return false;
+                EntryDitherPlacement placement;
+                if(!EntryDitherPlacement::resolve(x,y,view.x,view.y,placement))return false;
                 EffectMaskAssets::Asset mask;
-                return effectAssets_->entryDither(px,py,mask)&&emit(mask,view.x,view.y);
+                return effectAssets_->entryDither(80,placement.y,mask)&&emit(mask,view.x,view.y);
             });
         }, [&](auto emit) {
             for (std::size_t i=0;i<startup_.activeInstanceCount();++i) {

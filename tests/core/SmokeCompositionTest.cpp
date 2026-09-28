@@ -194,6 +194,17 @@ int main(int argc,char**argv){
         });
         assert(visited==(mode==3?0u:1u));
     }
+    // Black cover alpha is subtracted too. The no-control guard, not death,
+    // suppresses shade holes; a hardware cover is invalid in the shaded case.
+    for(unsigned mode=0;mode<3;++mode){
+        SmokeComposition::Settings settings;settings.noControl=mode==1;settings.death=mode==2;
+        const auto* shade=assets.shade();assert(shade);
+        auto blackCover=*shade;blackCover.low=blackCover.high=shade->mask.data;
+        assert(colored.prepareWithSurfaceProducers(emptyCurrency,smoke,assets,view,settings,
+            [](auto){return true;},[&](auto emit){return emit(blackCover,number(80),number(140));},
+            [&](auto emit){emit(number(80),number(140));},raster));
+        assert(colored.visible()==(mode==1));
+    }
     assert(!colored.prepareWithSurfaceProducers(emptyCurrency,smoke,assets,view,{},
         [](auto){return true;},[&](auto emit){assert(emit(blackAsset,number(80),number(301)));return false;},
         noShades,raster));
