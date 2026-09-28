@@ -9,6 +9,16 @@ template<unsigned Capacity> class DebrisEffects {
     static_assert(Capacity>0,"Debris capacity must be nonzero");
 public:
     using Handle=std::uint32_t;
+    struct BirthSequence{Handle next=1;};
+    BirthSequence birthSequence()const{return {next_};}
+    // Reconstruction may preserve or advance identities, never rewind them.
+    // A destruction request is not cleanup: retained registered children still
+    // occupy this owner even when size() reports zero. Failed teardown must
+    // also finish before a saved sequence can be restored.
+    bool restoreEmptyBirthSequence(BirthSequence sequence){
+        if(!good_||count_||(!next_&&sequence.next)||(sequence.next&&sequence.next<next_))return false;
+        next_=sequence.next;return true;
+    }
     struct Phase{Handle newest;};
     struct NoLifecycle{
         bool birth(Handle,const DebrisAnimation&)const{return true;}

@@ -1,6 +1,7 @@
 #include "core/BloodEffects.h"
 #include "core/SmokeEffects.h"
 #include "core/FlashBallEffects.h"
+#include "core/DebrisEffects.h"
 #include "core/GameMakerRandom.h"
 #include <cassert>
 #include <cstdio>
@@ -39,6 +40,30 @@ int main(){
     };
     check<SmokeEffects<2>>(randomizedCreate);
     check<FlashBallEffects<2>>(randomizedCreate);
+    check<DebrisEffects<2>>([&](auto& owner){
+        const auto before=random.drawCount();
+        const auto handle=owner.create({}, {},1,random);
+        if(!handle)assert(random.drawCount()==before);
+        return handle;
+    });
+    {
+        DebrisEffects<2> original;
+        const auto old=original.create({}, {},1,random);
+        const auto phase=original.beginPhase();const auto sequence=original.birthSequence();
+        assert(original.clear());
+        DebrisEffects<2> rebuilt;
+        assert(rebuilt.restoreEmptyBirthSequence(sequence));
+        const auto born=rebuilt.create({}, {},1,random);
+        assert(born>old&&!rebuilt.get(old));
+        const auto before=*rebuilt.get(born);const auto draws=random.drawCount();
+        assert(rebuilt.advanceAnimation(phase)&&rebuilt.advanceAlarm(phase,0));
+        assert(rebuilt.step(phase,random,
+            [](auto,const auto&,bool&){assert(false);return false;},
+            [](auto,const auto&,auto,auto,bool&){assert(false);return false;}));
+        assert(rebuilt.get(born)->timeline.bits==before.timeline.bits);
+        assert(rebuilt.get(born)->alarms.get(0)==before.alarms.get(0));
+        assert(random.drawCount()==draws);
+    }
     {
         BloodEffects<2> owner;
         const auto retired=owner.create({}, {},{}),phase=owner.beginPhase().newest;

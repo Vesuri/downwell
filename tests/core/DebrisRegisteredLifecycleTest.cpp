@@ -54,12 +54,14 @@ int main(){
         else{effect->disappearing=true;assert(owner.stepRegisteredOne(h,phase,random,stopped,meeting,publish,life));
             assert(writes==2&&queries==8&&effect->flash==1);}
         assert(!owner.get(h)&&owner.retained(h)==effect&&effect->destroyRequested&&life.marks==std::vector<unsigned>{h});
+        assert(owner.size()==0&&!owner.restoreEmptyBirthSequence(owner.birthSequence()));
         const auto draws=random.drawCount();const auto q=queries,w=writes,f=freezes;
         assert(!owner.createRegistered({}, {},1,random,life)&&owner.valid()&&random.drawCount()==draws&&life.deaths.empty());
         assert(owner.advanceRegisteredAnimationOne(h,phase,life)&&life.images.size()==1);
         assert(owner.advanceRegisteredAlarmOne(h,phase,0,life)&&life.marks.size()==1);
         assert(owner.stepRegisteredOne(h,phase,random,stopped,meeting,publish,life)&&queries==q&&writes==w&&freezes==f);
         assert(owner.retireMarked(h,life)&&!owner.retained(h)&&life.deaths==std::vector<unsigned>{h});
+        assert(owner.restoreEmptyBirthSequence(owner.birthSequence()));
         const auto next=owner.createRegistered({}, {},1,random,life);assert(next>h&&owner.retained(next));
         assert(owner.advanceRegisteredAnimationOne(next,phase,life)&&owner.get(next)->timeline.bits==original.timeline.bits);
     }
@@ -75,10 +77,12 @@ int main(){
             assert(retained->destroyRequested);
         }
         assert(!owner.valid());const auto marks=life.marks.size(),images=life.images.size();const auto draws=random.drawCount();
+        assert(!owner.restoreEmptyBirthSequence(owner.birthSequence()));
         assert(!owner.advanceRegisteredAnimationOne(h,phase,life)&&!owner.advanceRegisteredAlarmOne(h,phase,0,life));
         assert(!owner.createRegistered({}, {},1,random,life)&&random.drawCount()==draws&&life.marks.size()==marks&&life.images.size()==images);
         life.rejectRetire=false;const auto deaths=life.deaths.size();
         assert(owner.clear(life)&&owner.valid()&&life.deaths.size()==deaths+1&&life.deaths.back()==h);
+        assert(owner.restoreEmptyBirthSequence(owner.birthSequence()));
         assert(owner.clear(life)&&life.deaths.size()==deaths+1);
     }
     // Every legacy bulk entry point must also borrow the supplied lifecycle,

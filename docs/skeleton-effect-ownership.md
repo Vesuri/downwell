@@ -59,6 +59,14 @@ check, not natural destruction admission: persistent debris scheduling and the
 live player time-stop dependency of `alarmStop(0)` remain required before the
 normal box Step can invoke the complete sequence.
 
+Debris lifetime sequences can be carried across owner reconstruction without
+reusing retired handles or admitting new children to old phase cutoffs.
+Restoration requires successful cleanup of all registered children, including
+destruction-marked records that no longer contribute to the visible count.
+An exhausted sequence remains exhausted after clear/reconstruction. These
+contracts are covered by the shared birth-sequence and registered-debris tests;
+they do not yet give either world's normal scheduler persistent debris ownership.
+
 The current shared cavern stomp adapter checks reward success before its
 immediate enemy retirement, defeat count and player bounce. A failed reward
 retains prior combo changes and partial gem births, but stops contact traversal
