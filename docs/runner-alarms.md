@@ -96,6 +96,15 @@ invalidates the cache. Reuse omits only capture and sorting, never the live
 per-callback checks or alarm countdowns. Explicit caller-snapshot dispatch still
 captures fresh; the cache belongs exclusively to the bound combat owner.
 
+`ObjectAlarmMetadata` also retains up to 32 inherited handler records in a
+640-byte direct-mapped cache. The full object/alarm key is checked on a hit;
+collisions only cause another resource lookup. Initial mask resolution can
+populate handler entries, and rebinding invalidates every entry. The cached
+record includes the original owning object and code ID, including empty own
+events. It never contains an instance handle, countdown or exclusion flag.
+Dispatch still resolves the current object after binding changes and checks
+each lifetime immediately before invoking its handler.
+
 ## Skeleton consequence
 
 Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same

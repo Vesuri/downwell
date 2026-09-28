@@ -520,7 +520,7 @@ private:
             // deactivate or rebind another captured instance, so all live
             // checks and the current object read remain inside this loop.
             if(!eventCached){
-                eventFound=objects_.findEvent(object,2,int(alarm),event);eventCached=true;
+                eventFound=alarmMetadata_.findEvent(object,alarm,event);eventCached=true;
             }
             if(!eventFound)continue;
             {DW_PROFILE_SCOPE(profileAlarmCallback);

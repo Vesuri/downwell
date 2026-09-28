@@ -480,6 +480,12 @@ int main(){
                 PackedObjectEvent event;
                 const bool found=objects.findEvent(int(id),2,int(alarm),event);
                 assert(bool(mask&(1u<<alarm))==found);
+                for(unsigned repeat=0;repeat<2;++repeat){
+                    PackedObjectEvent cached{};
+                    assert(metadata.findEvent(int(id),alarm,cached)==found);
+                    if(found)assert(cached.ownerObjectId==event.ownerObjectId&&
+                        cached.eventType==event.eventType&&cached.eventSubtype==event.eventSubtype&&cached.codeId==event.codeId);
+                }
                 if(found&&event.ownerObjectId!=int(id))++inherited;
             }
         }
@@ -488,6 +494,19 @@ int main(){
         assert(!metadata.bind(invalid)&&!metadata.mask(0,mask));
         assert(metadata.bind(objects)&&metadata.mask(266,mask));
         assert(mask&1u);
+        PackedObjectEvent cached{};
+        assert(metadata.findEvent(266,0,cached)&&!metadata.findEvent(-1,0,cached)&&
+            !metadata.findEvent(386,0,cached)&&!metadata.findEvent(266,12,cached));
+        auto noAlarms=ob;
+        for(unsigned i=0;i<objects.bindingCount();++i){
+            PackedObjectEvent event;assert(objects.binding(i,event));
+            if(event.eventType==2)noAlarms[ObjectPack::headerSize+
+                objects.objectCount()*ObjectPack::objectRecordSize+i*ObjectPack::bindingRecordSize]=3;
+        }
+        ObjectPack replacement(noAlarms.data(),noAlarms.size());
+        assert(metadata.bind(replacement)&&metadata.mask(266,mask)&&mask==0&&!metadata.findEvent(266,0,cached));
+        assert(!metadata.bind(invalid)&&!metadata.findEvent(266,0,cached));
+        assert(metadata.bind(objects)&&metadata.findEvent(266,0,cached));
     }
     {
         TimeChangeEffects<8> effects;int speed=60;unsigned pauses=0;
