@@ -110,7 +110,17 @@ if [ -z "$ACTUAL" ]; then
   exit 1
 fi
 if [ "$ACTUAL" != "$EXPECTED" ]; then
+  # Restoration rebuilds out/ immediately after this script exits. Keep the
+  # exact failing image and symbols before that happens, not only its digest.
+  FAILURE_DIR="$(mktemp -d "$RUN/replay-failure.XXXXXX")"
+  cp out/Downwell.exe "$FAILURE_DIR/Downwell.exe"
+  cp out/Downwell.elf "$FAILURE_DIR/Downwell.elf"
+  cp "$RUN/gdb-out.log" "$FAILURE_DIR/gdb-out.log"
+  printf '%s\n' "$EXPECTED" > "$FAILURE_DIR/expected.txt"
+  printf '%s\n' "$ACTUAL" > "$FAILURE_DIR/actual.txt"
+  shasum -a 256 "$FAILURE_DIR/Downwell.exe" "$FAILURE_DIR/Downwell.elf" > "$FAILURE_DIR/hashes.txt"
   echo "cross-target replay mismatch"
+  echo "Failure artifacts retained in $FAILURE_DIR"
   echo "host:  $EXPECTED"
   echo "Amiga: $ACTUAL"
   exit 1

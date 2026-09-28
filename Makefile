@@ -2378,4 +2378,12 @@ build/spatial-publication-counters-test: tests/core/SpatialPublicationCountersTe
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
 
+.PHONY: verify-replay-frame-trace
+test: verify-replay-frame-trace
+verify-replay-frame-trace: build/replay-frame-trace-test
+	./build/replay-frame-trace-test
+build/replay-frame-trace-test: tests/core/ReplayFrameTraceTest.cpp src/core/ReplayFrameTrace.h
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
 -include $(DEPS)

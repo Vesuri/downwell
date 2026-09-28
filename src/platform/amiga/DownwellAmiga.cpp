@@ -322,7 +322,9 @@ static inline void checkSceneStack(ULONG){}
 #include "core/CorpseVerification.h"
 #include "core/DamageNumberVerification.h"
 #include "core/PlayerPreciseVerification.h"
+#include "core/ReplayFrameTrace.h"
 extern "C" {
+volatile std::uint32_t gReplayTrace[downwell::ReplayFrameTrace::capacity][downwell::ReplayFrameTrace::words];
 volatile ULONG gReplayComplete;
 volatile ULONG gReplayFrames;
 volatile ULONG gReplayDigestHigh;
@@ -1436,7 +1438,7 @@ __attribute__((noinline)) static int runDownwell(void) {
 #endif
     if (!rooms.valid() || !objects.valid() || !builders.valid() ||
 #ifdef DOWNWELL_REPLAY_VERIFY
-        !verificationReplay.valid() ||
+        !verificationReplay.valid() || verificationReplay.frameCount()>downwell::ReplayFrameTrace::capacity ||
 #endif
         !rooms.findRoom(11, mainRoom) ||
         !amigaBuildMenuDrawList(rooms, objects, menuDrawList)) {
@@ -3402,6 +3404,8 @@ __attribute__((noinline)) static int runDownwell(void) {
         }
         lastPortCheckpoint = port.trajectoryDigest();
 #ifdef DOWNWELL_REPLAY_VERIFY
+        if(port.tick()&&port.tick()<=downwell::ReplayFrameTrace::capacity)
+            downwell::ReplayFrameTrace::capture(port,gReplayTrace[port.tick()-1]);
         if (port.tick() == verificationReplay.frameCount()) {
             gReplayFrames = port.tick();
             gReplayDigestHigh = (ULONG)(lastPortCheckpoint >> 32);

@@ -281,6 +281,12 @@ Reference: [scene architecture](scene-architecture.md).
 
 ## 8. Broaden end-to-end verification
 
+- Isolate the unexplained native main-replay digest mismatch seen without
+  per-frame tracing. Spatial/effect subtests matched; adding per-frame capture
+  made two subsequent builds pass. Passing traced builds do not establish the
+  cause or prove the mismatch fixed. Preserve a failing executable and symbols
+  before restoration, then distinguish build-sensitive behavior from fixture
+  or execution-state differences.
 - Cover naturally funded purchases, all shop/side-room layouts and camera
   transitions, dense combat, uncommon upgrade combinations and repeated runs.
 - Compare new behavior through deterministic host/native replays, including

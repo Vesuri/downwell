@@ -9,6 +9,7 @@
 #include "core/CorpseVerification.h"
 #include "core/DamageNumberVerification.h"
 #include "core/PlayerPreciseVerification.h"
+#include "core/ReplayFrameTrace.h"
 
 #include <cinttypes>
 #include <cstdio>
@@ -16,7 +17,7 @@
 int main() {
     const downwell::ReplayReader replay(downwell::portReplayBytes,
                                         downwell::portReplaySize);
-    if (!replay.valid())
+    if (!replay.valid()||replay.frameCount()>downwell::ReplayFrameTrace::capacity)
         return 1;
 
     GameplayWorld runtime(300);
@@ -25,6 +26,11 @@ int main() {
         if (!replay.frame(frame, input))
             return 2;
         runtime.step(downwell::packReplayInput(input));
+        std::uint32_t trace[downwell::ReplayFrameTrace::words];
+        downwell::ReplayFrameTrace::capture(runtime,trace);
+        std::printf("FRAME %u",unsigned(frame+1));
+        for(auto word:trace)std::printf(" %08" PRIx32,word);
+        std::putchar('\n');
     }
 
     const std::uint64_t digest = runtime.trajectoryDigest();

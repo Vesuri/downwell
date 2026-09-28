@@ -127,3 +127,19 @@ checkpoint without resetting it. Diagnostic stage numbers are: 1 startup/gamepla
 8 bone benchmark, 9 bone creation, 10 bone animation, 11 spatial mutations and
 12 corpses. Both spatial and corpse fixtures reconstruct their scratch owners
 in static storage; they are sequential test workloads, not reentrant APIs.
+## Native frame diagnostics
+
+The bounded native replay gate also compares a `FRAME` record for every input
+tick. After the one-based frame number, twelve hexadecimal 32-bit words encode
+the checkpoint high/low halves, player Q8 x/y and velocity x/y, ammo, grounded,
+ring origin, first-bullet presence and first-bullet pixel x/y. Signed values
+retain their two's-complement bits. The checkpoint remains the full shared
+player-state check; these extra fields help localize a difference, not replace
+the original-game behavioral evidence. Trace storage is test-only and kept off
+the native task stack; tapes exceeding its capacity are rejected.
+
+On a comparison mismatch, `amiga/verify_replay.sh` retains the failing executable,
+ELF symbols, debugger output, expected/actual output and SHA-256 hashes in a
+fresh ignored `amiga/.run/replay-failure.*` directory before normal-build
+restoration can overwrite the image. Passing diagnostic builds do not alone
+resolve a mismatch observed in another build.
