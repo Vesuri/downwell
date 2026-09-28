@@ -665,30 +665,30 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
         require(edgeEntry.inPlayMenu(),
                 "edge entry completes the title and well transition without input");
 
-        require(runtime.instance(105186) != nullptr &&
-                    runtime.instance(105186)->objectId == 66,
-                "player Create spawns the depth meter first");
         require(runtime.instance(105187) != nullptr &&
-                    runtime.instance(105187)->objectId == 64,
+                    runtime.instance(105187)->objectId == 66,
+                "player Create spawns the depth meter first");
+        require(runtime.instance(105188) != nullptr &&
+                    runtime.instance(105188)->objectId == 64,
                 "player Create spawns camMain second");
-        const downwell::InstanceRecord* title = runtime.instance(105192);
+        const downwell::InstanceRecord* title = runtime.instance(105193);
         require(title != nullptr && title->objectId == 317 &&
                     title->x == 328 && title->y == 432 &&
                     title->imageSpeed == 0.0F,
                 "well Create spawns the stationary first-boot title");
-        const downwell::InstanceRecord* fade = runtime.instance(105193);
+        const downwell::InstanceRecord* fade = runtime.instance(105194);
         require(fade != nullptr && fade->objectId == 382 && fade->roomId == 20 &&
                     fade->x == 0 && fade->y == 0,
                 "rmMenu creates ditherFade with the authoritative runtime ID");
         require(fade->imageSpeed == 0.0F && fade->alarms.get(0) == 30,
                 "ditherFade Create freezes animation and arms Alarm 0");
-        require(runtime.nextRuntimeInstanceId() == 105194,
+        require(runtime.nextRuntimeInstanceId() == 105195,
                 "runtime allocator advances over all recovered Create spawns");
         require(runtime.deferredCommandsSucceeded(),
                 "deferred room-creation commands apply successfully");
 
         stepMany(runtime, 30);
-        fade = runtime.instance(105193);
+        fade = runtime.instance(105194);
         require(fade != nullptr && fade->imageSpeed == 0.2F,
                 "ditherFade Alarm 0 starts recovered animation speed");
         require(!runtime.controlsLocked(),
@@ -718,12 +718,12 @@ void testGeneratedPackEntersRecoveredMenu(const char* roomPath,
 
         for (int tick = 0; tick < 105; ++tick)
             runtime.step(wake, false);
-        title = runtime.instance(105192);
+        title = runtime.instance(105193);
         require(title != nullptr && title->alarms.get(2) >= 0,
                 "crossing beneath the title arms its recovered reveal delay");
         for (int tick = 0; tick < 50; ++tick)
             runtime.step(wake, false);
-        title = runtime.instance(105192);
+        title = runtime.instance(105193);
         require(title != nullptr && title->imageIndex == 9.0F &&
                     title->imageSpeed == 0.0F,
                 "title reveal reaches and holds its final recovered frame");

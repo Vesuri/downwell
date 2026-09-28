@@ -926,7 +926,7 @@ private:
     // A single 21x18 recovered side-room pattern can emit more than 128
     // objects before GameMaker returns to the step loop.
     DeferredInstanceQueue<512> deferredInstances_;
-    std::uint32_t nextRuntimeInstanceId_ = 105186;
+    std::uint32_t nextRuntimeInstanceId_ = 105187;
     bool deferredCommandsSucceeded_ = true;
     bool inputLeft_ = false;
     bool inputRight_ = false;

@@ -29,8 +29,11 @@ membership. Numeric IDs are preserved throughout.
 
 The pinned build records `GEN8.LastObj = 105186` and
 `GEN8.LastTile = 10000000`. Serialized room-instance IDs occupy the contiguous
-range 100000–105185, so 105186 is the source-backed starting boundary for
-runtime-created object IDs. This value must be carried into native runtime data
+range 100000–105185. The runner loads LastObj into its allocation counter and
+increments it before construction, making **105187** the first runtime-created
+object ID (not LastObj itself or the authored maximum plus one).
+`tools/verify-runner-instance-ids.py` pins the loader and allocation instructions.
+The next-ID value must be carried into native runtime data
 rather than recomputed from whichever subset of rooms happens to be loaded.
 
 There are 2,810 total `CODE` records. The remaining 309 records are child entries

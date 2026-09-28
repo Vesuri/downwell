@@ -1719,13 +1719,15 @@ generated/room-layer-metadata.json: data/data.win tools/export-room-layer-metada
 	bash tools/export-room-layer-metadata.sh
 
 generate-room-pack: generated/room-layer-metadata.json
+	python3 tools/verify-runner-instance-ids.py
 	python3 tools/verify-room-layer-metadata.py
 	tools/generate-room-pack.py
 
-verify-room-pack: $(ROOM_PACK_TEST_TARGET)
+verify-room-pack: $(ROOM_PACK_TEST_TARGET) $(STARTUP_TEST_TARGET)
+	python3 tools/verify-runner-instance-ids.py
 	tools/generate-room-pack.py --check
 	./$(ROOM_PACK_TEST_TARGET) generated/downwell-rooms.dwrm
-	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm
+	./$(STARTUP_TEST_TARGET) generated/downwell-rooms.dwrm generated/downwell-objects.dwob generated/downwell-builder-patterns.dwbp
 
 generate-object-pack:
 	tools/generate-object-pack.py

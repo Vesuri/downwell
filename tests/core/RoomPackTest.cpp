@@ -78,7 +78,7 @@ std::vector<std::uint8_t> makePack(bool persistentController=true) {
     appendU32(bytes, 1); // layers
     appendU32(bytes, 2); // memberships
     appendU64(bytes, downwell::RoomPack::sourceHashPrefix);
-    appendU32(bytes, 105186); // GEN8.LastObj
+    appendU32(bytes, 105187); // Next runtime ID: GEN8.LastObj + 1
 
     appendI32(bytes, 7);
     appendI32(bytes, 1000);
@@ -118,7 +118,7 @@ void testDecode() {
     require(pack.valid(), "valid pack is accepted");
     require(pack.roomCount() == 1 && pack.instanceCount() == 2,
             "header counts are decoded");
-    require(pack.nextRuntimeInstanceId() == 105186,
+    require(pack.nextRuntimeInstanceId() == 105187,
             "runtime instance allocator boundary is decoded");
 
     downwell::PackedRoom room;
@@ -410,7 +410,7 @@ void testGeneratedPack(const char* path) {
     require(pack.roomCount() == 25 && pack.instanceCount() == 5186 &&
                 pack.layerCount() == 132 && pack.membershipCount() == 5186,
             "generated room pack has audited totals");
-    require(pack.nextRuntimeInstanceId() == 105186,
+    require(pack.nextRuntimeInstanceId() == 105187,
             "generated pack carries authoritative GEN8.LastObj");
     unsigned instanceLayers=0,backgroundLayers=0,spriteBackgrounds=0;
     for(unsigned i=0;i<pack.layerCount();++i){

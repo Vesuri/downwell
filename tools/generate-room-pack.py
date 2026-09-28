@@ -51,9 +51,11 @@ def build_pack(manifest, layer_metadata):
     rooms_by_id = {room["id"]: room for room in resources["rooms"]}
     objects_by_id = {obj["id"]: obj for obj in resources["objects"]}
     room_order = manifest["gameMaker"]["roomOrder"]
-    next_runtime_instance_id = manifest["gameMaker"]["lastObjectInstanceId"]
-    require(next_runtime_instance_id > 0,
-            "runtime object instance boundary must be positive")
+    last_runtime_instance_id = manifest["gameMaker"]["lastObjectInstanceId"]
+    require(0 < last_runtime_instance_id < 0xffffffff,
+            "runtime object instance counter must admit a next ID")
+    # The selected runner increments GEN8.LastObj before construction.
+    next_runtime_instance_id = last_runtime_instance_id + 1
 
     room_records = []
     instance_records = []

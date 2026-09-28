@@ -99,7 +99,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     deferredInstances_.clear();
     nextRuntimeInstanceId_ = roomPack_ != nullptr
                                  ? roomPack_->nextRuntimeInstanceId()
-                                 : 105186;
+                                 : 105187;
     deferredCommandsSucceeded_ = true;
     alarmEventMasks_.fill(-1);
     inputLeft_ = false;

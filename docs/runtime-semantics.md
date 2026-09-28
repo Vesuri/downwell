@@ -143,7 +143,7 @@ Room creation code IDs 648 (`rmInit`) and 714 (`rmMenu`) are translated as
 deterministic core state. They establish the 160x284 camera, select sound 193
 (`bgmOverworld`), emit gain/play requests, lock control, and enqueue creation of
 object 382 (`ditherFade`). With the complete native packs, the command flushes
-between room creation code and Room Start, producing instance 105186 from the
+between room creation code and Room Start, producing instance 105187 from the
 source-backed allocator boundary and running its recovered PreCreate/Create
 bindings before it joins Room Start.
 
