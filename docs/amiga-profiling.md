@@ -70,6 +70,12 @@ publication) further split refresh. Publication includes the source no-resource
 branch, which updates the cache without inserting into the index. When nested
 in phase 83, their time is excluded from that phase's total.
 
+Animation phases 89 and 90 split the initial simulation work: 89 covers the
+room-instance animation walk (including lifetime validation and previous-position
+capture), while 90 covers flash, smoke and corpse-expiry animation. Both exclude
+their nested phases and are excluded from simulation phase 3. These brackets
+run once per update rather than once per instance to limit probe overhead.
+
 Use `SKIP_LEVEL=1` for level completion and `SKIP_INTRO=1` for style selection
 instead of the gameplay shortcut. Use `PROFILE_LASER=1` when investigating
 the upgraded Laser Sight fixture. Keep identical inputs, seeds, build options

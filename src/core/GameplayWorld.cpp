@@ -779,10 +779,15 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(debrisInstances_&&debrisInstances_->size())debrisBinding_.beginAnimation();
     else debrisBinding_={};
     // Only valid unit-sequence state is admitted through the effect owner.
+    {
+    DW_PROFILE_SCOPE(profileStandaloneEffectAnimation);
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();
+    }
     if(!run_.effectsSucceeded)return {};
+    {
+    DW_PROFILE_SCOPE(profileRoomAnimation);
     if(roomAnimation_){
         if(!roomAnimation_(roomAnimationContext_)){run_.effectsSucceeded=false;return {};}
     }else{
@@ -798,6 +803,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         downwell::advanceEnemyImageQ8(enemies_[i].imagePhase,enemies_[i].imageRemainder,
                                      enemies_[i].imageSpeed);
         if(!publishEnemyImage(enemies_[i],enemies_[i].imagePhase))return {};
+    }
     }
     }
     DW_PROFILE_PHASE(profilePlayer);
