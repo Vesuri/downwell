@@ -399,6 +399,10 @@ public:
         if(!local)return run_.effectsSucceeded=false;
         id=registration.sourceId(local);return run_.effectsSucceeded=id!=0;
     }
+    const DebrisEffects<debrisEffectCapacity>& debrisEffects()const{return ownedDebrisEffects_;}
+    bool spawnDebris(MotionBinary64 x,MotionBinary64 y,int area,std::uint32_t& id){
+        return spawnDebris(ownedDebrisRegistration_,ownedDebrisEffects_,x,y,area,id);
+    }
     template<unsigned Capacity,unsigned Registered,class Stopped>
     bool stepDebris(StoredDebrisRegistration<instanceCapacity,Registered>& registration,DebrisEffects<Capacity>& effects,
         InstanceHandle key,typename DebrisEffects<Capacity>::Phase phase,Stopped stopped){
@@ -1032,6 +1036,9 @@ private:
     StoredScriptSpawnRegistration<instanceCapacity,scriptSpawnEffectCapacity> ownedScriptRegistration_{
         instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     ScriptSpawnEffects<scriptSpawnEffectCapacity> ownedScriptEffects_;
+    StoredDebrisRegistration<instanceCapacity,debrisEffectCapacity> ownedDebrisRegistration_{
+        instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    DebrisEffects<debrisEffectCapacity> ownedDebrisEffects_;
 };
 
 } // namespace downwell

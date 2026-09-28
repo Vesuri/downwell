@@ -224,6 +224,10 @@ public:
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
+    const downwell::DebrisEffects<downwell::debrisEffectCapacity>& debrisEffects()const{return ownedDebrisEffects_;}
+    bool spawnDebris(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int area,downwell::InstanceHandle& result){
+        return spawnDebris(ownedDebrisEffects_,x,y,area,result);
+    }
     bool bindDebrisInstances(downwell::GameplayDebrisInstances& instances){
         if(debrisInstances_||!instances.valid()||instances.size())return false;
         debrisInstances_=&instances;return true;
@@ -747,6 +751,7 @@ private:
     EnemyLifecycleBinding enemyLifecycle_;
     downwell::ScriptEffectRuntimeBinding scriptEffectsBinding_;
     downwell::ScriptEffectRuntimeBinding debrisBinding_;
+    downwell::DebrisEffects<downwell::debrisEffectCapacity> ownedDebrisEffects_;
     bool clearRoomDebris(){
         if(debrisInstances_&&debrisInstances_->size()&&!debrisBinding_.clearRoom())return run_.effectsSucceeded=false;
         debrisBinding_={};return true;

@@ -64,8 +64,15 @@ reusing retired handles or admitting new children to old phase cutoffs.
 Restoration requires successful cleanup of all registered children, including
 destruction-marked records that no longer contribute to the visible count.
 An exhausted sequence remains exhausted after clear/reconstruction. These
-contracts are covered by the shared birth-sequence and registered-debris tests;
-they do not yet give either world's normal scheduler persistent debris ownership.
+contracts are covered by the shared birth-sequence and registered-debris tests.
+Both worlds own a 64-entry debris bank and expose creation through their existing
+registered lifecycle bridge. Retry clears registered particles before room
+teardown; native placement-new reconstruction preserves the bank's birth
+sequence. Real collision-owner tests cover creation, cleanup and rebirth in
+both worlds. Borrowed banks remain available for isolated tests, but cannot be
+mixed with a populated production bank. Normal source alarm/Step scheduling,
+player time-stop and natural destruction admission remain unfinished; owning
+storage alone does not establish a complete live debris feature.
 
 The current shared cavern stomp adapter checks reward success before its
 immediate enemy retirement, defeat count and player bounce. A failed reward

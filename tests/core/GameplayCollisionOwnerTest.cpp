@@ -596,6 +596,20 @@ int main(){
         bool unchanged=true;
         assert(!collision->debrisPlaceMeeting(local,{},{},masks,unchanged)&&unchanged&&!collision->valid());
     }
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));
+        InstanceHandle first,second;
+        assert(scene->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(300),1,first));
+        assert(scene->debrisEffects().size()==1&&collision->debris().find(first));
+        assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        assert(!scene->debrisEffects().size()&&!collision->debris().find(first));
+        assert(scene->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(300),1,second));
+        assert(second.generation>first.generation&&scene->debrisEffects().retained(second.generation));
+        assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+    }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),

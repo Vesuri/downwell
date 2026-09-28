@@ -2,6 +2,8 @@
 #define DOWNWELL_CORE_DEBRIS_EFFECTS_H
 #include "DebrisAnimation.h"
 namespace downwell {
+// Same bounded production storage on both platforms; exhaustion is terminal.
+constexpr unsigned debrisEffectCapacity=64;
 // Fixed object-370 storage. Handles are owner-local, not Windows instance IDs.
 // Capture cutoffs at global phase entry. Callbacks must not mutate this owner;
 // pass adapters anew after copying a world, never retain borrowed references.

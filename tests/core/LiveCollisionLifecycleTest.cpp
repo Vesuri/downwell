@@ -154,6 +154,20 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach world-owned debris fixture");world->skipToGameForTesting();
+        unsigned first=0,second=0;
+        require(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(300),1,first),"owned debris birth");
+        require(world->debrisEffects().size()==1&&world->instance(first),"owned debris registered");
+        const auto next=world->debrisEffects().birthSequence().next;
+        require(world->restartFromResults(DeathMenuSequence::Action::Retry,42),"owned debris Retry");
+        require(!world->debrisEffects().size()&&!world->instance(first),"owned debris retired before room teardown");
+        require(world->spawnDebris(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(300),1,second),"owned debris rebirth");
+        require(second>first&&world->debrisEffects().retained(next),"owned debris monotonic identities");
+        require(world->restartFromResults(DeathMenuSequence::Action::Retry,42),"owned debris fixture cleanup");
+    }
     for(bool failSmoke:{false,true}){
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
         checkBoxBurstWorld(*world,failSmoke);
