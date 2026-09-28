@@ -300,7 +300,7 @@ public:
         return run_.effectsSucceeded=scriptSpawnInstances_&&effects.advanceRegistered(phase,*scriptSpawnInstances_);
     }
     enum class PhaseBoundary { beginStep, alarm, step, collision, endStep, roomEntry };
-    enum class DrawActor { enemy, bullet, scriptEffect, debris };
+    enum class DrawActor { enemy, bullet, scriptEffect, debris, player };
     using DrawActorVisitor=bool (*)(void*,DrawActor,downwell::InstanceHandle,downwell::RunnerImageValue);
     using RoomActorDraw=bool (*)(const void*,DrawActorVisitor,void*);
     // Borrowed owner traversal, not a snapshot or a family-local birth sort.

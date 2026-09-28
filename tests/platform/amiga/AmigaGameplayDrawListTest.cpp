@@ -38,7 +38,7 @@ int main() {
         downwell::PackedObject def;assert(objects.findObject(112,def)&&def.creationDepth==-10000);
         assert(
             kinds==std::vector<GameplayWorld::DrawActor>({GameplayWorld::DrawActor::scriptEffect,
-                GameplayWorld::DrawActor::scriptEffect,GameplayWorld::DrawActor::enemy}));
+                GameplayWorld::DrawActor::scriptEffect,GameplayWorld::DrawActor::enemy,GameplayWorld::DrawActor::player}));
         UBYTE pack[8]{};AmigaGameplayDrawList list;const auto checkpoint=scene->checkpoint();
         assert(list.collect(*scene,pack,pack+8,160,34)&&scene->checkpoint()==checkpoint);
         assert(list.actors[0].sprite==602&&list.actors[0].frame==0&&list.actors[0].x==194&&list.actors[0].y==90);
@@ -50,6 +50,43 @@ int main() {
 #endif
         unsigned visited=0;
         assert(!scene->visitRoomActors([&](auto,auto,auto){++visited;return false;})&&visited==1);
+        {
+            auto& inventory=const_cast<downwell::UpgradeInventory&>(scene->upgrades());
+            inventory.levels[12]=1; // Presentation-only fixture.
+            const auto player=scene->playerHandle();const auto* record=scene->findPlayer(player);
+            assert(record&&list.collect(*scene,pack,pack+8,160,34)&&list.rayVisible);
+            assert(owner->playerBinding().activation(player,*record,false)&&owner->reconcileActivation());
+            assert(list.collect(*scene,pack,pack+8,160,34)&&!list.rayVisible);
+            for(unsigned i=0;i<list.count;++i)
+                assert(list.actors[i].sprite!=scene->player().spriteId(false)&&list.actors[i].sprite!=gameplayRayMarker);
+            assert(owner->playerBinding().activation(player,*record,true)&&owner->reconcileActivation());
+            // The drawing consumer must respect its owner's sequence. This
+            // synthetic visitor exercises a future deeper impact without
+            // claiming that native fixed-layer migration is integrated yet.
+            struct Tape {downwell::InstanceHandle player,effect;bool stale=false;} tape{player,b};
+            scene->configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* sink){
+                const auto& t=*static_cast<const Tape*>(context);auto h=t.player;
+                if(t.stale)++h.generation;
+                downwell::RunnerImageValue playerDepth,effectDepth;
+                playerDepth.assign(downwell::MotionBinary64::fromInteger(-50000));
+                effectDepth.assign(downwell::MotionBinary64::fromInteger(-60000));
+                return visit(sink,GameplayWorld::DrawActor::player,h,playerDepth)&&
+                    visit(sink,GameplayWorld::DrawActor::scriptEffect,t.effect,effectDepth);
+            },&tape);
+            assert(list.collect(*scene,pack,pack+8,160,34)&&list.rayVisible);
+            unsigned playerAt=list.count,rayAt=list.count,effectAt=list.count;
+            for(unsigned i=0;i<list.count;++i){
+                if(list.actors[i].sprite==scene->player().spriteId(false))playerAt=i;
+                if(list.actors[i].sprite==gameplayRayMarker)rayAt=i;
+                if(list.actors[i].sprite==602)effectAt=i;
+            }
+            assert(playerAt<rayAt&&rayAt<effectAt&&effectAt<list.count);
+            tape.stale=true;
+            assert(!list.collect(*scene,pack,pack+8,160,34)&&!list.rayVisible);
+            for(unsigned i=0;i<list.count;++i)assert(list.actors[i].sprite!=602);
+            assert(owner->attach(*scene)); // Restore production traversal.
+            inventory.levels[12]=0;
+        }
         downwell::InstanceHandle impact;
         assert(scene->spawnScriptEffect(n(248),n(128),101,{0x3fe00000u,0},{},{},frames,impact));
         for(unsigned tick=0;tick<16;++tick){

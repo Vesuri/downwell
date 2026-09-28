@@ -9,6 +9,7 @@
 bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack,
     const UBYTE* packEnd, int worldViewX, int worldViewY, bool compositeCurrency) {
     count = 0; failedSprite = failedFrame = 0;
+    rayLine = {};rayVisible=false;
 #ifdef DOWNWELL_REPLAY_VERIFY
     (void)compositeCurrency;
 #endif
@@ -90,10 +91,35 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             return true;
         });
     };
+    const auto drawPlayer=[&](){
+        if (port.playerVisible() && !append(
+                (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
+                (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),
+                downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(port.player().offsetXFixed()) - port.cameraOffsetX(),
+#ifdef DOWNWELL_REPLAY_VERIFY
+                replayGroundY + port.player().offsetY(),
+#else
+                playerStartY + downwell::roundGameMakerQ8(port.player().offsetYFixed()) - port.cameraOffsetY(),
+#endif
+                port.player().facing() < 0)) return false;
+        rayVisible = port.upgrades().levels[12] && !port.goalStopped();
+        if (rayVisible) {
+            DW_PROFILE_SCOPE(profileLaserTrace);
+            using Ray = downwell::LaserSightRay;
+            rayLine = downwell::LaserSightLine::from(
+                Ray::fromQ8(port.player().offsetXFixed(), 240),
+                Ray::fromQ8(port.player().offsetYFixed(), 176), port.laserSightEndpoint(),
+                worldViewX - downwellPlayfieldX, worldViewY);
+            if (count == capacity) { failedSprite = gameplayRayMarker; return false; }
+            actors[count++] = {gameplayRayMarker, 0, 0, 0, 0};
+        }
+        return true;
+    };
     if(port.hasRoomActorDraw()) {
         downwell::RunnerImageValue foregroundDepth;foregroundDepth.assign(downwell::MotionBinary64::fromInteger(-1000));
         if(!port.visitRoomActors([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
+            if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
             if(kind==GameplayWorld::DrawActor::enemy){
 #ifndef DOWNWELL_REPLAY_VERIFY
                 const auto* enemy=port.resolveEnemyLifetime(key);
@@ -155,7 +181,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             }
             failedSprite=failedFrame=0;
             return append(effect.spriteId,frame,downwellPlayfieldX+x-worldViewX,y-worldViewY,0);
-        }))ready=false;
+        }))return false;
     }
     for (unsigned index = 0; !port.hasRoomActorDraw() && index < port.bulletSlotEnd(); ++index) {
         const auto& bullet = port.bulletAt(index);
@@ -170,28 +196,7 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
             ready = false;
     }
     if(!drawForeground())ready=false;
-    if (port.playerVisible() && !append(
-            (UWORD)port.player().spriteId(port.deathSequence().movementDead()),
-            (UWORD)port.player().spriteFrame(port.deathSequence().movementDead(), port.deathSequence().animation),
-            downwellPlayfieldX + 80 + downwell::roundGameMakerQ8(port.player().offsetXFixed()) - port.cameraOffsetX(),
-#ifdef DOWNWELL_REPLAY_VERIFY
-            replayGroundY + port.player().offsetY(),
-#else
-            playerStartY + downwell::roundGameMakerQ8(port.player().offsetYFixed()) - port.cameraOffsetY(),
-#endif
-            port.player().facing() < 0)) ready = false;
-    rayLine = {};
-    rayVisible = port.upgrades().levels[12] && !port.goalStopped();
-    if (rayVisible) {
-        DW_PROFILE_SCOPE(profileLaserTrace);
-        using Ray = downwell::LaserSightRay;
-        rayLine = downwell::LaserSightLine::from(
-            Ray::fromQ8(port.player().offsetXFixed(), 240),
-            Ray::fromQ8(port.player().offsetYFixed(), 176), port.laserSightEndpoint(),
-            worldViewX - downwellPlayfieldX, worldViewY);
-        if (count == capacity) { failedSprite = gameplayRayMarker; ready = false; }
-        else actors[count++] = {gameplayRayMarker, 0, 0, 0, 0};
-    }
+    if(!port.hasRoomActorDraw()&&!drawPlayer())ready=false;
 
     // Original compatibility depth -200000: ahead of ordinary gameplay,
     // but behind the controller's effect-surface publication (-300000).
