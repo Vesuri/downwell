@@ -457,18 +457,30 @@ private:
     bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch){
         snapshot.sort();
         const unsigned count=snapshot.size();
-        for(unsigned alarm=0;alarm<AlarmBank::count;++alarm)for(unsigned i=0;i<count;++i){
+        for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
+          int cachedObject=-1;unsigned alarmMask=0;
+          PackedObjectEvent event;bool eventCached=false,eventFound=false;
+          for(unsigned i=0;i<count;++i){
             const auto h=snapshot.handle(i);const auto* current=owner_.resolve(h);
             if(!current||(current->flags&0x100003u))continue;
-            unsigned alarmMask;
-            if(!check(alarmMetadata_.mask(owner_.objectId(h),alarmMask)))return false;
+            const int object=owner_.objectId(h);
+            if(object!=cachedObject){
+                if(!check(alarmMetadata_.mask(object,alarmMask)))return false;
+                cachedObject=object;eventCached=false;
+            }
             if(!(alarmMask&(1u<<alarm)))continue;
             // Capture validated every admitted lifetime. Revalidate the typed
             // store before each real event, not for absent event-table entries.
             if(!check(resolves(h)))return false;
-            PackedObjectEvent event;
-            if(!objects_.findEvent(owner_.objectId(h),2,int(alarm),event))continue;
+            // Only immutable resource lookup is shared. A callback may retire,
+            // deactivate or rebind another captured instance, so all live
+            // checks and the current object read remain inside this loop.
+            if(!eventCached){
+                eventFound=objects_.findEvent(object,2,int(alarm),event);eventCached=true;
+            }
+            if(!eventFound)continue;
             if(!check(advanceAndDispatch(h,alarm,event))||!valid())return false;
+          }
         }
         return true;
     }

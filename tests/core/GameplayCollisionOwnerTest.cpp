@@ -789,9 +789,18 @@ int main(){
         effects.get(second.generation)->alarms.set(1,1);
         const auto cutoff=effects.beginPhase();RunnerStepSnapshot<16> snapshot;
         std::vector<unsigned> order,debrisOrder;unsigned bornVisits=0;
-        assert(collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
+        assert(collision->dispatchAlarmPhase(snapshot,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent& event){
             GameplayCollisionView::Kind kind;InstanceHandle local;
             assert(GameplayCollisionView::decode(h,kind,local));
+            if(kind==GameplayCollisionView::Kind::breakable||kind==GameplayCollisionView::Kind::enemy||
+                kind==GameplayCollisionView::Kind::debris){
+                const int object=kind==GameplayCollisionView::Kind::breakable?92:
+                    kind==GameplayCollisionView::Kind::enemy?112:370;
+                PackedObjectEvent expected;
+                assert(objects.findEvent(object,2,int(alarm),expected));
+                assert(event.ownerObjectId==expected.ownerObjectId&&event.codeId==expected.codeId&&
+                    event.eventType==expected.eventType&&event.eventSubtype==expected.eventSubtype);
+            }
             if(kind==GameplayCollisionView::Kind::breakable){
                 order.push_back(alarm*1000+92);
                 assert(scene->spawnDebris(effects,{},{},1,newborn));

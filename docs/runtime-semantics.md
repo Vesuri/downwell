@@ -4,6 +4,7 @@ This ledger separates behavior that is visible in recovered Downwell code from
 runtime behavior supplied by GameMaker itself. The latter must eventually be
 confirmed with a focused Windows trace or a bytecode/runtime reference test.
 
+
 ## Alarms
 
 Downwell uses the twelve conventional per-instance alarm slots (`alarm[0]`
@@ -22,6 +23,16 @@ The portable `AlarmBank` currently models the required runner behavior:
 - a handler may immediately rearm the same slot;
 - assigning zero does not dispatch an event and becomes `-1` next step;
 - slots without corresponding Alarm events do not count down.
+
+The native collision owner's captured alarm pass reuses inherited event
+metadata for consecutive instances whose current object ID matches. The
+resource pack is immutable; only its event mask and event descriptor are
+reused, separately for each alarm index. Lifetime, exclusion flags and current
+object ID are read again for every candidate, and typed ownership is checked
+before every admitted countdown. Callbacks still run synchronously and can
+change a later instance's countdown or retire it. No countdown or instance
+eligibility is cached. This does not extend the captured phase's existing
+same-phase birth semantics.
 
 `StartupRuntime` now uses this primitive for the recovered splash cadence. Its
 existing tick-731 and golden-state-digest tests remain unchanged, which guards
