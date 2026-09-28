@@ -49,12 +49,17 @@ public:
         return {};
     }
     template<class CameraX,class ViewY> bool create(CameraX cameraX,ViewY viewY,InstanceHandle& result){
+        return createInRoom(room_,cameraX,viewY,result);
+    }
+    // Synchronous player Create runs before the adapter commits room_. Use the
+    // parent's destination, not the room being left, for that child lifetime.
+    template<class CameraX,class ViewY> bool createInRoom(int destination,CameraX cameraX,ViewY viewY,InstanceHandle& result){
         if(!good_)return false;
         Slot* free=nullptr;for(auto& s:slots_)if(!s.id){free=&s;break;}
         PackedObject definition;
         if(!free||!objects_||!objects_->findObject(73,definition)||!nextId_||nextId_>0x7fffffffu)return fail();
         const auto id=nextId_;
-        if(records_.create(id,73,room_,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
+        if(records_.create(id,73,destination,definition.persistent(),definition.creationDepth)!=CreateInstanceResult::success)return fail();
         ++nextId_;*free={};free->id=id;free->key=records_.handleAt(records_.size()-1);
         result=free->key;auto* r=record(*free);if(!r)return fail();
         r->spriteId=definition.spriteId;r->maskId=definition.textureMaskId;
@@ -82,6 +87,13 @@ public:
         auto* s=slot(key);if(!s||!record(*s))return fail();
         if(!records_.erase(s->id,[&](auto h,const auto& r){return lifecycle_.retire(h,r);}))return fail();
         *s={};return true;
+    }
+    // Retire through the same owner before the enclosing room erases records.
+    // Stop on failure: do not free a registry slot whose owner rejected removal.
+    bool clear(){
+        if(!good_)return false;
+        for(auto& s:slots_)if(s.id&&!retire(s.key))return false;
+        return true;
     }
 };
 }

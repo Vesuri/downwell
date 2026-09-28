@@ -6,9 +6,10 @@
 #include <cstdio>
 using namespace downwell;
 struct Owner {
-    unsigned moves=0,marks=0,retires=0;bool reject=false;
-    template<class... A> bool birth(A...){return true;}
-    template<class... A> bool retire(A...){++retires;return true;}
+    unsigned moves=0,marks=0,retires=0;bool reject=false,rejectRetire=false;
+    int birthRoom=-1;
+    bool birth(InstanceHandle,const InstanceRecord& r){birthRoom=r.roomId;return true;}
+    template<class... A> bool retire(A...){++retires;return !rejectRetire;}
     template<class... A> bool activation(A...){return true;}
     template<class... A> bool membership(A...){return true;}
     template<class... A> bool sprite(A...){return true;}
@@ -40,10 +41,27 @@ int main(){
     assert(record->destroyRequested&&owner.marks==1&&owner.retires==0&&reads==120);
     assert(record->preciseY==-20.75F+119*16);
     assert(registration.retire(key)&&!records.resolve(key)&&owner.retires==1);
+    room=8; // The old room remains current while the new player creates children.
+    InstanceHandle entering;
+    assert(registration.createInRoom(11,camera,[](auto& out){out={};return true;},entering));
+    assert(room==8&&owner.birthRoom==11&&records.resolve(entering)->roomId==11);
+    assert(registration.clear()&&!records.resolve(entering)&&owner.retires==2);
+    assert(registration.clear()&&owner.retires==2);
     InstanceHandle replacement;assert(registration.create(camera,[](auto& out){out={};return true;},replacement));
-    assert(replacement.generation!=key.generation&&records.resolve(replacement)->instanceId==105188);
+    assert(replacement.generation!=key.generation&&records.resolve(replacement)->instanceId==105189&&
+        records.resolve(replacement)->roomId==8&&owner.birthRoom==8);
     owner.reject=true;const auto oldReads=reads;
     assert(!registration.step(replacement,camera)&&!good&&reads==oldReads);
     assert(!registration.step(replacement,camera)&&reads==oldReads);
+    // Partial teardown must not pretend the rejected lifetime was retired or
+    // retry its callback after the shared terminal failure latch is set.
+    InstanceStore<4> rejectedRecords;Owner rejectedOwner;bool healthy=true;
+    StoredEntryDitherRegistration<4,1> rejected(rejectedRecords,&objects,
+        InstanceLifecycleBinding::bindDestruction(rejectedOwner),next,room,healthy);
+    InstanceHandle retained;
+    assert(rejected.create(camera,[](auto& out){out={};return true;},retained));
+    rejectedOwner.rejectRetire=true;
+    assert(!rejected.clear()&&!healthy&&rejectedRecords.resolve(retained)&&rejectedOwner.retires==1);
+    assert(!rejected.clear()&&rejectedRecords.resolve(retained)&&rejectedOwner.retires==1);
     std::puts("Stored entry dither: source IDs, ordered setters, eligibility, alarm marking, retirement and failure passed");
 }
