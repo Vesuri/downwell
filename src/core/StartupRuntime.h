@@ -23,6 +23,7 @@
 #include "StoredTimeShardRegistration.h"
 #include "StoredTimeChangeRegistration.h"
 #include "StoredEntryDitherRegistration.h"
+#include "StoredDroneBulletRegistration.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
 #include "StoredRoomLayers.h"
@@ -314,6 +315,31 @@ public:
         return run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;
     }
     struct NoCollisionPass {bool operator()()const{return true;}};
+    enum class DronePhase {animation,alarm,step,endStep};
+    // Scoped dispatch joins the actual room phases. The event adapter must
+    // supply Step/End Step behavior; storage registration is not a substitute.
+    template<unsigned Capacity,class Execute>
+    bool stepWithDroneBullets(StoredDroneBulletRegistration<instanceCapacity,Capacity>& registration,
+        const Input& input,Execute execute,bool advancePressed=false){
+        if(!run_.effectsSucceeded)return false;
+        if(droneDispatch_||!registration.belongsTo(instances_)||!registration.valid())
+            return run_.effectsSucceeded=false;
+        auto dispatch=[&](const InstanceRecord& record,DronePhase phase){
+            const auto key=registration.handle(record);if(!key.generation)return false;
+            if(phase==DronePhase::animation)return registration.advanceAnimation(key);
+            if(phase==DronePhase::alarm)return registration.alarm(record);
+            return registration.dispatch(key,[&](auto& state,auto& publisher,bool& good){
+                return execute(state,publisher,phase,random_,good);
+            });
+        };
+        droneContext_=&dispatch;
+        droneDispatch_=[](void* context,const InstanceRecord& record,DronePhase phase){
+            return (*static_cast<decltype(dispatch)*>(context))(record,phase);
+        };
+        const bool ok=stepWithCollisionPass(input,advancePressed,NoCollisionPass{});
+        droneDispatch_=nullptr;droneContext_=nullptr;
+        return run_.effectsSucceeded=ok&&registration.valid();
+    }
     template<class Stopped,class Collisions=NoCollisionPass>
     bool stepWithOwnedDebris(const Input& input,Stopped stopped,bool advancePressed=false,Collisions collisions={}){
         return stepWithDebris(ownedDebrisRegistration_,ownedDebrisEffects_,input,stopped,advancePressed,collisions);
@@ -476,6 +502,9 @@ public:
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity> StoredEntryDitherRegistration<instanceCapacity,Capacity> entryDitherRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredDroneBulletRegistration<instanceCapacity,Capacity> droneBulletRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){
@@ -1019,6 +1048,8 @@ private:
     bool (*collisionDispatch_)(void*)=nullptr;
     void* scriptAnimationContext_=nullptr;
     bool (*scriptAnimationDispatch_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
+    bool (*droneDispatch_)(void*,const InstanceRecord&,DronePhase)=nullptr;
+    void* droneContext_=nullptr;
     void* timeEffectContext_=nullptr;
     void* entryDitherContext_=nullptr;
     void* entryDitherCreateContext_=nullptr;

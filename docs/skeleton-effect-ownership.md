@@ -1062,6 +1062,23 @@ exercise the actual room alarm/animation callbacks and Retry. These are injected
 lifecycle checks, not original-game visual comparison or a stock-memory fit test.
 
 Natural births remain disabled: full Step/End Step collision adapters, enemy
-damage, numeric-ID allocation, projected layer drawing/offline angle artwork,
-the SDL owner binding and source-ordered box admission still need integration.
+damage, native numeric-ID allocation, projected layer drawing/offline angle
+artwork and source-ordered box admission still need integration.
 The 32-slot bound is an implementation limit, not a recovered original limit.
+
+`StoredDroneBulletRegistration` binds that same shared store to SDL's instance
+records and collision/layer lifecycle, using the world's numeric-ID allocator.
+It preserves fractional constructor positions and publishes sprite, angle,
+image-index, movement, activation and destruction writes to both representations.
+The bridge must stay at a fixed address and be cleared before room teardown.
+
+`stepWithDroneBullets` scopes its callbacks to the real room animation, alarm,
+Step and End Step phases. The global stored-world alarm countdown is imported
+before shared dispatch; copying an older shared countdown back would undo that
+tick. Animation-end destruction excludes the subsequent alarm/Step dispatch.
+Missing dispatch ownership and stale registrations fail rather than silently
+running an incomplete projectile. The caller still supplies Step/End Step
+operations and explicit pre-Draw retirement. No natural source births use this
+entry point yet. Stored-world regression tests exercise these phase and lifetime
+boundaries with injected projectiles; the phase-routing fixture does not claim
+to implement or verify the missing live solid/enemy collision adapter.

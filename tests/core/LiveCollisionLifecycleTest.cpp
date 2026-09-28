@@ -1013,6 +1013,67 @@ int main(){
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach time-change world");
         {
+            world->skipToGameForTesting();
+            auto drone=world->droneBulletRegistration<2>();InstanceHandle local;
+            const RunnerImageValue x{0x43704000u},y{0x43308000u};
+            require(drone.create(x.promoted(),y.promoted(),local),"registered shared drone Create");
+            const auto key=drone.worldHandle(local);
+            const auto* shared=drone.instances().find(local);
+            require(shared&&key.generation,"drone has distinct shared and world handles");
+            const unsigned id=shared->sourceId;
+            const auto* r=world->instance(id);RunnerImageValue publishedX,publishedY;
+            require(r&&r->objectId==266&&r->spriteId==459&&r->imageSpeed==0&&r->alarms.get(0)==16&&
+                owner->collisionPosition(key,publishedX,publishedY)&&publishedX.bits==x.bits&&publishedY.bits==y.bits,
+                "drone Create publishes resource override and precise position to stored owner");
+            require(drone.dispatch(local,[](auto& state,auto& publish,bool&){
+                state.motion.direction=MotionBinary64::fromInteger(90);
+                state.damage=MotionBinary64::fromInteger(20);
+                return publish.publishAngle({0x42b40000u})&&publish.publishImageIndex({0x3f000000u});
+            }),"drone source caller overrides");
+            r=world->instance(id);
+            require(r&&r->rotation==90&&r->imageIndex==0.5F,"stored Draw fields reflect shared publications");
+            require(drone.activate(local,false)&&!world->instance(id)->active&&drone.activate(local,true),
+                "drone activation reaches stored ownership");
+            unsigned droneSteps=0,droneEnds=0;
+            auto event=[&](auto&,auto&,StartupRuntime::DronePhase phase,auto&,bool&){
+                if(phase==StartupRuntime::DronePhase::step)++droneSteps;
+                else if(phase==StartupRuntime::DronePhase::endStep)++droneEnds;
+                else return false;
+                return true; // This tape tests phase routing, not solid collision.
+            };
+            for(unsigned tick=1;tick<=16;++tick){
+                require(world->stepWithDroneBullets(drone,{},event),"drone joins stored room scheduler");
+                const auto* state=drone.instances().find(local);
+                const auto* stored=world->instance(id);
+                require(state&&stored&&state->state.decelerate==(tick==16)&&state->state.alarm0==16-int(tick)&&
+                    stored->alarms.get(0)==16-int(tick),
+                    "global alarm decrements once and is not restored by Step publication");
+            }
+            require(droneSteps==16&&droneEnds==16,"drone Step and End Step each dispatch once per tick");
+            require(drone.dispatch(local,[](auto&,auto& publish,bool&){
+                return publish.destroySelf()&&publish.publishPosition({0x43708000u},{0x4330c000u});
+            })&&world->instance(id)->destroyRequested&&
+                owner->collisionPosition(key,publishedX,publishedY)&&publishedX.bits==0x43708000u&&
+                publishedY.bits==0x4330c000u,"destroyed drone retains post-event position publication");
+            require(drone.retire(local)&&!world->instance(id)&&!drone.instances().find(local),
+                "drone cleanup retires both identities");
+            InstanceHandle replacement;
+            require(drone.create(x.promoted(),y.promoted(),replacement)&&replacement.slot==local.slot&&
+                replacement.generation>local.generation&&drone.instances().find(replacement)->sourceId>id&&
+                !drone.worldHandle(local).generation,
+                "drone recycling preserves source allocator and rejects stale handles");
+            require(drone.dispatch(replacement,[](auto& state,auto&,bool&){
+                state.imageSpeed={0x3f000000u};state.timeline={0x40b00000u};return true;
+            })&&world->stepWithDroneBullets(drone,{},event)&&
+                drone.instances().find(replacement)->destroyRequested&&droneSteps==16&&droneEnds==16&&drone.clear(),
+                "room animation destroys drone before same-tick alarm and Step dispatch");
+        }
+    }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach time-change world");
+        {
             auto entry=world->entryDitherRegistration<1>();InstanceHandle key;
             unsigned reads=0;bool fractionalCamera=false;
             auto camera=[&](MotionBinary64& out){

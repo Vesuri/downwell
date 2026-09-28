@@ -377,6 +377,8 @@ void StartupRuntime::stepInternal(bool advancePressed,
     }
     if(!instances_.visitAnimationChecked([this](InstanceHandle key,InstanceRecord& instance){
         if(!lifecycle_.capturePrevious(key,instance))return false;
+        if(instance.objectId==266&&(!droneDispatch_||
+            !droneDispatch_(droneContext_,instance,DronePhase::animation)))return false;
         if(instance.objectId==370&&!debrisBinding_.advance(key,&instance))return false;
         if(instance.objectId==219){
             if(scriptAnimationDispatch_){if(!scriptAnimationDispatch_(scriptAnimationContext_,key,instance))return false;}
@@ -1581,6 +1583,13 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(instance.objectId==266&&((eventType==2&&eventSubtype==0)||
+        (eventType==3&&(eventSubtype==0||eventSubtype==2)))){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=droneDispatch_&&droneDispatch_(droneContext_,instance,
+            eventType==2?DronePhase::alarm:eventSubtype==0?DronePhase::step:DronePhase::endStep);
+        return run_.effectsSucceeded;
+    }
     if(instance.objectId==73&&eventSubtype==0&&(eventType==2||eventType==3)){
         ++implementedCodeCalls_;
         const auto key=ownedEntryRegistration_.handle(instance);
