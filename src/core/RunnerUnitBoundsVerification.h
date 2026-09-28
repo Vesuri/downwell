@@ -1,6 +1,7 @@
 #ifndef DOWNWELL_RUNNER_UNIT_BOUNDS_VERIFICATION_H
 #define DOWNWELL_RUNNER_UNIT_BOUNDS_VERIFICATION_H
 #include "RunnerSpriteBounds.h"
+#include "PreparedUnitSpriteBounds.h"
 namespace downwell {
 struct RunnerUnitBoundsVerification {
     struct Resource {int marginLeft,marginTop,marginRight,marginBottom,originX,originY;};
@@ -10,6 +11,13 @@ struct RunnerUnitBoundsVerification {
             Resource resource{int(i)-16,11,7-int(i),19,8,12};
             R x,y;if(!x.assign(MotionBinary64::fromInteger(int(i)*127-2048))||
                 !y.assign(MotionBinary64::fromInteger(int(i)*1024)))return false;
+            PreparedUnitSpriteBounds prepared;prepared.prepare(resource);
+            B::Box cached{},immediate{};
+            if(!prepared.at(x,y,cached)||!B::fromSpriteBinary32(resource,x,y,
+                R{0x3f800000u},R{0x3f800000u},false,{},{},true,
+                [](R v,std::int32_t& p){return v.roundPixel(p);},immediate)||
+                cached.left.bits!=immediate.left.bits||cached.right.bits!=immediate.right.bits||
+                cached.top.bits!=immediate.top.bits||cached.bottom.bits!=immediate.bottom.bits)return false;
             for(unsigned mirror=0;mirror<4;++mirror)for(unsigned policy=0;policy<5;++policy){
                 const R sx{mirror&1?0xbf800000u:0x3f800000u},sy{mirror&2?0xbf800000u:0x3f800000u};
                 unsigned fastCalls=0,referenceCalls=0;
@@ -44,6 +52,25 @@ struct RunnerUnitBoundsVerification {
         if(!B::fromSprite(zero,R{0x80000000u},R{0x80000000u},R{0x3f800000u},R{0x3f800000u},false,{},{},true,
             [&](R v,std::int32_t& p){++calls;return v.promoted().roundPixel(p);},signedZero)||calls!=4||
             signedZero.left.bits||signedZero.top.bits||signedZero.right.bits||signedZero.bottom.bits)return false;
+        Resource extremes{-32768,32767,32767,-32768,32767,-32768};
+        PreparedUnitSpriteBounds prepared;prepared.prepare(extremes);
+        const int positions[]={-2097151,0,2097151};
+        for(int position:positions){
+            R x,y;if(!x.assignInteger(position)||!y.assignInteger(-position))return false;
+            B::Box cached{},reference{};
+            if(!prepared.at(x,y,cached)||!B::fromSpriteBinary32(extremes,x,y,
+                R{0x3f800000u},R{0x3f800000u},false,{},{},true,
+                [](R v,std::int32_t& p){return v.roundPixel(p);},reference)||
+                cached.left.bits!=reference.left.bits||cached.right.bits!=reference.right.bits||
+                cached.top.bits!=reference.top.bits||cached.bottom.bits!=reference.bottom.bits)return false;
+        }
+        B::Box rejected;
+        if(prepared.at(R{0x3f000000u},R{},rejected)||prepared.at(R{0x4a000000u},R{},rejected))return false;
+        prepared.prepare(zero);
+        if(!prepared.at(R{0x80000000u},R{0x80000000u},rejected)||
+            rejected.left.bits||rejected.right.bits||rejected.top.bits||rejected.bottom.bits)return false;
+        extremes.originX=32768;prepared.prepare(extremes);
+        if(prepared.at(R{},R{},rejected))return false;
         return true;
     }
 };

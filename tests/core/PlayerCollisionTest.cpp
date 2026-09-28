@@ -1,6 +1,7 @@
 #include "core/PlayerCollision.h"
 #include "core/SolidCollision.h"
 #include "core/FixedCollisionRoundingVerification.h"
+#include "core/PreparedUnitSpriteBounds.h"
 #include "core/PlayerBoxContact.h"
 #include <cmath>
 #include <fstream>
@@ -61,6 +62,22 @@ int main() {
             native.collisionMode==resource.collisionMode&&native.collisionMaskCount==resource.collisionMaskCount&&
             native.frameCount==resource.frameCount&&copiedPrepared.frameCount(id,frames)&&frames==resource.frameCount,
             "prepared descriptors and copied views preserve every original field");
+        downwell::PreparedUnitSpriteBounds geometry;geometry.prepare(resource);
+        require(geometry.available,"all pinned sprite margins fit prepared unit geometry");
+        for(int position:{-2097151,-32,0,32,2097151}){
+            downwell::RunnerImageValue x,y;x.assignInteger(position);y.assignInteger(-position);
+            downwell::RunnerSpatialSplit::Box cached,reference;
+            require(geometry.at(x,y,cached)&&downwell::RunnerSpriteBounds::fromSpriteBinary32(
+                resource,x,y,{0x3f800000u},{0x3f800000u},false,{},{},true,
+                [](auto v,std::int32_t& p){return v.roundPixel(p);},reference)&&
+                cached.left.bits==reference.left.bits&&cached.right.bits==reference.right.bits&&
+                cached.top.bits==reference.top.bits&&cached.bottom.bits==reference.bottom.bits,
+                "prepared geometry matches original arithmetic at domain extremes and zero");
+        }
+        downwell::RunnerSpatialSplit::Box rejected;
+        require(!geometry.at({0x3f000000u},{},rejected)&&
+            !geometry.at({0x4a000000u},{},rejected)&&!geometry.at({0x7f800000u},{},rejected),
+            "fractional, oversized and nonfinite coordinates retain generic geometry");
     }
     require(!prepared.prepare(nullptr,0),"failed reprepare leaves the existing view usable");
     downwell::PackedSpriteCollision missing{};

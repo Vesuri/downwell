@@ -93,6 +93,18 @@ membership links are not part of the prepared table. The compatibility Create
 depth override is still installed after binding, not substituted for OBJT depth
 inside it. Same-sprite rebinding retains the source setter's no-op behavior.
 
+`PreparedSpriteGeometry` prepares origin-relative compatibility edges for
+unit-scale, unrotated sprites before births. The shared owner uses these only
+for integer positions with magnitude below 2^21, with signed-16-bit source
+margins/origins and its fixed integer-preserving `roundPixel` policy. Every
+intermediate then lies inside +/-2^22 and is exactly representable: sorting and
+the far-edge decrement can precede translation. Runtime work is position
+validation, translation and final binary32 encoding; publication still uses
+the original bounds/index owner. Fractional/large positions, other transforms,
+special resources and unavailable templates retain the generic path. Generic
+rounding callbacks are never bypassed by `RunnerSpriteBounds` itself. The target
+template is 18 bytes (13,338 bytes for 741 entries, plus table metadata).
+
 The sprite-pack gate exercises this adapter across all 741 recovered metadata
 records and checks owner flags/cache publication against the full artwork
 metadata view. It also covers mask overrides, missing-resource retirement,

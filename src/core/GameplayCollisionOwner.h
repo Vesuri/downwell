@@ -13,6 +13,7 @@
 #include "ObjectDrawMetadata.h"
 #include "ObjectAlarmMetadata.h"
 #include "Profile.h"
+#include "PreparedUnitSpriteBounds.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -41,6 +42,7 @@ private:
     PackedSpriteCollision preparedSprites_[741];
     SpriteCollisionPack sprites_;
     PreparedObjectDefaults<386> objectDefaults_;
+    PreparedSpriteGeometry<741> spriteGeometry_;
     GameplayRoomLayers<View::capacity> layers_;
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
@@ -70,6 +72,21 @@ private:
     bool refresh(InstanceHandle key,bool publish){
         DW_PROFILE_SCOPE(profileInstanceBounds);
         const auto* flags=families_.flags(unsigned(owner_.objectId(key)));
+        const auto* state=owner_.resolve(key);
+        if(flags&&state){
+            const auto& sprite=properties_[key.slot].sprite;
+            if(!(state->special&&sprite.maskId<0)&&!(sprite.angle.bits&0x7fffffffu)&&
+               sprite.scaleX.bits==0x3f800000u&&sprite.scaleY.bits==0x3f800000u){
+                const int id=sprite.maskId<0?sprite.spriteId:sprite.maskId;
+                Owner::Box bounds;bool prepared;
+                {
+                    DW_PROFILE_SCOPE(profileBoundsGeometry);
+                    prepared=spriteGeometry_.at(id,state->x,state->y,bounds);
+                }
+                if(prepared)return owner_.refresh(key,*flags,false,&bounds,
+                    preparedSprites_[id].collisionMode==1,publish);
+            }
+        }
         return flags&&owner_.refreshSprite(key,*flags,false,sprites_,properties_[key.slot].sprite,true,
             [](auto angle,auto& cosine,auto& sine){
                 DW_PROFILE_SCOPE(profileInstanceBoundsTrig);
@@ -248,6 +265,7 @@ public:
         const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
         good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
+            spriteGeometry_.prepare(sprites_)&&
             families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
