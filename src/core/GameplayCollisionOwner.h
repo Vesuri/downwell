@@ -272,10 +272,22 @@ public:
                 if(!View::decode(shared,kind,local)||!View(*self.world_).contains(shared)||
                     !self.owner_.capturePrevious(shared))return false;
                 switch(kind){
-                    case View::Kind::enemy:return self.world_->advanceEnemyRoomAnimation(local);
-                    case View::Kind::bullet:return self.world_->advanceBulletRoomAnimation(local);
-                    case View::Kind::scriptEffect:return self.world_->advanceScriptRoomAnimation(local);
-                    case View::Kind::debris:return self.world_->advanceDebrisRoomAnimation(local);
+                    case View::Kind::enemy:{
+                        DW_PROFILE_SCOPE(profileAnimationDispatch);
+                        return self.world_->advanceEnemyRoomAnimation(local);
+                    }
+                    case View::Kind::bullet:{
+                        DW_PROFILE_SCOPE(profileAnimationDispatch);
+                        return self.world_->advanceBulletRoomAnimation(local);
+                    }
+                    case View::Kind::scriptEffect:{
+                        DW_PROFILE_SCOPE(profileAnimationDispatch);
+                        return self.world_->advanceScriptRoomAnimation(local);
+                    }
+                    case View::Kind::debris:{
+                        DW_PROFILE_SCOPE(profileAnimationDispatch);
+                        return self.world_->advanceDebrisRoomAnimation(local);
+                    }
                     default:return true;
                 }
             }));
