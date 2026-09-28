@@ -91,3 +91,13 @@ including early callback failures. Comparing only a level generated from one
 initial seed cannot establish equivalence. The decoded views' memory and
 preparation time must also be measured; eliminating pack reads does not remove
 the live spatial-index construction cost.
+
+A boolean collision result alone does not justify omitting spatial state.
+`GameplayCollisionOwner::registeredPlaceMeeting` discards the selected identity,
+but its `RunnerSpatialInstances::place` path still performs family preparation,
+conditional dirty-bound publication, temporary caller movement and lazy precise
+candidate refresh. Those mutations can affect subsequent identity-bearing
+queries. An alternative boolean search must preserve the applicable state
+transitions as well as the hit result; tests must compare later selections and
+pending state, not just boolean answers. This is separate from the `point`
+path, whose contract deliberately omits a global dirty flush.
