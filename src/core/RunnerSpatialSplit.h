@@ -90,24 +90,26 @@ struct RunnerSpatialSplit {
         }
         chosen=best;return true;
     }
-    // Eligible pixel rectangles have exact integer extents and a complete
+    // Eligible pixel rectangles have exact integer extents and each candidate
     // union area <=2^24. Thus each binary32 subtraction/product and growth
     // subtraction in child selection is exact; ties remain earliest-slot.
     // A false result means use the reference, not that the query is invalid.
     static bool choosePixelChild(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
         if(!count||count>6)return false;
-        PixelBox values[6],in,all;
+        PixelBox in;
         if(!pixels(incoming,in))return false;
-        all=in;
-        for(unsigned i=0;i<count;++i){
-            if(!pixels(boxes[i],values[i]))return false;
-            all=pixelUnion(all,values[i]);
-        }
-        const unsigned width=unsigned(all.right-all.left),height=unsigned(all.bottom-all.top);
-        if(width>65535||height>65535||pixelProduct(width,height)>0x1000000u)return false;
         unsigned best=0,bestArea=0,bestGrowth=0;
         for(unsigned i=0;i<count;++i){
-            const unsigned area=pixelArea(values[i]),growth=pixelArea(pixelUnion(values[i],in))-area;
+            PixelBox value;
+            if(!pixels(boxes[i],value))return false;
+            const PixelBox joined=pixelUnion(value,in);
+            const unsigned width=unsigned(joined.right-joined.left),height=unsigned(joined.bottom-joined.top);
+            if(width>65535||height>65535)return false;
+            const unsigned enlarged=pixelProduct(width,height);
+            if(enlarged>0x1000000u)return false;
+            // The candidate is contained in its union, so its extents and
+            // area satisfy the same exactness bounds without another check.
+            const unsigned area=pixelArea(value),growth=enlarged-area;
             if(!i||growth<bestGrowth||(growth==bestGrowth&&area<bestArea)){
                 best=i;bestArea=area;bestGrowth=growth;
             }
@@ -166,19 +168,19 @@ private:
         const auto integer=std::int32_t(mantissa>>shift);
         out=bits&0x80000000u?-integer:integer;return true;
     }
-    static bool pixels(Box value,PixelBox& out){
+    static bool pixels(const Box& value,PixelBox& out){
         return pixel(value.left,out.left)&&pixel(value.top,out.top)&&
             pixel(value.right,out.right)&&pixel(value.bottom,out.bottom)&&
             out.left<=out.right&&out.top<=out.bottom;
     }
-    static PixelBox pixelUnion(PixelBox a,PixelBox b){
+    static PixelBox pixelUnion(const PixelBox& a,const PixelBox& b){
         return {a.left<b.left?a.left:b.left,a.top<b.top?a.top:b.top,
             a.right>b.right?a.right:b.right,a.bottom>b.bottom?a.bottom:b.bottom};
     }
     static unsigned pixelProduct(unsigned width,unsigned height){
         return std::uint32_t(std::uint16_t(width))*std::uint32_t(std::uint16_t(height));
     }
-    static unsigned pixelArea(PixelBox box){
+    static unsigned pixelArea(const PixelBox& box){
         return pixelProduct(unsigned(box.right-box.left),unsigned(box.bottom-box.top));
     }
 public:

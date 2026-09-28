@@ -100,6 +100,22 @@ struct RunnerSpatialVerification {
         fast=99;
         result.check(!RunnerSpatialSplit::choosePixelChild(boxes,count,boxes[6],fast)&&fast==99);
     }
+    {
+        RunnerSpatialSplit::Box boxes[2],incoming;
+        auto assign=[](auto& box,int left,int top,int right,int bottom){
+            return box.left.assign(MotionBinary64::fromInteger(left))&&
+                box.top.assign(MotionBinary64::fromInteger(top))&&
+                box.right.assign(MotionBinary64::fromInteger(right))&&
+                box.bottom.assign(MotionBinary64::fromInteger(bottom));
+        };
+        result.check(assign(boxes[0],-4000,0,0,4000)&&assign(boxes[1],0,0,4000,4000)&&assign(incoming,0,0,0,4000));
+        unsigned expected=99,actual=99;
+        result.check(RunnerSpatialSplit::chooseBinary32Child(boxes,2,incoming,expected));
+        result.check(RunnerSpatialSplit::choosePixelChild(boxes,2,incoming,actual)&&actual==expected);
+        result.word(actual);
+        result.check(assign(boxes[1],0,0,4097,4096));actual=99;
+        result.check(!RunnerSpatialSplit::choosePixelChild(boxes,2,incoming,actual)&&actual==99);
+    }
     return result;
 }
 }

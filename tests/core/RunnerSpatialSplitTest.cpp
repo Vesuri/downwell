@@ -292,6 +292,14 @@ int main(){
         unsigned tiedChild=999;assert(Split::choosePixelChild(input,6,input[0],tiedChild)&&tiedChild==0);
         childCheck(input,0,input[0]);childCheck(input,7,input[0]);
         input[0].left.bits=0x7fc00000u;childCheck(input,1,input[0]);
+        // Pairwise unions fit exactly even when the union of all candidates
+        // does not. No area of that combined rectangle is used by the runner.
+        input[0]=packed({-4000,0,0,4000});
+        input[1]=packed({0,0,4000,4000});
+        assert(childCheck(input,2,packed({0,0,0,4000})));
+        // A later ineligible candidate must leave the fast result untouched.
+        input[1]=packed({0,0,4097,4096});
+        assert(!childCheck(input,2,packed({0,0,0,4000})));
     }
     assert(pixelAccepted>30000&&pixelFallback>0);
     assert(pixelPartitions==4096);

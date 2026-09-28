@@ -500,16 +500,23 @@ remain source-ordered. The independent scalar-tree comparison includes a
 
 Child selection retains its binary32 implementation as the fallback/reference.
 The pixel-bound fast path accepts only exact integer coordinates with magnitude
-below 2^24, non-inverted rectangles, complete-union extents at most 65535, and
-complete-union area at most 2^24. Every candidate area and union area is then
+below 2^24, non-inverted rectangles, candidate/incoming union extents at most
+65535, and each such union area at most 2^24. Every candidate area and union area is then
 an integer in [0, 2^24], as is the nonnegative enlargement. All are exactly
 representable in binary32, so integer subtraction/multiplication gives the
 same comparison values. Selection still minimizes enlargement, then area,
 then original slot order. Signed zeros compare equal on both paths. Fractional,
 larger or invalid inputs use the retained path; no approximate arithmetic or
 different collision traversal order is introduced.
+Child selection decodes and scores one candidate at a time, without a temporary
+array or a union of all candidates. Only candidate/incoming unions enter the
+source comparisons, so the all-candidate union need not satisfy these bounds.
+If any later candidate fails admission, selection remains unpublished and the
+reference handles the complete request.
 
-The same domain also permits exact quadratic partitioning. Pair-union area is
+Quadratic partitioning retains the stronger complete-union bound: all seven
+rectangles together must have extents at most 65535 and area at most 2^24.
+Pair-union area is
 at least each member's area, so `(union-a)-b` stays within [-whole, whole];
 enlargements and their differences have the same bound. All comparison values
 are therefore exact binary32 integers. The source's initial `-whole-1` score
