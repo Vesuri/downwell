@@ -1251,6 +1251,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             continue;
         if (enemy.objectId == 111 || enemy.objectId == 112) {
             const bool turtle = enemy.objectId == 112;
+            DW_PROFILE_SCOPE(profileEnemyWalker);
             const long cx = publishedCameraX * 4096L;
             const long cy = generationCameraY * 16;
             const bool visible = downwell::CrawlerMotion::inView(enemy.x, enemy.y,
@@ -1284,6 +1285,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             downwell::BatMotion bat{enemy.preciseX, enemy.preciseY, enemy.speedX, enemy.speedY,
                 enemy.direction, (enemy.moveSpeed * 40 + 128) / 256, enemy.facing,
                 enemy.batDirectionFraction};
+            DW_PROFILE_SCOPE(profileEnemyBat);
             bat.collisionMask=downwell::enemyContactMask(enemy.objectId,enemy.spriteId,enemy.maskId);
             const auto effects = downwell::stepBatBehavior(bat, enemy.batHit, enemy.batActivity,
                 enemy.x, enemy.y, bat.collisionMask, player_.frameStartXFixed(),
@@ -1313,6 +1315,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             const bool integrate = downwell::frogMotionVisible(enemy.x * 256L, enemy.y * 256L,
                 (publishedCameraX - 80) * 256L, generationCameraY - 142 * 256L,
                 (publishedCameraX + 80) * 256L, generationCameraY + 142 * 256L);
+            DW_PROFILE_SCOPE(profileEnemyFrog);
             downwell::FrogVerticalMotion vertical{
                 enemy.preciseY * 5 + enemy.gravityPositionRemainder,
                 enemy.speedY * 5 + enemy.gravityRemainder, enemy.grounded};
@@ -1343,6 +1346,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.speedX = downwell::FrogHorizontalMotion::toQ8(enemy.frogHorizontal.velocity);
             if(!effects.succeeded)return {};
         } else if (enemy.objectId == 117) {
+            DW_PROFILE_SCOPE(profileEnemySnail);
             const int hitAlarm = enemy.snailHit.consume(enemyRandom_);
             if (hitAlarm >= 0) {
                 if(!publishEnemyImage(enemy,0))return {};
@@ -1362,8 +1366,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
             enemy.speedY = enemy.snail.vy / 5;
             enemy.motionState = enemy.facing = enemy.snail.facing;
         } else if (enemy.objectId == 119) {
+            DW_PROFILE_SCOPE(profileEnemyCrawler);
             updateCrawler(enemy, false, publishedCameraX, generationCameraY);
         }
+        DW_PROFILE_SCOPE(profileEnemyFinalize);
         // World origins (240,176) are even integers, so ties-to-even is
         // unchanged by storing these positions relative to the origin.
         int publishedX = (int)downwell::roundGameMakerQ8(enemy.preciseX);

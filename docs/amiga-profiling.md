@@ -188,6 +188,11 @@ candidate scanning/metadata resolution and callback execution from phase 18.
 All are exclusive. Callback brackets count admitted countdown callbacks, not
 just alarms that fire; their instrumentation cost must not be treated as
 shipping overhead. Use the low-overhead FPS tape for end-to-end comparisons.
+Phases 110–115 separate enemy-family movement from shared position and
+presentation publication. Terrain queries and other nested phases remain
+excluded. Family phases include their synchronous sprite/transform callbacks;
+phase 115 includes common post-movement setters, not rendering. Per-enemy
+brackets add probe overhead, so compare like-for-like instrumented tapes.
 
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases

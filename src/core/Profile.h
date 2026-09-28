@@ -44,6 +44,8 @@ enum DownwellProfilePhase {
     profileProjectileCoordinate,
     profileSpatialPartitionFallback, profileSpatialChooseFallback,
     profileAlarmCapture, profileAlarmSort, profileAlarmScan, profileAlarmCallback,
+    profileEnemyWalker, profileEnemyBat, profileEnemyFrog, profileEnemySnail,
+    profileEnemyCrawler, profileEnemyFinalize,
     profilePhaseCount
 };
 
