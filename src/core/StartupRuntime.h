@@ -22,6 +22,7 @@
 #include "PlayerMotion.h"
 #include "StoredTimeShardRegistration.h"
 #include "StoredTimeChangeRegistration.h"
+#include "StoredEntryDitherRegistration.h"
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
 #include "StoredRoomLayers.h"
@@ -411,6 +412,9 @@ public:
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity> StoredTimeChangeRegistration<instanceCapacity,Capacity> timeChangeRegistration(){
+        return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
+    }
+    template<unsigned Capacity> StoredEntryDitherRegistration<instanceCapacity,Capacity> entryDitherRegistration(){
         return {instances_,objectPack_,lifecycle_,nextRuntimeInstanceId_,roomId_,run_.effectsSucceeded};
     }
     template<unsigned Capacity> StoredScriptSpawnRegistration<instanceCapacity,Capacity> scriptSpawnRegistration(){

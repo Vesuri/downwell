@@ -970,6 +970,15 @@ verify-entry-dither: build/entry-dither-test
 	python3 tools/verify-runner-instance-ids.py
 	./build/entry-dither-test
 
+test: verify-stored-entry-dither
+.PHONY: verify-stored-entry-dither
+verify-stored-entry-dither: build/stored-entry-dither-test
+	./build/stored-entry-dither-test
+
+build/stored-entry-dither-test: tests/core/StoredEntryDitherTest.cpp $(wildcard src/core/*.h) src/core/ObjectPack.cpp
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/core/StoredEntryDitherTest.cpp src/core/ObjectPack.cpp
+
 test: verify-entry-mask-offset
 .PHONY: verify-entry-mask-offset
 verify-entry-mask-offset: build/amiga-entry-mask-test

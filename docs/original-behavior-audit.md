@@ -70,6 +70,18 @@ failure prefixes. A freestanding 68000 probe compiles without undefined
 helpers; this is not emulator execution or live scene integration. Draw still
 requires the original effect-surface path and independently published view.
 
+`StoredEntryDitherRegistration` connects that state to stored instance lifetimes
+and the shared numeric allocator. Each coordinate setter is published before
+the next source read, not as an end-of-event batch. It imports externally
+written coordinates for Step, honors active/destroyed state, and marks Alarm 0
+destruction without immediately recycling the lifetime. Explicit retirement
+removes its owner registration before freeing storage. Tests use the recovered
+object pack and cover fractional positions, IDs, publication failure, inactive
+Step, expiry, retained destruction and reuse. The runtime exposes a borrowed
+registration factory; its caller must supply authoritative camera/view reads,
+dispatch and room cleanup. This is not yet automatic player Create integration
+or native controller ownership.
+
 The offline game-pack generator also exports `amiga-game.entry-mask` and its
 input/tool-hashed provenance. Its 48-byte rows contain transparent padding,
 the original sprite-129 opacity edge, then solid padding, at logical x=110.

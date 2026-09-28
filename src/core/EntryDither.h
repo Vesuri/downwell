@@ -15,25 +15,30 @@ private:
     bool good_=true;
     bool fail(){good_=false;return false;}
 public:
+    enum class Write {x,y,alarm};
+    struct IgnoreWrites {bool operator()(Write,const EntryDither&)const{return true;}};
     bool succeeded()const{return good_;}
     // Invoke reads in source order, rather than evaluating both before Create.
     // In particular, view Y is not derived from the newly created camera Y.
-    template<class CameraX,class ViewY>
-    bool create(CameraX cameraX,ViewY viewY){
+    template<class CameraX,class ViewY,class Publish=IgnoreWrites>
+    bool create(CameraX cameraX,ViewY viewY,Publish publish={}){
         if(!good_||destroyRequested)return false;
         MotionBinary64 value;
         if(!cameraX(value)||!x.assign(value))return fail();
+        if(!publish(Write::x,*this))return fail();
         if(!viewY(value)||!y.assign(value))return fail();
-        alarm0=120;return true;
+        if(!publish(Write::y,*this))return fail();
+        alarm0=120;return publish(Write::alarm,*this)||fail();
     }
-    template<class CameraX> bool step(CameraX cameraX){
+    template<class CameraX,class Publish=IgnoreWrites> bool step(CameraX cameraX,Publish publish={}){
         if(!good_||destroyRequested)return false;
         if(!SequenceTimeline::valid(y))return fail();
         auto next=y.promoted();
         if(!next.add(MotionBinary64::fromInteger(16))||!y.assign(next))return fail();
+        if(!publish(Write::y,*this))return fail();
         MotionBinary64 value;
         if(!cameraX(value)||!x.assign(value))return fail();
-        return true;
+        return publish(Write::x,*this)||fail();
     }
     // Global alarm dispatch has already decremented the authoritative counter.
     // Keep destruction distinct from deletion: no record or ID is recycled here.
