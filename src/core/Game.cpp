@@ -627,25 +627,9 @@ void Game::renderMenu(Renderer& renderer) const {
     // rmMenu uses the runner's positive-layer-count Draw branch, not the
     // legacy room list. Keep translated object Draw bodies at their owned
     // element positions, with the room background in the same traversal.
-    renderingSucceeded_ = startup_.sourceRoomLayers().visitDraw(
-        [&](InstanceHandle key, std::uint32_t sourceId, RunnerLayerDraw::Element& out) {
-            const auto* record = startup_.resolveInstance(key);
-            if (!record || record->instanceId != sourceId) return false;
-            PackedObject object;
-            out.object = objectPack_->findObject(record->objectId, object);
-            out.flags = (!record->active ? 2u : 0u) |
-                        (record->destroyRequested ? 1u : 0u) |
-                        (out.object && object.visible() ? 0x10u : 0u);
-            PackedObjectEvent event;
-            out.drawEvent = out.object && objectPack_->findEvent(record->objectId, 8, 0, event);
-            // The garden's translated defaults use the packed object sprite
-            // unless Create has selected a runtime sprite.
-            out.sprite = record->spriteId >= 0 || (out.object && object.spriteId >= 0);
-            return true;
-        },
-        [&](InstanceHandle key, std::uint32_t sourceId, int, RunnerLayerDraw::Action) {
-            const auto* record = startup_.resolveInstance(key);
-            return record && record->instanceId == sourceId && drawInstance(key, *record);
+    renderingSucceeded_ = startup_.visitSourceDrawChecked(
+        [&](InstanceHandle key, const InstanceRecord& record, int, RunnerLayerDraw::Action) {
+            return drawInstance(key, record);
         },
         [&](const RunnerLayerBackground& background, int) {
             return RunnerLayerBackgroundDraw::visit(background,

@@ -121,8 +121,36 @@ public:
     int achievementLoginCalls() const { return achievementLoginCalls_; }
     bool controllerPersistent() const;
     std::size_t activeInstanceCount() const { return instances_.size(); }
+    // Source-owned mixed layer traversal. Object flags below are the admitted
+    // stored-runtime fields, not a replacement for unimplemented VM setters.
+    template<class Visit,class Background> bool visitSourceDrawChecked(Visit visit,Background background)const{
+        if(!roomPack_||!objectPack_)return false;
+        return roomLayers_.visitDraw(
+            [&](InstanceHandle key,std::uint32_t id,RunnerLayerDraw::Element& out){
+                const auto* r=instances_.resolve(key);
+                if(!r||r->instanceId!=id)return false;
+                PackedObject object;
+                out.object=objectPack_->findObject(r->objectId,object);
+                out.flags=(!r->active?2u:0u)|(r->destroyRequested?1u:0u)|
+                    (out.object&&object.visible()?0x10u:0u);
+                PackedObjectEvent event;
+                out.drawEvent=out.object&&objectPack_->findEvent(r->objectId,8,0,event);
+                // A runtime sprite_index=-1 suppresses default drawing; the
+                // object resource's original sprite is not a fallback.
+                out.sprite=r->spriteId>=0;
+                return true;
+            },[&](InstanceHandle key,std::uint32_t id,int depth,RunnerLayerDraw::Action action){
+                const auto* r=instances_.resolve(key);
+                return r&&r->instanceId==id&&visit(key,*r,depth,action);
+            },background);
+    }
+    // Instance-only projection for actor and offscreen debris passes. Their
+    // surrounding renderer still owns background/terrain/surface composition.
     template<class Visit> bool visitDrawChecked(Visit visit)const{
-        return instances_.visitDrawChecked(visit);
+        if(!roomPack_)return instances_.visitDrawChecked(visit); // Explicit resource-less fixtures.
+        return visitSourceDrawChecked([&](InstanceHandle key,const InstanceRecord& r,int,auto){
+            return visit(key,r);
+        },[](const RunnerLayerBackground&,int){return true;});
     }
     bool hasInstance(std::uint32_t instanceId) const {
         return instances_.find(instanceId) != nullptr;
@@ -806,6 +834,7 @@ private:
     InstanceStore<instanceCapacity> instances_;
     RunnerLayerIds layerIds_;
     StoredRoomLayers<instanceCapacity,256,4096,8> roomLayers_{layerIds_};
+    bool layerBindingSucceeded_;
     InstanceLifecycleBinding lifecycle_;
     ScriptEffectRuntimeBinding scriptEffectsBinding_;
     ScriptEffectRuntimeBinding debrisBinding_;

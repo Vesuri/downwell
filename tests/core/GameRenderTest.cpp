@@ -414,6 +414,16 @@ int main() {
         require(world.spawnScriptEffect(n(240),n(120),603,{0x3fe00000u,0},n(270),{},frames,a)&&
             world.spawnScriptEffect(n(244),n(124),602,{0x3fe00000u,0},{},{},frames,b)&&b>a,
             "registered muzzle drawing fixture uses ordinary owned script creation");
+        std::vector<downwell::InstanceHandle> muzzleLifetimes;
+        for(unsigned i=0;i<world.activeInstanceCount();++i){
+            const auto& r=world.instanceAt(i);if(r.objectId!=219)continue;
+            const auto key=world.instanceHandleAt(i);
+            const auto* layer=world.sourceRoomLayers().lifetimes().resolve(key);
+            require(layer&&layer->sourceId==r.instanceId&&layer->depth.attached,
+                "built-in script registry inherits layer observer before its first birth");
+            muzzleLifetimes.push_back(key);
+        }
+        require(muzzleLifetimes.size()==2,"both owned muzzle lifetimes have room elements");
         const auto digest=world.stateDigest();RecordingRenderer draw;draw.recordTransforms=true;scene->render(draw);
         std::vector<RecordingRenderer::Transform> muzzles;
         for(const auto& item:draw.transforms)if(item.sprite==602||item.sprite==603)muzzles.push_back(item);
@@ -444,6 +454,9 @@ int main() {
             std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),602)==retired.spriteOrder.end()&&
             std::find(retired.spriteOrder.begin(),retired.spriteOrder.end(),603)==retired.spriteOrder.end(),
             "ordinary Animation End and cleanup remove muzzles from SDL drawing");
+        for(auto key:muzzleLifetimes)
+            require(!world.resolveInstance(key)&&!world.sourceRoomLayers().lifetimes().resolve(key),
+                "Animation End retires owned script storage and layer identity together");
         require(world.spawnScriptEffect(n(248),n(128),101,{0x3fe00000u,0},{},{},frames,a),
             "wall impact uses the shared script effect owner");
         for(unsigned tick=0;tick<16;++tick){
@@ -459,6 +472,63 @@ int main() {
         RecordingRenderer ended;scene->render(ended);
         require(std::find(ended.spriteOrder.begin(),ended.spriteOrder.end(),101)==ended.spriteOrder.end(),
             "wall impact retires after sixteen source animation updates");
+    }
+    {
+        // A copied fixture hides only rmMain's fixed player layer. Source
+        // layer visibility must affect the live actor projection; a legacy
+        // room-depth traversal would still visit the player.
+        auto hiddenBytes=roomBytes;
+        downwell::PackedRoom room;
+        require(rooms.findRoom(downwell::StartupRuntime::mainRoomId,room),"main room exists");
+        bool changed=false;
+        for(unsigned i=0;i<room.layerCount;++i){
+            downwell::PackedRoomLayer layer;require(rooms.roomLayer(room,i,layer),"main layer exists");
+            if(layer.depth!=-50000)continue;
+            require(layer.visible()&&layer.membershipCount==1,"original player fixed layer fixture");
+            std::uint32_t id;require(rooms.membership(layer.firstMembership,id)&&id==100855,
+                "fixture hides the serialized player layer, not a synthetic actor");
+            const auto offset=downwell::RoomPack::headerSize+rooms.roomCount()*downwell::RoomPack::roomRecordSize+
+                rooms.instanceCount()*downwell::RoomPack::instanceRecordSize+
+                (room.firstLayer+i)*downwell::RoomPack::layerRecordSize+8;
+            hiddenBytes[offset]&=0xfe;changed=true;
+        }
+        downwell::RoomPack hiddenRooms(hiddenBytes.data(),hiddenBytes.size());
+        require(changed&&hiddenRooms.valid(),"hidden-layer fixture retains valid resource structure");
+        auto normal=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::desktop,&rooms,&objects,2,&builders);
+        auto hidden=std::make_unique<downwell::StartupRuntime>(downwell::PlatformProfile::desktop,&hiddenRooms,&objects,2,&builders);
+        normal->skipToGameForTesting();hidden->skipToGameForTesting();
+        require(normal->stateDigest()==hidden->stateDigest(),"layer visibility does not change gameplay or RNG");
+        std::vector<unsigned> expected,actual;
+        bool playerSeen=false;
+        require(normal->visitDrawChecked([&](auto,const auto& r){
+            if(r.instanceId==100855)playerSeen=true;else expected.push_back(r.instanceId);return true;
+        })&&hidden->visitDrawChecked([&](auto,const auto& r){actual.push_back(r.instanceId);return true;}),
+            "production actor projection traverses both layer fixtures");
+        require(playerSeen&&!expected.empty()&&actual==expected,
+            "live Draw honors fixed-layer visibility while retaining dynamic actors");
+        unsigned calls=0;
+        require(!normal->visitDrawChecked([&](auto,const auto&){++calls;return false;})&&calls==1,
+            "live source-layer projection stops immediately on renderer failure");
+        unsigned backgrounds=0,instances=0;
+        require(normal->visitSourceDrawChecked([&](auto,const auto&,int,auto){++instances;return true;},
+            [&](const auto& bg,int){require(!instances&&bg.spriteId==-1,"source background precedes main instances");
+                ++backgrounds;return true;})&&backgrounds==1&&instances==expected.size()+1,
+            "full source traversal retains the background omitted by actor-only projection");
+        downwell::InstanceRecord* defaultSprite=nullptr;
+        for(unsigned i=0;i<normal->activeInstanceCount();++i){
+            const auto& r=normal->instanceAt(i);downwell::PackedObject object;downwell::PackedObjectEvent event;
+            if(r.active&&!r.destroyRequested&&r.spriteId>=0&&objects.findObject(r.objectId,object)&&
+               object.visible()&&object.spriteId>=0&&!objects.findEvent(r.objectId,8,0,event)){
+                defaultSprite=const_cast<downwell::InstanceRecord*>(&r);break;
+            }
+        }
+        require(defaultSprite,"main room has an ordinary default-sprite Draw instance");
+        const auto savedSprite=defaultSprite->spriteId;
+        defaultSprite->spriteId=-1; // Draw-only fixture, no simulation between writes.
+        bool seen=false;
+        require(normal->visitDrawChecked([&](auto,const auto& r){seen|=r.instanceId==defaultSprite->instanceId;return true;})&&!seen,
+            "sprite_index minus one does not fall back to the object resource sprite");
+        defaultSprite->spriteId=savedSprite;
     }
     {
         auto game=std::make_unique<downwell::Game>(&rooms,&objects,&builders);

@@ -57,10 +57,13 @@ StartupRuntime::StartupRuntime(PlatformProfile profile,
                                std::uint32_t randomSeed,
                                const BuilderPatternPack* builderPatternPack,
                                InstanceLifecycleBinding lifecycle)
-    : lifecycle_(lifecycle), roomPack_(roomPack), objectPack_(objectPack),
+    : layerBindingSucceeded_(!roomPack || lifecycle.observeLayers(roomLayers_.observer())),
+      lifecycle_(lifecycle), roomPack_(roomPack), objectPack_(objectPack),
       builderPatternPack_(builderPatternPack),
       randomSeed_(randomSeed), random_(randomSeed) {
-    if(roomPack_&&!lifecycle_.observeLayers(roomLayers_.observer())){
+    // Install the observer before owned registries copy lifecycle_, not in
+    // this body after those members have already been constructed.
+    if(!layerBindingSucceeded_){
         roomLoadSucceeded_=false;run_.effectsSucceeded=false;return;
     }
     reset(profile);

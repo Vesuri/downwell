@@ -838,6 +838,10 @@ owner. Disposal uses bounded loops, not room-sized stack temporaries. Catalog
 layer identities survive reset. Failed publication or preparation stops the
 runtime. The garden-grass activation write uses the same publication boundary
 as other stored actors, before changing the record's active flag.
+Observer installation occurs in member initialization before built-in effect
+registries copy the lifecycle binding. Installing it in the constructor body
+leaves those earlier copies without layer birth/retirement callbacks. The
+production muzzle test checks both attachment and retirement of these lifetimes.
 
 Runtime tests check every allocated instance's generation, source identity,
 attachment and activation against its layer element through startup, garden,
@@ -870,6 +874,18 @@ or Draw-time mutation support. The garden regression independently enumerates
 serialized layers/memberships and runtime births before comparing Draw output.
 `DOWNWELL_CAPTURE_GARDEN_TICK=N build/capture-sdl-landing captures/example`
 captures the Nth rmMenu update along the bounded full-startup input tape.
+
+`StartupRuntime::visitSourceDrawChecked` centralizes stored instance lookup,
+admitted visibility/active/destroyed fields and event/sprite availability for
+the garden and gameplay. The live registered-actor and offscreen-debris passes
+use its instance-only projection; only explicit resource-less fixtures retain
+legacy room-list Draw. Tests hide a copied rmMain player layer and require
+that production traversal omits only that layer, preserves dynamic actors,
+and stops on callback failure without changing simulation/RNG state.
+This is not full gameplay composition: terrain, shops, fields and standalone
+effect banks still need their source-ordered boundaries, and the native
+gameplay owner still uses its legacy actor traversal. Nonzero script-effect
+depth overrides remain gated until both live depth/migration paths are ready.
 
 The native static garden cache likewise separates Create order from painting:
 it consumes RNG in placement order, then reorders scenery in place using
