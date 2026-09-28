@@ -96,6 +96,38 @@ void lifecycle(){
     require(registry.attach(layers,layer,300,{99,1},dormant,false),"new dormant registration appends independently of inactive flag");
     require(ids(layers,registry,layer)==std::vector<unsigned>({101,102,100,300}),"append uses registration flag");
 }
+void identityCollisions(){
+    using R=RunnerLayerInstances<1,96>;
+    R registry;R::Layers layers;unsigned layer;
+    require(layers.insertAfterEquals(1,0,false,layer),"identity collision layer");
+    InstanceHandle handles[64];
+    for(unsigned i=0;i<64;++i){
+        // All collide in the compact index; slots exceed element capacity.
+        handles[i]={7+256*i,9};RunnerDepthService::Instance state;
+        require(registry.attach(layers,layer,0,handles[i],state,false),"colliding identity attach");
+    }
+    auto compare=[&](){
+        for(auto h:handles){
+            unsigned expected=R::End;
+            for(unsigned e=0;e<R::End;++e){const auto* entry=registry.get(e);
+                if(entry&&entry->instance.slot==h.slot&&entry->instance.generation==h.generation){expected=e;break;}}
+            require(registry.find(h)==expected,"colliding lookup matches complete scan");
+            require(registry.find(InstanceHandle{h.slot,h.generation+1})==R::End,"collision still checks generation");
+        }
+    };
+    compare();
+    for(unsigned i=0;i<64;++i){
+        const unsigned index=(i*17)%64;
+        require(registry.retire(layers,0,handles[index]),"unlink hash head/middle/tail");compare();
+    }
+    for(unsigned generation=1;generation<=32;++generation){
+        RunnerDepthService::Instance state;
+        require(registry.attach(layers,layer,0,{42,generation},state,false),"same slot distinct lifetime keys");
+    }
+    for(unsigned generation=1;generation<=32;++generation)
+        require(registry.find(InstanceHandle{42,generation})!=R::End&&registry.retire(layers,0,{42,generation}),"full-key lifetime lookup");
+    require(registry.discardUninitialized(),"identity index room reset");compare();
+}
 void bounds(){
     RunnerLayerInstances<1,1> registry;RunnerLayers<1,1> layers;unsigned layer=1;
     require(layers.insertAfterEquals(1,0,false,layer)&&registry.reserve(layers,layer,10),"capacity seed");
@@ -395,4 +427,4 @@ void unnumberedLifetimes(){
             "unrecovered numeric IDs cannot silently survive source room lookup");
     }
 }
-int main(){permutations();lifecycle();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}
+int main(){permutations();lifecycle();identityCollisions();bounds();roomFallback();globalFallbackOrder();serializedInitialization();rebindRelease();roomInitializationFailures();lifetimeDepthIntegration();lifetimeRoomInitialization();roomUninitialization();unnumberedLifetimes();std::cout<<"Serialized layer initialization, rebind release, room fallback and lifetime-checked attachment verified\n";}

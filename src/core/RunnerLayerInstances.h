@@ -15,6 +15,8 @@ public:
     bool discardUninitialized(){
         for(const auto& entry:entries_)if(entry.instance.generation)return false;
         for(auto& entry:entries_)entry=Entry{};
+        for(auto& head:identityHead_)head=0;
+        for(auto& next:identityNext_)next=0;
         usedEnd_=0;
         return true;
     }
@@ -26,8 +28,10 @@ public:
     }
     unsigned find(InstanceHandle h)const{
         if(!h.generation)return End;
-        for(unsigned i=0;i<usedEnd_;++i)if(entries_[i].present&&
-            entries_[i].instance.slot==h.slot&&entries_[i].instance.generation==h.generation)return i;
+        for(unsigned link=identityHead_[bucket(h)];link;link=identityNext_[link-1]){
+            const unsigned i=link-1;
+            if(entries_[i].instance.slot==h.slot&&entries_[i].instance.generation==h.generation)return i;
+        }
         return End;
     }
     // Call in serialized membership-array order; each placeholder enters at
@@ -52,6 +56,7 @@ public:
         RunnerImageValue depth;
         if(!depth.assign(MotionBinary64::fromInteger(destination->depth)))return false;
         entries_[element]={sourceId,h,true};
+        indexIdentity(element);
         if(element>=usedEnd_)usedEnd_=element+1;
         state.attached=true;state.layerId=destination->id;state.depth=depth;
         if(!reused)return layers.attach(layer,element,true,state.append,[](unsigned){return false;});
@@ -60,7 +65,7 @@ public:
     bool retire(Layers& layers,std::uint32_t sourceId,InstanceHandle h){
         const unsigned element=find(h);
         if(element==End||entries_[element].sourceId!=sourceId||!layers.detach(element))return false;
-        entries_[element]=Entry{};return true;
+        unindexIdentity(element);entries_[element]=Entry{};return true;
     }
     // 0x41498b: uninitialize a bound type-2 element without deleting its
     // room membership. Source lookup, not the cached pointer, finds the
@@ -81,7 +86,7 @@ public:
                 state->attached=false;state->layerId=-1;
             }
         }
-        entry.instance={};return true;
+        unindexIdentity(element);entry.instance={};return true;
     }
     // Search only this room for the attachment described by the instance.
     // Missing layer/element or a different lifetime is a source no-op. Do not
@@ -95,7 +100,7 @@ public:
         const unsigned element=find(h);
         if(element==End||layers.elementOwner(element)!=layer)return true;
         if(!layers.detachForRebind(element))return false;
-        entries_[element]=Entry{};return true;
+        unindexIdentity(element);entries_[element]=Entry{};return true;
     }
     template<class Lookup>
     bool initializeReserved(Layers& layers,unsigned element,Lookup lookup){
@@ -127,7 +132,7 @@ public:
         // must retire it before publication, without retiring the instance.
         if(find(h)!=End||!get(element)||layers.elementOwner(element)!=layer||
             !layers.get(layer)||layers.get(layer)->id!=id)return false;
-        entry.instance=h;state->attached=true;state->layerId=id;
+        entry.instance=h;indexIdentity(element);state->attached=true;state->layerId=id;
         return true;
     }
     // Room initialization's fallback (0x413590..0x413610), after serialized
@@ -182,13 +187,31 @@ public:
         return layers.normalizeRoomInstances(inactive);
     }
 private:
+    static_assert(ElementCapacity<65535,"Compact identity links require 16-bit elements");
+    static constexpr unsigned Buckets=ElementCapacity<16?16:ElementCapacity<64?64:256;
+    static unsigned bucket(InstanceHandle h){
+        return (h.slot+((h.generation<<5)|(h.generation>>27)))&(Buckets-1);
+    }
+    void indexIdentity(unsigned element){
+        const unsigned b=bucket(entries_[element].instance);
+        identityNext_[element]=identityHead_[b];identityHead_[b]=std::uint16_t(element+1);
+    }
+    void unindexIdentity(unsigned element){
+        auto* link=&identityHead_[bucket(entries_[element].instance)];
+        while(*link&&*link!=element+1)link=&identityNext_[*link-1];
+        if(*link)*link=identityNext_[element];
+        identityNext_[element]=0;
+    }
     unsigned free(const Layers& layers)const{
         for(unsigned i=0;i<ElementCapacity;++i)
             if(!entries_[i].present&&layers.elementOwner(i)==Layers::End)return i;
         return End;
     }
     Entry entries_[ElementCapacity?ElementCapacity:1]{};
-    // Search bound only: slots below it may be holes or non-instance elements.
+    // Lookup acceleration only: allocation, source-ID lookup and painter
+    // ordering still use the original scans/lists. Zero means no element.
+    std::uint16_t identityHead_[Buckets]{},identityNext_[ElementCapacity?ElementCapacity:1]{};
+    // Source-ID search bound: slots below it may be holes or non-instance elements.
     // Allocation and painter order remain governed by the original scans/lists.
     unsigned usedEnd_=0;
 };

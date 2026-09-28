@@ -642,6 +642,14 @@ produce the same reserved element order in tests. Additional tests cover
 inactive reuse, duplicate IDs/handles, retirement, slot reuse, new dormant
 registration and capacity failure. Source instance IDs, store handles and
 element slots remain distinct; source element-ID allocation is not fabricated.
+Lifetime-handle lookup uses a compact chained index, comparing both slot and
+generation. Attach/reserved initialization publish the index; retirement,
+uninitialization and rebind release unlink it. Source-ID lookup, first-free
+element allocation and all painter-order lists remain unchanged. Colliding
+keys follow the chain rather than aliasing another lifetime. The index costs
+two bytes per element plus up to 512 bytes of bucket heads; its worst-case
+collision chain is still linear. Tests compare collision-heavy lookup with a
+full element scan, including stale generations and slot reuse.
 This registry does not yet load all non-instance room elements or replace live
 room startup. Persistent-room rebinding and full serialized metadata publication
 remain integration work.
