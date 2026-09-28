@@ -28,6 +28,8 @@ template<unsigned Capacity,unsigned Nodes> class RunnerSpatialInstances {
     using Math=RunnerSpatialSplit;
 public:
     using Real=RunnerImageValue;
+    template<unsigned First,unsigned Last> using RegistrationProjection=
+        typename RunnerObjectMembership<Capacity>::template RegistrationProjection<First,Last>;
     using Box=Math::Box;
     struct State {
         Real x{},y{};
@@ -625,6 +627,15 @@ public:
             const InstanceHandle h{slot,generation};const auto* state=resolve(h);
             return state&&visit(h,object,*state);
         });
+    }
+    template<unsigned First,unsigned Last,class Visit>
+    bool visitRegistrationRange(RegistrationProjection<First,Last>& projection,
+        unsigned first,unsigned last,Visit visit)const{
+        return valid()&&membership_.visitRegistrationRange(projection,first,last,
+            [&](unsigned slot,std::uint32_t generation,int object){
+                const InstanceHandle h{slot,generation};const auto* state=resolve(h);
+                return state&&visit(h,object,*state);
+            });
     }
     // Object-resource branch of instance_number (0x4fe49b). This is NOT the
     // raw registration count used by collision preparation below. Filtering

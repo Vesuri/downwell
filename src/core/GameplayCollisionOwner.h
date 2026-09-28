@@ -25,6 +25,7 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
 private:
     Owner owner_;
+    Owner::RegistrationProjection<View::terrainBase,View::timeFieldBase> actorRegistrations_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
     RunnerRoomMembership<View::capacity> room_;
     RunnerRoomMembership<View::capacity>::AnimationProjection animationProjection_;
@@ -273,7 +274,7 @@ public:
             if(!self.drones_.size())return true;
             MotionBinary64 top;
             if(!multiplyBinary64(MotionBinary64::fromInteger(topQ12),{0x3f300000u,0},top))return self.check(false);
-            return self.check(self.owner_.visitRegistrationRange(View::droneBase,View::capacity,
+            return self.check(self.owner_.visitRegistrationRange(self.actorRegistrations_,View::droneBase,View::capacity,
                 [&](InstanceHandle shared,int object,const Owner::State& state){
                     if(state.flags&0x100003u)return true;
                     View::Kind kind;InstanceHandle local;
@@ -367,7 +368,7 @@ public:
         world.configureEnemyStepOrder([](void* context,GameplayWorld::EnemyStepOrder& snapshot){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.owner_.visitRegistrationRange(View::enemyBase,View::breakableBase,
+            return self.check(self.owner_.visitRegistrationRange(self.actorRegistrations_,View::enemyBase,View::breakableBase,
                 [&](InstanceHandle shared,int object,const Owner::State& state){
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
@@ -384,8 +385,8 @@ public:
             };
             // Only implemented families are admitted. Avoid scanning every
             // terrain record for this partial combat alarm traversal.
-            if(!self.check(self.owner_.visitRegistrationRange(View::enemyBase,View::terrainBase,capture)&&
-                self.owner_.visitRegistrationRange(View::debrisBase,View::capacity,capture)))return false;
+            if(!self.check(self.owner_.visitRegistrationRange(self.actorRegistrations_,View::enemyBase,View::terrainBase,capture)&&
+                self.owner_.visitRegistrationRange(self.actorRegistrations_,View::debrisBase,View::capacity,capture)))return false;
             return self.dispatchCapturedAlarms(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
                 return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
@@ -399,7 +400,7 @@ public:
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            return self.check(self.owner_.visitRegistrationRange(View::debrisBase,View::timeChangeBase,
+            return self.check(self.owner_.visitRegistrationRange(self.actorRegistrations_,View::debrisBase,View::timeChangeBase,
                 [&](InstanceHandle h,int object,const Owner::State& state){
                     if(state.flags&0x100003u)return true;
                     View::Kind kind;InstanceHandle local;

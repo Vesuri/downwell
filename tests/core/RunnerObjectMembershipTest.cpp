@@ -6,6 +6,7 @@
 static void require(bool ok,const char* message){if(!ok){std::cerr<<message<<'\n';std::exit(1);}}
 int main(){
     downwell::RunnerObjectMembership<8> registry;
+    downwell::RunnerObjectMembership<8>::RegistrationProjection<2,6> projection;
     // Synthetic immutable hierarchy: objects 1/2 derive from 0; 3 is unrelated.
     auto isA=[](int child,int parent){return parent==0 && (child==1 || child==2);};
     struct Record {unsigned slot;int object;std::uint32_t identity;};
@@ -37,6 +38,21 @@ int main(){
                 require(id==expected.front(),"range failure begins at first registration");++calls;return false;
             });
             require(complete==expected.empty()&&calls==(expected.empty()?0u:1u),"range callback failure stops traversal");
+            std::vector<std::uint32_t> projected;
+            const bool eligible=first==last||last<=2||first>=6;
+            const bool projectedOk=registry.visitRegistrationRange(projection,first,last,
+                [&](unsigned s,std::uint32_t id,int object){
+                    auto found=std::find_if(reference.begin(),reference.end(),[&](const Record& r){return r.slot==s;});
+                    require(found!=reference.end()&&found->object==object,"projection retains live resource identity");
+                    projected.push_back(id);return true;
+                });
+            require(projectedOk==eligible&&projected==(eligible?expected:std::vector<std::uint32_t>{}),
+                "cached projection matches raw capture or rejects overlapping request");
+            if(eligible){
+                calls=0;
+                const bool done=registry.visitRegistrationRange(projection,first,last,[&](auto,auto,auto){++calls;return false;});
+                require(done==expected.empty()&&calls==(expected.empty()?0u:1u),"projected callback failure stops capture");
+            }
         }
         require(!registry.visitRegistrationRange(3,2,[](auto,auto,auto){return true;})&&
             !registry.visitRegistrationRange(0,9,[](auto,auto,auto){return true;}),"invalid registration ranges fail");
@@ -54,6 +70,9 @@ int main(){
         }
     }
     registry.clear();require(!registry.size(),"clear retires all membership");
+    unsigned projectedCalls=0;
+    require(registry.visitRegistrationRange(projection,0,2,[&](auto,auto,auto){++projectedCalls;return true;})&&
+        !projectedCalls,"clear invalidates projected registrations");
     require(registry.bind(0,2,123),"registry reusable after clear");
     registry.clear();require(!registry.unbind(0),"clear removes stale slot links");
     registry.bind(0,1,10);registry.bind(1,2,20);registry.bind(0,1,10);
@@ -61,7 +80,18 @@ int main(){
     registry.visit(0,isA,[&](unsigned,std::uint32_t id){rebound.push_back(id);return true;});
     require(rebound==std::vector<std::uint32_t>({20,10}),
         "rebinding the same identity moves membership to the ancestor-list tail");
+    rebound.clear();require(registry.visitRegistrationRange(projection,0,2,[&](auto,std::uint32_t id,auto){
+        rebound.push_back(id);return true;
+    })&&rebound==std::vector<std::uint32_t>({20,10}),"projection follows same-identity rebind order");
+    unsigned mutations=0;
+    require(!registry.visitRegistrationRange(projection,0,2,[&](auto,auto,auto){
+        ++mutations;registry.bind(7,1,777);return true;
+    })&&mutations==1,"capture detects forbidden membership mutation");
     downwell::RunnerObjectMembership<0> empty;
+    downwell::RunnerObjectMembership<8>::RegistrationProjection<2,2> unfiltered;
+    unsigned allCalls=0;
+    require(registry.visitRegistrationRange(unfiltered,0,8,[&](auto,auto,auto){++allCalls;return true;})&&
+        allCalls==registry.size(),"empty excluded range projects every registration");
     require(!empty.bind(0,0,1) && !empty.count(0,isA),"zero capacity rejects births");
     std::cout<<"runner object membership tests passed\n";
 }
