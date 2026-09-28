@@ -10,6 +10,12 @@ extern "C" {
 #ifdef DOWNWELL_SKIP_TO_GAME
 volatile ULONG gDownwellProfileTargetScene = 3;
 volatile ULONG gDownwellProfileTargetFrames =
+#ifdef DOWNWELL_PROFILE_FRAMES
+#if DOWNWELL_PROFILE_FRAMES < 1
+#error PROFILE_FRAMES must be positive
+#endif
+    DOWNWELL_PROFILE_FRAMES;
+#else
 #ifdef DOWNWELL_PROFILE_CONTACT
     downwell::gameplayContactProfileFrames;
 #else
@@ -17,6 +23,7 @@ volatile ULONG gDownwellProfileTargetFrames =
     480;
 #else
     600;
+#endif
 #endif
 #endif
 #elif defined(DOWNWELL_SKIP_INTRO)

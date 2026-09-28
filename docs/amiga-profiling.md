@@ -44,6 +44,20 @@ SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=60 bash amiga/profile.sh fps
 SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=60 bash amiga/profile.sh probes
 ```
 
+For a short diagnostic prefix, add `PROFILE_FRAMES=11`. This compiles the
+stop count into the ordinary gameplay profiling build; it does not rely on
+debugger writes to target memory or breakpoints inside measured frames. Zero
+(the default) keeps the full 600-update tape. Prefixes cannot be used with
+contact or level-clear tapes and cannot establish their performance coverage.
+The wrapper restores the ordinary build with the override disabled.
+
+Collection phases 80 and 81 separate owned layer traversal from per-actor
+preparation. Phase 80 excludes callback preparation (81); both are excluded
+from phase 42. Add 42+80+81 when comparing with older aggregate collection
+traces, allowing for the extra instrumentation overhead. Actor preparation
+includes coordinate/animation selection, asset bounds and foreground insertion;
+it is not planar drawing or DMA publication. Ordinary builds omit these probes.
+
 Use `SKIP_LEVEL=1` for level completion and `SKIP_INTRO=1` for style selection
 instead of the gameplay shortcut. Use `PROFILE_LASER=1` when investigating
 the upgraded Laser Sight fixture. Keep identical inputs, seeds, build options

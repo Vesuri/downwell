@@ -31,6 +31,7 @@ enum DownwellProfilePhase {
     profileContactDirection, profileDamageNumberCreate, profileDamageNumberStep,
     profileDamageNumberDraw,
     profileControllerComposition,
+    profileActorLayerWalk, profileActorPreparation,
     profilePhaseCount
 };
 

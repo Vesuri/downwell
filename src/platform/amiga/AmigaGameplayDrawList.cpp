@@ -116,8 +116,10 @@ bool AmigaGameplayDrawList::collect(const GameplayWorld& port, const UBYTE* pack
         return true;
     };
     if(port.hasRoomActorDraw()) {
+        DW_PROFILE_SCOPE(profileActorLayerWalk);
         downwell::RunnerImageValue foregroundDepth;foregroundDepth.assign(downwell::MotionBinary64::fromInteger(-1000));
         if(!port.visitRoomActors([&](GameplayWorld::DrawActor kind,downwell::InstanceHandle key,downwell::RunnerImageValue depth){
+            DW_PROFILE_SCOPE(profileActorPreparation);
             if(downwell::RunnerSpatialSplit::less(depth,foregroundDepth)&&!drawForeground())return false;
             if(kind==GameplayWorld::DrawActor::player)return port.findPlayer(key)&&drawPlayer();
             if(kind==GameplayWorld::DrawActor::enemy){

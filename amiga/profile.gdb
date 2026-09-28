@@ -23,6 +23,7 @@ printf "Laser phases: 45=endpoint_trace 46=retention_checks 47=CPU_ray_draw 48=r
 printf "Generation detail: 67=command_create 68=command_initialize 69=terrain_cell 70=landing_index 71=tile_list 72=breakable_register 73=enemy_register 74=shop_create\n"
 printf "Damage detail: 75=contact_direction 76=number_create 77=number_step 78=number_draw_including_drain\n"
 printf "Controller detail: 79=currency_smoke_shade_composition (excluded from 42=actor_collection)\n"
+printf "Collection detail: 80=owned_layer_walk 81=actor_preparation; both excluded from 42, preparation excluded from 80\n"
 printf "Damage number births: %lu (zero means this tape did not measure a damaging contact)\n", gDownwellProfileDamageBirths
 if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"
