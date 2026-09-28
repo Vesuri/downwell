@@ -22,6 +22,10 @@ template<unsigned I> class GameplayRoomLayers {
     // Actor projection only. Nonprojected scenery/fields still occupy their
     // original elements and can terminate a layer when inactive.
     std::uint8_t projected_[(I+7)/8]{};
+    // 0 = resolve actor/placeholder, 1 = retained active scenery (skip),
+    // 2 = retained inactive scenery (end layer). Published at mutations, not
+    // guessed from visibility. Element identity survives depth moves/merges.
+    std::uint8_t retainedDraw_[E]{};
     unsigned live_=0,playerId_=0;
     bool good_=true,prepared_=false;
     bool fail(){good_=false;return false;}
@@ -37,6 +41,7 @@ public:
         if(!valid()||live_)return fail();
         if(prepared_&&!lifetimes_.uninitializeRoom([&](unsigned e){return backgrounds_.uninitialize(e);}))return fail();
         if(!registry_.discardUninitialized()||!backgrounds_.discardUninitialized()||!layers_.discardUninitialized())return fail();
+        for(auto& state:retainedDraw_)state=0;
         for(auto& v:visible_)v=true;
         if(!PackedRoomLayerLoader::load(*rooms_,11,layers_,registry_,[&](unsigned slot,const PackedRoomLayer& layer){
             visible_[slot]=layer.visible();
@@ -60,15 +65,30 @@ public:
         const unsigned bit=1u<<(h.slot&7);
         if(projected)projected_[h.slot>>3]|=bit;
         else projected_[h.slot>>3]&=~bit;
+        const unsigned element=registry_.find(h);
+        if(element==Registry::End)return fail();
+        retainedDraw_[element]=projected?0:(inactive?2:1);
         ++live_;return true;
     }
     bool retire(InstanceHandle h){
         if(!enabled())return true;
-        if(!valid()||!live_||!lifetimes_.retire(h))return fail();
+        if(!valid()||!live_)return fail();
+        const unsigned element=registry_.find(h);
+        if(element==Registry::End||!lifetimes_.retire(h))return fail();
+        retainedDraw_[element]=0;
         projected_[h.slot>>3]&=~(1u<<(h.slot&7));
         --live_;return true;
     }
-    bool activation(InstanceHandle h,bool active){return !enabled()||(valid()&&lifetimes_.publishInactive(h,!active));}
+    bool activation(InstanceHandle h,bool active){
+        if(!enabled())return true;
+        if(!valid()||!lifetimes_.publishInactive(h,!active))return false;
+        if(!(projected_[h.slot>>3]&(1u<<(h.slot&7)))){
+            const unsigned element=registry_.find(h);
+            if(element==Registry::End)return fail();
+            retainedDraw_[element]=active?1:2;
+        }
+        return true;
+    }
     bool reconcile(InstanceHandle h){return !enabled()||(valid()&&lifetimes_.reconcileActivation(h));}
     bool serviceDepths(){return !enabled()||(valid()&&lifetimes_.serviceDepths());}
     bool writeDepth(InstanceHandle h,MotionBinary64 value){
@@ -78,6 +98,10 @@ public:
         if(!enabled()||!valid()||!prepared_)return false;
         return RunnerLayerDraw::visit(layers_,[&](unsigned slot,const auto&){return visible_[slot];},
             [](unsigned,const auto&){return true;},[&](unsigned e,RunnerLayerDraw::Element& out){
+                if(retainedDraw_[e]){
+                    out.type=2;out.instance=true;
+                    out.flags=retainedDraw_[e]==2?2u:0u;return true;
+                }
                 const auto* entry=registry_.get(e);
                 if(!entry){out.type=1;return backgrounds_.get(e)!=nullptr;}
                 out.type=2;if(!entry->instance.generation)return true;

@@ -1593,6 +1593,49 @@ int main(){
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
+        // Cached retained scenery must have the same live termination behavior
+        // as the uncached instance lookup, before and after relinking/reuse.
+        auto cached=std::make_unique<GameplayRoomLayers<8>>(&rooms);
+        auto oracle=std::make_unique<GameplayRoomLayers<8>>(&rooms);
+        assert(cached->prepare()&&oracle->prepare());
+        RunnerImageValue depth;assert(depth.assign(MotionBinary64::fromInteger(-321)));
+        bool inactive=false;unsigned terrainGeneration=1;
+        auto birth=[&](InstanceHandle h){
+            assert(cached->birth(h,0,depth,false,h.slot!=0));
+            assert(oracle->birth(h,0,depth,false,true));
+        };
+        auto compare=[&](){
+            std::vector<unsigned> actual,expected;unsigned cachedTerrain=0,oracleTerrain=0;
+            auto walk=[&](auto& layers,auto& order,unsigned& terrainCalls){
+                return layers.visit([&](InstanceHandle h,RunnerLayerDraw::Element& out){
+                    out.instance=true;out.flags=0x10;out.object=h.slot!=0;out.drawEvent=true;
+                    if(h.slot==0){++terrainCalls;assert(h.generation==terrainGeneration);if(inactive)out.flags|=2;}
+                    return true;
+                },[&](InstanceHandle h,int){order.push_back(h.slot);return true;});
+            };
+            assert(walk(*cached,actual,cachedTerrain)&&walk(*oracle,expected,oracleTerrain));
+            assert(actual==expected&&cachedTerrain==0);
+            return actual;
+        };
+        birth({1,1});birth({0,1});birth({2,1});
+        assert((compare()==std::vector<unsigned>{2,1}));
+        inactive=true;assert(cached->activation({0,1},false)&&oracle->activation({0,1},false));
+        assert((compare()==std::vector<unsigned>{2}));
+        assert(cached->reconcile({0,1})&&oracle->reconcile({0,1}));
+        assert((compare()==std::vector<unsigned>{2,1}));
+        inactive=false;assert(cached->activation({0,1},true)&&oracle->activation({0,1},true));compare();
+        assert(cached->reconcile({0,1})&&oracle->reconcile({0,1}));compare();
+        assert(cached->writeDepth({0,1},MotionBinary64::fromInteger(-400))&&
+            oracle->writeDepth({0,1},MotionBinary64::fromInteger(-400)));
+        assert(cached->serviceDepths()&&oracle->serviceDepths());compare();
+        assert(cached->retire({0,1})&&oracle->retire({0,1}));compare();
+        terrainGeneration=2;birth({0,2});compare();
+        inactive=true;assert(cached->activation({0,2},false)&&oracle->activation({0,2},false));compare();
+        for(auto h:{InstanceHandle{0,2},InstanceHandle{1,1},InstanceHandle{2,1}})
+            assert(cached->retire(h)&&oracle->retire(h));
+        assert(cached->prepare()&&oracle->prepare());compare();
+    }
+    {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
