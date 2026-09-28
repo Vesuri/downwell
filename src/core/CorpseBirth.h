@@ -3,6 +3,7 @@
 #include "RandomBinary64.h"
 #include "RunnerImageValue.h"
 #include "AlarmBank.h"
+#include "RunnerMoveSnap.h"
 namespace downwell {
 // Object 263 and inherited object 90 Create. Wall queries select parent 57;
 // tile queries use layer 100. Queries report success separately from a hit.
@@ -17,13 +18,7 @@ struct CorpseBirth {
     int attempts=0,radius=0,maxRadius=0,rx=0,ry=0;
     bool grounded=false,active=false,hit=false,disappearing=false,noTouch=true,bouncing=true;
     static bool snap(RunnerImageValue coordinate,RunnerImageValue& out){
-        if(!coordinate.promoted().valid())return false;
-        const auto exponent=(coordinate.bits>>23)&255u;
-        if((coordinate.bits&0x7fffffffu)&&exponent<=4)return false;
-        if(coordinate.bits&0x7fffffffu)coordinate.bits-=4u<<23;
-        std::int32_t grid;
-        if(!coordinate.promoted().roundPixel(grid)||grid>134217727||grid< -134217728)return false;
-        return out.assign(MotionBinary64::fromInteger(grid*16));
+        return RunnerMoveSnap::coordinate16(coordinate,out);
     }
     template<class Random,class Queries>
     bool create(MotionBinary64 px,MotionBinary64 py,bool restInPieces,Random& random,Queries& queries){

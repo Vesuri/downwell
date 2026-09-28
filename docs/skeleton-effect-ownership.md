@@ -106,6 +106,25 @@ instance record retains the same fields for future non-box callers; stock A500
 memory fit remains unproven. These entry points still await complete natural
 destruction admission and actual audio backends.
 
+`CurrencyCreate` implements the object-248 Create event before reward-script
+overrides. It retains binary64 velocities and `imgSp` separately from builtin
+float position/image-speed fields. Area 5 consumes an extra random draw for
+negative vertical speed; areas 3/4 quarter gravity and cap it at 0.5. Attractor
+changes radius/speed/alarm 3, not initial attraction. Direction evaluates both
+integer-random arguments before `choose`, and retains negative angles.
+Embedded-wall relocation first tests parentWall 57, then tile layer 100 only
+on a wall miss. It snaps and publishes x/y separately. Candidate y offsets
+range from -radius through zero; candidate tile tests remain at the snapped
+origin. The source grows radius through 68 despite `rrmax=32`, makes at most
+33 attempts and applies even a final blocked candidate. This shares the
+existing checked 16-pixel move_snap operation with corpse creation.
+Scalar host tests cover all five areas, Attractor, wall/tile blocking, bounded
+search exhaustion, full RNG state and query failure prefixes. A controlled
+maximum-range tape runs on the 68000. The existing live `GemMotion` initializer
+remains approximate: registered currency ownership, reward-script caller
+writes and the exact Step/animation path still need integration before this
+Create event replaces it. These tests are not proof of complete live rewards.
+
 Box Alarm 0 is dispatched by both normal schedulers: the shared event body
 sets `wallHp` to zero, without emitting effects or retiring the box. Native
 storage keeps one 32-bit countdown per box; it does not allocate twelve slots

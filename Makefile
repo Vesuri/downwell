@@ -223,6 +223,16 @@ test: verify-debris-effects
 test: verify-debris-draw
 test: verify-dead-body-creation
 test: verify-corpse-birth
+test: verify-currency-create
+.PHONY: verify-currency-create
+verify-currency-create: build/currency-create-test
+	python3 tools/verify-currency-create.py
+	python3 tools/verify-runner-move-snap.py
+	./build/currency-create-test
+
+build/currency-create-test: tests/core/CurrencyCreateTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 test: verify-corpse-lifecycle
 test: verify-corpse-motion
 test: verify-out-of-view-lifetime
