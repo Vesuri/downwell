@@ -11,6 +11,36 @@ source-backed frontier/phase correction and remaining region-boundary gaps.
 VM-backed registration, latch/release and collision-phase camera snaps on both
 adapters, plus the remaining original-runner and achievement caveats.
 
+## Main-room controller births and numeric IDs
+
+`verify-runner-instance-ids.py` pins both the executable's GEN8-based counter
+and the relevant exported room/event evidence. `rmMain` contains 244 authored
+instances: 240 walls, builder 100856 at creation index 0, player 100855 at 1,
+`objDitherAbove` 100854 at 2 and `startTimeField` 101097 at 147. These authored
+IDs must not consume fresh dynamic IDs or be replaced by native family slots.
+
+Player Create first runs `scrPlayerInit`, then inherited `parentLife` Create
+(sets alive), then creates depth meter 66 and calls `scrSpawnCamera` (creates
+64 and stores `myCam`). Only in room 11 it subsequently creates entry-dither
+73 at (0,0), after the level-one style/achievement assignments. The earlier
+initializer can already create decoy 256 and one or two drones 249; this is
+not a fixed three-ID reservation independent of upgrades. Called scripts and
+child Creates still require their own complete synchronous birth accounting.
+
+Entry-dither Create copies parent-camera 63's x, reads view 0's published y,
+and sets Alarm 0 to 120. Step adds 16 to y and recopies camera x; Alarm 0
+destroys it. Draw targets `global.surfaceFx`. Camera Create itself does not
+publish the view, so substituting camera.y minus half the viewport height
+for that getter is not justified by these events. Neither a dummy ID nor a
+generic overlay reproduces this controller.
+
+The stored adapter currently queues only 66/64 in player Create, omitting 73
+and the full initializer's child births. Native terrain loading retains the
+authored player/wall IDs but is not complete cross-family room creation.
+Consequently, explicit-ID time-change tests do not establish the natural
+global ID stream. This source check also does not prove original runner room
+phase timing, initial view publication or rendered entry-mask parity.
+
 ## Horizontal control arithmetic
 
 `scrPlMovement`'s non-water living-player path applies left and right input

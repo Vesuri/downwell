@@ -35,6 +35,10 @@ behavior, both backend integrations and relevant original-game verification.
   collision adapters. Complete original room creation order across families,
   retaining source numeric instance IDs separately from native family-local
   generation handles for serialized bindings and global lookup order.
+  Include player-created depth meter/camera/entry-dither and conditional
+  companion births, not just visible actors; preserve entry-dither's published
+  view read and effect-surface Draw. See the
+  [main-room birth audit](original-behavior-audit.md#main-room-controller-births-and-numeric-ids).
 - Replace the usual-gun Q20/Q32 trajectory approximation with original setter
   and trigonometric semantics before enabling projectile selectors. Preserve muzzle-effect
   creation, collision-event ordering and destruction timing around movement.
