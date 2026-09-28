@@ -164,7 +164,9 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
                 "same sprite preserves cached frame and clean bounds");
         const auto flagsBeforeIndex=storedOwner.resolve(born)->flags;
         const auto timelineBeforeIndex=animated.timeline.bits;
-        for(unsigned phase : {0u,1u,127u,128u,255u,256u,639u,640u,65535u,0x7fffffffu}) {
+        for(unsigned phase : {0u,1u,127u,128u,255u,256u,639u,640u,65535u,
+                0xffffffu,0x1000000u,0x1000001u,0x1000002u,0x1000003u,
+                0x7fffffbfu,0x7fffffc0u,0x7fffffffu}) {
             const float expected=static_cast<float>(phase)/256.0f;
             std::uint32_t bits;std::memcpy(&bits,&expected,sizeof(bits));
             require(movement.phaseIndex(born,records.at(0),phase)&&animated.sprite.imageIndex.bits==bits&&

@@ -35,7 +35,11 @@ magnitude arithmetic. Collision-owner integer publication, object default depth
 and layer attachment depth use this path. Host tests compare 100,000 integers
 with both the retained path and host float conversion; shared native fixtures
 cover powers of two, ties, carries and the signed limits. Fractional inputs
-continue through the existing general narrowing path.
+continue through the existing general narrowing path. The shared lifecycle
+adapters also use direct narrowing for explicit integer position/transform
+writes and Q8 animation phase publication. The latter still narrows the integer
+first, then divides by 256 through its exponent; its unsupported-phase guard,
+missing-owner behavior and callback failure propagation are unchanged.
 
 The new, not-yet-live skeleton timing component now narrows `imgSp` when Step
 copies it to `image_speed`; subsequent custom-rate changes still leave that

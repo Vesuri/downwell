@@ -95,7 +95,7 @@ public:
                           RunnerImageValue alpha,std::uint32_t blend)const {
         if(!transform_)return true;
         RunnerImageValue narrowed;
-        return narrowed.assign(MotionBinary64::fromInteger(value))&&
+        return narrowed.assignInteger(value)&&
                transform_(context_,h,r,field,narrowed,alpha,blend);
     }
     template<class Owner> static RecordLifecycleBinding bindMasks(Owner& owner) {
@@ -212,7 +212,7 @@ public:
         if(!imageIndex_)return true;
         if(phase>0x7fffffffu)return false;
         RunnerImageValue value;
-        if(!value.assign(MotionBinary64::fromInteger(static_cast<std::int32_t>(phase))))return false;
+        if(!value.assignInteger(static_cast<std::int32_t>(phase)))return false;
         // Positive integer divided by 256: exact exponent adjustment after
         // narrowing, with no division helper or intermediate host float.
         if(value.bits)value.bits-=8u<<23;
@@ -226,7 +226,7 @@ public:
     bool integerPosition(InstanceHandle h,const Record& r,std::int32_t x,std::int32_t y)const {
         if(!move_)return true;
         RunnerImageValue px,py;
-        return px.assign(MotionBinary64::fromInteger(x))&&py.assign(MotionBinary64::fromInteger(y))&&
+        return px.assignInteger(x)&&py.assignInteger(y)&&
                move_(context_,h,r,px,py);
     }
     // Engine position publication requires an installed authoritative owner;
