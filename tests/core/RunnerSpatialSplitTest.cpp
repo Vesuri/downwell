@@ -244,6 +244,19 @@ int main(){
     auto random=[&](){state=state*1664525u+1013904223u;return state;};
     const auto partitionSeed=state;
     unsigned pixelAccepted=0,pixelFallback=0;
+    unsigned pixelPartitions=0;
+    auto pixelPartitionCheck=[&](const Split::Box (&input)[7]){
+        Split::Result expected,actual,fast;
+        const bool reference=Split::partitionBinary32(input,expected);
+        assert(Split::partition(input,actual)==reference);
+        const bool accepted=Split::partitionPixels(input,fast);
+        if(accepted)++pixelPartitions;
+        if(reference){
+            for(unsigned i=0;i<7;++i)assert(actual.group[i]==expected.group[i]&&(!accepted||fast.group[i]==expected.group[i]));
+            for(unsigned i=0;i<2;++i)assert(actual.count[i]==expected.count[i]&&(!accepted||fast.count[i]==expected.count[i]));
+        }else assert(!accepted);
+        return accepted;
+    };
     auto childCheck=[&](const Split::Box* input,unsigned count,Split::Box incoming){
         unsigned reference=999,actual=999,fast=999;
         const bool expected=Split::chooseBinary32Child(input,count,incoming,reference);
@@ -261,6 +274,7 @@ int main(){
             b=packed({float(x),float(y),float(x+int(random()%256)),float(y+int(random()%128))});
         }
         childCheck(input,1+trial%6,input[6]);
+        if(trial<4096)assert(pixelPartitionCheck(input));
     }
     {
         Split::Box input[6]{};
@@ -280,6 +294,16 @@ int main(){
         input[0].left.bits=0x7fc00000u;childCheck(input,1,input[0]);
     }
     assert(pixelAccepted>30000&&pixelFallback>0);
+    assert(pixelPartitions==4096);
+    {
+        Split::Box input[7];
+        for(auto& box:input)box=packed({0,0,4096,4096});
+        assert(pixelPartitionCheck(input)); // Source's -whole-1 seed rounds here.
+        input[0]=packed({0,0,4097,4096});assert(!pixelPartitionCheck(input));
+        input[0]=packed({0.5f,0,4,4});assert(!pixelPartitionCheck(input));
+        for(auto& box:input)box=packed({0.0f,0.0f,-0.0f,-0.0f});
+        assert(pixelPartitionCheck(input));
+    }
     state=partitionSeed; // Preserve the established partition/mutation corpus.
     for(unsigned trial=0;trial<8192;++trial){
         for(auto& b:boxes){

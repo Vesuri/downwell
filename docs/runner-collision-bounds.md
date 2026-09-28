@@ -473,8 +473,18 @@ representable in binary32, so integer subtraction/multiplication gives the
 same comparison values. Selection still minimizes enlargement, then area,
 then original slot order. Signed zeros compare equal on both paths. Fractional,
 larger or invalid inputs use the retained path; no approximate arithmetic or
-different collision traversal order is introduced. This bound applies only to
-child selection, not the quadratic node-partition algorithm.
+different collision traversal order is introduced.
+
+The same domain also permits exact quadratic partitioning. Pair-union area is
+at least each member's area, so `(union-a)-b` stays within [-whole, whole];
+enlargements and their differences have the same bound. All comparison values
+are therefore exact binary32 integers. The source's initial `-whole-1` score
+can round at the upper boundary, but its unset/equality clause still admits
+the first pair because every pair score is at least `-whole`. The integer path
+admits that first pair explicitly, then preserves the source's strict score,
+group-population and minimum-fill tie rules. Node distribution still follows
+original entry-array order, not assignment order. Fractional or oversized
+partitions retain the binary32 reference implementation.
 
 `RunnerSpatialVerification.h` supplies the `SPATIAL` result in the host/native
 replay comparison. It checks transform writes (including signed zero, alpha and

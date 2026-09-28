@@ -85,6 +85,17 @@ struct RunnerSpatialVerification {
         result.check(RunnerSpatialSplit::choosePixelChild(boxes,count,boxes[6],fast)&&fast==expected);
         result.check(RunnerSpatialSplit::chooseChild(boxes,count,boxes[6],actual)&&actual==expected);
         result.word(actual);
+        if(trial<16){
+            RunnerSpatialSplit::Result reference,partition,pixelPartition;
+            result.check(RunnerSpatialSplit::partitionBinary32(boxes,reference));
+            result.check(RunnerSpatialSplit::partitionPixels(boxes,pixelPartition));
+            result.check(RunnerSpatialSplit::partition(boxes,partition));
+            for(unsigned i=0;i<7;++i){
+                result.check(partition.group[i]==reference.group[i]&&pixelPartition.group[i]==reference.group[i]);
+                result.word(partition.group[i]);
+            }
+            for(unsigned i=0;i<2;++i)result.check(partition.count[i]==reference.count[i]&&pixelPartition.count[i]==reference.count[i]);
+        }
         boxes[0].left.bits=0x3f000000u; // Fractional coordinate must use fallback.
         fast=99;
         result.check(!RunnerSpatialSplit::choosePixelChild(boxes,count,boxes[6],fast)&&fast==99);

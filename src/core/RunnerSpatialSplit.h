@@ -15,6 +15,10 @@ struct RunnerSpatialSplit {
     struct Result { unsigned group[7]={}; unsigned count[2]={}; };
     static bool partition(const Box (&boxes)[7],Result& output){
         DW_PROFILE_SCOPE(profileSpatialPartition);
+        if(partitionPixels(boxes,output))return true;
+        return partitionBinary32(boxes,output);
+    }
+    static bool partitionBinary32(const Box (&boxes)[7],Result& output){
         Real areas[7];Box all=boxes[0];
         for(unsigned i=0;i<7;++i){
             if(!valid(boxes[i]) || !area(boxes[i],areas[i]))return false;
@@ -107,6 +111,46 @@ struct RunnerSpatialSplit {
             }
         }
         chosen=best;return true;
+    }
+    static bool partitionPixels(const Box (&boxes)[7],Result& output){
+        PixelBox values[7],all;unsigned areas[7];
+        for(unsigned i=0;i<7;++i){
+            if(!pixels(boxes[i],values[i]))return false;
+            all=i?pixelUnion(all,values[i]):values[i];
+        }
+        const unsigned width=unsigned(all.right-all.left),height=unsigned(all.bottom-all.top);
+        if(width>65535||height>65535||pixelProduct(width,height)>0x1000000u)return false;
+        for(unsigned i=0;i<7;++i)areas[i]=pixelArea(values[i]);
+        unsigned first=0,second=1;int best=0;bool unset=true;
+        for(unsigned i=0;i<6;++i)for(unsigned j=i+1;j<7;++j){
+            const int waste=int(pixelArea(pixelUnion(values[i],values[j])))-int(areas[i])-int(areas[j]);
+            // The source seed is -wholeArea-1 (rounded); every candidate is
+            // >=-wholeArea. Its unset equality clause always admits this first pair.
+            if(unset||best<waste){first=i;second=j;best=waste;unset=false;}
+        }
+        Result next;for(auto& group:next.group)group=2;
+        PixelBox bounds[2]={values[first],values[second]};
+        unsigned groupArea[2]={areas[first],areas[second]};
+        next.group[first]=0;next.group[second]=1;next.count[0]=next.count[1]=1;
+        unsigned assigned=2;
+        while(assigned<7&&next.count[0]<5&&next.count[1]<5){
+            int largest=-1;unsigned chosen=0,group=0;
+            for(unsigned i=0;i<7;++i)if(next.group[i]==2){
+                const unsigned growth0=pixelArea(pixelUnion(bounds[0],values[i]))-groupArea[0];
+                const unsigned growth1=pixelArea(pixelUnion(bounds[1],values[i]))-groupArea[1];
+                const int difference=int(growth1)-int(growth0);
+                const unsigned preferred=difference<0?1:0;
+                const int magnitude=difference<0?-difference:difference;
+                if(largest<magnitude||(largest==magnitude&&next.count[preferred]<next.count[group])){
+                    largest=magnitude;chosen=i;group=preferred;
+                }
+            }
+            next.group[chosen]=group;++next.count[group];++assigned;
+            bounds[group]=pixelUnion(bounds[group],values[chosen]);groupArea[group]=pixelArea(bounds[group]);
+        }
+        const unsigned remainder=next.count[0]>=5?1:0;
+        for(unsigned i=0;i<7;++i)if(next.group[i]==2){next.group[i]=remainder;++next.count[remainder];}
+        output=next;return true;
     }
 private:
     struct PixelBox {std::int32_t left,top,right,bottom;};
