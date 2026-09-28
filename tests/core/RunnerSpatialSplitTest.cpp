@@ -242,6 +242,45 @@ int main(){
     for(unsigned i=0;i<7;++i)assert(result.group[i]==tied[i]);
     std::uint32_t state=0x217fea93u;
     auto random=[&](){state=state*1664525u+1013904223u;return state;};
+    const auto partitionSeed=state;
+    unsigned pixelAccepted=0,pixelFallback=0;
+    auto childCheck=[&](const Split::Box* input,unsigned count,Split::Box incoming){
+        unsigned reference=999,actual=999,fast=999;
+        const bool expected=Split::chooseBinary32Child(input,count,incoming,reference);
+        assert(Split::chooseChild(input,count,incoming,actual)==expected&&actual==reference);
+        const bool accepted=Split::choosePixelChild(input,count,incoming,fast);
+        if(accepted){++pixelAccepted;assert(expected&&fast==reference);}
+        else{++pixelFallback;assert(fast==999);}
+        return accepted;
+    };
+    for(unsigned trial=0;trial<32768;++trial){
+        Split::Box input[7];
+        const int originX=int(random()%20000000)-10000000,originY=int(random()%20000000)-10000000;
+        for(auto& b:input){
+            const int x=originX+int(random()%256),y=originY+int(random()%16384);
+            b=packed({float(x),float(y),float(x+int(random()%256)),float(y+int(random()%128))});
+        }
+        childCheck(input,1+trial%6,input[6]);
+    }
+    {
+        Split::Box input[6]{};
+        input[0]=packed({0,0,4096,4096});
+        assert(childCheck(input,1,input[0])); // Exactly 2^24 area.
+        input[0]=packed({0,0,4097,4096});
+        assert(!childCheck(input,1,input[0])); // Possible rounded products: fall back.
+        input[0]=packed({0,0,65535,0});assert(childCheck(input,1,input[0]));
+        input[0]=packed({0,0,65536,0});assert(!childCheck(input,1,input[0]));
+        input[0]=packed({0.5f,0,4,4});assert(!childCheck(input,1,input[0]));
+        input[0]=packed({-16777215,-16777215,-16777200,-16777200});assert(childCheck(input,1,input[0]));
+        input[0]=packed({16777216,0,16777216,0});assert(!childCheck(input,1,input[0]));
+        for(auto& b:input)b=packed({-0.0f,-0.0f,0.0f,0.0f});
+        assert(childCheck(input,6,input[0]));
+        unsigned tiedChild=999;assert(Split::choosePixelChild(input,6,input[0],tiedChild)&&tiedChild==0);
+        childCheck(input,0,input[0]);childCheck(input,7,input[0]);
+        input[0].left.bits=0x7fc00000u;childCheck(input,1,input[0]);
+    }
+    assert(pixelAccepted>30000&&pixelFallback>0);
+    state=partitionSeed; // Preserve the established partition/mutation corpus.
     for(unsigned trial=0;trial<8192;++trial){
         for(auto& b:boxes){
             float x=(int(random()%16384)-8192)/8.0f,y=(int(random()%16384)-8192)/8.0f;

@@ -464,6 +464,18 @@ recursive split frames. Child selection, bounds propagation and sibling order
 remain source-ordered. The independent scalar-tree comparison includes a
 2,400-instance terrain grid as well as removal/reinsertion tapes.
 
+Child selection retains its binary32 implementation as the fallback/reference.
+The pixel-bound fast path accepts only exact integer coordinates with magnitude
+below 2^24, non-inverted rectangles, complete-union extents at most 65535, and
+complete-union area at most 2^24. Every candidate area and union area is then
+an integer in [0, 2^24], as is the nonnegative enlargement. All are exactly
+representable in binary32, so integer subtraction/multiplication gives the
+same comparison values. Selection still minimizes enlargement, then area,
+then original slot order. Signed zeros compare equal on both paths. Fractional,
+larger or invalid inputs use the retained path; no approximate arithmetic or
+different collision traversal order is introduced. This bound applies only to
+child selection, not the quadratic node-partition algorithm.
+
 `RunnerSpatialVerification.h` supplies the `SPATIAL` result in the host/native
 replay comparison. It checks transform writes (including signed zero, alpha and
 tint dependencies), all 256 low object-flag combinations in both preparation

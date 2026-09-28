@@ -67,6 +67,28 @@ struct RunnerSpatialVerification {
         result.check(owner.retire(h)&&!owner.resolve(h)&&!owner.pendingSpatial()&&!owner.pendingCollision());
         result.check(owner.attach({0,2},1,{})&&!owner.resolve(h));
     }
+    // Exact pixel-path decisions are compared with the retained binary32
+    // calculation on BOTH CPUs, independently of the final replay digest.
+    std::uint32_t seed=0x19537u;
+    for(unsigned trial=0;trial<64;++trial){
+        RunnerSpatialSplit::Box boxes[7];
+        for(auto& box:boxes){
+            seed=seed*1664525u+1013904223u;
+            const int x=int((seed>>8)&2047u)-1024,y=int((seed>>19)&4095u);
+            result.check(box.left.assign(MotionBinary64::fromInteger(x))&&
+                box.top.assign(MotionBinary64::fromInteger(y))&&
+                box.right.assign(MotionBinary64::fromInteger(x+int(seed&127u)))&&
+                box.bottom.assign(MotionBinary64::fromInteger(y+int((seed>>7)&31u))));
+        }
+        const unsigned count=1+trial%6;unsigned expected=99,fast=99,actual=99;
+        result.check(RunnerSpatialSplit::chooseBinary32Child(boxes,count,boxes[6],expected));
+        result.check(RunnerSpatialSplit::choosePixelChild(boxes,count,boxes[6],fast)&&fast==expected);
+        result.check(RunnerSpatialSplit::chooseChild(boxes,count,boxes[6],actual)&&actual==expected);
+        result.word(actual);
+        boxes[0].left.bits=0x3f000000u; // Fractional coordinate must use fallback.
+        fast=99;
+        result.check(!RunnerSpatialSplit::choosePixelChild(boxes,count,boxes[6],fast)&&fast==99);
+    }
     return result;
 }
 }

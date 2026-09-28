@@ -66,6 +66,12 @@ struct RunnerSpatialSplit {
     // 0x4fff98: least enlargement, then least area, then earliest slot.
     static bool chooseChild(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
         DW_PROFILE_SCOPE(profileSpatialChoose);
+        if(choosePixelChild(boxes,count,incoming,chosen))return true;
+        return chooseBinary32Child(boxes,count,incoming,chosen);
+    }
+    // Retained reference/fallback. Do not change rounding or tie ordering when
+    // widening the eligibility of the integer path below.
+    static bool chooseBinary32Child(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
         if(!count || count>6 || !valid(incoming))return false;
         unsigned best=0;Real bestGrowth{},bestArea{};
         for(unsigned i=0;i<count;++i){
@@ -78,6 +84,58 @@ struct RunnerSpatialSplit {
         }
         chosen=best;return true;
     }
+    // Eligible pixel rectangles have exact integer extents and a complete
+    // union area <=2^24. Thus each binary32 subtraction/product and growth
+    // subtraction in child selection is exact; ties remain earliest-slot.
+    // A false result means use the reference, not that the query is invalid.
+    static bool choosePixelChild(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
+        if(!count||count>6)return false;
+        PixelBox values[6],in,all;
+        if(!pixels(incoming,in))return false;
+        all=in;
+        for(unsigned i=0;i<count;++i){
+            if(!pixels(boxes[i],values[i]))return false;
+            all=pixelUnion(all,values[i]);
+        }
+        const unsigned width=unsigned(all.right-all.left),height=unsigned(all.bottom-all.top);
+        if(width>65535||height>65535||pixelProduct(width,height)>0x1000000u)return false;
+        unsigned best=0,bestArea=0,bestGrowth=0;
+        for(unsigned i=0;i<count;++i){
+            const unsigned area=pixelArea(values[i]),growth=pixelArea(pixelUnion(values[i],in))-area;
+            if(!i||growth<bestGrowth||(growth==bestGrowth&&area<bestArea)){
+                best=i;bestArea=area;bestGrowth=growth;
+            }
+        }
+        chosen=best;return true;
+    }
+private:
+    struct PixelBox {std::int32_t left,top,right,bottom;};
+    static bool pixel(Real value,std::int32_t& out){
+        const unsigned bits=value.bits,magnitude=bits&0x7fffffffu;
+        if(!magnitude){out=0;return true;}
+        const unsigned exponent=(bits>>23)&255u;
+        if(exponent<127||exponent>150)return false;
+        const unsigned shift=150-exponent,mantissa=(bits&0x7fffffu)|0x800000u;
+        if(mantissa&((1u<<shift)-1))return false;
+        const auto integer=std::int32_t(mantissa>>shift);
+        out=bits&0x80000000u?-integer:integer;return true;
+    }
+    static bool pixels(Box value,PixelBox& out){
+        return pixel(value.left,out.left)&&pixel(value.top,out.top)&&
+            pixel(value.right,out.right)&&pixel(value.bottom,out.bottom)&&
+            out.left<=out.right&&out.top<=out.bottom;
+    }
+    static PixelBox pixelUnion(PixelBox a,PixelBox b){
+        return {a.left<b.left?a.left:b.left,a.top<b.top?a.top:b.top,
+            a.right>b.right?a.right:b.right,a.bottom>b.bottom?a.bottom:b.bottom};
+    }
+    static unsigned pixelProduct(unsigned width,unsigned height){
+        return std::uint32_t(std::uint16_t(width))*std::uint32_t(std::uint16_t(height));
+    }
+    static unsigned pixelArea(PixelBox box){
+        return pixelProduct(unsigned(box.right-box.left),unsigned(box.bottom-box.top));
+    }
+public:
     // Closed bounds: touching edges survive broad-phase pruning.
     static bool overlaps(Box a,Box b){return !less(a.right,b.left)&&!less(b.right,a.left)&&
         !less(a.bottom,b.top)&&!less(b.bottom,a.top);}
