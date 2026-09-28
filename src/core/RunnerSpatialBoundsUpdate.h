@@ -2,6 +2,7 @@
 #define DOWNWELL_CORE_RUNNER_SPATIAL_BOUNDS_UPDATE_H
 #include "RunnerSpatialDirtyQueue.h"
 #include "RunnerSpatialSplit.h"
+#include "ProfileCounters.h"
 namespace downwell {
 // 0x5020a0: direct publication after bounds recalculation. Sprite/mask lookup
 // and the caller's update-enable argument determine whether this is invoked.
@@ -32,6 +33,16 @@ struct RunnerSpatialBoundsUpdate {
         std::uint32_t objectFlags,std::uint32_t& instanceFlags,bool allPrepared,Box oldBox,Box newBox){
         if(!RunnerSpatialDirtyQueue<1>::shouldPublishBounds(objectFlags,instanceFlags,allPrepared))return true;
         if(!normalize(oldBox) || !normalize(newBox))return false;
+#ifdef DOWNWELL_PROBES
+        // Count actual admitted publications, not geometry refreshes or queue
+        // marks. Equal bounds are diagnostic only: source removal/insertion
+        // order remains observable and is never skipped by this counter.
+        if(!(instanceFlags&0x8000u))DW_PROFILE_COUNT(counterSpatialFirstPublication);
+        else if(Math::equal(oldBox.left,newBox.left)&&Math::equal(oldBox.top,newBox.top)&&
+            Math::equal(oldBox.right,newBox.right)&&Math::equal(oldBox.bottom,newBox.bottom))
+            DW_PROFILE_COUNT(counterSpatialEqualRepublication);
+        else DW_PROFILE_COUNT(counterSpatialChangedRepublication);
+#endif
         if(instanceFlags&0x8000u){
             bool removed=false;
             if(!index.remove(oldBox,id,true,removed))return false;

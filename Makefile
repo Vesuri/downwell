@@ -2370,4 +2370,12 @@ verify-wall-background:
 	$(CXX) -Isrc $(CXXFLAGS) -o build/wall-background-test tests/core/WallBackgroundTilesTest.cpp
 	./build/wall-background-test
 
+.PHONY: verify-spatial-publication-counters
+test: verify-spatial-publication-counters
+verify-spatial-publication-counters: build/spatial-publication-counters-test
+	./build/spatial-publication-counters-test
+build/spatial-publication-counters-test: tests/core/SpatialPublicationCountersTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
+
 -include $(DEPS)

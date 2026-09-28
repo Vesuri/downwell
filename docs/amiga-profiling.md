@@ -95,6 +95,17 @@ and child selection. Nested costs are exclusive: partition/selection are
 excluded from insertion/removal, and all are excluded from phase 88 where
 nested. These probes compile away in ordinary and FPS-only builds.
 
+`Spatial publications` counts admitted bounds publications after normalization:
+`first` has no existing index-membership flag; `reinsert_equal` and
+`reinsert_changed` distinguish already-indexed instances by normalized bounds.
+The counts describe attempts (an index failure can still follow), not every
+geometry refresh or dirty-queue mark. They exclude direct index operations
+outside the bounds-publication adapter and activity before the profile resets
+its counters. Equal bounds still execute source removal/reinsertion; equality
+does not prove that skipping publication would preserve traversal order.
+Use these counts to distinguish new population from repeated live updates
+before choosing a scheduling or caching change.
+
 Phase 91 brackets only enemy, bullet, script-effect and debris animation calls
 inside the native room walk, after lifetime validation and previous-position
 capture. It is excluded from 89. Entries with no animation dispatch have no

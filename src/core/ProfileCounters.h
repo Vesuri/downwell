@@ -10,6 +10,8 @@ enum DownwellProfileCounter {
     counterAnimationFullPass, counterAnimationProjectedPass, counterAnimationProjectionBuild,
     counterTerrainSnapshots, counterActorSnapshots,
     counterSnapshotEqualMoves, counterSnapshotChangedMoves,
+    counterSpatialFirstPublication, counterSpatialEqualRepublication,
+    counterSpatialChangedRepublication,
     profileCounterCount
 };
 #ifdef DOWNWELL_PROBES
