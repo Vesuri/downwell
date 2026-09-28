@@ -130,12 +130,18 @@ private:
                 if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
             }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
-            if(!parent.check(parent.owner_.attach(h,object(r),state)))return false;
+            {
+                DW_PROFILE_SCOPE(profileBirthRegistration);
+                if(!parent.check(parent.owner_.attach(h,object(r),state)))return false;
+            }
             auto& p=parent.properties_[h.slot];p={};
-            if(!parent.check(parent.owner_.bindObjectFromPacks(h,object(r),true,p,
-                parent.objects_,parent.sprites_,parent.families_,false)))return false;
-            PackedObject definition;
-            if(!parent.objects_.findObject(object(r),definition)||!real(definition.creationDepth,p.depth))return parent.check(false);
+            {
+                DW_PROFILE_SCOPE(profileBirthMetadata);
+                if(!parent.check(parent.owner_.bindObjectFromPacks(h,object(r),true,p,
+                    parent.objects_,parent.sprites_,parent.families_,false)))return false;
+                PackedObject definition;
+                if(!parent.objects_.findObject(object(r),definition)||!real(definition.creationDepth,p.depth))return parent.check(false);
+            }
             if constexpr(Kind==View::Kind::debris){
                 // instance_create uses the compatibility depth table, not the
                 // GMS2 OBJT default; Create also selects area-specific art.
@@ -145,7 +151,10 @@ private:
             if constexpr(Kind==View::Kind::entryDither){
                 if(!real(-200000,p.depth))return parent.check(false);
             }
-            if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
+            {
+                DW_PROFILE_SCOPE(profileBirthRoomOrder);
+                if(!parent.check(parent.room_.bind(h.slot,p.depth)))return false;
+            }
             parent.roomKeys_[h.slot]=h;
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)parent.activationPending_=true;
             if constexpr(Kind==View::Kind::enemy){

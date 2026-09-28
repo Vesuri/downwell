@@ -153,6 +153,11 @@ Phase 96 isolates pending destroyed-instance sweeps at Draw entry from phase 4
 excludes nested spatial removals; frames without a pending sweep do not enter
 this bracket. This distinguishes room cleanup from pixel drawing costs.
 
+Birth phases 97–99 separate lifetime registration, resource binding/defaults,
+and sorted room-list insertion from phase 82. Spatial bounds publication and
+layer attachment retain their existing separate brackets. These probes do not
+defer or reorder synchronous Create work, and compile away in ordinary builds.
+
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases
 for comparisons. The wrapper resets this option when restoring the build.
