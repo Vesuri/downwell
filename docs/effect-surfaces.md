@@ -139,6 +139,7 @@ its serialized layer at -300000. Lower depths draw in front:
 | bulletStandard / bulletEnmBone | 0 |
 | objPlayer_n | -50000 |
 | fxFlashBall | -200000 |
+| objEnterDither (surface producer) | -200000 |
 | objControlerN (surface publication) | -300000 |
 
 Flash balls have no parent or Draw override and their Create does not change
@@ -147,6 +148,15 @@ actors, but behind the controller's surface publication. Both port draw lists
 place flashes at that boundary. This does not establish equal-depth instance
 ordering or fix every existing actor family ordering. Smoke's death/low-spec
 direct fallback has a different boundary from controller-composited smoke.
+
+Entry dither contributes to surfaceFx at -200000, after ordinary debris (-1000)
+and before the controller (-300000). Its shared depth with flash balls does not
+make them interchangeable: flash draws directly, whereas the dither's pixels
+are presented by the later controller. `visitEntryDitherDraw` uses the stored
+world's source-layer traversal and carries the resolved depth and published
+record to the renderer. The live room-entry test verifies this lifetime remains
+drawable with an offscreen origin and disappears on its destruction mark.
+Native mixed-family Draw ownership and final pixel composition remain open.
 
 `make verify-effect-depths` checks the 342 table entries from VM assembly,
 pins the reviewed compatibility functions and flash Create, and checks the

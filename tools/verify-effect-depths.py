@@ -43,7 +43,8 @@ expected = {"objControlerN": -300000, "fxFlashBall": -200000,
             "objPlayer_n": -50000, "bulletStandard": 0,
             "bulletEnmBone": 0, "fxSmoke": 1000, "objCurrency": 10000,
             "enmSkeleton": 14000, "breakablesDebris": -1000, "objDeadBody": 1000,
-            "fxJobutsu": -1000, "objDmgCalcFxPlayer": -1000}
+            "fxJobutsu": -1000, "objDmgCalcFxPlayer": -1000,
+            "objEnterDither": -200000}
 assert all(by_name[name] == depth for name, depth in expected.items())
 objects = {obj["name"]: obj for obj in manifest["resources"]["objects"]}
 flash = objects["fxFlashBall"]
@@ -55,4 +56,6 @@ layer = next(layer for layer in room["layers"] if controller["instanceId"] in la
 assert layer["depth"] == by_name["objControlerN"]
 assert objects["objControlerN"]["Persistent"]
 assert by_name["objControlerN"] < by_name["fxFlashBall"] < by_name["objPlayer_n"]
+assert by_name["objControlerN"] < by_name["objEnterDither"] < by_name["breakablesDebris"]
+assert objects["objEnterDither"]["id"] == 73 and objects["objEnterDither"]["spriteId"] == 129
 print("Source effect depths: controller -300000, flash -200000, player -50000; 342 VM mappings checked")

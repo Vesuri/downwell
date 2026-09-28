@@ -941,6 +941,15 @@ int main(){
                         "global alarm phase decrements entry lifetime exactly once");
                 require(r->preciseY==float((tick<120?tick:119)*16),
                         "alarm destruction excludes same-tick entry Step");
+                unsigned drawn=0;
+                require(world->visitEntryDitherDraw([&](InstanceHandle h,const InstanceRecord& record,int depth){
+                    ++drawn;
+                    require(h.slot==key.slot&&h.generation==key.generation&&record.instanceId==id&&
+                        depth==-200000&&record.spriteId==129&&record.preciseY==r->preciseY,
+                        "entry Draw resolves original layer depth and published lifetime state");
+                    return true;
+                })&&drawn==(tick==120?0u:1u),
+                    "entry Draw keeps offscreen origins until alarm destruction, without scrInView clipping");
             }
             require(reads==120,"one Create and 119 ordinary-Step camera reads");
             require(world->cleanupEntryDither(entry,[](auto,const auto&){return false;})&&!world->instance(id),

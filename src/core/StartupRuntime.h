@@ -515,6 +515,15 @@ public:
             const auto* effect=debrisForDraw(key,record);return effect&&visit(*effect);
         });
     }
+    // drawOnSurface does not use scrInView: the sprite can overlap the view
+    // even with its origin outside it. Preserve the source layer traversal,
+    // including depth-setter overrides; the renderer resolves transforms.
+    template<class Visit> bool visitEntryDitherDraw(Visit visit)const{
+        return visitDrawAtDepthChecked([&](InstanceHandle key,const InstanceRecord& record,int depth){
+            if(record.objectId!=73||!record.active||record.destroyRequested)return true;
+            return visit(key,record,depth);
+        });
+    }
     // Read the source player's pTimeStop at the particle's Step boundary;
     // neither goalStopped nor a shop control lock is a substitute.
     template<unsigned Registered>
