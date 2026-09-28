@@ -17,6 +17,44 @@ std::vector<unsigned> ids(const Layers& layers,const Registry& registry,unsigned
     }),"bounded elements");return result;
 }
 void permutations(){
+    // Compare the bounded lookups with a full-capacity oracle through sparse
+    // mixed membership, retirement, slot reuse and complete room reset.
+    {
+        using R=RunnerLayerInstances<1,96>;
+        R r;R::Layers l;unsigned layer=1;
+        auto check=[&](){
+            for(unsigned id=0;id<130;++id){
+                unsigned expected=R::End;
+                for(unsigned e=0;e<R::End;++e){const auto* p=r.get(e);
+                    if(id&&p&&p->sourceId==id){expected=e;break;}}
+                require(r.find(id)==expected,"bounded source lookup equals full scan");
+            }
+            for(unsigned slot=0;slot<8;++slot)for(unsigned generation=0;generation<20;++generation){
+                const InstanceHandle h{slot,generation};unsigned expected=R::End;
+                for(unsigned e=0;e<R::End;++e){const auto* p=r.get(e);
+                    if(generation&&p&&p->instance.slot==slot&&p->instance.generation==generation){expected=e;break;}}
+                require(r.find(h)==expected,"bounded lifetime lookup equals full scan");
+            }
+        };
+        for(unsigned room=0;room<2;++room){
+            require(l.insertAfterEquals(1,0,false,layer),"sparse layer");
+            for(unsigned e=0;e<80;++e)
+                require(l.attach(layer,e,false,false,[](unsigned){return false;}),"non-instance prefix");
+            require(r.reserve(l,layer,100)&&r.find(100u)==80,"reserve after mixed prefix");
+            for(unsigned generation=1;generation<20;++generation){
+                RunnerDepthService::Instance state;
+                const unsigned id=generation==1?100:0;
+                const InstanceHandle h{generation%8,generation};
+                require(r.attach(l,layer,id,h,state,false),"sparse attach");check();
+                require(!r.discardUninitialized(),"live binding prevents reset");check();
+                require(r.retire(l,id,h),"sparse retire");check();
+                if(generation==1){
+                    for(unsigned e=0;e<80;++e)require(l.detach(e),"release mixed prefix");
+                }
+            }
+            require(r.discardUninitialized()&&l.discardUninitialized(),"reset sparse room");check();
+        }
+    }
     unsigned order[]={0,1,2,3};unsigned count=0;
     do {
         Registry registry;Layers layers;unsigned layer=2;

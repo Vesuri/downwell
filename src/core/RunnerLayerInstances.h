@@ -15,17 +15,18 @@ public:
     bool discardUninitialized(){
         for(const auto& entry:entries_)if(entry.instance.generation)return false;
         for(auto& entry:entries_)entry=Entry{};
+        usedEnd_=0;
         return true;
     }
     const Entry* get(unsigned element)const{return element<ElementCapacity&&entries_[element].present?&entries_[element]:nullptr;}
     unsigned find(std::uint32_t sourceId)const{
         if(!sourceId)return End; // Unnumbered native lifetimes have no ID lookup.
-        for(unsigned i=0;i<ElementCapacity;++i)if(entries_[i].present&&entries_[i].sourceId==sourceId)return i;
+        for(unsigned i=0;i<usedEnd_;++i)if(entries_[i].present&&entries_[i].sourceId==sourceId)return i;
         return End;
     }
     unsigned find(InstanceHandle h)const{
         if(!h.generation)return End;
-        for(unsigned i=0;i<ElementCapacity;++i)if(entries_[i].present&&
+        for(unsigned i=0;i<usedEnd_;++i)if(entries_[i].present&&
             entries_[i].instance.slot==h.slot&&entries_[i].instance.generation==h.generation)return i;
         return End;
     }
@@ -36,7 +37,9 @@ public:
         if(!sourceId||find(sourceId)!=End)return false;
         const unsigned element=free(layers);
         if(element==End||!layers.attach(layer,element,true,false,[](unsigned){return false;}))return false;
-        entries_[element]={sourceId,{},true};return true;
+        entries_[element]={sourceId,{},true};
+        if(element>=usedEnd_)usedEnd_=element+1;
+        return true;
     }
     bool attach(Layers& layers,unsigned layer,std::uint32_t sourceId,InstanceHandle h,
         RunnerDepthService::Instance& state,bool inactive){
@@ -49,6 +52,7 @@ public:
         RunnerImageValue depth;
         if(!depth.assign(MotionBinary64::fromInteger(destination->depth)))return false;
         entries_[element]={sourceId,h,true};
+        if(element>=usedEnd_)usedEnd_=element+1;
         state.attached=true;state.layerId=destination->id;state.depth=depth;
         if(!reused)return layers.attach(layer,element,true,state.append,[](unsigned){return false;});
         return !inactive||layers.reconcileInstanceActivation(element,true);
@@ -184,6 +188,9 @@ private:
         return End;
     }
     Entry entries_[ElementCapacity?ElementCapacity:1]{};
+    // Search bound only: slots below it may be holes or non-instance elements.
+    // Allocation and painter order remain governed by the original scans/lists.
+    unsigned usedEnd_=0;
 };
 }
 #endif
