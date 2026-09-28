@@ -124,13 +124,18 @@ banks; these combinations fail rather than overwrite active DMA storage.
 `EntryDither` Create/Step/Alarm implementation as the stored adapter. Its two
 fixed slots retain original numeric IDs separately from monotonic generations.
 Each coordinate setter publishes to the resource-backed owner before the next
-source read. The mixed-family alarm traversal includes these records; explicit
-ordinary-Step dispatch uses the room's captured lifetime order. Inactive and
+source read. The mixed-family alarm traversal includes these records. The normal
+gameplay tick captures active entry lifetimes after alarms, updates them after
+camMain (64) and before builder Step, and rechecks each lifetime before dispatch.
+Reused slots retain registration order through monotonic generations. Camera X
+is narrowed from the existing Q12 adapter to binary32 before the effect reads
+it; rounded display-window coordinates are not used. This does not establish
+original camera arithmetic or alternate-camera object selection. Inactive and
 destroyed records do not advance. Alarm expiry marks destruction, with actual
 retirement at Draw cleanup; retry and next-level teardown clear the owner too.
 The layer visitor retains the original -200000 depth and does not origin-cull
-the effect. This is not automatic production creation/Step scheduling: callers
-still must provide source-ordered numeric allocation and camera reads. The BOB
+the effect. Automatic production creation still requires source-ordered numeric
+allocation and the initial camera read. The BOB
 draw list extracts a separate cover command rather than producing a BOB.
 `EntryDitherPlacement` shares centered/integral placement validation between
 SDL and Amiga. Multiple covers, unsupported positions and non-default depth

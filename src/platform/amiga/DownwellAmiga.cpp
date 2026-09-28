@@ -1281,13 +1281,18 @@ __attribute__((noinline)) static int runDownwell(void) {
             const auto* view=port.roomEntryView();if(!view)return false;v=view->y.promoted();return true;
         },key))return 20;
         for(unsigned frame=1;frame<=120;++frame){
-            if(!entries.advanceAlarm(key,0)||!entries.step(key,camera))return 20;
+            port.step(0);
+            if(!port.effectsSucceeded()||!collisionOwner.valid())return 20;
             const auto* r=entries.find(key);std::int32_t y;
             if(!r||!r->y.promoted().roundPixel(y)||y!=16*int(frame<120?frame:119)||
                r->effect.alarm0!=120-int(frame)||r->destroyRequested!=(frame==120))return 20;
             ++gDownwellEntryLifetimeChecks;
         }
         if(!collisionOwner.prepareDraw()||entries.size()||entries.find(key))return 20;
+        // Restore the ordinary initial gameplay state before the independent
+        // presentation sweep. The fixture above uses the real room scheduler.
+        if(port.restartFromResults(downwell::DeathMenuSequence::Action::Retry,2,initialRingOrigin)!=
+            downwell::ResultsDestination::gameplay)return 20;
     }
 #endif
     checkSceneStack(3);

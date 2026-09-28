@@ -1619,6 +1619,31 @@ int main(){
         assert(entries.create(400003,camera,[](auto& v){v={};return true;},key));
         assert(key.generation>previous.generation&&entries.clear()&&owner->valid());
     }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,true,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain(),&rooms);
+        assert(owner->attach(*world));auto& entries=owner->entryDithers();InstanceHandle key,shared;
+        // Birth allocation is still explicit; all subsequent scheduling is the
+        // ordinary gameplay path, with no manual alarm or Step dispatch.
+        assert(entries.create(410001,[](auto& x){x=MotionBinary64::fromInteger(240);return true;},
+            [&](auto& y){y=world->roomEntryView()->y.promoted();return true;},key));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::entryDither,key,shared));
+        assert(entries.activate(key,false)&&owner->reconcileActivation());
+        world->step(0);
+        assert(world->effectsSucceeded()&&entries.find(key)->effect.alarm0==120&&entries.find(key)->y.bits==0);
+        assert(entries.activate(key,true)&&owner->reconcileActivation());
+        for(unsigned tick=1;tick<=120;++tick){
+            world->step(0);assert(world->effectsSucceeded()&&owner->valid());
+            const auto* r=entries.find(key);assert(r);
+            std::int32_t y;assert(r->y.promoted().roundPixel(y));
+            assert(y==16*int(tick<120?tick:119)&&r->effect.alarm0==120-int(tick)&&
+                r->destroyRequested==(tick==120)&&r->x.bits==0x43700000u);
+            assert(owner->state(shared)->x.bits==r->x.bits&&owner->state(shared)->y.bits==r->y.bits);
+        }
+        assert(owner->prepareDraw()&&!entries.find(key)&&!owner->state(shared));
+    }
     for(unsigned failure=0;failure<3;++failure){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);

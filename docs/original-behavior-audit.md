@@ -107,15 +107,18 @@ Unindexed reference worlds opt into local-store publication, retaining identical
 IDs and lifetimes; a configured collision owner must still accept every write.
 Resource-backed tests cover automatic expiry and Retry before expiry in addition
 to the scoped traversal above. Host rendering consumes those registered records.
-Automatic native births/Step and full companion creation ordering remain open;
-the native registered lifetime and immutable presentation fixtures do not close
-those integration requirements.
+The native gameplay tick dispatches registered entry Step after camera Step;
+automatic native births and full companion creation ordering remain open. The
+explicit-ID native lifetime and immutable presentation fixtures do not close
+those creation requirements.
 
 The offline game-pack generator also exports `amiga-game.entry-mask` and its
 input/tool-hashed provenance. Its 48-byte rows contain transparent padding,
 the original sprite-129 opacity edge, then solid padding, at logical x=110.
-It occupies 31,104 bytes, the same size as the exit cover, but is not yet
-loaded/resident in the Amiga backend. `AmigaEntryMask::offset` selects a full
+It occupies 31,104 bytes, the same size as the exit cover. The native backend
+loads it into the retired-garden overlay bank with tracked copper-slot residency;
+see [effect surfaces](effect-surfaces.md) for the retirement fence and overlap
+restrictions. `AmigaEntryMask::offset` selects a full
 284-row window without shifting or modifying the bytes. The compact solid tail
 requires screen y >= -116 (the original sprite's bottom then lies outside the
 display); unsupported positions fail without changing the output pointer
@@ -123,7 +126,7 @@ offset. Rendering a lower bottom requires a different representation, not
 clamping to solid. The independent texture test checks every row, including
 HUD margins, for 917 integer screen positions. It uses the existing binary
 opacity threshold, not an assertion that source alpha=1 holes are bit-identical
-to zero-alpha GPU blending. Live mask ownership, fractional raster policy and
+to zero-alpha GPU blending. Automatic birth timing, fractional raster policy and
 original-runner presentation verification remain open.
 
 ## Horizontal control arithmetic

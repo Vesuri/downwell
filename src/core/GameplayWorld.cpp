@@ -1040,6 +1040,21 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     if(!reconcilePhase(PhaseBoundary::alarm))return {};
     const auto smokeStepPhase=run_.smokeEffects.beginPhase();
     const auto damageNumberStepPhase=run_.damageNumbers.beginPhase();
+    // Capture before ordinary Step: later births must not inherit a turn.
+    // This family's monotonic generation is its registration order, not its
+    // numeric VM ID. Reused storage slots must not reorder two live covers.
+    downwell::InstanceHandle entryStep[downwell::GameplayEntryDithers::capacity]{};
+    unsigned entryStepCount=0;
+    if(entryDithers_){
+        if(!entryDithers_->valid()){run_.effectsSucceeded=false;return {};}
+        for(unsigned i=0;i<downwell::GameplayEntryDithers::capacity;++i){
+            const auto key=entryDithers_->handle(i);const auto* r=entryDithers_->find(key);
+            if(r&&r->active&&!r->destroyRequested)entryStep[entryStepCount++]=key;
+        }
+        if(entryStepCount==2&&entryStep[0].generation>entryStep[1].generation){
+            const auto first=entryStep[0];entryStep[0]=entryStep[1];entryStep[1]=first;
+        }
+    }
     DW_PROFILE_PHASE(profilePlayer);
     int scrollDelta = 0;
     int cameraXDelta = 0;
@@ -1066,6 +1081,21 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         ringOrigin_ = (unsigned)origin;
     }
 
+    // camMain (64) precedes objEnterDither (73), which precedes the builder.
+    // Publish the existing Q12 camera adapter as binary32 before the VM read;
+    // do not substitute its rounded display-window X. Full source camera
+    // arithmetic and source-ordered native controller births remain separate.
+    for(unsigned i=0;i<entryStepCount;++i){
+        const auto key=entryStep[i];
+        if(!entryDithers_->find(key))continue;
+        if(!entryDithers_->step(key,[&](downwell::MotionBinary64& x){
+            auto precise=downwell::MotionBinary64::fromInteger(cameraMotion_.x);
+            if(!precise.zero())precise.high-=12u<<20;
+            downwell::RunnerImageValue published;
+            if(!published.assign(precise))return false;
+            x=published.promoted();return true;
+        })){run_.effectsSucceeded=false;return {};}
+    }
     if(!captureEnemyStepOrder())return {};
     if(debrisStepDispatch_){
         debrisStepOrder_.clear();debrisStepPhase_=ownedDebrisEffects_.beginPhase();
