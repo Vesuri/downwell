@@ -90,6 +90,7 @@ void StartupRuntime::reset(PlatformProfile profile) {
     implementedCodeCalls_ = 0;
     unimplementedCodeCalls_ = 0;
     cameraViewWidth_ = 0;
+    roomEntryViews_.clear();
     cameraViewHeight_ = 0;
     backgroundMusicId_ = -1;
     controlsLocked_ = false;
@@ -2338,7 +2339,8 @@ void StartupRuntime::loadRoom(int roomId, bool firstGameRoom) {
             instances_, *roomPack_, roomId, firstGameRoom,
             instanceHandler, roomCreationHandler,
             deferredHandler,objectPack_,lifecycle_,[this](auto& survivors,int room){
-                return roomLayers_.prepare(*roomPack_,room,survivors);
+                return roomEntryViews_.load(*roomPack_,room)&&
+                    roomLayers_.prepare(*roomPack_,room,survivors);
             }) == PackedRoomLoadResult::success;
     } else {
         // Bounded fallback's rmInit instances, in recovered creation order.

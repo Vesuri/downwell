@@ -26,6 +26,7 @@
 #include "StoredScriptSpawnRegistration.h"
 #include "StoredDebrisRegistration.h"
 #include "StoredRoomLayers.h"
+#include "RoomEntryViews.h"
 #include "EventScheduler.h"
 #include "ScriptSpawnOperations.h"
 #include "EffectSpawnScript.h"
@@ -96,6 +97,10 @@ public:
                             InstanceLifecycleBinding lifecycle = {});
 
     void reset(PlatformProfile profile);
+    // Resource cache visible to room-entry events, not a current-frame follow query.
+    const RoomEntryViews::View* roomEntryView(unsigned slot=0)const{
+        return roomEntryViews_.get(slot);
+    }
     // Call at a room-transition boundary, after consuming the results action.
     // Seed is explicit so randomize can be recorded/replayed by the platform.
     bool restartFromResults(DeathMenuSequence::Action action, std::uint32_t seed);
@@ -991,6 +996,7 @@ private:
     std::uint32_t implementedCodeCalls_ = 0;
     std::uint32_t unimplementedCodeCalls_ = 0;
     int cameraViewWidth_ = 0;
+    RoomEntryViews roomEntryViews_;
     int cameraViewHeight_ = 0;
     int backgroundMusicId_ = -1;
     bool controlsLocked_ = false;

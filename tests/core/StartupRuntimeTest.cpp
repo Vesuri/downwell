@@ -103,6 +103,8 @@ public:
 };
 
 struct LifecycleAudit {
+    const downwell::StartupRuntime* observedRuntime=nullptr;
+    unsigned initialViewsSeen=0;
     bool markDestroyed(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
         require(matches(h,r)&&!r.destroyRequested,"destroy marks a still-live lifetime");return true;
     }
@@ -180,6 +182,13 @@ struct LifecycleAudit {
         return h.slot<entries.size()&&entries[h.slot].live&&entries[h.slot].generation==h.generation&&entries[h.slot].id==r.instanceId;
     }
     bool birth(downwell::InstanceHandle h,const downwell::InstanceRecord& r){
+        if(observedRuntime&&r.roomId==11&&r.objectId==35){
+            const auto* view=observedRuntime->roomEntryView();
+            require(view&&view->enabled&&view->x.bits==0&&view->y.bits==0&&
+                    view->width.bits==0x43200000u&&view->height.bits==0x438e0000u,
+                    "rmMain resource camera is ready before player Create and its children");
+            ++initialViewsSeen;
+        }
         ++calls;if(fail==1||(r.objectId==rejectBirthObject&&r.roomId==rejectBirthRoom))return false;
         require(h.slot<entries.size()&&!entries[h.slot].live&&h.generation>entries[h.slot].generation,
                 "live runtime publishes births before reusing generation-checked slots");
@@ -246,7 +255,9 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
     auto indexed=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
         downwell::InstanceLifecycleBinding::bindMaskDestruction(audit));
     auto plain=std::make_unique<Runtime>(downwell::PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+    audit.observedRuntime=indexed.get();
     indexed->skipToGameForTesting();plain->skipToGameForTesting();audit.verify(*indexed);
+    require(audit.initialViewsSeen==1,"live room entry observed source initial camera view");
     for(unsigned tick=0;tick<1800;++tick){
         const auto input=downwell::gameplayContactProfileInput(tick,indexed->mainPlayerX(),indexed->mainPlayerY());
         indexed->step(input,false);plain->step(input,false);

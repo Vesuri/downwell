@@ -1,4 +1,5 @@
 #include "core/RoomPack.h"
+#include "core/RoomEntryViews.h"
 #include "core/PackedRoomLoader.h"
 #include "core/PackedRoomLayerLoader.h"
 #include "core/RunnerLayerBackground.h"
@@ -137,6 +138,20 @@ void testDecode() {
     require(!pack.roomView(1, 0, view) && !pack.roomView(0, 8, view) &&
             view.x==-16 && view.objectId==63,
             "out of range camera reads leave output untouched");
+    downwell::RoomEntryViews entryViews;
+    require(!entryViews.get(0)&&entryViews.load(pack,7)&&entryViews.get(0)&&
+            entryViews.get(0)->x.bits==0xc1800000u&&entryViews.get(0)->y.bits==0x42000000u&&
+            entryViews.get(0)->enabled&&!entryViews.get(7)->enabled&&!entryViews.get(8),
+            "room-entry cache converts serialized coordinates to runner binary32");
+    require(!entryViews.load(pack,999)&&!entryViews.get(0),
+            "failed room entry cannot expose stale camera coordinates");
+    auto fractionalBoundary=bytes;
+    const auto xOffset=downwell::RoomPack::headerSize+40+4;
+    fractionalBoundary[xOffset]=1;fractionalBoundary[xOffset+1]=0;
+    fractionalBoundary[xOffset+2]=0;fractionalBoundary[xOffset+3]=1;
+    downwell::RoomPack roundedPack(fractionalBoundary.data(),fractionalBoundary.size());
+    require(entryViews.load(roundedPack,7)&&entryViews.get(0)->x.bits==0x4b800000u,
+            "integer 16777217 narrows to nearest-even binary32 view coordinate");
 
     downwell::PackedRoom room;
     require(pack.findRoom(7, room), "room is found by resource ID");

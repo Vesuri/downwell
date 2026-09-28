@@ -1599,7 +1599,12 @@ int main(){
         const auto oldPlayer=roomWorld->playerHandle();
         assert(roomWorld->findPlayer(oldPlayer)&&roomWorld->findPlayer(oldPlayer)->sourceInstanceId==0);
         unsigned calls=0,codes=0;
-        assert(roomWorld->loadRoomTerrain(rooms,room,[&](const PackedRoomInstance& r){++calls;codes+=r.creationCodeId!=-1;return true;}));
+        assert(!roomWorld->roomEntryView());
+        assert(roomWorld->loadRoomTerrain(rooms,room,[&](const PackedRoomInstance& r){
+            const auto* view=roomWorld->roomEntryView();
+            assert(view&&view->enabled&&view->x.bits==0&&view->y.bits==0&&
+                view->width.bits==0x43200000u&&view->height.bits==0x438e0000u);
+            ++calls;codes+=r.creationCodeId!=-1;return true;}));
         assert(calls==240&&codes==3&&roomOwner->terrain().size()==240);
         checkCollisionViewMembership(*roomWorld);
         unsigned authoredPlayers=0;

@@ -27,6 +27,7 @@
 #include "core/AreaOneBuilder.h"
 #include "core/EnemyCreateProfile.h"
 #include "core/ObjectPack.h"
+#include "core/RoomEntryViews.h"
 #include "core/PlayerLifeRules.h"
 #include "core/FrogHorizontalMotion.h"
 #include "core/FrogHitState.h"
@@ -445,6 +446,7 @@ public:
         if(!run_.effectsSucceeded)return false;
         if(roomTerrainLoaded_||!rooms.valid()){run_.effectsSucceeded=false;return false;}
         roomTerrainLoaded_=true; // A partial load cannot be retried.
+        if(!roomEntryViews_.load(rooms,room.roomId)){run_.effectsSucceeded=false;return false;}
         for(unsigned i=0;i<room.instanceCount;++i){
             downwell::PackedRoomInstance instance;
             if(!rooms.roomInstance(room,i,instance)){run_.effectsSucceeded=false;return false;}
@@ -468,6 +470,9 @@ public:
             }
         }
         return true;
+    }
+    const downwell::RoomEntryViews::View* roomEntryView(unsigned slot=0)const{
+        return roomEntryViews_.get(slot);
     }
     downwell::InstanceHandle playerHandle() const { return {0,playerInstance_.lifetimeId}; }
     bool playerTimeFieldInstance(downwell::RunnerImageValue x,downwell::RunnerImageValue y,
@@ -893,6 +898,7 @@ private:
     int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
     bool clearRoomTimeChanges();
     bool roomTerrainLoaded_=false;
+    downwell::RoomEntryViews roomEntryViews_;
     PlayerInstance playerInstance_;
     std::uint32_t nextPlayerLifetimeId_=1;
     bool birthPlayerOwnership();
