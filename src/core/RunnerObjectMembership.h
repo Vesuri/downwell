@@ -68,6 +68,12 @@ public:
     void clear() {while(head_!=End)unbind(head_);}
     bool bind(unsigned slot,int object,std::uint32_t identity) {
         if(slot>=Capacity || object<0)return false;
+        if(slot==tail_&&entries_[slot].object==object&&entries_[slot].identity==identity){
+            // Removing and appending this tail changes no links or payload.
+            // Preserve both revision increments, including mutation detection
+            // inside forbidden capture callbacks and projection invalidation.
+            revision_+=2;return true;
+        }
         unbind(slot);
         auto& entry=entries_[slot];
         entry.object=object;entry.identity=identity;entry.previous=tail_;entry.next=End;

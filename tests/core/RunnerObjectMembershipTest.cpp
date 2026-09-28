@@ -83,6 +83,18 @@ int main(){
     rebound.clear();require(registry.visitRegistrationRange(projection,0,2,[&](auto,std::uint32_t id,auto){
         rebound.push_back(id);return true;
     })&&rebound==std::vector<std::uint32_t>({20,10}),"projection follows same-identity rebind order");
+    for(unsigned repeat=0;repeat<32;++repeat){
+        require(registry.bind(0,1,10),"same tail can rebind repeatedly");
+        rebound.clear();
+        require(registry.visitRegistrationRange(projection,0,2,[&](auto,std::uint32_t id,auto){
+            rebound.push_back(id);return true;
+        })&&rebound==std::vector<std::uint32_t>({20,10})&&registry.size()==2,
+            "same tail rebind preserves links, payload, size and projected order");
+    }
+    unsigned tailMutations=0;
+    require(!registry.visitRegistrationRange(projection,0,2,[&](auto,auto,auto){
+        ++tailMutations;registry.bind(0,1,10);return true;
+    })&&tailMutations==1,"same tail rebind still invalidates capture revision");
     unsigned mutations=0;
     require(!registry.visitRegistrationRange(projection,0,2,[&](auto,auto,auto){
         ++mutations;registry.bind(7,1,777);return true;

@@ -178,10 +178,10 @@ public:
     // separately apply the resource/flag/queue effects at 0x46b8b2..0x46b968.
     bool rebindObjectMembership(InstanceHandle h,int object,bool registered){
         if(!valid()||!live(h)||object<0)return false;
-        membership_.unbind(h.slot);
         entries_[h.slot].object=object;
         changedBinding();
         if(registered)membership_.bind(h.slot,object,h.generation);
+        else membership_.unbind(h.slot);
         return true;
     }
     // Collision/flag portion of 0x46b8b2..0x46b968, after membership rebinding
