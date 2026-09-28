@@ -95,6 +95,9 @@ struct GameplayFieldReentryVerification {
         }
         const auto* liveBox=world.findBreakable(box);
         if(!liveBox||liveBox->alarm0!=-1||!liveBox->state.wallHp.zero()||!liveBox->active||liveBox->destroyRequested)return false;
+        if(!world.breakableActiveAt(boxX,boxY)||!world.markBreakableDestroyed(box)||
+            world.breakableActiveAt(boxX,boxY)||!world.findBreakable(box)||
+            !owner.prepareDraw()||world.findBreakable(box))return false;
         if(!world.goalFieldInstances().find(local)||!owner.state(key)||!world.startTimeField()||
             !owner.population(371,population)||population!=1)return false;
         checks|=16;

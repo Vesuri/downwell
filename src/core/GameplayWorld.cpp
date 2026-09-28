@@ -533,7 +533,7 @@ downwell::LaserSightRay GameplayWorld::traceLaserSight(
             const auto path = local(roomPath);
             for (unsigned i = 0; i < breakableCount_; ++i) {
                 const auto& block = breakables_[i];
-                if (block.active && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8))
+                if (block.active && !block.destroyRequested && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8))
                     return true;
             }
             if (segmentResolver_) return segmentResolver_(solidResolverContext_, path);
@@ -673,13 +673,13 @@ bool GameplayWorld::breakableActiveAt(int x, int y) const
     if (breakableIndexReady_) {
         const int index = indexedBreakable(x, y);
         return index >= 0 && breakables_[index].x == x && breakables_[index].y == y &&
-               breakables_[index].active;
+               breakables_[index].active&&!breakables_[index].destroyRequested;
     }
     DW_PROFILE_COUNT(counterBreakableFallback);
     unsigned index;
     for (index = 0; index < breakableCount_; ++index)
         if (breakables_[index].x == x && breakables_[index].y == y)
-            return breakables_[index].active;
+            return breakables_[index].active&&!breakables_[index].destroyRequested;
     return false;
 }
 
@@ -916,7 +916,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         if(!downwell::PlayerBoxContact::prepare(x,y,240,176,bounds))return false;
         for (unsigned i = 0; i < runtime.breakableCount_; ++i) {
             Breakable& box = runtime.breakables_[i];
-            if(!box.active)continue;
+            if(!box.active||box.destroyRequested)continue;
             bool hit=false;
             if(!downwell::PlayerBoxContact::testPrepared(bounds,box.x+240,box.y+176,hit))return false;
             if (hit) {
@@ -1088,7 +1088,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                             const int next = indexedBreakable(xs[column], ys[row]);
                             if (next < 0) continue;
                             const auto& block = breakables_[next];
-                            if (block.active && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8) &&
+                            if (block.active && !block.destroyRequested && path.intersects(block.x-8, block.x+8, block.y-8, block.y+8) &&
                                     (candidate < 0 || next < candidate)) candidate = next;
                         }
                         firstBlock = candidate < 0 ? 0 : (unsigned)candidate;
@@ -1097,7 +1097,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                     for (unsigned blockIndex = firstBlock; blockIndex < endBlock; ++blockIndex) {
                         Breakable& block = breakables_[blockIndex];
                         // Indexed selection already proved this exact hit.
-                        if (block.active && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
+                        if (block.active && !block.destroyRequested && (breakableIndexReady_ || path.intersects(block.x - 8, block.x + 8,
                                                            block.y - 8, block.y + 8))) {
                             if(!inactivateBreakable(blockIndex))return true;
                             if (destroyedBlockCount < destroyedCapacity) {
@@ -1431,7 +1431,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     const bool boxesRetired=downwell::retireMainRoomObjectsChecked(breakableCount_, 11, 1, viewTop,
         [this](unsigned i) {
             const auto& box = breakables_[i];
-            return downwell::LifetimeInstance{92, box.y + 176, box.active};
+            return downwell::LifetimeInstance{92, box.y + 176, box.active&&!box.destroyRequested};
         },
         [this](unsigned i) { return retireBreakable(i); });
     if(!boxesRetired){run_.effectsSucceeded=false;return {};}

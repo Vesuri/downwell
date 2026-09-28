@@ -365,6 +365,24 @@ int main(){
             owner->resolve(selected)->box.hit&&owner->resolve(selected)->active==active&&
             owner->resolve(selected)->destroyRequested==destroyed&&world->randomDrawCount()==draws,
             "health/hit writes retain fractional overkill, membership and RNG");
+        const auto selectedId=owner->resolve(selected)->instanceId;
+        const auto destructionDraws=world->randomDrawCount();
+        require(world->markBoxDestroyed(selected)&&world->markBoxDestroyed(selected)&&
+            owner->resolve(selected)&&owner->resolve(selected)->active&&owner->resolve(selected)->destroyRequested&&
+            world->randomDrawCount()==destructionDraws,"box destruction marks once and retains the current event lifetime");
+        require(world->publishCollisionPosition(selected,insideX,insideY)&&world->publishBoxAlarm0(selected,1)&&
+            owner->stopBoxAlarm0(*world,selected,true,480)&&owner->resolve(selected)->alarms.get(0)==2,
+            "marked box still executes alarmStop but no longer contacts time fields");
+        InstancePlaceResult afterMark;
+        require(owner->nonPreciseLine({},92,insideX.promoted(),insideY.promoted(),insideX.promoted(),insideY.promoted(),false,afterMark)&&
+            afterMark.id==-4,"marked box immediately leaves collision selection");
+        bool retainedAtCollision=false;
+        require(world->stepWithCollisionPass({},false,[&]{
+            const auto* retained=owner->resolve(selected);
+            retainedAtCollision=retained&&retained->destroyRequested;return retainedAtCollision;
+        })&&retainedAtCollision,"marked box storage survives through the collision boundary");
+        require(world->effectsSucceeded()&&!world->instance(selectedId)&&!owner->resolve(selected),
+            "stored frame retires marked box at its pre-Draw cleanup boundary");
         auto wrong=selected;++wrong.generation;hp={0x3ff00000u,0};parent=-123;
         require(!owner->projectileBoxHealth(wrong,hp)&&hp.high==0x3ff00000u&&
             !owner->projectileWallParent(wrong,parent)&&parent==-123&&

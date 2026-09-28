@@ -90,6 +90,18 @@ destroy-marked box inside the room sides can receive a refund despite overlappin
 a field. A retained-lifetime test covers this distinction; do not bypass the
 original collision guard just because the event has not returned yet.
 
+Both box destruction entry points publish the destruction mark before changing
+the retained record flag; repeated requests do not republish it. The object-92
+ancestor chain has no Destroy/Clean Up events. The stored frame's pre-Draw sweep
+owns marked-box retirement, while the native collision owner's `prepareDraw`
+retires its marked box slots. Out-of-view sweeps must not erase those records
+early. Older terrain, landing, head-contact, bullet, smoke-wall and laser query
+paths also exclude marked records, even while their active flag remains true.
+The distinction permits synchronous post-destroy child creation and alarm work
+without allowing later actors to collide with the dying box. This lifecycle
+contract does not replace the remaining natural box Step integration or terrain
+redraw notification for that full destruction path.
+
 Debris lifetime sequences can be carried across owner reconstruction without
 reusing retired handles or admitting new children to old phase cutoffs.
 Restoration requires successful cleanup of all registered children, including

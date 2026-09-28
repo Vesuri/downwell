@@ -478,7 +478,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         run_.collideSmokeWalls([&](const ContactBounds& query,auto emit){
             for(std::size_t i=0;i<instances_.size();++i){
                 const auto& wall=instances_.at(i);
-                if(!wall.active || (wall.objectId!=60 && wall.objectId!=92 && wall.objectId!=293))continue;
+                if(!wall.active || wall.destroyRequested || (wall.objectId!=60 && wall.objectId!=92 && wall.objectId!=293))continue;
                 if((wall.scaleX!=1 && wall.scaleX!=-1) || (wall.scaleY!=1 && wall.scaleY!=-1) || wall.rotation!=0)return false;
                 const auto bounds=contactWorldBounds({long(wall.x)*256,long(wall.y)*256,
                     int(wall.scaleX),int(wall.scaleY),wall.objectId==293?569:585});
@@ -515,9 +515,10 @@ void StartupRuntime::stepInternal(bool advancePressed,
         run_.ammoGauge.step(mainAmmo_, mainPlayerMotion_.ammoCapacity());
         run_.gameplayPresentationStep(random_);
         // This frame adapter finishes at the pre-Draw boundary. Only the
-        // projectile family is owned here; external effect owners retain their
+        // box/projectile families and bound script/debris effects are owned here;
+        // external effect owners retain their
         // separate cleanup dispatch until the full room scheduler is joined.
-        if(!cleanupMainBullets())run_.effectsSucceeded=false;
+        if(!cleanupMainOwnedDestroyed())run_.effectsSucceeded=false;
     }
 }
 
@@ -643,7 +644,7 @@ LaserSightRay StartupRuntime::traceLaserSight(LaserSightRay::Coordinate x,
             if (run_.shops.rayWallIntersects(path)) return true;
             for (std::size_t i = 0; i < instances_.size(); ++i) {
                 const auto& wall = instances_.at(i);
-                if (wall.active && (wall.objectId == 60 || wall.objectId == 92) &&
+                if (wall.active && !wall.destroyRequested && (wall.objectId == 60 || wall.objectId == 92) &&
                     path.intersects(wall.x-8, wall.x+8, wall.y-8, wall.y+8)) return true;
             }
             return false;
@@ -670,7 +671,7 @@ bool StartupRuntime::mainSolidAt(float x, float y) const {
     y = std::floor(y);
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         const InstanceRecord& wall = instances_.at(index);
-        if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
+        if (!wall.active || wall.destroyRequested || (wall.objectId != 60 && wall.objectId != 92))
             continue;
         if (x >= wall.x - 8.0F && x <= wall.x + 7.0F &&
             y >= wall.y - 8.0F && y <= wall.y + 7.0F)
@@ -682,7 +683,7 @@ bool StartupRuntime::mainSolidAt(float x, float y) const {
 InstanceRecord* StartupRuntime::mainBulletCollision(const ProjectileSegment& path) {
     for (std::size_t index = 0; index < instances_.size(); ++index) {
         InstanceRecord& wall = instances_.at(index);
-        if (!wall.active || (wall.objectId != 60 && wall.objectId != 92))
+        if (!wall.active || wall.destroyRequested || (wall.objectId != 60 && wall.objectId != 92))
             continue;
         if (path.intersects(wall.x - 8, wall.x + 8, wall.y - 8, wall.y + 8))
             return &wall;
@@ -867,9 +868,9 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
     return true;
 }
 
-bool StartupRuntime::cleanupMainBullets(){
+bool StartupRuntime::cleanupMainOwnedDestroyed(){
     return run_.effectsSucceeded&&instances_.cleanupDestroyedIf(
-        [this](const InstanceRecord& r){return r.objectId==261||r.objectId==370||(r.objectId==219&&!scriptAnimationDispatch_);},
+        [this](const InstanceRecord& r){return r.objectId==92||r.objectId==261||r.objectId==370||(r.objectId==219&&!scriptAnimationDispatch_);},
         [this](InstanceHandle key,const InstanceRecord& r){
             if(r.objectId==219)return scriptEffectsBinding_.retire(key,&r);
             if(r.objectId==370)return debrisBinding_.retire(key,&r);
@@ -1196,7 +1197,7 @@ void StartupRuntime::updateMainLifecycle(bool endStep, long publishedViewTopQ12)
         publishedViewTopQ12,
         [this, &removed](unsigned i) {
             const auto& instance = instances_.at(i - removed);
-            return LifetimeInstance{instance.objectId, instance.y, instance.active};
+            return LifetimeInstance{instance.objectId, instance.y, instance.active&&!instance.destroyRequested};
         },
         [this, &removed](unsigned i) {
             const auto id = instances_.at(i - removed).instanceId;
@@ -1380,7 +1381,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         int nearest = gameplayNoLanding;
         for (std::size_t i = 0; i < runtime.instances_.size(); ++i) {
             const auto& tile = runtime.instances_.at(i);
-            if (!tile.active || (tile.objectId != 60 && tile.objectId != 92 &&
+            if (!tile.active || tile.destroyRequested || (tile.objectId != 60 && tile.objectId != 92 &&
                                  tile.objectId != 93)) continue;
             const int landing = tile.y - 16 - runtime.mainPlayerOriginY_;
             if (landing >= minimumY && landing < nearest &&
@@ -1396,7 +1397,7 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
         if(!PlayerBoxContact::prepare(x,y,runtime.mainPlayerOriginX_,runtime.mainPlayerOriginY_,bounds))return false;
         for (std::size_t i = 0; i < runtime.instances_.size(); ++i) {
             auto& box = runtime.instances_.at(i);
-            if(!box.active || box.objectId!=92)continue;
+            if(!box.active || box.destroyRequested || box.objectId!=92)continue;
             bool hit=false;
             if(!PlayerBoxContact::testPrepared(bounds,box.x,box.y,hit))return false;
             if (hit) {

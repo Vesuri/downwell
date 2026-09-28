@@ -1981,13 +1981,16 @@ int main(){
         assert(world->publishBoxAlarm0(key,-2));world->step(0);
         assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==-2);
         if(registered){
+            assert(world->breakableActiveAt(x,y));
             assert(world->publishBoxAlarm0(key,1)&&world->markBreakableDestroyed(key));
+            assert(world->markBreakableDestroyed(key)&&world->findBreakable(key)&&!world->breakableActiveAt(x,y));
             // The event continues, but compatibility collision rejects the
             // destroyed self (flag 1), even while it overlaps a live field.
             assert(owner->stopBoxAlarm0(key,true,480,masks)&&world->findBreakable(key)->alarm0==2);
             world->step(0);
             assert(world->effectsSucceeded()&&world->findBreakable(key)->alarm0==2&&
                 world->findBreakable(key)->state.wallHp.high==0x40080000u);
+            assert(owner->prepareDraw()&&!world->findBreakable(key)&&!world->breakableActiveAt(x,y));
         }
         assert(world->restartFromResults(DeathMenuSequence::Action::Retry,2,300)!=ResultsDestination::none);
         assert(world->appendBreakables(&x,&y,1));

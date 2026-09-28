@@ -197,6 +197,13 @@ public:
         if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;
         r->box.hit=true;return true;
     }
+    bool markBoxDestroyed(InstanceHandle h){
+        auto* r=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;
+        if(r->destroyRequested)return true;
+        if(lifecycle_.hasOwner()&&!lifecycle_.markDestroyed(h,*r))return run_.effectsSucceeded=false;
+        r->destroyRequested=true;return true;
+    }
     bool markBulletDestroyed(InstanceHandle h){
         auto* r=instances_.resolve(h);
         if(!run_.effectsSucceeded||!r||r->objectId!=261)return run_.effectsSucceeded=false;
@@ -838,7 +845,7 @@ private:
     void emitMainBullet(int x,int y);
     void updateMainBullets();
     bool publishMainBullet(MainBulletState& bullet,bool angle);
-    bool cleanupMainBullets();
+    bool cleanupMainOwnedDestroyed();
     bool clearMainBullets();
     bool publishMainInactivation(const InstanceRecord& record);
     bool publishMainEnemyImage(std::size_t index,unsigned phase);

@@ -11,6 +11,11 @@ assert manifest["source"]["sha256"] == "c07daf5fbe940ae0a19503b5ba5137a56ee49275
 assert manifest["extractor"]["version"] == "0.9.2.0"
 assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d000472e0"
 box = manifest["resources"]["objects"][92]
+ancestor=92
+while ancestor>=0:
+    definition=manifest["resources"]["objects"][ancestor]
+    assert not any(e["eventType"] in (1,12) for e in definition["events"]), "box inherits a Destroy/Clean Up handler"
+    ancestor=definition["parentId"]
 alarm = next(e for e in box["events"] if e["eventType"] == 2 and e["eventSubtype"] == 0)
 assert alarm["actions"] == [{"codeId": 1086, "codeName": "gml_Object_objBox_n_Alarm_0"}]
 alarm_code = (export / "Assembly/gml_Object_objBox_n_Alarm_0.asm").read_bytes()
