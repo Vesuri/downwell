@@ -358,6 +358,28 @@ public:
     // transition callback runs at the shared player's source Begin Step boundary.
     struct NoTimeTransition {bool operator()(const InstanceRecord&,const PlayerMotion&,int,int)const{return true;}};
     enum class TimeEffectPhase {animation,alarm,step,playerBegin};
+    template<unsigned Capacity,class CameraX,class Collisions=NoCollisionPass>
+    bool stepWithEntryDither(StoredEntryDitherRegistration<instanceCapacity,Capacity>& registration,
+        CameraX cameraX,const Input& input,bool advancePressed=false,Collisions collisions={}){
+        if(!run_.effectsSucceeded)return false;
+        if(entryDitherDispatch_||!registration.belongsTo(instances_))return run_.effectsSucceeded=false;
+        auto dispatch=[&](InstanceRecord& record,bool alarm){
+            const auto key=registration.handle(record);
+            return key.generation&&(alarm?registration.alarm(key):registration.step(key,cameraX));
+        };
+        entryDitherContext_=&dispatch;
+        entryDitherDispatch_=[](void* p,InstanceRecord& r,bool alarm){return (*static_cast<decltype(dispatch)*>(p))(r,alarm);};
+        const bool ok=stepWithCollisionPass(input,advancePressed,collisions);
+        entryDitherDispatch_=nullptr;entryDitherContext_=nullptr;return ok;
+    }
+    template<unsigned Capacity,class Other>
+    bool cleanupEntryDither(StoredEntryDitherRegistration<instanceCapacity,Capacity>& registration,Other other){
+        if(!run_.effectsSucceeded)return false;
+        return run_.effectsSucceeded=registration.belongsTo(instances_)&&instances_.cleanupDestroyed(
+            [&](InstanceHandle key,const InstanceRecord& record){
+                return record.objectId==73?registration.retire(key):other(key,record);
+            });
+    }
     template<unsigned Capacity,unsigned Registered,unsigned Changes,class Transition=NoTimeTransition,class Collisions=NoCollisionPass> bool stepWithTimeStopEffects(
         StoredTimeShardRegistration<instanceCapacity,Registered>& shards,
         StoredTimeChangeRegistration<instanceCapacity,Changes>& changes,TimeStopEffects<Capacity>& state,
@@ -947,6 +969,8 @@ private:
     void* scriptAnimationContext_=nullptr;
     bool (*scriptAnimationDispatch_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
     void* timeEffectContext_=nullptr;
+    void* entryDitherContext_=nullptr;
+    bool (*entryDitherDispatch_)(void*,InstanceRecord&,bool)=nullptr;
     bool (*timeEffectDispatch_)(void*,InstanceRecord&,TimeEffectPhase,unsigned)=nullptr;
     const RoomPack* roomPack_ = nullptr;
     const ObjectPack* objectPack_ = nullptr;

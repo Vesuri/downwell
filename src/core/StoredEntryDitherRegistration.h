@@ -43,6 +43,11 @@ public:
         :records_(records),objects_(objects),lifecycle_(lifecycle),nextId_(nextId),room_(room),good_(good){}
     StoredEntryDitherRegistration(const StoredEntryDitherRegistration&)=delete;
     StoredEntryDitherRegistration& operator=(const StoredEntryDitherRegistration&)=delete;
+    bool belongsTo(const InstanceStore<WorldCapacity>& records)const{return &records_==&records;}
+    InstanceHandle handle(const InstanceRecord& r){
+        for(auto& s:slots_)if(s.id&&s.id==r.instanceId&&record(s)==&r)return s.key;
+        return {};
+    }
     template<class CameraX,class ViewY> bool create(CameraX cameraX,ViewY viewY,InstanceHandle& result){
         if(!good_)return false;
         Slot* free=nullptr;for(auto& s:slots_)if(!s.id){free=&s;break;}

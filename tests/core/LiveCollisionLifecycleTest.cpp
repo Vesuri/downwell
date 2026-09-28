@@ -902,6 +902,24 @@ int main(){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
         require(owner->attach(*world),"attach time-change world");world->skipToGameForTesting();
+        {
+            auto entry=world->entryDitherRegistration<1>();InstanceHandle key;
+            const auto id=world->nextRuntimeInstanceId();unsigned reads=0;
+            auto camera=[&](MotionBinary64& out){++reads;out=RunnerImageValue{0x43704000u}.promoted();return true;};
+            require(entry.create(camera,[](MotionBinary64& out){out={};return true;},key),
+                    "create entry dither in resource-backed main-room owner");
+            for(unsigned tick=1;tick<=120;++tick){
+                require(world->stepWithEntryDither(entry,camera,{}),"entry dither joins actual room tick");
+                const auto* r=world->instance(id);
+                require(r&&r->destroyRequested==(tick==120)&&r->alarms.get(0)==120-int(tick),
+                        "global alarm phase decrements entry lifetime exactly once");
+                require(r->preciseY==float((tick<120?tick:119)*16),
+                        "alarm destruction excludes same-tick entry Step");
+            }
+            require(reads==120,"one Create and 119 ordinary-Step camera reads");
+            require(world->cleanupEntryDither(entry,[](auto,const auto&){return false;})&&!world->instance(id),
+                    "global cleanup retires marked entry controller and collision/layer ownership");
+        }
         PackedObject definition;
         require(objects.findObject(211,definition)&&definition.parentId==-1&&definition.spriteId==-1,
             "time-change resource has no parent or visible sprite");

@@ -79,8 +79,16 @@ removes its owner registration before freeing storage. Tests use the recovered
 object pack and cover fractional positions, IDs, publication failure, inactive
 Step, expiry, retained destruction and reuse. The runtime exposes a borrowed
 registration factory; its caller must supply authoritative camera/view reads,
-dispatch and room cleanup. This is not yet automatic player Create integration
-or native controller ownership.
+dispatch and room cleanup. `stepWithEntryDither` scopes the registration into
+the real stored-room alarm/ordinary-Step traversal; its callback does not
+survive the tick. Object-73 dispatch without that owner fails instead of
+silently freezing the effect. `cleanupEntryDither` retires selected marked
+records through global cleanup and delegates other families explicitly.
+The resource-backed live collision test exercises 120 ordinary main-room
+ticks, checking one decrement per tick, 119 Step calls, retained destruction
+and owner/layer retirement. Its explicit camera/view inputs do not establish
+initial room publication. Automatic player Create, rendering and native
+controller ownership remain unconnected.
 
 The offline game-pack generator also exports `amiga-game.entry-mask` and its
 input/tool-hashed provenance. Its 48-byte rows contain transparent padding,

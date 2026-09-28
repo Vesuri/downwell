@@ -1534,6 +1534,11 @@ bool StartupRuntime::dispatchObjectEvent(InstanceRecord& instance,
     if (objectPack_ == nullptr ||
         !objectPack_->findEvent(instance.objectId, eventType, eventSubtype, event))
         return false;
+    if(instance.objectId==73&&eventSubtype==0&&(eventType==2||eventType==3)){
+        ++implementedCodeCalls_;
+        run_.effectsSucceeded=entryDitherDispatch_&&entryDitherDispatch_(entryDitherContext_,instance,eventType==2);
+        return run_.effectsSucceeded;
+    }
     if(eventType==3&&eventSubtype==0&&instance.objectId==238&&timeEffectDispatch_){
         ++implementedCodeCalls_;
         run_.effectsSucceeded=timeEffectDispatch_(timeEffectContext_,instance,TimeEffectPhase::step,0);
