@@ -202,6 +202,16 @@ int main(){
         }
     }
     Box boxes[7]={};check(boxes);
+    // Population tie-breaks still change even when a group's rectangle does
+    // not grow. Exercise every insertion order of equal/nested rectangles.
+    const Box nested[7]={{-8,-8,8,8},{-8,-8,8,8},{-4,-4,4,4},
+        {-2,-2,2,2},{-8,-2,-4,2},{4,-2,8,2},{0,0,0,0}};
+    unsigned permutation[]={0,1,2,3,4,5,6},permutations=0;
+    do{
+        for(unsigned i=0;i<7;++i)boxes[i]=nested[permutation[i]];
+        check(boxes);++permutations;
+    }while(std::next_permutation(permutation,permutation+7));
+    assert(permutations==5040);
     Split::Box identical[7]={};Split::Result result;
     assert(Split::partition(identical,result));
     // Equal growth goes to group zero until the minimum-fill rule intervenes.
