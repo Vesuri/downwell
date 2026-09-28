@@ -61,7 +61,7 @@ private:
         return SmokeDirection::radians(angle,radians)&&smokeTrig(radians.promoted(),c,s)&&
             cosine.assign(c)&&sine.assign(s);
     }
-    static bool roundPixel(RunnerImageValue v,std::int32_t& n){return v.promoted().roundPixel(n);}
+    static bool roundPixel(RunnerImageValue v,std::int32_t& n){return v.roundPixel(n);}
     static bool real(int n,RunnerImageValue& out){return out.assignInteger(n);}
     bool refresh(InstanceHandle key,bool publish){
         DW_PROFILE_SCOPE(profileInstanceBounds);
@@ -72,7 +72,7 @@ private:
                 RunnerImageValue radians;MotionBinary64 c,s;
                 return SmokeDirection::radians(angle,radians)&&smokeTrig(radians.promoted(),c,s)&&
                     cosine.assign(c)&&sine.assign(s);
-            },[](auto v,std::int32_t& n){return v.promoted().roundPixel(n);},publish);
+            },[](auto v,std::int32_t& n){return v.roundPixel(n);},publish);
     }
     template<class Record,View::Kind Kind> struct Binding {
         GameplayCollisionOwner& parent;

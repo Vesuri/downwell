@@ -3,11 +3,27 @@
 #include "RunnerImageValue.h"
 namespace downwell {
 struct RunnerIntegerValueVerification {
+    static bool checkPixel(std::uint32_t bits){
+        const RunnerImageValue value{bits};
+        std::int32_t direct=1234567,reference=1234567;
+        return value.roundPixel(direct)==value.promoted().roundPixel(reference)&&direct==reference;
+    }
     static bool check(std::int32_t n){
         RunnerImageValue direct,reference;
         return direct.assignInteger(n)&&reference.assign(MotionBinary64::fromInteger(n))&&direct.bits==reference.bits;
     }
     static bool run(){
+        const std::uint32_t mantissas[]={0u,1u,0x3fffffu,0x400000u,0x400001u,0x7fffffu};
+        for(unsigned exponent=0;exponent<256;++exponent)for(unsigned sign=0;sign<2;++sign)
+            for(auto mantissa:mantissas)
+                if(!checkPixel((sign<<31)|(exponent<<23)|mantissa))return false;
+        for(unsigned exponent=126;exponent<150;++exponent){
+            const unsigned half=1u<<(149-exponent);
+            for(unsigned parity=0;parity<2;++parity)for(int offset=-1;offset<=1;++offset){
+                const auto bits=(exponent<<23)+half+(parity<<(150-exponent))+offset;
+                if(!checkPixel(bits)||!checkPixel(bits|0x80000000u))return false;
+            }
+        }
         if(!check(0)||!check(-2147483647-1)||!check(2147483647))return false;
         for(unsigned power=0;power<31;++power){
             const std::int32_t center=std::int32_t(1u<<power);

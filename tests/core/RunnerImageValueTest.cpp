@@ -10,6 +10,7 @@ int main() {
     unsigned cases = 0;
     for (unsigned i = 0; i < 100000; ++i) {
         rng = rng * 1664525u + 1013904223u;
+        check(downwell::RunnerIntegerValueVerification::checkPixel(rng));
         const std::int32_t integer=std::int32_t(rng&0x7fffffffu)*(rng&0x80000000u?-1:1);
         check(downwell::RunnerIntegerValueVerification::check(integer));
         downwell::RunnerImageValue direct;

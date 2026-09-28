@@ -146,6 +146,13 @@ including nearest-even ties beyond 2^24 and INT_MIN. Only conversion changes:
 arithmetic, callback order, sorting, and the rotated path's integer decrement
 before conversion remain unchanged. Host tests include full-width resource
 fields against an independent floating-point operation-order transcription.
+The resource-backed collision owner rounds published binary32 coordinates
+directly through `RunnerImageValue::roundPixel`, retaining nearest-even results
+and the existing promoted adapter's rejection of magnitudes at or above 2^31.
+It does not alter the supplied rounding-policy interface or establish a new
+original-runner FP-mode assumption. The retained promotion-and-binary64 rounding
+path remains the differential oracle, including signed zero, exponent-zero
+promotion, ties and unchanged outputs on failure.
 
 ## Rotated ordinary-sprite branch
 

@@ -7,6 +7,26 @@ namespace downwell {
 // subnormal/nonfinite/overflow values fail without changing the destination.
 struct RunnerImageValue {
     std::uint32_t bits = 0;
+    // Same nearest-even pixel conversion as promoted().roundPixel(), without
+    // building a split binary64 mantissa. Preserve that adapter's range (even
+    // -2^31 rejects) and its exponent-zero promotion to signed zero. Callers
+    // remain responsible for normal/zero admission before geometry operations.
+    bool roundPixel(std::int32_t& result)const{
+        const unsigned exponent=(bits>>23)&255u;
+        if(exponent<126){result=0;return true;}
+        if(exponent>157)return false;
+        const std::uint32_t mantissa=(bits&0x7fffffu)|0x800000u;
+        std::uint32_t value;
+        if(exponent>=150)value=mantissa<<(exponent-150);
+        else{
+            const unsigned shift=150-exponent;
+            value=mantissa>>shift;
+            const unsigned half=1u<<(shift-1),tail=mantissa&((1u<<shift)-1);
+            if(tail>half||(tail==half&&(value&1u)))++value;
+        }
+        result=bits&0x80000000u?-static_cast<std::int32_t>(value):static_cast<std::int32_t>(value);
+        return true;
+    }
     // Every int32 is exactly representable in binary64. Direct nearest-even
     // narrowing therefore matches assign(MotionBinary64::fromInteger(value)).
     bool assignInteger(std::int32_t value) {
