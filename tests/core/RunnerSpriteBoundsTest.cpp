@@ -67,6 +67,25 @@ int main(){
     }
     assert(roundCalls==8192*4);
     assert(reassociatedDifferences>0); // Fixtures reject independent far-edge calculation.
+    // Full signed resource fields exercise nearest-even integer narrowing,
+    // including values outside binary32's exact-integer range. No pixel-round
+    // callback is used here, so large finite bounds remain admitted.
+    {
+        std::uint32_t seed=0x348712abu;
+        auto integer=[&](){seed=seed*1664525u+1013904223u;
+            std::int32_t value;std::memcpy(&value,&seed,4);return value;};
+        for(unsigned i=0;i<4096;++i){
+            downwell::RunnerUnitBoundsVerification::Resource r{integer(),integer(),integer(),integer(),integer(),integer()};
+            if(i==0)r={-2147483647-1,2147483647,16777217,-16777217,16777219,-16777219};
+            const float sx=i&1?-0.5f:1.5f,sy=i&2?-1.f:0.25f;
+            Bounds::Box actual;
+            assert(Bounds::fromSprite(r,packed(17.5f),packed(-23.25f),packed(sx),packed(sy),false,{},{},false,round,actual));
+            const auto h=axis(float(r.marginLeft),float(r.marginRight),r.originX,17.5f,sx,false);
+            const auto v=axis(float(r.marginTop),float(r.marginBottom),r.originY,-23.25f,sy,false);
+            assert(unpacked(actual.left)==h.first&&unpacked(actual.right)==h.second&&
+                   unpacked(actual.top)==v.first&&unpacked(actual.bottom)==v.second);
+        }
+    }
     unsigned rotatedComparisons=0;
     for(unsigned i=0;i<4096;++i)for(bool compat:{false,true}){
         const float angle=float(i)*0.013f,C=float(std::cos(double(angle))),S=float(std::sin(double(angle)));

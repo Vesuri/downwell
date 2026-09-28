@@ -29,10 +29,10 @@ struct RunnerSpriteBounds {
         Real scaleX,Real scaleY,bool hasRotation,Real cosine,Real sine,
         bool compatibility,Round round,Box& result){
         Box margins;
-        if(!margins.left.assign(MotionBinary64::fromInteger(sprite.marginLeft))||
-           !margins.top.assign(MotionBinary64::fromInteger(sprite.marginTop))||
-           !margins.right.assign(MotionBinary64::fromInteger(sprite.marginRight))||
-           !margins.bottom.assign(MotionBinary64::fromInteger(sprite.marginBottom)))return false;
+        if(!margins.left.assignInteger(sprite.marginLeft)||
+           !margins.top.assignInteger(sprite.marginTop)||
+           !margins.right.assignInteger(sprite.marginRight)||
+           !margins.bottom.assignInteger(sprite.marginBottom))return false;
         return hasRotation?rotated(margins,sprite.originX,sprite.originY,x,y,scaleX,scaleY,
                                    cosine,sine,compatibility,round,result):
                            unrotated(margins,sprite.originX,sprite.originY,x,y,scaleX,scaleY,
@@ -100,8 +100,8 @@ private:
             // Preserve callback order, failures and nonstandard policies.
             if(!round(near,roundedA)||!round(far,roundedB))return false;
             if(roundedA!=a||roundedB!=b){
-                if(!near.assign(MotionBinary64::fromInteger(roundedA))||
-                   !far.assign(MotionBinary64::fromInteger(roundedB)))return false;
+                if(!near.assignInteger(roundedA)||
+                   !far.assignInteger(roundedB))return false;
                 sort(near,far);return Math::sub(far,Real{0x3f800000u},far);
             }
         }
@@ -113,7 +113,7 @@ private:
         Real offset;
         // Original compares serialized margins before origin subtraction.
         sort(low,high);
-        return offset.assign(MotionBinary64::fromInteger(origin))&&
+        return offset.assignInteger(origin)&&
             Math::sub(low,offset,near)&&Math::sub(high,offset,far)&&
             add(far,Real{0x3f800000},far)&&mul(near,scale,near)&&mul(far,scale,far);
     }
@@ -121,7 +121,7 @@ private:
         std::int32_t pixel;
         if(!round(value,pixel)||(upper&&pixel==(-2147483647-1)))return false;
         // Rotated path decrements the INTEGER before converting to binary32.
-        return value.assign(MotionBinary64::fromInteger(upper?pixel-1:pixel));
+        return value.assignInteger(upper?pixel-1:pixel);
     }
     static bool add(Real a,Real b,Real& out){return Math::sub(a,Math::negate(b),out);}
     static bool mul(Real a,Real b,Real& out){
@@ -130,14 +130,14 @@ private:
     template<class Round> static bool axis(Real low,Real high,int origin,Real position,
         Real scale,bool compatibility,Round& round,Real& near,Real& far){
         Real width,offset;const Real one{0x3f800000};
-        if(!offset.assign(MotionBinary64::fromInteger(origin))||
+        if(!offset.assignInteger(origin)||
            !Math::sub(high,low,width)||!add(width,one,width)||
            !Math::sub(low,offset,near)||!mul(near,scale,near)||
            !mul(scale,width,far)||!add(near,position,near)||!add(far,near,far))return false;
         if(compatibility){
             std::int32_t a,b;
             if(!round(near,a)||!round(far,b)||
-               !near.assign(MotionBinary64::fromInteger(a))||!far.assign(MotionBinary64::fromInteger(b)))return false;
+               !near.assignInteger(a)||!far.assignInteger(b))return false;
         }
         if(Math::less(far,near)){const auto saved=near;near=far;far=saved;}
         // Subtract AFTER rounding and sorting, including zero-scale bounds.

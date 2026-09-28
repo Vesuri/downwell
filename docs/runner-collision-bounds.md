@@ -139,6 +139,13 @@ Fractional positions, other scales/rotations and larger resources use
 `fromSpriteBinary32`. Differential host cases and the native field verifier
 cover both mirror axes, reversed margins, signed zero, policy failures and extreme policy outputs.
 This adds neither a bounds cache nor a change in creation/query ordering.
+The general binary32 geometry path narrows signed integer resource fields and
+rounded pixel outputs directly with `assignInteger`. All int32 inputs are exact
+in binary64, so this matches the former integer-to-binary64-to-binary32 path,
+including nearest-even ties beyond 2^24 and INT_MIN. Only conversion changes:
+arithmetic, callback order, sorting, and the rotated path's integer decrement
+before conversion remain unchanged. Host tests include full-width resource
+fields against an independent floating-point operation-order transcription.
 
 ## Rotated ordinary-sprite branch
 
