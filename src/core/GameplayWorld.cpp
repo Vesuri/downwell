@@ -123,6 +123,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
 bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsigned initialRingOrigin) {
     if (!run_.levelClearActive || !run_.nextLevelRequested ||
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
+    if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;
     if(!clearBulletOwnership())return false;

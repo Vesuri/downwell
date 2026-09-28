@@ -68,7 +68,11 @@ contracts are covered by the shared birth-sequence and registered-debris tests.
 Both worlds own a 64-entry debris bank and expose creation through their existing
 registered lifecycle bridge. Retry clears registered particles before room
 teardown; native placement-new reconstruction preserves the bank's birth
-sequence. Real collision-owner tests cover creation, cleanup and rebirth in
+sequence. Native next-level preparation also clears active and destruction-marked
+debris before replacing the room: object 370 is nonpersistent. The transition
+test checks registry/collision removal, unchanged RNG, retained monotonic birth
+sequence and rejection of old handles after a new-room birth.
+Real collision-owner tests cover creation, cleanup and rebirth in
 both worlds. Borrowed banks remain available for isolated tests, but cannot be
 mixed with a populated production bank. `stepWithOwnedDebris` routes the stored
 bank through the ordinary room scheduler using an explicit checked time-stop

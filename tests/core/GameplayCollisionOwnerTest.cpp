@@ -1681,7 +1681,30 @@ int main(){
             bool confirm=true;
             assert(fieldWorld->stepLevelClear(confirm,false,false,heart,[](auto,unsigned){}));
         }
+        // Nonpersistent debris must leave with the old room, whether still
+        // active or already marked for deferred destruction before Draw.
+        InstanceHandle roomDebris,markedDebris,roomDebrisKey,markedDebrisKey;
+        assert(fieldWorld->spawnDebris({},{},1,roomDebris));
+        assert(fieldWorld->spawnDebris({},{},1,markedDebris));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,roomDebris,roomDebrisKey));
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,markedDebris,markedDebrisKey));
+        for(unsigned tick=0;tick<30;++tick)
+            assert(fieldWorld->advanceOwnedDebrisRoomAlarm(markedDebris,fieldWorld->debrisEffects().beginPhase(),0));
+        assert(fieldWorld->debrisEffects().retained(markedDebris.generation)->destroyRequested);
+        assert(fieldsOwner->state(roomDebrisKey)&&fieldsOwner->state(markedDebrisKey));
+        const auto debrisSequence=fieldWorld->debrisEffects().birthSequence();
+        const auto transitionDraws=fieldWorld->randomDrawCount();
         assert(fieldWorld->prepareNextAreaOneLevel({},300)&&fieldWorld->runStage().level==2);
+        assert(!fieldWorld->debrisInstances()->size()&&!fieldWorld->debrisEffects().retained(roomDebris.generation)&&
+            !fieldWorld->debrisEffects().retained(markedDebris.generation));
+        assert(!fieldsOwner->state(roomDebrisKey)&&!fieldsOwner->state(markedDebrisKey)&&
+            fieldsOwner->population(370,population)&&population==0);
+        assert(fieldWorld->debrisEffects().birthSequence().next==debrisSequence.next&&
+            fieldWorld->randomDrawCount()==transitionDraws);
+        InstanceHandle nextDebris,nextDebrisKey;
+        assert(fieldWorld->spawnDebris({},{},1,nextDebris)&&nextDebris.generation>markedDebris.generation);
+        assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,nextDebris,nextDebrisKey));
+        assert(fieldsOwner->state(nextDebrisKey)&&!fieldsOwner->state(roomDebrisKey)&&!fieldsOwner->state(markedDebrisKey));
         const auto startDraws=fieldWorld->randomDrawCount();
         assert(fieldWorld->createRoomStartField()&&fieldWorld->startTimeField()&&
             fieldsOwner->population(371,population)&&population==1&&fieldWorld->randomDrawCount()==startDraws+1);

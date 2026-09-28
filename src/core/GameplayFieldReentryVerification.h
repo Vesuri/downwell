@@ -47,7 +47,24 @@ struct GameplayFieldReentryVerification {
             bool confirm=true;++clearSteps;
             if(!world.stepLevelClear(confirm,false,false,heart,[](auto,unsigned){}))return false;
         }
-        if(!world.nextLevelRequested()||!world.prepareNextAreaOneLevel({},origin)||world.runStage().level!=2)return false;
+        if(!world.nextLevelRequested())return false;
+        // Exercise nonpersistent effect teardown on the target too, including
+        // a destroy-marked particle whose ordinary Draw cleanup has not run.
+        InstanceHandle liveDebris,markedDebris,liveKey,markedKey;
+        if(!world.spawnDebris({},{},1,liveDebris)||!world.spawnDebris({},{},1,markedDebris)||
+            !GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,liveDebris,liveKey)||
+            !GameplayCollisionView::encode(GameplayCollisionView::Kind::debris,markedDebris,markedKey))return false;
+        for(unsigned i=0;i<30;++i)
+            if(!world.advanceOwnedDebrisRoomAlarm(markedDebris,world.debrisEffects().beginPhase(),0))return false;
+        const auto* marked=world.debrisEffects().retained(markedDebris.generation);
+        if(!marked||!marked->destroyRequested||!owner.state(liveKey)||!owner.state(markedKey))return false;
+        const auto debrisNext=world.debrisEffects().birthSequence().next;
+        const auto transitionDraws=world.randomDrawCount();
+        if(!world.prepareNextAreaOneLevel({},origin)||world.runStage().level!=2||
+            world.debrisInstances()->size()||world.debrisEffects().retained(liveDebris.generation)||
+            world.debrisEffects().retained(markedDebris.generation)||owner.state(liveKey)||owner.state(markedKey)||
+            world.debrisEffects().birthSequence().next!=debrisNext||world.randomDrawCount()!=transitionDraws||
+            !owner.population(370,population)||population)return false;
         checks|=4;
 
         stage=4;

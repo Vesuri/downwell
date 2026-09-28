@@ -15,6 +15,7 @@ assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d00047
 obj = manifest["resources"]["objects"][370]
 assert (obj["id"], obj["name"], obj["parentId"], obj["spriteId"]) == (370, "breakablesDebris", -1, 91)
 assert obj["textureMaskId"] == 598
+assert obj["Persistent"] is False
 event = next(e for e in obj["events"] if e["eventType"] == 0 and e["eventSubtype"] == 0)
 assert event["actions"] == [{"codeId": 2722, "codeName": "gml_Object_breakablesDebris_Create_0"}]
 assert not any(e["eventType"] == 7 and e["eventSubtype"] == 7 for e in obj["events"])
