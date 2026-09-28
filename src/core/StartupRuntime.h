@@ -176,6 +176,12 @@ public:
             return run_.effectsSucceeded=false;
         r->box.wallHp=health;return true;
     }
+    int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playBoxBreakSound(InstanceHandle h,MotionBinary64 volume,Audio& audio){
+        auto* box=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!box||box->objectId!=92)return run_.effectsSucceeded=false;
+        return run_.playBoxBreakSound(box->sound,box->box.breakSound,volume,audio);
+    }
     bool publishBoxAlarm0(InstanceHandle h,std::int32_t value){
         auto* record=instances_.resolve(h);
         if(!run_.effectsSucceeded||!record||record->objectId!=92)return run_.effectsSucceeded=false;

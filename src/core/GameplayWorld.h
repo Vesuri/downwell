@@ -203,6 +203,7 @@ public:
         downwell::BreakableState state{};
         std::int32_t alarm0=-1;
         downwell::InstanceHandle myFx{}; // Internal lifetime, never a VM numeric ID.
+        downwell::SoundPlayState sound{};
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     struct PlayerInstance {
@@ -470,6 +471,12 @@ public:
     bool publishBoxHealth(downwell::InstanceHandle h,downwell::MotionBinary64 health){
         if(!run_.effectsSucceeded||!findBreakable(h)||!health.valid())return run_.effectsSucceeded=false;
         breakables_[h.slot].state.wallHp=health;return true;
+    }
+    int overlapSound(unsigned channel)const{return channel<11?run_.overlapSounds[channel]:-1;}
+    template<class Audio> bool playBoxBreakSound(downwell::InstanceHandle h,downwell::MotionBinary64 volume,Audio& audio){
+        if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
+        auto& box=breakables_[h.slot];
+        return run_.playBoxBreakSound(box.sound,box.state.breakSound,volume,audio);
     }
     bool publishBoxAlarm0(downwell::InstanceHandle h,std::int32_t value){
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;

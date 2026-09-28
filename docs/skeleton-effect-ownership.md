@@ -89,6 +89,23 @@ failure prefix. Actual audio backends, shared channel ownership, duck behavior
 and natural box-event admission remain integration requirements; these tests
 do not establish audible fidelity.
 
+Both worlds expose `playBoxBreakSound` against a retained object-92 lifetime.
+The operation uses its recovered `breakSound`, stores scratch fields on that
+caller and shares run-owned `OLchannel[7]`. The supplied volume is the current
+source game-volume value; this channel has no view, water-pitch or music-mute
+gate. A backend failure latches the existing world effect failure and blocks
+retries without undoing preceding writes. Both world adapters have fault-prefix
+tests; the bounded native lifecycle tape invokes a real retained box and checks
+that Retry zeros its channel. The eleven channel entries are initialized/reset
+to zero as in `soundInitialize`; room retirement does not clear them.
+This does not implement the rest of soundInitialize's emitters/sample groups.
+Sound scratch storage is separate from builder `BreakableState`, so creation
+commands do not carry it. It costs 32 bytes per native retained box (16 KiB at
+512 slots), plus 44 bytes for shared channel entries. The general stored-world
+instance record retains the same fields for future non-box callers; stock A500
+memory fit remains unproven. These entry points still await complete natural
+destruction admission and actual audio backends.
+
 Box Alarm 0 is dispatched by both normal schedulers: the shared event body
 sets `wallHp` to zero, without emitting effects or retiring the box. Native
 storage keeps one 32-bit countdown per box; it does not allocate twelve slots

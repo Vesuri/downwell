@@ -18,6 +18,7 @@
 #include "InstanceHandle.h"
 #include "WallEndStep.h"
 #include "BreakableState.h"
+#include "SoundPlayScript.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -79,6 +80,7 @@ struct InstanceRecord {
     WallEndStepState wall{};
     BreakableState box{};
     std::uint32_t boxMyFx=0; // scrEffectSpawn's source numeric child ID on object 92.
+    SoundPlayState sound{};
 };
 
 enum class CreateInstanceResult {

@@ -1,0 +1,47 @@
+#ifndef DOWNWELL_CORE_BOX_SOUND_VERIFICATION_H
+#define DOWNWELL_CORE_BOX_SOUND_VERIFICATION_H
+#include "SoundPlayScript.h"
+#include "InstanceHandle.h"
+namespace downwell {
+// World ownership tape. Script branch semantics have separate VM-pinned tests.
+// The injected audio backend records commands; it does not play audible sound.
+struct BoxSoundVerification {
+    template<class World> struct Audio {
+        World& world;
+        int sound;
+        unsigned fail=0,calls=0;
+        bool valid=true;
+        bool call(int op){
+            const int expected[]={sound,1000+sound,2000+sound,3000,4000,5000,900};
+            if(calls>=7||op!=expected[calls])valid=false;
+            ++calls;return valid&&calls!=fail;
+        }
+        bool isPlaying(int id,bool& yes){yes=true;return call(id);}
+        bool stop(int id){return call(1000+id);}
+        bool play(int id,int priority,bool loop,int& result){
+            valid=valid&&world.overlapSound(7)==sound&&priority==50&&!loop;
+            result=900;return call(2000+id);
+        }
+        bool getGain(int id,MotionBinary64& gain){valid=valid&&id==900;gain={0x3fe00000u,0};return call(3000);}
+        bool setGain(int id,MotionBinary64 gain,int duration){
+            valid=valid&&id==900&&duration==0&&gain.high==0x3fc00000u&&gain.low==0;return call(4000);
+        }
+        bool setPitch(int id,MotionBinary64 pitch){
+            valid=valid&&id==900&&pitch.high==0x3ff00000u&&pitch.low==0;return call(5000);
+        }
+    };
+    template<class World,class Read> static bool run(World& world,InstanceHandle box,int sound,Read read,unsigned failure=0){
+        Audio<World> audio{world,sound,failure};const auto draws=world.randomDrawCount();
+        const int before=world.overlapSound(7);
+        const bool ok=world.playBoxBreakSound(box,{0x3fd00000u,0},audio);
+        const auto* caller=read();
+        if(!caller||!audio.valid||audio.calls!=(failure?failure:7)||ok!=(failure==0)||world.effectsSucceeded()!=ok||
+            world.randomDrawCount()!=draws||caller->sfxIndex!=sound||caller->soundPriority!=50||
+            caller->loop||caller->cutPrv||caller->chanNum!=7||caller->doNotPlay||
+            world.overlapSound(7)!=((!failure||failure>=3)?sound:before))return false;
+        if(!failure)return caller->sndsnd==900&&caller->sndgain.high==0x3fc00000u&&caller->sndgain.low==0;
+        return !world.playBoxBreakSound(box,{0x3fd00000u,0},audio)&&audio.calls==failure&&world.randomDrawCount()==draws;
+    }
+};
+}
+#endif

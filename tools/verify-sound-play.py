@@ -13,6 +13,7 @@ assert manifest["extractor"]["commit"] == "03c7048438347799e0717b6e57a9358d00047
 for name, digest in (
     ("soundPlay", "9aefb5fdbe118719d35e19389d76f2ea22990b67357d777850395c2d87edd33e"),
     ("soundPlayOL", "71426bbaa0d41da4ab49b5179a6f28b0f6dfe6e003785afaee60969182944553"),
+    ("soundInitialize", "d551673a4b80ecd7ecf26edbb67188fa437077a910cf2cd5913e2fc7806d0850"),
 ):
     assert sha256((export / f"Assembly/gml_GlobalScript_{name}.asm").read_bytes()).hexdigest() == digest
 print("Pinned sound scripts: caller writes, ten channels, cut/visibility/water/music gates and voice returns")

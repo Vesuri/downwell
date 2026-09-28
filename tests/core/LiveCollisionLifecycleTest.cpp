@@ -15,6 +15,7 @@
 #include "core/EffectSpawnScript.h"
 #include "core/ScriptSpawnOperations.h"
 #include "core/MachineGunSourceStep.h"
+#include "core/BoxSoundVerification.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -427,6 +428,24 @@ int main(){
             world->scriptEffects().size()==2&&lookups==2,"retain both child birth and caller assignment on failure");
         require(!world->spawnBoxScriptEffect(box,x,y,603,{},{},{},frames)&&lookups==2&&world->randomDrawCount()==draws,
             "failed box effect is never retried");
+    }
+    for(unsigned failure=0;failure<=7;++failure){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach box sound world");world->skipToGameForTesting();
+        InstanceHandle box{};
+        for(unsigned tick=0;tick<600&&!box.generation;++tick){
+            for(unsigned i=0;i<world->activeInstanceCount();++i)
+                if(world->instanceAt(i).objectId==92&&world->instanceAt(i).active){box=world->instanceHandleAt(i);break;}
+            if(!box.generation)world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+        }
+        require(box.generation&&world->effectsSucceeded(),"find box sound caller");
+        require(BoxSoundVerification::run(*world,box,owner->resolve(box)->box.breakSound,
+            [&](){return &owner->resolve(box)->sound;},failure),"source box sound ownership and failure prefix");
+        if(!failure){
+            require(world->restartFromResults(DeathMenuSequence::Action::Retry,43)&&world->overlapSound(7)==0,
+                "new run reinitializes overlap channel entries");
+        }
     }
     for(unsigned failure=1;failure<=7;++failure){
         auto owner=std::make_unique<ProjectileFailureOwner>(objects,sprites,masks);owner->reject=failure;

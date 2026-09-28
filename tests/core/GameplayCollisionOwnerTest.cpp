@@ -1966,6 +1966,11 @@ int main(){
             owner->scriptEffects().find(second)&&world->scriptEffects().size()==2&&lookups==2);
         assert(!world->spawnBoxScriptEffect(box,x,y,603,{},{},{},frames)&&lookups==2&&world->randomDrawCount()==draws);
     }
+    for(unsigned failure=1;failure<=7;++failure){
+        auto world=std::make_unique<GameplayWorld>(300,true);
+        const int bx=0,by=336;assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
+        assert(BoxSoundVerification::run(*world,box,171,[&](){return &world->findBreakable(box)->sound;},failure));
+    }
     for(bool registered:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,

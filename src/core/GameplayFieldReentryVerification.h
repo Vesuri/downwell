@@ -2,6 +2,7 @@
 #define DOWNWELL_GAMEPLAY_FIELD_REENTRY_VERIFICATION_H
 #include "GameplayCollisionOwner.h"
 #include "SoundPlayVerification.h"
+#include "BoxSoundVerification.h"
 namespace downwell {
 // Test-only lifecycle tape, shared by host tests and the 68000 debugger gate.
 // The exit is deliberately placed at the player; this is not evidence for a
@@ -97,6 +98,7 @@ struct GameplayFieldReentryVerification {
         }
         const auto* liveBox=world.findBreakable(box);
         if(!liveBox||liveBox->alarm0!=-1||!liveBox->state.wallHp.zero()||!liveBox->active||liveBox->destroyRequested)return false;
+        if(!BoxSoundVerification::run(world,box,liveBox->state.breakSound,[&](){return &world.findBreakable(box)->sound;}))return false;
         if(!world.breakableActiveAt(boxX,boxY)||!world.markBreakableDestroyed(box)||
             world.breakableActiveAt(boxX,boxY)||!world.findBreakable(box)||
             !owner.prepareDraw()||world.findBreakable(box))return false;
@@ -108,6 +110,7 @@ struct GameplayFieldReentryVerification {
         if(world.restartFromResults(DeathMenuSequence::Action::Retry,2,origin)!=ResultsDestination::gameplay||
             !world.effectsSucceeded()||!owner.valid()||world.goalFieldInstances().find(local)||owner.state(key)||
             !owner.population(255,population)||population)return false;
+        if(world.overlapSound(7)!=0)return false;
         checks|=32;
 
         stage=7;

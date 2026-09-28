@@ -35,6 +35,7 @@
 #include "PortableAtan.h"
 #include "ForcedPlayerJump.h"
 #include "Profile.h"
+#include "SoundPlayScript.h"
 namespace downwell {
 // Persistent subset currently modeled by the port. ResetPlayer calls
 // scrInitialize, which resets defaults then reloads records through scrLoadSave.
@@ -49,6 +50,17 @@ struct RunRecords {
 // World/room instances, player initialization, RNG reseeding and platform
 // effects remain separate; this is not a whole-game restart by itself.
 struct RunSession {
+    // soundInitialize writes entries 0..10 to zero. Room changes do not
+    // reinitialize them; scrInitialize/new-run reset does.
+    int overlapSounds[11]{};
+    template<class Audio> bool playBoxBreakSound(SoundPlayState& caller,int sound,
+        MotionBinary64 volume,Audio& audio){
+        if(!effectsSucceeded)return false;
+        SoundPlayEnvironment env;env.gameVolume=volume;
+        int result=-1;bool returned=false;
+        return SoundPlayScript::overlap(caller,env,audio,[]{return false;},overlapSounds[7],
+            sound,50,false,true,"waterThings",result,returned,effectsSucceeded);
+    }
     RunGemStatistics gems;
     RunClock clock;
     RunCombo combo;
@@ -525,6 +537,7 @@ struct RunSession {
         return {gems.lifetime, gems.record, combo.state.record};
     }
     void reset(const RunRecords& saved = {}) {
+        for(auto& sound:overlapSounds)sound=0;
         gems = {};
         gems.lifetime = saved.lifetimeGems;
         gems.record = saved.bestRunGems;
