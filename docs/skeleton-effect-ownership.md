@@ -150,9 +150,9 @@ already attracted gem. This happens after the reward's size override and before
 movement/terrain queries; an alarm-expired gem never reaches Step. Reusing a
 GemMotion record resets this state. CurrencyCreate shares the same fields for
 the future exact scheduler. No sound is played by this selection itself.
-Gem replay fixture version 8 includes these fields, resulting RNG state,
-default alarm boundaries and binary32 animation; its CPU-equivalence digest is
-`7a84fb46cb3566ad` (coverage 1023), not an original Windows gameplay capture.
+Gem replay fixture version 9 includes these fields, resulting RNG state,
+default alarm boundaries and pre-alarm binary32 animation; its CPU-equivalence digest is
+`ffa629f6f72c7cff` (coverage 1023), not an original Windows gameplay capture.
 Alarm 0 writes Alarm 1 before that later slot is decremented in the same phase;
 Alarm 1 likewise writes Alarm 2. Consequently the default unfrozen gem first
 flashes hidden on update 189 and expires on 308, not 190/310. An attracted gem

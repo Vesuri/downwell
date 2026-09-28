@@ -831,6 +831,10 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     // Only valid unit-sequence state is admitted through the effect owner.
     {
     DW_PROFILE_SCOPE(profileStandaloneEffectAnimation);
+    // Currency has no Animation End callback; only gems present at this
+    // boundary participate. Rewards born later in this tick must not advance.
+    for(unsigned i=0;i<gemSlotEnd_;++i)
+        if(gems_[i].active)gems_[i].motion.animation.advance();
     run_.advanceFlashAnimation();
     run_.advanceSmokeAnimation();
     run_.advanceCorpseExpiryAnimation();

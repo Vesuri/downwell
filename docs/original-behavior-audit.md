@@ -106,8 +106,8 @@ The real SDL renderer test uses a spawned gem and checks ages 0, 188, 189,
 190, 307, 308, 309 and 65536, preserves other gems, and checks that repainting
 changes neither lifetime nor RNG.
 
-The shared gem CPU fixture schema 8 includes visibility, first-Step choice,
-same-phase chained alarms and binary32 animation state. Its digest is `7a84fb46cb3566ad`, coverage
+The shared gem CPU fixture schema 9 includes visibility, first-Step choice,
+same-phase chained alarms and binary32 animation before expiry. Its digest is `ffa629f6f72c7cff`, coverage
 `3ff`. The fixture requires both visible and hidden disappearing gems to
 remain alive. This CPU-equivalence check does not establish Windows-exact
 currency movement, general time-stop/event scheduling, drawFx palette effects
@@ -130,8 +130,17 @@ the sequence position. At speed +0.3, update 10 has image-index bits `403fffff`
 The helper admits only the four Create speeds and an internally maintained
 four-frame position; arbitrary image-index/speed writes need the full owner.
 
-The live animation still needs scheduling in the runner's animation phase,
-including birth eligibility and time-stop speed writes.
+Both world adapters advance existing gems before Begin Step and alarms, not
+inside currency movement. Combat-born gems therefore retain image index zero
+for their birth tick and advance for the first time on the following tick.
+The paired contact tape checks these boundaries in both live worlds. The
+isolated CPU fixture explicitly advances before expiry as well. No gem
+Animation End callback runs, and animation itself consumes no RNG.
+
+Currency still needs registered active-room membership, pending activation
+semantics, and time-stop image-speed writes; the current standalone family
+pass does not replace those ownership requirements. Currency movement and
+alarm scheduling remain provisional, including same-tick birth eligibility.
 The arithmetic test does not prove the Windows process's live FP mode, event
 phase parity, or presentation parity. See the source image-field and FP-mode
 audits before treating the scalar comparison as a complete runtime oracle.

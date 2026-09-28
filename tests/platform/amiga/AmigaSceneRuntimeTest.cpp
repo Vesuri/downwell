@@ -2374,7 +2374,7 @@ int main(int argc, char** argv) {
             host.skipToGameForTesting();
             AmigaPortRuntime game(300,false,1201-176,true);game.initializeEntryInput(false);
             LiveSceneWorld live(patterns,objects);live.bind(game,rooms,room,false,&host);
-            unsigned firstDamage=0,damageFrames=0;
+            unsigned firstDamage=0,damageFrames=0,currencyBirths=0,currencyAdvances=0;
             for(unsigned tick=0;tick<downwell::gameplayContactProfileFrames;++tick){
                 const auto input=downwell::gameplayContactProfileInput(game.tick(),240+game.player().offsetX(),
                     176+game.player().offsetY(),phase);
@@ -2384,6 +2384,31 @@ int main(int argc, char** argv) {
                 if(!search){
                     host.step(input,false);parityFrame=tick;
                     compareInitialGameplay(game,host);
+                    // This tape creates currency through combat after the
+                    // engine animation boundary, not as room-start instances.
+                    unsigned currencyIndex=0;
+                    for(unsigned i=0;i<game.gemCapacity;++i){
+                        const auto& gem=game.gemAt(i);if(!gem.active)continue;
+                        require(currencyIndex<host.mainCurrencyCount(),"paired currency count");
+                        const auto& other=host.mainCurrencyAt(currencyIndex++);
+                        require(gem.age==other.age &&
+                            gem.motion.animation.phaseBits()==other.motion.animation.phaseBits() &&
+                            gem.motion.animation.speedBits()==other.motion.animation.speedBits(),
+                            "paired currency animation phase and speed agree");
+                        if(gem.age==1){
+                            ++currencyBirths;
+                            require(gem.motion.animation.phaseBits()==0,
+                                "combat-born currency retains Create frame in its birth tick");
+                        }else if(gem.age==2){
+                            ++currencyAdvances;
+                            downwell::RunnerImageValue expected{};bool crossed=false;
+                            require(downwell::SequenceTimeline::advance(expected,
+                                {gem.motion.animation.speedBits()},4,crossed),"first gem animation");
+                            require(gem.motion.animation.phaseBits()==expected.bits,
+                                "combat-born currency advances once on the next tick");
+                        }
+                    }
+                    require(currencyIndex==host.mainCurrencyCount(),"paired live currency count");
                     require(game.health()==host.mainPlayerHealth()&&game.damageNumbers().size()==host.damageNumbers().size(),
                         "contact tape health and damage ownership agree");
                     require(game.damageNumbers().birthSequence().next==host.damageNumbers().birthSequence().next,
@@ -2405,6 +2430,7 @@ int main(int argc, char** argv) {
                         "contact tape full RNG agrees");
                 }
             }
+            if(!search)require(currencyBirths&&currencyAdvances,"contact tape exercises currency birth and next animation");
             std::cout<<"Contact profile phase="<<phase<<" first_damage="<<firstDamage
                 <<" damage_frames="<<damageFrames<<" health="<<game.health()<<" y="<<176+game.player().offsetY()<<std::endl;
             if(!search)require(firstDamage&&damageFrames,"profile input must reach real damage");

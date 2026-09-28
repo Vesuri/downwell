@@ -26,6 +26,10 @@ for index, digest in enumerate((
 )):
     assert sha256((export / f"Assembly/gml_Object_objCurrency_Alarm_{index}.asm").read_bytes()).hexdigest() == digest
 obj = manifest["resources"]["objects"][248]
+assert obj["name"] == "objCurrency" and obj["parentId"] == -1
+# The standalone animation traversal must not bypass an inherited or local
+# Animation End handler when a four-frame currency sequence wraps.
+assert not any(e["eventType"] == 7 and e["eventSubtype"] == 7 for e in obj["events"])
 event = next(e for e in obj["events"] if e["eventType"] == 0 and e["eventSubtype"] == 0)
 assert event["actions"][0]["codeName"] == "gml_Object_objCurrency_Create_0"
 print("Pinned currency Create: area-specific RNG, defaults, alarms, image rate, direction and wall/tile relocation")

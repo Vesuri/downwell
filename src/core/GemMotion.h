@@ -48,7 +48,9 @@ struct GemMotion {
     bool step(long targetX, long targetY, Solid solid, Random& random, bool large=false) {
         if (!lifetime.advance(attracted)) return false;
         sound.begin(large?1:0,random);
-        animation.advance();
+        // Animation belongs to the world's earlier animation traversal, not
+        // this movement/collection phase. A gem born during Step stays at its
+        // Create image index until the next frame's animation traversal.
         const long dx = targetX - q8(x), dy = targetY - q8(y);
         if (attracted) {
             long sx, sy;

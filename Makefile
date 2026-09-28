@@ -292,6 +292,7 @@ build/corpse-effects-test: tests/core/CorpseEffectsTest.cpp $(wildcard src/core/
 test: verify-currency-animation
 .PHONY: verify-currency-animation
 verify-currency-animation: build/currency-animation-contract-test
+	python3 tools/verify-currency-create.py
 	python3 tools/verify-animation-metadata.py
 	python3 tools/verify-runner-image-fields.py
 	./build/currency-animation-contract-test

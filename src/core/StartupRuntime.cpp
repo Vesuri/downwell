@@ -325,6 +325,9 @@ void StartupRuntime::stepInternal(bool advancePressed,
         else scriptEffectsBinding_={};
     }
     if(roomId_==mainRoomId)
+        for(std::size_t i=0;i<mainCurrencyCount_;++i)
+            mainCurrencyItems_[i].motion.animation.advance();
+    if(roomId_==mainRoomId)
         run_.advanceFlashAnimation();
     if(roomId_==mainRoomId)run_.advanceSmokeAnimation();
     if(roomId_==mainRoomId)run_.advanceCorpseExpiryAnimation();

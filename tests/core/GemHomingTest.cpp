@@ -237,6 +237,8 @@ int main() {
     const auto empty = [](int, int) { return false; };
     for (unsigned tick = 1; tick <= 20; ++tick) {
         motion.step(10000 * 256L, 0, empty, random);
+        require(motion.animation.phaseBits()==0,
+                "ordinary currency Step does not perform engine animation");
         require(motion.vy == 448L * tick && motion.y == 224L * tick * (tick + 1) && motion.vx == 0,
                 "free gravity is exact .035 and sign(0) does not invent horizontal motion");
     }
@@ -247,8 +249,12 @@ int main() {
             "acquisition update still performs free motion; homing begins next update");
     motion = {};
     motion.lifetime.age = 307;
+    motion.animation.advance();
+    const auto expiryImage = motion.animation.phaseBits();
     require(!motion.step(10 * 256L, 0, empty, random) && !motion.attracted && motion.y == 0,
             "expiry alarm runs before motion and cannot acquire a nearby player on its last tick");
+    require(expiryImage==0x3f000000u && motion.animation.phaseBits()==expiryImage,
+            "expiry keeps the image already advanced by the earlier engine phase");
     motion = {};
     motion.attracted = true;
     motion.lifetime.age = 307;

@@ -1810,7 +1810,7 @@ int main() {
               << " coverage=" << gems.coverage << '\n';
     // Version 7 includes immediate chained alarm dispatch (flash 189/expiry
     // 308), in addition to v6's first-Step choice. Player trajectory is unchanged.
-    require(gems.coverage == 1023 && gems.digest == 0x7a84fb46cb3566adULL,
+    require(gems.coverage == 1023 && gems.digest == 0xffa629f6f72c7cffULL,
             "gem cross-CPU fixture covers motion, collection/account expiry and both flash phases with a pinned digest");
     const auto weapon = downwell::verifyMachineGun();
     std::cout << "Weapon fixture digest: " << std::hex << weapon.digest << std::dec

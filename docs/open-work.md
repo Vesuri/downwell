@@ -137,9 +137,9 @@ Reference: [area-two recovery](area-two-recovery.md).
 - Replace approximate live animation where original float/sequence behavior
   changes observable frames or event timing. Cover relevant sprite/index writes;
   a legacy animation helper is not the selected GMS2 sequence path.
-  For currency, integrate original animation-phase eligibility and time-stop
-  speed writes with the shared float sequence arithmetic; see the currency
-  animation audit. Arithmetic agreement alone does not close this item.
+  For currency, integrate registered active-room membership, pending activation
+  semantics and time-stop speed writes; see the currency animation audit.
+  The standalone pre-Step animation pass does not close these ownership gaps.
 - Complete side-room reward objects and omitted title/particle effects.
 - Verify fractional raster positions, draw order, effect surfaces, shaders and
   alternate palettes against original-game captures.

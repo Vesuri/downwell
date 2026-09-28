@@ -22,11 +22,12 @@ inline GemVerificationResult verifyGemSimulation() {
     bool alive[3] = {true, true, true};
     VerificationDigest digest;
     unsigned coverage = 0;
-    digest.addU32(8); // Binary32 gem animation state and source wrap rounding.
+    digest.addU32(9); // Animation precedes alarms, even on the expiry update.
     for (unsigned tick = 0; tick < 400; ++tick) {
         digest.addU32(tick);
         for (unsigned i = 0; i < 3; ++i) {
             if (alive[i]) {
+                gems[i].animation.advance();
                 const bool wasAttracted = gems[i].attracted;
                 bool terrainHit = false;
                 const long targetX = i == 0 ? 1000 * 256L : i == 1 ? 32 * 256L :

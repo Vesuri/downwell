@@ -169,10 +169,10 @@ sanitizers; gem-motion, enemy-contact and machine-gun trajectory tests pass.
 Both ordinary builds pass, with clean 68000 instruction/helper audits
 (`/tmp/downwell-gem-choose-{amiga,sdl}.log`). No emulator was launched.
 
-Gem CPU fixture version 8 has fingerprint `7a84fb46cb3566ad`, coverage 1023.
+Gem CPU fixture version 9 has fingerprint `ffa629f6f72c7cff`, coverage 1023.
 It retains version 6's one-word first-Step bounce-sound choice and
 `allSet`/`bounceSnd`/`mySound` fields, version 7's chained alarm timing, and
-adds binary32 animation state instead of the exact-tenths approximation.
+version 8's binary32 animation state, and advances animation before expiry.
 Version 5 (`e526fc84c6bf6315`) corrected
 Create choices but omitted that Step draw; the earlier `f175194dfba46820`
 encoded the two-word chooser bug. These are versioned CPU-equivalence fixtures,
