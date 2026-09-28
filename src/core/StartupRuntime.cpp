@@ -1693,22 +1693,31 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             // Use a private one-command queue so a parent's in-flight batch
             // cannot be replayed recursively. roomId_ still names the previous
             // room during entry: the parent's destination room is authoritative.
-            const auto createChild=[&](int object,int x,int y){
+            const auto createChild=[&](int object,int x,int y)->std::uint32_t{
                 DeferredInstanceQueue<1> child;
-                if(!child.enqueueCreate(object,x,y))return false;
-                return child.applyChecked(instances_,*objectPack_,instance->roomId,
+                if(!child.enqueueCreate(object,x,y))return 0;
+                std::uint32_t childId=0;
+                const auto applied=child.applyChecked(instances_,*objectPack_,instance->roomId,
                     nextRuntimeInstanceId_,[&](InstanceRecord& record){
+                        // Capture this birth, not nextRuntimeInstanceId_-1:
+                        // synchronous nested Creates can consume more IDs.
+                        childId=record.instanceId;
                         dispatchInstancePhase(record,RoomInstancePhase::preCreate);
                         if(!deferredCommandsSucceeded_||!run_.effectsSucceeded)return false;
                         dispatchInstancePhase(record,RoomInstancePhase::create);
                         return deferredCommandsSucceeded_&&run_.effectsSucceeded;
-                    },lifecycle_)==ApplyInstanceCommandsResult::success;
+                    },lifecycle_);
+                return applied==ApplyInstanceCommandsResult::success?childId:0;
             };
-            // Full scrPlayerInit companion births, scrSpawnCamera's caller
-            // assignments and main-room entry-dither creation remain unwired.
-            if (!createChild(66, -100, instance->y) ||
-                !createChild(64, instance->x, instance->y))
-                deferredCommandsSucceeded_ = false;
+            if (!createChild(66, -100, instance->y)){
+                deferredCommandsSucceeded_=false;return;
+            }
+            const auto cameraId=createChild(64,instance->x,instance->y);
+            if(!cameraId){deferredCommandsSucceeded_=false;return;}
+            // scrSpawnCamera assigns myCam only after child Create completes.
+            instance->playerCameraId=cameraId;
+            // Full initializer companion births, camera mode assignments and
+            // main-room entry-dither creation remain unwired.
         }
         return;
     case 849: // gml_Object_objPlayer_n_Step_1 (menu/rmMain movement subsets)
@@ -2607,6 +2616,7 @@ std::uint64_t StartupRuntime::stateDigest() const {
             digest.addU32(instance.batHit.fraction);
             digest.addU32(instance.batDirectionFraction);
         }
+        if (instance.objectId == 35) digest.addU32(instance.playerCameraId);
         if (instance.objectId == 111 || instance.objectId == 112) {
             digest.addI32(instance.walker.x);
             digest.addI32(instance.walker.y);

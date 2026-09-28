@@ -40,8 +40,13 @@ room instance. It passes the parent's destination room, not the still-current
 old room, to the shared allocator. A rejected child birth retains the allocated
 prefix, prevents later room births and latches failure. Menu/main-room tests
 check child adjacency, destination ownership, numeric IDs and both child-failure
-boundaries. It still omits 73 and the full initializer's child births, along
-with scrSpawnCamera's caller assignments. Native terrain loading retains the
+boundaries. Successful camera creation returns that child's captured numeric
+ID and publishes it to the player's `myCam` field only after Create completes.
+The reference is included in stored-state digests; it is not reconstructed
+from a storage slot or the allocator cursor after possible nested births.
+Failed births do not publish a result. It still omits 73 and the full
+initializer's child births, along with scrSpawnCamera's camera-mode assignments.
+Native terrain loading retains the
 authored player/wall IDs but is not complete cross-family room creation.
 Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room

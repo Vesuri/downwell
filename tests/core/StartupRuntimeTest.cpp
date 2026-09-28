@@ -62,6 +62,8 @@ void verifyPlayerChildren(const downwell::StartupRuntime& runtime,int room){
                 "synchronous children belong to destination room, not previous room");
         require(camera.instanceId==meter.instanceId+1,
                 "child births share the original numeric allocator");
+        require(player.playerCameraId==camera.instanceId&&runtime.instance(player.playerCameraId)==&camera,
+                "myCam retains the completed camera's source numeric identity");
     }
     require(found,"room contains a player for synchronous birth test");
 }
@@ -225,6 +227,8 @@ void testLiveLifecycle(const downwell::RoomPack& rooms,const downwell::ObjectPac
         require(!healthy(*runtime),"synchronous player-child birth failure stops room entry");
         require(runtime->hasInstance(100855)&&!runtime->hasInstance(100854),
                 "failed child retains parent but prevents the next authored controller birth");
+        require(runtime->instance(100855)->playerCameraId==0,
+                "failed child creation does not publish a myCam result");
         bool meter=false,camera=false;
         for(std::size_t i=0;i<runtime->activeInstanceCount();++i){
             meter|=runtime->instanceAt(i).objectId==66;
