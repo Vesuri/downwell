@@ -41,6 +41,7 @@ enum DownwellProfilePhase {
     profileDrawCleanup,
     profileBirthRegistration, profileBirthMetadata, profileBirthRoomOrder,
     profileBulletEnemyQuery, profileBulletSolidQuery, profileBulletPublication,
+    profileProjectileCoordinate,
     profilePhaseCount
 };
 

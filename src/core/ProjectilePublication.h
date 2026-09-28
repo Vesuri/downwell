@@ -3,12 +3,14 @@
 #include "MachineGunTrajectory.h"
 #include "RunnerImageValue.h"
 #include "MultiplyBinary64.h"
+#include "Profile.h"
 namespace downwell {
 // Publish the currently implemented Q20/Q32 trajectory without truncating its
 // fractions to drawing pixels. This does not make that approximate trajectory
 // an original-runner oracle; projectile selectors remain gated until replaced.
 struct ProjectilePublication {
     static bool coordinate(MachineGunTrajectory::Coordinate value,int origin,RunnerImageValue& out){
+        DW_PROFILE_SCOPE(profileProjectileCoordinate);
         if(origin<0||value.fraction>=unsigned(MachineGunTrajectory::unit)||
             value.pixel>0x7fffffff-origin)return false;
         auto result=MotionBinary64::fromInteger(value.pixel+origin);

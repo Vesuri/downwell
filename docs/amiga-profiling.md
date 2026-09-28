@@ -163,6 +163,8 @@ and first-Step angle/per-Step position publication from phase 17. The remaining
 phase 17 includes motion, view checks and loop/retirement work. Query brackets
 include their existing hit callbacks; do not interpret them as pure geometry
 timings. Nested bounds/spatial probes remain exclusive.
+Phase 103 isolates split-coordinate conversion from its publication caller;
+compare it separately from lifetime lookup, setter and bounds-update costs.
 
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases
