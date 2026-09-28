@@ -96,12 +96,16 @@ invalidates the cache. Reuse omits only capture and sorting, never the live
 per-callback checks or alarm countdowns. Explicit caller-snapshot dispatch still
 captures fresh; the cache belongs exclusively to the bound combat owner.
 
-`ObjectAlarmMetadata` also retains up to 32 inherited handler records in a
-640-byte direct-mapped cache. The full object/alarm key is checked on a hit;
-collisions only cause another resource lookup. Initial mask resolution can
-populate handler entries, and rebinding invalidates every entry. The cached
-record includes the original owning object and code ID, including empty own
-events. It never contains an instance handle, countdown or exclusion flag.
+`ObjectAlarmMetadata::bind` prepares all inherited alarm handlers before
+gameplay. Each object has a 12-bit presence mask and a sparse-row offset;
+present handlers store the original owning object and code ID in alarm order,
+including empty own events. Lookup ranks the lower presence bits and reads
+the prepared row, with no inheritance walk or cache eviction during gameplay.
+The original pack expands to 389 handlers. The 512-handler capacity reserves
+4096 bytes, plus 1544 bytes for 386 masks/offsets and a four-byte object count.
+Binding fails closed on insufficient capacity or invalid input; partially
+prepared rows cannot be queried. Rebinding rebuilds the table. It never
+contains an instance handle, countdown or exclusion flag.
 Dispatch still resolves the current object after binding changes and checks
 each lifetime immediately before invoking its handler.
 

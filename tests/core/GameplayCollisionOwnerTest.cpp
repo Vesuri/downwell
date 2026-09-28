@@ -473,6 +473,10 @@ int main(){
     {
         ObjectAlarmMetadata<386> metadata;unsigned mask=0;
         assert(!metadata.mask(0,mask)&&metadata.bind(objects));
+        ObjectAlarmMetadata<386,388> tooSmall;
+        assert(!tooSmall.bind(objects)&&!tooSmall.mask(0,mask));
+        ObjectAlarmMetadata<386,389> exact;
+        assert(exact.bind(objects));
         unsigned inherited=0;
         for(unsigned pass=0;pass<2;++pass)for(unsigned id=0;id<objects.objectCount();++id){
             assert(metadata.mask(int(id),mask));
@@ -485,6 +489,9 @@ int main(){
                     assert(metadata.findEvent(int(id),alarm,cached)==found);
                     if(found)assert(cached.ownerObjectId==event.ownerObjectId&&
                         cached.eventType==event.eventType&&cached.eventSubtype==event.eventSubtype&&cached.codeId==event.codeId);
+                    PackedObjectEvent prepared{};
+                    assert(exact.findEvent(int(id),alarm,prepared)==found);
+                    if(found)assert(prepared.ownerObjectId==event.ownerObjectId&&prepared.codeId==event.codeId);
                 }
                 if(found&&event.ownerObjectId!=int(id))++inherited;
             }
