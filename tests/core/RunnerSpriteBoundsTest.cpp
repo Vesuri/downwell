@@ -18,7 +18,7 @@ int main(){
             auto scalar=[&](){return int(random()&65535u)-32768;};
             downwell::RunnerUnitBoundsVerification::Resource resource{scalar(),scalar(),scalar(),scalar(),scalar(),scalar()};
             const float x=float(int(random()&0x7fffffu)-0x400000),y=float(int(random()&0x7fffffu)-0x400000);
-            const auto sx=packed(i%7?1.f:-1.f),sy=packed(i%11?1.f:0.5f);
+            const auto sx=packed(i%7?1.f:-1.f),sy=packed(i%11?(i&1?-1.f:1.f):0.5f);
             auto px=packed(x),py=packed(y);
             if(i%13==0)px=packed(x+0.5f);
             if(i%17==0)py.bits=0x80000000u;

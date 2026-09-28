@@ -137,7 +137,7 @@ original order; failures stop immediately. If a policy changes an integer,
 conversion, sorting and far-edge subtraction use the retained binary32 path.
 Fractional positions, other scales/rotations and larger resources use
 `fromSpriteBinary32`. Differential host cases and the native field verifier
-cover reversed margins, signed zero, policy failures and extreme policy outputs.
+cover both mirror axes, reversed margins, signed zero, policy failures and extreme policy outputs.
 This adds neither a bounds cache nor a change in creation/query ordering.
 
 ## Rotated ordinary-sprite branch
