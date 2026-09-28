@@ -54,6 +54,14 @@ struct PackedRoomInstance {
     bool persistent() const { return (flags & 1U) != 0; }
 };
 
+// Serialized camera inputs, before following an instance or script setters.
+struct PackedRoomView {
+    bool enabled;
+    std::int32_t x, y, width, height;
+    std::int32_t portX, portY, portWidth, portHeight;
+    std::int32_t borderX, borderY, speedX, speedY, objectId;
+};
+
 struct PackedRoomLayer {
     std::uint32_t layerId;
     std::int32_t depth;
@@ -73,11 +81,13 @@ struct PackedRoomLayer {
 
 class RoomPack {
 public:
-    static constexpr std::uint16_t formatVersion = 3;
+    static constexpr std::uint16_t formatVersion = 4;
     static constexpr std::uint32_t manifestSchema = 3;
     static constexpr std::uint64_t sourceHashPrefix = 0xe00a94be5faf7dc0ULL;
     static constexpr std::size_t headerSize = 40;
-    static constexpr std::size_t roomRecordSize = 40;
+    static constexpr std::size_t viewCount = 8;
+    static constexpr std::size_t viewRecordSize = 56;
+    static constexpr std::size_t roomRecordSize = 40 + viewCount * viewRecordSize;
     static constexpr std::size_t instanceRecordSize = 48;
     static constexpr std::size_t layerRecordSize = 48;
     static constexpr std::size_t membershipRecordSize = 4;
@@ -94,6 +104,8 @@ public:
 
     bool room(std::uint32_t index, PackedRoom& output) const;
     bool findRoom(std::int32_t roomId, PackedRoom& output) const;
+    bool roomView(std::uint32_t roomIndex, std::uint32_t viewIndex,
+                  PackedRoomView& output) const;
     bool instance(std::uint32_t index, PackedRoomInstance& output) const;
     bool roomInstance(const PackedRoom& room,
                       std::uint32_t index,

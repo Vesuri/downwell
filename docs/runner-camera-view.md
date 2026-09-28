@@ -23,6 +23,15 @@ room-entry execution trace: intervening script camera setters, persistent-room
 reentry and the first follow publication still need integration/verification.
 Do not generalize the new-room copy path to all room transitions.
 
+Native room-pack format 4 retains all eight serialized view records per room,
+including disabled slots, signed coordinates, port rectangles and follow
+settings. `RoomPack::roomView` decodes them without adding camera objects or
+changing the rendering view. The rmMain resource starts at (0,0), with a
+160-by-284 view and parent-camera object 63 as its follow target. This metadata
+is the input to room-entry publication, not a replacement for the subsequent
+phase-aware follow/setter behavior. The additional pack storage is 11,200 bytes
+(25 rooms, eight 56-byte records); the decoder does not allocate a view array.
+
 ## Frame publication
 
 The followed instance `camMain` (object 64) is not the camera view cache.

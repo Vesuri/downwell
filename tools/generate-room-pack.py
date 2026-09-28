@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 MAGIC = b"DWRM"
-VERSION = 3
+VERSION = 4
 MANIFEST_SCHEMA = 3
 SOURCE_SHA256 = "c07daf5fbe940ae0a19503b5ba5137a56ee492753b1cea34b276a5cf7545fdb8"
 EXPECTED_ROOMS = 25
@@ -20,6 +20,10 @@ EXPECTED_LAYERS = 132
 
 HEADER = struct.Struct("<4sHHIIIIIQI")
 ROOM = struct.Struct("<iiiiiIIIII")
+VIEW = struct.Struct("<14i")
+VIEW_FIELDS = ("enabled", "viewX", "viewY", "viewWidth", "viewHeight",
+               "portX", "portY", "portWidth", "portHeight", "borderX", "borderY",
+               "speedX", "speedY", "objectId")
 INSTANCE = struct.Struct("<Iiii5fiiI")
 LAYER = struct.Struct("<IiIIIIiIIffI")
 MEMBERSHIP = struct.Struct("<I")
@@ -130,6 +134,7 @@ def build_pack(manifest, layer_metadata):
                 background.get("AnimationSpeedType", 0),
             ))
 
+        require(len(room["views"]) == 8, "expected eight serialized room views")
         room_records.append(ROOM.pack(
             room["id"],
             room["width"],
@@ -141,7 +146,8 @@ def build_pack(manifest, layer_metadata):
             len(room["instanceCreationOrder"]),
             first_layer,
             len(room["layers"]),
-        ))
+        ) + b"".join(VIEW.pack(*(view[field] for field in VIEW_FIELDS))
+                   for view in room["views"]))
 
     require(len(instance_records) == EXPECTED_INSTANCES,
             "unexpected total room instance count")

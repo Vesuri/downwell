@@ -91,6 +91,11 @@ std::vector<std::uint8_t> makePack(bool persistentController=true) {
     appendU32(bytes, 0);
     appendU32(bytes, 1);
 
+    for (unsigned view=0; view<downwell::RoomPack::viewCount; ++view) {
+        for (int value : {view==0?1:0, -16, 32, 160, 284, 0, 0, 320, 568,
+                          80, 300, -1, -1, 63})
+            appendI32(bytes, value);
+    }
     appendInstance(bytes, 100065, 37, persistentController);
     appendInstance(bytes, 100066, 36, false);
 
@@ -120,6 +125,18 @@ void testDecode() {
             "header counts are decoded");
     require(pack.nextRuntimeInstanceId() == 105187,
             "runtime instance allocator boundary is decoded");
+    downwell::PackedRoomView view;
+    require(pack.roomView(0, 0, view) && view.enabled && view.x==-16 &&
+            view.y==32 && view.width==160 && view.height==284 &&
+            view.portX==0 && view.portY==0 && view.portWidth==320 &&
+            view.portHeight==568 && view.borderX==80 && view.borderY==300 &&
+            view.speedX==-1 && view.speedY==-1 && view.objectId==63,
+            "serialized camera inputs retain signed coordinates and follow settings");
+    require(pack.roomView(0, 7, view) && !view.enabled,
+            "disabled camera slots are retained");
+    require(!pack.roomView(1, 0, view) && !pack.roomView(0, 8, view) &&
+            view.x==-16 && view.objectId==63,
+            "out of range camera reads leave output untouched");
 
     downwell::PackedRoom room;
     require(pack.findRoom(7, room), "room is found by resource ID");
@@ -412,6 +429,23 @@ void testGeneratedPack(const char* path) {
             "generated room pack has audited totals");
     require(pack.nextRuntimeInstanceId() == 105187,
             "generated pack carries authoritative GEN8.LastObj");
+    bool mainViewChecked=false;
+    for(unsigned i=0;i<pack.roomCount();++i){
+        downwell::PackedRoom entry;
+        require(pack.room(i,entry),"generated room decode");
+        for(unsigned slot=0;slot<pack.viewCount;++slot){
+            downwell::PackedRoomView view;
+            require(pack.roomView(i,slot,view),"all original view slots retained");
+            if(entry.roomId==11&&slot==0){
+                require(view.enabled&&view.x==0&&view.y==0&&view.width==160&&view.height==284&&
+                    view.portWidth==320&&view.portHeight==568&&view.borderX==80&&view.borderY==300&&
+                    view.speedX==-1&&view.speedY==-1&&view.objectId==63,
+                    "rmMain initial view comes from resource, not camera actor");
+                mainViewChecked=true;
+            }
+        }
+    }
+    require(mainViewChecked,"rmMain view was verified");
     unsigned instanceLayers=0,backgroundLayers=0,spriteBackgrounds=0;
     for(unsigned i=0;i<pack.layerCount();++i){
         downwell::PackedRoomLayer layer;require(pack.layer(i,layer),"generated layer decode");

@@ -172,6 +172,20 @@ bool RoomPack::room(std::uint32_t index, PackedRoom& output) const {
     return true;
 }
 
+bool RoomPack::roomView(std::uint32_t roomIndex, std::uint32_t viewIndex,
+                       PackedRoomView& output) const {
+    if (!valid() || roomIndex >= roomCount_ || viewIndex >= viewCount)
+        return false;
+    const auto* data = bytes_ + roomsOffset_ + roomIndex * roomRecordSize +
+                       40 + viewIndex * viewRecordSize;
+    output = {readI32(data) != 0,
+        readI32(data+4), readI32(data+8), readI32(data+12), readI32(data+16),
+        readI32(data+20), readI32(data+24), readI32(data+28), readI32(data+32),
+        readI32(data+36), readI32(data+40), readI32(data+44), readI32(data+48),
+        readI32(data+52)};
+    return true;
+}
+
 bool RoomPack::findRoom(std::int32_t roomId, PackedRoom& output) const {
     for (std::uint32_t index = 0; index < roomCount_; ++index) {
         if (room(index, output) && output.roomId == roomId)
