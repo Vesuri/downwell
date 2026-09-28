@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 bool nativeDebrisOwnership(GameplayWorld& world,downwell::DebrisEffects<2>& effects,
     downwell::GameplayCollisionOwner& owner,downwell::InstanceHandle& key){
@@ -718,6 +719,76 @@ int main(){
         }
     }
     assert(masks.valid());
+    for(bool high:{false,true}){
+        // Exercise the recovered Step against real resource-backed selectors
+        // and box writes. The bullet's own registration/event dispatch remains
+        // outside this fixture; no native storage order supplies the target.
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
+        assert(world->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
+        MachineGunSourceMotion motion;GameMakerRandom random(2);
+        assert(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),true));
+        ScriptSpawnEffects<4> effects;bool succeeded=true;unsigned child=~0u;
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
+            if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
+        auto muzzle=scriptSpawnOperations(effects,owner->scriptEffects(),frames,
+            [&](unsigned id){child=id;return true;},succeeded);
+        struct Ops {
+            GameplayCollisionOwner& owner;MachineGunSourceMotion& motion;const SpriteMaskPack& masks;
+            InstanceHandle selected{};unsigned lines=0,points=0,writes=0,approachWrites=0;
+            bool destroyed=false,approaching=false;
+            bool publishAngle(RunnerImageValue angle){return angle.bits==motion.imageAngle.bits;}
+            bool publishPosition(RunnerImageValue x,RunnerImageValue y){
+                if(approaching){
+                    assert((approachWrites%2==0?x.bits==motion.x.bits:y.bits==motion.y.bits));
+                    ++approachWrites;
+                }else{
+                    assert(destroyed&&(writes%2==0?y.bits==motion.y.bits:x.bits==motion.x.bits));
+                    ++writes;
+                }
+                return true;
+            }
+            bool query(int object,GameplayCollisionOwner::Owner::Result& result){
+                MotionBinary64 x,y;if(!motion.endpoint(x,y))return false;++lines;
+                return owner.projectileNonPreciseLine({},object,motion.x.promoted(),motion.y.promoted(),x,y,false,result);
+            }
+            bool line(int object,bool& hit){GameplayCollisionOwner::Owner::Result result;
+                if(!query(object,result))return false;hit=result.found;return true;}
+            bool selectWall(){GameplayCollisionOwner::Owner::Result result;
+                if(!query(59,result)||!result.found)return false;selected=result.handle;return true;}
+            bool approachSolid(){approaching=true;unsigned iterations=0;
+                const bool ok=motion.approachSolid([&](auto x,auto y,bool& hit){
+                    ++points;GameplayCollisionOwner::Owner::Result result;
+                    if(!owner.projectileSolidPoint({},x,y,false,masks,result))return false;
+                    hit=result.found;return true;
+                },[&](auto x,auto y){return publishPosition(x,y);},iterations);
+                approaching=false;return ok;
+            }
+            bool wallParent(int& parent){return owner.projectileWallParent(selected,parent);}
+            bool wallHealth(MotionBinary64& hp){return owner.projectileBoxHealth(selected,hp);}
+            bool wallHealthWrite(MotionBinary64 hp){return owner.projectileBoxHealthWrite(selected,hp);}
+            bool wallHit(){return owner.projectileBoxHit(selected);}
+            bool destroySelf(){destroyed=true;return true;}
+            bool effect(int,MotionBinary64,MotionBinary64){return false;}
+            bool soundWall(){return false;}bool explosion(int){return false;}
+            bool placeShootable(int,bool&){return false;}bool selectShootable(int){return false;}
+            bool thingHealth(MotionBinary64&){return false;}bool thingHealthWrite(MotionBinary64){return false;}
+            bool thingHit(){return false;}bool thingHitEffect(bool&){return false;}
+        } ops{*owner,motion,masks};
+        assert(MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded));
+        assert(succeeded&&ops.destroyed&&ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2);
+        assert(random.drawCount()==1&&child!=~0u&&owner->scriptEffects().size()==1);
+        const auto* box=world->findBreakable({0,1});assert(box);
+        const auto expected=MotionBinary64::fromInteger(1-machineGunProfile(high).damage);
+        assert(box->state.wallHp.high==expected.high&&box->state.wallHp.low==expected.low&&box->state.hit);
+        assert(box->active&&!box->destroyRequested); // Its Step, not bullet damage, owns destruction effects.
+        GameplayCollisionOwner::Owner::Result selected;
+        const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(512);
+        assert(owner->projectileSolidPoint({},x,y,false,masks,selected)&&selected.found&&
+            selected.handle.slot==ops.selected.slot&&selected.handle.generation==ops.selected.generation);
+    }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),

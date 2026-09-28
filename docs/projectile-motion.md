@@ -136,6 +136,18 @@ second-Step initialization. This shared event composition is not yet wired
 into the live schedulers: remaining target/effect/retirement adapters above
 still gate replacement of the approximate gun path.
 
+`GameplayCollisionOwnerTest` also composes this Step with resource-backed wall
+line/point selection, actual box health/hit writes and the registered script
+effect owner for its muzzle. Ordinary and gem-high Laser Sight profiles consume
+one spread draw, issue three line queries, approach the selected box through
+the original point-query loop, and retain both final position writes after the
+bullet's destruction request. The damaged box remains active and selectable;
+its own Step must produce destruction effects later. This is a controlled
+integration fixture, not live projectile admission: the bullet's own lifetime,
+position/angle publication, destruction request and event scheduling are still
+fixture callbacks. Shootable, stone-impact, audio, rendering and full shared
+RNG ordering are not established by this case.
+
 ## Collision lookup boundaries
 
 `verify-runner-line-point.py` pins the reviewed registrations, wrappers and
