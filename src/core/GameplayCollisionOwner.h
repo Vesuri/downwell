@@ -460,18 +460,41 @@ private:
         DW_PROFILE_SCOPE(profileAlarmScan);
         {DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
+        const auto bindingRevision=owner_.bindingRevision();
+        unsigned capturedAlarms=0;int previousObject=-1;
+        // Capture admitted resource-backed objects and sort grouped them.
+        // No callbacks occur here, so one lookup per group safely identifies
+        // entire event-table columns that cannot dispatch any captured entry.
+        for(unsigned i=0;i<count;++i){
+            const int object=snapshot.object(i);
+            if(object==previousObject)continue;
+            unsigned mask;
+            if(!check(alarmMetadata_.mask(object,mask)))return false;
+            capturedAlarms|=mask;previousObject=object;
+        }
         for(unsigned alarm=0;alarm<AlarmBank::count;++alarm){
+          if(!(capturedAlarms&(1u<<alarm))&&owner_.bindingsUnchanged(bindingRevision))continue;
           int cachedObject=-1;unsigned alarmMask=0;
           PackedObjectEvent event;bool eventCached=false,eventFound=false;
           for(unsigned i=0;i<count;++i){
-            const auto h=snapshot.handle(i);const auto* current=owner_.resolve(h);
-            if(!current||(current->flags&0x100003u))continue;
-            const int object=owner_.objectId(h);
+            const auto h=snapshot.handle(i);
+            const Owner::State* current=nullptr;
+            int object=snapshot.object(i);
+            // A captured object's absent event needs no instance lookup while
+            // bindings are unchanged. Any birth, retire, rebind or clear makes
+            // the rest of this pass use live lookup, including later alarms.
+            if(!owner_.bindingsUnchanged(bindingRevision)){
+                current=owner_.resolve(h);
+                if(!current||(current->flags&0x100003u))continue;
+                object=owner_.objectId(h);
+            }
             if(object!=cachedObject){
                 if(!check(alarmMetadata_.mask(object,alarmMask)))return false;
                 cachedObject=object;eventCached=false;
             }
             if(!(alarmMask&(1u<<alarm)))continue;
+            if(!current)current=owner_.resolve(h);
+            if(!current||(current->flags&0x100003u))continue;
             // Capture validated every admitted lifetime. Revalidate the typed
             // store before each real event, not for absent event-table entries.
             if(!check(resolves(h)))return false;

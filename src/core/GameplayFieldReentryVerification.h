@@ -14,6 +14,7 @@
 #include "RunnerUnitBoundsVerification.h"
 #include "RunnerLayerAllocationVerification.h"
 #include "RunnerIntegerValueVerification.h"
+#include "RunnerBindingRevisionVerification.h"
 namespace downwell {
 // Test-only lifecycle tape, shared by host tests and the 68000 debugger gate.
 // The exit is deliberately placed at the player; this is not evidence for a
@@ -36,6 +37,7 @@ struct GameplayFieldReentryVerification {
         if(!RunnerUnitBoundsVerification::run())return false;
         if(!RunnerLayerAllocationVerification::run())return false;
         if(!RunnerIntegerValueVerification::run())return false;
+        if(!RunnerBindingRevisionVerification::run())return false;
         if(!ProjectileViewRetirementVerification::run())return false;
         if(!DroneBulletRegistrationVerification::run(world,owner))return false;
         if(!SoundPlayVerification::run())return false;

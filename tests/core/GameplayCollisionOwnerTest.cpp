@@ -1,4 +1,5 @@
 #include "core/GameplayCollisionOwner.h"
+#include "core/RunnerBindingRevisionVerification.h"
 #include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
 bool nativeRegisteredTimeChange(downwell::GameplayCollisionOwner& owner,
@@ -296,6 +297,7 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
     assert(!world->findEnemy(dormant)&&world->resolveEnemyLifetime(dormant)==&overwritten);
 }
 int main(){
+    assert(downwell::RunnerBindingRevisionVerification::run());
     for(bool failSmoke:{false,true}){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         checkBoxBurstWorld(*world,failSmoke);

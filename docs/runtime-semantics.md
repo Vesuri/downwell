@@ -27,9 +27,14 @@ The portable `AlarmBank` currently models the required runner behavior:
 The native collision owner's captured alarm pass reuses inherited event
 metadata for consecutive instances whose current object ID matches. The
 resource pack is immutable; only its event mask and event descriptor are
-reused, separately for each alarm index. Lifetime, exclusion flags and current
-object ID are read again for every candidate, and typed ownership is checked
-before every admitted countdown. Callbacks still run synchronously and can
+reused, separately for each alarm index. While object/lifetime bindings remain
+unchanged since capture, an absent event is rejected from the captured object
+ID before resolving the instance. A saturating binding revision changes on
+birth, retirement, rebinding and clear; any change disables this shortcut for
+the rest of the pass, and saturation always uses live lookup. No cached binding
+can survive a callback mutation. A union of captured objects' event masks also
+skips entire absent alarm indices under the same revision guard. Lifetime and exclusion flags are checked
+before every admitted countdown, as is typed ownership. Callbacks still run synchronously and can
 change a later instance's countdown or retire it. No countdown or instance
 eligibility is cached. This does not extend the captured phase's existing
 same-phase birth semantics.

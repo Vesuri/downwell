@@ -55,6 +55,7 @@ public:
         for(unsigned i=0;i<count_;++i)entries_[i]=ordered[i];
     }
     unsigned size()const{return count_;}
+    int object(unsigned i)const{return i<count_?entries_[i].object:-1;}
     InstanceHandle handle(unsigned i)const{return i<count_?entries_[i].handle:InstanceHandle{};}
 };
 }

@@ -116,9 +116,14 @@ public:
         });
     }
     bool valid()const{return good_ && index_.valid();}
+    std::uint32_t bindingRevision()const{return bindingRevision_;}
+    bool bindingsUnchanged(std::uint32_t revision)const{
+        return revision!=0xffffffffu&&revision==bindingRevision_;
+    }
     // Clear retires memberships but preserves generation high-water marks.
     // Replacing the external handle domain requires replacing this owner too.
     void clear(){
+        changedBinding();
         membership_.clear();spatial_.clear();collision_.clear();index_.clear();
         for(auto& entry:entries_)entry.object=-1;
         good_=true;
@@ -133,6 +138,7 @@ public:
             (state.flags&0x8000u) || !Math::valid(state.x)||!Math::valid(state.y))return false;
         auto& e=entries_[h.slot];e.state=state;e.state.previous={state.x,state.y};
         e.object=object;e.generation=h.generation;
+        changedBinding();
         return membership_.bind(h.slot,object,h.generation);
     }
     // 0x50dbf8..0x50dc0a, before this instance's animation in active-room
@@ -165,6 +171,7 @@ public:
         if(!valid()||!live(h)||object<0)return false;
         membership_.unbind(h.slot);
         entries_[h.slot].object=object;
+        changedBinding();
         if(registered)membership_.bind(h.slot,object,h.generation);
         return true;
     }
@@ -429,7 +436,7 @@ public:
     bool retire(InstanceHandle h){
         if(!removeSpatialMembership(h))return false;
         membership_.unbind(h.slot);
-        entries_[h.slot].object=-1;return true;
+        entries_[h.slot].object=-1;changedBinding();return true;
     }
     unsigned pendingSpatial()const{return spatial_.size();}
     unsigned pendingCollision()const{return collision_.size();}
@@ -702,6 +709,8 @@ private:
     Queue spatial_,collision_;
     RunnerSpatialIndex<Nodes> index_;
     bool good_=true;
+    std::uint32_t bindingRevision_=0;
+    void changedBinding(){if(bindingRevision_!=0xffffffffu)++bindingRevision_;}
     bool* snapshotDirty_=nullptr;
     unsigned snapshotFirst_=0,snapshotLast_=0;
     bool checked(bool ok){if(!ok)good_=false;return ok;}
