@@ -21,7 +21,9 @@ struct RunnerSpriteChange {
         if(!frames)reset=!(negative&&magnitude>=0x3f800000u);
         else{
             RunnerImageValue bound;
-            if(!bound.assign(MotionBinary64::fromInteger(frames)))return false;
+            // The admitted frame count is <=65535: it is exactly representable
+            // in binary32, without a software binary64 intermediate on 68000.
+            if(!bound.assignInteger(static_cast<std::int32_t>(frames)))return false;
             reset=!negative&&magnitude>=bound.bits;
         }
         out={true,reset,reset&&frames!=0};return true;

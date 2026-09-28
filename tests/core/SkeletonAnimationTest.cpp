@@ -10,6 +10,18 @@ static bool same(downwell::MotionBinary64 v, double expected) {
 }
 int main() {
     unsigned changes=0;
+    // All admitted counts, just below/at/above the reset threshold. Retain the
+    // old binary64 conversion as an independent oracle for the narrowed bound.
+    for(unsigned frames=1;frames<=65535;++frames){
+        downwell::RunnerImageValue bound;
+        check(bound.assign(downwell::MotionBinary64::fromInteger(frames)));
+        for(int delta:{-1,0,1}){
+            downwell::RunnerSpriteChange::Result result;
+            check(downwell::RunnerSpriteChange::plan(1,2,{bound.bits+delta},frames,result));
+            check(result.changed&&result.resetIndex==(delta>=0)&&result.resetTimeline==(delta>=0));
+            ++changes;
+        }
+    }
     for(unsigned frames:{0u,1u,6u,8u,65535u})for(int eighth=-1024;eighth<=2048;++eighth){
         const float value=float(eighth)/8;
         downwell::RunnerImageValue index;std::memcpy(&index.bits,&value,4);
