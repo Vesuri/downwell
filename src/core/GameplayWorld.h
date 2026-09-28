@@ -556,17 +556,17 @@ public:
         return enemy?downwell::InstanceHandle{enemy->identitySlot,enemy->lifetimeId}:downwell::InstanceHandle{};
     }
     const EnemyState* findEnemy(downwell::InstanceHandle handle) const {
-        if(handle.slot>=enemyCapacity||!handle.generation||!enemyIdentitySlots_[handle.slot])return nullptr;
-        const auto* enemy=findEnemy(handle.generation);
-        return enemy&&enemy->identitySlot==handle.slot?enemy:nullptr;
+        const auto* enemy=resolveEnemyLifetime(handle);
+        return enemy&&(enemy->active||enemy->activationPending)?enemy:nullptr;
     }
     // Lifetime resolution must not discard inactive records before collision
     // dispatch applies its own source-specific exclusion checks.
     const EnemyState* resolveEnemyLifetime(downwell::InstanceHandle handle) const {
-        if(handle.slot>=enemyCapacity||!handle.generation||!enemyIdentitySlots_[handle.slot])return nullptr;
-        for(unsigned i=0;i<enemyCount_;++i)
-            if(enemies_[i].identitySlot==handle.slot&&enemies_[i].lifetimeId==handle.generation)return &enemies_[i];
-        return nullptr;
+        if(handle.slot>=enemyCapacity||!handle.generation||!enemySlotIndex_[handle.slot])return nullptr;
+        const unsigned index=enemySlotIndex_[handle.slot]-1;
+        if(index>=enemyCount_)return nullptr;
+        const auto& enemy=enemies_[index];
+        return enemy.identitySlot==handle.slot&&enemy.lifetimeId==handle.generation?&enemy:nullptr;
     }
     const downwell::FlashBallEffects<32>& flashEffects() const {return run_.flashEffects;}
     const downwell::CorpseExpiryEffects<32>& corpseExpiryEffects()const{return run_.corpseExpiryEffects;}
@@ -813,7 +813,10 @@ private:
     bool (*enemyOrderCapture_)(void*,EnemyStepOrder&)=nullptr;
     void* enemyOrderContext_=nullptr;
     bool captureEnemyStepOrder();
-    bool enemyIdentitySlots_[enemyCapacity]{};
+    // Index + 1; zero means no lifetime owns this slot. This is lookup only,
+    // never traversal order. Update moved records during stable compaction.
+    static_assert(enemyCapacity<=65535,"enemy index must fit its slot directory");
+    unsigned short enemySlotIndex_[enemyCapacity]{};
     GemState gems_[gemCapacity];
     unsigned enemyCount_;
     downwell::GameMakerRandom enemyRandom_;

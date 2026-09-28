@@ -147,7 +147,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
     for (unsigned i = 0; i < enemyCapacity; ++i) {
         enemies_[i].active = false;
         enemies_[i].identitySlot = 0xffffu;
-        enemyIdentitySlots_[i] = false;
+        enemySlotIndex_[i] = 0;
     }
     for (unsigned i = 0; i < gemCapacity; ++i) gems_[i].active = false;
     generationStep_ = nullptr; generationContext_ = nullptr;
@@ -344,7 +344,7 @@ bool GameplayWorld::retireEnemyOwnership(EnemyState& enemy) {
         run_.effectsSucceeded=false;
         return false;
     }
-    enemyIdentitySlots_[enemy.identitySlot]=false;
+    enemySlotIndex_[enemy.identitySlot]=0;
     enemy.identitySlot=0xffffu;
     return true;
 }
@@ -391,10 +391,10 @@ bool GameplayWorld::configureEnemy(unsigned index, int objectId,
     if(index<enemyCount_ && !retireEnemyOwnership(enemy))return false;
     if(index>=enemyCount_ || slot>=enemyCapacity){
         slot=0;
-        while(slot<enemyCapacity&&enemyIdentitySlots_[slot])++slot;
+        while(slot<enemyCapacity&&enemySlotIndex_[slot])++slot;
     }
     if(slot==enemyCapacity){run_.effectsSucceeded=false;return false;}
-    enemyIdentitySlots_[slot]=true;
+    enemySlotIndex_[slot]=static_cast<unsigned short>(index+1);
     enemy.identitySlot=static_cast<unsigned short>(slot);
     enemy.lifetimeId = nextEnemyLifetimeId_++;
     enemy.objectId = objectId;
@@ -584,7 +584,11 @@ bool GameplayWorld::retireMarkedEnemy(downwell::InstanceHandle handle) {
     if(!run_.effectsSucceeded||!enemy||!enemy->destroyRequested){run_.effectsSucceeded=false;return false;}
     const unsigned index=unsigned(enemy-enemies_);
     if(!retireEnemyOwnership(*enemy))return false;
-    for(unsigned next=index+1;next<enemyCount_;++next)enemies_[next-1]=enemies_[next];
+    for(unsigned next=index+1;next<enemyCount_;++next){
+        enemies_[next-1]=enemies_[next];
+        if(enemies_[next-1].identitySlot<enemyCapacity)
+            enemySlotIndex_[enemies_[next-1].identitySlot]=static_cast<unsigned short>(next);
+    }
     --enemyCount_;
     enemies_[enemyCount_].identitySlot=0xffffu;
     enemies_[enemyCount_].lifetimeId=0;
@@ -1350,8 +1354,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
         [this, &retiredEnemies](unsigned i) {
             const unsigned index = i - retiredEnemies;
             if(!retireEnemyOwnership(enemies_[index]))return false;
-            for (unsigned next = index + 1; next < enemyCount_; ++next)
+            for (unsigned next = index + 1; next < enemyCount_; ++next){
                 enemies_[next - 1] = enemies_[next];
+                if(enemies_[next-1].identitySlot<enemyCapacity)
+                    enemySlotIndex_[enemies_[next-1].identitySlot]=static_cast<unsigned short>(next);
+            }
             --enemyCount_;
             enemies_[enemyCount_].identitySlot=0xffffu;
             ++retiredEnemies;

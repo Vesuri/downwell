@@ -172,6 +172,47 @@ struct BulletAudit {
     bool membership(InstanceHandle,const Record&,bool){return true;}
     bool mask(InstanceHandle,const Record&,int){return true;}
 };
+static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollisionPack& sprites){
+    auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+    auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+        owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+    assert(owner->attach(*world));
+    InstanceHandle handles[24]{};bool retired[24]{};
+    for(unsigned i=0;i<24;++i){
+        assert(world->createGeneratedInstance({112,240+int(i)*16,512},objects,[](const auto&){return true;}));
+        const auto& e=world->enemyAt(i);handles[i]={e.identitySlot,e.lifetimeId};
+    }
+    const auto check=[&](){
+        for(unsigned i=0;i<24;++i){
+            const GameplayWorld::EnemyState* expected=nullptr;
+            for(unsigned j=0;j<world->enemyCount();++j){
+                const auto& e=world->enemyAt(j);
+                if(e.identitySlot==handles[i].slot&&e.lifetimeId==handles[i].generation)expected=&e;
+            }
+            assert((expected==nullptr)==retired[i]);
+            assert(world->resolveEnemyLifetime(handles[i])==expected);
+            assert(world->findEnemy(handles[i])==expected);
+        }
+    };
+    check();
+    // Middle, head and tail removals keep source traversal stable while the
+    // borrowed record addresses change. Compare every indexed lookup to scan.
+    for(unsigned parity=0;parity<2;++parity)for(unsigned i=parity;i<24;i+=2){
+        assert(world->markEnemyDestroyed(handles[i])&&owner->prepareDraw());
+        retired[i]=true;check();
+    }
+    assert(world->enemyCount()==0);
+    assert(world->createGeneratedInstance({112,240,512},objects,[](const auto&){return true;}));
+    const auto& next=world->enemyAt(0);const InstanceHandle replacement{next.identitySlot,next.lifetimeId};
+    assert(replacement.slot==handles[0].slot&&replacement.generation!=handles[0].generation);
+    assert(!world->resolveEnemyLifetime(handles[0])&&world->resolveEnemyLifetime(replacement)==&next);
+    assert(world->configureEnemy(0,112,163,0,336,0,0,5,14,0,0,-1,-1,0,0,false));
+    const auto& overwritten=world->enemyAt(0);const InstanceHandle dormant{overwritten.identitySlot,overwritten.lifetimeId};
+    assert(!world->resolveEnemyLifetime(replacement)&&world->resolveEnemyLifetime(dormant)==&overwritten);
+    auto& flags=const_cast<GameplayWorld::EnemyState&>(overwritten);
+    flags.activationPending=false;
+    assert(!world->findEnemy(dormant)&&world->resolveEnemyLifetime(dormant)==&overwritten);
+}
 int main(){
     for(unsigned failure=1;failure<=7;++failure){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
@@ -309,6 +350,7 @@ int main(){
     }
     auto ob=read("generated/downwell-objects.dwob"),sb=read("generated/downwell-sprites.dwsc");
     ObjectPack objects(ob.data(),ob.size());SpriteCollisionPack sprites(sb.data(),sb.size());
+    checkEnemySlotDirectory(objects,sprites);
     const auto mb=read("generated/downwell-sprite-masks.dwsm");SpriteMaskPack masks(mb.data(),mb.size());
     {
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
@@ -729,6 +771,9 @@ int main(){
             assert(world->createGeneratedInstance({object,240,512},objects,[](const auto&){return true;}));
         const auto first=world->enemyHandle(world->enemyAt(0).lifetimeId);
         const auto survivor=world->enemyHandle(world->enemyAt(1).lifetimeId);
+        assert(!world->resolveEnemyLifetime({GameplayWorld::enemyCapacity,1})&&
+            !world->resolveEnemyLifetime({first.slot,0})&&
+            !world->resolveEnemyLifetime({first.slot,first.generation+100}));
         const InstanceHandle box{0,1};assert(world->findBreakable(box));
         const auto wall=owner->terrain().handle(0);
         assert(world->markEnemyDestroyed(first)&&world->markEnemyDestroyed(first));
