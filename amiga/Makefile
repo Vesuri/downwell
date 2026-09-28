@@ -18,6 +18,7 @@ LASER_VERIFY ?= 0
 RESULTS_RESTART_VERIFY ?= 0
 BOB_VERIFY ?= 0
 EXIT_WIPE_VERIFY ?= 0
+ENTRY_WIPE_VERIFY ?= 0
 CLEAR_VERIFY ?= 0
 NATURAL_VERIFY ?= 0
 SKIP_INTRO ?= 0
@@ -66,6 +67,12 @@ CFLAGS := -g $(AMIGA_OPTIMIZATION) -flto -m68000 -msoft-float -nostdlib -MP -MMD
 	-Wall -Wextra -Wpedantic -DNO_ASSEMBLER -DDOWNWELL_PLATFORM_AMIGA
 ifeq ($(EXIT_WIPE_VERIFY),1)
 CFLAGS += -DDOWNWELL_EXIT_WIPE_VERIFY
+endif
+ifeq ($(ENTRY_WIPE_VERIFY),1)
+ifeq ($(EXIT_WIPE_VERIFY),1)
+$(error ENTRY_WIPE_VERIFY and EXIT_WIPE_VERIFY are mutually exclusive)
+endif
+CFLAGS += -DDOWNWELL_ENTRY_WIPE_VERIFY
 endif
 ifeq ($(CLEAR_VERIFY),1)
 CFLAGS += -DDOWNWELL_CLEAR_VERIFY -DDOWNWELL_SCENE_VERIFY
@@ -147,6 +154,7 @@ LDFLAGS := -Wl,--emit-relocs,--gc-sections,-Ttext=0,-Map=$(OUT).map
 AMIGA_HUD := $(REPO)/generated/amiga-hud.dwap
 AMIGA_GAME := $(REPO)/generated/amiga-game.dwap
 AMIGA_EXIT_MASK := $(REPO)/generated/amiga-game.exit-mask
+AMIGA_ENTRY_MASK := $(REPO)/generated/amiga-game.entry-mask
 AMIGA_SELECTION_MASK := $(REPO)/generated/amiga-game.selection-mask
 AMIGA_RESULTS := $(REPO)/generated/amiga-results.dwap
 AMIGA_SHOP := $(REPO)/generated/amiga-shop.dwap
@@ -449,10 +457,13 @@ $(BUILDER_PACK):
 $(AMIGA_EXIT_MASK): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
+$(AMIGA_ENTRY_MASK): $(AMIGA_GAME)
+	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
+
 $(AMIGA_SELECTION_MASK): $(AMIGA_GAME)
 	@test -f $@ || $(MAKE) -C $(REPO) generate-amiga-game
 
-obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_SELECTION_MASK) \
+obj/AmigaAssets.o: $(AMIGA_SRC)/AmigaAssets.s $(AMIGA_HUD) $(AMIGA_GAME) $(AMIGA_EXIT_MASK) $(AMIGA_ENTRY_MASK) $(AMIGA_SELECTION_MASK) \
 		$(AMIGA_RESULTS) $(AMIGA_SHOP) $(AMIGA_CLEAR) $(ROOM_PACK) $(OBJECT_PACK) $(COLLISION_PACK) $(COLLISION_MASK_PACK) $(BUILDER_PACK)
 	@mkdir -p $(@D)
 	$(AS) $(ASFLAGS) -o $@ $<

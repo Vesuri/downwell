@@ -45,6 +45,7 @@ __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile
 #include "AmigaSceneRuntime.h"
 #include "GameplaySceneStorage.h"
 #include "AmigaExitMask.h"
+#include "AmigaEntryMask.h"
 #include "AmigaClearPresenter.h"
 #include "AmigaClearSceneAssets.h"
 #include "AmigaUpgradeScene.h"
@@ -103,6 +104,8 @@ extern const UBYTE amiga_game_pack_end[];
 extern const UBYTE amiga_results_pack[];
 extern const UBYTE amiga_exit_mask[];
 extern const UBYTE amiga_exit_mask_end[];
+extern const UBYTE amiga_entry_mask[];
+extern const UBYTE amiga_entry_mask_end[];
 extern const UBYTE amiga_selection_mask[];
 extern const UBYTE amiga_selection_mask_end[];
 extern const UBYTE amiga_results_pack_end[];
@@ -209,7 +212,12 @@ const UBYTE* gDownwellShopPack;
 volatile ULONG gDownwellShopAssetBytes;
 static UBYTE* overlayAssetStorage;
 static unsigned overlayAssetCapacity;
-static bool exitMaskResident;
+enum class ResidentCover {none,exit,entry};
+static ResidentCover residentCover;
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+volatile ULONG gDownwellEntryWipeFrames,gDownwellEntryWipeFailures;
+__attribute__((noinline, used)) void downwellEntryWipeReady(){__asm__ volatile("" ::: "memory");}
+#endif
 #ifdef DOWNWELL_EXIT_WIPE_VERIFY
 volatile ULONG gDownwellExitWipeFrames, gDownwellExitWipeFailures;
 __attribute__((noinline, used)) void downwellExitWipeReady() { __asm__ volatile("" ::: "memory"); }
@@ -241,7 +249,7 @@ __attribute__((noinline, used)) void downwellClearReady() { __asm__ volatile("" 
 // Drain the blitter before replacing a bank it may still be reading. Hardware
 // sprites and display bitplanes never point into this immutable artwork region.
 static bool selectOverlayAssetBank(bool shop) {
-    if (exitMaskResident) return false; // DMA owns this bank until scene retirement.
+    if (residentCover!=ResidentCover::none) return false; // DMA owns this bank until scene retirement.
     if ((shop && gDownwellShopPack) || (!shop && gDownwellResultsPack)) return true;
     const UBYTE* source = shop ? amiga_shop_pack : amiga_results_pack;
     const UBYTE* end = shop ? amiga_shop_pack_end : amiga_results_pack_end;
@@ -257,7 +265,8 @@ static bool selectOverlayAssetBank(bool shop) {
     return true;
 }
 static bool selectExitMaskBank() {
-    if (exitMaskResident) return true;
+    if (residentCover==ResidentCover::exit) return true;
+    if (residentCover!=ResidentCover::none) return false;
     if (!overlayAssetStorage || AmigaExitMask::bytes > overlayAssetCapacity ||
         amiga_exit_mask_end - amiga_exit_mask != AmigaExitMask::bytes) return false;
     AmigaHardware::blitterDrain();
@@ -265,9 +274,21 @@ static bool selectExitMaskBank() {
         overlayAssetStorage[i] = amiga_exit_mask[i];
     gDownwellResultsPack = gDownwellShopPack = nullptr;
     gDownwellResultsAssetBytes = gDownwellShopAssetBytes = 0;
-    exitMaskResident = true;
+    residentCover = ResidentCover::exit;
     return true;
 }
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+static bool selectEntryMaskBank(){
+    if(residentCover==ResidentCover::entry)return true;
+    if(residentCover!=ResidentCover::none||!overlayAssetStorage||AmigaEntryMask::bytes>overlayAssetCapacity||
+       amiga_entry_mask_end-amiga_entry_mask!=AmigaEntryMask::bytes)return false;
+    AmigaHardware::blitterDrain();
+    for(unsigned i=0;i<AmigaEntryMask::bytes;++i)overlayAssetStorage[i]=amiga_entry_mask[i];
+    gDownwellResultsPack=gDownwellShopPack=nullptr;
+    gDownwellResultsAssetBytes=gDownwellShopAssetBytes=0;
+    residentCover=ResidentCover::entry;return true;
+}
+#endif
 volatile ULONG gDownwellResultsAssetFailures;
 volatile ULONG gDownwellResultsBackdropFailures;
 volatile ULONG gDownwellResultsBackdropChecks;
@@ -2019,7 +2040,7 @@ __attribute__((noinline)) static int runDownwell(void) {
                     activeHudPackEnd = activeHudPack + hudBytes;
                     overlayAssetStorage = memory.menuForeground() + storage.resultsOffset;
                     overlayAssetCapacity = storage.resultsCapacity;
-                    exitMaskResident = false;
+                    residentCover = ResidentCover::none;
                     // Retired intro DMA is blank. Copy immutable, already planar
                     // assets once; never convert or copy them per results frame.
                     gDownwellResultsPack = gDownwellShopPack = nullptr;
@@ -2985,6 +3006,28 @@ __attribute__((noinline)) static int runDownwell(void) {
                 downwellGameplayRenderFailure();
                 break;
             }
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+            // Presentation-only fixture, independent of unfinished native
+            // controller lifetimes. Retain one immutable bank across both slots.
+            if(!selectEntryMaskBank()){exitCode=20;break;}
+            const int entryY=gDownwellEntryWipeFrames?320+int(gDownwellEntryWipeFrames-1)*16:-116;
+            unsigned entryOffset;
+            if(!AmigaEntryMask::offset(entryY,entryOffset)||
+               !gameplayScene.entryMask(back,overlayAssetStorage,AmigaEntryMask::bytes,entryY)){
+                exitCode=20;break;
+            }
+            const auto& entryList=gameplayScene.copper(back);
+            const UWORD* entryWords=entryList.data();
+            if(entryWords[entryList.moveOffset(0x100)+1]!=0x6401)++gDownwellEntryWipeFailures;
+            for(unsigned reg=0xf0;reg<=0xf4;reg+=4){
+                const unsigned at=entryList.moveOffset(reg);
+                const ULONG pointer=(ULONG(entryWords[at+1])<<16)|entryWords[at+3];
+                if(pointer!=ULONG(overlayAssetStorage+entryOffset+downwellFetchCropBytes))++gDownwellEntryWipeFailures;
+            }
+            for(unsigned i=0;i<AmigaEntryMask::bytes;++i)
+                if(overlayAssetStorage[i]!=amiga_entry_mask[i])++gDownwellEntryWipeFailures;
+            ++gDownwellEntryWipeFrames;
+#else
             const UBYTE* exitMask = nullptr;
             if (port.exitDither().active) {
                 if (!selectExitMaskBank()) { exitCode = 20; break; }
@@ -2992,9 +3035,13 @@ __attribute__((noinline)) static int runDownwell(void) {
                     port.exitDither().y - (mainInitialViewY + port.cameraOffsetY()));
             }
             if (!gameplayScene.mask(back, exitMask)) { exitCode = 20; break; }
+#endif
             /* AmigaPlatform makes the published list live at next VBlank. */
             DW_PROFILE_PHASE(profilePublish);
             platform.publish(gameplayScene.copper(back));
+#ifdef DOWNWELL_ENTRY_WIPE_VERIFY
+            if(gDownwellEntryWipeFrames==25){platform.waitVblank();downwellEntryWipeReady();}
+#endif
 #ifdef DOWNWELL_NATURAL_VERIFY
             if (naturalRoute.done) { platform.waitVblank(); downwellNaturalReady(); }
 #endif

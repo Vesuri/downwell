@@ -93,8 +93,19 @@ copper slot. Valid calls reuse the existing two mask-plane pointer patches and
 display-mode patch; neither a copper rebuild nor bitmap conversion is needed.
 The caller must retain the bank until both displayed slots stop referencing it.
 Scene tests use copper-method doubles; pixel tests compare 917 viewports with
-the source sprite. This does not yet establish live native entry-wipe timing or
-DMA ownership: automatic effect admission and asset-bank residency remain open.
+the source sprite. `make verify-amiga-entry-wipe` additionally runs a native
+presentation fixture through 25 frames, covering the lowest supported position,
+the edge sweep and fully transparent padding. It checks both mask DMA pointers,
+six-plane mode and unchanged bank bytes before returning from the final VBlank.
+The test uses the retired-garden overlay region, with a distinct resident-cover
+tag that prevents shop/results or the exit cover from overwriting an entry bank.
+It has a 45-second emulator deadline (configurable up to 60), stops its emulator,
+and restores the normal build. The A500 test configuration has 512 KiB Chip and
+8 MiB Fast RAM; this is neither a stock-memory proof nor a frame-budget result.
+The immutable entry asset adds 31,104 bytes to executable data, with no new
+Chip allocation. Its bank-selection path is currently verification-only.
+Automatic native lifetime admission, release after both display slots retire,
+and production entry-wipe timing remain open.
 
 Currency is also a `drawFx` producer, not an independent direct sprite in the
 normal path. `objCurrency_Draw_0` selects sprite 133/134 for small/large gems,

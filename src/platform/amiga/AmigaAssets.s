@@ -21,6 +21,13 @@ amiga_exit_mask:
 amiga_exit_mask_end:
 
 	.balign 4
+	.globl amiga_entry_mask
+amiga_entry_mask:
+	.incbin "../generated/amiga-game.entry-mask"
+	.globl amiga_entry_mask_end
+amiga_entry_mask_end:
+
+	.balign 4
 	.globl amiga_selection_mask
 amiga_selection_mask:
 	.incbin "../generated/amiga-game.selection-mask"

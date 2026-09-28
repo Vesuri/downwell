@@ -2117,6 +2117,10 @@ verify-amiga-clear-scene:
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_clear.gdb READY_MARKER=DOWNWELL_CLEAR_READY READY_DESCRIPTION="two native clears and third-level reentry" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-360} amiga/verify_startup.sh'
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4'
 .PHONY: verify-amiga-exit-wipe
+.PHONY: verify-amiga-entry-wipe
+verify-amiga-entry-wipe:
+	bash amiga/verify_entry_wipe.sh
+
 verify-amiga-exit-wipe:
 	bash -c '. amiga/env.sh && $(MAKE) -C amiga clean && $(MAKE) -C amiga -j4 SKIP_TO_GAME=1 EXIT_WIPE_VERIFY=1'
 	bash -c '. amiga/env.sh && GDB_SOURCE=verify_exit_wipe.gdb READY_MARKER=DOWNWELL_EXIT_WIPE_READY READY_DESCRIPTION="exit wipe DMA" VERIFY_TIMEOUT_SECONDS=$${VERIFY_TIMEOUT_SECONDS:-45} amiga/verify_startup.sh'
