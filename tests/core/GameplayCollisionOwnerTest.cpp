@@ -1945,6 +1945,34 @@ int main(){
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
+        auto& drones=owner->droneBullets();InstanceHandle local,shared;
+        assert(drones.create(105190,MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(1200),local)&&
+            GameplayCollisionView::encode(GameplayCollisionView::Kind::drone,local,shared));
+        for(unsigned tick=1;tick<=16;++tick){
+            world->step(0);
+            const auto* record=drones.find(local);
+            assert(world->effectsSucceeded()&&record&&record->state.decelerate==(tick==16));
+        }
+        // Exercise the actual pre-Step room animation dispatch and deferred
+        // cleanup, not a direct call to the projectile animation helper.
+        assert(drones.dispatch(local,[](auto& state,auto&,bool&){
+            state.animation=true;state.imageSpeed={0x3f000000u};
+            state.timeline={0x40b00000u};state.imageIndex=state.timeline;return true;
+        }));
+        world->step(0);
+        assert(world->effectsSucceeded()&&owner->prepareDraw()&&!drones.find(local)&&!owner->state(shared));
+        InstanceHandle retained;
+        assert(drones.create(105191,{},{},retained));
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        assert(world->droneBullets()==&drones&&!drones.find(retained)&&drones.size()==0&&owner->valid());
+        InstanceHandle replacement;
+        assert(drones.create(105192,{},{},replacement)&&replacement.generation>retained.generation&&drones.clear());
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));
         for(unsigned i=0;i<8;++i){world->step(4);assert(world->effectsSucceeded()&&owner->prepareDraw());}
         assert(world->bulletCount()==2);
         const auto local=[](const auto& b){return InstanceHandle{b.identitySlot,b.lifetimeId};};

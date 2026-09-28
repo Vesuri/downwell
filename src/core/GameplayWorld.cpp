@@ -40,6 +40,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if (destination == downwell::ResultsDestination::none) return destination;
     if(!clearRoomTimeChanges())return downwell::ResultsDestination::none;
     if(entryDithers_&&!entryDithers_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
+    if(droneBullets_&&!droneBullets_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(!clearRoomDebris())return downwell::ResultsDestination::none;
     if(!clearRoomScriptEffects())return downwell::ResultsDestination::none;
     if(!run_.effectsSucceeded||!clearBulletOwnership())return downwell::ResultsDestination::none;
@@ -54,6 +55,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto debrisInstances=debrisInstances_;
     const auto timeChangeInstances=timeChangeInstances_;
     const auto entryDithers=entryDithers_;
+    const auto droneBullets=droneBullets_;
     const auto phaseBoundary=phaseBoundary_;
     const auto roomAnimation=roomAnimation_;
     const auto roomAlarms=roomAlarms_;void* const roomAlarmsContext=roomAlarmsContext_;
@@ -95,6 +97,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     debrisInstances_=debrisInstances;
     timeChangeInstances_=timeChangeInstances;
     entryDithers_=entryDithers;
+    droneBullets_=droneBullets;
     configurePhaseBoundary(phaseBoundary,phaseBoundaryContext);
     configureRoomAnimation(roomAnimation,roomAnimationContext);
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
@@ -162,6 +165,7 @@ bool GameplayWorld::prepareNextAreaOneLevel(const downwell::Input& input, unsign
         run_.stage.area != 1 || run_.stage.level >= 3) return false;
     if(!clearRoomTimeChanges())return false;
     if(entryDithers_&&!entryDithers_->clear())return run_.effectsSucceeded=false;
+    if(droneBullets_&&!droneBullets_->clear())return run_.effectsSucceeded=false;
     if(!clearRoomDebris())return false;
     if(!clearRoomScriptEffects())return false;
     if (!run_.effectsSucceeded || !clearEnemyOwnership() || !clearBreakableOwnership() || !retirePlayerOwnership()) return false;

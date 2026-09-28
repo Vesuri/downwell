@@ -8,7 +8,7 @@ namespace downwell {
 // and lifetimeId do not. Borrowed views never cache pointers across a mutation.
 class GameplayCollisionView {
 public:
-    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither};
+    enum class Kind {player,enemy,breakable,terrain,timeField,goalField,exitController,bullet,scriptEffect,debris,timeChange,entryDither,drone};
     static constexpr unsigned enemyBase=1;
     static constexpr unsigned breakableBase=enemyBase+GameplayWorld::enemyCapacity;
     static constexpr unsigned terrainBase=breakableBase+GameplayWorld::breakableCapacity;
@@ -20,7 +20,8 @@ public:
     static constexpr unsigned debrisBase=scriptEffectBase+GameplayScriptSpawnInstances::capacity;
     static constexpr unsigned timeChangeBase=debrisBase+GameplayDebrisInstances::capacity;
     static constexpr unsigned entryDitherBase=timeChangeBase+8;
-    static constexpr unsigned capacity=entryDitherBase+GameplayEntryDithers::capacity;
+    static constexpr unsigned droneBase=entryDitherBase+GameplayEntryDithers::capacity;
+    static constexpr unsigned capacity=droneBase+GameplayWorld::droneBulletCapacity;
     struct Record {
         const GameplayWorld::PlayerInstance* player=nullptr;
         const GameplayWorld::EnemyState* enemy=nullptr;
@@ -34,6 +35,7 @@ public:
         const GameplayDebrisInstances::Record* debris=nullptr;
         const NativeTimeChangeRegistration::Record* timeChange=nullptr;
         const GameplayEntryDithers::Record* entryDither=nullptr;
+        const GameplayWorld::DroneBullets::Record* drone=nullptr;
     };
     explicit GameplayCollisionView(const GameplayWorld& world):world_(world){}
     static bool encode(Kind kind,InstanceHandle local,InstanceHandle& key){
@@ -52,6 +54,7 @@ public:
             case Kind::debris:base=debrisBase;count=GameplayDebrisInstances::capacity;break;
             case Kind::timeChange:base=timeChangeBase;count=8;break;
             case Kind::entryDither:base=entryDitherBase;count=GameplayEntryDithers::capacity;break;
+            case Kind::drone:base=droneBase;count=GameplayWorld::droneBulletCapacity;break;
             default:return false;
         }
         if(local.slot>=count)return false;
@@ -59,6 +62,7 @@ public:
     }
     static bool decode(InstanceHandle key,Kind& kind,InstanceHandle& local){
         if(!key.generation||key.slot>=capacity)return false;
+        if(key.slot>=droneBase){kind=Kind::drone;local={key.slot-droneBase,key.generation};return true;}
         if(key.slot>=entryDitherBase){kind=Kind::entryDither;local={key.slot-entryDitherBase,key.generation};return true;}
         if(key.slot>=timeChangeBase){kind=Kind::timeChange;local={key.slot-timeChangeBase,key.generation};return true;}
         const unsigned base=key.slot<enemyBase?0:key.slot<breakableBase?enemyBase:key.slot<terrainBase?breakableBase:key.slot<timeFieldBase?terrainBase:key.slot<goalFieldBase?timeFieldBase:key.slot<exitControllerBase?goalFieldBase:key.slot<bulletBase?exitControllerBase:key.slot<scriptEffectBase?bulletBase:key.slot<debrisBase?scriptEffectBase:debrisBase;
@@ -107,6 +111,9 @@ private:
                 break;
             case Kind::entryDither:
                 if(!world_.entryDithers()||!(next.entryDither=world_.entryDithers()->find(local)))return false;
+                break;
+            case Kind::drone:
+                if(!world_.droneBullets()||!(next.drone=world_.droneBullets()->find(local)))return false;
                 break;
         }
         if constexpr(Publish)*record=next;

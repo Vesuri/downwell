@@ -20,6 +20,7 @@
 #include "core/GameplayGoalFields.h"
 #include "core/GameplayExitControllers.h"
 #include "core/GameplayEntryDithers.h"
+#include "core/DroneBulletInstances.h"
 #include "core/GameplayScriptSpawnInstances.h"
 #include "core/GameplayDebrisInstances.h"
 #include "core/GameplayTimeChangeRegistration.h"
@@ -239,6 +240,13 @@ public:
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
     const downwell::NativeTimeChangeRegistration* timeChangeInstances()const{return timeChangeInstances_;}
     const downwell::GameplayEntryDithers* entryDithers()const{return entryDithers_;}
+    using DroneBullets=downwell::DroneBulletInstances<32>;
+    static constexpr unsigned droneBulletCapacity=32;
+    const DroneBullets* droneBullets()const{return droneBullets_;}
+    bool bindDroneBullets(DroneBullets& bullets){
+        if(droneBullets_||!bullets.valid()||bullets.size())return false;
+        droneBullets_=&bullets;return true;
+    }
     bool bindEntryDithers(downwell::GameplayEntryDithers& entries){
         if(entryDithers_||!entries.valid()||entries.size())return false;
         entryDithers_=&entries;return true;
@@ -905,6 +913,7 @@ private:
     downwell::GameplayDebrisInstances* debrisInstances_=nullptr;
     downwell::NativeTimeChangeRegistration* timeChangeInstances_=nullptr;
     downwell::GameplayEntryDithers* entryDithers_=nullptr;
+    DroneBullets* droneBullets_=nullptr;
     downwell::TimeChangeEffects<8>* timeChangeEffects_=nullptr;
     int* timeChangeSpeed_=nullptr; // Borrowed source room-speed global, not PAL catch-up.
     bool clearRoomTimeChanges();

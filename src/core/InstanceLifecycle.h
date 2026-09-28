@@ -153,6 +153,15 @@ public:
     bool capturePrevious(InstanceHandle h,const Record& r)const{
         return !previous_||previous_(context_,h,r);
     }
+    // Positioned actors may use external event query adapters without exposing
+    // queries through their storage binding. Still publish every transform.
+    template<class Owner> static RecordLifecycleBinding bindPositionedActor(Owner& owner){
+        auto b=bindMaskDestruction(owner);
+        b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){
+            return static_cast<Owner*>(p)->birthAt(h,r,x,y);
+        };
+        return b;
+    }
     template<class Owner> static RecordLifecycleBinding bindPositionedBirths(Owner& owner){
         auto b=bindInstanceQueries(owner);
         b.birthAt_=[](void* p,InstanceHandle h,const Record& r,RunnerImageValue x,RunnerImageValue y){

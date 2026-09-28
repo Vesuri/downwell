@@ -24,7 +24,7 @@ public:
     using Owner=RunnerSpatialInstances<View::capacity,View::capacity*2>;
 private:
     Owner owner_;
-    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity> combatAlarmPhase_;
+    RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
     RunnerRoomMembership<View::capacity> room_;
     InstanceHandle roomKeys_[View::capacity]{};
     Owner::Properties properties_[View::capacity]{};
@@ -77,6 +77,7 @@ private:
             if constexpr(Kind==View::Kind::debris)return 370;
             if constexpr(Kind==View::Kind::timeChange)return 211;
             if constexpr(Kind==View::Kind::entryDither)return 73;
+            if constexpr(Kind==View::Kind::drone)return 266;
             if constexpr(Kind==View::Kind::goalField||Kind==View::Kind::exitController)return r.objectId;
             return Kind==View::Kind::player?35:92;
         }
@@ -100,6 +101,7 @@ private:
             else if constexpr(Kind==View::Kind::debris)pointer=actual.debris;
             else if constexpr(Kind==View::Kind::timeChange)pointer=actual.timeChange;
             else if constexpr(Kind==View::Kind::entryDither)pointer=actual.entryDither;
+            else if constexpr(Kind==View::Kind::drone)pointer=actual.drone;
             else pointer=actual.breakable;
             return parent.check(pointer==&r);
         }
@@ -116,7 +118,7 @@ private:
             }else if constexpr(Kind==View::Kind::debris){
                 if(!r.effect)return parent.check(false);
                 state.x=r.effect->x;state.y=r.effect->y;
-            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither){
+            }else if constexpr(Kind==View::Kind::timeChange||Kind==View::Kind::entryDither||Kind==View::Kind::drone){
                 state.x=r.x;state.y=r.y;
             }else{
                 if(r.x>0x7fffffff-ox||r.y>0x7fffffff-oy)return parent.check(false);
@@ -157,6 +159,7 @@ private:
             if constexpr(Kind==View::Kind::player)sourceId=parent.layers_.playerSourceId();
             if constexpr(Kind==View::Kind::timeChange)sourceId=parent.pendingTimeChangeId_;
             if constexpr(Kind==View::Kind::entryDither)sourceId=r.sourceId;
+            if constexpr(Kind==View::Kind::drone)sourceId=r.sourceId;
             constexpr bool projected=Kind==View::Kind::player||Kind==View::Kind::enemy||
                 Kind==View::Kind::bullet||Kind==View::Kind::scriptEffect||Kind==View::Kind::debris||Kind==View::Kind::entryDither;
             {
@@ -167,6 +170,11 @@ private:
                 if(!parent.world_){parent.initialPlayer_=&r;parent.initialPlayerKey_=local;}
             }
             return true;
+        }
+        bool birthAt(InstanceHandle local,const Record& r,RunnerImageValue x,RunnerImageValue y){
+            // The store has already published its narrowed constructor fields.
+            // Never emulate this as integer birth followed by a move.
+            return parent.check(r.x.bits==x.bits&&r.y.bits==y.bits)&&birth(local,r);
         }
         bool retire(InstanceHandle local,const Record& r){InstanceHandle h;
             if(!key(local,r,h)||!parent.check(parent.room_.contains(h.slot)))return false;
@@ -222,6 +230,8 @@ private:
     NativeTimeChangeRegistration timeChanges_{*this};
     Binding<GameplayEntryDithers::Record,View::Kind::entryDither> entryBinding_{*this};
     GameplayEntryDithers entries_{GameplayEntryDithers::Binding::bindDestruction(entryBinding_)};
+    Binding<GameplayWorld::DroneBullets::Record,View::Kind::drone> droneBinding_{*this};
+    GameplayWorld::DroneBullets drones_{GameplayWorld::DroneBullets::Binding::bindPositionedActor(droneBinding_)};
     std::uint32_t pendingTimeChangeId_=0;
     GameplayTerrainInstances terrain_;
 public:
@@ -239,7 +249,7 @@ public:
     }
     GameplayCollisionOwner(const GameplayCollisionOwner&)=delete;
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
-    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&layers_.valid();}
+    bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid();}
     bool attach(GameplayWorld& world){
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
@@ -251,6 +261,7 @@ public:
         if(!world_&&!world.bindDebrisInstances(debris_))return check(false);
         if(!world_&&!world.bindTimeChangeInstances(timeChanges_))return check(false);
         if(!world_&&!world.bindEntryDithers(entries_))return check(false);
+        if(!world_&&!world.bindDroneBullets(drones_))return check(false);
         world_=&world;
         world.configureRoomActorDraw([](const void* context,GameplayWorld::DrawActorVisitor visit,void* visitor){
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
@@ -323,6 +334,7 @@ public:
                         DW_PROFILE_SCOPE(profileAnimationDispatch);
                         return self.world_->advanceDebrisRoomAnimation(local);
                     }
+                    case View::Kind::drone:return self.drones_.advanceAnimation(local);
                     default:return true;
                 }
             }));
@@ -360,6 +372,7 @@ public:
                     kind==View::Kind::breakable?self.world_->advanceBoxRoomAlarm(local,alarm):
                     kind==View::Kind::debris?self.world_->advanceBoundDebrisRoomAlarm(local,alarm):
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
+                    kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
             });
         },this);
@@ -405,6 +418,7 @@ public:
         return true;
     }
     GameplayTerrainInstances& terrain(){return terrain_;}
+    GameplayWorld::DroneBullets& droneBullets(){return drones_;}
     // Caller-resident phase snapshot, shared by all twelve alarm indices.
     // advanceAndDispatch owns the actor's alarm storage: decrement once and
     // execute the selected event synchronously only on reaching zero. Objects
@@ -746,6 +760,7 @@ private:
                 case View::Kind::debris:return record.debris&&world_->retireDebrisRoomEffect(local);
                 case View::Kind::timeChange:return record.timeChange&&world_->retireTimeChangeRoomEffect(local);
                 case View::Kind::entryDither:return record.entryDither&&entries_.retire(local);
+                case View::Kind::drone:return record.drone&&drones_.retire(local);
                 default:return false;
             }
         });

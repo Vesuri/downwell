@@ -1038,3 +1038,30 @@ Next owner work should join shared actor/projectile/effect storage and phase
 dispatch, then expose the resulting retained state to both renderers. Fixed
 capacity, creation order, synchronous Create RNG and event-boundary retirement
 are part of that contract. Offline artwork alone does not supply this ownership.
+
+### Drone projectile registration boundary
+
+The native resource-backed owner binds a separate `DroneBulletInstances<32>`
+store for object 266 (parent 89), rather than impersonating usual bullets (261).
+Its collision-view slots follow the existing families; these internal slots
+are not numeric GameMaker IDs. Callers must supply the source ID explicitly.
+Construction publishes binary32 room coordinates with serialized sprite 458,
+then the synchronous Create override publishes sprite 459. Angle, image index
+and subsequent position writes update the same retained owner record.
+
+Room animation and alarm dispatch include this family, and Draw-boundary
+cleanup retires destruction-marked lifetimes. Retry and next-cavern teardown
+clear the borrowed store while preserving its generation sequence. The
+positioned-actor lifecycle binding supplies transforms and destruction without
+pretending that the store itself implements collision queries.
+
+The shared resource-backed registration tape runs on host and 68000. It checks
+fractional coordinates, parent population, setters, activation, post-destruction
+position publication, retirement and slot reuse. Host scheduler tests also
+exercise the actual room alarm/animation callbacks and Retry. These are injected
+lifecycle checks, not original-game visual comparison or a stock-memory fit test.
+
+Natural births remain disabled: full Step/End Step collision adapters, enemy
+damage, numeric-ID allocation, projected layer drawing/offline angle artwork,
+the SDL owner binding and source-ordered box admission still need integration.
+The 32-slot bound is an implementation limit, not a recovered original limit.

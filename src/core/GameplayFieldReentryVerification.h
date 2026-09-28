@@ -8,6 +8,7 @@
 #include "DroneBulletVerification.h"
 #include "DroneBulletSolidVerification.h"
 #include "DroneBulletInstancesVerification.h"
+#include "DroneBulletRegistrationVerification.h"
 namespace downwell {
 // Test-only lifecycle tape, shared by host tests and the 68000 debugger gate.
 // The exit is deliberately placed at the player; this is not evidence for a
@@ -26,6 +27,7 @@ struct GameplayFieldReentryVerification {
         checks=0;gameSteps=clearSteps=0;
         unsigned population=0;
         stage=1;
+        if(!DroneBulletRegistrationVerification::run(world,owner))return false;
         if(!SoundPlayVerification::run())return false;
         if(!CurrencyCreateVerification::run())return false;
         if(!CurrencySpawnVerification::run())return false;
