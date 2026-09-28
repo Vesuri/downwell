@@ -273,6 +273,27 @@ public:
         downwell::DebrisEffects<downwell::debrisEffectCapacity>::Phase phase,Stopped stopped,Meeting meeting){
         return stepDebrisRoomEffect(ownedDebrisEffects_,key,phase,stopped,meeting);
     }
+    using DebrisStepOrder=downwell::RunnerStepSnapshot<downwell::debrisEffectCapacity>;
+    void configureDebrisStepOrder(bool (*capture)(void*,DebrisStepOrder&),void* context){
+        debrisOrderCapture_=capture;debrisOrderContext_=context;
+    }
+    // Scoped source-state adapters; no stack callback survives this tick.
+    // Natural callers must supply the real per-particle TimeStopBound query.
+    template<class Stopped,class Meeting>
+    bool stepWithOwnedDebris(std::uint8_t input,Stopped stopped,Meeting meeting){
+        if(!run_.effectsSucceeded)return false;
+        if(debrisStepDispatch_||!debrisOrderCapture_||
+            (debrisInstances_&&debrisInstances_->size()&&debrisBinding_.effects!=&ownedDebrisEffects_))
+            return run_.effectsSucceeded=false;
+        auto dispatch=[&](downwell::InstanceHandle key){
+            return stepOwnedDebrisRoomEffect(key,debrisStepPhase_,stopped,meeting);
+        };
+        debrisStepContext_=&dispatch;
+        debrisStepDispatch_=[](void* p,downwell::InstanceHandle key){return (*static_cast<decltype(dispatch)*>(p))(key);};
+        step(input);
+        debrisStepDispatch_=nullptr;debrisStepContext_=nullptr;
+        return effectsSucceeded();
+    }
     template<unsigned Capacity>
     bool advanceDebrisRoomAlarm(downwell::DebrisEffects<Capacity>& effects,downwell::InstanceHandle key,
         typename downwell::DebrisEffects<Capacity>::Phase phase,unsigned index){
@@ -775,6 +796,12 @@ private:
     bool (*roomAlarms_)(void*)=nullptr;
     void* roomAlarmsContext_=nullptr;
     downwell::DebrisEffects<downwell::debrisEffectCapacity> ownedDebrisEffects_;
+    DebrisStepOrder debrisStepOrder_;
+    downwell::DebrisEffects<downwell::debrisEffectCapacity>::Phase debrisStepPhase_{};
+    bool (*debrisOrderCapture_)(void*,DebrisStepOrder&)=nullptr;
+    void* debrisOrderContext_=nullptr;
+    bool (*debrisStepDispatch_)(void*,downwell::InstanceHandle)=nullptr;
+    void* debrisStepContext_=nullptr;
     bool clearRoomDebris(){
         if(debrisInstances_&&debrisInstances_->size()&&!debrisBinding_.clearRoom())return run_.effectsSucceeded=false;
         debrisBinding_={};return true;

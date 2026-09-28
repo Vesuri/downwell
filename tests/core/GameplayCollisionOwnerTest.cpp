@@ -1,6 +1,10 @@
 #include "core/GameplayCollisionOwner.h"
 #include "core/MachineGunSourceStep.h"
 #ifdef DOWNWELL_NATIVE_QUERY_PROBE
+bool nativeOwnedDebrisTick(GameplayWorld& world){
+    return world.stepWithOwnedDebris(0,[](auto,const auto&,bool& frozen){frozen=false;return true;},
+        [](auto,const auto&,auto,auto,bool& hit){hit=false;return true;});
+}
 bool nativeAlarmDispatch(downwell::GameplayCollisionOwner& owner,downwell::RunnerStepSnapshot<16>& phase,
     bool (*dispatch)(downwell::InstanceHandle,unsigned,const downwell::PackedObjectEvent&)){
     return owner.dispatchAlarmPhase(phase,dispatch);
@@ -716,6 +720,37 @@ int main(){
             assert(!scene->debrisEffects().retained(key.generation)&&!collision->debris().size());
             assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
         }
+    }
+    {
+        auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto scene=std::make_unique<GameplayWorld>(300,true,0,false,collision->enemyBinding(),
+            collision->breakableBinding(),collision->playerBinding(),&collision->terrain());
+        assert(collision->attach(*scene));InstanceHandle key;
+        assert(scene->spawnDebris(MotionBinary64::fromInteger(20000),MotionBinary64::fromInteger(20000),1,key));
+        auto expected=*scene->debrisEffects().retained(key.generation);auto random=scene->randomState();unsigned stops=0;
+        for(unsigned tick=0;tick<40;++tick){
+            const bool frozen=tick<5;
+            assert(expected.advanceImage());for(unsigned a=0;a<3;++a)expected.advanceAlarm(a);
+            assert(expected.step(frozen,random,[](auto,auto,bool& hit){hit=false;return true;}));
+            assert(scene->stepWithOwnedDebris(0,[&](auto,const auto&,bool& stop){++stops;stop=frozen;return true;},
+                [&](InstanceHandle local,const auto&,auto x,auto y,bool& hit){return collision->debrisPlaceMeeting(local,x,y,masks,hit);}));
+            assert(collision->prepareDraw());
+            const auto* actual=scene->debrisEffects().retained(key.generation);
+            if(expected.destroyRequested){assert(!actual);continue;}
+            assert(actual&&actual->x.bits==expected.x.bits&&actual->y.bits==expected.y.bits&&
+                actual->imageIndex.bits==expected.imageIndex.bits&&actual->imageSpeed.bits==expected.imageSpeed.bits&&
+                actual->noTouch==expected.noTouch&&actual->disappearing==expected.disappearing&&actual->flash==expected.flash);
+            for(unsigned a=0;a<3;++a)assert(actual->alarms.get(a)==expected.alarms.get(a));
+        }
+        assert(stops==34);
+        assert(scene->restartFromResults(DeathMenuSequence::Action::Retry,42,300)!=ResultsDestination::none);
+        assert(scene->spawnDebris(MotionBinary64::fromInteger(20000),MotionBinary64::fromInteger(20000),1,key));
+        // A failed source time-stop query is terminal, not interpreted as an
+        // unfrozen effect; no collision callbacks may follow it.
+        unsigned queries=0;
+        assert(!scene->stepWithOwnedDebris(0,[](auto,const auto&,bool&){return false;},
+            [&](auto,const auto&,auto,auto,bool&){++queries;return true;}));
+        assert(!queries&&!scene->effectsSucceeded());
     }
     for(int area=1;area<=5;++area){
         auto collision=std::make_unique<GameplayCollisionOwner>(objects,sprites);

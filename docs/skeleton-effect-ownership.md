@@ -76,8 +76,15 @@ callback. Its test covers animation, alarm countdown/refund, five frozen frames,
 motion and cleanup at expiry. The native owned-bank per-instance alarm/Step
 hooks have corresponding freeze/motion/expiry checks. Native alarms now run
 alongside registered enemies in the ordinary frame's ordered alarm phase;
-native debris Step is not yet admitted to a mixed-actor source traversal.
-Live player time-stop and
+native `stepWithOwnedDebris` additionally captures registered debris at Step
+entry and runs motion before the existing Step reconciliation. Its checked
+time-stop and terrain callbacks are scoped to that tick, never retained on
+the caller's stack afterward. A forty-frame native test compares animation,
+countdowns, freeze refunds, motion, presentation fields and expiry against the
+source primitives, using real collision-owner terrain queries. Callback
+failure stops further particle work. This is a controlled integration path,
+not a complete mixed-actor source traversal: the native loop still interleaves
+some earlier actors' Step/collision work. Live player time-stop and
 natural destruction admission remain unfinished; these dispatch adapters do
 not establish a complete live debris feature.
 

@@ -55,6 +55,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto roomActorDraw=roomActorDraw_;
     const auto roomActorDrawContext=roomActorDrawContext_;
     const auto enemyOrderCapture=enemyOrderCapture_;
+    const auto debrisOrderCapture=debrisOrderCapture_;void* const debrisOrderContext=debrisOrderContext_;
     void* const enemyOrderContext=enemyOrderContext_;
     void* const phaseBoundaryContext=phaseBoundaryContext_;
     const auto playerLifecycle=playerLifecycle_;
@@ -91,6 +92,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     configureRoomAlarms(roomAlarms,roomAlarmsContext);
     configureRoomActorDraw(roomActorDraw,roomActorDrawContext);
     configureEnemyStepOrder(enemyOrderCapture,enemyOrderContext);
+    configureDebrisStepOrder(debrisOrderCapture,debrisOrderContext);
     nextBulletLifetimeId_=nextBulletIdentity;
     bulletLifecycle_=bulletLifecycle;
     nextEnemyLifetimeId_=nextEnemyIdentity;
@@ -1006,6 +1008,11 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     if(!captureEnemyStepOrder())return {};
+    if(debrisStepDispatch_){
+        debrisStepOrder_.clear();debrisStepPhase_=ownedDebrisEffects_.beginPhase();
+        if(!debrisOrderCapture_(debrisOrderContext_,debrisStepOrder_)){run_.effectsSucceeded=false;return {};}
+        debrisStepOrder_.sort();
+    }
     if (generationStep_ && generationSucceeded_) {
         DW_PROFILE_SCOPE(profileGeneration);
         const long bottom = generationCameraY + 318L * 256L;
@@ -1357,6 +1364,12 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
     }
 
     DW_PROFILE_PHASE(profileLifecycle);
+    if(debrisStepDispatch_)for(unsigned i=0;i<debrisStepOrder_.size();++i){
+        const auto key=debrisStepOrder_.handle(i);
+        const auto* record=debrisInstances_?debrisInstances_->find(key):nullptr;
+        if(!record||!record->active||record->destroyRequested)continue;
+        if(!debrisStepDispatch_(debrisStepContext_,key)){run_.effectsSucceeded=false;return {};}
+    }
     // Only discard inactive tails; holes stay in creation order until the
     // existing stable compaction at the next birth. Never reorder live slots.
     while (bulletSlotEnd_ && bullets_[bulletSlotEnd_-1].identitySlot>=bulletCapacity) --bulletSlotEnd_;

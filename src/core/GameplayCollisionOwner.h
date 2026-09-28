@@ -340,6 +340,17 @@ public:
                     kind==View::Kind::debris&&self.world_->advanceBoundDebrisRoomAlarm(local,alarm);
             });
         },this);
+        world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
+            auto& self=*static_cast<GameplayCollisionOwner*>(context);
+            if(!self.valid())return false;
+            return self.check(self.owner_.visitRegistrationRange(View::debrisBase,View::capacity,
+                [&](InstanceHandle h,int object,const Owner::State& state){
+                    if(state.flags&0x100003u)return true;
+                    View::Kind kind;InstanceHandle local;
+                    return View::decode(h,kind,local)&&kind==View::Kind::debris&&self.resolves(h)&&
+                        phase.append(local.slot,local.generation,object);
+                }));
+        },this);
         return true;
     }
     auto playerBinding(){return GameplayWorld::PlayerLifecycleBinding::bindTransforms(player_);}
