@@ -12,9 +12,10 @@ on PAL; do not add 60 Hz catch-up.
 
 ## Priority and scope
 
-Next: recover the A500 gameplay frame budget (section 5), prioritizing synchronous
-generation bursts (bounds construction, layer allocation and spatial insertion),
-alongside steady room/event traversal and the garden-to-well transition. Then finish live
+Next: recover the A500 gameplay frame budget (section 5) through work scheduling
+and precomputation, not compiler tuning. Separate level preparation from live
+generation publication, alongside steady room/event traversal and the
+garden-to-well transition. Then finish live
 skeleton encounters, following the dependency order in section 1, make
 catacombs playable (section 2), followed by the remaining
 content (section 4). Apply the fidelity, performance, architecture, memory and
@@ -194,6 +195,18 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
 
 - Fit worst-case gameplay, style/upgrade navigation and transitions into 20 ms.
   Re-profile after integration changes; average FPS is not the criterion.
+- Move invariant work out of gameplay into offline or pre-level preparation.
+  Audit generation dependencies and classify each operation as asset-wide,
+  level-wide, pattern/variant-wide or dependent on current gameplay state.
+  Prepare native resource descriptors, default property/bounds templates and
+  reusable pattern geometry before their first live use; measure memory and
+  preparation latency as well as gameplay savings. Keep live publication limited
+  to state-dependent decisions and required identity/order updates. Do not
+  preconsume the shared RNG or freeze health-dependent rewards: the current
+  builder makes these choices during camera-triggered generation. Verify a
+  prepared path against immediate execution with intervening gameplay RNG and
+  health changes, not just a fixed initial seed. Decide the remaining collision
+  and layer ownership work from these dependencies before further micro-tuning.
 - Reduce full-room bookkeeping in layer projection, animation/previous-position
   snapshots and alarm registration capture. Preserve inactive layer termination,
   callback order, generation checks and synchronous mutation visibility. Measure
