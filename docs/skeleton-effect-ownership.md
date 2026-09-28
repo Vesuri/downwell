@@ -59,6 +59,16 @@ check, not natural destruction admission: persistent debris scheduling and the
 live player time-stop dependency of `alarmStop(0)` remain required before the
 normal box Step can invoke the complete sequence.
 
+The box-owned `spawnBoxScriptEffect` adapter retains `scrEffectSpawn`'s `myFx`
+assignment on the caller immediately after synchronous child creation, before
+sprite validation and the remaining setters. The stored world retains the
+source numeric instance ID; the native world retains a generation-checked
+handle, not a fabricated VM ID. Both re-resolve the caller after creation.
+A later setter failure retains the child and caller assignment and terminates
+further effect work. Resource-backed tests cover fractional placement, setter
+ordering, unchanged RNG and the partial-failure prefix in both worlds. This
+entry point is not yet admission of the complete natural box destruction Step.
+
 Box Alarm 0 is dispatched by both normal schedulers: the shared event body
 sets `wallHp` to zero, without emitting effects or retiring the box. Native
 storage keeps one 32-bit countdown per box; it does not allocate twelve slots

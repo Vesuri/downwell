@@ -78,6 +78,7 @@ struct InstanceRecord {
     AlarmBank alarms;
     WallEndStepState wall{};
     BreakableState box{};
+    std::uint32_t boxMyFx=0; // scrEffectSpawn's source numeric child ID on object 92.
 };
 
 enum class CreateInstanceResult {

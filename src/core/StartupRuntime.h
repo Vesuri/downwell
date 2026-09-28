@@ -468,6 +468,13 @@ public:
     bool spawnScriptEffect(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
         ScriptSpawnEffects<Capacity>& effects,MotionBinary64 x,MotionBinary64 y,int sprite,
         MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,std::uint32_t& myFx){
+        return spawnScriptEffectWithCaller(registration,effects,x,y,sprite,speed,angle,depth,frames,
+            [&](std::uint32_t child){myFx=child;return true;});
+    }
+    template<unsigned Capacity,unsigned Registered,class Frames,class Caller>
+    bool spawnScriptEffectWithCaller(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,
+        ScriptSpawnEffects<Capacity>& effects,MotionBinary64 x,MotionBinary64 y,int sprite,
+        MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames,Caller caller){
         if(!run_.effectsSucceeded)return false;
         if(!registration.belongsTo(instances_)){run_.effectsSucceeded=false;return false;}
         if(scriptEffectsBinding_.effects!=&effects||scriptEffectsBinding_.registry!=&registration){
@@ -475,9 +482,19 @@ public:
             scriptEffectsBinding_=ScriptEffectRuntimeBinding::bind<InstanceRecord>(effects,registration);
         }
         auto ops=scriptSpawnOperations(effects,registration,frames,[&](unsigned local){
-            const auto id=registration.sourceId(local);if(!id)return false;myFx=id;return true;
+            const auto id=registration.sourceId(local);return id&&caller(id);
         },run_.effectsSucceeded);
         return EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
+    }
+    template<class Frames> bool spawnBoxScriptEffect(InstanceHandle box,MotionBinary64 x,MotionBinary64 y,int sprite,
+        MotionBinary64 speed,MotionBinary64 angle,MotionBinary64 depth,Frames frames){
+        const auto* r=instances_.resolve(box);
+        if(!run_.effectsSucceeded||!r||r->objectId!=92)return run_.effectsSucceeded=false;
+        return spawnScriptEffectWithCaller(ownedScriptRegistration_,ownedScriptEffects_,x,y,sprite,speed,angle,depth,frames,
+            [&](std::uint32_t child){
+                auto* caller=instances_.resolve(box);if(!caller||caller->objectId!=92)return false;
+                caller->boxMyFx=child;return true;
+            });
     }
     template<unsigned Capacity,unsigned Registered>
     bool advanceScriptEffectAnimation(StoredScriptSpawnRegistration<instanceCapacity,Registered>& registration,

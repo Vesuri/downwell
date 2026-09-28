@@ -391,6 +391,43 @@ int main(){
         require(world->restartFromResults(DeathMenuSequence::Action::Retry,43)&&!owner->resolve(selected)&&
             !owner->projectileBoxHealthWrite(*world,selected,fractional),"Retry invalidates retained box selection");
     }
+    {
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach box effect caller world");world->skipToGameForTesting();
+        InstanceHandle box{};
+        for(unsigned tick=0;tick<600&&!box.generation;++tick){
+            for(unsigned i=0;i<world->activeInstanceCount();++i)
+                if(world->instanceAt(i).objectId==92&&world->instanceAt(i).active){box=world->instanceHandleAt(i);break;}
+            if(!box.generation)world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+        }
+        require(box.generation&&world->effectsSucceeded(),"find box effect caller");
+        unsigned lookups=0,observed=0;bool accept=true;
+        auto frames=[&](int sprite,unsigned& count){
+            ++lookups;observed=owner->resolve(box)->boxMyFx;
+            const auto* child=world->instance(observed);
+            require(sprite==603&&child&&child->objectId==219&&child->spriteId==-1,
+                "source child ID is stored on the caller before sprite validation");
+            PackedSpriteCollision art;require(sprites.sprite(sprite,art),"impact sprite exists");count=art.frameCount;return accept;
+        };
+        auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(524);
+        require(x.add({0x3fd00000u,0})&&y.add({0x3fc00000u,0}),"fractional impact position");
+        const auto draws=world->randomDrawCount();
+        require(world->spawnBoxScriptEffect(box,x,y,603,{0x3fe00000u,0},MotionBinary64::fromInteger(270),
+            MotionBinary64::fromInteger(-60000),frames),"publish owned box effect");
+        const auto first=observed;const auto* child=world->scriptEffects().atNewest(0);
+        require(child&&child->spriteId==603&&child->x.bits==0x43704000u&&child->y.bits==0x44030800u&&
+            child->imageSpeed.bits==0x3f000000u&&child->angle.bits==0x43870000u&&world->randomDrawCount()==draws,
+            "owned box effect retains source setters without extra RNG");
+        accept=false;
+        require(!world->spawnBoxScriptEffect(box,x,y,603,{0x3fe00000u,0},MotionBinary64::fromInteger(270),
+            MotionBinary64::fromInteger(-60000),frames),"reject later sprite validation");
+        const auto second=owner->resolve(box)->boxMyFx;
+        require(!world->effectsSucceeded()&&second>first&&world->instance(first)&&world->instance(second)&&
+            world->scriptEffects().size()==2&&lookups==2,"retain both child birth and caller assignment on failure");
+        require(!world->spawnBoxScriptEffect(box,x,y,603,{},{},{},frames)&&lookups==2&&world->randomDrawCount()==draws,
+            "failed box effect is never retried");
+    }
     for(unsigned failure=1;failure<=7;++failure){
         auto owner=std::make_unique<ProjectileFailureOwner>(objects,sprites,masks);owner->reject=failure;
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,

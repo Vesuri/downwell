@@ -202,6 +202,7 @@ public:
         bool destroyRequested=false;
         downwell::BreakableState state{};
         std::int32_t alarm0=-1;
+        downwell::InstanceHandle myFx{}; // Internal lifetime, never a VM numeric ID.
     };
     using BreakableLifecycleBinding = downwell::RecordLifecycleBinding<Breakable>;
     struct PlayerInstance {
@@ -319,6 +320,13 @@ public:
     bool spawnScriptEffect(downwell::ScriptSpawnEffects<Capacity>& effects,
         downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,
         downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,Frames frames,downwell::InstanceHandle& myFx){
+        return spawnScriptEffectWithCaller(effects,x,y,sprite,speed,angle,depth,frames,
+            [&](downwell::InstanceHandle child){myFx=child;return true;});
+    }
+    template<unsigned Capacity,class Frames,class Caller>
+    bool spawnScriptEffectWithCaller(downwell::ScriptSpawnEffects<Capacity>& effects,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,
+        downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,Frames frames,Caller caller){
         DW_PROFILE_SCOPE(profileEffectBirth);
         if(!run_.effectsSucceeded)return false;
         if(!scriptSpawnInstances_){run_.effectsSucceeded=false;return false;}
@@ -328,11 +336,21 @@ public:
             scriptEffectsBinding_=downwell::ScriptEffectRuntimeBinding::bind<downwell::GameplayScriptSpawnInstances::Record>(effects,registration);
         }
         auto ops=downwell::scriptSpawnOperations(effects,registration,frames,[&](unsigned local){
-            const auto key=registration.handle(local);if(!key.generation)return false;myFx=key;return true;
+            const auto key=registration.handle(local);return key.generation&&caller(key);
         },run_.effectsSucceeded);
         return downwell::EffectSpawnScript::run(ops,x,y,sprite,speed,angle,depth);
     }
     const downwell::ScriptSpawnEffects<downwell::scriptSpawnEffectCapacity>& scriptEffects()const{return ownedScriptEffects_;}
+    template<class Frames> bool spawnBoxScriptEffect(downwell::InstanceHandle box,
+        downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,downwell::MotionBinary64 speed,
+        downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,Frames frames){
+        if(!run_.effectsSucceeded||!findBreakable(box))return run_.effectsSucceeded=false;
+        return spawnScriptEffectWithCaller(ownedScriptEffects_,x,y,sprite,speed,angle,depth,frames,
+            [&](downwell::InstanceHandle child){
+                if(!findBreakable(box))return false;
+                breakables_[box.slot].myFx=child;return true;
+            });
+    }
     template<class Frames> bool spawnScriptEffect(downwell::MotionBinary64 x,downwell::MotionBinary64 y,int sprite,
         downwell::MotionBinary64 speed,downwell::MotionBinary64 angle,downwell::MotionBinary64 depth,
         Frames frames,downwell::InstanceHandle& myFx){

@@ -59,6 +59,12 @@ bool nativeOwnedScript(GameplayWorld& world,const downwell::SpriteCollisionPack&
         [&](int id,unsigned& frames){downwell::PackedSpriteCollision r;if(!sprites.sprite(id,r))return false;
             frames=r.frameCount;return true;},caller);
 }
+bool nativeBoxScript(GameplayWorld& world,const downwell::SpriteCollisionPack& sprites,downwell::InstanceHandle box){
+    return world.spawnBoxScriptEffect(box,{},{},603,{0x3fe00000u,0},
+        downwell::MotionBinary64::fromInteger(270),downwell::MotionBinary64::fromInteger(-60000),
+        [&](int id,unsigned& frames){downwell::PackedSpriteCollision r;if(!sprites.sprite(id,r))return false;
+            frames=r.frameCount;return true;});
+}
 bool nativeActorDraw(const GameplayWorld& world){
     return world.visitRoomActors([](auto,downwell::InstanceHandle key,auto){return key.generation!=0;});
 }
@@ -1929,6 +1935,36 @@ int main(){
         assert(terrain->size()==GameplayTerrainInstances::capacity&&calls==GameplayTerrainInstances::capacity+1);
         assert(!full->createGeneratedInstance({60,0,0},objects,backend)&&calls==GameplayTerrainInstances::capacity+1);
         full->step(0);assert(!full->effectsSucceeded());
+    }
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
+            GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
+        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));const int bx=0,by=336;
+        assert(world->appendBreakables(&bx,&by,1));const InstanceHandle box{0,1};
+        unsigned lookups=0;bool accept=true;InstanceHandle observed;
+        auto frames=[&](int sprite,unsigned& count){
+            ++lookups;assert(sprite==603);observed=world->findBreakable(box)->myFx;
+            const auto* child=owner->scriptEffects().find(observed);
+            assert(child&&child->effect&&child->effect->spriteId==-1);
+            PackedSpriteCollision art;assert(sprites.sprite(sprite,art));count=art.frameCount;return accept;
+        };
+        auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(524);
+        assert(x.add({0x3fd00000u,0})&&y.add({0x3fc00000u,0}));
+        const auto draws=world->randomDrawCount();
+        assert(world->spawnBoxScriptEffect(box,x,y,603,{0x3fe00000u,0},MotionBinary64::fromInteger(270),
+            MotionBinary64::fromInteger(-60000),frames));
+        const auto first=observed;const auto* child=owner->scriptEffects().find(first)->effect;
+        assert(child->spriteId==603&&child->x.bits==0x43704000u&&child->y.bits==0x44030800u&&
+            child->imageSpeed.bits==0x3f000000u&&child->angle.bits==0x43870000u&&world->randomDrawCount()==draws);
+        accept=false;
+        assert(!world->spawnBoxScriptEffect(box,x,y,603,{0x3fe00000u,0},MotionBinary64::fromInteger(270),
+            MotionBinary64::fromInteger(-60000),frames));
+        const auto second=world->findBreakable(box)->myFx;
+        assert(!world->effectsSucceeded()&&second.generation>first.generation&&owner->scriptEffects().find(first)&&
+            owner->scriptEffects().find(second)&&world->scriptEffects().size()==2&&lookups==2);
+        assert(!world->spawnBoxScriptEffect(box,x,y,603,{},{},{},frames)&&lookups==2&&world->randomDrawCount()==draws);
     }
     for(bool registered:{false,true}){
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
