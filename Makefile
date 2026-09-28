@@ -964,6 +964,16 @@ build/time-shard-birth-test: tests/core/TimeShardBirthTest.cpp $(wildcard src/co
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/TimeShardBirthTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-time-change
+test: verify-entry-dither
+.PHONY: verify-entry-dither
+verify-entry-dither: build/entry-dither-test
+	python3 tools/verify-runner-instance-ids.py
+	./build/entry-dither-test
+
+build/entry-dither-test: tests/core/EntryDitherTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EntryDitherTest.cpp
+
 verify-time-change: build/time-change-test
 	./build/time-change-test
 

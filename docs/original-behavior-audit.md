@@ -41,6 +41,20 @@ Consequently, explicit-ID time-change tests do not establish the natural
 global ID stream. This source check also does not prove original runner room
 phase timing, initial view publication or rendered entry-mask parity.
 
+`EntryDither` expresses the shared Create/Step/Alarm behavior without owning
+room traversal or numeric IDs. Its ordered reader callbacks preserve the x
+assignment before the view read, and the y increment before the next camera
+read. Built-in coordinate writes narrow to binary32 using integer-only native
+arithmetic. Read/arithmetic failures retain the accepted prefix and latch
+failure. Destruction is a request, not immediate storage retirement. The room
+scheduler must exclude destroyed/inactive instances and either decrement the
+compact alarm or call `fireAlarm` after its own decrement, never both.
+`verify-entry-dither` compares fractional/large-coordinate Step results to a
+host floating-point transcription and checks the 120-update lifetime and
+failure prefixes. A freestanding 68000 probe compiles without undefined
+helpers; this is not emulator execution or live scene integration. Draw still
+requires the original effect-surface path and independently published view.
+
 ## Horizontal control arithmetic
 
 `scrPlMovement`'s non-water living-player path applies left and right input
