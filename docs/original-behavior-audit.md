@@ -84,10 +84,18 @@ the real stored-room alarm/ordinary-Step traversal; its callback does not
 survive the tick. Object-73 dispatch without that owner fails instead of
 silently freezing the effect. `cleanupEntryDither` retires selected marked
 records through global cleanup and delegates other families explicitly.
-The resource-backed live collision test exercises 120 ordinary main-room
-ticks, checking one decrement per tick, 119 Step calls, retained destruction
-and owner/layer retirement. Its explicit camera/view inputs do not establish
-initial room publication. Automatic player Create, rendering and native
+`withEntryDitherRoomCreation` additionally scopes the owner into the actual
+player Create event, after camera creation/mode setters and before the next
+authored room instance. It uses the parent's destination room and the prepared
+resource view Y, while the caller supplies the parent-camera X lookup. Both
+creation and event callbacks are removed when the scoped operation returns.
+The resource-backed live collision test now enters through this player event,
+verifies the contiguous camera/dither IDs and destination room, then exercises
+120 main-room ticks: one decrement per tick, 119 Step calls, retained destruction
+and owner/layer retirement. Fast-forward includes the first new-room update,
+so its return snapshot has Y=16/alarm=119, not the Create snapshot Y=0/alarm=120.
+The test checks the single-camera case; alternate camera lookup/publication
+still needs verification. Default production ownership, rendering and native
 controller ownership remain unconnected.
 
 The offline game-pack generator also exports `amiga-game.entry-mask` and its

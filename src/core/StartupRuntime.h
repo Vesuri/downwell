@@ -363,6 +363,36 @@ public:
     // transition callback runs at the shared player's source Begin Step boundary.
     struct NoTimeTransition {bool operator()(const InstanceRecord&,const PlayerMotion&,int,int)const{return true;}};
     enum class TimeEffectPhase {animation,alarm,step,playerBegin};
+    // Scoped admission while entering a room: the player's recovered Create
+    // invokes this owner after scrSpawnCamera, not after the room has loaded.
+    // The caller keeps the registry alive and retires it before room teardown.
+    template<unsigned Capacity,class CameraX,class Operation>
+    bool withEntryDitherRoomCreation(StoredEntryDitherRegistration<instanceCapacity,Capacity>& registration,
+        CameraX cameraX,Operation operation){
+        if(!run_.effectsSucceeded)return false;
+        if(entryDitherCreate_||entryDitherDispatch_||!registration.belongsTo(instances_))
+            return run_.effectsSucceeded=false;
+        auto create=[&](int room){
+            InstanceHandle key;
+            return registration.createInRoom(room,cameraX,[&](MotionBinary64& out){
+                const auto* view=roomEntryViews_.get(0);
+                if(!view)return false;
+                out=view->y.promoted();return true;
+            },key);
+        };
+        auto dispatch=[&](InstanceRecord& record,bool alarm){
+            const auto key=registration.handle(record);
+            return key.generation&&(alarm?registration.alarm(key):registration.step(key,cameraX));
+        };
+        entryDitherCreateContext_=&create;
+        entryDitherCreate_=[](void* p,int room){return (*static_cast<decltype(create)*>(p))(room);};
+        entryDitherContext_=&dispatch;
+        entryDitherDispatch_=[](void* p,InstanceRecord& r,bool alarm){return (*static_cast<decltype(dispatch)*>(p))(r,alarm);};
+        const bool okay=operation();
+        entryDitherCreate_=nullptr;entryDitherCreateContext_=nullptr;
+        entryDitherDispatch_=nullptr;entryDitherContext_=nullptr;
+        return run_.effectsSucceeded=okay&&run_.effectsSucceeded&&roomLoadSucceeded_&&deferredCommandsSucceeded_;
+    }
     template<unsigned Capacity,class CameraX,class Collisions=NoCollisionPass>
     bool stepWithEntryDither(StoredEntryDitherRegistration<instanceCapacity,Capacity>& registration,
         CameraX cameraX,const Input& input,bool advancePressed=false,Collisions collisions={}){
@@ -975,6 +1005,8 @@ private:
     bool (*scriptAnimationDispatch_)(void*,InstanceHandle,const InstanceRecord&)=nullptr;
     void* timeEffectContext_=nullptr;
     void* entryDitherContext_=nullptr;
+    void* entryDitherCreateContext_=nullptr;
+    bool (*entryDitherCreate_)(void*,int)=nullptr;
     bool (*entryDitherDispatch_)(void*,InstanceRecord&,bool)=nullptr;
     bool (*timeEffectDispatch_)(void*,InstanceRecord&,TimeEffectPhase,unsigned)=nullptr;
     const RoomPack* roomPack_ = nullptr;

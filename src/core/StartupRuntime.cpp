@@ -1729,8 +1729,11 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             const int room=instance->roomId;
             if((room>=20&&room<=24)||room==10||room==17)camera->cameraFreeCam=true;
             if(room==11)camera->cameraAutoScroll=false;
+            if(room==11&&entryDitherCreate_&&!entryDitherCreate_(entryDitherCreateContext_,room)){
+                run_.effectsSucceeded=false;return;
+            }
             // Full initializer companion births and main-room entry-dither
-            // creation remain unwired. Alternate camera motion is separate.
+            // default ownership remain unwired. Alternate camera motion is separate.
         }
         return;
     case 849: // gml_Object_objPlayer_n_Step_1 (menu/rmMain movement subsets)

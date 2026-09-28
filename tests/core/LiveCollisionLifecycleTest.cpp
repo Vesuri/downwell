@@ -901,14 +901,40 @@ int main(){
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
-        require(owner->attach(*world),"attach time-change world");world->skipToGameForTesting();
+        require(owner->attach(*world),"attach time-change world");
         {
             auto entry=world->entryDitherRegistration<1>();InstanceHandle key;
-            const auto id=world->nextRuntimeInstanceId();unsigned reads=0;
-            auto camera=[&](MotionBinary64& out){++reads;out=RunnerImageValue{0x43704000u}.promoted();return true;};
-            require(entry.create(camera,[](MotionBinary64& out){out={};return true;},key),
-                    "create entry dither in resource-backed main-room owner");
-            for(unsigned tick=1;tick<=120;++tick){
+            unsigned reads=0;
+            auto camera=[&](MotionBinary64& out){
+                ++reads;unsigned cameras=0;
+                if(reads==1){
+                    const auto* view=world->roomEntryView();
+                    require(view&&view->y.bits==0,"Create observes serialized initial view before following");
+                }
+                for(unsigned i=0;i<world->activeInstanceCount();++i){
+                    const auto& r=world->instanceAt(i);
+                    if(r.objectId!=64||r.roomId!=11)continue;
+                    ++cameras;out=MotionBinary64::fromInteger(r.x);
+                }
+                require(cameras==1,"entry reads the unique main-room parentCamera descendant");
+                return true;
+            };
+            require(world->withEntryDitherRoomCreation(entry,camera,[&]{world->skipToGameForTesting();return true;}),
+                    "player Create births entry dither synchronously through its registered owner");
+            std::uint32_t id=0;
+            for(unsigned i=0;i<world->activeInstanceCount();++i){
+                const auto& r=world->instanceAt(i);
+                if(r.objectId!=73)continue;
+                require(!id&&i>=3,"one player-created entry dither");id=r.instanceId;key=entry.handle(r);
+                const auto& cameraRecord=world->instanceAt(i-1);
+                require(cameraRecord.objectId==64&&id==cameraRecord.instanceId+1&&r.roomId==11&&
+                    r.preciseX==240&&r.preciseY==16&&r.alarms.get(0)==119,
+                    "entry follows camera Create before next authored instance and joins first room tick");
+            }
+            // Fast-forward returns after the first new-room update, not at its
+            // Create boundary: one Create and one ordinary Step have run.
+            require(id&&key.generation&&reads==2,"room entry executed Create and first room Step");
+            for(unsigned tick=2;tick<=120;++tick){
                 require(world->stepWithEntryDither(entry,camera,{}),"entry dither joins actual room tick");
                 const auto* r=world->instance(id);
                 require(r&&r->destroyRequested==(tick==120)&&r->alarms.get(0)==120-int(tick),
