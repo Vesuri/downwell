@@ -1,0 +1,54 @@
+#ifndef DOWNWELL_TEST_BOX_BURST_WORLD_CHECK_H
+#define DOWNWELL_TEST_BOX_BURST_WORLD_CHECK_H
+#include <cassert>
+#include "core/SmokeEffects.h"
+#include "core/FlashBallEffects.h"
+
+// Integration check, not an independent script oracle: the burst primitives
+// have separate VM/scalar tests. Here verify world RNG ownership, coordinates,
+// retained children and terminal failure across the two effect banks.
+template<class World> void checkBoxBurstWorld(World& world,bool failSmoke){
+    using namespace downwell;
+    SmokeEffects<32> smoke;FlashBallEffects<32> flash;
+    auto random=world.randomState();
+    auto sameRandom=[&](){
+        assert(world.randomState().drawCount()==random.drawCount());
+        assert(world.randomState().stateIndex()==random.stateIndex());
+        for(unsigned i=0;i<16;++i)assert(world.randomState().stateWord(i)==random.stateWord(i));
+    };
+    auto same64=[](MotionBinary64 a,MotionBinary64 b){assert(a.high==b.high&&a.low==b.low);};
+    auto sameChildren=[&](){
+        assert(world.smokeEffects().size()==smoke.size());
+        for(unsigned i=0;i<32;++i){
+            const auto& a=world.smokeEffects().slot(i);const auto& b=smoke.slot(i);
+            assert(a.handle==b.handle);
+            if(a.handle){
+                same64(a.effect.xx,b.effect.xx);same64(a.effect.yy,b.effect.yy);
+                same64(a.effect.speed,b.effect.speed);same64(a.effect.direction,b.effect.direction);
+                assert(a.effect.imageSpeed.bits==b.effect.imageSpeed.bits);
+                assert(a.effect.imageIndex.bits==b.effect.imageIndex.bits);
+            }
+            const auto& c=world.flashEffects().slot(i);const auto& d=flash.slot(i);
+            assert(c.handle==d.handle);
+            if(c.handle){
+                assert(c.effect.x.bits==d.effect.x.bits&&c.effect.y.bits==d.effect.y.bits);
+                assert(c.effect.imageIndex.bits==d.effect.imageIndex.bits);
+            }
+        }
+    };
+    for(unsigned i=0;i<32;++i){
+        const auto x=MotionBinary64::fromInteger(240+i),y=MotionBinary64::fromInteger(304+i);
+        assert(smoke.boxBurst(x,y,random));assert(world.emitBoxSmoke(x,y));
+        sameRandom();sameChildren();
+        const auto baseY=MotionBinary64::fromInteger(300+i);
+        assert(flash.boxBurst(x,baseY,random));assert(world.emitBoxFlash(x,baseY));
+        sameRandom();sameChildren();
+    }
+    const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(304);
+    if(failSmoke){assert(!smoke.boxBurst(x,y,random));assert(!world.emitBoxSmoke(x,y));}
+    else {assert(!flash.boxBurst(x,y,random));assert(!world.emitBoxFlash(x,y));}
+    assert(!world.effectsSucceeded());sameRandom();sameChildren();
+    assert(!world.emitBoxSmoke(x,y));assert(!world.emitBoxFlash(x,y));
+    sameRandom();sameChildren();
+}
+#endif

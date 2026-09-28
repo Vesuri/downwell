@@ -49,6 +49,16 @@ The SDL `Game` latches simulation failure separately from ordinary quit and
 does not dispatch more updates afterward. The executable returns 20 before
 rendering/presenting the failed update, matching the Amiga effect-error path.
 
+Box-specific smoke and flash entry points likewise use each world's existing
+shared RNG and this failure latch. Smoke receives the script's already-offset
+`y+4`; the owner must not apply the offset again. `BoxBurstWorldCheck` exercises
+both live world adapters, comparing children and the full RNG state against the
+separately verified burst primitives, including exhausted smoke/flash banks and
+suppression of subsequent requests after failure. This is an ownership/wiring
+check, not natural destruction admission: persistent debris scheduling and the
+live player time-stop dependency of `alarmStop(0)` remain required before the
+normal box Step can invoke the complete sequence.
+
 The current shared cavern stomp adapter checks reward success before its
 immediate enemy retirement, defeat count and player bounce. A failed reward
 retains prior combo changes and partial gem births, but stops contact traversal

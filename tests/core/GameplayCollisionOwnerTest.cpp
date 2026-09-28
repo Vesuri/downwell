@@ -62,6 +62,7 @@ bool nativeCollisionQueries(downwell::GameplayCollisionOwner& owner,
         owner.projectileSolidPoint(self,x,y,false,masks,result);
 }
 #else
+#include "BoxBurstWorldCheck.h"
 #include "core/GameplayFieldReentryVerification.h"
 #include "core/ProjectilePublication.h"
 #include "core/WallPresentation.h"
@@ -238,6 +239,10 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
     assert(!world->findEnemy(dormant)&&world->resolveEnemyLifetime(dormant)==&overwritten);
 }
 int main(){
+    for(bool failSmoke:{false,true}){
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
+        checkBoxBurstWorld(*world,failSmoke);
+    }
     {
         auto world=std::make_unique<GameplayWorld>(300,false,1000,false);
         BulletAudit audit{world.get()};

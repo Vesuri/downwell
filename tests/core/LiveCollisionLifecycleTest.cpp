@@ -145,6 +145,7 @@ struct ProjectileFailureOwner:StoredWorldCollision {
     bool markDestroyed(InstanceHandle h,const InstanceRecord& r){return allow(r,6)&&StoredWorldCollision::markDestroyed(h,r);}
     bool retire(InstanceHandle h,const InstanceRecord& r){return allow(r,7)&&StoredWorldCollision::retire(h,r);}
 };
+#include "BoxBurstWorldCheck.h"
 int main(){
     const auto rb=read("generated/downwell-rooms.dwrm"),ob=read("generated/downwell-objects.dwob"),
         bb=read("generated/downwell-builder-patterns.dwbp"),sb=read("generated/downwell-sprites.dwsc"),
@@ -153,6 +154,10 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(bool failSmoke:{false,true}){
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns);
+        checkBoxBurstWorld(*world,failSmoke);
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
