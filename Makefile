@@ -2239,6 +2239,11 @@ test: verify-live-collision-lifecycle
 verify-live-collision-lifecycle: generate-room-pack generate-object-pack generate-sprite-pack generate-collision-masks generate-builder-pattern-pack build/live-collision-lifecycle-test
 	./build/live-collision-lifecycle-test
 
+.PHONY: verify-source-shot-owners
+test: verify-source-shot-owners
+verify-source-shot-owners: generate-room-pack generate-object-pack generate-sprite-pack generate-collision-masks generate-builder-pattern-pack build/live-collision-lifecycle-test build/gameplay-collision-owner-test
+	python3 tools/verify-source-shot-owners.py
+
 build/capture-projectile-art: tools/capture-projectile-art.cpp src/platform/sdl/PlatformSDL.cpp src/core/SpritePack.cpp src/core/FontPack.cpp $(HOST_CHECK_HEADERS)
 	@mkdir -p build
 	$(CXX) -Isrc $(SDL_CFLAGS) $(CXXFLAGS) -o $@ $(filter %.cpp,$^) $(SDL_LDFLAGS)

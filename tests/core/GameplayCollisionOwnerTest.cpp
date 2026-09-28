@@ -759,7 +759,7 @@ int main(){
         assert(!world->publishBulletCollisionPosition(key,{0x7f800000u},{})&&!world->effectsSucceeded());
         assert(owner->state(shared)->x.bits==last.x.bits&&owner->state(shared)->y.bits==last.y.bits);
     }
-    for(bool high:{false,true}){
+    for(bool high:{false,true})for(bool laser:{false,true}){
         // Exercise the recovered Step against real resource-backed selectors
         // and box writes, using a real fired lifetime for setter/destruction
         // callbacks. The supplied profile and isolated position are fixture
@@ -773,7 +773,7 @@ int main(){
         InstanceHandle shotShared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,shotKey,shotShared));
         assert(world->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
         MachineGunSourceMotion motion;GameMakerRandom random(2);
-        assert(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),true));
+        assert(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),laser));
         assert(world->publishBulletCollisionPosition(shotKey,motion.x,motion.y));
         ScriptSpawnEffects<4> effects;bool succeeded=true;unsigned child=~0u;
         auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
@@ -840,6 +840,9 @@ int main(){
         assert(owner->projectileSolidPoint({},x,y,false,masks,selected)&&selected.found&&
             selected.handle.slot==ops.selected.slot&&selected.handle.generation==ops.selected.generation);
         assert(world->resolveBulletLifetime(shotKey)&&world->resolveBulletLifetime(shotKey)->destroyRequested);
+        std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
+            unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
+            unsigned(box->state.wallHp.high),unsigned(box->state.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
         assert(owner->prepareDraw(effects)&&!world->resolveBulletLifetime(shotKey)&&!owner->state(shotShared));
     }
     {

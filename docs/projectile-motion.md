@@ -138,7 +138,8 @@ still gate replacement of the approximate gun path.
 
 `GameplayCollisionOwnerTest` also composes this Step with resource-backed wall
 line/point selection, actual box health/hit writes and the registered script
-effect owner for its muzzle. Ordinary and gem-high Laser Sight profiles consume
+effect owner for its muzzle. Ordinary and gem-high profiles, with and without
+Laser Sight, consume
 one spread draw, issue three line queries, approach the selected box through
 the original point-query loop, and retain both final position writes after the
 bullet's destruction request. The damaged box remains active and selectable;
@@ -148,6 +149,15 @@ receives the exact angle and intermediate positions, destruction marking and
 room cleanup. Starting position, supplied profile and event invocation remain
 controlled fixture inputs. Shootable, stone-impact, audio, rendering, natural
 scheduling and full shared RNG ordering are not established by this case.
+
+`make verify-source-shot-owners` compares those four scenarios with the stored
+world's real collision/effect/lifetime owners. The stored fixture obtains a shot
+and box from normal startup, then isolates their positions through the engine
+setters; it does not resume normal simulation after rearranging that scene.
+The comparison checks bit-exact final position, angle and box health, plus line,
+point and position-write counts. Both executables independently require the
+synchronous muzzle birth and retained marked projectile. These are host-built
+world-owner tests, not an Amiga CPU replay or Windows gameplay capture.
 
 Both live worlds route ordinary shot-consumption through `markBulletDestroyed`.
 This handle-based operation publishes the collision exclusion once, retains the

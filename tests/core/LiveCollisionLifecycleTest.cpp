@@ -14,6 +14,7 @@
 #include "core/ProjectilePublication.h"
 #include "core/EffectSpawnScript.h"
 #include "core/ScriptSpawnOperations.h"
+#include "core/MachineGunSourceStep.h"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -152,6 +153,81 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(bool high:{false,true})for(bool laser:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach source bullet Step world");world->skipToGameForTesting();
+        InstanceHandle box{},shot{};
+        for(unsigned tick=0;tick<1000;++tick){
+            world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+            for(std::size_t i=0;i<world->activeInstanceCount();++i){
+                const auto& r=world->instanceAt(i);
+                if(r.objectId==92&&r.active&&!r.destroyRequested)box=world->instanceHandleAt(i);
+            }
+            if(box.generation&&world->mainBulletCount()){shot=world->mainBulletAt(0).instance;break;}
+        }
+        require(world->effectsSucceeded()&&box.generation&&shot.generation,"natural generation provides live box and shot identities");
+        // Isolate the event geometrically, without bypassing either owner's
+        // setters. Do not resume the normal simulation after this fixture.
+        auto real=[](int n){RunnerImageValue value;require(value.assign(MotionBinary64::fromInteger(n)),"fixture coordinate");return value;};
+        for(std::size_t i=0;i<world->activeInstanceCount();++i){
+            const auto key=world->instanceHandleAt(i);
+            require(world->publishCollisionPosition(key,real(10000+int(i)*32),real(10000)),"isolate collision geometry");
+        }
+        require(world->publishCollisionPosition(box,real(240),real(512)),"position isolated box");
+        MachineGunSourceMotion motion;GameMakerRandom random(2);
+        require(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),laser)&&
+            world->publishBulletCollisionPosition(shot,motion.x,motion.y),"publish source bullet starting position");
+        auto registration=world->scriptSpawnRegistration<4>();ScriptSpawnEffects<4> effects;
+        bool succeeded=true;unsigned child=0;
+        auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
+            if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
+        auto muzzle=scriptSpawnOperations(effects,registration,frames,[&](unsigned id){child=id;return true;},succeeded);
+        struct Ops {
+            StartupRuntime& world;StoredWorldCollision& owner;MachineGunSourceMotion& motion;InstanceHandle shot;
+            InstanceHandle selected{};unsigned lines=0,points=0,approachWrites=0,writes=0;
+            bool approaching=false,destroyed=false;
+            bool publishAngle(RunnerImageValue angle){return world.publishBulletAngle(shot,angle);}
+            bool publishPosition(RunnerImageValue x,RunnerImageValue y){
+                if(approaching)++approachWrites;else {require(destroyed,"final movement follows destruction request");++writes;}
+                RunnerImageValue actualX,actualY;
+                return world.publishBulletCollisionPosition(shot,x,y)&&owner.collisionPosition(shot,actualX,actualY)&&
+                    actualX.bits==x.bits&&actualY.bits==y.bits;
+            }
+            bool query(int object,InstancePlaceResult& result){MotionBinary64 x,y;++lines;
+                return motion.endpoint(x,y)&&owner.nonPreciseLine(shot,object,motion.x.promoted(),motion.y.promoted(),x,y,false,result);}
+            bool line(int object,bool& hit){InstancePlaceResult result;if(!query(object,result))return false;hit=result.id!=-4;return true;}
+            bool selectWall(){InstancePlaceResult result;if(!query(59,result)||result.id==-4)return false;selected=result.handle;return true;}
+            bool approachSolid(){approaching=true;unsigned count=0;
+                const bool ok=motion.approachSolid([&](auto x,auto y,bool& hit){++points;InstancePlaceResult result;
+                    if(!owner.collisionPoint(shot,59,x,y,false,false,result))return false;hit=result.id!=-4;return true;
+                },[&](auto x,auto y){return publishPosition(x,y);},count);approaching=false;return ok;}
+            bool wallParent(int& p){return owner.projectileWallParent(selected,p);}
+            bool wallHealth(MotionBinary64& hp){return owner.projectileBoxHealth(selected,hp);}
+            bool wallHealthWrite(MotionBinary64 hp){return owner.projectileBoxHealthWrite(world,selected,hp);}
+            bool wallHit(){return owner.projectileBoxHit(world,selected);}
+            bool destroySelf(){destroyed=world.markBulletDestroyed(shot);return destroyed;}
+            bool effect(int,MotionBinary64,MotionBinary64){return false;}
+            bool soundWall(){return false;}bool explosion(int){return false;}
+            bool placeShootable(int,bool&){return false;}bool selectShootable(int){return false;}
+            bool thingHealth(MotionBinary64&){return false;}bool thingHealthWrite(MotionBinary64){return false;}
+            bool thingHit(){return false;}bool thingHitEffect(bool&){return false;}
+        } ops{*world,*owner,motion,shot};
+        require(MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded)&&succeeded,
+            "source Step runs through stored collision, transform, effect and damage owners");
+        const auto expected=MotionBinary64::fromInteger(1-machineGunProfile(high).damage);
+        const auto* target=owner->resolve(box);
+        require(ops.selected.slot==box.slot&&ops.selected.generation==box.generation&&target&&target->box.hit&&
+            target->box.wallHp.high==expected.high&&target->box.wallHp.low==expected.low&&target->active&&!target->destroyRequested,
+            "source bullet damage leaves the selected box alive for its own Step");
+        require(ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2&&
+            random.drawCount()==1&&child&&registration.sourceId(child)&&owner->resolve(shot)->destroyRequested,
+            "source query/movement counts and synchronous muzzle birth survive destruction marking");
+        std::printf("SOURCE_SHOT %u %u %08x %08x %08x %08x %08x %u %u %u %u\n",
+            unsigned(high),unsigned(laser),unsigned(motion.x.bits),unsigned(motion.y.bits),unsigned(motion.imageAngle.bits),
+            unsigned(target->box.wallHp.high),unsigned(target->box.wallHp.low),ops.lines,ops.points,ops.approachWrites,ops.writes);
+        require(effects.clear(registration),"retire borrowed muzzle registry before fixture teardown");
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
