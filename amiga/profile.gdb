@@ -38,6 +38,7 @@ printf "Alarm detail: 106=capture 107=sort 108=scan_and_metadata 109=callback; e
 printf "Enemy detail: 110=walker 111=bat 112=frog 113=snail 114=crawler 115=position_and_presentation; exclusive, excluded from 19\n"
 printf "Binding detail: 116=definition 117=membership 118=properties; exclusive, excluded from 98\n"
 printf "Layer birth detail: 119=adopt 120=resolve depth/layer 121=attach element 122=allocate slot; exclusive, excluded from 85\n"
+printf "Object population: 123=registration walk to count selector family; exclusive, before query-path selection\n"
 printf "Damage number births: %lu (zero means this tape did not measure a damaging contact)\n", gDownwellProfileDamageBirths
 if gDownwellProfileRequireDamage && gDownwellProfileDamageBirths == 0
     printf "Damage profiling tape did not reach a damaging contact\n"

@@ -48,6 +48,7 @@ enum DownwellProfilePhase {
     profileEnemyCrawler, profileEnemyFinalize,
     profileBindingDefinition, profileBindingMembership, profileBindingProperties,
     profileLayerAdopt, profileLayerResolve, profileLayerAttach, profileLayerAllocate,
+    profileObjectPopulation,
     profilePhaseCount
 };
 

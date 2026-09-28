@@ -100,6 +100,14 @@ lookup only applies to numbered lifetimes: generated terrain currently has zero
 source IDs, unlike authored room terrain. A faster numeric-ID search therefore
 does not imply faster generated-terrain registration.
 
+Object-population counting has its own exclusive phase (123). It measures the
+registration-list walk used before `place`, `point` and `collisionLine` select
+their list/tree path. It does not measure tree publication, list-only point
+selection, or collision-pair collection. Zero calls only excludes this counting
+path in the measured tape; it is not proof that every collision consumer is
+inactive. Compare it with spatial publication counters before changing query
+data structures or introducing retained population counts.
+
 The shared element links maintain a two-level free-slot bitmap. Allocation
 uses it to reproduce the lowest-unowned-element scan, then still checks the
 instance registry's presence flag. All element owners update the same map;

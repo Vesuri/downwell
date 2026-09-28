@@ -207,6 +207,11 @@ Reference: [upgrade IDs and source entry points](upgrade-coverage.md).
   prepared path against immediate execution with intervening gameplay RNG and
   health changes, not just a fixed initial seed. Decide the remaining collision
   and layer ownership work from these dependencies before further micro-tuning.
+  Audit which live consumers require the exact spatial tree versus native
+  terrain queries. Avoid paying for duplicate representations without a live
+  consumer; any deferred construction must preserve historical insertion/removal
+  order, first-hit identity, query-preparation side effects and failure timing.
+  Rebuilding from current positions alone is not an equivalent substitute.
 - Reduce full-room bookkeeping in layer projection, animation/previous-position
   snapshots and alarm registration capture. Preserve inactive layer termination,
   callback order, generation checks and synchronous mutation visibility. Measure

@@ -1,5 +1,6 @@
 #ifndef DOWNWELL_CORE_RUNNER_OBJECT_MEMBERSHIP_H
 #define DOWNWELL_CORE_RUNNER_OBJECT_MEMBERSHIP_H
+#include "Profile.h"
 #include <cstdint>
 namespace downwell {
 // 0x478380/0x479880: append registration, stable unlink. With an immutable
@@ -99,6 +100,7 @@ public:
         }
     }
     template<class IsA> unsigned count(int object,IsA isA) const {
+        DW_PROFILE_SCOPE(profileObjectPopulation);
         unsigned result=0;
         visit(object,isA,[&](unsigned,std::uint32_t){++result;return true;});
         return result;
