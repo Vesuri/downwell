@@ -105,8 +105,12 @@ private:
                 sort(near,far);return Math::sub(far,Real{0x3f800000u},far);
             }
         }
-        if(a>b){const auto saved=a;a=b;b=saved;}
-        near=unitReal(a);far=unitReal(compatibility?b-1:b);return true;
+        // The unchanged integer edges are already encoded above. Preserve
+        // those encodings through sorting; only the compatibility far-edge
+        // decrement needs a new conversion.
+        if(a>b){const auto saved=a;a=b;b=saved;const auto edge=near;near=far;far=edge;}
+        if(compatibility)far=unitReal(b-1);
+        return true;
     }
     static void sort(Real& a,Real& b){if(Math::less(b,a)){const auto saved=a;a=b;b=saved;}}
     static bool local(Real low,Real high,int origin,Real scale,Real& near,Real& far){
