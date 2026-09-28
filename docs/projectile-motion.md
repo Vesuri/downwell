@@ -143,10 +143,11 @@ one spread draw, issue three line queries, approach the selected box through
 the original point-query loop, and retain both final position writes after the
 bullet's destruction request. The damaged box remains active and selectable;
 its own Step must produce destruction effects later. This is a controlled
-integration fixture, not live projectile admission: the bullet's own lifetime,
-position/angle publication, destruction request and event scheduling are still
-fixture callbacks. Shootable, stone-impact, audio, rendering and full shared
-RNG ordering are not established by this case.
+integration fixture, not live projectile admission. A real fired lifetime now
+receives the exact angle and intermediate positions, destruction marking and
+room cleanup. Starting position, supplied profile and event invocation remain
+controlled fixture inputs. Shootable, stone-impact, audio, rendering, natural
+scheduling and full shared RNG ordering are not established by this case.
 
 Both live worlds route ordinary shot-consumption through `markBulletDestroyed`.
 This handle-based operation publishes the collision exclusion once, retains the
@@ -165,6 +166,11 @@ the retained previous-position snapshot and rejection of nonfinite input.
 The stored owner tests the same boundary after marking destruction. The normal
 gun adapters use this publication entry point, but still supply their legacy
 trajectory coordinates; this does not yet replace their motion or rendering.
+`publishBulletAngle` similarly accepts the already-narrowed original angle and
+publishes through the transform owner on both platforms. The stored record
+retains its exact binary32 bits, including fractional degrees. The live legacy
+initializers now use this API, but still derive their input from the approximate
+Q32 direction until source motion is admitted.
 
 ## Collision lookup boundaries
 

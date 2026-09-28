@@ -209,6 +209,11 @@ int main(){
         const auto key=world->mainBulletAt(0).instance;
         require(world->markBulletDestroyed(key)&&world->markBulletDestroyed(key)&&owner->resolve(key),
             "repeated destruction requests retain the executing projectile identity");
+        RunnerImageValue angle;auto degrees=MotionBinary64::fromInteger(267);
+        require(degrees.add({0x3fd00000u,0})&&angle.assign(degrees)&&world->publishBulletAngle(key,angle),
+            "marked projectile accepts the source-narrowed fractional angle");
+        std::uint32_t storedAngle=0;std::memcpy(&storedAngle,&owner->resolve(key)->rotation,4);
+        require(storedAngle==angle.bits,"stored projectile retains the exact published angle bits");
         RunnerImageValue x,y,actualX,actualY;
         require(x.assign(MotionBinary64::fromInteger(240))&&y.assign(MotionBinary64::fromInteger(500))&&
             world->publishBulletCollisionPosition(key,x,y)&&owner->collisionPosition(key,actualX,actualY)&&

@@ -385,6 +385,13 @@ bool GameplayWorld::publishBulletCollisionPosition(downwell::InstanceHandle h,
         return run_.effectsSucceeded=false;
     return true;
 }
+bool GameplayWorld::publishBulletAngle(downwell::InstanceHandle h,downwell::RunnerImageValue angle){
+    const auto* bullet=resolveBulletLifetime(h);
+    if(!run_.effectsSucceeded||!bullet||!downwell::RunnerSpatialSplit::valid(angle)||
+       !bulletLifecycle_.transform(h,*bullet,downwell::RunnerTransformField::angle,angle,{0x3f800000u},0xffffffu))
+        return run_.effectsSucceeded=false;
+    return true;
+}
 
 bool GameplayWorld::configureEnemy(unsigned index, int objectId,
                                       int spriteId, int x, int y,
@@ -1089,8 +1096,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                     if(!bulletLifecycle_.hasOwner())return true;
                     downwell::RunnerImageValue angle;
                     if(!downwell::ProjectilePublication::angle(bullet.trajectory.direction,angle)||
-                        !bulletLifecycle_.transform({bullet.identitySlot,bullet.lifetimeId},bullet,
-                            downwell::RunnerTransformField::angle,angle,{0x3f800000u},0xffffffu))
+                        !publishBulletAngle({bullet.identitySlot,bullet.lifetimeId},angle))
                         return run_.effectsSucceeded=false;
                     return true;
                 }))return {};

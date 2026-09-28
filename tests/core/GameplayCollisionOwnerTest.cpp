@@ -761,15 +761,20 @@ int main(){
     }
     for(bool high:{false,true}){
         // Exercise the recovered Step against real resource-backed selectors
-        // and box writes. The bullet's own registration/event dispatch remains
-        // outside this fixture; no native storage order supplies the target.
+        // and box writes, using a real fired lifetime for setter/destruction
+        // callbacks. The supplied profile and isolated position are fixture
+        // inputs, not a claim about natural gem-high activation/scheduling.
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
-        auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
-        assert(owner->attach(*world));
+        assert(owner->attach(*world));world->step(4);
+        assert(world->effectsSucceeded()&&world->bulletCount()==1);
+        const auto& shot=world->bulletAt(0);const InstanceHandle shotKey{shot.identitySlot,shot.lifetimeId};
+        InstanceHandle shotShared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,shotKey,shotShared));
         assert(world->createGeneratedInstance({92,240,512},objects,[](const auto&){return true;}));
         MachineGunSourceMotion motion;GameMakerRandom random(2);
         assert(motion.reset(MotionBinary64::fromInteger(240),MotionBinary64::fromInteger(500),true));
+        assert(world->publishBulletCollisionPosition(shotKey,motion.x,motion.y));
         ScriptSpawnEffects<4> effects;bool succeeded=true;unsigned child=~0u;
         auto frames=[&](int id,unsigned& count){PackedSpriteCollision art;
             if(!sprites.sprite(id,art))return false;count=art.frameCount;return true;};
@@ -777,9 +782,13 @@ int main(){
             [&](unsigned id){child=id;return true;},succeeded);
         struct Ops {
             GameplayCollisionOwner& owner;MachineGunSourceMotion& motion;const SpriteMaskPack& masks;
+            GameplayWorld& world;InstanceHandle shotKey,shotShared;
             InstanceHandle selected{};unsigned lines=0,points=0,writes=0,approachWrites=0;
             bool destroyed=false,approaching=false;
-            bool publishAngle(RunnerImageValue angle){return angle.bits==motion.imageAngle.bits;}
+            bool publishAngle(RunnerImageValue angle){
+                return angle.bits==motion.imageAngle.bits&&world.publishBulletAngle(shotKey,angle)&&
+                    owner.properties(shotShared)->sprite.angle.bits==angle.bits;
+            }
             bool publishPosition(RunnerImageValue x,RunnerImageValue y){
                 if(approaching){
                     assert((approachWrites%2==0?x.bits==motion.x.bits:y.bits==motion.y.bits));
@@ -788,11 +797,13 @@ int main(){
                     assert(destroyed&&(writes%2==0?y.bits==motion.y.bits:x.bits==motion.x.bits));
                     ++writes;
                 }
-                return true;
+                if(!world.publishBulletCollisionPosition(shotKey,x,y))return false;
+                const auto* state=owner.state(shotShared);
+                return state&&state->x.bits==x.bits&&state->y.bits==y.bits;
             }
             bool query(int object,GameplayCollisionOwner::Owner::Result& result){
                 MotionBinary64 x,y;if(!motion.endpoint(x,y))return false;++lines;
-                return owner.projectileNonPreciseLine({},object,motion.x.promoted(),motion.y.promoted(),x,y,false,result);
+                return owner.projectileNonPreciseLine(shotShared,object,motion.x.promoted(),motion.y.promoted(),x,y,false,result);
             }
             bool line(int object,bool& hit){GameplayCollisionOwner::Owner::Result result;
                 if(!query(object,result))return false;hit=result.found;return true;}
@@ -801,7 +812,7 @@ int main(){
             bool approachSolid(){approaching=true;unsigned iterations=0;
                 const bool ok=motion.approachSolid([&](auto x,auto y,bool& hit){
                     ++points;GameplayCollisionOwner::Owner::Result result;
-                    if(!owner.projectileSolidPoint({},x,y,false,masks,result))return false;
+                    if(!owner.projectileSolidPoint(shotShared,x,y,false,masks,result))return false;
                     hit=result.found;return true;
                 },[&](auto x,auto y){return publishPosition(x,y);},iterations);
                 approaching=false;return ok;
@@ -810,13 +821,13 @@ int main(){
             bool wallHealth(MotionBinary64& hp){return owner.projectileBoxHealth(selected,hp);}
             bool wallHealthWrite(MotionBinary64 hp){return owner.projectileBoxHealthWrite(selected,hp);}
             bool wallHit(){return owner.projectileBoxHit(selected);}
-            bool destroySelf(){destroyed=true;return true;}
+            bool destroySelf(){destroyed=world.markBulletDestroyed(shotKey);return destroyed;}
             bool effect(int,MotionBinary64,MotionBinary64){return false;}
             bool soundWall(){return false;}bool explosion(int){return false;}
             bool placeShootable(int,bool&){return false;}bool selectShootable(int){return false;}
             bool thingHealth(MotionBinary64&){return false;}bool thingHealthWrite(MotionBinary64){return false;}
             bool thingHit(){return false;}bool thingHitEffect(bool&){return false;}
-        } ops{*owner,motion,masks};
+        } ops{*owner,motion,masks,*world,shotKey,shotShared};
         assert(MachineGunSourceStep::run(motion,random,high,muzzle,ops,succeeded));
         assert(succeeded&&ops.destroyed&&ops.lines==3&&ops.points>1&&ops.approachWrites==2*(ops.points-1)&&ops.writes==2);
         assert(random.drawCount()==1&&child!=~0u&&owner->scriptEffects().size()==1);
@@ -828,6 +839,8 @@ int main(){
         const auto x=MotionBinary64::fromInteger(240),y=MotionBinary64::fromInteger(512);
         assert(owner->projectileSolidPoint({},x,y,false,masks,selected)&&selected.found&&
             selected.handle.slot==ops.selected.slot&&selected.handle.generation==ops.selected.generation);
+        assert(world->resolveBulletLifetime(shotKey)&&world->resolveBulletLifetime(shotKey)->destroyRequested);
+        assert(owner->prepareDraw(effects)&&!world->resolveBulletLifetime(shotKey)&&!owner->state(shotShared));
     }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);

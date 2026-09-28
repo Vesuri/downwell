@@ -547,6 +547,7 @@ public:
     // private fields after each successful setter, not inside this callback.
     bool publishBulletCollisionPosition(downwell::InstanceHandle h,
         downwell::RunnerImageValue x,downwell::RunnerImageValue y);
+    bool publishBulletAngle(downwell::InstanceHandle h,downwell::RunnerImageValue angle);
     const BulletState* findBullet(std::uint32_t lifetimeId) const {
         if(lifetimeId)for(unsigned i=0;i<bulletSlotEnd_;++i)
             if(bullets_[i].active && bullets_[i].lifetimeId==lifetimeId)return &bullets_[i];

@@ -252,6 +252,7 @@ public:
         if(!run_.effectsSucceeded||!record||record->objectId!=261)return run_.effectsSucceeded=false;
         return publishCollisionPosition(h,x,y);
     }
+    bool publishBulletAngle(InstanceHandle h,RunnerImageValue angle);
     bool inMenu() const { return roomId_ == menuRoomId; }
     bool inPlayMenu() const { return roomId_ == playMenuRoomId; }
     bool inMainRoom() const { return roomId_ == mainRoomId; }

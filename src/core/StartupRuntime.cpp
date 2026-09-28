@@ -841,15 +841,21 @@ void StartupRuntime::updateMainBullets() {
     mainBulletCount_ = write;
 }
 
+bool StartupRuntime::publishBulletAngle(InstanceHandle h,RunnerImageValue angle){
+    auto* record=instances_.resolve(h);
+    if(!run_.effectsSucceeded||!record||record->objectId!=261||!RunnerSpatialSplit::valid(angle)||
+       !lifecycle_.transform(h,*record,RunnerTransformField::angle,angle,{0x3f800000u},0xffffffu))
+        return run_.effectsSucceeded=false;
+    std::memcpy(&record->rotation,&angle.bits,4);return true;
+}
+
 bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
     if(!bullet.instance.generation)return true; // Explicit resource-less fixture.
     auto* record=instances_.resolve(bullet.instance);
     if(!record||record->objectId!=261)return false;
     if(angle){
         RunnerImageValue value;
-        if(!ProjectilePublication::angle(bullet.trajectory.direction,value)||
-            !lifecycle_.transform(bullet.instance,*record,RunnerTransformField::angle,value,{0x3f800000u},0xffffffu))return false;
-        std::memcpy(&record->rotation,&value.bits,4);return true;
+        return ProjectilePublication::angle(bullet.trajectory.direction,value)&&publishBulletAngle(bullet.instance,value);
     }
     RunnerImageValue x,y;std::int32_t ix,iy;
     if(!ProjectilePublication::coordinate(bullet.trajectory.x,0,x)||
