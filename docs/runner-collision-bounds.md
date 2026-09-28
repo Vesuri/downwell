@@ -537,20 +537,29 @@ array or a union of all candidates. Only candidate/incoming unions enter the
 source comparisons, so the all-candidate union need not satisfy these bounds.
 If any later candidate fails admission, selection remains unpublished and the
 reference handles the complete request.
-During tree descent, `ChildSelection` borrows the unchanged incoming rectangle
-and decodes its integer coordinates once. Each node's candidates are still
-decoded and scored at that node, with the same per-candidate admission checks
-and binary32 fallback. The borrowed rectangle must remain immutable until all
-selections finish; insertion ends that scope before mutating any node. Leaf-only
-insertion performs no decode. This uses only bounded per-descent scratch, not
-a persistent cache of tree bounds. Profiling attributes initial decode to
-insertion rather than selection, so compare their combined exclusive time.
-Both selection paths borrow candidate bounds directly from the node's strided
-entries through a read-only accessor. There is no six-box staging copy at each
-level and no persistent candidate scratch array in the index. Accessors must
-return stable references for the selection's duration; node mutation still
-begins only after descent finishes. Strided fixtures cover integer admission
-and fractional/invalid fallback as well as the independent full-tree tests.
+`RunnerSpatialIndex` begins with integer-backed bounds. Each inserted rectangle
+is decoded once, and its leaf and ancestor bounds remain signed integer pixels.
+A tagged-at-owner union keeps the node storage size unchanged. Child selection,
+unions, closed overlap queries and partitioning use these coordinates directly;
+the area/extent checks above still apply. If those checks fail, that operation
+reconstructs exact binary32 inputs and uses the retained arithmetic reference.
+
+The first inserted fractional, out-of-range or negative-zero coordinate converts
+all retained node bounds back to binary32 before insertion. This conversion is
+exact for the admitted integers. Negative zero triggers conversion rather than
+discarding its sign. The tree remains binary32 until clear; removal does not
+try to infer that it has become integral again. Integer read queries use direct
+closed comparisons; fractional queries and line queries reconstruct binary32
+bounds without changing the tree's representation. No callbacks run during
+conversion, and traversal callbacks must not mutate the index.
+
+The standalone `ChildSelection` helper still borrows an unchanged incoming box
+and strided candidate references for arithmetic verification. The index's
+`IntegralStorage=false` instantiation forces original binary32 scoring and
+storage for cross-target comparison. Verification covers populated-tree
+fallback, fractional reads, released-node reuse and clear, alongside the
+independent scalar-tree mutation and traversal tests. Representation does not
+change partition seeds, ties, child order or instance identities.
 
 Quadratic partitioning retains the stronger complete-union bound: all seven
 rectangles together must have extents at most 65535 and area at most 2^24.

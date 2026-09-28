@@ -10,7 +10,6 @@ namespace downwell {
 // entry. This is not a complete spatial index or an instance_place adapter.
 // Finite normal/zero binary32 inputs only; failures leave output untouched.
 struct RunnerSpatialSplit {
-private:
     struct PixelBox {std::int32_t left,top,right,bottom;};
 public:
     using Real=RunnerImageValue;
@@ -113,11 +112,19 @@ public:
 private:
     template<class Bounds>
     static bool chooseDecodedChild(Bounds bounds,unsigned count,const PixelBox& in,unsigned& chosen){
+        return choosePixelValues([&](unsigned i,PixelBox& out){return pixels(bounds(i),out);},count,in,chosen);
+    }
+public:
+    // Accessor supplies admitted integral, noninverted boxes with coordinates
+    // strictly inside +/-2^24. Keep area/extent admission here: integral stored
+    // coordinates alone do not guarantee exact binary32 area arithmetic.
+    template<class Pixels>
+    static bool choosePixelValues(Pixels pixelsAt,unsigned count,const PixelBox& in,unsigned& chosen){
         if(!count||count>6)return false;
         unsigned best=0,bestArea=0,bestGrowth=0;
         for(unsigned i=0;i<count;++i){
             PixelBox value;
-            if(!pixels(bounds(i),value))return false;
+            if(!pixelsAt(i,value))return false;
             const PixelBox joined=pixelUnion(value,in);
             const unsigned width=unsigned(joined.right-joined.left),height=unsigned(joined.bottom-joined.top);
             if(width>65535||height>65535)return false;
@@ -134,11 +141,16 @@ private:
     }
 public:
     static bool partitionPixels(const Box (&boxes)[7],Result& output){
-        PixelBox values[7],all;unsigned areas[7];
+        PixelBox values[7];
         for(unsigned i=0;i<7;++i){
             if(!pixels(boxes[i],values[i]))return false;
-            all=i?pixelUnion(all,values[i]):values[i];
         }
+        return partitionPixelValues(values,output);
+    }
+    // Same coordinate admission as choosePixelValues.
+    static bool partitionPixelValues(const PixelBox (&values)[7],Result& output){
+        PixelBox all=values[0];unsigned areas[7];
+        for(unsigned i=1;i<7;++i)all=pixelUnion(all,values[i]);
         const unsigned width=unsigned(all.right-all.left),height=unsigned(all.bottom-all.top);
         if(width>65535||height>65535||pixelProduct(width,height)>0x1000000u)return false;
         for(unsigned i=0;i<7;++i)areas[i]=pixelArea(values[i]);
@@ -202,6 +214,13 @@ private:
         return pixelProduct(unsigned(box.right-box.left),unsigned(box.bottom-box.top));
     }
 public:
+    static bool decodePixels(const Box& box,PixelBox& out){return pixels(box,out);}
+    static Box encodePixels(const PixelBox& box){
+        Box result;
+        result.left.assignInteger(box.left);result.top.assignInteger(box.top);
+        result.right.assignInteger(box.right);result.bottom.assignInteger(box.bottom);
+        return result;
+    }
     // A descent borrows one immutable incoming box until all child selections
     // finish. Candidate bounds stay live; no decoded tree state is retained.
     class ChildSelection {

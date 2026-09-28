@@ -5,9 +5,9 @@ namespace downwell {
 // Fixed node representation for the runner's six-entry spatial tree.
 // Links are caller-owned indices, never native pointers. Tree allocation,
 // traversal, condensation and scheduling belong to the index owner.
-struct RunnerSpatialNode {
+template<class Box> struct RunnerSpatialNodeStorage {
     struct Entry {
-        RunnerSpatialSplit::Box bounds;
+        Box bounds;
         std::uint32_t child=0,instance=0;
     };
     int level=0;
@@ -29,12 +29,18 @@ struct RunnerSpatialNode {
     }
     // 0x501420 redistributes in original array order, independently of the
     // quadratic assignment order. Both outputs remain intact on failure.
-    bool split(const Entry& incoming,RunnerSpatialNode& sibling){
+    bool split(const Entry& incoming,RunnerSpatialNodeStorage& sibling){
+        return splitUsing(incoming,sibling,[](const Box (&bounds)[7],RunnerSpatialSplit::Result& groups){
+            return RunnerSpatialSplit::partition(bounds,groups);
+        });
+    }
+    template<class Partition>
+    bool splitUsing(const Entry& incoming,RunnerSpatialNodeStorage& sibling,Partition partition){
         if(count!=6 || &sibling==this)return false;
-        RunnerSpatialSplit::Box bounds[7];
+        Box bounds[7];
         for(unsigned i=0;i<6;++i)bounds[i]=entries[i].bounds;
         bounds[6]=incoming.bounds;RunnerSpatialSplit::Result groups;
-        if(!RunnerSpatialSplit::partition(bounds,groups))return false;
+        if(!partition(bounds,groups))return false;
         // All fallible work is complete. Compact group zero in place while
         // appending group one to the sibling; retain source array order.
         // Copy incoming first because callers may pass one of our entries.
@@ -51,5 +57,6 @@ struct RunnerSpatialNode {
         return true;
     }
 };
+using RunnerSpatialNode=RunnerSpatialNodeStorage<RunnerSpatialSplit::Box>;
 }
 #endif

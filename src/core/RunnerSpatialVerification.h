@@ -164,6 +164,49 @@ struct RunnerSpatialVerification {
         auto invalid=a;invalid.left.bits=0x7fc00000u;
         result.check(!Math::area(invalid,invalid.left)&&invalid.left.bits==0x7fc00000u);
     }
+    // Compare the integer-backed owner to forced original arithmetic across
+    // populated-tree representation changes and reuse of released nodes.
+    {
+        using Fast=RunnerSpatialIndex<64>;
+        using Reference=RunnerSpatialIndex<64,false>;
+        alignas(Fast) static std::uint8_t fastStorage[sizeof(Fast)];
+        alignas(Reference) static std::uint8_t referenceStorage[sizeof(Reference)];
+        const RunnerSpatialSplit::Box triggers[]={
+            {{0x3f000000u},{0xbf000000u},{0x43008000u},{0x43008000u}},
+            {{0x80000000u},{0},{0},{0}},
+            {{0x4b800000u},{0},{0x4b800000u},{0x41800000u}}
+        };
+        for(const auto& trigger:triggers){
+            auto& fast=*new(fastStorage) Fast;
+            auto& reference=*new(referenceStorage) Reference;
+            RunnerSpatialSplit::Box boxes[32];
+            auto compare=[&](RunnerSpatialSplit::Box query){
+                unsigned a[40],b[40],na=0,nb=0;
+                result.check(fast.query(query,[&](unsigned id){if(na<40)a[na++]=id;return na<40;}));
+                result.check(reference.query(query,[&](unsigned id){if(nb<40)b[nb++]=id;return nb<40;}));
+                result.check(na==nb&&fast.height()==reference.height()&&fast.nodeCount()==reference.nodeCount());
+                for(unsigned i=0;i<na&&i<nb;++i){result.check(a[i]==b[i]);result.word(a[i]);}
+            };
+            for(unsigned id=0;id<32;++id){
+                const int x=int(id%8)*16,y=int(id/8)*16;
+                boxes[id]=RunnerSpatialSplit::encodePixels({x,y,x+16,y+16});
+                result.check(fast.insert(boxes[id],id)&&reference.insert(boxes[id],id));
+            }
+            // Fractional reads do not mutate integer storage.
+            compare(triggers[0]);
+            for(unsigned id=0;id<16;++id){
+                bool a=false,b=false;
+                result.check(fast.remove(boxes[id],id,false,a)&&reference.remove(boxes[id],id,false,b)&&a&&b);
+            }
+            result.check(fast.insert(trigger,32)&&reference.insert(trigger,32));
+            for(unsigned id=0;id<16;++id)
+                result.check(fast.insert(boxes[id],id)&&reference.insert(boxes[id],id));
+            compare(RunnerSpatialSplit::encodePixels({-1,-1,256,256}));compare(trigger);
+            for(const auto& box:boxes)compare(box);
+            fast.clear();reference.clear();
+            result.check(fast.insert(boxes[0],0)&&reference.insert(boxes[0],0));compare(boxes[0]);
+        }
+    }
     return result;
 }
 }
