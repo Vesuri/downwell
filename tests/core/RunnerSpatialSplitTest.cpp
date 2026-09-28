@@ -262,6 +262,13 @@ int main(){
         const bool expected=Split::chooseBinary32Child(input,count,incoming,reference);
         assert(Split::chooseChild(input,count,incoming,actual)==expected&&actual==reference);
         const Split::ChildSelection selection(incoming);
+        struct Strided {unsigned before;Split::Box box;unsigned after;};
+        Strided entries[6]{};
+        for(unsigned i=0;i<count&&i<6;++i)entries[i]={0x12345678u,input[i],0xfedcba98u};
+        unsigned borrowed=999;
+        assert(selection.chooseFrom([&](unsigned i)->const Split::Box&{
+            assert(i<count&&i<6);return entries[i].box;
+        },count,borrowed)==expected&&borrowed==reference);
         for(unsigned repeat=0;repeat<2;++repeat){
             unsigned reused=999;
             assert(selection.choose(input,count,reused)==expected&&reused==reference);

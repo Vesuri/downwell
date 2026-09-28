@@ -80,19 +80,26 @@ public:
     // Retained reference/fallback. Do not change rounding or tie ordering when
     // widening the eligibility of the integer path below.
     static bool chooseBinary32Child(const Box* boxes,unsigned count,Box incoming,unsigned& chosen){
+        return chooseBinary32From([&](unsigned i)->const Box&{return boxes[i];},count,incoming,chosen);
+    }
+private:
+    template<class Bounds>
+    static bool chooseBinary32From(Bounds bounds,unsigned count,const Box& incoming,unsigned& chosen){
         DW_PROFILE_SCOPE(profileSpatialChooseFallback);
         if(!count || count>6 || !valid(incoming))return false;
         unsigned best=0;Real bestGrowth{},bestArea{};
         for(unsigned i=0;i<count;++i){
+            const Box& box=bounds(i);
             Real oldArea,growth;
-            if(!valid(boxes[i]) || !area(boxes[i],oldArea) ||
-               !area(unite(boxes[i],incoming),growth) || !sub(growth,oldArea,growth))return false;
+            if(!valid(box) || !area(box,oldArea) ||
+               !area(unite(box,incoming),growth) || !sub(growth,oldArea,growth))return false;
             if(!i || less(growth,bestGrowth) || (equal(growth,bestGrowth)&&less(oldArea,bestArea))){
                 best=i;bestGrowth=growth;bestArea=oldArea;
             }
         }
         chosen=best;return true;
     }
+public:
     // Eligible pixel rectangles have exact integer extents and each candidate
     // union area <=2^24. Thus each binary32 subtraction/product and growth
     // subtraction in child selection is exact; ties remain earliest-slot.
@@ -101,15 +108,16 @@ public:
         if(!count||count>6)return false;
         PixelBox in;
         if(!pixels(incoming,in))return false;
-        return chooseDecodedChild(boxes,count,in,chosen);
+        return chooseDecodedChild([&](unsigned i)->const Box&{return boxes[i];},count,in,chosen);
     }
 private:
-    static bool chooseDecodedChild(const Box* boxes,unsigned count,const PixelBox& in,unsigned& chosen){
+    template<class Bounds>
+    static bool chooseDecodedChild(Bounds bounds,unsigned count,const PixelBox& in,unsigned& chosen){
         if(!count||count>6)return false;
         unsigned best=0,bestArea=0,bestGrowth=0;
         for(unsigned i=0;i<count;++i){
             PixelBox value;
-            if(!pixels(boxes[i],value))return false;
+            if(!pixels(bounds(i),value))return false;
             const PixelBox joined=pixelUnion(value,in);
             const unsigned width=unsigned(joined.right-joined.left),height=unsigned(joined.bottom-joined.top);
             if(width>65535||height>65535)return false;
@@ -201,9 +209,14 @@ public:
     public:
         explicit ChildSelection(const Box& incoming):incoming_(incoming),pixelValid_(pixels(incoming,pixel_)){}
         bool choose(const Box* boxes,unsigned count,unsigned& chosen)const{
+            return chooseFrom([&](unsigned i)->const Box&{return boxes[i];},count,chosen);
+        }
+        // Borrow strided node entries directly; copying their bounds into a
+        // contiguous scratch array is unnecessary for either arithmetic path.
+        template<class Bounds> bool chooseFrom(Bounds bounds,unsigned count,unsigned& chosen)const{
             DW_PROFILE_SCOPE(profileSpatialChoose);
-            if(pixelValid_&&chooseDecodedChild(boxes,count,pixel_,chosen))return true;
-            return chooseBinary32Child(boxes,count,incoming_,chosen);
+            if(pixelValid_&&chooseDecodedChild(bounds,count,pixel_,chosen))return true;
+            return chooseBinary32From(bounds,count,incoming_,chosen);
         }
     };
     // Closed bounds: touching edges survive broad-phase pruning.

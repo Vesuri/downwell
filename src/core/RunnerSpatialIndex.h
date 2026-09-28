@@ -69,7 +69,6 @@ private:
     // Mutation is non-reentrant. Retain bounded descent scratch with its owner
     // rather than stacking it under generated-instance Create and world Step.
     unsigned parents_[depthLimit]{},selections_[depthLimit]{};
-    Box choices_[6]{};
     Node nodes_[Capacity]={};unsigned links_[Capacity]={};
     unsigned used_=1,live_=1,root_=0,free_=Capacity;bool good_=true;
     bool insertRoot(const Node::Entry& entry,int level){
@@ -109,9 +108,9 @@ private:
             while(nodes_[node].level!=level){
                 const Node& n=nodes_[node];
                 if(n.level<level||depth==depthLimit)return false;
-                for(unsigned i=0;i<n.count;++i)choices_[i]=n.entries[i].bounds;
                 unsigned selected;
-                if(!selection.choose(choices_,n.count,selected))return false;
+                if(!selection.chooseFrom([&](unsigned i)->const Box&{return n.entries[i].bounds;},
+                                         n.count,selected))return false;
                 parents_[depth]=node;selections_[depth++]=selected;
                 node=n.entries[selected].child;
             }

@@ -521,6 +521,12 @@ selections finish; insertion ends that scope before mutating any node. Leaf-only
 insertion performs no decode. This uses only bounded per-descent scratch, not
 a persistent cache of tree bounds. Profiling attributes initial decode to
 insertion rather than selection, so compare their combined exclusive time.
+Both selection paths borrow candidate bounds directly from the node's strided
+entries through a read-only accessor. There is no six-box staging copy at each
+level and no persistent candidate scratch array in the index. Accessors must
+return stable references for the selection's duration; node mutation still
+begins only after descent finishes. Strided fixtures cover integer admission
+and fractional/invalid fallback as well as the independent full-tree tests.
 
 Quadratic partitioning retains the stronger complete-union bound: all seven
 rectangles together must have extents at most 65535 and area at most 2^24.

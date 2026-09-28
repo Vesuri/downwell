@@ -86,6 +86,12 @@ struct RunnerSpatialVerification {
         result.check(RunnerSpatialSplit::chooseChild(boxes,count,boxes[6],actual)&&actual==expected);
         const RunnerSpatialSplit::ChildSelection selection(boxes[6]);
         actual=99;result.check(selection.choose(boxes,count,actual)&&actual==expected);
+        struct Strided {unsigned prefix;RunnerSpatialSplit::Box box;unsigned suffix;};
+        Strided entries[6]{};
+        for(unsigned i=0;i<count;++i)entries[i]={i,boxes[i],~i};
+        actual=99;result.check(selection.chooseFrom([&](unsigned i)->const RunnerSpatialSplit::Box&{
+            return entries[i].box;
+        },count,actual)&&actual==expected);
         result.word(actual);
         if(trial<16){
             RunnerSpatialSplit::Result reference,partition,pixelPartition;
@@ -104,6 +110,10 @@ struct RunnerSpatialVerification {
         expected=actual=99;
         const bool fallback=RunnerSpatialSplit::chooseBinary32Child(boxes,count,boxes[6],expected);
         result.check(selection.choose(boxes,count,actual)==fallback&&actual==expected);
+        entries[0].box=boxes[0];actual=99;
+        result.check(selection.chooseFrom([&](unsigned i)->const RunnerSpatialSplit::Box&{
+            return entries[i].box;
+        },count,actual)==fallback&&actual==expected);
         auto fractional=boxes[6];fractional.left.bits=0x3f000000u;
         const RunnerSpatialSplit::ChildSelection fractionalSelection(fractional);
         expected=actual=99;
