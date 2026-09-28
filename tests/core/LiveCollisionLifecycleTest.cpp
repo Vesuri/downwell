@@ -23,6 +23,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <cstring>
 using namespace downwell;
 static void require(bool ok,const char* message){if(!ok){std::fprintf(stderr,"%s\n",message);std::exit(1);}}
 static std::vector<std::uint8_t> read(const char* path){
@@ -155,6 +156,34 @@ int main(){
     BuilderPatternPack patterns(bb.data(),bb.size());SpriteCollisionPack sprites(sb.data(),sb.size());
     SpriteMaskPack masks(mb.data(),mb.size());
     require(rooms.valid()&&objects.valid()&&patterns.valid()&&sprites.valid()&&masks.valid(),"real collision resources validate");
+    for(unsigned reject=1;reject<=3;++reject){
+        struct CameraWrites:StoredWorldCollision {
+            using StoredWorldCollision::StoredWorldCollision;
+            unsigned reject=0,writes=0,id=0;InstanceHandle key;
+            RunnerImageValue oldX,oldY;float oldPreciseX=0,oldPreciseY=0;int oldPixelX=0,oldPixelY=0;
+            bool move(InstanceHandle h,const InstanceRecord& r,RunnerImageValue x,RunnerImageValue y){
+                if(r.objectId==64&&r.roomId==11&&++writes==reject){
+                    id=r.instanceId;key=h;oldPreciseX=r.preciseX;oldPreciseY=r.preciseY;oldPixelX=r.x;oldPixelY=r.y;
+                    require(collisionPosition(h,oldX,oldY),"camera still registered at rejected publication");
+                    return false;
+                }
+                return StoredWorldCollision::move(h,r,x,y);
+            }
+        };
+        auto owner=std::make_unique<CameraWrites>(objects,sprites,masks);owner->reject=reject;
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,
+            InstanceLifecycleBinding::bindPointQueries(*owner));
+        require(owner->attach(*world),"attach camera publication failure fixture");
+        world->skipToGameForTesting();
+        require(!world->effectsSucceeded()&&owner->writes==reject&&owner->id,
+            "rejected camera Create/Step/collision publication latches failure");
+        const auto* camera=world->instance(owner->id);RunnerImageValue x,y;
+        require(camera&&camera->preciseX==owner->oldPreciseX&&camera->preciseY==owner->oldPreciseY&&
+            camera->x==owner->oldPixelX&&camera->y==owner->oldPixelY&&
+            owner->collisionPosition(owner->key,x,y)&&x.bits==owner->oldX.bits&&y.bits==owner->oldY.bits,
+            "failed publication preserves the accepted camera record and owner prefix");
+        world->step(false);require(owner->writes==reject,"failed camera world does not retry writes");
+    }
     {
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
@@ -904,7 +933,7 @@ int main(){
         require(owner->attach(*world),"attach time-change world");
         {
             auto entry=world->entryDitherRegistration<1>();InstanceHandle key;
-            unsigned reads=0;
+            unsigned reads=0;bool fractionalCamera=false;
             auto camera=[&](MotionBinary64& out){
                 ++reads;unsigned cameras=0;
                 if(reads==1){
@@ -914,7 +943,14 @@ int main(){
                 for(unsigned i=0;i<world->activeInstanceCount();++i){
                     const auto& r=world->instanceAt(i);
                     if(r.objectId!=64||r.roomId!=11)continue;
-                    ++cameras;out=MotionBinary64::fromInteger(r.x);
+                    ++cameras;
+                    RunnerImageValue x,y,registeredX,registeredY;
+                    std::memcpy(&x.bits,&r.preciseX,4);std::memcpy(&y.bits,&r.preciseY,4);
+                    require(owner->collisionPosition(world->instanceHandleAt(i),registeredX,registeredY)&&
+                        registeredX.bits==x.bits&&registeredY.bits==y.bits,
+                        "entry reader sees the same precise camera fields as the registered owner");
+                    fractionalCamera|=r.preciseY!=float(r.y);
+                    out=x.promoted();
                 }
                 require(cameras==1,"entry reads the unique main-room parentCamera descendant");
                 return true;
@@ -952,6 +988,7 @@ int main(){
                     "entry Draw keeps offscreen origins until alarm destruction, without scrInView clipping");
             }
             require(reads==120,"one Create and 119 ordinary-Step camera reads");
+            require(fractionalCamera,"camera publication retains fractional positions, not only pixel caches");
             require(world->cleanupEntryDither(entry,[](auto,const auto&){return false;})&&!world->instance(id),
                     "global cleanup retires marked entry controller and collision/layer ownership");
         }

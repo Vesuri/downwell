@@ -508,8 +508,7 @@ void StartupRuntime::stepInternal(bool advancePressed,
         for (std::size_t i = 0; i < instances_.size(); ++i) {
             auto& camera = instances_.at(i);
             if (camera.active && camera.objectId == 64) {
-                camera.x = mainCameraMotion_.pixelX();
-                camera.y = mainCameraMotion_.pixelY();
+                if(!publishMainCameraPosition(camera))return;
             }
         }
         updateMainLifecycle(true, ordinaryStepViewTopQ12_);
@@ -1461,6 +1460,22 @@ void StartupRuntime::updateMainPlayer(InstanceRecord& instance) {
     instance.imageIndex = mainPlayerImageIndex_;
 }
 
+bool StartupRuntime::publishMainCameraPosition(InstanceRecord& instance){
+    if(!run_.effectsSucceeded)return false;
+    RunnerImageValue x,y;
+    std::memcpy(&x.bits,&mainCameraX_,sizeof x.bits);
+    std::memcpy(&y.bits,&mainCameraY_,sizeof y.bits);
+    // Only called with a record supplied by this store's event/room traversal.
+    // Resolve its stable handle without another per-frame linear ID search.
+    const auto index=static_cast<std::size_t>(&instance-&instances_.at(0));
+    if(index>=instances_.size()||!SequenceTimeline::valid(x)||!SequenceTimeline::valid(y)||
+       (lifecycle_.hasOwner()&&!lifecycle_.publishedPosition(instances_.handleAt(index),instance,x,y)))
+        return run_.effectsSucceeded=false;
+    instance.x=mainCameraMotion_.pixelX();instance.y=mainCameraMotion_.pixelY();
+    instance.preciseX=mainCameraX_;instance.preciseY=mainCameraY_;
+    return true;
+}
+
 void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     if (!mainCameraInitialized_ || !mainPlayerInitialized_)
         return;
@@ -1470,8 +1485,7 @@ void StartupRuntime::updateMainCamera(InstanceRecord& instance) {
     mainCameraX_ = mainCameraMotion_.x / 4096.0F;
     mainCameraY_ = mainCameraMotion_.y / 4096.0F;
     mainCameraTargetY_ = mainCameraMotion_.targetY / 4096.0F;
-    instance.x = mainCameraMotion_.pixelX();
-    instance.y = mainCameraMotion_.pixelY();
+    publishMainCameraPosition(instance);
 }
 
 void StartupRuntime::updateMenuCamera() {
@@ -2079,6 +2093,7 @@ void StartupRuntime::executeCode(InstanceRecord* instance,
             mainCameraY_ = static_cast<float>(instance->y);
             mainCameraTargetY_ = mainCameraY_;
             mainCameraMotion_.reset(instance->x, instance->y);
+            publishMainCameraPosition(*instance);
         }
         return;
     case 999: // gml_Object_camMain_Step_0 (menu/rmMain camera subsets)

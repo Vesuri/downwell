@@ -49,6 +49,16 @@ necessary. Each world retains eight small view records, not camera matrices.
 ## Frame publication
 
 The followed instance `camMain` (object 64) is not the camera view cache.
+
+The stored main-camera adapter publishes its resolved position to the instance's
+binary32 fields and resource-backed query owner during Create, ordinary Step
+and the side-locker collision correction. Pixel caches remain for existing
+render consumers, but entry-effect readers use the precise fields. Rejected
+owner publication leaves the record's accepted position unchanged and fails the
+world. Tests check fractional positions at the actual entry-effect read and
+failure at each of those publication sites. This synchronizes the implemented
+camera-motion adapter; it does not validate all of that adapter's Q12 easing
+against the original VM or replace the separate published-view phase rules.
 Its Step precedes `objBuilder` (65), but writing its x/y does not itself
 publish new values for `camera_get_view_y`.
 

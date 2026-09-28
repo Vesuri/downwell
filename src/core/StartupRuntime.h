@@ -931,6 +931,7 @@ private:
     void updateMenuCamera();
     void updateMainPlayer(InstanceRecord& instance);
     void updateMainCamera(InstanceRecord& instance);
+    bool publishMainCameraPosition(InstanceRecord& instance);
     void updateMainBuilder(InstanceRecord& instance);
     void syncMainBuilderState();
     void syncMainPlayerState();
