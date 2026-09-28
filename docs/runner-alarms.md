@@ -76,6 +76,14 @@ Alarm 0 expiry and cleanup before and after Retry. This is not a complete
 global alarm owner: other families, the remaining original birth/mutation
 cases, and debris Step's time-stop refunds still require integration.
 
+The sorted snapshot permits skipping an entire contiguous object group when
+its immutable metadata has no event for the current alarm. This shortcut is
+valid only while the owner's binding revision matches capture; any birth,
+retirement, rebind or clear forces the remaining traversal back to live
+instance/object checks. No callbacks occur inside an absent group, so finding
+its end by binary search preserves callback and countdown order. Present-event
+groups still resolve each lifetime and check live flags before dispatch.
+
 ## Skeleton consequence
 
 Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same

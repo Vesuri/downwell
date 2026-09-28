@@ -492,7 +492,13 @@ private:
                 if(!check(alarmMetadata_.mask(object,alarmMask)))return false;
                 cachedObject=object;eventCached=false;
             }
-            if(!(alarmMask&(1u<<alarm)))continue;
+            if(!(alarmMask&(1u<<alarm))){
+                // No callbacks occur in an absent event group. While bindings
+                // match capture, every remaining member has the same resource
+                // and can be skipped together. After mutation retain live reads.
+                if(owner_.bindingsUnchanged(bindingRevision))i=snapshot.objectGroupEnd(i)-1;
+                continue;
+            }
             if(!current)current=owner_.resolve(h);
             if(!current||(current->flags&0x100003u))continue;
             // Capture validated every admitted lifetime. Revalidate the typed

@@ -109,6 +109,12 @@ void testOrderedSnapshotSort() {
         }
         std::stable_sort(reference.begin(),reference.end(),[](auto a,auto b){return a.first<b.first;});
         snapshot.sort();
+        require(snapshot.objectGroupEnd(count)==count,"group end rejects past-end index");
+        for(unsigned i=0;i<count;++i){
+            unsigned end=i+1;
+            while(end<count&&reference[end].first==reference[i].first)++end;
+            require(snapshot.objectGroupEnd(i)==end,"binary group boundary matches scalar walk");
+        }
         for(unsigned i=0;i<count;++i)
             require(snapshot.handle(i).slot==reference[i].second &&
                     snapshot.handle(i).generation==reference[i].second+1,"bounded heap order matches independent stable sort");

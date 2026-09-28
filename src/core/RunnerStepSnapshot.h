@@ -60,6 +60,18 @@ public:
         for(unsigned i=0;i<count_;++i)entries_[i]=ordered[i];
     }
     unsigned size()const{return count_;}
+    // After sorting, equal resource IDs are contiguous. Find the first entry
+    // after this group without walking every captured lifetime in it.
+    unsigned objectGroupEnd(unsigned i)const{
+        if(i>=count_)return count_;
+        const int object=entries_[i].object;
+        unsigned low=i+1,high=count_;
+        while(low<high){
+            const unsigned middle=low+(high-low)/2;
+            if(entries_[middle].object==object)low=middle+1;else high=middle;
+        }
+        return low;
+    }
     int object(unsigned i)const{return i<count_?entries_[i].object:-1;}
     InstanceHandle handle(unsigned i)const{return i<count_?entries_[i].handle:InstanceHandle{};}
 };
