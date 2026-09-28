@@ -16,6 +16,7 @@
 #include "RunnerLineBounds.h"
 #include "RunnerSpriteChange.h"
 #include "ObjectPack.h"
+#include "Profile.h"
 namespace downwell {
 // Shared collision ownership for externally allocated instance handles. The
 // scheduler must attach every relevant birth before Create, publish its bounds,
@@ -251,6 +252,7 @@ public:
     }
     bool refresh(InstanceHandle h,std::uint32_t objectFlags,bool allPrepared,
         const Box* bounds,bool precise,bool publish){
+        DW_PROFILE_SCOPE(profileBoundsPublication);
         if(!valid()||!live(h))return false;
         auto& s=entries_[h.slot].state;
         return checked(RunnerSpatialBoundsUpdate::finishRefresh(index_,h.slot,
@@ -275,8 +277,11 @@ public:
         const bool rotated=(sprite.angle.bits&0x7fffffffu)!=0;
         Real cosine{},sine{};Box bounds;
         if(rotated&&!trig(sprite.angle,cosine,sine))return checked(false);
-        if(!RunnerSpriteBounds::fromSprite(resource,s.x,s.y,sprite.scaleX,sprite.scaleY,
-            rotated,cosine,sine,compatibility,round,bounds))return checked(false);
+        {
+            DW_PROFILE_SCOPE(profileBoundsGeometry);
+            if(!RunnerSpriteBounds::fromSprite(resource,s.x,s.y,sprite.scaleX,sprite.scaleY,
+                rotated,cosine,sine,compatibility,round,bounds))return checked(false);
+        }
         return refresh(h,objectFlags,allPrepared,&bounds,resource.collisionMode==1,publish);
     }
     // Ordinary compatibility-mode branch of 0x464d30. refreshBounds(handle,

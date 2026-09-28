@@ -65,6 +65,10 @@ effect creation excludes instance birth, and instance birth excludes nested
 bounds and layer attachment. Bounds refresh also runs outside births. Sum the
 relevant nested phases when comparing older caller totals; phase 86 alone is
 not the total cost of an effect. Normal and FPS-only builds omit these probes.
+Phases 87 (sprite bounds geometry) and 88 (bounds-cache update and spatial-index
+publication) further split refresh. Publication includes the source no-resource
+branch, which updates the cache without inserting into the index. When nested
+in phase 83, their time is excluded from that phase's total.
 
 Use `SKIP_LEVEL=1` for level completion and `SKIP_INTRO=1` for style selection
 instead of the gameplay shortcut. Use `PROFILE_LASER=1` when investigating
