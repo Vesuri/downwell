@@ -225,10 +225,15 @@ test: verify-dead-body-creation
 test: verify-corpse-birth
 test: verify-currency-create
 .PHONY: verify-currency-create
-verify-currency-create: build/currency-create-test
+verify-currency-create: build/currency-create-test build/currency-spawn-script-test
 	python3 tools/verify-currency-create.py
 	python3 tools/verify-runner-move-snap.py
 	./build/currency-create-test
+	./build/currency-spawn-script-test
+
+build/currency-spawn-script-test: tests/core/CurrencySpawnScriptTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $(filter %.cpp,$^)
 
 build/currency-create-test: tests/core/CurrencyCreateTest.cpp $(wildcard src/core/*.h) src/core/GameMakerRandom.cpp
 	@mkdir -p build

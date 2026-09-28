@@ -125,6 +125,24 @@ remains approximate: registered currency ownership, reward-script caller
 writes and the exact Step/animation path still need integration before this
 Create event replaces it. These tests are not proof of complete live rewards.
 
+`CurrencySpawnScript` preserves `scrCurrencySpawn`'s caller fields and its two
+distinct denomination loops. `atrState` is set only when the caller's direct
+parent is 83 and `stomped` compares equal to one. Each object-248 Create runs
+before assigning caller `myGem`, then the child receives getAmount, size (tens
+only), and optional attraction. Remaining `moniAmount` is decremented last;
+an odd/fractional final remainder can become negative. The with environment
+keeps its selected child for the amount/size writes, while the subsequent
+attraction setter rereads the caller's myGem. Caller fields are reread after
+synchronous callbacks, and the twos loop never jumps back to tens.
+Checked failure retains preceding children, caller writes and RNG consumption.
+Host tests join this script to the real CurrencyCreate event and compare its
+full RNG state with a scalar reference, including each operation failure
+prefix. The bounded 68000 tape covers a mixed 10/2/2 reward and terminal
+capacity exhaustion. Source numeric IDs/native lifetime handles remain the
+owner adapter's responsibility. The older live CurrencyReward helper has not
+yet been replaced: registered creation, caller publication and exact gem Step
+must be connected together before enabling natural reward events.
+
 Box Alarm 0 is dispatched by both normal schedulers: the shared event body
 sets `wallHp` to zero, without emitting effects or retiring the box. Native
 storage keeps one 32-bit countdown per box; it does not allocate twelve slots

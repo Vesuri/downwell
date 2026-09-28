@@ -4,6 +4,7 @@
 #include "SoundPlayVerification.h"
 #include "BoxSoundVerification.h"
 #include "CurrencyCreateVerification.h"
+#include "CurrencySpawnVerification.h"
 namespace downwell {
 // Test-only lifecycle tape, shared by host tests and the 68000 debugger gate.
 // The exit is deliberately placed at the player; this is not evidence for a
@@ -22,6 +23,7 @@ struct GameplayFieldReentryVerification {
         stage=1;
         if(!SoundPlayVerification::run())return false;
         if(!CurrencyCreateVerification::run())return false;
+        if(!CurrencySpawnVerification::run())return false;
         if(!world.effectsSucceeded()||!owner.valid()||world.runStage().area!=1||world.runStage().level!=1||
             !owner.population(255,population)||population)return false;
         firstGeneration=world.goalFieldInstances().birthSequence();
