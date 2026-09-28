@@ -754,12 +754,14 @@ public:
         DW_PROFILE_SCOPE(profileDrawCleanup);
         const bool cleaned=room_.visitCleanupChecked([&](unsigned slot){
             const auto h=roomKeys_[slot];const auto* state=owner_.resolve(h);
+            if(!state)return false;
+            // Unmarked entries still validate their typed lifetime, but do not
+            // need the wide borrowed-record payload used by retirement.
+            if(!(state->flags&1u))return View(*world_).contains(h);
             View::Record record;
-            if(!state||!View(*world_).resolve(h,record))return false;
-            if(!(state->flags&1u))return true;
+            if(!View(*world_).resolve(h,record))return false;
             if(!retire(h,record)||!valid()||owner_.resolve(h))return false;
-            View::Record remaining;
-            return !View(*world_).resolve(h,remaining);
+            return !View(*world_).contains(h);
         });
         if(!check(cleaned))return false;
         destructionPending_=false;return true;
