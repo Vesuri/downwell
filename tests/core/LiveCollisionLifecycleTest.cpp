@@ -211,7 +211,7 @@ int main(){
             "repeated destruction requests retain the executing projectile identity");
         RunnerImageValue x,y,actualX,actualY;
         require(x.assign(MotionBinary64::fromInteger(240))&&y.assign(MotionBinary64::fromInteger(500))&&
-            world->publishCollisionPosition(key,x,y)&&owner->collisionPosition(key,actualX,actualY)&&
+            world->publishBulletCollisionPosition(key,x,y)&&owner->collisionPosition(key,actualX,actualY)&&
             actualX.bits==x.bits&&actualY.bits==y.bits&&owner->resolve(key)->destroyRequested,
             "Step-tail position setters publish through a real owner after destruction without resurrection");
         auto stale=key;++stale.generation;

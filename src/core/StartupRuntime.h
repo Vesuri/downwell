@@ -247,6 +247,11 @@ public:
     // Engine x/y setter for collision response. Keeps private actor motion and
     // preciseX/Y motion caches untouched; the collision owner stores exact x/y.
     bool publishCollisionPosition(InstanceHandle h,RunnerImageValue x,RunnerImageValue y);
+    bool publishBulletCollisionPosition(InstanceHandle h,RunnerImageValue x,RunnerImageValue y){
+        const auto* record=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!record||record->objectId!=261)return run_.effectsSucceeded=false;
+        return publishCollisionPosition(h,x,y);
+    }
     bool inMenu() const { return roomId_ == menuRoomId; }
     bool inPlayMenu() const { return roomId_ == playMenuRoomId; }
     bool inMainRoom() const { return roomId_ == mainRoomId; }

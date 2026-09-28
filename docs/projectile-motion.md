@@ -156,6 +156,16 @@ collision owner after marking destruction. This supplies the destruction-request
 boundary needed by the recovered Step; it does not change when the approximate
 gun path currently requests destruction or complete its source scheduling.
 
+`publishBulletCollisionPosition` exposes checked builtin position publication
+on both live worlds. It resolves the projectile lifetime on each call, accepts
+marked-but-not-retired shots, and leaves private trajectory integration to the
+caller. Native tests drive it with `MachineGunSourceMotion::commitPosition`,
+checking each intermediate X-before-Y position in the real collision owner,
+the retained previous-position snapshot and rejection of nonfinite input.
+The stored owner tests the same boundary after marking destruction. The normal
+gun adapters use this publication entry point, but still supply their legacy
+trajectory coordinates; this does not yet replace their motion or rendering.
+
 ## Collision lookup boundaries
 
 `verify-runner-line-point.py` pins the reviewed registrations, wrappers and

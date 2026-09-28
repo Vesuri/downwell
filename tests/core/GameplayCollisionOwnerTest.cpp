@@ -732,6 +732,33 @@ int main(){
         }
     }
     assert(masks.valid());
+    {
+        auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
+        auto world=std::make_unique<GameplayWorld>(300,false,1000,false,owner->enemyBinding(),
+            owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
+        assert(owner->attach(*world));world->step(4);
+        assert(world->effectsSucceeded()&&world->bulletCount()==1);
+        const auto& shot=world->bulletAt(0);const InstanceHandle key{shot.identitySlot,shot.lifetimeId};
+        InstanceHandle shared;assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::bullet,key,shared));
+        const auto original=*owner->state(shared);const auto trajectory=shot.trajectory;
+        MachineGunSourceMotion motion;GameMakerRandom random(2);
+        assert(motion.reset(original.x.promoted(),original.y.promoted())&&motion.initialize(random));
+        assert(world->markBulletDestroyed(key));unsigned writes=0;
+        assert(motion.commitPosition([&](RunnerImageValue x,RunnerImageValue y){
+            assert(writes==0?y.bits==original.y.bits:x.bits==motion.x.bits);
+            assert(world->publishBulletCollisionPosition(key,x,y));
+            const auto* state=owner->state(shared);
+            assert(state&&state->x.bits==x.bits&&state->y.bits==y.bits&&(state->flags&1u));
+            assert(state->previous.x.bits==original.previous.x.bits&&state->previous.y.bits==original.previous.y.bits);
+            ++writes;return true;
+        }));
+        assert(writes==2&&shot.destroyRequested&&shot.trajectory.x.pixel==trajectory.x.pixel&&
+            shot.trajectory.x.fraction==trajectory.x.fraction&&shot.trajectory.y.pixel==trajectory.y.pixel&&
+            shot.trajectory.y.fraction==trajectory.y.fraction);
+        const auto last=*owner->state(shared);
+        assert(!world->publishBulletCollisionPosition(key,{0x7f800000u},{})&&!world->effectsSucceeded());
+        assert(owner->state(shared)->x.bits==last.x.bits&&owner->state(shared)->y.bits==last.y.bits);
+    }
     for(bool high:{false,true}){
         // Exercise the recovered Step against real resource-backed selectors
         // and box writes. The bullet's own registration/event dispatch remains

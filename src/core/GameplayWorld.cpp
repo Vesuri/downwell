@@ -377,6 +377,14 @@ bool GameplayWorld::markBulletDestroyed(downwell::InstanceHandle h){
     if(!bulletLifecycle_.markDestroyed(h,*bullet))return run_.effectsSucceeded=false;
     bullet->destroyRequested=true;bullet->active=false;return true;
 }
+bool GameplayWorld::publishBulletCollisionPosition(downwell::InstanceHandle h,
+    downwell::RunnerImageValue x,downwell::RunnerImageValue y){
+    const auto* bullet=resolveBulletLifetime(h);
+    if(!run_.effectsSucceeded||!bullet||!downwell::RunnerSpatialSplit::valid(x)||
+       !downwell::RunnerSpatialSplit::valid(y)||!bulletLifecycle_.publishedPosition(h,*bullet,x,y))
+        return run_.effectsSucceeded=false;
+    return true;
+}
 
 bool GameplayWorld::configureEnemy(unsigned index, int objectId,
                                       int spriteId, int x, int y,
@@ -1091,7 +1099,7 @@ GameplayFrame GameplayWorld::step(std::uint8_t packedInput)
                 downwell::RunnerImageValue x,y;
                 if(!downwell::ProjectilePublication::coordinate(bullet.trajectory.x,240,x)||
                     !downwell::ProjectilePublication::coordinate(bullet.trajectory.y,176,y)||
-                    !bulletLifecycle_.publishedPosition(h,bullet,x,y)){
+                    !publishBulletCollisionPosition(h,x,y)){
                     run_.effectsSucceeded=false;return {};
                 }
             }

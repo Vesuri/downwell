@@ -543,6 +543,10 @@ public:
     // Destruction is visible to collision queries immediately, but the
     // executing record remains resolvable until room cleanup.
     bool markBulletDestroyed(downwell::InstanceHandle h);
+    // Builtin collision x/y only. The executing motion owner commits its
+    // private fields after each successful setter, not inside this callback.
+    bool publishBulletCollisionPosition(downwell::InstanceHandle h,
+        downwell::RunnerImageValue x,downwell::RunnerImageValue y);
     const BulletState* findBullet(std::uint32_t lifetimeId) const {
         if(lifetimeId)for(unsigned i=0;i<bulletSlotEnd_;++i)
             if(bullets_[i].active && bullets_[i].lifetimeId==lifetimeId)return &bullets_[i];

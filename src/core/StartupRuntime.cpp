@@ -855,7 +855,7 @@ bool StartupRuntime::publishMainBullet(MainBulletState& bullet,bool angle){
     if(!ProjectilePublication::coordinate(bullet.trajectory.x,0,x)||
         !ProjectilePublication::coordinate(bullet.trajectory.y,0,y)||
         !x.promoted().roundPixel(ix)||!y.promoted().roundPixel(iy)||
-        (lifecycle_.hasOwner()&&!lifecycle_.publishedPosition(bullet.instance,*record,x,y)))return false;
+        (lifecycle_.hasOwner()&&!publishBulletCollisionPosition(bullet.instance,x,y)))return false;
     record->x=ix;record->y=iy;
     std::memcpy(&record->preciseX,&x.bits,4);std::memcpy(&record->preciseY,&y.bits,4);
     return true;
