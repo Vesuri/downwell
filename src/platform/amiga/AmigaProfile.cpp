@@ -7,7 +7,10 @@
 // Revs-style emulated clock: never use host time or stop GDB inside a sample.
 static const ULONG ticksPerField = 313UL * 256UL;
 extern "C" {
-#ifdef DOWNWELL_SKIP_TO_GAME
+#ifdef DOWNWELL_PROFILE_TRANSITION
+volatile ULONG gDownwellProfileTargetScene = 2;
+volatile ULONG gDownwellProfileTargetFrames = 60;
+#elif defined(DOWNWELL_SKIP_TO_GAME)
 volatile ULONG gDownwellProfileTargetScene = 3;
 volatile ULONG gDownwellProfileTargetFrames =
 #ifdef DOWNWELL_PROFILE_FRAMES
@@ -115,6 +118,7 @@ static unsigned sceneId;
 static ULONG startField;
 #ifdef DOWNWELL_PROBES
 static unsigned phaseId;
+static bool frameActive;
 static ULONG phaseStart, frameStart;
 static ULONG frameTicks[profilePhaseCount];
 static unsigned terrainSpanCount;
@@ -132,6 +136,7 @@ void downwellProfileBegin(unsigned scene)
     sceneId = scene < 4 ? scene : 0;
     startField = gDownwellProfileVbi;
 #ifdef DOWNWELL_PROBES
+    frameActive = true;
     terrainSpanCount = 0;
     for (unsigned phase = 0; phase < profilePhaseCount; ++phase) frameTicks[phase] = 0;
     frameStart = phaseStart = beamTick();
@@ -142,6 +147,7 @@ void downwellProfileBegin(unsigned scene)
 void downwellProfilePhase(unsigned phase)
 {
 #ifdef DOWNWELL_PROBES
+    if (!frameActive) return;
     const ULONG now = beamTick();
     const ULONG elapsed = now - phaseStart;
     frameTicks[phaseId] += elapsed;
@@ -160,6 +166,7 @@ void downwellProfileEnd()
 {
 #ifdef DOWNWELL_PROBES
     downwellProfilePhase(profileOther);
+    frameActive = false;
     const ULONG elapsed = phaseStart - frameStart;
     if (elapsed > gDownwellProfileFrameMax[sceneId]) {
         gDownwellProfileFrameMax[sceneId] = elapsed;

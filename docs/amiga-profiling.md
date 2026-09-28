@@ -44,6 +44,20 @@ SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=60 bash amiga/profile.sh fps
 SKIP_TO_GAME=1 VERIFY_TIMEOUT_SECONDS=60 bash amiga/profile.sh probes
 ```
 
+Use `bash amiga/profile.sh transition` to traverse splash and garden/well into
+60 style-reveal frames. This forces all skip toggles off and compiles in the
+profiling stop condition (`PROFILE_TRANSITION=1`). It reports
+all three scene windows and validates their worst-frame phase totals. It does
+not cover later gameplay, and its instrumented rates are not shipping FPS.
+Automatic fire advances the splash pages quickly; this is a transition-cost
+tape, not a check of their normal display durations. Instrumentation outside
+an active frame is excluded, including pre-loop scene/resource construction;
+that startup loading cost must be measured separately, not divided by splash
+frame counts. The transition report rejects phase brackets larger than their
+scene's maximum measured frame.
+Use longer gameplay windows (for example `PROFILE_FRAMES=600 SKIP_TO_GAME=1`)
+as well: a short initial-room sample can miss synchronous generation bursts.
+
 For a short diagnostic prefix, add `PROFILE_FRAMES=11`. This compiles the
 stop count into the ordinary gameplay profiling build; it does not rely on
 debugger writes to target memory or breakpoints inside measured frames. Zero
