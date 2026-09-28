@@ -113,6 +113,30 @@ remain alive. This CPU-equivalence check does not establish Windows-exact
 currency movement, general time-stop/event scheduling, drawFx palette effects
 or audio fidelity; those remain in the open-work queue.
 
+### Currency animation arithmetic
+
+Sprites 133 (`sprGemS`) and 134 (`sprGemM`) each have four consecutive unit
+keys and playback speed 1 frame per game frame. The metadata guard explicitly
+checks these two resources. Their signed Create image speeds narrow to binary32.
+The selected runner adds the speed in binary32 and, on crossing a boundary,
+wraps with `float(fmod(float(fmod(position,4)+4),4))`.
+
+`make verify-currency-animation` compares the integer-only sequence evaluator
+with independent host float arithmetic for all four Create choices over 4096
+updates each. It also reports differences from the live `GemAnimation` helper;
+that comparison is diagnostic, not an assertion that the current helper is
+correct. At speed +0.3 the first difference is update 10: the source-style
+image index has bits `403fffff` (just below 3), selecting frame 2, whereas
+the live exact-tenths counter selects frame 3. There are 409 differing visible
+frames in this tape. The other three choices select the same visible frames
+over this interval; that does not establish equality of their internal state.
+
+The live animation still needs replacement and scheduling in the runner's
+animation phase, including birth eligibility and time-stop speed writes.
+The arithmetic test does not prove the Windows process's live FP mode, event
+phase parity, or presentation parity. See the source image-field and FP-mode
+audits before treating the scalar comparison as a complete runtime oracle.
+
 ## Exit-field timer guard
 
 ### Live Draw RNG

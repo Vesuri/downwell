@@ -289,6 +289,17 @@ build/corpse-effects-test: tests/core/CorpseEffectsTest.cpp $(wildcard src/core/
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ tests/core/CorpseEffectsTest.cpp src/core/GameMakerRandom.cpp
 
 .PHONY: verify-corpse-animation
+test: verify-currency-animation
+.PHONY: verify-currency-animation
+verify-currency-animation: build/currency-animation-contract-test
+	python3 tools/verify-animation-metadata.py
+	python3 tools/verify-runner-image-fields.py
+	./build/currency-animation-contract-test
+
+build/currency-animation-contract-test: tests/core/CurrencyAnimationContractTest.cpp $(wildcard src/core/*.h)
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -ffp-contract=off -o $@ tests/core/CurrencyAnimationContractTest.cpp
+
 verify-corpse-animation: build/corpse-animation-test
 	python3 tools/verify-animation-metadata.py
 	./build/corpse-animation-test
