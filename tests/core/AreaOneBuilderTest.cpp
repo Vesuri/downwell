@@ -177,6 +177,65 @@ int main(int argc, char** argv) {
         (std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
     BuilderPatternPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "builder pack validates");
+    // Preparation must not move shared RNG or health-dependent decisions to
+    // level entry. Pin live interleaving, including the state at failed Create.
+    // This is an immediate-executor regression tape, not a Windows capture.
+    unsigned interleavedCallbacks=0,failedCreates=0,finishedLevels=0;
+    for(unsigned seed=1;seed<=8;++seed)for(unsigned level=1;level<=3;++level)
+    for(unsigned style: {0u,1u,4u})for(unsigned failAt: {0u,1u,17u,101u,701u}){
+        AreaOneBuilder live;GameMakerRandom rng(seed);
+        live.reset(240,704,rng,{level,style,true,false});
+        struct Probe {
+            GameMakerRandom& random;
+            GameMakerRandom afterCallback;
+            Commands commands;
+            unsigned count=0,failAt;
+        } probe{rng,rng,{},0,failAt};
+        auto callback=[](void* opaque,const DeferredCreateInstance& command){
+            auto& p=*static_cast<Probe*>(opaque);
+            p.commands.push_back(command);++p.count;
+            // Child Create effects happen before the next cell, even when
+            // the callback ultimately fails after partially applying them.
+            for(unsigned i=0;i<p.count%4;++i)p.random.nextU32();
+            p.afterCallback=p.random;
+            return !p.failAt || p.count!=p.failAt;
+        };
+        bool terminated=false;
+        for(unsigned tick=0;tick<128 && !terminated;++tick){
+            for(unsigned i=0;i<tick%5;++i)rng.nextU32();
+            live.setPlayerHealth(1+tick%6);
+            const bool visible=tick%3!=0;
+            const auto before=rng;
+            const int beforeY=live.y();
+            AreaOneBuilderStep event{};
+            const bool ok=live.stepVisible(pack,rng,visible?100000:live.y()-128,callback,&probe,event);
+            if(!visible)require(ok && probe.commands.empty() && sameRandom(before,rng) &&
+                live.y()==beforeY && !event.patternGenerated,"interleaved invisible event is a no-op");
+            capture(probe.commands,rng);
+            for(auto value: {int(ok),live.y(),live.generationCount(),int(live.rowsGenerated()),
+                int(live.endReached()),live.chunkOrCrate(),int(live.specialObjectsGenerated()),
+                int(live.rightRoomsMade()),int(live.shopMade()),int(live.spawnerMade()),
+                int(event.patternGenerated),int(event.family),int(event.patternIndex),event.patternY,
+                int(event.reversed),int(event.sideRoom),int(event.appendPillars),int(event.advancedRows)})mix(value);
+            interleavedCallbacks+=probe.commands.size();probe.commands.clear();
+            if(!ok){
+                require(failAt && probe.count==failAt && sameRandom(rng,probe.afterCallback),
+                    "failed callback stops all subsequent emission and RNG draws");
+                ++failedCreates;terminated=true;
+            }else if(live.endReached()){
+                require(!failAt,"failure tape must reach its requested callback");
+                ++finishedLevels;terminated=true;
+            }
+        }
+        require(terminated,"interleaved tape terminates within its bound");
+    }
+    std::cout<<"interleaved callbacks "<<interleavedCallbacks<<", failures "<<failedCreates
+        <<", levels "<<finishedLevels<<", digest "<<std::hex<<emissionDigest<<std::dec<<'\n';
+    require(interleavedCallbacks==148068 && failedCreates==288 && finishedLevels==72,
+        "interleaved corpus covers all successful levels and failure boundaries");
+    require(emissionDigest==0xb89d2e31bdbd7d69ULL,
+        "live RNG/health interleaving preserves ordered commands and partial builder state");
+    emissionDigest=legacyDigest=preBoxDigest=14695981039346656037ULL;
     unsigned fieldCount=0;
     for(unsigned seed=1;seed<=32;++seed){
         AreaOneBuilder builder;GameMakerRandom actual(seed),shadow(seed);
