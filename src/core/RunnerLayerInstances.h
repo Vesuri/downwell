@@ -55,7 +55,13 @@ public:
         }else{element=free(layers);if(element==End)return false;}
         RunnerImageValue depth;
         if(!depth.assignInteger(destination->depth))return false;
-        entries_[element]={sourceId,h,true};
+        // Keep aligned identity fields as scalar stores on 68000; aggregate
+        // construction otherwise expands these into individual byte writes.
+        auto& entry=entries_[element];
+        entry.sourceId=sourceId;
+        entry.instance.slot=h.slot;
+        entry.instance.generation=h.generation;
+        entry.present=true;
         indexIdentity(element);
         if(element>=usedEnd_)usedEnd_=element+1;
         state.attached=true;state.layerId=destination->id;state.depth=depth;
