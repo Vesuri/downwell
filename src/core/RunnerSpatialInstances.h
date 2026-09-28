@@ -151,6 +151,40 @@ public:
         if(applied&&creationDepth)*creationDepth=definition->creationDepth;
         return applied;
     }
+    // Fresh construction only: attach guarantees this slot has no lifetime.
+    // Properties are initialized here, so setter intermediate states cannot
+    // be observed. Keep attach/rebind order and revision changes; coalesce
+    // repeated head-of-queue marks only within this callback-free interval.
+    template<unsigned Resources,class Graph>
+    bool attachObjectPrepared(InstanceHandle h,int object,State state,bool registered,
+        Properties& properties,const PreparedObjectDefaults<Resources>& defaults,
+        const Graph& graph,Real* creationDepth=nullptr){
+        {
+            DW_PROFILE_SCOPE(profileBirthRegistration);
+            if(!attach(h,object,state))return false;
+        }
+        properties=Properties{};
+        const auto* definition=defaults.get(object);
+        // Unusual caller states and unsupported frame counts retain the
+        // general path, including its failure/mutation ordering.
+        if(!definition||(state.flags&~2u)!=8u||state.special||
+            (definition->spriteId!=-1&&definition->frames>65535u))
+            return bindObjectPrepared(h,object,registered,properties,defaults,graph,false,creationDepth);
+        if(!graph.valid()||!graph.flags(unsigned(object)))return checked(false);
+        const auto objectFlags=*graph.flags(unsigned(object));
+        if((objectFlags&0x87u)!=definition->propertyFlags)return checked(false);
+        {
+            DW_PROFILE_SCOPE(profileBindingMembership);
+            if(!rebindObjectMembership(h,object,registered))return checked(false);
+        }
+        properties.sprite.maskId=definition->maskId;
+        properties.sprite.spriteId=definition->spriteId;
+        properties.depth=definition->depth;
+        entries_[h.slot].state.flags=definition->initialFlags|(state.flags&2u);
+        markSpatialChange(h.slot,objectFlags);
+        if(creationDepth)*creationDepth=definition->creationDepth;
+        return true;
+    }
     bool valid()const{return good_ && index_.valid();}
     std::uint32_t bindingRevision()const{return bindingRevision_;}
     std::uint32_t captureRevision()const{return captureRevision_;}

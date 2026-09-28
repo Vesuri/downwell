@@ -9,7 +9,7 @@ namespace downwell {
 struct PreparedObjectDefault {
     std::int32_t spriteId,maskId;
     RunnerImageValue depth,creationDepth;
-    std::uint32_t propertyFlags,frames;
+    std::uint32_t propertyFlags,frames,initialFlags;
 };
 template<unsigned Capacity> class PreparedObjectDefaults {
     PreparedObjectDefault entries_[Capacity?Capacity:1];
@@ -26,6 +26,8 @@ public:
             if(!out.depth.assignInteger(source.depth)||!out.creationDepth.assignInteger(source.creationDepth))return false;
             out.propertyFlags=(source.solid()?1u:0u)|(source.visible()?2u:0u)|
                 (source.persistent()?4u:0u)|(source.managed()?0x80u:0u);
+            out.initialFlags=8u|(source.solid()?0x20u:0u)|(source.visible()?0x10u:0u)|
+                (source.persistent()?0x40u:0u)|(source.managed()?0x200000u:0u);
             out.frames=0;
             if(source.spriteId>=0)sprites.frameCount(unsigned(source.spriteId),out.frames);
         }

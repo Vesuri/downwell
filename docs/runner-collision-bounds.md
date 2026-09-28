@@ -84,7 +84,7 @@ queries and sprite setters use this same prepared view on both backends.
 
 `PreparedObjectDefaults` likewise prepares the 386 immutable object bindings
 before births: sprite/mask IDs, binary32 OBJT/compatibility depths, default
-property bits and artwork frame counts (24 bytes per record). The original
+property bits, initial instance flags and artwork frame counts (28 bytes per record). The original
 `bindObjectFromPacks` path remains the immediate-decoding reference. Prepared
 binding still reads current family flags, rebinds membership, installs mask and
 depth defaults, executes the sprite setter, and publishes dirty queues in that
@@ -92,6 +92,17 @@ order. Dynamic preparation flags, active state, image index, timeline and
 membership links are not part of the prepared table. The compatibility Create
 depth override is still installed after binding, not substituted for OBJT depth
 inside it. Same-sprite rebinding retains the source setter's no-op behavior.
+
+Fresh shared births use `attachObjectPrepared`: attach a new lifetime, initialize
+properties, preserve the source membership rebind/revision updates, and install
+the prepared initial flags/defaults. For ordinary initial flags (8, optionally
+inactive bit 2), no special state and supported frame counts, general sprite
+setter/reset machinery is unnecessary: the starting sprite is -1, image index
+and timeline are zero, and cached frame is -1. The callback-free binding interval
+can coalesce repeated dirty-queue head marks to one final mark. Birth attachment
+guarantees the slot is fresh; neither Create nor index publication moves earlier.
+Unusual states retain the general prepared-binding path, including failure
+ordering. General rebinding remains separate and does not assume fresh state.
 
 `PreparedSpriteGeometry` prepares origin-relative compatibility edges for
 unit-scale, unrotated sprites before births. The shared owner uses these only

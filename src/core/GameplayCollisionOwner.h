@@ -140,16 +140,12 @@ private:
                 if(!real(r.x+ox,state.x)||!real(r.y+oy,state.y))return parent.check(false);
             }
             if constexpr(Kind!=View::Kind::timeField)if(!r.active)state.flags|=2u;
-            {
-                DW_PROFILE_SCOPE(profileBirthRegistration);
-                if(!parent.check(parent.owner_.attach(h,object(r),state)))return false;
-            }
-            auto& p=parent.properties_[h.slot];p={};
+            auto& p=parent.properties_[h.slot];
             {
                 DW_PROFILE_SCOPE(profileBirthMetadata);
                 RunnerImageValue creationDepth;
-                if(!parent.check(parent.owner_.bindObjectPrepared(h,object(r),true,p,
-                    parent.objectDefaults_,parent.families_,false,&creationDepth)))return false;
+                if(!parent.check(parent.owner_.attachObjectPrepared(h,object(r),state,true,p,
+                    parent.objectDefaults_,parent.families_,&creationDepth)))return false;
                 p.depth=creationDepth;
             }
             if constexpr(Kind==View::Kind::debris){

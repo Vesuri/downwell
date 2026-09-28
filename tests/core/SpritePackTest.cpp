@@ -128,6 +128,27 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         require(!preparedDefaults.prepare(objects,downwell::SpriteCollisionPack(nullptr,0))&&
             !preparedDefaults.get(0)&&preparedDefaults.prepare(objects,compact),
             "invalid preparation clears stale defaults and valid preparation restores them");
+        for(unsigned id=0;id<objects.objectCount();++id)
+        for(unsigned flags:{8u,10u,0u,0x200078u})for(bool registered:{false,true}){
+            Owner reference,materialized;Owner::Properties a,b;Owner::State initial;initial.flags=flags;
+            initial.x={0x43800000u};initial.y={0x44000000u};
+            std::int32_t depth;Owner::Real preparedDepth,expectedDepth;
+            require(reference.attach({0,1},int(id),initial)&&
+                reference.bindObjectFromPacks({0,1},int(id),registered,a,objects,compact,families,false,&depth)&&
+                materialized.attachObjectPrepared({0,1},int(id),initial,registered,b,preparedDefaults,families,&preparedDepth)&&
+                expectedDepth.assignInteger(depth),"materialize each original newborn and unusual-state fallback");
+            require(a.sprite.spriteId==b.sprite.spriteId&&a.sprite.maskId==b.sprite.maskId&&
+                a.sprite.imageIndex.bits==b.sprite.imageIndex.bits&&a.sprite.scaleX.bits==b.sprite.scaleX.bits&&
+                a.sprite.scaleY.bits==b.sprite.scaleY.bits&&a.sprite.angle.bits==b.sprite.angle.bits&&
+                a.depth.bits==b.depth.bits&&a.timeline.bits==b.timeline.bits&&a.cachedFrame.bits==b.cachedFrame.bits&&
+                preparedDepth.bits==expectedDepth.bits&&
+                reference.resolve({0,1})->flags==materialized.resolve({0,1})->flags&&
+                reference.pendingSpatial()==materialized.pendingSpatial()&&
+                reference.pendingCollision()==materialized.pendingCollision()&&
+                reference.bindingRevision()==materialized.bindingRevision()&&
+                reference.captureRevision()==materialized.captureRevision(),
+                "prepared construction preserves fields, flags, queues and membership revisions");
+        }
         Owner incomplete;Owner::Properties unchanged;
         require(incomplete.attach({0,1},0,{}),"attach incomplete-graph fixture");
         downwell::RunnerObjectFamilies<386> spatialOnly;require(spatialOnly.bindSpatialFlags(objects),"load deliberately incomplete flags");
