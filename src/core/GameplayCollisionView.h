@@ -58,6 +58,13 @@ public:
         local={key.slot-base,key.generation};return true;
     }
     bool resolve(InstanceHandle key,Record& record)const{
+        return resolveImpl<true>(key,&record);
+    }
+    // The same typed-store/generation validation without constructing a wide
+    // borrowed-record result when a caller only needs lifetime membership.
+    bool contains(InstanceHandle key)const{return resolveImpl<false>(key,nullptr);}
+private:
+    template<bool Publish> bool resolveImpl(InstanceHandle key,Record* record)const{
         Kind kind;InstanceHandle local;
         if(!decode(key,kind,local))return false;
         Record next;
@@ -88,7 +95,8 @@ public:
                 if(!world_.debrisInstances()||!(next.debris=world_.debrisInstances()->find(local)))return false;
                 break;
         }
-        record=next;return true;
+        if constexpr(Publish)*record=next;
+        return true;
     }
 private:
     const GameplayWorld& world_;

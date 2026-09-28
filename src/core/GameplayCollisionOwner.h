@@ -43,7 +43,7 @@ private:
         return terrainFamilies_[object==60?0:1];
     }
     bool resolves(InstanceHandle h)const{
-        View::Record r;return world_&&owner_.resolve(h)&&View(*world_).resolve(h,r);
+        return world_&&owner_.resolve(h)&&View(*world_).contains(h);
     }
     static bool inverseTrig(RunnerImageValue angle,RunnerImageValue& cosine,RunnerImageValue& sine){
         angle.bits^=0x80000000u;
@@ -223,14 +223,13 @@ public:
             const auto& self=*static_cast<const GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
             const auto draw=[&](InstanceHandle shared,RunnerImageValue depth){
-                View::Record record;
                 View::Kind kind;InstanceHandle local;
                 if(!View::decode(shared,kind,local))return false;
                 // Retained terrain/field composition is not part of this
                 // visitor. Do not resolve or copy their records per frame.
                 if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&kind!=View::Kind::debris&&kind!=View::Kind::player)return true;
                 const auto* state=self.owner_.resolve(shared);
-                if(!state||!View(*self.world_).resolve(shared,record))return false;
+                if(!state||!View(*self.world_).contains(shared))return false;
                 if(state->flags&0x100003u)return true;
                 switch(kind){
                     case View::Kind::player:return visit(visitor,GameplayWorld::DrawActor::player,local,depth);
@@ -261,9 +260,9 @@ public:
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
             return self.check(self.room_.visitAnimationChecked([&](unsigned slot){
-                const auto shared=self.roomKeys_[slot];View::Record record;
+                const auto shared=self.roomKeys_[slot];
                 View::Kind kind;InstanceHandle local;
-                if(!View::decode(shared,kind,local)||!View(*self.world_).resolve(shared,record)||
+                if(!View::decode(shared,kind,local)||!View(*self.world_).contains(shared)||
                     !self.owner_.capturePrevious(shared))return false;
                 switch(kind){
                     case View::Kind::enemy:return self.world_->advanceEnemyRoomAnimation(local);

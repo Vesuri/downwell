@@ -172,6 +172,16 @@ struct BulletAudit {
     bool membership(InstanceHandle,const Record&,bool){return true;}
     bool mask(InstanceHandle,const Record&,int){return true;}
 };
+static void checkCollisionViewMembership(const GameplayWorld& world){
+    const GameplayCollisionView view(world);
+    for(unsigned slot=0;slot<=GameplayCollisionView::capacity;++slot){
+        for(unsigned generation:{0u,1u,2u,3u,0xffffffffu}){
+            GameplayCollisionView::Record record;
+            const InstanceHandle h{slot,generation};
+            assert(view.contains(h)==view.resolve(h,record));
+        }
+    }
+}
 static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollisionPack& sprites){
     auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites);
     auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),
@@ -183,6 +193,7 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
         const auto& e=world->enemyAt(i);handles[i]={e.identitySlot,e.lifetimeId};
     }
     const auto check=[&](){
+        checkCollisionViewMembership(*world);
         for(unsigned i=0;i<24;++i){
             const GameplayWorld::EnemyState* expected=nullptr;
             for(unsigned j=0;j<world->enemyCount();++j){
@@ -192,6 +203,9 @@ static void checkEnemySlotDirectory(const ObjectPack& objects,const SpriteCollis
             assert((expected==nullptr)==retired[i]);
             assert(world->resolveEnemyLifetime(handles[i])==expected);
             assert(world->findEnemy(handles[i])==expected);
+            InstanceHandle shared;
+            assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::enemy,handles[i],shared));
+            assert(GameplayCollisionView(*world).contains(shared)==(expected!=nullptr));
         }
     };
     check();
@@ -1095,6 +1109,7 @@ int main(){
         unsigned calls=0,codes=0;
         assert(roomWorld->loadRoomTerrain(rooms,room,[&](const PackedRoomInstance& r){++calls;codes+=r.creationCodeId!=-1;return true;}));
         assert(calls==240&&codes==3&&roomOwner->terrain().size()==240);
+        checkCollisionViewMembership(*roomWorld);
         unsigned authoredPlayers=0;
         for(unsigned i=0;i<room.instanceCount;++i){
             PackedRoomInstance r;assert(rooms.roomInstance(room,i,r));
@@ -1184,6 +1199,7 @@ int main(){
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::timeField,{0,identity},fieldKey));
         GameplayCollisionView::Record record;
         assert(GameplayCollisionView(*fieldWorld).resolve(fieldKey,record)&&record.timeField==fieldWorld->timeFields().at(0));
+        checkCollisionViewMembership(*fieldWorld);
         const auto* state=fieldsOwner->state(fieldKey);std::int32_t x,y;
         assert(state&&state->x.promoted().roundPixel(x)&&x==240&&state->y.promoted().roundPixel(y)&&y==512);
         unsigned population=0;
@@ -1240,6 +1256,7 @@ int main(){
         assert(fieldWorld->createRoomStartField()&&fieldWorld->startTimeField()&&
             fieldsOwner->population(371,population)&&population==1&&fieldWorld->randomDrawCount()==startDraws+1);
         const auto startLocal=fieldWorld->goalFieldInstances().handle(0);
+        checkCollisionViewMembership(*fieldWorld);
         InstanceHandle startKey;
         assert(GameplayCollisionView::encode(GameplayCollisionView::Kind::goalField,startLocal,startKey));
         assert(fieldsOwner->state(startKey)&&fieldsOwner->properties(startKey)->sprite.scaleX.bits==0x40000000u&&
