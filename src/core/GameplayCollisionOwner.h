@@ -9,6 +9,7 @@
 #include "DebrisDraw.h"
 #include "TimeStopBound.h"
 #include "GameplayRoomLayers.h"
+#include "ObjectDrawMetadata.h"
 namespace downwell {
 // Resource-backed ownership at the native world's existing publication points.
 // Terrain-only queries retain their explicit resource-family gate. Projectile
@@ -28,6 +29,7 @@ private:
     const ObjectPack& objects_;
     const SpriteCollisionPack& sprites_;
     GameplayRoomLayers<View::capacity> layers_;
+    ObjectDrawMetadata<386> drawMetadata_;
     GameplayWorld* world_=nullptr;
     const GameplayWorld::PlayerInstance* initialPlayer_=nullptr;
     InstanceHandle initialPlayerKey_{};
@@ -194,7 +196,7 @@ public:
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
-        good_=sprites.valid()&&families_.bindInstanceFlags(objects);
+        good_=sprites.valid()&&families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
             for(unsigned i=0;i<families_.size();++i)
@@ -246,9 +248,9 @@ public:
                 // and sprite lookups for every terrain tile each frame.
                 if(kind!=View::Kind::enemy&&kind!=View::Kind::bullet&&kind!=View::Kind::scriptEffect&&
                     kind!=View::Kind::debris&&kind!=View::Kind::player)return true;
-                PackedObject object;const int id=self.owner_.objectId(h);
-                out.object=self.objects_.findObject(id,object);
-                PackedObjectEvent event;out.drawEvent=out.object&&self.objects_.findEvent(id,8,0,event);
+                const unsigned metadata=self.drawMetadata_.get(self.owner_.objectId(h));
+                out.object=(metadata&ObjectDrawMetadata<386>::exists)!=0;
+                out.drawEvent=(metadata&ObjectDrawMetadata<386>::drawEvent)!=0;
                 out.sprite=self.properties_[h.slot].sprite.spriteId>=0;return true;
             },[&](InstanceHandle h,int depth){RunnerImageValue value;return real(depth,value)&&draw(h,value);});
             return self.room_.visitDrawChecked([&](unsigned slot){return draw(self.roomKeys_[slot],self.properties_[slot].depth);});

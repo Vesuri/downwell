@@ -1,4 +1,5 @@
 #include "core/ObjectPack.h"
+#include "core/ObjectDrawMetadata.h"
 #include "core/RunnerObjectFamilies.h"
 #include "core/RunnerObjectMembership.h"
 #include "core/RunnerSpatialObjectPreparation.h"
@@ -85,6 +86,24 @@ void testDecodeAndInheritance() {
     const std::vector<std::uint8_t> bytes = makePack();
     const downwell::ObjectPack pack(bytes.data(), bytes.size());
     require(pack.valid(), "valid object pack is accepted");
+    downwell::ObjectDrawMetadata<2> draw;
+    require(draw.bind(pack)&&draw.get(0)==1&&draw.get(1)==1&&draw.get(-1)==0&&draw.get(2)==0,
+        "Draw metadata distinguishes missing objects from missing events");
+    for(unsigned owner=0;owner<2;++owner)for(unsigned subtype=0;subtype<2;++subtype){
+        auto table=makePack();
+        const auto offset=downwell::ObjectPack::headerSize+2*downwell::ObjectPack::objectRecordSize+
+            owner*downwell::ObjectPack::bindingRecordSize;
+        table[offset]=8;table[offset+4]=static_cast<std::uint8_t>(subtype);
+        downwell::ObjectPack variant(table.data(),table.size());
+        require(draw.bind(variant),"bind Draw inheritance fixture");
+        for(int id=0;id<2;++id)require(draw.get(id)==unsigned(1+((id>=int(owner)&&subtype==0)?2:0)),
+            "ordinary Draw inherits but other subevents do not");
+    }
+    require(draw.bind(pack)&&draw.get(1)==1,"rebind removes old event facts");
+    downwell::ObjectDrawMetadata<1> tooSmall;
+    require(!tooSmall.bind(pack)&&tooSmall.get(0)==0,"failed capacity bind exposes no partial cache");
+    downwell::ObjectPack invalid(nullptr,0);
+    require(!draw.bind(invalid)&&draw.get(0)==0,"failed rebind invalidates old cache");
     downwell::RunnerObjectFamilies<2> spatialFlags;
     require(spatialFlags.bindSpatialFlags(pack) && *spatialFlags.flags(0)==0x10 && *spatialFlags.flags(1)==0x10,
             "objects with sprites but no collision events are not collision-pair prepared");
@@ -246,6 +265,13 @@ void testGeneratedPack(const char* path) {
     require(pack.valid(), "generated object pack passes native validation");
     require(pack.objectCount() == 386 && pack.bindingCount() == 2075,
             "generated object pack has audited totals");
+    downwell::ObjectDrawMetadata<386> draw;
+    require(draw.bind(pack),"bind all original object Draw metadata");
+    for(unsigned id=0;id<pack.objectCount();++id){
+        downwell::PackedObjectEvent event;
+        require(draw.get(id)==unsigned(1+(pack.findEvent(id,8,0,event)?2:0)),
+            "cached Draw metadata agrees with original inherited event lookup");
+    }
     downwell::RunnerObjectFamilies<386> collisionFamilies;
     require(collisionFamilies.bindSpatialFlags(pack),"derive initial spatial flags from recovered collisions");
     const unsigned count=pack.objectCount();
