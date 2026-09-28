@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <iostream>
+#include <memory>
 
 namespace {
 
@@ -618,7 +619,9 @@ int main() {
                     downwell::roundGameMakerQ8(q + 176 * 256) - 176 == rounded,
                 "even world origins preserve rounded relative coordinates");
     }
-    AmigaPortRuntime roundingActors(300, true, 0, true);
+    // Keep large, long-lived fixture worlds off the host's limited main stack.
+    auto roundingActorsStorage=std::make_unique<AmigaPortRuntime>(300,true,0,true);
+    auto& roundingActors=*roundingActorsStorage;
     roundingActors.configureSolidResolver(noSolid, nullptr);
     require(roundingActors.configureEnemy(0, 111, 163, 40, 20, 192, 0, 5, 6) &&
                 roundingActors.configureEnemy(1, 111, 163, -40, 20, -192, 0, 5, 6),
@@ -628,7 +631,8 @@ int main() {
                 roundingActors.enemyAt(0).y == 20 && roundingActors.enemyAt(1).y == 20,
             "enemy Step rounds final coordinates instead of truncating toward origin");
 
-    AmigaPortRuntime eventOrder(300, true, 0, true);
+    auto eventOrderStorage=std::make_unique<AmigaPortRuntime>(300,true,0,true);
+    auto& eventOrder=*eventOrderStorage;
     eventOrder.configureSolidResolver(noSolid, nullptr);
     require(eventOrder.configureEnemy(0, 112, 169, 40, 0, 64, 0,
                 5, 14, 0, 1, -1, 1), "configure existing alarm source");
@@ -646,7 +650,8 @@ int main() {
             "new alarm first fires on the following tick; generation failure is visible");
     eventOrder.step(0);
     require(generation.calls == 2, "failed generation cannot replay a partial event");
-    AmigaPortRuntime lifecycle(300);
+    auto lifecycleStorage=std::make_unique<AmigaPortRuntime>(300);
+    auto& lifecycle=*lifecycleStorage;
     require(lifecycle.configureEnemy(0, 111, 163, 0, -303, 0, 0, 5, 6),
             "configure enemy beyond upper cleanup boundary");
     require(lifecycle.configureEnemy(1, 111, 163, 0, -302, 0, 0, 5, 6),
@@ -740,7 +745,8 @@ int main() {
                   "bullet simulation capacity matches SDL, not DMA channels");
     static_assert(AmigaPortRuntime::gemCapacity == 64,
                   "gem simulation capacity matches SDL");
-    AmigaPortRuntime crowdedRewards(300);
+    auto crowdedRewardsStorage=std::make_unique<AmigaPortRuntime>(300);
+    auto& crowdedRewards=*crowdedRewardsStorage;
     require(crowdedRewards.configureEnemy(0, 111, 163, 0, 5,
                                           0, 0, 5, 140),
             "configure reward exceeding the former twelve-gem limit");
@@ -838,7 +844,8 @@ int main() {
         require(!reserveHud.step(0).healthChanged,
                 "unchanged reserve does not redraw the native health HUD");
     }
-    AmigaPortRuntime runtime(300);
+    auto runtimeStorage=std::make_unique<AmigaPortRuntime>(300);
+    auto& runtime=*runtimeStorage;
     const AmigaPortFrame jump = runtime.step(4);
     require(!jump.scrolled && !runtime.player().grounded() &&
                 runtime.player().jumps() == 1,
@@ -855,7 +862,8 @@ int main() {
     require(runtime.checkpoint() != 0 && runtime.trajectoryDigest() != 0,
             "port runtime exposes final and rolling checkpoints");
 
-    AmigaPortRuntime burst(300, false, 1000);
+    auto burstStorage=std::make_unique<AmigaPortRuntime>(300,false,1000);
+    auto& burst=*burstStorage;
     burst.step(4);
     for (unsigned frame = 0; frame < 7; ++frame)
         burst.step(4);
@@ -902,7 +910,8 @@ int main() {
     for(unsigned tick=0;tick<100 && !burst.bulletCount();++tick)burst.step(tick%2?4:0);
     require(burst.bulletCount() && burst.bulletAt(0).lifetimeId>lastBulletIdentity,
             "Retry preserves identity sequence while resetting game rules");
-    AmigaPortRuntime movingShot(300, false, 1000);
+    auto movingShotStorage=std::make_unique<AmigaPortRuntime>(300,false,1000);
+    auto& movingShot=*movingShotStorage;
     for (unsigned frame = 0; frame < 12; ++frame) movingShot.step(2);
     const int muzzleX = downwell::roundGameMakerQ8(movingShot.player().offsetXFixed());
     const int muzzleY = downwell::roundGameMakerQ8(movingShot.player().offsetYFixed());
@@ -1762,7 +1771,8 @@ int main() {
     sideCamera.restartFromResults(downwell::DeathMenuSequence::Action::Retry, 2, 300);
     require(!sideCamera.cameraSideLocked(), "restart discards room-owned camera lock");
 
-    AmigaPortRuntime fallingRuntime(300, false, 1201 - 176, true);
+    auto fallingRuntimeStorage=std::make_unique<AmigaPortRuntime>(300,false,1201-176,true);
+    auto& fallingRuntime=*fallingRuntimeStorage;
     int accumulatedScroll = fallingRuntime.cameraOffsetY();
     for (unsigned frame = 0;
          frame < 300 && !fallingRuntime.player().grounded(); ++frame) {
@@ -1783,7 +1793,8 @@ int main() {
                                         downwell::portReplaySize);
     require(replay.valid() && replay.frameCount() == 64,
             "cross-target replay tape validates");
-    AmigaPortRuntime replayRuntime(300);
+    auto replayRuntimeStorage=std::make_unique<AmigaPortRuntime>(300);
+    auto& replayRuntime=*replayRuntimeStorage;
     for (std::uint32_t frame = 0; frame < replay.frameCount(); ++frame) {
         downwell::Input replayInput;
         require(replay.frame(frame, replayInput),
