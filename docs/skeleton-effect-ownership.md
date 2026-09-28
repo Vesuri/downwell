@@ -104,6 +104,20 @@ actual retirement or reuse invalidates the caller without changing the output.
 The native lifecycle tape checks that boundary. These adapters still need to
 replace the live removal-only Step together with the full effect/reward owners.
 
+Gunpowder Blocks creates object 266 (`bulletDrone`), not an explosion. Its
+Create overrides the serialized sprite 458 with 459, sets speed 7, damage 4,
+zero spread and alarm 0 to 16; the box subsequently assigns direction 90 and
+damage 20. `DroneBulletSourceStep` shares the source motion/event contract:
+first Step consumes `random_range(0,0)`, publishes the initial angle before
+`allSet`, then publishes it again in the ordinary body. Alarm 0 enables a
+binary64 speed multiplication by 0.8 on each Step. Below speed 3, animation is
+enabled once at image speed 0.5. Solid checking precedes separate builtin x/y
+writes, including after a destruction request. End Step runs `scrOutofview`
+then `scrBulletOov`; animation end requests destruction and Draw requires
+`allSet`. Scalar host traces and the native tape cover this contract. Live
+object ownership, inherited hit memory, collision-event dispatch, animation
+and both renderers remain unconnected; this helper does not enable the upgrade.
+
 The final box `alarmStop(0)` adapter also resolves its caller again after the
 time-bound query. A callback which retires the caller cannot publish into its
 old storage, and a nested ownership failure remains terminal even if the

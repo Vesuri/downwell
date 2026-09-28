@@ -582,6 +582,14 @@ build/box-destruction-test: tests/core/BoxDestructionScriptTest.cpp $(wildcard s
 verify-machine-gun-source-step: build/machine-gun-source-step-test
 	python3 tools/verify-machine-gun.py
 	./build/machine-gun-source-step-test
+test: verify-drone-bullet
+.PHONY: verify-drone-bullet
+verify-drone-bullet: build/drone-bullet-source-step-test
+	python3 tools/verify-drone-bullet.py
+	./build/drone-bullet-source-step-test
+build/drone-bullet-source-step-test: tests/core/DroneBulletSourceStepTest.cpp src/core/GameMakerRandom.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
+	@mkdir -p build
+	$(CXX) -Isrc $(CXXFLAGS) -o $@ $< src/core/GameMakerRandom.cpp
 build/machine-gun-source-step-test: tests/core/MachineGunSourceStepTest.cpp $(wildcard src/core/*.h) generated/smoke-trig.inc
 	@mkdir -p build
 	$(CXX) -Isrc $(CXXFLAGS) -o $@ $<
