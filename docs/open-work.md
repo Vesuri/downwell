@@ -248,11 +248,10 @@ Reference: [scene architecture](scene-architecture.md).
   synthetic geometry alone does not establish rendering fidelity.
 - Compare original Windows behavior/captures with both ports through startup,
   selection, gameplay, death, upgrades and later-area progression.
-- Revalidate garden framebuffer fixtures after the source RNG-choice correction
-  in `0c430a4`. The wake-frame checksum predates that correction and fails on
-  the current capture despite passing the Copper-patch and prepared-sprite
-  checks. Verify the complete raster before replacing the expected hash;
-  matching creation-state tests alone is insufficient.
+- Revalidate the remaining garden title/entry framebuffer fixtures after the
+  source RNG-choice correction and serialized-layer painter-order integration.
+  Verify the complete raster before replacing expected hashes; matching
+  creation-state tests alone is insufficient.
 - Run all relevant regression gates before claiming parity. Component tests,
   CPU replays and screenshots each prove only their respective scope.
 - Prepare release packaging, compatibility tests and installation documentation

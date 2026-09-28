@@ -90,15 +90,34 @@ bool amigaBuildMenuDrawList(const downwell::RoomPack& rooms,
             instance.instanceId, instance.x, instance.y, instance.objectId,
             spriteId, frame, object.depth
         };
-        unsigned destination = list.count;
-        while (destination > 0 &&
-               list.items[destination - 1].depth < item.depth) {
-            list.items[destination] = list.items[destination - 1];
-            --destination;
-        }
-        list.items[destination] = item;
-        ++list.count;
+        list.items[list.count++] = item;
     }
     list.randomDrawCount = random.drawCount();
+
+    // Creates above must consume RNG in placement order. Painting is a
+    // separate order: the selected GMS2 runner traverses layers backwards,
+    // and reserves serialized instance elements at the head of each layer.
+    // Reorder in place, without another cache-sized allocation on the 68000.
+    unsigned destination = 0;
+    for (unsigned layerIndex = room.layerCount; layerIndex > 0; --layerIndex) {
+        downwell::PackedRoomLayer layer;
+        if (!rooms.roomLayer(room, layerIndex - 1, layer)) return false;
+        if (layer.type == 1) continue; // Solid room background; cache is cleared.
+        if (layer.type != 2 || !layer.visible()) return false;
+        for (unsigned member = layer.membershipCount; member > 0; --member) {
+            std::uint32_t id;
+            if (!rooms.membership(layer.firstMembership + member - 1, id)) return false;
+            unsigned source = destination;
+            while (source < list.count && list.items[source].instanceId != id) ++source;
+            if (source == list.count) continue; // Invisible, inactive or player sprite.
+            const auto selected = list.items[source];
+            list.items[source] = list.items[destination];
+            list.items[destination] = selected;
+            list.items[destination++].depth = layer.depth;
+        }
+    }
+    // This static scene adapter only owns serialized scenery. Do not silently
+    // append objects missing from its source layers using a legacy sort.
+    if (destination != list.count) return false;
     return true;
 }

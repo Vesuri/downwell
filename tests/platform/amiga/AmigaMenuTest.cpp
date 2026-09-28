@@ -113,6 +113,29 @@ int main(int argc, char** argv) {
     require(grassCount > 0 && alternateGrassCount > 0,
             "seeded menu includes surviving alternate grass artwork");
 
+    // Independent source membership walk, not a sort by OBJT depth or a call
+    // into the native builder. Every scenery item must retain its exact ID.
+    unsigned painted=0;
+    for(unsigned i=menu.layerCount;i>0;--i){
+        downwell::PackedRoomLayer layer;
+        require(rooms.roomLayer(menu,i-1,layer),"source garden layer exists");
+        if(layer.type!=2||!layer.visible())continue;
+        for(unsigned j=layer.membershipCount;j>0;--j){
+            std::uint32_t id;
+            require(rooms.membership(layer.firstMembership+j-1,id),"source garden member exists");
+            const auto* instance=reference.instance(id);
+            downwell::PackedObject object;
+            if(!instance||!instance->active||instance->objectId==35||
+               !objects.findObject(instance->objectId,object)||!object.visible()||
+               (instance->spriteId<0&&object.spriteId<0))continue;
+            require(painted<list.count&&list.items[painted].instanceId==id&&
+                list.items[painted].depth==layer.depth,
+                "native static scenery follows source layer and reverse membership order");
+            ++painted;
+        }
+    }
+    require(painted==list.count,"all native static scenery is source-layer owned");
+
     unsigned removedGrassCount = 0;
     for (std::size_t index = 0; index < reference.activeInstanceCount(); ++index) {
         const downwell::InstanceRecord& instance = reference.instanceAt(index);
@@ -122,6 +145,13 @@ int main(int argc, char** argv) {
     }
     require(removedGrassCount > 0,
             "native reconstruction preserves seeded grass removal");
+
+    if(std::getenv("DOWNWELL_DUMP_GARDEN_SCENERY"))
+        for(unsigned i=0;i<list.count;++i){
+            const auto& item=list.items[i];
+            std::cout<<"SCENERY "<<item.instanceId<<' '<<item.objectId<<' '
+                <<item.spriteId<<' '<<item.frame<<' '<<item.x<<' '<<item.y<<'\n';
+        }
 
     std::cout << "Amiga menu reconstruction tests passed\n";
     return 0;
