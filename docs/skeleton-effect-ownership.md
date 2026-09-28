@@ -143,6 +143,17 @@ owner adapter's responsibility. The older live CurrencyReward helper has not
 yet been replaced: registered creation, caller publication and exact gem Step
 must be connected together before enabling natural reward events.
 
+The live shared gem loop now executes the source first-Step sound choice:
+size zero selects 168/169/170; other sizes select 163/164. It copies bounceSnd
+to mySound and sets allSet, consuming one WELL word exactly once, even for an
+already attracted gem. This happens after the reward's size override and before
+movement/terrain queries; an alarm-expired gem never reaches Step. Reusing a
+GemMotion record resets this state. CurrencyCreate shares the same fields for
+the future exact scheduler. No sound is played by this selection itself.
+Gem replay fixture version 6 includes these fields and the resulting RNG state;
+its CPU-equivalence digest is `c57fd381461e0fdd` (coverage 1023), not an original
+Windows gameplay capture. The remaining GemMotion approximations are unchanged.
+
 Box Alarm 0 is dispatched by both normal schedulers: the shared event body
 sets `wallHp` to zero, without emitting effects or retiring the box. Native
 storage keeps one 32-bit countdown per box; it does not allocate twelve slots

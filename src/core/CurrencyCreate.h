@@ -3,11 +3,12 @@
 #include "RandomBinary64.h"
 #include "RunnerMoveSnap.h"
 #include "AlarmBank.h"
+#include "CurrencyStepSound.h"
 namespace downwell {
 // Object 248 Create, before scrCurrencySpawn applies amount/size/attraction.
 // Constructor membership precedes this call. Queries use parentWall (57) and
 // tile layer 100; publish follows each separate builtin x/y write.
-struct CurrencyCreate {
+struct CurrencyCreate : CurrencyStepSound {
     RunnerImageValue x{},y{},imageSpeed{};
     MotionBinary64 xx{},yy{},xsp{},ysp{},imgSp{};
     MotionBinary64 gravity{0x3fa1eb85u,0x1eb851ecu},hardGravity{0x3fc99999u,0x9999999au};
@@ -15,9 +16,9 @@ struct CurrencyCreate {
     AlarmBank alarms;
     int unobtime=10,obtime=180,distime=120,stuckKamo=0,bounceGain=1,stepRate=1;
     int size=0,getAmount=2,flash=-1,attractionRadius=24,attractionSpeed=4;
-    int rotationSpeed=5,gemSpeed=1,direction=0,bounceSound=14;
+    int rotationSpeed=5,gemSpeed=1,direction=0;
     int attempts=0,radius=0,maxRadius=0,rx=0,ry=0;
-    bool active=true,allSet=false,suckable=false,obtainable=false,disappearing=false,attracted=false;
+    bool active=true,suckable=false,obtainable=false,disappearing=false,attracted=false;
     template<class Random,class Queries>
     bool create(MotionBinary64 px,MotionBinary64 py,int area,bool attractor,Random& random,Queries& queries){
         *this=CurrencyCreate{};

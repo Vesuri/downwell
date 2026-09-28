@@ -8,8 +8,24 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    for(int size:{0,1,2})for(unsigned choice=0;choice<unsigned(size?2:3);++choice){
+        struct Choice {
+            unsigned selected,count,calls=0;
+            unsigned chooseIndexSmall(unsigned n){require(n==count,"source bounce-sound candidate count");++calls;return selected;}
+        } random{choice,unsigned(size?2:3)};
+        downwell::CurrencyStepSound state;
+        require(!state.allSet&&state.bounceSound==14,"Create defers bounce-sound selection to Step");
+        state.begin(size,random);
+        require(state.allSet&&state.bounceSound==int(choice)+(size?163:168)&&state.mySound==state.bounceSound&&random.calls==1,
+            "first Step publishes source bounceSnd then mySound and allSet");
+        state.begin(size?0:1,random);
+        require(random.calls==1,"later size changes do not repeat first-Step RNG");
+    }
     {
-        struct Random { unsigned randomIntegerSmall(unsigned) { return 0; } } random;
+        struct Random {
+            unsigned randomIntegerSmall(unsigned) { return 0; }
+            unsigned chooseIndexSmall(unsigned) { return 0; }
+        } random;
         for (bool upgraded : {false, true}) {
             downwell::CurrencyAccount account;
             downwell::GemMotion gem;
@@ -57,6 +73,7 @@ int main() {
         struct RandomProbe {
             unsigned calls = 0;
             unsigned randomIntegerSmall(unsigned) { ++calls; return 0; }
+            unsigned chooseIndexSmall(unsigned) { ++calls; return 0; }
         } random;
         CurrencyAccount account;
         GemMotion gem;
@@ -66,6 +83,8 @@ int main() {
         auto result = stepCurrency(gem, false, 2, 1000 * 256L, 0, 0, 0, account, solid, random);
         require(result == CurrencyStepResult::alive && gem.lifetime.age == 9 && account.currency == 0,
                 "shared currency phase cannot collect before the obtainable alarm");
+        require(gem.sound.allSet&&gem.sound.bounceSound==168&&gem.sound.mySound==168&&random.calls==1,
+                "live small gem consumes and retains its first-Step choice");
         result = stepCurrency(gem, false, 2, 1000 * 256L, 0, 0, 0, account, solid, random);
         require(result == CurrencyStepResult::collected && account.currency == 2 &&
                     account.gameGem == 2 && account.streak == 2 && account.timer == 300,
@@ -82,6 +101,8 @@ int main() {
         result = stepCurrency(large, true, 10, 1000 * 256L, 0, 9 * 256L, 0, account, solid, random);
         require(result == CurrencyStepResult::collected && account.currency == 12,
                 "shared phase preserves the large gem's wider collection mask");
+        require(large.sound.bounceSound==163&&large.sound.mySound==163,
+                "live large reward selects its own bounce sound after the size override");
         GemMotion small;
         small.lifetime.age = 9;
         result = stepCurrency(small, false, 2, 1000 * 256L, 0, 9 * 256L, 0, account, solid, random);
@@ -171,9 +192,9 @@ int main() {
             const unsigned values[] = {0, 10, 60, 1};
             return values[call++ % 4];
         }
-        unsigned chooseIndexSmall(unsigned) {
+        unsigned chooseIndexSmall(unsigned count) {
             const unsigned values[] = {0, 10, 60, 1};
-            return values[call++ % 4];
+            return values[call++ % 4]%count;
         }
         unsigned randomIntegerSmall(unsigned) { return 25600; }
     } random;

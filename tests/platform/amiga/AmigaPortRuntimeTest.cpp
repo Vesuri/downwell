@@ -1808,9 +1808,9 @@ int main() {
     const auto gems = downwell::verifyGemSimulation();
     std::cout << "Gem fixture digest: " << std::hex << gems.digest << std::dec
               << " coverage=" << gems.coverage << '\n';
-    // Re-recorded after correcting the two gem choices to one WELL word each;
-    // the old f175194dfba46820 fingerprint encoded the two-word chooser bug.
-    require(gems.coverage == 1023 && gems.digest == 0xe526fc84c6bf6315ULL,
+    // Version 6 includes the source first-Step bounce-sound selection and its
+    // one-word RNG draw; v5 omitted it. Player trajectory is unchanged above.
+    require(gems.coverage == 1023 && gems.digest == 0xc57fd381461e0fddULL,
             "gem cross-CPU fixture covers motion, collection/account expiry and both flash phases with a pinned digest");
     const auto weapon = downwell::verifyMachineGun();
     std::cout << "Weapon fixture digest: " << std::hex << weapon.digest << std::dec

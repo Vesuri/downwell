@@ -13,6 +13,11 @@ code = (export / "Assembly/gml_Object_objCurrency_Create_0.asm").read_bytes()
 assert sha256(code).hexdigest() == "306c47960dd5a67345f80fd7cb0b8066ed23c01a13fcd06557016df5c75c73e1"
 assert sha256((export / "Assembly/gml_GlobalScript_scrCurrencySpawn.asm").read_bytes()).hexdigest() == \
     "cb0077955a13e851726c15bde3e4724e75b46d64a57c784b168b8ea584229161"
+step = (export / "Assembly/gml_Object_objCurrency_Step_0.asm").read_bytes()
+assert sha256(step).hexdigest() == "eef98cd1ea85b43303c5a5b58bcb7725655fa3c65d8836176afbea41bbc66f95"
+prefix = step.decode().split(":[5]", 1)[0]
+assert "call.i choose(argc=3)" in prefix and "call.i choose(argc=2)" in prefix
+assert "pop.v.v self.mySound\npushi.e 1\npop.v.i self.allSet" in prefix
 obj = manifest["resources"]["objects"][248]
 event = next(e for e in obj["events"] if e["eventType"] == 0 and e["eventSubtype"] == 0)
 assert event["actions"][0]["codeName"] == "gml_Object_objCurrency_Create_0"

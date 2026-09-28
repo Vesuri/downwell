@@ -22,7 +22,7 @@ inline GemVerificationResult verifyGemSimulation() {
     bool alive[3] = {true, true, true};
     VerificationDigest digest;
     unsigned coverage = 0;
-    digest.addU32(5); // Includes both visible/hidden disappearing-gem phases.
+    digest.addU32(6); // Includes source first-Step bounce-sound choice/RNG.
     for (unsigned tick = 0; tick < 400; ++tick) {
         digest.addU32(tick);
         for (unsigned i = 0; i < 3; ++i) {
@@ -54,6 +54,9 @@ inline GemVerificationResult verifyGemSimulation() {
             digest.addI32(gems[i].homing.turnFifths);
             digest.addI32(gems[i].homing.speedEighths);
             digest.addI32(gems[i].animation.rateTenths);
+            digest.addU32(gems[i].sound.allSet);
+            digest.addI32(gems[i].sound.bounceSound);
+            digest.addI32(gems[i].sound.mySound);
             digest.addU32(gems[i].animation.phaseTenths);
         }
         digest.addU64(random.drawCount());

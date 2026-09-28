@@ -4,6 +4,7 @@
 #include "GemLifetime.h"
 #include "GemAnimation.h"
 #include "EnemyContact.h"
+#include "CurrencyStepSound.h"
 namespace downwell {
 // Positions in 1/12800 pixels keep .035 gravity exact, with no 64-bit math.
 // Terrain probes remain provisional, not the source sprite-mask solver.
@@ -12,6 +13,7 @@ struct GemMotion {
     GemHoming homing;
     GemLifetime lifetime;
     GemAnimation animation;
+    CurrencyStepSound sound;
     bool attracted = false;
     bool attractorAtBirth = false;
     static long q8(long value) { return value < 0 ? -((-value + 25) / 50) : (value + 25) / 50; }
@@ -34,6 +36,7 @@ struct GemMotion {
     template<class Random>
     void initialize(int px, int py, bool attract, Random& random, bool attractor = false) {
         lifetime = {};
+        sound = {};
         attractorAtBirth = attractor;
         x = px * 12800L; y = py * 12800L; attracted = attract;
         vx = static_cast<long>(random.randomIntegerSmall(51200)) - 25600;
@@ -42,8 +45,9 @@ struct GemMotion {
         homing.initialize(random);
     }
     template<class Solid, class Random>
-    bool step(long targetX, long targetY, Solid solid, Random& random) {
+    bool step(long targetX, long targetY, Solid solid, Random& random, bool large=false) {
         if (!lifetime.advance(attracted)) return false;
+        sound.begin(large?1:0,random);
         animation.advance();
         const long dx = targetX - q8(x), dy = targetY - q8(y);
         if (attracted) {

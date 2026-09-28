@@ -169,13 +169,14 @@ sanitizers; gem-motion, enemy-contact and machine-gun trajectory tests pass.
 Both ordinary builds pass, with clean 68000 instruction/helper audits
 (`/tmp/downwell-gem-choose-{amiga,sdl}.log`). No emulator was launched.
 
-The host gem verification fingerprint is now `e526fc84c6bf6315`, replacing
-`f175194dfba46820`; coverage remains 1023. This records the corrected fixture,
-not an independent Windows or native-emulator capture. Native cross-CPU
-verification and the stale natural-route/startup tests remain outstanding.
-The full host-compiled Amiga port runtime suite passes after this fingerprint
-update (`/tmp/downwell-gem-choose-runtime.log`); weapon coverage remains 16383.
-Player/reward callbacks and enemy alarm RNG are next in the call-site audit.
+Gem CPU fixture version 6 has fingerprint `c57fd381461e0fdd`, coverage 1023.
+It includes the one-word first-Step bounce-sound choice and retained
+`allSet`/`bounceSnd`/`mySound` fields. Version 5 (`e526fc84c6bf6315`) corrected
+Create choices but omitted that Step draw; the earlier `f175194dfba46820`
+encoded the two-word chooser bug. These are versioned CPU-equivalence fixtures,
+not independent Windows gameplay captures. Full natural-route RNG ordering,
+player/reward callbacks and enemy alarm choices remain subject to the live
+call-site audit in `open-work.md`.
 
 ## Fourth migration: shop callbacks
 
