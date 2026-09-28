@@ -751,6 +751,7 @@ public:
     template<class Retire> bool cleanupDestroyed(Retire retire){
         if(!valid()||!world_)return check(false);
         if(!destructionPending_)return true;
+        DW_PROFILE_SCOPE(profileDrawCleanup);
         const bool cleaned=room_.visitCleanupChecked([&](unsigned slot){
             const auto h=roomKeys_[slot];const auto* state=owner_.resolve(h);
             View::Record record;

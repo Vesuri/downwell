@@ -148,6 +148,11 @@ test; do not leave it running after the measurement.
 Fine-grained instrumentation changes execution cost: do not report its FPS as
 shipping performance or subtract its timings from an uninstrumented run.
 
+Phase 96 isolates pending destroyed-instance sweeps at Draw entry from phase 4
+(the historical `title` label also covers gameplay HUD/overlay updates). It
+excludes nested spatial removals; frames without a pending sweep do not enter
+this bracket. This distinguishes room cleanup from pixel drawing costs.
+
 Inner generation probes are opt-in with `GENERATION_DETAIL=1`; frequent phase
 switches can substantially inflate generation bursts. Prefer coarse phases
 for comparisons. The wrapper resets this option when restoring the build.
