@@ -180,8 +180,10 @@ private:
         const unsigned exponent=(bits>>23)&255u;
         if(exponent<127||exponent>150)return false;
         const unsigned shift=150-exponent,mantissa=(bits&0x7fffffu)|0x800000u;
-        if(mantissa&((1u<<shift)-1))return false;
         const auto integer=std::int32_t(mantissa>>shift);
+        // Reconstruct the mantissa to reject discarded fractional bits. The
+        // admitted shift is [0,23]; reconstruction cannot overflow uint32.
+        if((std::uint32_t(integer)<<shift)!=mantissa)return false;
         out=bits&0x80000000u?-integer:integer;return true;
     }
     static bool pixels(const Box& value,PixelBox& out){

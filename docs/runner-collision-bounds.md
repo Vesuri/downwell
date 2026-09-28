@@ -515,6 +515,11 @@ same comparison values. Selection still minimizes enlargement, then area,
 then original slot order. Signed zeros compare equal on both paths. Fractional,
 larger or invalid inputs use the retained path; no approximate arithmetic or
 different collision traversal order is introduced.
+Coordinate admission shifts the 24-bit mantissa down and reconstructs it to
+detect any discarded fractional bits. The admitted shift range is 0–23, so
+reconstruction cannot overflow; this is identical to the low-bit mask test
+without constructing a mask or loading a table. Tests exercise each mantissa
+bit for both signs at every admitted exponent.
 Child selection decodes and scores one candidate at a time, without a temporary
 array or a union of all candidates. Only candidate/incoming unions enter the
 source comparisons, so the all-candidate union need not satisfy these bounds.

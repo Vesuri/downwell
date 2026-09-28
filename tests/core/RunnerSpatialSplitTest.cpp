@@ -314,6 +314,14 @@ int main(){
         assert(!childCheck(input,2,packed({0,0,0,4000})));
     }
     assert(pixelAccepted>30000&&pixelFallback>0);
+    for(unsigned exponent=127;exponent<=150;++exponent)for(unsigned sign=0;sign<2;++sign){
+        for(unsigned bit=0;bit<23;++bit){
+            const unsigned raw=(sign<<31)|(exponent<<23)|(1u<<bit);
+            Split::Box point{{raw},{},{raw},{}};
+            const bool exact=bit>=150-exponent;
+            assert(childCheck(&point,1,point)==exact);
+        }
+    }
     assert(pixelPartitions==4096);
     {
         Split::Box input[7];
