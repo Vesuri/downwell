@@ -970,6 +970,15 @@ verify-entry-dither: build/entry-dither-test
 	python3 tools/verify-runner-instance-ids.py
 	./build/entry-dither-test
 
+test: verify-entry-mask-offset
+.PHONY: verify-entry-mask-offset
+verify-entry-mask-offset: build/amiga-entry-mask-test
+	./build/amiga-entry-mask-test
+
+build/amiga-entry-mask-test: tests/platform/amiga/AmigaEntryMaskTest.cpp src/platform/amiga/AmigaEntryMask.h
+	@mkdir -p build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -Isrc -o $@ tests/platform/amiga/AmigaEntryMaskTest.cpp
+
 build/entry-dither-test: tests/core/EntryDitherTest.cpp $(wildcard src/core/*.h)
 	@mkdir -p build
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Isrc -o $@ tests/core/EntryDitherTest.cpp
@@ -2054,6 +2063,7 @@ verify-amiga-game: generate-amiga-game verify-default-shader
 	python3 tools/verify-amiga-menu-sprites.py
 	tools/generate-amiga-hud.py --profile game --check
 	python3 tests/exit-mask-test.py
+	python3 tests/entry-mask-test.py
 	python3 tests/skeleton-art-test.py
 	python3 tests/muzzle-art-test.py
 	python3 tests/wall-impact-art-test.py

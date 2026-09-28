@@ -945,6 +945,32 @@ def build_exit_mask(pack, stride=48, left=110):
     return bytes(output)
 
 
+def build_entry_mask(pack):
+    """Pointer-scrolled entry cover: transparent / original edge / solid.
+
+    Source sprite 129 has origin y=400. For screen y >= -116 its finite
+    bottom never intersects a 284-row display. Earlier positions need a
+    different representation; AmigaEntryMask rejects them rather than making
+    the source's solid tail infinite. No runtime conversion is required.
+    """
+    count = HEADER.unpack_from(pack)[3]
+    record = next(RECORD.unpack_from(pack, HEADER.size + i * RECORD.size)
+                  for i in range(count)
+                  if RECORD.unpack_from(pack, HEADER.size + i * RECORD.size)[:2] == (65004, 0))
+    _, _, _, _, width, height, dma_width, _, offset, length = record
+    require(width == 160 and height == 80 and dma_width == 160 and length >= 1600,
+            "unexpected entry-edge planar layout")
+    output = bytearray(48 * 648)
+    for y in range(284, 648):
+        for x in range(160):
+            covered = y >= 364 or bool(pack[offset + (y - 284) * 20 + x // 8]
+                                       & (0x80 >> (x & 7)))
+            if covered:
+                px = 110 + x
+                output[y * 48 + px // 8] |= 0x80 >> (px & 7)
+    return bytes(output)
+
+
 def atomic_write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
@@ -983,6 +1009,24 @@ def main():
         atomic_write(args.output, data)
         print(f"Amiga {args.profile} pack written: {len(data)} bytes sha256 {digest}")
     if args.profile == "game":
+        entry_mask = build_entry_mask(data)
+        entry_path = args.output.with_suffix(".entry-mask")
+        entry_manifest = args.output.with_suffix(".entry-mask.json")
+        entry_provenance = json.dumps({
+            "schemaVersion": 1, "generator": "generate-amiga-hud.py/entry-mask-v1",
+            "extractor": manifest["extractor"], "sourceSha256": SOURCE_SHA256,
+            "packSha256": digest, "sourceSpriteId": 129, "sourceFrame": 0,
+            "derivedStripId": 65004, "width": 384, "height": 648,
+            "playfieldX": 110, "playfieldWidth": 160, "bytesPerRow": 48,
+            "minimumScreenY": -116, "sourceOriginY": 400,
+            "maskSha256": hashlib.sha256(entry_mask).hexdigest(),
+        }, sort_keys=True, indent=2).encode("utf-8") + b"\n"
+        if args.check:
+            require(entry_path.read_bytes() == entry_mask, "entry mask is not reproducible")
+            require(entry_manifest.read_bytes() == entry_provenance, "entry mask provenance differs")
+        else:
+            atomic_write(entry_path, entry_mask)
+            atomic_write(entry_manifest, entry_provenance)
         mask = build_exit_mask(data)
         mask_path = args.output.with_suffix(".exit-mask")
         provenance_path = args.output.with_suffix(".exit-mask.json")
