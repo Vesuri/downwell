@@ -104,14 +104,17 @@ private:
         // Capacity bounds tree height. Keep only the descent path, rather than
         // a complete split/child-selection call frame at every tree level.
         unsigned depth=0;
-        while(nodes_[node].level!=level){
-            const Node& n=nodes_[node];
-            if(n.level<level||depth==depthLimit)return false;
-            for(unsigned i=0;i<n.count;++i)choices_[i]=n.entries[i].bounds;
-            unsigned selected;
-            if(!Math::chooseChild(choices_,n.count,entry.bounds,selected))return false;
-            parents_[depth]=node;selections_[depth++]=selected;
-            node=n.entries[selected].child;
+        if(nodes_[node].level!=level){
+            const Math::ChildSelection selection(entry.bounds);
+            while(nodes_[node].level!=level){
+                const Node& n=nodes_[node];
+                if(n.level<level||depth==depthLimit)return false;
+                for(unsigned i=0;i<n.count;++i)choices_[i]=n.entries[i].bounds;
+                unsigned selected;
+                if(!selection.choose(choices_,n.count,selected))return false;
+                parents_[depth]=node;selections_[depth++]=selected;
+                node=n.entries[selected].child;
+            }
         }
         unsigned split=Capacity;
         if(!add(node,entry,split))return false;

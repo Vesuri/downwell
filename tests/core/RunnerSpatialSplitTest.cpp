@@ -261,6 +261,11 @@ int main(){
         unsigned reference=999,actual=999,fast=999;
         const bool expected=Split::chooseBinary32Child(input,count,incoming,reference);
         assert(Split::chooseChild(input,count,incoming,actual)==expected&&actual==reference);
+        const Split::ChildSelection selection(incoming);
+        for(unsigned repeat=0;repeat<2;++repeat){
+            unsigned reused=999;
+            assert(selection.choose(input,count,reused)==expected&&reused==reference);
+        }
         const bool accepted=Split::choosePixelChild(input,count,incoming,fast);
         if(accepted){++pixelAccepted;assert(expected&&fast==reference);}
         else{++pixelFallback;assert(fast==999);}

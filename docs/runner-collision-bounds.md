@@ -513,6 +513,14 @@ array or a union of all candidates. Only candidate/incoming unions enter the
 source comparisons, so the all-candidate union need not satisfy these bounds.
 If any later candidate fails admission, selection remains unpublished and the
 reference handles the complete request.
+During tree descent, `ChildSelection` borrows the unchanged incoming rectangle
+and decodes its integer coordinates once. Each node's candidates are still
+decoded and scored at that node, with the same per-candidate admission checks
+and binary32 fallback. The borrowed rectangle must remain immutable until all
+selections finish; insertion ends that scope before mutating any node. Leaf-only
+insertion performs no decode. This uses only bounded per-descent scratch, not
+a persistent cache of tree bounds. Profiling attributes initial decode to
+insertion rather than selection, so compare their combined exclusive time.
 
 Quadratic partitioning retains the stronger complete-union bound: all seven
 rectangles together must have extents at most 65535 and area at most 2^24.

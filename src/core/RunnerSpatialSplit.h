@@ -10,6 +10,9 @@ namespace downwell {
 // entry. This is not a complete spatial index or an instance_place adapter.
 // Finite normal/zero binary32 inputs only; failures leave output untouched.
 struct RunnerSpatialSplit {
+private:
+    struct PixelBox {std::int32_t left,top,right,bottom;};
+public:
     using Real=RunnerImageValue;
     struct Box { Real left,top,right,bottom; };
     struct Result { unsigned group[7]={}; unsigned count[2]={}; };
@@ -98,6 +101,11 @@ struct RunnerSpatialSplit {
         if(!count||count>6)return false;
         PixelBox in;
         if(!pixels(incoming,in))return false;
+        return chooseDecodedChild(boxes,count,in,chosen);
+    }
+private:
+    static bool chooseDecodedChild(const Box* boxes,unsigned count,const PixelBox& in,unsigned& chosen){
+        if(!count||count>6)return false;
         unsigned best=0,bestArea=0,bestGrowth=0;
         for(unsigned i=0;i<count;++i){
             PixelBox value;
@@ -116,6 +124,7 @@ struct RunnerSpatialSplit {
         }
         chosen=best;return true;
     }
+public:
     static bool partitionPixels(const Box (&boxes)[7],Result& output){
         PixelBox values[7],all;unsigned areas[7];
         for(unsigned i=0;i<7;++i){
@@ -157,7 +166,6 @@ struct RunnerSpatialSplit {
         output=next;return true;
     }
 private:
-    struct PixelBox {std::int32_t left,top,right,bottom;};
     static bool pixel(Real value,std::int32_t& out){
         const unsigned bits=value.bits,magnitude=bits&0x7fffffffu;
         if(!magnitude){out=0;return true;}
@@ -184,6 +192,20 @@ private:
         return pixelProduct(unsigned(box.right-box.left),unsigned(box.bottom-box.top));
     }
 public:
+    // A descent borrows one immutable incoming box until all child selections
+    // finish. Candidate bounds stay live; no decoded tree state is retained.
+    class ChildSelection {
+        const Box& incoming_;
+        PixelBox pixel_{};
+        bool pixelValid_;
+    public:
+        explicit ChildSelection(const Box& incoming):incoming_(incoming),pixelValid_(pixels(incoming,pixel_)){}
+        bool choose(const Box* boxes,unsigned count,unsigned& chosen)const{
+            DW_PROFILE_SCOPE(profileSpatialChoose);
+            if(pixelValid_&&chooseDecodedChild(boxes,count,pixel_,chosen))return true;
+            return chooseBinary32Child(boxes,count,incoming_,chosen);
+        }
+    };
     // Closed bounds: touching edges survive broad-phase pruning.
     static bool overlaps(const Box& a,const Box& b){return !less(a.right,b.left)&&!less(b.right,a.left)&&
         !less(a.bottom,b.top)&&!less(b.bottom,a.top);}

@@ -84,6 +84,8 @@ struct RunnerSpatialVerification {
         result.check(RunnerSpatialSplit::chooseBinary32Child(boxes,count,boxes[6],expected));
         result.check(RunnerSpatialSplit::choosePixelChild(boxes,count,boxes[6],fast)&&fast==expected);
         result.check(RunnerSpatialSplit::chooseChild(boxes,count,boxes[6],actual)&&actual==expected);
+        const RunnerSpatialSplit::ChildSelection selection(boxes[6]);
+        actual=99;result.check(selection.choose(boxes,count,actual)&&actual==expected);
         result.word(actual);
         if(trial<16){
             RunnerSpatialSplit::Result reference,partition,pixelPartition;
@@ -99,6 +101,14 @@ struct RunnerSpatialVerification {
         boxes[0].left.bits=0x3f000000u; // Fractional coordinate must use fallback.
         fast=99;
         result.check(!RunnerSpatialSplit::choosePixelChild(boxes,count,boxes[6],fast)&&fast==99);
+        expected=actual=99;
+        const bool fallback=RunnerSpatialSplit::chooseBinary32Child(boxes,count,boxes[6],expected);
+        result.check(selection.choose(boxes,count,actual)==fallback&&actual==expected);
+        auto fractional=boxes[6];fractional.left.bits=0x3f000000u;
+        const RunnerSpatialSplit::ChildSelection fractionalSelection(fractional);
+        expected=actual=99;
+        const bool fractionalFallback=RunnerSpatialSplit::chooseBinary32Child(boxes,count,fractional,expected);
+        result.check(fractionalSelection.choose(boxes,count,actual)==fractionalFallback&&actual==expected);
     }
     {
         RunnerSpatialSplit::Box boxes[2],incoming;
