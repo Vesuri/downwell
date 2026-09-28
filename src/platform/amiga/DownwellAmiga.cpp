@@ -2,6 +2,7 @@
 #ifdef DOWNWELL_FIELD_VERIFY
 #include "core/GameplayFieldReentryVerification.h"
 extern "C" {
+volatile unsigned gPreparedObjects, gPreparedAlarms, gPreparedSprites;
 volatile unsigned gDownwellFieldChecks, gDownwellFieldStage, gDownwellFieldGameSteps,
     gDownwellFieldClearSteps, gDownwellFieldFirst, gDownwellFieldLater, gDownwellFieldRetry;
 __attribute__((noinline,used)) void downwellFieldReentryReady(){__asm__ volatile("" ::: "memory");}
@@ -1318,7 +1319,10 @@ __attribute__((noinline)) static int runDownwell(void) {
     using FieldTape = downwell::GameplayFieldReentryVerification;
     alignas(FieldTape) static UBYTE fieldTapeStorage[sizeof(FieldTape)];
     auto& fieldTape = *new (fieldTapeStorage) FieldTape;
-    const bool fieldPassed = fieldTape.run(port,collisionOwner,objects,initialRingOrigin);
+    const bool fieldPassed = fieldTape.run(port,collisionOwner,objects,collisionSprites,initialRingOrigin);
+    gPreparedObjects=fieldTape.preparedResources.objectsChecked;
+    gPreparedAlarms=fieldTape.preparedResources.alarmsChecked;
+    gPreparedSprites=fieldTape.preparedResources.spritesChecked;
     gDownwellFieldChecks=fieldTape.checks;gDownwellFieldStage=fieldTape.stage;
     gDownwellFieldGameSteps=fieldTape.gameSteps;gDownwellFieldClearSteps=fieldTape.clearSteps;
     gDownwellFieldFirst=fieldTape.firstGeneration;gDownwellFieldLater=fieldTape.laterGeneration;

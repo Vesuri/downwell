@@ -16,6 +16,7 @@
 #include "RunnerIntegerValueVerification.h"
 #include "FixedCollisionRoundingVerification.h"
 #include "RunnerBindingRevisionVerification.h"
+#include "PreparedResourceVerification.h"
 namespace downwell {
 // Test-only lifecycle tape, shared by host tests and the 68000 debugger gate.
 // The exit is deliberately placed at the player; this is not evidence for a
@@ -29,11 +30,14 @@ struct GameplayFieldReentryVerification {
     unsigned checks=0,stage=0,gameSteps=0,clearSteps=0;
     unsigned firstGeneration=0,laterGeneration=0,retryGeneration=0;
     TimeChangeEffects<8> timeChanges;
+    PreparedResourceVerification preparedResources;
     int sourceRoomSpeed=60;
-    bool run(GameplayWorld& world,GameplayCollisionOwner& owner,const ObjectPack& objects,unsigned origin){
+    bool run(GameplayWorld& world,GameplayCollisionOwner& owner,const ObjectPack& objects,
+        const SpriteCollisionPack& sprites,unsigned origin){
         checks=0;gameSteps=clearSteps=0;
         unsigned population=0;
         stage=1;
+        if(!preparedResources.run(objects,sprites))return false;
         if(!ProjectilePublicationVerification::run())return false;
         if(!RunnerUnitBoundsVerification::run())return false;
         if(!RunnerLayerAllocationVerification::run())return false;

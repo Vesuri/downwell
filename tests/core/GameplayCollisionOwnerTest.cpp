@@ -2116,9 +2116,14 @@ int main(){
             owner->breakableBinding(),owner->playerBinding(),&owner->terrain());
         assert(owner->attach(*world));
         auto tape=std::make_unique<GameplayFieldReentryVerification>();
-        assert(tape->run(*world,*owner,objects,300)&&tape->checks==255&&tape->gameSteps==108&&
+        assert(tape->run(*world,*owner,objects,sprites,300)&&tape->checks==255&&tape->gameSteps==108&&
             tape->clearSteps>0&&tape->clearSteps<400&&tape->firstGeneration<tape->laterGeneration&&
             tape->laterGeneration<tape->retryGeneration);
+        assert(tape->preparedResources.objectsChecked==386&&
+            tape->preparedResources.alarmsChecked==4632&&tape->preparedResources.spritesChecked==741);
+        std::printf("Prepared resources: objects=%u alarm slots=%u sprites=%u\n",
+            tape->preparedResources.objectsChecked,tape->preparedResources.alarmsChecked,
+            tape->preparedResources.spritesChecked);
         std::printf("Field reentry tape: checks=%u gameplay=%u upgrade=%u generations=%u/%u/%u\n",
             tape->checks,tape->gameSteps,tape->clearSteps,tape->firstGeneration,tape->laterGeneration,tape->retryGeneration);
     }

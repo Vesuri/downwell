@@ -37,6 +37,16 @@ The fixture injects an exit at the player before terrain binding; it does not
 prove natural descent, presentation parity, full cross-family creation order,
 or stock-A500 memory fit. The native gate checks the stack guard as well.
 
+Before the lifecycle tape, `PreparedResourceVerification` checks all 386
+original object defaults, all 4,632 inherited alarm slots (including absent
+handlers), and all 741 sprite-bound templates at three integer translations
+against direct resource reads and the general bounds implementation. Native
+completion requires the exact coverage counts, not only a matching digest.
+Its large workspace belongs to the test-only static field tape, never the
+Amiga task stack or the normal game. This checks the resource preparation
+contract on both CPUs; it does not prove runtime mutation ordering, transformed
+bounds outside the unit-scale path, or a frame-time improvement.
+
 From the repository root:
 
 ```sh
