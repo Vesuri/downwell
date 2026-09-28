@@ -27,6 +27,8 @@ private:
     Owner owner_;
     Owner::RegistrationProjection<View::terrainBase,View::timeFieldBase> actorRegistrations_;
     RunnerStepSnapshot<GameplayWorld::enemyCapacity+GameplayWorld::breakableCapacity+GameplayDebrisInstances::capacity+8+GameplayEntryDithers::capacity+GameplayWorld::droneBulletCapacity> combatAlarmPhase_;
+    std::uint32_t combatAlarmCaptureRevision_=0;
+    bool combatAlarmCaptureValid_=false;
     RunnerRoomMembership<View::capacity> room_;
     RunnerRoomMembership<View::capacity>::AnimationProjection animationProjection_;
     bool terrainSnapshotDirty_=true;
@@ -253,6 +255,7 @@ public:
     GameplayCollisionOwner& operator=(const GameplayCollisionOwner&)=delete;
     bool valid()const{return good_&&owner_.valid()&&terrain_.valid()&&scriptEffects_.valid()&&debris_.valid()&&timeChanges_.valid()&&entries_.valid()&&drones_.valid()&&layers_.valid();}
     bool attach(GameplayWorld& world){
+        combatAlarmCaptureValid_=false;
         if(!valid()||(world_&&world_!=&world)||(!world_&&
             (!initialPlayer_||world.findPlayer(initialPlayerKey_)!=initialPlayer_)))return false;
         if(!world_&&!world.bindTimeFieldLifecycle(OrdinaryTimeFields<64>::Binding::bind(fields_)))return check(false);
@@ -377,14 +380,23 @@ public:
             DW_PROFILE_SCOPE(profileAlarmCapture);
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
             if(!self.valid())return false;
-            auto& phase=self.combatAlarmPhase_;phase.clear();
-            auto capture=[&](InstanceHandle h,int object,const Owner::State& state){
-                return self.resolves(h)&&((state.flags&0x100003u)||phase.append(h.slot,h.generation,object));
-            };
-            // Only implemented families are admitted. Avoid scanning every
-            // terrain record for this partial combat alarm traversal.
-            if(!self.check(self.owner_.visitRegistrationRange(self.actorRegistrations_,View::enemyBase,View::terrainBase,capture)&&
-                self.owner_.visitRegistrationRange(self.actorRegistrations_,View::debrisBase,View::capacity,capture)))return false;
+            auto& phase=self.combatAlarmPhase_;
+            const bool reused=self.combatAlarmCaptureValid_&&
+                self.owner_.captureUnchanged(self.combatAlarmCaptureRevision_);
+            if(!reused){
+                phase.clear();
+                auto capture=[&](InstanceHandle h,int object,const Owner::State& state){
+                    return self.resolves(h)&&((state.flags&0x100003u)||phase.append(h.slot,h.generation,object));
+                };
+                // Only implemented families are admitted. Avoid scanning every
+                // terrain record for this partial combat alarm traversal.
+                if(!self.check(self.owner_.visitRegistrationRange(self.actorRegistrations_,View::enemyBase,View::terrainBase,capture)&&
+                    self.owner_.visitRegistrationRange(self.actorRegistrations_,View::debrisBase,View::capacity,capture)))return false;
+                // Save before callbacks: mutation during dispatch invalidates
+                // reuse next tick without changing this phase's captured set.
+                self.combatAlarmCaptureRevision_=self.owner_.captureRevision();
+                self.combatAlarmCaptureValid_=true;
+            }
             return self.dispatchCapturedAlarms(phase,[&](InstanceHandle h,unsigned alarm,const PackedObjectEvent&){
                 View::Kind kind;InstanceHandle local;if(!View::decode(h,kind,local))return false;
                 return kind==View::Kind::enemy?self.world_->advanceEnemyRoomAlarm(local,alarm):
@@ -393,7 +405,7 @@ public:
                     kind==View::Kind::timeChange?self.world_->advanceTimeChangeRoomAlarm(local,alarm):
                     kind==View::Kind::drone?(alarm==0&&self.drones_.advanceAlarm(local)):
                     kind==View::Kind::entryDither&&self.entries_.advanceAlarm(local,alarm);
-            });
+            },reused);
         },this);
         world.configureDebrisStepOrder([](void* context,GameplayWorld::DebrisStepOrder& phase){
             auto& self=*static_cast<GameplayCollisionOwner*>(context);
@@ -456,9 +468,9 @@ public:
     }
 private:
     template<unsigned Capacity,class AdvanceAndDispatch>
-    bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch){
+    bool dispatchCapturedAlarms(RunnerStepSnapshot<Capacity>& snapshot,AdvanceAndDispatch advanceAndDispatch,bool alreadySorted=false){
         DW_PROFILE_SCOPE(profileAlarmScan);
-        {DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
+        if(!alreadySorted){DW_PROFILE_SCOPE(profileAlarmSort);snapshot.sort();}
         const unsigned count=snapshot.size();
         const auto bindingRevision=owner_.bindingRevision();
         unsigned capturedAlarms=0;int previousObject=-1;

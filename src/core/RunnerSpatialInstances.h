@@ -121,6 +121,10 @@ public:
     }
     bool valid()const{return good_ && index_.valid();}
     std::uint32_t bindingRevision()const{return bindingRevision_;}
+    std::uint32_t captureRevision()const{return captureRevision_;}
+    bool captureUnchanged(std::uint32_t revision)const{
+        return revision!=0xffffffffu&&revision==captureRevision_;
+    }
     bool bindingsUnchanged(std::uint32_t revision)const{
         return revision!=0xffffffffu&&revision==bindingRevision_;
     }
@@ -161,6 +165,7 @@ public:
     // At source reconciliation boundaries, not when the active flag is written.
     bool registerObject(InstanceHandle h,bool registered){
         if(!valid()||!live(h))return false;
+        if(membership_.contains(h.slot)!=registered)changedCapture();
         if(!registered)membership_.unbind(h.slot);
         else if(!membership_.contains(h.slot))membership_.bind(h.slot,entries_[h.slot].object,h.generation);
         auto& flags=entries_[h.slot].state.flags;
@@ -210,6 +215,7 @@ public:
     bool setActive(InstanceHandle h,bool active,std::uint32_t objectFlags){
         if(!valid()||!live(h))return false;
         auto& flags=entries_[h.slot].state.flags;
+        if(bool(flags&2u)==active)changedCapture();
         if(active){
             if((flags&2u)&&Queue::shouldQueue(true,objectFlags,flags)){
                 spatial_.mark(h.slot);
@@ -234,7 +240,9 @@ public:
     // Immediate exclusion flags can precede deferred object-list reconciliation.
     bool setExclusions(InstanceHandle h,std::uint32_t exclusions){
         if(!valid()||!live(h)||(exclusions&~0x100003u))return false;
-        auto& f=entries_[h.slot].state.flags;f=(f&~0x100003u)|exclusions;return true;
+        auto& f=entries_[h.slot].state.flags;
+        if((f&0x100003u)!=exclusions)changedCapture();
+        f=(f&~0x100003u)|exclusions;return true;
     }
     bool move(InstanceHandle h,Real x,Real y,std::uint32_t objectFlags){
         if(!valid()||!live(h))return false;
@@ -714,7 +722,9 @@ private:
     RunnerSpatialIndex<Nodes> index_;
     bool good_=true;
     std::uint32_t bindingRevision_=0;
-    void changedBinding(){if(bindingRevision_!=0xffffffffu)++bindingRevision_;}
+    std::uint32_t captureRevision_=0;
+    void changedCapture(){if(captureRevision_!=0xffffffffu)++captureRevision_;}
+    void changedBinding(){if(bindingRevision_!=0xffffffffu)++bindingRevision_;changedCapture();}
     bool* snapshotDirty_=nullptr;
     unsigned snapshotFirst_=0,snapshotLast_=0;
     bool checked(bool ok){if(!ok)good_=false;return ok;}

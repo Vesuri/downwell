@@ -84,6 +84,18 @@ instance/object checks. No callbacks occur inside an absent group, so finding
 its end by binary search preserves callback and countdown order. Present-event
 groups still resolve each lifetime and check live flags before dispatch.
 
+The bound combat path retains its sorted snapshot across ticks only while a
+separate capture revision is unchanged. Attach/retire/rebind/clear, actual
+registration changes, and changes to exclusion bits `0x100003` invalidate it;
+position, image and bounds-dirty writes do not change capture eligibility.
+Repeated no-op activation/registration writes do not invalidate it. Revision
+saturation disables reuse. The saved revision precedes callbacks, so an alarm
+that changes membership or eligibility forces recapture on the next tick,
+without admitting newborns into the current phase. Attaching a world also
+invalidates the cache. Reuse omits only capture and sorting, never the live
+per-callback checks or alarm countdowns. Explicit caller-snapshot dispatch still
+captures fresh; the cache belongs exclusively to the bound combat owner.
+
 ## Skeleton consequence
 
 Its Alarm 2 sets Alarm 3 to 15. Alarm 3 is then decremented to 14 in the same
