@@ -1566,6 +1566,35 @@ int main(){
     auto rb=read("generated/downwell-rooms.dwrm");RoomPack rooms(rb.data(),rb.size());
     PackedRoom room;assert(rooms.valid()&&rooms.findRoom(11,room));
     {
+        struct PlayerViewProbe {
+            GameplayWorld* world=nullptr;unsigned births=0;
+            bool birth(InstanceHandle,const GameplayWorld::PlayerInstance&){
+                const auto* view=world->roomEntryView();
+                assert(view&&view->enabled&&view->x.bits==0&&view->y.bits==0&&
+                    view->width.bits==0x43200000u&&view->height.bits==0x438e0000u);
+                ++births;return true;
+            }
+            bool retire(InstanceHandle,const GameplayWorld::PlayerInstance&){return true;}
+            bool activation(InstanceHandle,const GameplayWorld::PlayerInstance&,bool){return true;}
+            bool membership(InstanceHandle,const GameplayWorld::PlayerInstance&,bool){return true;}
+        } probe;
+        // Supply the address before construction so the actual birth callback
+        // reads the already-constructed cache, not a post-construction snapshot.
+        void* storage=::operator new(sizeof(GameplayWorld));
+        probe.world=static_cast<GameplayWorld*>(storage);
+        std::unique_ptr<GameplayWorld> world(new(storage) GameplayWorld(300,false,1025,true,
+            {},{},GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&rooms));
+        assert(world->effectsSucceeded()&&probe.births==1);
+        assert(world->restartFromResults(DeathMenuSequence::Action::Retry,42,300)==ResultsDestination::gameplay);
+        assert(world->effectsSucceeded()&&probe.births==2&&world->roomEntryView()->y.bits==0);
+        RoomPack invalid(nullptr,0);
+        auto rejected=std::make_unique<GameplayWorld>(300,false,1025,true,
+            GameplayWorld::EnemyLifecycleBinding{},GameplayWorld::BreakableLifecycleBinding{},
+            GameplayWorld::PlayerLifecycleBinding::bind(probe),nullptr,&invalid);
+        assert(!rejected->effectsSucceeded()&&!rejected->roomEntryView()&&
+            !rejected->playerHandle().generation&&probe.births==2);
+    }
+    {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);
         auto world=std::make_unique<GameplayWorld>(300,true,0,false,owner->enemyBinding(),

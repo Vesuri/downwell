@@ -222,6 +222,8 @@ public:
         std::uint32_t sourceInstanceId=0;
     };
     using PlayerLifecycleBinding = downwell::RecordLifecycleBinding<PlayerInstance>;
+    // When supplied, entryRooms is borrowed for this world and its run resets;
+    // it prepares rmMain's initial view cache before player lifecycle callbacks.
     explicit GameplayWorld(unsigned initialRingOrigin,
                               bool startsGrounded = true,
                               int landingOffset = 0,
@@ -229,7 +231,8 @@ public:
                               const EnemyLifecycleBinding& enemyLifecycle = {},
                               const BreakableLifecycleBinding& breakableLifecycle = {},
                               const PlayerLifecycleBinding& playerLifecycle = {},
-                              downwell::GameplayTerrainInstances* terrainInstances = nullptr);
+                              downwell::GameplayTerrainInstances* terrainInstances = nullptr,
+                              const downwell::RoomPack* entryRooms = nullptr);
     const downwell::GameplayTerrainInstances* terrainInstances()const{return terrainInstances_;}
     const downwell::GameplayScriptSpawnInstances* scriptSpawnInstances()const{return scriptSpawnInstances_;}
     const downwell::GameplayDebrisInstances* debrisInstances()const{return debrisInstances_;}
@@ -899,6 +902,9 @@ private:
     bool clearRoomTimeChanges();
     bool roomTerrainLoaded_=false;
     downwell::RoomEntryViews roomEntryViews_;
+    // Borrowed resource pack survives in-place run recreation. Its initial
+    // view cache must be available before any player birth callbacks.
+    const downwell::RoomPack* entryRooms_=nullptr;
     PlayerInstance playerInstance_;
     std::uint32_t nextPlayerLifetimeId_=1;
     bool birthPlayerOwnership();

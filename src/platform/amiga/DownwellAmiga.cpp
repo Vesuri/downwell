@@ -1267,11 +1267,11 @@ __attribute__((noinline)) static int runDownwell(void) {
 #ifdef DOWNWELL_REPLAY_VERIFY
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin,true,0,false,collisionOwner.enemyBinding(),
-            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain());
+            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain(),&rooms);
 #else
     AmigaPortRuntime& port = *new (portRuntimeStorage)
         AmigaPortRuntime(initialRingOrigin, false, 1201 - 176, true,collisionOwner.enemyBinding(),
-            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain());
+            collisionOwner.breakableBinding(),collisionOwner.playerBinding(),&collisionOwner.terrain(),&rooms);
 #endif
     if(!port.effectsSucceeded()||!collisionOwner.attach(port))return 20;
     checkSceneStack(3);

@@ -48,6 +48,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     if(!exitControllers_.clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     if(terrainInstances_&&!terrainInstances_->clear()){run_.effectsSucceeded=false;return downwell::ResultsDestination::none;}
     const auto terrainInstances=terrainInstances_;
+    const auto entryRooms=entryRooms_;
     const auto scriptSpawnInstances=scriptSpawnInstances_;
     const auto debrisInstances=debrisInstances_;
     const auto timeChangeInstances=timeChangeInstances_;
@@ -86,7 +87,7 @@ downwell::ResultsDestination GameplayWorld::restartFromResults(
     const auto flashBirths=run_.flashEffects.birthSequence();
     const auto foregroundBirth=run_.nextForegroundBirth;
     this->~GameplayWorld();
-    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances);
+    new (this) GameplayWorld(initialRingOrigin, false, 1201 - 176, true, enemyLifecycle,breakableLifecycle,{},terrainInstances,entryRooms);
     nextBreakableLifetimeId_=nextBreakableIdentity;
     scriptSpawnInstances_=scriptSpawnInstances;
     debrisInstances_=debrisInstances;
@@ -205,7 +206,8 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
                                    bool followCamera, const EnemyLifecycleBinding& enemyLifecycle,
                                    const BreakableLifecycleBinding& breakableLifecycle,
                                    const PlayerLifecycleBinding& playerLifecycle,
-                                   downwell::GameplayTerrainInstances* terrainInstances)
+                                   downwell::GameplayTerrainInstances* terrainInstances,
+                                   const downwell::RoomPack* entryRooms)
     : enemyLifecycle_(enemyLifecycle), breakableLifecycle_(breakableLifecycle), playerLifecycle_(playerLifecycle), terrainInstances_(terrainInstances), player_(startsGrounded, landingOffset), tick_(0),
       ringOrigin_(initialRingOrigin % ringHeight),
       followCamera_(followCamera), cameraY_(0), cameraPixelY_(0),
@@ -218,6 +220,12 @@ GameplayWorld::GameplayWorld(unsigned initialRingOrigin,
 {
     unsigned index;
     run_.reset();
+    entryRooms_=entryRooms;
+    // The selected runner copies serialized views before instance events.
+    // This adapter enters rmMain; following the camera is a separate phase.
+    if(entryRooms_&&!roomEntryViews_.load(*entryRooms_,11)){
+        run_.effectsSucceeded=false;return;
+    }
     run_.stage.advance(1); // This runtime starts at the confirmed scrNextLevel(1) entry.
     currencyAccount_.playerCreated();
     if (followCamera_) {

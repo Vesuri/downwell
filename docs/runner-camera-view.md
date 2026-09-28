@@ -34,10 +34,14 @@ phase-aware follow/setter behavior. The additional pack storage is 11,200 bytes
 
 `RoomEntryViews` narrows these integers to binary32 without host floating-point
 conversion and invalidates its readable state on a failed load. StartupRuntime
-loads it in room preparation before authored instance births. The native
-GameplayWorld loads the same structure at the room-terrain handoff; that handoff
-still occurs after its player birth and is not a complete room lifecycle.
-Tests observe the cache from actual player-birth/terrain callbacks. These are
+loads it in room preparation before authored instance births. The production
+native GameplayWorld receives a borrowed room pack and loads rmMain's cache
+before player birth, independently of its followed-camera initialization. It
+retains that pack across in-place run recreation. Invalid resources fail before
+publishing a player. Resource-free fixtures can omit the pack; the terrain
+handoff still loads the cache for those callers. This does not establish full
+cross-family room birth ordering. Tests observe the cache from actual
+player-birth callbacks, including retry, and terrain callbacks. These are
 initial snapshots, explicitly not current-frame view getters; connecting them
 to entry-effect creation and the complete camera publication lifecycle remains
 necessary. Each world retains eight small view records, not camera matrices.
