@@ -40,6 +40,7 @@ private:
     // any births/queries; keep preparation storage off the target task stack.
     PackedSpriteCollision preparedSprites_[741];
     SpriteCollisionPack sprites_;
+    PreparedObjectDefaults<386> objectDefaults_;
     GameplayRoomLayers<View::capacity> layers_;
     ObjectDrawMetadata<386> drawMetadata_;
     ObjectAlarmMetadata<386> alarmMetadata_;
@@ -129,10 +130,10 @@ private:
             auto& p=parent.properties_[h.slot];p={};
             {
                 DW_PROFILE_SCOPE(profileBirthMetadata);
-                std::int32_t creationDepth;
-                if(!parent.check(parent.owner_.bindObjectFromPacks(h,object(r),true,p,
-                    parent.objects_,parent.sprites_,parent.families_,false,&creationDepth)))return false;
-                if(!real(creationDepth,p.depth))return parent.check(false);
+                RunnerImageValue creationDepth;
+                if(!parent.check(parent.owner_.bindObjectPrepared(h,object(r),true,p,
+                    parent.objectDefaults_,parent.families_,false,&creationDepth)))return false;
+                p.depth=creationDepth;
             }
             if constexpr(Kind==View::Kind::debris){
                 // instance_create uses the compatibility depth table, not the
@@ -246,7 +247,8 @@ public:
         GameplayTerrainInstances::Presentation presentation={},GameplayTerrainInstances::WallCollision collision={},
         const RoomPack* rooms=nullptr):objects_(objects),sprites_(sprites),layers_(rooms),
         terrain_(GameplayTerrainInstances::Binding::bindDestruction(terrainBinding_),presentation,collision){
-        good_=sprites_.prepare(preparedSprites_,741)&&families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
+        good_=sprites_.prepare(preparedSprites_,741)&&objectDefaults_.prepare(objects,sprites_)&&
+            families_.bindInstanceFlags(objects)&&drawMetadata_.bind(objects)&&alarmMetadata_.bind(objects);
         if(good_)for(unsigned selector=0;selector<2;++selector){
             terrainFamilies_[selector]=true;
             for(unsigned i=0;i<families_.size();++i)

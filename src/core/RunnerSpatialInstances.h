@@ -16,6 +16,7 @@
 #include "RunnerLineBounds.h"
 #include "RunnerSpriteChange.h"
 #include "ObjectPack.h"
+#include "PreparedObjectDefaults.h"
 #include "Profile.h"
 namespace downwell {
 // Shared collision ownership for externally allocated instance handles. The
@@ -123,6 +124,31 @@ public:
         // Compatibility Create uses another depth from the same immutable
         // record. Return it on success instead of decoding the record again.
         if(applied&&creationDepth)*creationDepth=definition.creationDepth;
+        return applied;
+    }
+    // Prepared counterpart of bindObjectFromPacks. Only immutable resource
+    // work moves earlier; membership, current graph flags and setter actions
+    // remain synchronous, in the same order as the packed reference above.
+    template<unsigned Resources,class Graph>
+    bool bindObjectPrepared(InstanceHandle h,int object,bool registered,Properties& properties,
+        const PreparedObjectDefaults<Resources>& defaults,const Graph& graph,
+        bool allPrepared,Real* creationDepth=nullptr){
+        if(!valid()||!live(h))return false;
+        const auto* definition=defaults.get(object);
+        if(!definition||!graph.valid()||!graph.flags(unsigned(object)))return checked(false);
+        const auto objectFlags=*graph.flags(unsigned(object));
+        if((objectFlags&0x87u)!=definition->propertyFlags)return checked(false);
+        {
+            DW_PROFILE_SCOPE(profileBindingMembership);
+            if(!rebindObjectMembership(h,object,registered))return checked(false);
+        }
+        properties.sprite.maskId=definition->maskId;
+        properties.depth=definition->depth;
+        const bool applied=applyBindingProperties(h,objectFlags,allPrepared,[&](InstanceHandle live){
+            return changeSprite(live,properties.sprite,properties.timeline,properties.cachedFrame,
+                definition->spriteId,definition->frames,objectFlags);
+        });
+        if(applied&&creationDepth)*creationDepth=definition->creationDepth;
         return applied;
     }
     bool valid()const{return good_ && index_.valid();}

@@ -82,6 +82,17 @@ publication or Create ordering. Insufficient preparation capacity fails owner
 initialization instead of silently preparing only some resources. Collision
 queries and sprite setters use this same prepared view on both backends.
 
+`PreparedObjectDefaults` likewise prepares the 386 immutable object bindings
+before births: sprite/mask IDs, binary32 OBJT/compatibility depths, default
+property bits and artwork frame counts (24 bytes per record). The original
+`bindObjectFromPacks` path remains the immediate-decoding reference. Prepared
+binding still reads current family flags, rebinds membership, installs mask and
+depth defaults, executes the sprite setter, and publishes dirty queues in that
+order. Dynamic preparation flags, active state, image index, timeline and
+membership links are not part of the prepared table. The compatibility Create
+depth override is still installed after binding, not substituted for OBJT depth
+inside it. Same-sprite rebinding retains the source setter's no-op behavior.
+
 The sprite-pack gate exercises this adapter across all 741 recovered metadata
 records and checks owner flags/cache publication against the full artwork
 metadata view. It also covers mask overrides, missing-resource retirement,

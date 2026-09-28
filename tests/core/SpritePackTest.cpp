@@ -60,14 +60,39 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
         downwell::RunnerObjectFamilies<386> families;
         require(families.bindInstanceFlags(objects),"load complete object binding flags");
         using Owner=downwell::RunnerSpatialInstances<2,8>;
+        downwell::PreparedObjectDefaults<386> preparedDefaults;
+        require(preparedDefaults.prepare(objects,compact),"prepare immutable object defaults before births");
+        require(!preparedDefaults.get(-1)&&!preparedDefaults.get(int(objects.objectCount())),
+            "prepared defaults reject absent object IDs");
+        downwell::PreparedObjectDefaults<1> tooSmall;
+        require(!tooSmall.prepare(objects,compact)&&!tooSmall.get(0),"insufficient default capacity fails closed");
         for(unsigned id=0;id<objects.objectCount();++id)for(bool registered:{false,true}){
             Owner owner;Owner::Properties properties;
             properties.sprite.spriteId=-999;properties.sprite.maskId=597;
             properties.sprite.imageIndex={0x41000000u};properties.timeline={0x41000000u};
+            Owner preparedOwner;auto preparedProperties=properties;
+            require(preparedOwner.attach({0,1},0,{}),"attach prepared binding lifetime");
             require(owner.attach({0,1},0,{}),"attach object-binding lifetime");
             std::int32_t creationDepth=0x12345678;
             require(owner.bindObjectFromPacks({0,1},int(id),registered,properties,objects,compact,families,false,&creationDepth),
                     "bind complete original object through both resource packs");
+            Owner::Real preparedCreation,expectedCreation;
+            require(preparedOwner.bindObjectPrepared({0,1},int(id),registered,preparedProperties,
+                preparedDefaults,families,false,&preparedCreation)&&expectedCreation.assignInteger(creationDepth),
+                "bind each original object through prepared defaults");
+            require(preparedCreation.bits==expectedCreation.bits&&
+                preparedProperties.depth.bits==properties.depth.bits&&
+                preparedProperties.sprite.spriteId==properties.sprite.spriteId&&
+                preparedProperties.sprite.maskId==properties.sprite.maskId&&
+                preparedProperties.sprite.imageIndex.bits==properties.sprite.imageIndex.bits&&
+                preparedProperties.timeline.bits==properties.timeline.bits&&
+                preparedProperties.cachedFrame.bits==properties.cachedFrame.bits&&
+                preparedOwner.resolve({0,1})->flags==owner.resolve({0,1})->flags&&
+                preparedOwner.pendingSpatial()==owner.pendingSpatial()&&
+                preparedOwner.pendingCollision()==owner.pendingCollision()&&
+                preparedOwner.bindingRevision()==owner.bindingRevision()&&
+                preparedOwner.captureRevision()==owner.captureRevision(),
+                "prepared and immediate binding preserve properties, flags, queues and revisions");
             downwell::PackedObject original;require(objects.object(id,original),"read independent object record");
             require(creationDepth==original.creationDepth,"binding returns the independently decoded compatibility depth");
             require(properties.sprite.spriteId==original.spriteId&&properties.sprite.maskId==original.textureMaskId,
@@ -85,7 +110,24 @@ void testGeneratedPack(const char* path,const char* maskPath,const char* objectP
             const bool queued=original.solid()||(*families.flags(id)&0x28u);
             require(owner.pendingSpatial()==unsigned(queued)&&
                     owner.pendingCollision()==unsigned(queued&&(*families.flags(id)&8u)),"binding queues only eligible families");
+            // Same-sprite rebinding must not reset animation even when its
+            // current index is beyond the immutable resource's frame count.
+            properties.sprite.imageIndex=preparedProperties.sprite.imageIndex={0x47800000u};
+            properties.timeline=preparedProperties.timeline={0x41000000u};
+            properties.cachedFrame=preparedProperties.cachedFrame={0x40000000u};
+            require(owner.bindObjectFromPacks({0,1},int(id),registered,properties,objects,compact,families,true)&&
+                preparedOwner.bindObjectPrepared({0,1},int(id),registered,preparedProperties,preparedDefaults,families,true)&&
+                preparedProperties.sprite.imageIndex.bits==properties.sprite.imageIndex.bits&&
+                preparedProperties.timeline.bits==properties.timeline.bits&&
+                preparedProperties.cachedFrame.bits==properties.cachedFrame.bits&&
+                preparedOwner.resolve({0,1})->flags==owner.resolve({0,1})->flags&&
+                preparedOwner.pendingSpatial()==owner.pendingSpatial()&&
+                preparedOwner.pendingCollision()==owner.pendingCollision(),
+                "prepared rebinding retains source same-sprite no-op and all-prepared queue behavior");
         }
+        require(!preparedDefaults.prepare(objects,downwell::SpriteCollisionPack(nullptr,0))&&
+            !preparedDefaults.get(0)&&preparedDefaults.prepare(objects,compact),
+            "invalid preparation clears stale defaults and valid preparation restores them");
         Owner incomplete;Owner::Properties unchanged;
         require(incomplete.attach({0,1},0,{}),"attach incomplete-graph fixture");
         downwell::RunnerObjectFamilies<386> spatialOnly;require(spatialOnly.bindSpatialFlags(objects),"load deliberately incomplete flags");
