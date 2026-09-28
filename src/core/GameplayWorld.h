@@ -518,6 +518,7 @@ public:
         if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         bool timeAllowed=false;
         if(!timeBound(timeAllowed))return run_.effectsSucceeded=false;
+        if(!run_.effectsSucceeded||!findBreakable(h))return run_.effectsSucceeded=false;
         auto& box=breakables_[h.slot];
         return run_.effectsSucceeded=box.state.stopAlarmZero(timeAllowed,box.alarm0);
     }

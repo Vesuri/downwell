@@ -479,6 +479,31 @@ int main(){
         require(!world->spawnBoxScriptEffect(box,x,y,603,{},{},{},frames)&&lookups==2&&world->randomDrawCount()==draws,
             "failed box effect is never retried");
     }
+    for(bool retire:{false,true}){
+        auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
+        auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());
+        require(owner->attach(*world),"attach box alarm callback world");world->skipToGameForTesting();
+        InstanceHandle box{};
+        for(unsigned tick=0;tick<600&&!box.generation;++tick){
+            for(unsigned i=0;i<world->activeInstanceCount();++i)
+                if(world->instanceAt(i).objectId==92&&world->instanceAt(i).active){box=world->instanceHandleAt(i);break;}
+            if(!box.generation)world->step(gameplayContactProfileInput(tick,world->mainPlayerX(),world->mainPlayerY()),false);
+        }
+        require(box.generation&&world->publishBoxAlarm0(box,5),"arm callback box");
+        unsigned queries=0;
+        require(!world->stopBoxAlarm0(box,[&](bool& allowed){
+            ++queries;allowed=false;
+            if(retire){
+                require(world->restartFromResults(DeathMenuSequence::Action::Retry,43)&&!owner->resolve(box),
+                    "callback retires old room caller");
+            }else{
+                require(!world->publishBoxAlarm0({box.slot,box.generation+1},17),"nested stale write fails");
+            }
+            return true;
+        })&&!world->effectsSucceeded()&&queries==1,"alarm callback cannot revive failure or write a retired caller");
+        if(!retire)require(owner->resolve(box)->alarms.get(0)==5,"nested failure preserves countdown");
+        require(!world->stopBoxAlarm0(box,[&](bool&){++queries;return true;})&&queries==1,"failed callback is not retried");
+    }
     for(unsigned failure=0;failure<=7;++failure){
         auto owner=std::make_unique<StoredWorldCollision>(objects,sprites,masks);
         auto world=std::make_unique<StartupRuntime>(PlatformProfile::nonDesktop,&rooms,&objects,2,&patterns,owner->binding());

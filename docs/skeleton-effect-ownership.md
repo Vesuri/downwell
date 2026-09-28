@@ -104,6 +104,12 @@ actual retirement or reuse invalidates the caller without changing the output.
 The native lifecycle tape checks that boundary. These adapters still need to
 replace the live removal-only Step together with the full effect/reward owners.
 
+The final box `alarmStop(0)` adapter also resolves its caller again after the
+time-bound query. A callback which retires the caller cannot publish into its
+old storage, and a nested ownership failure remains terminal even if the
+callback returns success. Both world lifecycle tests exercise these failure
+boundaries; they do not assert that the original time-bound query retires boxes.
+
 `SoundPlayScript` models the original plain and overlap-aware audio scripts,
 including caller scratch fields and partial-failure ordering. The overlap
 channels are footsteps/gunshot/gunwall/merchant/enemymove/music/waterEnemy/

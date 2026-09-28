@@ -2235,6 +2235,25 @@ int main(){
         assert(!world->stopBoxAlarm0(fresh,[&](bool&){++queries;return true;})&&queries==1);
         assert(!world->publishBoxAlarm0(key,1)&&!world->effectsSucceeded());
     }
+    for(bool retire:{false,true}){
+        auto world=std::make_unique<GameplayWorld>(300,true);
+        const int x=64,y=512;assert(world->appendBreakables(&x,&y,1));
+        const InstanceHandle box{0,1};unsigned queries=0;
+        assert(world->publishBoxAlarm0(box,5));
+        assert(!world->stopBoxAlarm0(box,[&](bool& allowed){
+            ++queries;allowed=false;
+            if(retire){
+                assert(world->markBreakableDestroyed(box)&&world->retireMarkedBreakable(box));
+            }else{
+                // A callback cannot conceal a nested ownership failure by
+                // returning true to its enclosing event.
+                assert(!world->publishBoxAlarm0({box.slot,box.generation+1},17));
+            }
+            return true;
+        })&&!world->effectsSucceeded()&&queries==1);
+        if(!retire)assert(world->findBreakable(box)->alarm0==5);
+        assert(!world->stopBoxAlarm0(box,[&](bool&){++queries;return true;})&&queries==1);
+    }
     std::puts("Native collision owner: actor/terrain births, dormant flags, movement, compaction, retirement, Retry and terminal failure passed");
 }
 #endif

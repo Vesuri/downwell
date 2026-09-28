@@ -199,6 +199,10 @@ public:
         if(!record||record->objectId!=92)return run_.effectsSucceeded=false;
         bool allowed=false;
         if(!timeBound(allowed))return run_.effectsSucceeded=false;
+        // The query is an integration callback. Resolve the retained lifetime
+        // again before publishing, and never clear a failure raised within it.
+        record=instances_.resolve(h);
+        if(!run_.effectsSucceeded||!record||record->objectId!=92)return run_.effectsSucceeded=false;
         auto alarm=record->alarms.get(0);
         run_.effectsSucceeded=record->box.stopAlarmZero(allowed,alarm);
         if(run_.effectsSucceeded)record->alarms.set(0,alarm);
