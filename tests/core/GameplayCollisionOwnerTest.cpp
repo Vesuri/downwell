@@ -1635,6 +1635,42 @@ int main(){
             assert(cached->retire(h)&&oracle->retire(h));
         assert(cached->prepare()&&oracle->prepare());compare();
     }
+    for(unsigned mode=0;mode<3;++mode){
+        // Warm skip links, then change a later scenery element or insert at
+        // the head during Draw. The uncached/all-projected owner walks every
+        // raw element and is the ordering oracle for this optimization.
+        auto cached=std::make_unique<GameplayRoomLayers<8>>(&rooms);
+        auto oracle=std::make_unique<GameplayRoomLayers<8>>(&rooms);
+        assert(cached->prepare()&&oracle->prepare());
+        RunnerImageValue depth;assert(depth.assign(MotionBinary64::fromInteger(-321)));
+        bool inactive[2]={mode==1,mode==1};
+        for(unsigned slot:{1u,3u,0u,2u}){
+            const bool scenery=slot==0||slot==3;
+            assert(cached->birth({slot,1},0,depth,false,!scenery));
+            assert(oracle->birth({slot,1},0,depth,false,true));
+        }
+        for(unsigned side=0;side<2;++side)if(inactive[side])
+            assert((side?oracle:cached)->activation({3,1},false));
+        auto draw=[&](unsigned side,bool mutate){
+            auto& layers=*(side?oracle:cached);std::vector<unsigned> trace;
+            assert(layers.visit([&](InstanceHandle h,RunnerLayerDraw::Element& out){
+                out.instance=true;out.flags=0x10;out.object=h.slot!=0&&h.slot!=3;out.drawEvent=true;
+                if(h.slot==3&&inactive[side])out.flags|=2;
+                return true;
+            },[&](InstanceHandle h,int){
+                trace.push_back(h.slot);
+                if(mutate&&h.slot==2){
+                    if(mode==2)assert(layers.birth({4,1},0,depth,false,true));
+                    else{inactive[side]=mode==0;assert(layers.activation({3,1},!inactive[side]));}
+                }
+                return true;
+            }));return trace;
+        };
+        assert(draw(0,false)==draw(1,false));
+        const auto actual=draw(0,true),expected=draw(1,true);
+        assert(actual==expected&&actual==(mode==0?std::vector<unsigned>{2}:std::vector<unsigned>{2,1}));
+        assert(draw(0,false)==draw(1,false));
+    }
     {
         auto owner=std::make_unique<GameplayCollisionOwner>(objects,sprites,
             GameplayTerrainInstances::Presentation{},GameplayTerrainInstances::WallCollision{},&rooms);

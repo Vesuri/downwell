@@ -129,6 +129,11 @@ public:
     template<class Visit> bool visitDrawElements(unsigned layer,Visit visit)const{
         return get(layer)&&elements_.visitDraw(layer,visit);
     }
+    unsigned firstDrawElement(unsigned layer)const{return elements_.first(layer);}
+    unsigned nextDrawElement(unsigned element)const{return elements_.successor(element);}
+    template<class Visit> bool visitElementsBackward(unsigned layer,Visit visit)const{
+        return get(layer)&&elements_.visitBackward(layer,visit);
+    }
 private:
     void eraseEmpty(unsigned slot){unlink(slot);layers_[slot]=Layer{};}
     void unlink(unsigned slot){

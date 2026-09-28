@@ -26,9 +26,38 @@ template<unsigned I> class GameplayRoomLayers {
     // 2 = retained inactive scenery (end layer). Published at mutations, not
     // guessed from visibility. Element identity survives depth moves/merges.
     std::uint8_t retainedDraw_[E]{};
+    static_assert(E<65535,"Compact scenery-run links require 16-bit elements");
+    mutable std::uint16_t nextRelevant_[E]{};
+    mutable bool projectionValid_[L]{};
     unsigned live_=0,playerId_=0;
     bool good_=true,prepared_=false;
     bool fail(){good_=false;return false;}
+    template<class Visit> bool visitProjectedElements(unsigned layer,Visit visit)const{
+        if(!layers_.get(layer))return false;
+        for(unsigned e=layers_.firstDrawElement(layer);e!=Registry::End;){
+            if(!projectionValid_[layer]){
+                unsigned next=Registry::End;
+                if(!layers_.visitElementsBackward(layer,[&](unsigned element){
+                    if(retainedDraw_[element]!=1)next=element;
+                    nextRelevant_[element]=std::uint16_t(next);return true;
+                }))return false;
+                projectionValid_[layer]=true;
+            }
+            e=nextRelevant_[e];if(e==Registry::End)break;
+            // Save the raw successor, NOT the projected one: a callback can
+            // activate scenery or insert after an upcoming skipped element.
+            const unsigned next=layers_.nextDrawElement(e);
+            if(!visit(e))return false;
+            e=next;
+        }
+        return true;
+    }
+    struct DrawProjection {
+        const GameplayRoomLayers& owner;
+        bool succeeded()const{return owner.layers_.succeeded();}
+        template<class Visit> bool visitLayersReverse(Visit visit)const{return owner.layers_.visitLayersReverse(visit);}
+        template<class Visit> bool visitDrawElements(unsigned layer,Visit visit)const{return owner.visitProjectedElements(layer,visit);}
+    };
 public:
     explicit GameplayRoomLayers(const RoomPack* rooms):rooms_(rooms){
         if(rooms_&&!PackedRoomLayerLoader::loadCatalogIds(*rooms_,ids_))good_=false;
@@ -39,6 +68,7 @@ public:
     bool prepare(){
         if(!enabled())return true;
         if(!valid()||live_)return fail();
+        for(auto& valid:projectionValid_)valid=false;
         if(prepared_&&!lifetimes_.uninitializeRoom([&](unsigned e){return backgrounds_.uninitialize(e);}))return fail();
         if(!registry_.discardUninitialized()||!backgrounds_.discardUninitialized()||!layers_.discardUninitialized())return fail();
         for(auto& state:retainedDraw_)state=0;
@@ -67,17 +97,21 @@ public:
         else projected_[h.slot>>3]&=~bit;
         const unsigned element=registry_.find(h);
         if(element==Registry::End)return fail();
+        const unsigned layer=layers_.elementOwner(element);
+        if(layer==Layers::End)return fail();
         retainedDraw_[element]=projected?0:(inactive?2:1);
+        projectionValid_[layer]=false;
         ++live_;return true;
     }
     bool retire(InstanceHandle h){
         if(!enabled())return true;
         if(!valid()||!live_)return fail();
         const unsigned element=registry_.find(h);
-        if(element==Registry::End||!lifetimes_.retire(h))return fail();
+        const unsigned layer=layers_.elementOwner(element);
+        if(element==Registry::End||layer==Layers::End||!lifetimes_.retire(h))return fail();
         retainedDraw_[element]=0;
         projected_[h.slot>>3]&=~(1u<<(h.slot&7));
-        --live_;return true;
+        projectionValid_[layer]=false;--live_;return true;
     }
     bool activation(InstanceHandle h,bool active){
         if(!enabled())return true;
@@ -85,18 +119,36 @@ public:
         if(!(projected_[h.slot>>3]&(1u<<(h.slot&7)))){
             const unsigned element=registry_.find(h);
             if(element==Registry::End)return fail();
-            retainedDraw_[element]=active?1:2;
+            const unsigned layer=layers_.elementOwner(element);
+            if(layer==Layers::End)return fail();
+            const unsigned state=active?1:2;
+            if(retainedDraw_[element]!=state){
+                retainedDraw_[element]=std::uint8_t(state);
+                projectionValid_[layer]=false;
+            }
         }
         return true;
     }
-    bool reconcile(InstanceHandle h){return !enabled()||(valid()&&lifetimes_.reconcileActivation(h));}
-    bool serviceDepths(){return !enabled()||(valid()&&lifetimes_.serviceDepths());}
+    bool reconcile(InstanceHandle h){
+        if(!enabled())return true;
+        if(!valid())return false;
+        const auto* state=lifetimes_.resolve(h);
+        const unsigned layer=state?layers_.find(state->depth.layerId):Layers::End;
+        if(layer==Layers::End)return fail();
+        projectionValid_[layer]=false;return lifetimes_.reconcileActivation(h);
+    }
+    bool serviceDepths(){
+        if(!enabled())return true;
+        // Depth service can merge whole layers and dispose dynamic IDs.
+        if(lifetimes_.pendingDepths())for(auto& valid:projectionValid_)valid=false;
+        return valid()&&lifetimes_.serviceDepths();
+    }
     bool writeDepth(InstanceHandle h,MotionBinary64 value){
         return enabled()&&valid()&&lifetimes_.writeDepth(h,value);
     }
     template<class Lookup,class Draw> bool visit(Lookup lookup,Draw draw)const{
         if(!enabled()||!valid()||!prepared_)return false;
-        return RunnerLayerDraw::visit(layers_,[&](unsigned slot,const auto&){return visible_[slot];},
+        return RunnerLayerDraw::visit(DrawProjection{*this},[&](unsigned slot,const auto&){return visible_[slot];},
             [](unsigned,const auto&){return true;},[&](unsigned e,RunnerLayerDraw::Element& out){
                 if(retainedDraw_[e]){
                     out.type=2;out.instance=true;
