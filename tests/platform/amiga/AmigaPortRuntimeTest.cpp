@@ -1808,9 +1808,9 @@ int main() {
     const auto gems = downwell::verifyGemSimulation();
     std::cout << "Gem fixture digest: " << std::hex << gems.digest << std::dec
               << " coverage=" << gems.coverage << '\n';
-    // Version 6 includes the source first-Step bounce-sound selection and its
-    // one-word RNG draw; v5 omitted it. Player trajectory is unchanged above.
-    require(gems.coverage == 1023 && gems.digest == 0xc57fd381461e0fddULL,
+    // Version 7 includes immediate chained alarm dispatch (flash 189/expiry
+    // 308), in addition to v6's first-Step choice. Player trajectory is unchanged.
+    require(gems.coverage == 1023 && gems.digest == 0x07f60a863bb3c7dcULL,
             "gem cross-CPU fixture covers motion, collection/account expiry and both flash phases with a pinned digest");
     const auto weapon = downwell::verifyMachineGun();
     std::cout << "Weapon fixture digest: " << std::hex << weapon.digest << std::dec

@@ -905,11 +905,11 @@ int main() {
             unsigned baseline = 0;
             for (std::size_t i = 1; i < state.mainCurrencyCount(); ++i)
                 baseline += state.mainCurrencyAt(i).motion.lifetime.visible();
-            for (unsigned age : {0u, 189u, 190u, 191u, 309u, 310u, 311u, 65536u}) {
+            for (unsigned age : {0u, 188u, 189u, 190u, 307u, 308u, 309u, 65536u}) {
                 gem.motion.lifetime.age = age;
                 RecordingRenderer capture;
                 damagedGame.render(capture);
-                require(capture.gemDraws == baseline + (age < 190 || (age & 1u)),
+                require(capture.gemDraws == baseline + (age < 189 || (age & 1u)==0),
                         "live renderer omits flashing currency without changing other gems");
                 require(gem.motion.lifetime.age == age && state.randomDrawCount() == rng,
                         "repainting a flashing gem changes neither lifetime nor RNG");
@@ -963,7 +963,11 @@ int main() {
     }
     require(hidden > 0 && flashingVisible > 0 && recovered,
             "live render tape covers hidden, visible and fully recovered player states");
-    require(firstDamage == 647 && mainTicks == 737 && hidden == 45 && flashingVisible == 45 &&
+    std::printf("Damage checkpoint: first=%u recovery=%u hidden=%u visible=%u health=%d\n",
+        firstDamage,mainTicks,hidden,flashingVisible,damagedGame.startup().mainPlayerHealth());
+    // Revalidated with the unchanged input tape in both world adapters after
+    // restoring source gem RNG/timing; do not inject damage to satisfy this.
+    require(firstDamage == 645 && mainTicks == 735 && hidden == 45 && flashingVisible == 45 &&
             damagedGame.startup().mainPlayerHealth() == 3,
             "render route reaches the verified natural contact and complete immunity interval");
     require(gemFlashChecked, "live render tape exercises a spawned currency item's flash phases");

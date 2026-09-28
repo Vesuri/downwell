@@ -228,6 +228,7 @@ test: verify-currency-create
 verify-currency-create: build/currency-create-test build/currency-spawn-script-test
 	python3 tools/verify-currency-create.py
 	python3 tools/verify-runner-move-snap.py
+	python3 tools/verify-runner-alarms.py
 	./build/currency-create-test
 	./build/currency-spawn-script-test
 

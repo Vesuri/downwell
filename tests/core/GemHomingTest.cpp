@@ -1,6 +1,7 @@
 #include "core/GemHoming.h"
 #include "core/GemMotion.h"
 #include "core/CurrencyStep.h"
+#include "core/AlarmBank.h"
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -8,6 +9,30 @@ void require(bool value, const char* text) {
     if (!value) { std::cerr << text << '\n'; std::exit(1); }
 }
 int main() {
+    // An independent event-driven oracle, not another sum of age thresholds.
+    for(bool upgraded:{false,true})for(bool attracted:{false,true}){
+        downwell::AlarmBank alarms;alarms.set(0,10);alarms.set(3,upgraded?30:15);
+        downwell::GemLifetime life;
+        bool obtainable=false,disappearing=false,suckable=false,alive=true;int flash=-1;
+        for(unsigned tick=1;tick<=400&&alive;++tick){
+            for(unsigned index=0;index<4;++index)if(alarms.advanceOne(index)){
+                switch(index){
+                case 0: obtainable=true;alarms.set(1,180);break;
+                case 1: disappearing=true;alarms.set(2,120);break;
+                case 2: if(!attracted)alive=false;break;
+                case 3: suckable=true;break;
+                }
+            }
+            require(life.advance(attracted)==alive,"live default gem lifetime matches immediate per-index dispatch");
+            if(!alive){require(tick==308,"source chained alarms expire on update 308");break;}
+            if(disappearing)flash=-flash;
+            require(life.obtainable()==obtainable&&life.disappearing()==disappearing&&
+                life.suckable(upgraded)==suckable&&life.visible()==(flash<0),
+                "collection, attraction and Draw flash match the event-driven oracle");
+            if(tick==10)require(alarms.get(1)==179,"Alarm 1 starts decrementing in Alarm 0's phase");
+            if(tick==189)require(alarms.get(2)==119&&!life.visible(),"Alarm 2 starts during the first hidden flash update");
+        }
+    }
     for(int size:{0,1,2})for(unsigned choice=0;choice<unsigned(size?2:3);++choice){
         struct Choice {
             unsigned selected,count,calls=0;
@@ -90,7 +115,7 @@ int main() {
                     account.gameGem == 2 && account.streak == 2 && account.timer == 300,
                 "collection uses the current player position, not the distant homing target");
         GemMotion expired;
-        expired.lifetime.age = 309;
+        expired.lifetime.age = 307;
         const auto oldQueries = terrainQueries, oldRandom = random.calls;
         result = stepCurrency(expired, true, 10, 0, 0, 0, 0, account, solid, random);
         require(result == CurrencyStepResult::expired && account.currency == 2 &&
@@ -110,14 +135,14 @@ int main() {
                 "small gem cannot collect through the large-only fringe");
         GemMotion flashing;
         CurrencyAccount flashingAccount;
-        flashing.lifetime.age = 189;
+        flashing.lifetime.age = 188;
         result = stepCurrency(flashing, false, 2, 1000 * 256L, 0, 0, 0, flashingAccount, solid, random);
         require(result == CurrencyStepResult::collected && !flashing.lifetime.visible() &&
                     flashingAccount.currency == 2,
                 "hidden flash phases remain collectible and credit the same currency");
         GemMotion homing;
         homing.attracted = true;
-        homing.lifetime.age = 309;
+        homing.lifetime.age = 307;
         const auto before = homing;
         GemMotion expected = before;
         expected.step(30 * 256L, 0, solid, random);
@@ -172,15 +197,15 @@ int main() {
     require(attracted.visible(), "new currency draws with source dflash=-1");
     for (unsigned age = 1; age <= 400; ++age) {
         require(attracted.advance(true), "attracted gem survives its source expiry alarm");
-        if (age >= 190) dflash *= -1;
+        if (age >= 189) dflash *= -1;
         require(attracted.visible() == (dflash < 0),
                 "gem visibility follows source Alarm 1 then Step negation, including attracted expiry");
         require(attracted.obtainable() == (age >= 10) &&
                 attracted.suckable() == (age >= 15) &&
-                attracted.disappearing() == (age >= 190),
+                attracted.disappearing() == (age >= 189),
                 "default currency alarm boundaries match Create and Alarm 0/1/3");
-        if (age <= 310)
-            require(loose.advance(false) == (age < 310), "loose gem expires exactly at Alarm 2");
+        if (age <= 308)
+            require(loose.advance(false) == (age < 308), "loose gem expires exactly at Alarm 2");
     }
     require(attracted.advance(false), "expired Alarm 2 is not repeated if attraction later clears");
     attracted.age = 65535;
@@ -216,12 +241,12 @@ int main() {
     require(motion.attracted && motion.homing.speedEighths == 32 && motion.vy == 448,
             "acquisition update still performs free motion; homing begins next update");
     motion = {};
-    motion.lifetime.age = 309;
+    motion.lifetime.age = 307;
     require(!motion.step(10 * 256L, 0, empty, random) && !motion.attracted && motion.y == 0,
             "expiry alarm runs before motion and cannot acquire a nearby player on its last tick");
     motion = {};
     motion.attracted = true;
-    motion.lifetime.age = 309;
+    motion.lifetime.age = 307;
     require(motion.step(10 * 256L, 0, empty, random) && motion.x != 0,
             "already attracted gem survives expiry and still moves that update");
     downwell::GemHoming gem;

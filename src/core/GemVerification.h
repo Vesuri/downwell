@@ -22,7 +22,7 @@ inline GemVerificationResult verifyGemSimulation() {
     bool alive[3] = {true, true, true};
     VerificationDigest digest;
     unsigned coverage = 0;
-    digest.addU32(6); // Includes source first-Step bounce-sound choice/RNG.
+    digest.addU32(7); // Includes same-phase chained alarm decrements.
     for (unsigned tick = 0; tick < 400; ++tick) {
         digest.addU32(tick);
         for (unsigned i = 0; i < 3; ++i) {
@@ -39,7 +39,7 @@ inline GemVerificationResult verifyGemSimulation() {
                 if (!wasAttracted && gems[i].attracted) coverage |= 4;
                 if (terrainHit) coverage |= 8;
                 if (!alive[i]) coverage |= 16;
-                if (alive[i] && gems[i].lifetime.age > 310) coverage |= 32;
+                if (alive[i] && gems[i].lifetime.age > GemLifetime::expiryAge) coverage |= 32;
                 digest.addBool(gems[i].collectible(targetX, targetY, i == 1));
             }
             digest.addBool(alive[i]);
@@ -77,7 +77,7 @@ inline GemVerificationResult verifyGemSimulation() {
     }
     const bool streakExpired = account.timer == 0 && account.streak == 0;
     GemMotion expired;
-    expired.lifetime.age = 309;
+    expired.lifetime.age = GemLifetime::expiryAge-1;
     const auto retired = stepCurrency(expired, true, 10, 0, 0, 0, 0, account, solid, random);
     digest.addU32(static_cast<unsigned>(retired));
     const bool noPostExpiryCredit = retired == CurrencyStepResult::expired && account.currency == 2;
